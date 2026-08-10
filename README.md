@@ -1,4 +1,4 @@
-# ![Sable](src/lib/assets/res/svg/logo.svg) Sable Next
+# <img src="src/lib/assets/res/svg/logo.svg" alt="Sable" width="32" height="32"> Sable Next
 
 A from-scratch rewrite of [Sable](https://github.com/SableClient/Sable), with Svelte and Rust.
 
