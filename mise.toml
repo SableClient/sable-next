@@ -118,6 +118,6 @@ run = ["command -v pod >/dev/null 2>&1 || brew install cocoapods", "pnpm tauri i
 description = "Install Visual Studio Build Tools + WebView2 runtime"
 confirm = { message = "Install Visual Studio Build Tools and WebView2 runtime? (required for Tauri)", default = "no" }
 run = [
-  "winget install --id Microsoft.VisualStudio.BuildTools --source winget --force --override '--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.Windows11SDK.26100 --addProductLang En-us'",
+  "winget install --id Microsoft.VisualStudio.BuildTools --source winget --force --override \"--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.Windows11SDK.26100 --addProductLang En-us\"",
   "winget install --id Microsoft.EdgeWebView2Runtime --source winget",
 ]

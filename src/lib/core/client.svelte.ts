@@ -1,0 +1,136 @@
+import type { CoreEvent } from '@/generated/CoreEvent';
+import type { SessionInfo } from '@/generated/SessionInfo';
+
+import { createTransport } from '../../transport/create';
+import type { Transport } from '../../transport';
+
+export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'ready' | 'error';
+export type CoreSession = Pick<SessionInfo, 'user_id'> & Partial<Pick<SessionInfo, 'device_id'>>;
+
+export class CoreClient {
+  status = $state<CoreStatus>('idle');
+  session = $state<CoreSession | null>(null);
+
+  private transport: Transport | null = null;
+  private unsubscribe: (() => void) | null = null;
+  private startPromise: Promise<void> | null = null;
+  private generation = 0;
+
+  async start(): Promise<void> {
+    if (this.startPromise) return this.startPromise;
+
+    const promise = this.startTransport();
+    this.startPromise = promise;
+
+    try {
+      await promise;
+    } finally {
+      if (this.startPromise === promise) this.startPromise = null;
+    }
+  }
+
+  async login(homeserver: string, username: string, password: string): Promise<void> {
+    let transport: Transport;
+    try {
+      transport = this.ensureTransport();
+    } catch (error) {
+      this.status = 'error';
+      throw error;
+    }
+
+    const generation = ++this.generation;
+    this.status = 'starting';
+    this.session = null;
+
+    try {
+      const response = await transport.send({
+        type: 'login',
+        homeserver,
+        username,
+        password,
+      });
+
+      if (generation !== this.generation || transport !== this.transport) return;
+
+      this.session = { user_id: response.user_id };
+      this.status = 'ready';
+    } catch (error) {
+      if (generation === this.generation && transport === this.transport) {
+        this.status = 'error';
+      }
+      throw error;
+    }
+  }
+
+  stop(): void {
+    this.generation += 1;
+    this.startPromise = null;
+    this.cleanupTransport();
+    this.session = null;
+    this.status = 'idle';
+  }
+
+  private async startTransport(): Promise<void> {
+    const generation = ++this.generation;
+    this.status = 'starting';
+
+    try {
+      const transport = this.ensureTransport();
+      const response = await transport.send({ type: 'restore' });
+      if (generation !== this.generation) return;
+
+      if (response.session) {
+        this.session = response.session;
+        this.status = 'ready';
+      } else {
+        this.session = null;
+        this.status = 'signed-out';
+      }
+    } catch {
+      if (generation !== this.generation) return;
+
+      this.session = null;
+      this.status = 'error';
+      this.cleanupTransport();
+    }
+  }
+
+  private ensureTransport(): Transport {
+    if (this.transport) return this.transport;
+
+    const transport = createTransport();
+    this.transport = transport;
+    this.unsubscribe = transport.subscribe(this.handleEvent);
+    return transport;
+  }
+
+  private readonly handleEvent = (event: CoreEvent): void => {
+    if (event.type !== 'session_ended') return;
+
+    this.session = null;
+    this.status = 'signed-out';
+  };
+
+  private cleanupTransport(): void {
+    const unsubscribe = this.unsubscribe;
+    const transport = this.transport;
+    this.unsubscribe = null;
+    this.transport = null;
+
+    try {
+      unsubscribe?.();
+    } catch {
+      // Cleanup should continue even if a transport subscription fails.
+    }
+
+    try {
+      transport?.close();
+    } catch {
+      // Closing an already-closed transport is safe to ignore.
+    }
+  }
+}
+
+export function createCoreClient(): CoreClient {
+  return new CoreClient();
+}

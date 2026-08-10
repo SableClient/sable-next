@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, Combobox, Label, Switch, Tooltip } from 'bits-ui';
+  import { Button, Combobox, Label, Tooltip } from 'bits-ui';
   import logo from '$lib/assets/res/svg/logo.svg';
   import { useCoreClient } from '$lib/core/context';
 
@@ -9,7 +9,6 @@
   let homeserver = $state(homeservers[0]);
   let username = $state('');
   let password = $state('');
-  let slidingSync = $state(true);
   let loginError = $state<string | null>(null);
   let isStarting = $derived(core.status === 'starting');
 
@@ -84,22 +83,6 @@
                 </Combobox.Content>
               </Combobox.Portal>
             </Combobox.Root>
-          </div>
-          <div class="sliding-sync">
-            <div>
-              <Label.Root for="sliding-sync">Use sliding sync</Label.Root>
-              <Tooltip.Root>
-                <Tooltip.Trigger class="info" aria-label="About sliding sync">i</Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content class="tooltip" sideOffset={6}>
-                    Sliding sync is faster and uses less bandwidth, but it can be buggier.
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </div>
-            <Switch.Root id="sliding-sync" bind:checked={slidingSync} class="sync-switch">
-              <Switch.Thumb class="sync-thumb" />
-            </Switch.Root>
           </div>
           <div class="field">
             <Label.Root for="username">Username</Label.Root>
@@ -260,19 +243,6 @@
 
   :global(.homeserver-option[data-highlighted]) {
     background: var(--sable-surface-container-hover);
-  }
-
-  .sliding-sync {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    margin-top: -1.25rem;
-  }
-
-  .sliding-sync > div {
-    align-items: center;
-    display: flex;
-    gap: 0.375rem;
   }
 
   :global(.info) {
