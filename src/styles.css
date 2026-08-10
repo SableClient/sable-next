@@ -1,0 +1,80 @@
+@import '@fontsource-variable/geist';
+
+/* Palette lifted verbatim from Sable's src/app/styles/themes.css so the two
+   apps read as the same product. These stay plain CSS rather than a generated
+   vanilla-extract theme because light and dark are switched by toggling `.dark`
+   on <html> at runtime; `src/styles/theme.css.ts` is the typed contract over
+   them. */
+:root {
+  --sable-bg-container: #ffffff;
+  --sable-bg-container-hover: #f4f4f5;
+  --sable-bg-container-active: #e4e4e7;
+  --sable-bg-container-line: #d4d4d8;
+  --sable-bg-on-container: #18181b;
+
+  --sable-surface-container: #f4f4f5;
+  --sable-surface-container-hover: #ffffff;
+  --sable-surface-container-active: #e4e4e7;
+  --sable-surface-container-line: #d4d4d8;
+  --sable-surface-on-container: #18181b;
+
+  --sable-primary-main: #6e56cf;
+  --sable-primary-main-hover: #644ec1;
+  --sable-primary-on-main: #ffffff;
+  --sable-primary-container: #ded9e6;
+  --sable-primary-on-container: #2d235c;
+
+  --sable-sec-on-container: #2d235c;
+  --sable-critical-main: #d6409f;
+
+  --background: var(--sable-bg-container);
+  --foreground: var(--sable-bg-on-container);
+  --card: var(--sable-surface-container);
+  --card-foreground: var(--sable-surface-on-container);
+  --popover: var(--sable-bg-container);
+  --popover-foreground: var(--sable-bg-on-container);
+  --primary: var(--sable-primary-main);
+  --primary-foreground: var(--sable-primary-on-main);
+  --secondary: var(--sable-surface-container);
+  --secondary-foreground: var(--sable-surface-on-container);
+  --muted: var(--sable-surface-container);
+  --muted-foreground: #71717a;
+  --accent: var(--sable-bg-container-hover);
+  --accent-foreground: var(--sable-bg-on-container);
+  --destructive: var(--sable-critical-main);
+  --border: var(--sable-bg-container-line);
+  --input: var(--sable-bg-container-line);
+  --ring: var(--sable-primary-main);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --sable-bg-container: #1b1a21;
+  --sable-bg-container-hover: #24232c;
+  --sable-bg-container-active: #2d2c36;
+  --sable-bg-container-line: #363541;
+  --sable-bg-on-container: #eae8f0;
+
+  --sable-surface-container: #24232c;
+  --sable-surface-container-hover: #2d2c36;
+  --sable-surface-container-active: #363541;
+  --sable-surface-container-line: #403f4c;
+  --sable-surface-on-container: #eae8f0;
+
+  --sable-primary-main: #bdb6ec;
+  --sable-primary-main-hover: #a9a1e6;
+  --sable-primary-on-main: #1b1a21;
+  --sable-primary-container: #2d235c;
+  --sable-primary-on-container: #e3e1f7;
+
+  --sable-sec-on-container: #eae8f0;
+  --sable-critical-main: #f65cb6;
+
+  --muted-foreground: #9992ac;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+  }
+}

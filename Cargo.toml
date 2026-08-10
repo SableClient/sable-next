@@ -1,0 +1,26 @@
+[workspace]
+members = ["crates/*", "src-tauri"]
+# sable-wasm only compiles for wasm32 - its session store holds JS functions,
+# which are not Send. Build it with `-p sable-wasm --target wasm32-unknown-unknown`.
+default-members = ["crates/sable-core", "src-tauri"]
+resolver = "3"
+
+[workspace.dependencies]
+matrix-sdk = { version = "0.18", default-features = false, features = ["e2e-encryption"] }
+matrix-sdk-ui = "0.18"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "fs"] }
+futures-util = "0.3"
+tracing = "0.1"
+url = "2"
+ts-rs = "12"
+
+# The wasm bundle is the web build's dominant cost, so the release profile
+# optimises for size rather than speed.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

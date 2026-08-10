@@ -1,0 +1,6 @@
+allowBuilds:
+  wasm-pack: true
+  esbuild: true
+  lightningcss: true
+onlyBuiltDependencies:
+  - esbuild

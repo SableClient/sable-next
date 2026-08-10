@@ -1,0 +1,31 @@
+[package]
+name = "sable-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+
+[dependencies]
+matrix-sdk = { workspace = true }
+matrix-sdk-ui = { workspace = true }
+mime = "0.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures-util = { workspace = true }
+tracing = { workspace = true }
+ts-rs = { workspace = true }
+url = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+matrix-sdk = { workspace = true, features = ["sqlite", "automatic-room-key-forwarding"] }
+tokio = { workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+matrix-sdk = { workspace = true, features = ["indexeddb", "js"] }
+matrix-sdk-ui = { workspace = true, features = ["js"] }
+tokio = { version = "1", default-features = false, features = ["sync", "macros"] }
+wasm-bindgen-futures = "0.4"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

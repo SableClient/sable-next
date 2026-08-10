@@ -1,0 +1,9 @@
+[env]
+# ts-rs resolves this relative to each crate `relative = true` pins it to the
+# workspace root instead, so `cargo test export_bindings` writes to one place.
+TS_RS_EXPORT_DIR = { value = "src/generated", relative = true }
+
+# getrandom 0.3 refuses wasm32-unknown-unknown unless told which backend to use;
+# the feature below is necessary but not sufficient without this flag.
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

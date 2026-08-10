@@ -1,0 +1,72 @@
+experiment
+dist
+coverage
+node_modules
+devAssets
+.svelte-kit
+
+.DS_Store
+.idea
+*.code-workspace
+.env
+
+.wrangler
+.dev.vars*
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfbackend
+!*.tfbackend.example
+crash.log
+build.sh
+
+# the following line was added with the "git ignore" tool by itsrye.dev, version 0.1.0
+.lh
+
+# Tauri
+/build
+/target/
+/gen/schemas
+dist-js
+
+# Gradle / Android build artifacts
+**/android/build/
+**/android/.tauri/
+**/android/.gradle/
+**/.gradle/
+
+# Rust build artifacts
+src-tauri/target/
+# Tauri Android build outputs
+src-tauri/gen/android/app/build/
+# Tauri Apple outputs
+src-tauri/gen/apple/*
+!src-tauri/gen/apple/PrivacyInfo.xcprivacy
+# Tauri Android release keystore
+*.jks
+
+# Tauri-typegen cache
+.typecache
+
+# Worktrees
+.worktrees
+
+# the following line was added with nvim by Shea because its annoying to clear every so often
+.vscode/bookmarks.json
+
+# Playwright visual regression
+/test-results
+/playwright-report
+/blob-report
+/tests/e2e/.auth
+
+# Nix things
+## nix build output
+result
+## direnv config + local state
+.envrc
+.direnv
+## auto-generated pre-commit config
+.pre-commit-config.yaml
