@@ -1,42 +1,39 @@
-# sv
+# ![Sable](src/lib/assets/res/svg/logo.svg) Sable Next
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A from-scratch rewrite of [Sable](https://github.com/SableClient/Sable), with Svelte and Rust.
 
-## Creating a project
+Join the Matrix space at [#sable:sable.moe](https://matrix.to/#/#sable:sable.moe) to discuss the project and meowing.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Getting started
 
-```sh
-# create a new project
-npx sv create my-app
+[mise](https://mise.jdx.dev) manages Node, pnpm, Rust, and other tooling.
+
+```bash
+mise install
+mise run setup    # pnpm install + git pre-commit hook
+mise run dev      # SvelteKit on http://localhost:3000
 ```
 
-To recreate this project with the same configuration:
+Run `mise tasks` for the full list.
 
-```sh
-# recreate this project
-pnpm dlx sv@0.17.0 create --template minimal --types ts --install pnpm .
+## Apps (Tauri)
+
+Native builds use [Tauri](https://v2.tauri.app). Targets: **Windows**, **macOS**, **Linux**, **Android**, and **iOS**.
+
+```bash
+mise run tauri:setup          # Shared Rust/system dependencies, including Linux packages
+mise run tauri:icons          # Regenerate native icons after changing the logo SVG
+mise run tauri dev            # Run the app for the current desktop OS
+mise run tauri:setup:windows  # Windows: Visual Studio Build Tools + WebView2
+mise run tauri:setup:macos    # macOS: Xcode
+mise run tauri:setup:android  # Android: SDK packages + NDK
+mise run tauri:setup:ios      # iOS: Xcode project + CocoaPods (macOS)
 ```
 
-## Developing
+## Contributing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```sh
-npm run dev
+## License
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+[AGPL-3.0-only](LICENSE), with an [additional permission](LICENSE) for App Store executables under MPL 2.0. The Sable name and logo are covered by [TRADEMARKS.md](TRADEMARKS.md).

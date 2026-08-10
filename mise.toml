@@ -1,0 +1,123 @@
+min_version = '2026.7.11'
+
+[env]
+_.path = ["{{config_root}}/node_modules/.bin"]
+NODE_OPTIONS = "--max-old-space-size=4192"
+
+[settings]
+idiomatic_version_file_enable_tools = ["pnpm", "node", "rust"]
+minimum_release_age = "1d"
+experimental = true
+
+[task_config]
+includes = ["scripts"]
+
+[tools]
+"aqua:wasm-bindgen/wasm-pack" = "0.13.1"
+
+[tasks.setup]
+description = "Install mise tools, pnpm dependencies, and git hooks"
+run = ["mise install", "pnpm install", { task = "hooks" }]
+sources = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'mise.toml']
+outputs = ['node_modules/.pnpm/lock.yaml']
+
+[tasks.hooks]
+description = "Install the git pre-commit hook (runs `mise run pre-commit`)"
+run = "mise generate git-pre-commit --write --task=pre-commit"
+
+[tasks.dev]
+description = "Start SvelteKit dev server (port 3000 for Tauri)"
+alias = "d"
+run = "vite dev --port 3000"
+raw = true
+
+[tasks.build]
+description = "Build frontend with Vite"
+alias = "b"
+run = "vite build"
+
+[tasks.preview]
+description = "Preview the production build"
+alias = "p"
+run = "vite preview"
+
+[tasks.format]
+description = "Format frontend and project config with Oxfmt"
+alias = "fmt"
+run = "pnpm fmt"
+
+[tasks.check]
+description = "Type-check frontend and lint Rust (fmt + clippy)"
+alias = ["c", "lint"]
+run = [
+  "pnpm fmt:check",
+  "pnpm check",
+  "cargo fmt --check",
+  "cargo clippy --locked --all-targets -- -D warnings",
+]
+
+[tasks.test]
+description = "Run Rust tests"
+alias = "t"
+run = "cargo test --locked"
+raw = true
+
+[tasks.ci]
+description = "Full local CI: check + test"
+run = [{ task = "check" }, { task = "test" }]
+
+[tasks.fix]
+description = "Auto-fix Rust formatting"
+alias = "f"
+run = "cargo fmt"
+
+[tasks."generate:types"]
+description = "Regenerate TypeScript bindings from Rust (ts-rs)"
+run = "cargo test -p sable-core export_bindings -- --nocapture"
+
+[tasks."wasm:build"]
+description = "Build the WASM core for the web client"
+alias = ["wasm", "wb"]
+run = "wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release"
+
+[tasks.pre-commit]
+description = "Pre-commit checks (installed via `mise run hooks`)"
+hide = true
+run = { task = "check" }
+
+[tasks."tauri:icons"]
+description = "Generate native app icons from the canonical Sable SVG"
+run = "pnpm tauri icon src/lib/assets/res/svg/logo.svg --output src-tauri/icons"
+
+[tasks."tauri:setup"]
+description = "Install Tauri tools and system packages"
+run = ["mise install", "mise bootstrap packages apply --yes --update"]
+env = { MISE_ENV = "tauri" }
+
+[tasks."tauri:setup:android"]
+description = "Install Android SDK packages + NDK (no Android Studio needed)"
+depends = ["tauri:setup"]
+env = { MISE_ENV = "tauri" }
+run = [
+  "yes | sdkmanager --licenses",
+  'sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;{{env.ANDROID_NDK_VERSION}}"',
+]
+
+[tasks."tauri:setup:macos"]
+description = "Install Xcode"
+confirm = { message = "Install Xcode? (required for Tauri)", default = "no" }
+run = "xcode-select --print-path >/dev/null 2>&1 || xcode-select --install"
+
+[tasks."tauri:setup:ios"]
+description = "Set up iOS Xcode project"
+depends = ["tauri:setup:macos"]
+confirm = { message = "Set up iOS Xcode project? (required for Tauri)", default = "no" }
+run = ["command -v pod >/dev/null 2>&1 || brew install cocoapods", "pnpm tauri ios init"]
+
+[tasks."tauri:setup:windows"]
+description = "Install Visual Studio Build Tools + WebView2 runtime"
+confirm = { message = "Install Visual Studio Build Tools and WebView2 runtime? (required for Tauri)", default = "no" }
+run = [
+  "winget install --id Microsoft.VisualStudio.BuildTools --source winget --force --override '--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.Windows11SDK.26100 --addProductLang En-us'",
+  "winget install --id Microsoft.EdgeWebView2Runtime --source winget",
+]

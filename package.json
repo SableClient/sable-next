@@ -1,7 +1,7 @@
 {
   "name": "sable-next",
-  "private": true,
   "version": "0.0.1",
+  "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -10,16 +10,10 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
-  },
-  "devDependencies": {
-    "@sveltejs/adapter-auto": "^7.0.1",
-    "@sveltejs/kit": "^2.63.0",
-    "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "svelte": "^5.56.1",
-    "svelte-check": "^4.6.0",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@fontsource-variable/nunito": "5.2.7",
@@ -31,5 +25,23 @@
     "i18next": "^26.3.6",
     "i18next-browser-languagedetector": "^8.2.1",
     "svelte-i18next": "^2.2.2"
-  }
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/kit": "^2.63.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tauri-apps/cli": "2.11.4",
+    "oxfmt": "^0.63.0",
+    "svelte": "^5.56.1",
+    "svelte-check": "^4.6.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.x"
+    }
+  },
+  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
 }
