@@ -1265,8 +1265,12 @@ impl Core {
 
         let authorization_url = data.url.to_string();
         let mut pending = self.pending_login.lock().await;
-        if pending.is_some() {
+        if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _))) {
             return Err(CommandErr::Unavailable);
+        }
+
+        if pending.is_some() {
+            tracing::warn!("replacing unfinished OIDC login with a new attempt");
         }
         *pending = Some(PendingLogin::Oidc(homeserver, client));
 
@@ -1277,24 +1281,25 @@ impl Core {
         self: &Arc<Self>,
         callback_url: String,
     ) -> Result<CommandOk, CommandErr> {
+        let url = Url::parse(&callback_url)
+            .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
+
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Oidc(_, _)) = pending.as_ref() else {
+        let Some(PendingLogin::Oidc(_, client)) = pending.as_ref() else {
             tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
-        let Some(PendingLogin::Oidc(homeserver, client)) = pending.take() else {
-            return Err(CommandErr::Unavailable);
-        };
-        drop(pending);
-
-        let url = Url::parse(&callback_url)
-            .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
 
         client
             .oauth()
             .finish_login(url.into())
             .await
             .map_err(|error| self.failed("complete_oidc_login", error))?;
+
+        let Some(PendingLogin::Oidc(homeserver, client)) = pending.take() else {
+            return Err(CommandErr::Unavailable);
+        };
+        drop(pending);
 
         let full = client
             .oauth()

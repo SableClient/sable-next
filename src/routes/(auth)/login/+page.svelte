@@ -100,7 +100,7 @@
 
     const callbackUrl = window.location.href;
     if (!isTauri() && redirectLoginType(callbackUrl)) {
-      callbackChannel = new BroadcastChannel(`sable-auth-callback:${window.name}`);
+      callbackChannel = new BroadcastChannel(callbackChannelName(callbackUrl));
       callbackChannel.postMessage(callbackUrl);
       window.setTimeout(() => {
         window.close();
@@ -159,6 +159,12 @@
     return new URL(window.location.pathname, window.location.origin).toString();
   }
 
+  function callbackChannelName(callbackUrl: string): string {
+    const url = new URL(callbackUrl);
+    const state = url.searchParams.get('state');
+    return state ? `sable-auth-callback:${state}` : `sable-auth-callback:${window.name}`;
+  }
+
   async function completeRedirectLogin(callbackUrl: string): Promise<void> {
     if (isCompletingLogin) return;
     const loginType = redirectLoginType(callbackUrl);
@@ -190,21 +196,7 @@
       loginError = t('auth.allowPopups');
       return;
     }
-    if (popup) popup.opener = null;
-
     let authChannel: BroadcastChannel | undefined;
-    if (popup) {
-      const channel = new BroadcastChannel(`sable-auth-callback:${popupName}`);
-      authChannel = channel;
-      authChannels.add(channel);
-      channel.onmessage = (event: MessageEvent<unknown>) => {
-        if (typeof event.data === 'string' && redirectLoginType(event.data)) {
-          void completeRedirectLogin(event.data);
-          channel.close();
-          authChannels.delete(channel);
-        }
-      };
-    }
 
     isLaunchingLogin = true;
     loginError = null;
@@ -229,6 +221,16 @@
           throw new CoreError(error as CommandErr);
         }
       } else if (popup) {
+        const channel = new BroadcastChannel(callbackChannelName(authorizationUrl));
+        authChannel = channel;
+        authChannels.add(channel);
+        channel.onmessage = (event: MessageEvent<unknown>) => {
+          if (typeof event.data === 'string' && redirectLoginType(event.data)) {
+            void completeRedirectLogin(event.data);
+            channel.close();
+            authChannels.delete(channel);
+          }
+        };
         popup.location.replace(authorizationUrl);
       }
     } catch (error) {
