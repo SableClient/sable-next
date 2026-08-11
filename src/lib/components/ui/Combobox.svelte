@@ -24,6 +24,7 @@
     ariaInvalid?: boolean;
     oninput?: HTMLInputAttributes['oninput'];
     onblur?: HTMLInputAttributes['onblur'];
+    onvaluechange?: (value: string) => void;
   };
 
   let {
@@ -40,6 +41,7 @@
     ariaInvalid = false,
     oninput,
     onblur,
+    onvaluechange,
   }: Props = $props();
 
   let searchValue = $state('');
@@ -67,6 +69,7 @@
   bind:value
   {required}
   onOpenChange={handleOpenChange}
+  onValueChange={onvaluechange}
   allowDeselect={false}
   {disabled}
 >

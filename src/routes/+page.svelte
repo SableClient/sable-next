@@ -11,8 +11,10 @@
   import { invoke, isTauri } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { onMount } from 'svelte';
+  import CaretDownIcon from 'phosphor-icons-svelte/IconCaretDownRegular.svelte';
   import EyeIcon from 'phosphor-icons-svelte/IconEyeRegular.svelte';
   import EyeSlashIcon from 'phosphor-icons-svelte/IconEyeSlashRegular.svelte';
+  import { cubicOut } from 'svelte/easing';
   import { prefersReducedMotion } from 'svelte/motion';
   import { fade } from 'svelte/transition';
 
@@ -33,15 +35,46 @@
   let isCheckingHomeserver = $state(false);
   let validationGeneration = 0;
   let observedHomeserver = homeservers[0];
+  let hasInitializedHomeserver = $state(false);
   let isLaunchingLogin = $state(false);
   let isCompletingLogin = false;
   let isAuthenticating = $derived(core.status === 'authenticating');
   let hasLoggedInBefore = $state(false);
 
   let showPassword = $state(false);
+  let showAllLoginMethods = $state(false);
+
+  type LoginMethod = 'oidc' | 'sso' | 'password';
+  const loginMethodOrder: LoginMethod[] = ['oidc', 'sso', 'password'];
+  let preferredLoginMethod = $derived.by(() => {
+    const flows = loginFlows;
+    if (!flows) return null;
+    if (flows.oauth_aware_preferred && flows.sso) return 'sso';
+    return loginMethodOrder.find((method) => flows[method]) ?? null;
+  });
+  let availableLoginMethodCount = $derived.by(() => {
+    const flows = loginFlows;
+    if (!flows) return 0;
+    return loginMethodOrder.filter((method) => flows[method]).length;
+  });
+  let firstAvailableLoginMethod = $derived.by(() => {
+    const flows = loginFlows;
+    if (!flows) return null;
+    return loginMethodOrder.find((method) => flows[method]) ?? null;
+  });
+  let isPasswordLoginVisible = $derived(
+    loginFlows?.password === true && (showAllLoginMethods || preferredLoginMethod === 'password')
+  );
 
   $effect(() => {
     if (homeserver !== observedHomeserver) clearHomeserverValidation();
+  });
+
+  $effect(() => {
+    if (core.status !== 'signed-out' || hasInitializedHomeserver) return;
+
+    hasInitializedHomeserver = true;
+    void validateHomeserver();
   });
 
   onMount(() => {
@@ -178,6 +211,7 @@
     validationGeneration += 1;
     validatedHomeserver = null;
     loginFlows = null;
+    showAllLoginMethods = false;
     isCheckingHomeserver = false;
     loginError = null;
     if (invalidField === 'homeserver') {
@@ -286,6 +320,34 @@
       loginError = authenticationError(error);
     }
   }
+
+  function smoothSlide(node: HTMLElement, { duration }: { duration: number }) {
+    const style = getComputedStyle(node);
+    const height = parseFloat(style.height);
+    const paddingTop = parseFloat(style.paddingTop);
+    const paddingBottom = parseFloat(style.paddingBottom);
+    const marginTop = parseFloat(style.marginTop);
+    const marginBottom = parseFloat(style.marginBottom);
+    const borderTopWidth = parseFloat(style.borderTopWidth);
+    const borderBottomWidth = parseFloat(style.borderBottomWidth);
+
+    return {
+      duration,
+      easing: cubicOut,
+      css: (t: number) => `
+        overflow: hidden;
+        opacity: ${String(t)};
+        height: ${String(t * height)}px;
+        padding-top: ${String(t * paddingTop)}px;
+        padding-bottom: ${String(t * paddingBottom)}px;
+        margin-top: ${String(t * marginTop)}px;
+        margin-bottom: ${String(t * marginBottom)}px;
+        border-top-width: ${String(t * borderTopWidth)}px;
+        border-bottom-width: ${String(t * borderBottomWidth)}px;
+        min-height: 0;
+      `,
+    };
+  }
 </script>
 
 <svelte:head>
@@ -339,6 +401,11 @@
               oninput={() => {
                 clearHomeserverValidation();
               }}
+              onvaluechange={(selectedHomeserver: string) => {
+                homeserver = selectedHomeserver;
+                clearHomeserverValidation();
+                void validateHomeserver();
+              }}
               onblur={() => {
                 void validateHomeserver();
               }}
@@ -351,8 +418,59 @@
             {/if}
           </div>
 
-          {#if loginFlows?.password}
-            <div class="login-method">
+          {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
+            <div
+              class="login-method"
+              class:method-divider={showAllLoginMethods && firstAvailableLoginMethod !== 'oidc'}
+              transition:smoothSlide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
+            >
+              <div class="actions">
+                <Button
+                  disabled={isAuthenticating || isLaunchingLogin}
+                  onclick={() => void launchRedirectLogin('oidc')}
+                >
+                  {isLaunchingLogin ? 'Opening…' : 'Sign in with homeserver'}
+                </Button>
+              </div>
+            </div>
+          {/if}
+
+          {#if loginFlows?.sso && (showAllLoginMethods || preferredLoginMethod === 'sso')}
+            <div
+              class="login-method"
+              class:method-divider={showAllLoginMethods && firstAvailableLoginMethod !== 'sso'}
+              transition:smoothSlide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
+            >
+              {#if loginFlows.sso_identity_providers.length > 0}
+                <div class="actions sso-actions">
+                  {#each loginFlows.sso_identity_providers as provider (provider.id)}
+                    <Button
+                      disabled={isAuthenticating || isLaunchingLogin}
+                      onclick={() => void launchRedirectLogin('sso', provider.id)}
+                    >
+                      Sign in with {provider.name}
+                    </Button>
+                  {/each}
+                </div>
+              {:else}
+                <div class="actions">
+                  <Button
+                    disabled={isAuthenticating || isLaunchingLogin}
+                    onclick={() => void launchRedirectLogin('sso')}
+                  >
+                    {isLaunchingLogin ? 'Opening…' : 'Sign in with SSO'}
+                  </Button>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
+            <div
+              class="login-method"
+              class:method-divider={showAllLoginMethods && firstAvailableLoginMethod !== 'password'}
+              transition:smoothSlide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
+            >
               <div class="field">
                 <Label for="username">Username</Label>
                 <TextInput
@@ -434,47 +552,33 @@
             </div>
           {/if}
 
-          {#if loginFlows?.oidc}
-            <div class="login-method">
-              <div class="actions">
-                <Button
-                  disabled={isAuthenticating || isLaunchingLogin}
-                  onclick={() => void launchRedirectLogin('oidc')}
-                >
-                  {isLaunchingLogin ? 'Opening…' : 'Sign in with OpenID Connect'}
-                </Button>
-              </div>
-            </div>
+          {#if availableLoginMethodCount > 1}
+            <button
+              class="method-toggle"
+              type="button"
+              aria-expanded={showAllLoginMethods}
+              onclick={() => {
+                showAllLoginMethods = !showAllLoginMethods;
+              }}
+            >
+              <span
+                >{showAllLoginMethods ? 'Hide other ways to sign in' : 'More ways to sign in'}</span
+              >
+              <span
+                class:expanded={showAllLoginMethods}
+                class="method-toggle-icon"
+                aria-hidden="true"
+              >
+                <CaretDownIcon />
+              </span>
+            </button>
           {/if}
 
-          {#if loginFlows?.sso}
-            <div class="login-method">
-              {#if loginFlows.sso_identity_providers.length > 0}
-                <div class="actions sso-actions">
-                  {#each loginFlows.sso_identity_providers as provider (provider.id)}
-                    <Button
-                      disabled={isAuthenticating || isLaunchingLogin}
-                      onclick={() => void launchRedirectLogin('sso', provider.id)}
-                    >
-                      Sign in with {provider.name}
-                    </Button>
-                  {/each}
-                </div>
-              {:else}
-                <div class="actions">
-                  <Button
-                    disabled={isAuthenticating || isLaunchingLogin}
-                    onclick={() => void launchRedirectLogin('sso')}
-                  >
-                    {isLaunchingLogin ? 'Opening…' : 'Sign in with single sign-on'}
-                  </Button>
-                </div>
-              {/if}
-            </div>
-          {/if}
-
-          {#if !loginFlows?.password}
-            <div class="submit-area">
+          {#if !loginFlows || (!isPasswordLoginVisible && (fieldError || loginError || core.status === 'error'))}
+            <div
+              class="submit-area"
+              transition:smoothSlide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
+            >
               <div class="error-slot" aria-live="polite">
                 {#if fieldError || loginError || core.status === 'error'}
                   <p class="error">{fieldError ?? loginError ?? 'Unable to start Sable.'}</p>
@@ -494,6 +598,14 @@
       {/if}
     </div>
   </section>
+
+  <footer class="auth-footer">
+    <a href="https://github.com/SableClient/sable-next" rel="noreferrer" target="_blank">
+      Source code
+    </a>
+    <span aria-hidden="true">·</span>
+    <span>Powered by <a href="https://matrix.org" rel="noreferrer" target="_blank">Matrix</a></span>
+  </footer>
 </main>
 
 <style>
@@ -502,18 +614,79 @@
   }
 
   .auth-page {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     min-height: 100dvh;
     padding: 2rem 1.5rem;
   }
 
   .auth-content {
     display: grid;
-    grid-template-rows: 1fr auto 1fr;
-    margin: auto;
+    flex: 1 0 auto;
+    grid-template-rows: calc((100dvh - 4rem) / 3) auto;
+    margin: 0 auto;
     max-width: 24rem;
-    min-height: calc(100dvh - 4rem);
     width: 100%;
+  }
+
+  .auth-main {
+    align-self: start;
+    padding-bottom: 3rem;
+  }
+
+  .auth-footer {
+    align-items: center;
+    color: var(--sable-sec-main);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 1rem auto 0;
+  }
+
+  .auth-footer a {
+    color: inherit;
+  }
+
+  .auth-footer a:hover {
+    color: var(--sable-bg-on-container);
+  }
+
+  .method-toggle {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--sable-sec-main);
+    cursor: pointer;
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.5rem;
+    justify-content: center;
+    padding: 0.25rem;
+  }
+
+  .method-toggle:hover {
+    color: var(--sable-bg-on-container);
+  }
+
+  .method-toggle-icon {
+    align-items: center;
+    display: flex;
+  }
+
+  .method-toggle-icon :global(svg) {
+    height: 1rem;
+    width: 1rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .method-toggle-icon {
+      transition: transform var(--motion-normal) ease;
+    }
+
+    .method-toggle-icon.expanded {
+      transform: rotate(180deg);
+    }
   }
 
   .auth-heading {
@@ -555,7 +728,7 @@
   }
 
   .error-slot {
-    min-height: 1.25rem;
+    min-height: 0.75rem;
   }
 
   @keyframes error-in {
@@ -589,9 +762,12 @@
   }
 
   .login-method {
-    border-top: 1px solid var(--sable-surface-container-line);
     display: grid;
     gap: 1.5rem;
+  }
+
+  .method-divider {
+    border-top: 1px solid var(--sable-surface-container-line);
     padding-top: 1.5rem;
   }
 

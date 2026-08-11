@@ -6,6 +6,8 @@
    on <html> at runtime; `src/styles/theme.css.ts` is the typed contract over
    them. */
 html {
+  scrollbar-gutter: stable;
+
   /* Background */
   --sable-bg-container: #fff;
   --sable-bg-container-hover: #f4f4f5;
