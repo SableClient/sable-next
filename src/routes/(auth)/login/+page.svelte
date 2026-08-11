@@ -4,6 +4,13 @@
   import Label from '$lib/ui/primitives/Label.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import logo from '$lib/assets/res/svg/logo.svg';
+  import {
+    callbackChannelName,
+    createRedirectUri,
+    redirectLoginType,
+    scrubbedCallbackPath,
+    type RedirectLoginType,
+  } from '$lib/auth/redirect';
   import { useCoreClient } from '$lib/core/context';
   import { i18n, t } from '$lib/i18n';
   import { goto } from '$app/navigation';
@@ -100,8 +107,9 @@
 
     const callbackUrl = window.location.href;
     if (!isTauri() && redirectLoginType(callbackUrl)) {
-      callbackChannel = new BroadcastChannel(callbackChannelName(callbackUrl));
+      callbackChannel = new BroadcastChannel(callbackChannelName(callbackUrl, window.name));
       callbackChannel.postMessage(callbackUrl);
+      history.replaceState(history.state, '', scrubbedCallbackPath(callbackUrl));
       window.setTimeout(() => {
         window.close();
       }, 0);
@@ -136,33 +144,11 @@
     };
   });
 
-  function redirectLoginType(callbackUrl: string): 'oidc' | 'sso' | null {
-    let url: URL;
-    try {
-      url = new URL(callbackUrl);
-    } catch {
-      return null;
-    }
-
-    if (url.searchParams.has('loginToken')) return 'sso';
-    if (
-      url.searchParams.has('state') &&
-      (url.searchParams.has('code') || url.searchParams.has('error'))
-    ) {
-      return 'oidc';
-    }
-    return null;
-  }
-
-  function redirectUri(): string {
-    if (isTauri()) return 'moe.sable.next://login';
-    return new URL(window.location.pathname, window.location.origin).toString();
-  }
-
-  function callbackChannelName(callbackUrl: string): string {
-    const url = new URL(callbackUrl);
-    const state = url.searchParams.get('state');
-    return state ? `sable-auth-callback:${state}` : `sable-auth-callback:${window.name}`;
+  function redirectUri(loginType: RedirectLoginType): string {
+    const baseUrl = isTauri()
+      ? 'moe.sable.next://login'
+      : new URL(window.location.pathname, window.location.origin).toString();
+    return createRedirectUri(loginType, baseUrl, crypto.randomUUID());
   }
 
   async function completeRedirectLogin(callbackUrl: string): Promise<void> {
@@ -209,10 +195,11 @@
         return;
       }
 
+      const callbackUri = redirectUri(loginType);
       const authorizationUrl =
         loginType === 'oidc'
-          ? await core.startOidcLogin(homeserver.trim(), redirectUri())
-          : await core.startSsoLogin(homeserver.trim(), redirectUri(), identityProviderId);
+          ? await core.startOidcLogin(homeserver.trim(), callbackUri)
+          : await core.startSsoLogin(homeserver.trim(), callbackUri, identityProviderId);
 
       if (isTauri()) {
         try {
@@ -221,7 +208,9 @@
           throw new CoreError(error as CommandErr);
         }
       } else if (popup) {
-        const channel = new BroadcastChannel(callbackChannelName(authorizationUrl));
+        const channel = new BroadcastChannel(
+          callbackChannelName(loginType === 'oidc' ? authorizationUrl : callbackUri, popup.name)
+        );
         authChannel = channel;
         authChannels.add(channel);
         channel.onmessage = (event: MessageEvent<unknown>) => {

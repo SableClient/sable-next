@@ -6,6 +6,7 @@
     ".svelte-kit/non-ambient.d.ts",
     ".svelte-kit/types/**/$types.d.ts",
     "vite.config.ts",
+    "vitest.config.ts",
     "oxfmt.config.ts",
     "src/app.d.ts",
     "src/**/*.svelte",

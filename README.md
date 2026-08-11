@@ -18,6 +18,10 @@ mise run setup    # pnpm install + git pre-commit hook
 mise run dev      # SvelteKit on http://localhost:3000
 ```
 
+`mise run dev` builds the development WASM bundle first. While editing Rust in
+another terminal, run `mise run wasm:watch`; Vite reloads after each regenerated
+bundle. Production builds generate the optimised WASM bundle automatically.
+
 Run `mise tasks` for the full list.
 
 ## Apps (Tauri)

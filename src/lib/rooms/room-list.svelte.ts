@@ -5,6 +5,7 @@ import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
 import { applyDiffs } from '@/transport';
 
+import { bufferSubscription } from '$lib/core/buffered-subscription';
 import type { CoreClient } from '$lib/core/client.svelte';
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
@@ -62,43 +63,30 @@ export class RoomList {
 
   private async startSubscription(): Promise<void> {
     const generation = this.generation;
-    let subscription: SubscriptionId | null = null;
-    const bufferedDiffs: Array<{ subscription: SubscriptionId; diffs: RoomListDiffs }> = [];
-    const unsubscribeEvents = this.core.subscribeEvents((event) => {
-      if (event.type !== 'room_list_diff') return;
-
-      if (subscription === null) {
-        const buffered = bufferedDiffs.find((entry) => entry.subscription === event.subscription);
-        if (buffered) buffered.diffs = [...buffered.diffs, ...event.diffs];
-        else bufferedDiffs.push({ subscription: event.subscription, diffs: event.diffs });
-        return;
-      }
-
-      if (event.subscription === subscription) {
-        this.rooms = applyDiffs(this.rooms, event.diffs);
-      }
-    });
+    const buffered = bufferSubscription<CoreEvent, RoomListDiffs[number], RoomSummary>(
+      (listener) => this.core.subscribeEvents(listener),
+      (event) => (event.type === 'room_list_diff' ? event : null),
+      applyDiffs,
+      (diffs) => (this.rooms = applyDiffs(this.rooms, diffs))
+    );
 
     let response;
     try {
       response = await this.core.subscribeRoomList();
     } catch (error) {
-      unsubscribeEvents();
+      buffered.stop();
       throw error;
     }
 
-    subscription = response.subscription;
-
     if (generation !== this.generation) {
-      this.core.unsubscribe(subscription).catch(() => {});
-      unsubscribeEvents();
+      this.core.unsubscribe(response.subscription).catch(() => {});
+      buffered.stop();
       return;
     }
 
-    this.subscription = subscription;
-    const buffered = bufferedDiffs.find((entry) => entry.subscription === subscription);
-    this.rooms = applyDiffs(response.rooms, buffered?.diffs ?? []);
-    this.unsubscribeEvents = unsubscribeEvents;
+    this.subscription = response.subscription;
+    this.rooms = buffered.activate(response.subscription, response.rooms);
+    this.unsubscribeEvents = buffered.stop;
   }
 }
 

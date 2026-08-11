@@ -43,8 +43,8 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --version 0.13.1 --locked
 
-      - name: Build WASM bindings
-        run: wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release
+      - name: Build the web app
+        run: pnpm build
 
       - name: Check Oxfmt formatting
         run: pnpm fmt:check

@@ -47,9 +47,12 @@ impl SessionStore for JsSessionStore {
         })
     }
 
-    fn clear(&self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+    fn clear(&self) -> Pin<Box<dyn Future<Output = Result<(), String>> + '_>> {
         Box::pin(async move {
-            let _ = call(&self.clear, &JsValue::UNDEFINED).await;
+            call(&self.clear, &JsValue::UNDEFINED)
+                .await
+                .map(|_| ())
+                .map_err(|error| format!("{error:?}"))
         })
     }
 }

@@ -3,6 +3,15 @@ const DATABASE_VERSION = 1;
 const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
 
+const MATRIX_DATABASE_NAMES = [
+  'sable-next',
+  'sable-next::matrix-sdk-state',
+  'sable-next::matrix-sdk-crypto',
+  'sable-next::matrix-sdk-crypto-meta',
+  'sable-next::event_cache',
+  'sable-next::media',
+];
+
 let databasePromise: Promise<IDBDatabase> | undefined;
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -102,4 +111,24 @@ export function saveSession(bytes: Uint8Array): Promise<void> {
 
 export function clearSession(): Promise<void> {
   return transaction('readwrite', (store) => store.delete(SESSION_KEY));
+}
+
+function deleteDatabase(name: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.deleteDatabase(name);
+    request.onsuccess = () => {
+      resolve();
+    };
+    request.onerror = () => {
+      reject(request.error ?? new Error(`Could not delete ${name}`));
+    };
+  });
+}
+
+export async function resetWebSession(): Promise<void> {
+  const database = await databasePromise?.catch(() => undefined);
+  database?.close();
+  databasePromise = undefined;
+
+  await Promise.all([DATABASE_NAME, ...MATRIX_DATABASE_NAMES].map(deleteDatabase));
 }

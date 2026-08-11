@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
+  import RoomPage from '$lib/features/room/RoomPage.svelte';
 </script>
 
-<h1>{$i18n.t('nav.direct')}</h1>
+<RoomPage />
