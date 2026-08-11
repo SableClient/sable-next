@@ -20,6 +20,11 @@ export default defineConfig({
       },
 
       // The web build is a client-side app served as Cloudflare Worker assets.
+      // Dynamic app routes are resolved by the client after Cloudflare's SPA
+      // fallback serves the root document
+      prerender: {
+        handleUnseenRoutes: 'ignore',
+      },
       adapter: adapter({
         assets: 'dist',
         pages: 'dist',
