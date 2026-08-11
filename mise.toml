@@ -14,6 +14,7 @@ includes = ["scripts"]
 
 [tools]
 "aqua:wasm-bindgen/wasm-pack" = "0.13.1"
+"aqua:watchexec/watchexec" = "2.5.1"
 
 [tasks.setup]
 description = "Install mise tools, pnpm dependencies, and git hooks"
@@ -26,15 +27,15 @@ description = "Install the git pre-commit hook (runs `mise run pre-commit`)"
 run = "mise generate git-pre-commit --write --task=pre-commit"
 
 [tasks.dev]
-description = "Start SvelteKit dev server (port 3000 for Tauri)"
+description = "Build development WASM and start SvelteKit (port 3000 for Tauri)"
 alias = "d"
-run = "vite dev --port 3000"
+run = "pnpm dev"
 raw = true
 
 [tasks.build]
-description = "Build frontend with Vite"
+description = "Build release WASM and frontend with Vite"
 alias = "b"
-run = "vite build"
+run = "pnpm build"
 
 [tasks.preview]
 description = "Preview the production build"
@@ -87,7 +88,13 @@ run = "cargo test -p sable-core export_bindings -- --nocapture"
 [tasks."wasm:build"]
 description = "Build the WASM core for the web client"
 alias = ["wasm", "wb"]
-run = "wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release"
+run = "pnpm wasm:build"
+
+[tasks."wasm:watch"]
+description = "Rebuild development WASM when Rust sources change"
+alias = "ww"
+run = "pnpm wasm:watch"
+raw = true
 
 [tasks.pre-commit]
 description = "Pre-commit checks (installed via `mise run hooks`)"

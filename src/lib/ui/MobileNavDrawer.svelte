@@ -225,7 +225,7 @@
     background: var(--sable-surface-container);
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   @media (prefers-reduced-motion: no-preference) {

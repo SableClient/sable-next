@@ -3,40 +3,40 @@ import type { JoinRuleView } from "./JoinRuleView";
 import type { RoomTag } from "./RoomTag";
 import type { SubscriptionId } from "./SubscriptionId";
 
-export type Command = { "type": "discover_homeserver", server_name: string, } | { "type": "login", homeserver: string, username: string, password: string, } | { "type": "login_flows", homeserver: string, } | { "type": "start_oidc_login", homeserver: string, redirect_uri: string, } | { "type": "complete_oidc_login", callback_url: string, } | { "type": "start_sso_login", homeserver: string, redirect_uri: string, idp_id: string | null, } | { "type": "complete_sso_login", callback_url: string, } | { "type": "restore" } | { "type": "logout" } | { "type": "subscribe_room_list" } | { "type": "subscribe_timeline", room_id: string, } | { "type": "unsubscribe", subscription: SubscriptionId, } | { "type": "paginate", room_id: string, count: number, } | { "type": "room_members", room_id: string, } | { "type": "user_profile", user_id: string, } | { "type": "send_message", room_id: string, body: string, formatted: string | null, 
+export type Command = { "type": "discover_homeserver", server_name: string, } | { "type": "login", homeserver: string, username: string, password: string, } | { "type": "login_flows", homeserver: string, } | { "type": "start_oidc_login", homeserver: string, redirect_uri: string, } | { "type": "complete_oidc_login", callback_url: string, } | { "type": "start_sso_login", homeserver: string, redirect_uri: string, idp_id: string | null, } | { "type": "complete_sso_login", callback_url: string, } | { "type": "restore" } | { "type": "logout" } | { "type": "subscribe_room_list" } | { "type": "subscribe_timeline", room_id: string, event_id: string | null, } | { "type": "unsubscribe", subscription: SubscriptionId, } | { "type": "paginate", subscription: SubscriptionId, count: number, } | { "type": "room_members", room_id: string, } | { "type": "user_profile", user_id: string, } | { "type": "send_message", room_id: string, body: string, formatted: string | null,
 /**
  * Replying inside a thread needs no extra field: the SDK infers the
  * thread from the replied-to event.
  */
-in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "mark_read", room_id: string, event_id: string, } | { "type": "retry_send", room_id: string, transaction_id: string, } | { "type": "cancel_send", room_id: string, transaction_id: string, } | { "type": "create_room", name: string | null, topic: string | null, is_space: boolean, 
+in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "mark_read", room_id: string, event_id: string, } | { "type": "retry_send", room_id: string, transaction_id: string, } | { "type": "cancel_send", room_id: string, transaction_id: string, } | { "type": "create_room", name: string | null, topic: string | null, is_space: boolean,
 /**
  * Published in the directory, joinable by link.
  */
-public: boolean, 
+public: boolean,
 /**
  * Ignored for a space or a public room.
  */
-encrypted: boolean, invite: string[], 
+encrypted: boolean, invite: string[],
 /**
  * Adds an `m.space.child` edge from this space.
  */
-parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "join_room", 
+parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "join_room",
 /**
  * A room id or an alias. A pasted address could be either.
  */
-address: string, 
+address: string,
 /**
  * Servers to try when the id is not resolvable on ours, or empty.
  */
-via: Array<string>, } | { "type": "leave_room", room_id: string, } | { "type": "invite_user", room_id: string, user_id: string, } | { "type": "encryption_status" } | { "type": "devices" } | { "type": "recover_identity", recovery_key: string, } | { "type": "enable_recovery", 
+via: Array<string>, } | { "type": "leave_room", room_id: string, } | { "type": "invite_user", room_id: string, user_id: string, } | { "type": "encryption_status" } | { "type": "devices" } | { "type": "recover_identity", recovery_key: string, } | { "type": "enable_recovery",
 /**
  * A passphrase to unlock the key with. The key is returned either way.
  */
-passphrase: string | null, } | { "type": "reset_recovery_key", passphrase: string | null, } | { "type": "delete_device", device_id: string, password: string | null, } | { "type": "rename_device", device_id: string, display_name: string, } | { "type": "set_display_name", name: string | null, } | { "type": "set_avatar_url", url: string | null, } | { "type": "set_direct", room_id: string, direct: boolean, } | { "type": "ignore_user", user_id: string, } | { "type": "unignore_user", user_id: string, } | { "type": "set_typing", room_id: string, typing: boolean, } | { "type": "set_room_tag", room_id: string, tag: RoomTag, 
+passphrase: string | null, } | { "type": "reset_recovery_key", passphrase: string | null, } | { "type": "delete_device", device_id: string, password: string | null, } | { "type": "rename_device", device_id: string, display_name: string, } | { "type": "set_display_name", name: string | null, } | { "type": "set_avatar_url", url: string | null, } | { "type": "set_direct", room_id: string, direct: boolean, } | { "type": "ignore_user", user_id: string, } | { "type": "unignore_user", user_id: string, } | { "type": "set_typing", room_id: string, typing: boolean, } | { "type": "set_room_tag", room_id: string, tag: RoomTag,
 /**
  * False removes it.
  */
-set: boolean, } | { "type": "set_room_name", room_id: string, name: string | null, } | { "type": "set_room_topic", room_id: string, topic: string, } | { "type": "set_room_avatar", room_id: string, url: string | null, } | { "type": "set_room_join_rule", room_id: string, rule: JoinRuleView, } | { "type": "send_state_event", room_id: string, event_type: string, state_key: string, content: unknown, } | { "type": "set_user_power_level", room_id: string, user_id: string, power_level: number, } | { "type": "kick_user", room_id: string, user_id: string, reason: string | null, } | { "type": "ban_user", room_id: string, user_id: string, reason: string | null, } | { "type": "unban_user", room_id: string, user_id: string, reason: string | null, } | { "type": "request_verification", user_id: string, } | { "type": "accept_verification", user_id: string, flow_id: string, } | { "type": "confirm_verification", user_id: string, flow_id: string, } | { "type": "cancel_verification", user_id: string, flow_id: string, 
+set: boolean, } | { "type": "set_room_name", room_id: string, name: string | null, } | { "type": "set_room_topic", room_id: string, topic: string, } | { "type": "set_room_avatar", room_id: string, url: string | null, } | { "type": "set_room_join_rule", room_id: string, rule: JoinRuleView, } | { "type": "send_state_event", room_id: string, event_type: string, state_key: string, content: unknown, } | { "type": "set_user_power_level", room_id: string, user_id: string, power_level: number, } | { "type": "kick_user", room_id: string, user_id: string, reason: string | null, } | { "type": "ban_user", room_id: string, user_id: string, reason: string | null, } | { "type": "unban_user", room_id: string, user_id: string, reason: string | null, } | { "type": "request_verification", user_id: string, } | { "type": "accept_verification", user_id: string, flow_id: string, } | { "type": "confirm_verification", user_id: string, flow_id: string, } | { "type": "cancel_verification", user_id: string, flow_id: string,
 /**
  * The emoji differed. An attack signal the other side must be told
  * about. A plain cancel is not.

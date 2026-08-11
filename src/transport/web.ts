@@ -1,15 +1,11 @@
 import type { Command } from '@/generated/Command';
 import type { CommandOk } from '@/generated/CommandOk';
 import type { CoreEvent } from '@/generated/CoreEvent';
+import { resetWebSession } from '@/platform/sessionStorage';
 import type { WorkerMessage, WorkerRequest } from '@/worker/protocol';
 import { CoreError, type ResponseFor, type Transport } from './index';
 
 export function createWebTransport(): Transport {
-  const worker = new SharedWorker(new URL('../worker/core.worker.ts', import.meta.url), {
-    type: 'module',
-    name: 'sable-core',
-  });
-
   const listeners = new Set<(event: CoreEvent) => void>();
   // Which reply belongs to which id is a runtime fact, so it cannot be typed.
   type Reply = CommandOk | Uint8Array<ArrayBuffer> | string | null;
@@ -18,37 +14,69 @@ export function createWebTransport(): Transport {
     { resolve: (value: Reply) => void; reject: (error: unknown) => void }
   >();
   let nextId = 1;
+  let worker: SharedWorker | null = null;
+  let resetPromise: Promise<void> | null = null;
 
-  worker.port.onmessage = (message: MessageEvent<WorkerMessage>) => {
-    const data = message.data;
+  function connect(): SharedWorker {
+    if (worker) return worker;
 
-    if ('event' in data) {
-      for (const listener of listeners) listener(data.event);
-      return;
-    }
+    const nextWorker = new SharedWorker(new URL('../worker/core.worker.ts', import.meta.url), {
+      type: 'module',
+      name: 'sable-core-v2',
+    });
 
-    const waiting = pending.get(data.id);
-    if (!waiting) return;
-    pending.delete(data.id);
+    nextWorker.port.onmessage = (message: MessageEvent<WorkerMessage>) => {
+      const data = message.data;
 
-    if ('ok' in data) waiting.resolve(data.ok);
-    else if ('bytes' in data) waiting.resolve(data.bytes);
-    else if ('uri' in data) waiting.resolve(data.uri);
-    else waiting.reject(new CoreError(data.err));
-  };
+      if ('event' in data) {
+        if (data.event.type === 'session_ended') resetAfterTerminalSession();
+        for (const listener of listeners) listener(data.event);
+        return;
+      }
 
-  worker.port.start();
+      const waiting = pending.get(data.id);
+      if (!waiting) return;
+      pending.delete(data.id);
+
+      if ('ok' in data) waiting.resolve(data.ok);
+      else if ('bytes' in data) waiting.resolve(data.bytes);
+      else if ('uri' in data) waiting.resolve(data.uri);
+      else waiting.reject(new CoreError(data.err));
+    };
+
+    nextWorker.port.start();
+    worker = nextWorker;
+    return nextWorker;
+  }
+
+  function resetAfterTerminalSession(): void {
+    if (resetPromise) return;
+
+    const previousWorker = worker;
+    worker = null;
+    previousWorker?.port.close();
+    for (const waiting of pending.values()) waiting.reject(new Error('Session ended'));
+    pending.clear();
+
+    resetPromise = resetWebSession().finally(() => {
+      resetPromise = null;
+    });
+  }
 
   function request<T extends Reply>(
     body: (id: number) => WorkerRequest,
     transfers: Transferable[] = []
   ): Promise<T> {
-    const id = nextId++;
+    return (async () => {
+      await resetPromise;
+      const id = nextId++;
+      const activeWorker = connect();
 
-    return new Promise<T>((resolve, reject) => {
-      pending.set(id, { resolve: resolve as (value: Reply) => void, reject });
-      worker.port.postMessage(body(id), transfers);
-    });
+      return new Promise<T>((resolve, reject) => {
+        pending.set(id, { resolve: resolve as (value: Reply) => void, reject });
+        activeWorker.port.postMessage(body(id), transfers);
+      });
+    })();
   }
 
   return {
@@ -99,7 +127,8 @@ export function createWebTransport(): Transport {
       listeners.clear();
       // The worker outlives the tab: others may be using it, and it is what
       // keeps sync running.
-      worker.port.close();
+      worker?.port.close();
+      worker = null;
     },
   };
 }

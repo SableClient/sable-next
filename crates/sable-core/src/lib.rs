@@ -55,7 +55,10 @@ use matrix_sdk::send_queue::SendHandle;
 use matrix_sdk_ui::{
     room_list_service::filters::new_filter_non_left,
     sync_service::State as SyncState,
-    timeline::{AttachmentConfig, AttachmentSource, RoomExt, Timeline, TimelineEventItemId},
+    timeline::{
+        AttachmentConfig, AttachmentSource, RoomExt, Timeline, TimelineEventFocusThreadMode,
+        TimelineEventItemId, TimelineFocus,
+    },
 };
 use mime::Mime;
 use tokio::sync::{Mutex, RwLock, mpsc};
@@ -103,16 +106,29 @@ fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
     Ok(uri)
 }
 
-fn same_redirect_target(expected: &Url, callback: &Url) -> bool {
-    let mut expected_target = expected.clone();
-    expected_target.set_query(None);
-    expected_target.set_fragment(None);
-
+fn same_redirect_target(expected: &Url, callback: &Url, response_parameters: &[&str]) -> bool {
     let mut callback_target = callback.clone();
+    let query = callback
+        .query_pairs()
+        .filter(|(key, _)| !response_parameters.contains(&key.as_ref()))
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect::<Vec<_>>();
     callback_target.set_query(None);
-    callback_target.set_fragment(None);
+    if !query.is_empty() {
+        callback_target
+            .query_pairs_mut()
+            .extend_pairs(query.iter().map(|(key, value)| (key, value)));
+    }
 
-    expected_target == callback_target
+    expected == &callback_target
+}
+
+fn has_single_nonempty_query_parameter(url: &Url, name: &str) -> bool {
+    let mut values = url
+        .query_pairs()
+        .filter(|(key, _)| key == name)
+        .map(|(_, value)| value);
+    matches!(values.next(), Some(value) if !value.is_empty()) && values.next().is_none()
 }
 
 fn message_content(body: String, formatted: Option<String>) -> RoomMessageEventContent {
@@ -188,13 +204,19 @@ pub struct Core {
     session_store_lock: Mutex<()>,
     session: RwLock<Option<Session>>,
     pending_login: Mutex<Option<PendingLogin>>,
-    subscriptions: Mutex<HashMap<SubscriptionId, Task>>,
+    subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
+    active_room_subscription: Mutex<Option<SubscriptionId>>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
 }
 
 enum PendingLogin {
-    Oidc(String, matrix_sdk::Client),
+    Oidc(String, Url, matrix_sdk::Client),
     Sso(String, Url, matrix_sdk::Client),
+}
+
+struct Subscription {
+    task: Task,
+    timeline: Option<Arc<Timeline>>,
 }
 
 impl Core {
@@ -215,6 +237,7 @@ impl Core {
             session: RwLock::new(None),
             pending_login: Mutex::new(None),
             subscriptions: Mutex::new(HashMap::new()),
+            active_room_subscription: Mutex::new(None),
             timelines: Mutex::new(HashMap::new()),
         });
         (core, rx)
@@ -336,18 +359,40 @@ impl Core {
 
             Command::SubscribeRoomList => self.subscribe_room_list().await,
 
-            Command::SubscribeTimeline { room_id } => self.subscribe_timeline(room_id).await,
-
-            Command::Unsubscribe { subscription } => {
-                let task = self.subscriptions.lock().await.remove(&subscription);
-                task.map_or(Err(CommandErr::UnknownSubscription), |task| {
-                    task.abort();
-                    Ok(CommandOk::Unsubscribe)
-                })
+            Command::SubscribeTimeline { room_id, event_id } => {
+                self.subscribe_timeline(room_id, event_id).await
             }
 
-            Command::Paginate { room_id, count } => {
-                let timeline = self.timeline(&room_id).await?;
+            Command::Unsubscribe { subscription } => {
+                let Some(removed) = self.subscriptions.lock().await.remove(&subscription) else {
+                    return Err(CommandErr::UnknownSubscription);
+                };
+                removed.task.abort();
+
+                let mut active = self.active_room_subscription.lock().await;
+                if *active == Some(subscription) {
+                    self.sync_service()
+                        .await?
+                        .room_list_service()
+                        .subscribe_to_rooms(&[])
+                        .await;
+                    *active = None;
+                }
+
+                Ok(CommandOk::Unsubscribe)
+            }
+
+            Command::Paginate {
+                subscription,
+                count,
+            } => {
+                let timeline = self
+                    .subscriptions
+                    .lock()
+                    .await
+                    .get(&subscription)
+                    .and_then(|subscription| subscription.timeline.clone())
+                    .ok_or(CommandErr::UnknownSubscription)?;
                 let reached_start = timeline
                     .paginate_backwards(count)
                     .await
@@ -1258,7 +1303,7 @@ impl Core {
 
         let data = client
             .oauth()
-            .login(redirect_uri, None, Some(registration), None)
+            .login(redirect_uri.clone(), None, Some(registration), None)
             .build()
             .await
             .map_err(|error| self.failed("start_oidc_login", error))?;
@@ -1272,7 +1317,7 @@ impl Core {
         if pending.is_some() {
             tracing::warn!("replacing unfinished OIDC login with a new attempt");
         }
-        *pending = Some(PendingLogin::Oidc(homeserver, client));
+        *pending = Some(PendingLogin::Oidc(homeserver, redirect_uri, client));
 
         Ok(CommandOk::StartOidcLogin { authorization_url })
     }
@@ -1285,10 +1330,21 @@ impl Core {
             .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Oidc(_, client)) = pending.as_ref() else {
+        let Some(PendingLogin::Oidc(_, expected_redirect_uri, client)) = pending.as_ref() else {
             tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
+
+        if !same_redirect_target(
+            expected_redirect_uri,
+            &url,
+            &["code", "state", "error", "error_description", "error_uri"],
+        ) {
+            return Err(self.failed(
+                "complete_oidc_login: callback_url",
+                "callback URL does not match the redirect URI used to start OAuth",
+            ));
+        }
 
         client
             .oauth()
@@ -1296,7 +1352,7 @@ impl Core {
             .await
             .map_err(|error| self.failed("complete_oidc_login", error))?;
 
-        let Some(PendingLogin::Oidc(homeserver, client)) = pending.take() else {
+        let Some(PendingLogin::Oidc(homeserver, _, client)) = pending.take() else {
             return Err(CommandErr::Unavailable);
         };
         drop(pending);
@@ -1329,6 +1385,9 @@ impl Core {
     ) -> Result<CommandOk, CommandErr> {
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_sso_login: redirect_uri", error))?;
+        if !has_single_nonempty_query_parameter(&redirect_uri, "sable_sso_state") {
+            return Err(CommandErr::Denied);
+        }
 
         let client = session::build_client(&self.store_id, &homeserver)
             .await
@@ -1365,6 +1424,9 @@ impl Core {
         // redirect and consume the pending flow exactly once.
         let callback_url = Url::parse(&callback_url)
             .map_err(|error| self.failed("complete_sso_login: callback_url", error))?;
+        if !has_single_nonempty_query_parameter(&callback_url, "loginToken") {
+            return Err(CommandErr::Denied);
+        }
 
         let mut pending = self.pending_login.lock().await;
         let Some(PendingLogin::Sso(_, expected_redirect_uri, _)) = pending.as_ref() else {
@@ -1372,7 +1434,7 @@ impl Core {
             return Err(CommandErr::Unavailable);
         };
 
-        if !same_redirect_target(expected_redirect_uri, &callback_url) {
+        if !same_redirect_target(expected_redirect_uri, &callback_url, &["loginToken"]) {
             return Err(self.failed(
                 "complete_sso_login: callback_url",
                 "callback URL does not match the redirect URI used to start SSO",
@@ -1485,7 +1547,7 @@ impl Core {
             session.sync_service.stop().await;
         }
 
-        self.clear_persisted_session().await;
+        self.clear_persisted_session().await?;
 
         Ok(CommandOk::Logout)
     }
@@ -1509,13 +1571,17 @@ impl Core {
             .map_err(|error| self.failed("persist: save", error))
     }
 
-    async fn clear_persisted_session(&self) {
+    async fn clear_persisted_session(&self) -> Result<(), CommandErr> {
         let _guard = self.session_store_lock.lock().await;
-        self.sessions.clear().await;
+        self.sessions
+            .clear()
+            .await
+            .map_err(|error| self.failed("clear session", error))
     }
 
     async fn take_session(&self) -> Option<Session> {
         self.subscriptions.lock().await.clear();
+        *self.active_room_subscription.lock().await = None;
         self.timelines.lock().await.clear();
         self.session.write().await.take()
     }
@@ -1527,6 +1593,10 @@ impl Core {
         generation: u64,
     ) -> Result<(), CommandErr> {
         let oauth = client.oauth().full_session().is_some();
+        client
+            .event_cache()
+            .subscribe()
+            .map_err(|error| self.failed("subscribe_event_cache", error))?;
         self.watch_session(&client, &homeserver, generation);
         self.watch_ephemeral(&client);
         self.watch_encryption(&client);
@@ -1546,7 +1616,13 @@ impl Core {
             }
         });
 
-        *self.session.write().await = Some(Session {
+        let mut session = self.session.write().await;
+        if self.session_generation.load(Ordering::SeqCst) != generation {
+            drop(session);
+            sync_service.stop().await;
+            return Ok(());
+        }
+        *session = Some(Session {
             client,
             sync_service,
             homeserver,
@@ -1842,31 +1918,45 @@ impl Core {
         let mut changes = client.subscribe_to_session_changes();
         rt::spawn(async move {
             while let Ok(change) = changes.recv().await {
-                // The session is over. No retry will fix it.
-                if let matrix_sdk::SessionChange::UnknownToken(_) = change {
-                    if core
-                        .session_generation
-                        .compare_exchange(
-                            generation,
-                            generation + 1,
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                        )
-                        .is_err()
-                    {
-                        return;
-                    }
-
-                    if let Some(session) = core.take_session().await {
-                        session.sync_service.stop().await;
-                    }
-                    core.clear_persisted_session().await;
-                    core.emit(CoreEvent::SessionEnded {
-                        reason: "token_rejected".to_owned(),
-                    });
+                if core.handle_session_change(change, generation).await {
+                    return;
                 }
             }
         });
+    }
+
+    async fn handle_session_change(
+        self: &Arc<Self>,
+        change: matrix_sdk::SessionChange,
+        generation: u64,
+    ) -> bool {
+        if !matches!(change, matrix_sdk::SessionChange::UnknownToken(_)) {
+            return false;
+        }
+
+        if self
+            .session_generation
+            .compare_exchange(
+                generation,
+                generation + 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_err()
+        {
+            return true;
+        }
+
+        if let Some(session) = self.take_session().await {
+            session.sync_service.stop().await;
+        }
+        if let Err(error) = self.clear_persisted_session().await {
+            tracing::error!("could not clear rejected session: {error:?}");
+        }
+        self.emit(CoreEvent::SessionEnded {
+            reason: "token_rejected".to_owned(),
+        });
+        true
     }
 
     // subscriptions
@@ -1926,7 +2016,13 @@ impl Core {
             }
         });
 
-        self.subscriptions.lock().await.insert(subscription, task);
+        self.subscriptions.lock().await.insert(
+            subscription,
+            Subscription {
+                task,
+                timeline: None,
+            },
+        );
 
         // The filter makes the stream open with a `Reset` carrying everything.
         Ok(CommandOk::SubscribeRoomList {
@@ -1935,14 +2031,33 @@ impl Core {
         })
     }
 
+    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
     async fn subscribe_timeline(
         self: &Arc<Self>,
         room_id: OwnedRoomId,
+        event_id: Option<OwnedEventId>,
     ) -> Result<CommandOk, CommandErr> {
-        let timeline = self.timeline(&room_id).await?;
+        let subscription = self.allocate_subscription();
+        let timeline = match event_id {
+            Some(event_id) => Arc::new(
+                build_room_timeline(&self.room(&room_id).await?, Some(event_id))
+                    .await
+                    .map_err(|error| self.failed("build focused timeline", error))?,
+            ),
+            None => self.timeline(&room_id).await?,
+        };
+
+        let sync_service = self.sync_service().await?;
+        let mut active = self.active_room_subscription.lock().await;
+        sync_service
+            .room_list_service()
+            .subscribe_to_rooms(&[room_id.as_ref()])
+            .await;
+        *active = Some(subscription);
+        drop(active);
+
         let (items, stream) = timeline.subscribe().await;
 
-        let subscription = self.allocate_subscription();
         let core = self.clone();
 
         let task = rt::spawn(async move {
@@ -1958,7 +2073,13 @@ impl Core {
             }
         });
 
-        self.subscriptions.lock().await.insert(subscription, task);
+        self.subscriptions.lock().await.insert(
+            subscription,
+            Subscription {
+                task,
+                timeline: Some(timeline),
+            },
+        );
 
         Ok(CommandOk::SubscribeTimeline {
             subscription,
@@ -1972,6 +2093,17 @@ impl Core {
             .as_ref()
             .ok_or(CommandErr::NotLoggedIn)?
             .client
+            .clone())
+    }
+
+    async fn sync_service(
+        &self,
+    ) -> Result<Arc<matrix_sdk_ui::sync_service::SyncService>, CommandErr> {
+        let guard = self.session.read().await;
+        Ok(guard
+            .as_ref()
+            .ok_or(CommandErr::NotLoggedIn)?
+            .sync_service
             .clone())
     }
 
@@ -2091,18 +2223,161 @@ impl Core {
                 .map_err(|error| self.failed("build timeline", error))?,
         );
 
-        self.timelines
-            .lock()
-            .await
-            .insert(room_id.clone(), timeline.clone());
-
-        Ok(timeline)
+        let mut timelines = self.timelines.lock().await;
+        Ok(timelines.entry(room_id.clone()).or_insert(timeline).clone())
     }
+}
+
+async fn build_room_timeline(
+    room: &matrix_sdk::Room,
+    event_id: Option<OwnedEventId>,
+) -> Result<Timeline, matrix_sdk_ui::timeline::Error> {
+    let builder = room.timeline_builder();
+    let builder = match event_id {
+        Some(event_id) => builder.with_focus(TimelineFocus::Event {
+            target: event_id,
+            num_context_events: 20,
+            thread_mode: TimelineEventFocusThreadMode::Automatic {
+                hide_threaded_events: false,
+            },
+        }),
+        None => builder,
+    };
+    builder.build().await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn oauth_callback_must_match_its_redirect_target() -> Result<(), url::ParseError> {
+        let expected = Url::parse("https://next.sable.moe/login")?;
+        let valid = Url::parse("https://next.sable.moe/login?code=secret&state=csrf")?;
+        let error = Url::parse(
+            "https://next.sable.moe/login?error=access_denied&error_description=no&state=csrf",
+        )?;
+        let wrong_path = Url::parse("https://next.sable.moe/other?code=secret&state=csrf")?;
+        let wrong_origin = Url::parse("https://attacker.invalid/login?code=secret&state=csrf")?;
+        let wrong_port = Url::parse("https://next.sable.moe:8443/login?code=secret&state=csrf")?;
+        let fragment = Url::parse("https://next.sable.moe/login?code=secret&state=csrf#token")?;
+        let extra_query =
+            Url::parse("https://next.sable.moe/login?code=secret&state=csrf&next=attacker")?;
+
+        let response_parameters = ["code", "state", "error", "error_description", "error_uri"];
+        assert!(same_redirect_target(
+            &expected,
+            &valid,
+            &response_parameters
+        ));
+        assert!(same_redirect_target(
+            &expected,
+            &error,
+            &response_parameters
+        ));
+        for invalid in [wrong_path, wrong_origin, wrong_port, fragment, extra_query] {
+            assert!(!same_redirect_target(
+                &expected,
+                &invalid,
+                &response_parameters
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn sso_callback_must_preserve_our_state() -> Result<(), url::ParseError> {
+        let expected = Url::parse("moe.sable.next://login?sable_sso_state=expected")?;
+        let valid =
+            Url::parse("moe.sable.next://login?sable_sso_state=expected&loginToken=secret")?;
+        let wrong_state =
+            Url::parse("moe.sable.next://login?sable_sso_state=attacker&loginToken=secret")?;
+
+        assert!(same_redirect_target(&expected, &valid, &["loginToken"]));
+        assert!(!same_redirect_target(
+            &expected,
+            &wrong_state,
+            &["loginToken"]
+        ));
+        assert!(has_single_nonempty_query_parameter(
+            &expected,
+            "sable_sso_state"
+        ));
+        assert!(has_single_nonempty_query_parameter(&valid, "loginToken"));
+        assert!(!has_single_nonempty_query_parameter(
+            &Url::parse("moe.sable.next://login")?,
+            "sable_sso_state"
+        ));
+        assert!(!has_single_nonempty_query_parameter(
+            &Url::parse("moe.sable.next://login?sable_sso_state=")?,
+            "sable_sso_state"
+        ));
+        assert!(!has_single_nonempty_query_parameter(
+            &Url::parse("moe.sable.next://login?loginToken=one&loginToken=two")?,
+            "loginToken"
+        ));
+        Ok(())
+    }
+
+    struct FailingClearSessionStore;
+
+    impl SessionStore for FailingClearSessionStore {
+        fn load(
+            &self,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send + '_>>
+        {
+            Box::pin(async { None })
+        }
+
+        fn save(
+            &self,
+            _bytes: Vec<u8>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
+        {
+            Box::pin(async { Ok(()) })
+        }
+
+        fn clear(
+            &self,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
+        {
+            Box::pin(async { Err("storage unavailable".to_owned()) })
+        }
+    }
+
+    struct TestSessionStore {
+        bytes: Arc<Mutex<Option<Vec<u8>>>>,
+    }
+
+    impl SessionStore for TestSessionStore {
+        fn load(
+            &self,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send + '_>>
+        {
+            Box::pin(async move { self.bytes.lock().await.clone() })
+        }
+
+        fn save(
+            &self,
+            bytes: Vec<u8>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
+        {
+            Box::pin(async move {
+                *self.bytes.lock().await = Some(bytes);
+                Ok(())
+            })
+        }
+
+        fn clear(
+            &self,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
+        {
+            Box::pin(async move {
+                *self.bytes.lock().await = None;
+                Ok(())
+            })
+        }
+    }
 
     #[tokio::test]
     async fn commands_before_login_are_rejected() {
@@ -2112,7 +2387,54 @@ mod tests {
             Err(CommandErr::NotLoggedIn)
         ));
     }
+
+    #[tokio::test]
+    async fn session_clear_failure_is_reported() {
+        let (core, _rx) = Core::new("test", Box::new(FailingClearSessionStore));
+        assert!(matches!(
+            core.clear_persisted_session().await,
+            Err(CommandErr::Failed { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn unknown_token_ends_the_session_but_refresh_does_not() {
+        let bytes = Arc::new(Mutex::new(Some(b"session".to_vec())));
+        let (core, mut events) = Core::new(
+            "test",
+            Box::new(TestSessionStore {
+                bytes: bytes.clone(),
+            }),
+        );
+
+        assert!(
+            !core
+                .handle_session_change(matrix_sdk::SessionChange::TokensRefreshed, 1)
+                .await
+        );
+        assert_eq!(*bytes.lock().await, Some(b"session".to_vec()));
+
+        assert!(
+            core.handle_session_change(
+                matrix_sdk::SessionChange::UnknownToken(
+                    matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
+                ),
+                1,
+            )
+            .await
+        );
+        assert_eq!(*bytes.lock().await, None);
+        assert!(matches!(
+            events.recv().await,
+            Some(CoreEvent::SessionEnded { reason }) if reason == "token_rejected"
+        ));
+    }
 }
+
+#[cfg(all(test, not(target_family = "wasm")))]
+// These timeline tests use panic-based assertions to keep async test failures readable.
+#[allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+mod sdk_timeline_tests;
 
 #[cfg(test)]
 // These ignored network tests intentionally panic with context on an unexpected

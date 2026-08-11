@@ -1,8 +1,10 @@
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
+import type { MemberView } from '@/generated/MemberView';
 import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
+import type { TimelineItemView } from '@/generated/TimelineItemView';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
@@ -161,6 +163,50 @@ export class CoreClient {
   async subscribeRoomList(): Promise<{ subscription: SubscriptionId; rooms: RoomSummary[] }> {
     const response = await this.ensureTransport().send({ type: 'subscribe_room_list' });
     return response;
+  }
+
+  async subscribeTimeline(
+    roomId: string,
+    eventId: string | null = null
+  ): Promise<{ subscription: SubscriptionId; items: TimelineItemView[] }> {
+    const response = await this.ensureTransport().send({
+      type: 'subscribe_timeline',
+      room_id: roomId,
+      event_id: eventId,
+    });
+    return response;
+  }
+
+  async paginate(subscription: SubscriptionId, count: number): Promise<{ reached_start: boolean }> {
+    const response = await this.ensureTransport().send({
+      type: 'paginate',
+      subscription,
+      count,
+    });
+    return response;
+  }
+
+  async roomMembers(roomId: string): Promise<MemberView[]> {
+    const response = await this.ensureTransport().send({ type: 'room_members', room_id: roomId });
+    return response.members;
+  }
+
+  async sendMessage(roomId: string, body: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'send_message',
+      room_id: roomId,
+      body,
+      formatted: null,
+      in_reply_to: null,
+    });
+  }
+
+  async markRead(roomId: string, eventId: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'mark_read', room_id: roomId, event_id: eventId });
+  }
+
+  async setTyping(roomId: string, typing: boolean): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_typing', room_id: roomId, typing });
   }
 
   async unsubscribe(subscription: SubscriptionId): Promise<void> {

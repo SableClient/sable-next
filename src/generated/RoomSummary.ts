@@ -6,15 +6,15 @@ export type RoomSummary = { room_id: string, canonical_alias: string | null, nam
 /**
  * An `invited` room is an invitation to accept, not a room to open.
  */
-state: RoomStateView, 
+state: RoomStateView,
 /**
  * `null` until the state event loads, which is not the same as `false`.
  */
-encrypted: boolean | null, is_space: boolean, 
+encrypted: boolean | null, is_space: boolean,
 /**
  * Spaces are a DAG, so there can be several.
  */
-space_parents: string[], 
+space_parents: string[],
 /**
  * Already sorted by `order`, then the child event's age.
  */

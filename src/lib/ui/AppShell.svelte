@@ -36,9 +36,10 @@
   .app-content {
     background: var(--sable-surface-container);
     box-sizing: border-box;
-    min-height: 100%;
+    display: flex;
+    height: 100%;
     min-width: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   @media (width >= 48rem) {

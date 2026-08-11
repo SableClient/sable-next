@@ -27,8 +27,12 @@ wasm-bindgen-futures = "0.4"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
+matrix-sdk = { workspace = true, features = ["testing"] }
+matrix-sdk-test = "0.18"
+matrix-sdk-test-utils = "0.18"
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+wiremock = "0.6"
 
 [lints]
 workspace = true

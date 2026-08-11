@@ -42,11 +42,6 @@ runs:
       working-directory: ${{ github.workspace }}
       run: cargo install wasm-pack --version 0.13.1 --locked
 
-    - name: Build WASM bindings
-      shell: bash
-      working-directory: ${{ github.workspace }}
-      run: wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release
-
     - name: Build app
       if: ${{ inputs.build == 'true' }}
       shell: bash

@@ -43,14 +43,15 @@ pub enum Command {
     SubscribeTimeline {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
+        #[ts(type = "string | null")]
+        event_id: Option<OwnedEventId>,
     },
     Unsubscribe {
         subscription: SubscriptionId,
     },
 
     Paginate {
-        #[ts(type = "string")]
-        room_id: OwnedRoomId,
+        subscription: SubscriptionId,
         count: u16,
     },
     RoomMembers {
