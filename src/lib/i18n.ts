@@ -3,7 +3,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import { createI18nStore } from 'svelte-i18next';
 import en from '../locales/en.json';
 
-i18next.use(LanguageDetector).init({
+void i18next.use(LanguageDetector).init({
   fallbackLng: 'en',
   resources: {
     en: { translation: en },
@@ -22,5 +22,5 @@ i18next.use(LanguageDetector).init({
 export const i18n = createI18nStore(i18next);
 /** Translate outside of templates (not reactive). */
 export function t(key: string, options?: Record<string, unknown>): string {
-  return String(i18next.t(key, options));
+  return i18next.t(key, options);
 }
