@@ -1,13 +1,20 @@
 name: Prepare OpenTofu Deployment
 description: Builds the Sable web assets and prepares OpenTofu in infra/web.
 
+inputs:
+  build:
+    description: Whether to build the Sable web assets before preparing OpenTofu.
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
     - name: Setup app and build
+      if: ${{ inputs.build == 'true' }}
       uses: ./.github/actions/setup
       with:
-        build: 'true'
+        build: ${{ inputs.build }}
 
     - name: Set up OpenTofu with mise
       uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
