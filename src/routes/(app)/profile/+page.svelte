@@ -1,9 +1,5 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
+  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
 </script>
 
-<svelte:head>
-  <title>{$i18n.t('nav.profile')} · Sable</title>
-</svelte:head>
-
-<h1>{$i18n.t('nav.profile')}</h1>
+<RoutePlaceholder titleKey="nav.profile" />

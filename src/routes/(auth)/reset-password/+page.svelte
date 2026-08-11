@@ -1,8 +1,5 @@
-<svelte:head>
-  <title>Reset password · Sable</title>
-</svelte:head>
+<script lang="ts">
+  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+</script>
 
-<main>
-  <h1>Reset password</h1>
-  <p>Not implemented yet.</p>
-</main>
+<RoutePlaceholder title="Reset password" description="Not implemented yet." />

@@ -1,8 +1,5 @@
-<svelte:head>
-  <title>Register · Sable</title>
-</svelte:head>
+<script lang="ts">
+  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+</script>
 
-<main>
-  <h1>Register</h1>
-  <p>Not implemented yet.</p>
-</main>
+<RoutePlaceholder title="Register" description="Not implemented yet." />
