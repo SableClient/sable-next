@@ -3,5 +3,52 @@
     "home": "Home",
     "direct": "Direct messages",
     "settings": "Settings"
+  },
+  "auth": {
+    "welcome": "Welcome to Sable",
+    "welcomeBack": "Welcome back",
+    "starting": "Starting Sable...",
+    "signedInAs": "Signed in as",
+    "homeserver": "Homeserver",
+    "checkingHomeserver": "Checking homeserver…",
+    "opening": "Opening…",
+    "signInWithHomeserver": "Sign in with homeserver",
+    "signInWithProvider": "Sign in with {{name}}",
+    "signInWithSso": "Sign in with SSO",
+    "username": "Username",
+    "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "moreWaysToSignIn": "More ways to sign in",
+    "hideOtherWaysToSignIn": "Hide other ways to sign in",
+    "continue": "Continue",
+    "checking": "Checking…",
+    "unableToStart": "Unable to start Sable.",
+    "chooseSignInMethod": "Choose one of the sign-in methods offered by this homeserver.",
+    "allowPopups": "Allow pop-ups to sign in with this homeserver.",
+    "enterHomeserver": "Enter a homeserver.",
+    "enterUsername": "Enter your username.",
+    "enterPassword": "Enter your password."
+  },
+  "footer": {
+    "sourceCode": "Source code",
+    "poweredBy": "Powered by"
+  },
+  "combobox": {
+    "showOptions": "Show options"
+  },
+  "errors": {
+    "homeserverNotFound": "Unable to find a Matrix homeserver at this address.",
+    "unsupportedSignIn": "This homeserver does not offer a sign-in method supported by Sable.",
+    "passwordUnsupported": "This homeserver does not support password sign-in.",
+    "checkingTooFast": "The homeserver is checking addresses too quickly. Try again shortly.",
+    "temporarilyUnavailable": "The homeserver is temporarily unavailable. Try again.",
+    "invalidCredentials": "Invalid username or password.",
+    "tooManyAttempts": "Too many sign-in attempts. Try again later.",
+    "tooManyAttemptsSeconds": "Too many sign-in attempts. Try again in {{seconds}} seconds.",
+    "connectionError": "Unable to sign in due to a connection error.",
+    "coreError": "Unable to sign in due to a core or homeserver error."
   }
 }

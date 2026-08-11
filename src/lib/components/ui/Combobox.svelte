@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Combobox as BitsCombobox } from 'bits-ui';
+  import { i18n } from '$lib/i18n';
   import CaretDownIcon from 'phosphor-icons-svelte/IconCaretDownRegular.svelte';
   import TextInput from './TextInput.svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
@@ -93,7 +94,7 @@
       {/snippet}
     </BitsCombobox.Input>
 
-    <BitsCombobox.Trigger aria-label="Show options">
+    <BitsCombobox.Trigger aria-label={$i18n.t('combobox.showOptions')}>
       {#snippet child({ props })}
         <button {...props} class="combobox-trigger"><CaretDownIcon class="combobox-icon" /></button>
       {/snippet}

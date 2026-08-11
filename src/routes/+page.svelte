@@ -5,6 +5,7 @@
   import TextInput from '$lib/components/ui/TextInput.svelte';
   import logo from '$lib/assets/res/svg/logo.svg';
   import { useCoreClient } from '$lib/core/context';
+  import { i18n, t } from '$lib/i18n';
   import type { CommandErr } from '@/generated/CommandErr';
   import type { LoginFlowsView } from '@/generated/LoginFlowsView';
   import { CoreError } from '@/transport';
@@ -164,7 +165,7 @@
       ? null
       : window.open('about:blank', 'sable-auth', 'popup,width=520,height=720');
     if (!isTauri() && !popup) {
-      loginError = 'Allow pop-ups to sign in with this homeserver.';
+      loginError = t('auth.allowPopups');
       return;
     }
     if (popup) popup.opener = null;
@@ -222,46 +223,48 @@
 
   function homeserverError(error: unknown): string {
     if (!(error instanceof CoreError)) {
-      return 'Unable to find a Matrix homeserver at this address.';
+      return t('errors.homeserverNotFound');
     }
 
     switch (error.detail.code) {
       case 'unsupported':
-        return 'This homeserver does not offer a sign-in method supported by Sable.';
+        return t('errors.unsupportedSignIn');
       case 'rate_limited':
-        return 'The homeserver is checking addresses too quickly. Try again shortly.';
+        return t('errors.checkingTooFast');
       case 'unavailable':
-        return 'The homeserver is temporarily unavailable. Try again.';
+        return t('errors.temporarilyUnavailable');
       default:
-        return 'Unable to find a Matrix homeserver at this address.';
+        return t('errors.homeserverNotFound');
     }
   }
 
   function authenticationError(error: unknown): string {
-    if (!(error instanceof CoreError)) return 'Unable to sign in due to a connection error.';
+    if (!(error instanceof CoreError)) return t('errors.connectionError');
 
     switch (error.detail.code) {
       case 'denied':
-        return 'Invalid username or password.';
+        return t('errors.invalidCredentials');
       case 'rate_limited':
         return error.detail.retry_after_ms
-          ? `Too many sign-in attempts. Try again in ${String(Math.ceil(error.detail.retry_after_ms / 1000))} seconds.`
-          : 'Too many sign-in attempts. Try again later.';
+          ? t('errors.tooManyAttemptsSeconds', {
+              seconds: Math.ceil(error.detail.retry_after_ms / 1000),
+            })
+          : t('errors.tooManyAttempts');
       case 'unavailable':
-        return 'The homeserver is temporarily unavailable. Try again.';
+        return t('errors.temporarilyUnavailable');
       case 'unknown_homeserver':
-        return 'Unable to find a Matrix homeserver at this address.';
+        return t('errors.homeserverNotFound');
       case 'unsupported':
-        return 'This homeserver does not support password sign-in.';
+        return t('errors.passwordUnsupported');
       default:
-        return 'Unable to sign in due to a core or homeserver error.';
+        return t('errors.coreError');
     }
   }
 
   async function validateHomeserver(): Promise<LoginFlowsView | null> {
     const candidate = homeserver.trim();
     if (!candidate) {
-      setFieldError('homeserver', 'Enter a homeserver.');
+      setFieldError('homeserver', t('auth.enterHomeserver'));
       return null;
     }
 
@@ -299,17 +302,17 @@
     const flows = await validateHomeserver();
     if (!flows) return;
     if (!flows.password) {
-      loginError = 'Choose one of the sign-in methods offered by this homeserver.';
+      loginError = t('auth.chooseSignInMethod');
       return;
     }
 
     if (!username.trim()) {
-      setFieldError('username', 'Enter your username.');
+      setFieldError('username', t('auth.enterUsername'));
       return;
     }
 
     if (!password) {
-      setFieldError('password', 'Enter your password.');
+      setFieldError('password', t('auth.enterPassword'));
       return;
     }
 
@@ -359,7 +362,7 @@
     <header class="auth-heading">
       <img class="logo" src={logo} alt="" />
       <h1 id="sable-title">
-        {hasLoggedInBefore ? 'Welcome back' : 'Welcome to Sable'}
+        {hasLoggedInBefore ? $i18n.t('auth.welcomeBack') : $i18n.t('auth.welcome')}
       </h1>
     </header>
 
@@ -367,11 +370,11 @@
       {#if core.status === 'starting' || core.status === 'idle'}
         <div class="bootstrap" aria-live="polite">
           <span class="spinner" aria-hidden="true"></span>
-          <p>Starting Sable...</p>
+          <p>{$i18n.t('auth.starting')}</p>
         </div>
       {:else if core.status === 'ready'}
         <div class="bootstrap">
-          <p>Signed in as <strong>{core.session?.user_id}</strong>.</p>
+          <p>{$i18n.t('auth.signedInAs')} <strong>{core.session?.user_id}</strong>.</p>
         </div>
       {:else}
         <form
@@ -385,7 +388,7 @@
           }}
         >
           <div class="field">
-            <Label for="homeserver">Homeserver</Label>
+            <Label for="homeserver">{$i18n.t('auth.homeserver')}</Label>
             <Combobox
               id="homeserver"
               bind:value={homeserver}
@@ -413,7 +416,7 @@
             {#if isCheckingHomeserver}
               <p class="checking" aria-live="polite">
                 <span class="spinner" aria-hidden="true"></span>
-                Checking homeserver…
+                {$i18n.t('auth.checkingHomeserver')}
               </p>
             {/if}
           </div>
@@ -429,7 +432,9 @@
                   disabled={isAuthenticating || isLaunchingLogin}
                   onclick={() => void launchRedirectLogin('oidc')}
                 >
-                  {isLaunchingLogin ? 'Opening…' : 'Sign in with homeserver'}
+                  {isLaunchingLogin
+                    ? $i18n.t('auth.opening')
+                    : $i18n.t('auth.signInWithHomeserver')}
                 </Button>
               </div>
             </div>
@@ -448,7 +453,7 @@
                       disabled={isAuthenticating || isLaunchingLogin}
                       onclick={() => void launchRedirectLogin('sso', provider.id)}
                     >
-                      Sign in with {provider.name}
+                      {$i18n.t('auth.signInWithProvider', { name: provider.name })}
                     </Button>
                   {/each}
                 </div>
@@ -458,7 +463,7 @@
                     disabled={isAuthenticating || isLaunchingLogin}
                     onclick={() => void launchRedirectLogin('sso')}
                   >
-                    {isLaunchingLogin ? 'Opening…' : 'Sign in with SSO'}
+                    {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
                   </Button>
                 </div>
               {/if}
@@ -472,7 +477,7 @@
               transition:smoothSlide={{ duration: prefersReducedMotion.current ? 0 : 200 }}
             >
               <div class="field">
-                <Label for="username">Username</Label>
+                <Label for="username">{$i18n.t('auth.username')}</Label>
                 <TextInput
                   id="username"
                   bind:value={username}
@@ -490,7 +495,7 @@
               </div>
 
               <div class="field">
-                <Label for="password">Password</Label>
+                <Label for="password">{$i18n.t('auth.password')}</Label>
                 <div class="password-input">
                   <TextInput
                     id="password"
@@ -512,7 +517,9 @@
                     class="password-toggle"
                     type="button"
                     disabled={isAuthenticating}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword
+                      ? $i18n.t('auth.hidePassword')
+                      : $i18n.t('auth.showPassword')}
                     aria-pressed={showPassword}
                     onclick={() => {
                       showPassword = !showPassword;
@@ -534,7 +541,7 @@
                 <div class="error-slot" aria-live="polite">
                   {#if fieldError || loginError || core.status === 'error'}
                     <p class="error">
-                      {fieldError ?? loginError ?? 'Unable to start Sable.'}
+                      {fieldError ?? loginError ?? $i18n.t('auth.unableToStart')}
                     </p>
                   {/if}
                 </div>
@@ -545,7 +552,7 @@
                       <span class="spinner" aria-hidden="true"></span>
                     {/if}
 
-                    {isAuthenticating ? 'Signing in...' : 'Sign in'}
+                    {isAuthenticating ? $i18n.t('auth.signingIn') : $i18n.t('auth.signIn')}
                   </Button>
                 </div>
               </div>
@@ -562,7 +569,9 @@
               }}
             >
               <span
-                >{showAllLoginMethods ? 'Hide other ways to sign in' : 'More ways to sign in'}</span
+                >{showAllLoginMethods
+                  ? $i18n.t('auth.hideOtherWaysToSignIn')
+                  : $i18n.t('auth.moreWaysToSignIn')}</span
               >
               <span
                 class:expanded={showAllLoginMethods}
@@ -581,14 +590,14 @@
             >
               <div class="error-slot" aria-live="polite">
                 {#if fieldError || loginError || core.status === 'error'}
-                  <p class="error">{fieldError ?? loginError ?? 'Unable to start Sable.'}</p>
+                  <p class="error">{fieldError ?? loginError ?? $i18n.t('auth.unableToStart')}</p>
                 {/if}
               </div>
 
               {#if !loginFlows}
                 <div class="actions">
                   <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver}>
-                    {isCheckingHomeserver ? 'Checking…' : 'Continue'}
+                    {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
                   </Button>
                 </div>
               {/if}
@@ -601,10 +610,13 @@
 
   <footer class="auth-footer">
     <a href="https://github.com/SableClient/sable-next" rel="noreferrer" target="_blank">
-      Source code
+      {$i18n.t('footer.sourceCode')}
     </a>
     <span aria-hidden="true">·</span>
-    <span>Powered by <a href="https://matrix.org" rel="noreferrer" target="_blank">Matrix</a></span>
+    <span
+      >{$i18n.t('footer.poweredBy')}
+      <a href="https://matrix.org" rel="noreferrer" target="_blank">Matrix</a></span
+    >
   </footer>
 </main>
 
