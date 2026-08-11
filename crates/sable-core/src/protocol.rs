@@ -880,6 +880,8 @@ pub struct ProfileView {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
+// These are independent server capabilities, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 pub struct LoginFlowsView {
     pub password: bool,
     pub oidc: bool,

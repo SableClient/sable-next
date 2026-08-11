@@ -25,6 +25,7 @@ pub struct Session {
 }
 
 /// Whatever the client holds now, which after a refresh is newer than disk.
+#[must_use]
 pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedSession> {
     if let Some(full) = client.oauth().full_session() {
         return Some(PersistedSession {
@@ -61,6 +62,7 @@ pub struct PersistedSession {
 }
 
 impl Credentials {
+    #[must_use]
     pub fn oauth(session: OAuthSession) -> Self {
         Self::OAuth {
             client_id: session.client_id.as_str().to_owned(),
@@ -68,6 +70,7 @@ impl Credentials {
         }
     }
 
+    #[must_use]
     pub fn user_id(&self) -> String {
         match self {
             Self::Password(session) => session.meta.user_id.to_string(),
@@ -75,6 +78,7 @@ impl Credentials {
         }
     }
 
+    #[must_use]
     pub fn device_id(&self) -> String {
         match self {
             Self::Password(session) => session.meta.device_id.to_string(),
@@ -83,7 +87,12 @@ impl Credentials {
     }
 }
 
-/// A filesystem path natively, an IndexedDB name on the web.
+/// A filesystem path natively, an `IndexedDB` name on the web.
+///
+/// # Errors
+///
+/// Returns the Matrix SDK build error if the local store or homeserver cannot
+/// be initialized.
 pub async fn build_client(
     store_id: &str,
     homeserver: &str,
@@ -102,6 +111,13 @@ pub async fn build_client(
 /// For dynamic client registration. The redirect URI must match the one handed
 /// to `OAuth::login`, and a private-use scheme must be the reverse-DNS of
 /// `client_uri`'s host or MAS rejects it with `invalid_redirect_uri`.
+///
+/// # Panics
+///
+/// This function relies on `ClientMetadata` being serializable because all
+/// fields are constructed from validated URLs and static protocol values.
+#[allow(clippy::expect_used)] // metadata serialization is an invariant of this typed value
+#[must_use]
 pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
     let loopback = matches!(
         redirect_uri.host_str(),
@@ -111,15 +127,8 @@ pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
     let (application_type, client_uri) = match redirect_uri.scheme() {
         // MAS rejects an http `client_uri`. A loopback http redirect is a
         // *native* client per RFC 8252, which is what a dev server is.
-        "https" => (
-            ApplicationType::Web,
-            Url::parse(&redirect_uri.origin().ascii_serialization()).expect("origin is a url"),
-        ),
         "http" if loopback => (ApplicationType::Native, canonical_client_uri()),
-        "http" => (
-            ApplicationType::Web,
-            Url::parse(&redirect_uri.origin().ascii_serialization()).expect("origin is a url"),
-        ),
+        "https" | "http" => (ApplicationType::Web, origin_url(redirect_uri)),
         scheme => (ApplicationType::Native, reverse_dns_url(scheme)),
     };
 
@@ -127,10 +136,11 @@ pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
     // one is rejected (continuwuity answers `invalid_client_metadata`).
     // Authorization still uses the real URI.
     let mut registered_uri = redirect_uri.clone();
-    if redirect_uri.scheme() == "http" && loopback {
-        registered_uri
-            .set_port(None)
-            .expect("a loopback url accepts a port change");
+    if redirect_uri.scheme() == "http"
+        && loopback
+        && let Err(error) = registered_uri.set_port(None)
+    {
+        tracing::warn!("loopback redirect URI kept its port: {error:?}");
     }
 
     let mut metadata = ClientMetadata::new(
@@ -146,15 +156,29 @@ pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
 }
 
 fn canonical_client_uri() -> Url {
-    Url::parse("https://next.sable.moe").expect("static url")
+    #[allow(clippy::expect_used)] // this compile-time URL is part of the OAuth protocol contract
+    {
+        Url::parse("https://next.sable.moe").expect("static URL is valid")
+    }
 }
 
 /// `moe.sable.next` -> `https://next.sable.moe`
 fn reverse_dns_url(scheme: &str) -> Url {
     let host = scheme.split('.').rev().collect::<Vec<_>>().join(".");
-    Url::parse(&format!("https://{host}")).expect("reversed scheme is a host")
+    Url::parse(&format!("https://{host}")).unwrap_or_else(|_| canonical_client_uri())
 }
 
+fn origin_url(redirect_uri: &Url) -> Url {
+    Url::parse(&redirect_uri.origin().ascii_serialization())
+        .unwrap_or_else(|_| redirect_uri.clone())
+}
+
+/// Starts the sync service for an authenticated client.
+///
+/// # Errors
+///
+/// Returns the sync-service error if its initial state cannot be built.
+#[allow(clippy::arc_with_non_send_sync)] // the WASM sync service is intentionally single-threaded
 pub async fn start_sync(
     client: Client,
 ) -> Result<Arc<SyncService>, matrix_sdk_ui::sync_service::Error> {
@@ -163,13 +187,19 @@ pub async fn start_sync(
     Ok(sync_service)
 }
 
-pub fn oauth_session(client_id: String, user: UserSession) -> OAuthSession {
+#[must_use]
+pub const fn oauth_session(client_id: String, user: UserSession) -> OAuthSession {
     OAuthSession {
         client_id: ClientId::new(client_id),
         user,
     }
 }
 
+/// Discovers a homeserver and creates a client for it.
+///
+/// # Errors
+///
+/// Returns the Matrix SDK build error if discovery cannot construct a client.
 pub async fn discovery_client(homeserver: &str) -> Result<Client, matrix_sdk::ClientBuildError> {
     apply_server(Client::builder(), homeserver).build().await
 }

@@ -33,7 +33,7 @@ export function createTauriTransport(): Transport {
     for (const listener of listeners) listener(event);
   };
 
-  const ready = invoke<void>('subscribe_events', { channel });
+  const ready = invoke<unknown>('subscribe_events', { channel });
 
   return {
     async send<C extends Command>(command: C) {

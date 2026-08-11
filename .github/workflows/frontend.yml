@@ -1,0 +1,61 @@
+name: Frontend CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+
+      # Pin the action and toolchain version so `stable` cannot drift.
+      - name: Set up Rust for WASM generation
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: 1.97.1
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version 0.13.1 --locked
+
+      - name: Build WASM bindings
+        run: wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release
+
+      - name: Check Oxfmt formatting
+        run: pnpm fmt:check
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Run Stylelint
+        run: pnpm stylelint
+
+      - name: Run svelte-check
+        run: pnpm check

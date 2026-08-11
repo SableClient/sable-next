@@ -4,8 +4,9 @@ import type { SessionInfo } from '@/generated/SessionInfo';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
+import { CoreError } from '../../transport';
 
-export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'ready' | 'error';
+export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = Pick<SessionInfo, 'user_id'> & Partial<Pick<SessionInfo, 'device_id'>>;
 
 export class CoreClient {
@@ -40,7 +41,7 @@ export class CoreClient {
     }
 
     const generation = ++this.generation;
-    this.status = 'starting';
+    this.status = 'authenticating';
     this.session = null;
 
     try {
@@ -57,7 +58,7 @@ export class CoreClient {
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.status = 'error';
+        this.status = this.statusAfterAuthenticationError(error);
       }
       throw error;
     }
@@ -92,7 +93,7 @@ export class CoreClient {
     }
 
     const generation = ++this.generation;
-    this.status = 'starting';
+    this.status = 'authenticating';
     this.session = null;
 
     try {
@@ -107,7 +108,7 @@ export class CoreClient {
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.status = 'error';
+        this.status = this.statusAfterAuthenticationError(error);
       }
       throw error;
     }
@@ -134,7 +135,7 @@ export class CoreClient {
     }
 
     const generation = ++this.generation;
-    this.status = 'starting';
+    this.status = 'authenticating';
     this.session = null;
 
     try {
@@ -149,7 +150,7 @@ export class CoreClient {
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.status = 'error';
+        this.status = this.statusAfterAuthenticationError(error);
       }
       throw error;
     }
@@ -195,6 +196,19 @@ export class CoreClient {
     this.transport = transport;
     this.unsubscribe = transport.subscribe(this.handleEvent);
     return transport;
+  }
+
+  private statusAfterAuthenticationError(error: unknown): CoreStatus {
+    if (error instanceof CoreError) {
+      switch (error.detail.code) {
+        case 'denied':
+        case 'rate_limited':
+        case 'unsupported':
+        case 'unknown_homeserver':
+          return 'signed-out';
+      }
+    }
+    return 'error';
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {

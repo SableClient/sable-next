@@ -19,6 +19,8 @@
 
 <style>
   .label {
-    font-size: 0.875rem;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-heading);
   }
 </style>

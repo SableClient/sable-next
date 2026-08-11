@@ -1,0 +1,56 @@
+name: Setup App
+description: Installs the Sable web toolchain and optionally builds the app.
+
+inputs:
+  build:
+    description: Whether to build the static web app after generating WASM.
+    required: false
+    default: 'false'
+  build-command:
+    description: Command used when the app build is enabled.
+    required: false
+    default: pnpm run build
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm
+      uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+      with:
+        version: 10.32.1
+
+    - name: Set up Node.js
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: 24.14.0
+        cache: pnpm
+
+    - name: Set up Rust for WASM generation
+      uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+      with:
+        toolchain: 1.97.1
+        targets: wasm32-unknown-unknown
+
+    - name: Cache Rust artifacts
+      uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+
+    - name: Install JavaScript dependencies
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: pnpm install --frozen-lockfile
+
+    - name: Install wasm-pack
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: cargo install wasm-pack --version 0.13.1 --locked
+
+    - name: Build WASM bindings
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release
+
+    - name: Build app
+      if: ${{ inputs.build == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: ${{ inputs.build-command }}

@@ -1,0 +1,105 @@
+[advisories]
+version = 2
+yanked = "deny"
+unmaintained = "workspace"
+ignore = [
+  { id = "RUSTSEC-2026-0194", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
+  { id = "RUSTSEC-2026-0195", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
+]
+
+[licenses]
+confidence-threshold = 0.93
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "AGPL-3.0-only",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+exceptions = []
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "all"
+deny = []
+# These exact older versions are pulled by transitive crates with incompatible
+# semver requirements. Keep the duplicate check strict for any new versions.
+skip = [
+  { crate = "base64@0.21.7", reason = "swift-rs has not adopted base64 0.22 yet" },
+  { crate = "bitflags@1.3.2", reason = "legacy GTK/WebKit bindings require bitflags 1.x" },
+  { crate = "chacha20@0.9.1", reason = "chacha20poly1305 has an incompatible 0.9 requirement" },
+  { crate = "cpufeatures@0.2.17", reason = "AES and digest transitive dependencies have incompatible requirements" },
+  { crate = "derive_more@1.0.0", reason = "wasm_evt_listener has not adopted derive_more 2.x" },
+  { crate = "derive_more-impl@1.0.0", reason = "paired with derive_more 1.0.0 above" },
+  { crate = "foldhash@0.1.5", reason = "hashbrown 0.15 has an incompatible foldhash requirement" },
+  { crate = "getrandom@0.2.17", reason = "ring and legacy crypto dependencies require getrandom 0.2" },
+  { crate = "getrandom@0.3.4", reason = "transitive platform dependencies have not converged on getrandom 0.4" },
+  { crate = "hashbrown@0.12.3", reason = "legacy selectors require hashbrown 0.12" },
+  { crate = "hashbrown@0.14.5", reason = "legacy GTK/WebKit bindings require hashbrown 0.14" },
+  { crate = "hashbrown@0.15.5", reason = "transitive parser dependencies require hashbrown 0.15" },
+  { crate = "heck@0.4.1", reason = "glib-macros has an incompatible heck requirement" },
+  { crate = "html5ever@0.38.0", reason = "dom_query has an incompatible html5ever requirement" },
+  { crate = "indexmap@1.9.3", reason = "schemars has an incompatible indexmap requirement" },
+  { crate = "itertools@0.10.5", reason = "aquamarine has an incompatible itertools requirement" },
+  { crate = "markup5ever@0.38.0", reason = "html5ever 0.38 requires its matching markup5ever release" },
+  { crate = "png@0.17.16", reason = "Tauri's ico dependency has not adopted png 0.18" },
+  { crate = "proc-macro-crate@1.3.1", reason = "legacy proc-macro dependencies require proc-macro-crate 1.x" },
+  { crate = "proc-macro-crate@2.0.2", reason = "legacy proc-macro dependencies require proc-macro-crate 2.x" },
+  { crate = "r-efi@5.3.0", reason = "getrandom 0.3 has an incompatible r-efi requirement" },
+  { crate = "rand@0.8.7", reason = "legacy Matrix crypto dependencies require rand 0.8" },
+  { crate = "rand@0.9.5", reason = "transitive crypto dependencies have not converged on rand 0.10" },
+  { crate = "rand_chacha@0.3.1", reason = "rand 0.8 has an incompatible rand_chacha requirement" },
+  { crate = "rand_core@0.6.4", reason = "rand 0.8 has an incompatible rand_core requirement" },
+  { crate = "rand_core@0.9.5", reason = "rand 0.9 has an incompatible rand_core requirement" },
+  { crate = "serde_spanned@0.6.9", reason = "toml 0.8 has an incompatible serde_spanned requirement" },
+  { crate = "syn@1.0.109", reason = "legacy proc-macro dependencies require syn 1.x" },
+  { crate = "syn@2.0.119", reason = "current proc-macro dependencies have not all adopted syn 3.x" },
+  { crate = "thiserror@1.0.69", reason = "legacy GTK/WebKit dependencies require thiserror 1.x" },
+  { crate = "thiserror-impl@1.0.69", reason = "paired with thiserror 1.0.69 above" },
+  { crate = "toml@0.8.2", reason = "legacy Tauri dependencies require toml 0.8" },
+  { crate = "toml@0.9.12+spec-1.1.0", reason = "cargo-deny and parser dependencies require toml 0.9" },
+  { crate = "toml_datetime@0.6.3", reason = "toml 0.8 has an incompatible toml_datetime requirement" },
+  { crate = "toml_datetime@0.7.5+spec-1.1.0", reason = "toml 0.9 has an incompatible toml_datetime requirement" },
+  { crate = "toml_edit@0.19.15", reason = "legacy Tauri dependencies require toml_edit 0.19" },
+  { crate = "toml_edit@0.20.2", reason = "legacy Tauri dependencies require toml_edit 0.20" },
+  { crate = "windows-link@0.1.3", reason = "windows 0.61 has an incompatible windows-link requirement" },
+  { crate = "windows-sys@0.45.0", reason = "legacy platform crates require windows-sys 0.45" },
+  { crate = "windows-sys@0.59.0", reason = "Tauri plugin dependencies require windows-sys 0.59" },
+  { crate = "windows-sys@0.60.2", reason = "Tauri dependencies require windows-sys 0.60" },
+  { crate = "windows-targets@0.42.2", reason = "legacy platform crates require windows-targets 0.42" },
+  { crate = "windows-targets@0.52.6", reason = "Tauri dependencies require windows-targets 0.52" },
+  { crate = "windows_aarch64_gnullvm@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_aarch64_gnullvm@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_aarch64_msvc@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_aarch64_msvc@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_i686_gnu@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_i686_gnu@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_i686_gnullvm@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_i686_msvc@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_i686_msvc@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_x86_64_gnu@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_x86_64_gnu@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_x86_64_gnullvm@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_x86_64_gnullvm@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "windows_x86_64_msvc@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
+  { crate = "windows_x86_64_msvc@0.52.6", reason = "paired with windows-targets 0.52.6 above" },
+  { crate = "winnow@0.5.40", reason = "legacy toml dependencies require winnow 0.5" },
+  { crate = "winnow@0.7.15", reason = "toml 0.9 has an incompatible winnow requirement" },
+]
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

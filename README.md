@@ -4,6 +4,10 @@ A from-scratch rewrite of [Sable](https://github.com/SableClient/Sable), with Sv
 
 Join the Matrix space at [#sable:sable.moe](https://matrix.to/#/#sable:sable.moe) to discuss the project and meowing.
 
+The development web build is deployed to [next.sable.moe](https://next.sable.moe/).
+See [`infra/README.md`](infra/README.md) for the Cloudflare Worker and OpenTofu
+setup.
+
 ## Getting started
 
 [mise](https://mise.jdx.dev) manages Node, pnpm, Rust, and other tooling.

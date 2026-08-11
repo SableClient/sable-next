@@ -25,10 +25,13 @@ tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
-sable-core = { path = "../crates/sable-core" }
+sable-core = { path = "../crates/sable-core", version = "0.1.0" }
 tokio = { workspace = true }
 
 # Desktop only: a second launch carrying the OIDC redirect must hand the URL to
 # the running instance instead of starting a rival process.
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+[lints]
+workspace = true

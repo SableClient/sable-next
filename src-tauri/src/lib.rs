@@ -11,8 +11,9 @@ use sable_core::{
 };
 use tauri::{
     ipc::{Channel, InvokeBody, Request, Response},
-    Manager, State,
+    AppHandle, Manager, State,
 };
+use tauri_plugin_opener::OpenerExt;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 struct AppState {
@@ -96,11 +97,15 @@ async fn upload_media(
 
 /// Called once at startup.
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
 fn subscribe_events(
     state: State<'_, AppState>,
     channel: Channel<CoreEvent>,
 ) -> Result<(), CommandErr> {
-    let mut events = state.events.lock().expect("event receiver mutex poisoned");
+    let mut events = state
+        .events
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut rx = events.take().ok_or(CommandErr::Unavailable)?;
 
     tauri::async_runtime::spawn(async move {
@@ -112,6 +117,19 @@ fn subscribe_events(
     });
 
     Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
+fn open_auth_url(app: AppHandle, url: String) -> Result<(), CommandErr> {
+    let parsed = tauri::Url::parse(&url).map_err(|_| CommandErr::Denied)?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(CommandErr::Denied);
+    }
+
+    app.opener()
+        .open_url(parsed.to_string(), None::<String>)
+        .map_err(|_| CommandErr::Unavailable)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -127,7 +145,7 @@ pub fn run() {
         }
     }));
 
-    builder
+    if let Err(error) = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
@@ -164,8 +182,11 @@ pub fn run() {
             subscribe_events,
             fetch_media,
             send_attachment,
-            upload_media
+            upload_media,
+            open_auth_url
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    {
+        log::error!("error while running Tauri application: {error}");
+    }
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
@@ -37,9 +38,10 @@ pub struct SpaceInfo {
     pub children: Vec<SpaceChildEdge>,
 }
 
-pub fn room_summary(
+#[must_use]
+pub fn room_summary<S: BuildHasher>(
     item: &RoomListItem,
-    space_cache: &HashMap<OwnedRoomId, SpaceInfo>,
+    space_cache: &HashMap<OwnedRoomId, SpaceInfo, S>,
 ) -> RoomSummary {
     let info = space_cache.get(item.room_id());
     RoomSummary {
@@ -56,7 +58,7 @@ pub fn room_summary(
             EncryptionState::Encrypted => Some(true),
             EncryptionState::NotEncrypted => Some(false),
             // `m.room.encryption` is not loaded, so neither answer is honest.
-            _ => None,
+            EncryptionState::Unknown => None,
         },
         state: match item.state() {
             RoomState::Joined => RoomStateView::Joined,
@@ -65,11 +67,11 @@ pub fn room_summary(
             RoomState::Left => RoomStateView::Left,
             RoomState::Banned => RoomStateView::Banned,
         },
-        is_space: info.map(|i| i.is_space).unwrap_or(false),
+        is_space: info.is_some_and(|i| i.is_space),
         space_parents: info.map(|i| i.parents.clone()).unwrap_or_default(),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
-        unread: item.num_unread_messages().min(u32::MAX as u64) as u32,
-        highlight: item.num_unread_mentions().min(u32::MAX as u64) as u32,
+        unread: u32::try_from(item.num_unread_messages()).unwrap_or(u32::MAX),
+        highlight: u32::try_from(item.num_unread_mentions()).unwrap_or(u32::MAX),
         latest_event: latest_event(item),
     }
 }
@@ -140,10 +142,10 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
 
 /// `Room::parent_spaces` hits the state store, so this runs once per room per
 /// subscription.
-pub async fn enrich_space_fields(
+pub async fn enrich_space_fields<S: BuildHasher>(
     client: &Client,
     diff: &eyeball_im::VectorDiff<RoomListItem>,
-    space_cache: &mut HashMap<OwnedRoomId, SpaceInfo>,
+    space_cache: &mut HashMap<OwnedRoomId, SpaceInfo, S>,
 ) {
     use eyeball_im::VectorDiff as In;
 
@@ -228,7 +230,7 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
             continue;
         }
         children.push(SpaceChildEdge {
-            room_id: original.state_key.to_owned(),
+            room_id: original.state_key.clone(),
             order: original.content.order.map(|order| order.to_string()),
         });
     }
@@ -242,6 +244,7 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
     children
 }
 
+#[must_use]
 pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
     let id = item.unique_id().0.clone();
 
@@ -255,13 +258,13 @@ pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
             TimelineItemView {
                 id,
                 event_id: event.event_id().map(ToOwned::to_owned),
-                transaction_id: event.transaction_id().map(|id| id.to_string()),
+                transaction_id: event.transaction_id().map(ToString::to_string),
                 send_state: event.send_state().map(send_state),
                 sender: Some(event.sender().to_owned()),
                 sender_name: profile.and_then(|p: &Profile| p.display_name.clone()),
                 sender_avatar: profile
                     .and_then(|p: &Profile| p.avatar_url.as_ref())
-                    .map(|url| url.to_string()),
+                    .map(ToString::to_string),
                 timestamp: event.timestamp().0.into(),
                 content: content(event.content()),
                 in_reply_to: in_reply_to(event.content()),
@@ -368,7 +371,7 @@ fn formatted_body(msgtype: &MessageType) -> Option<String> {
     }
 }
 
-fn msg_like(content: &TimelineItemContent) -> Option<&MsgLikeContent> {
+const fn msg_like(content: &TimelineItemContent) -> Option<&MsgLikeContent> {
     match content {
         TimelineItemContent::MsgLike(msg) => Some(msg),
         _ => None,
@@ -429,21 +432,26 @@ fn reactions(content: &TimelineItemContent) -> Vec<ReactionGroup> {
         .collect()
 }
 
+#[must_use]
 pub fn member_view(member: &RoomMember) -> MemberView {
     MemberView {
         user_id: member.user_id().to_owned(),
         display_name: member.display_name().map(str::to_owned),
-        avatar_url: member.avatar_url().map(|url| url.to_string()),
+        avatar_url: member.avatar_url().map(ToString::to_string),
         power_level: match member.power_level() {
-            UserPowerLevel::Infinite => i32::MAX,
-            UserPowerLevel::Int(level) => {
-                i64::from(level).clamp(i32::MIN.into(), i32::MAX.into()) as i32
-            }
+            UserPowerLevel::Int(level) => i32::try_from(level).unwrap_or_else(|_| {
+                if level.is_negative() {
+                    i32::MIN
+                } else {
+                    i32::MAX
+                }
+            }),
             _ => i32::MAX,
         },
     }
 }
 
+#[must_use]
 pub fn map_diff<T, U>(diff: eyeball_im::VectorDiff<T>, map: impl Fn(&T) -> U) -> VectorDiff<U> {
     use eyeball_im::VectorDiff as In;
 
@@ -477,8 +485,10 @@ fn diff_values<T>(diff: &eyeball_im::VectorDiff<T>) -> Vec<&T> {
 
     match diff {
         In::Append { values } | In::Reset { values } => values.iter().collect(),
-        In::PushFront { value } | In::PushBack { value } => vec![value],
-        In::Insert { value, .. } | In::Set { value, .. } => vec![value],
+        In::PushFront { value }
+        | In::PushBack { value }
+        | In::Insert { value, .. }
+        | In::Set { value, .. } => vec![value],
         In::Clear | In::PopFront | In::PopBack | In::Remove { .. } | In::Truncate { .. } => {
             Vec::new()
         }

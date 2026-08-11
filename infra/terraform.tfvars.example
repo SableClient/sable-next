@@ -1,0 +1,4 @@
+account_id    = "replace-with-cloudflare-account-id"
+zone_id       = "replace-with-cloudflare-zone-id"
+worker_name   = "sable-next"
+custom_domain = "next.sable.moe"

@@ -1,0 +1,35 @@
+name: Prepare OpenTofu Deployment
+description: Builds the Sable web assets and prepares OpenTofu in infra/web.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup app and build
+      uses: ./.github/actions/setup
+      with:
+        build: 'true'
+
+    - name: Set up OpenTofu with mise
+      uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+      with:
+        cache: true
+
+    - name: Trust project mise configuration
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
+
+    - name: Check OpenTofu formatting
+      shell: bash
+      working-directory: ${{ github.workspace }}/infra/web
+      run: mise run opentofu -- fmt -check
+
+    - name: Initialize OpenTofu
+      shell: bash
+      working-directory: ${{ github.workspace }}/infra/web
+      run: mise run opentofu -- init -input=false -reconfigure
+
+    - name: Validate OpenTofu configuration
+      shell: bash
+      working-directory: ${{ github.workspace }}/infra/web
+      run: mise run opentofu -- validate -no-color

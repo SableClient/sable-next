@@ -7,11 +7,6 @@ let databasePromise: Promise<IDBDatabase> | undefined;
 
 function openDatabase(): Promise<IDBDatabase> {
   databasePromise ??= new Promise((resolve, reject) => {
-    if (!globalThis.indexedDB) {
-      reject(new Error('IndexedDB is unavailable in this worker'));
-      return;
-    }
-
     const request = globalThis.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
 
     request.onupgradeneeded = () => {
@@ -51,7 +46,9 @@ function transaction(
         request.onerror = () => {
           reject(request.error ?? new Error('Session database request failed'));
         };
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          resolve();
+        };
         tx.onerror = () => {
           reject(tx.error ?? new Error('Session database transaction failed'));
         };
@@ -69,6 +66,10 @@ function toBytes(value: unknown): Uint8Array | null {
   throw new TypeError('Session database returned an unsupported value');
 }
 
+function asError(cause: unknown): Error {
+  return cause instanceof Error ? cause : new Error(String(cause));
+}
+
 export function loadSession(): Promise<Uint8Array | null> {
   return openDatabase().then(
     (database) =>
@@ -80,7 +81,7 @@ export function loadSession(): Promise<Uint8Array | null> {
           try {
             resolve(toBytes(request.result));
           } catch (error) {
-            reject(error);
+            reject(asError(error));
           }
         };
         request.onerror = () => {

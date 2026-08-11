@@ -1,7 +1,7 @@
 use std::{future::Future, pin::Pin};
 
 /// The core decides *what* to persist, the carrier *where*: a file natively,
-/// IndexedDB in a worker, which has no `localStorage`.
+/// `IndexedDB` in a worker, which has no `localStorage`.
 #[cfg(not(target_family = "wasm"))]
 pub trait SessionStore: Send + Sync + 'static {
     fn load(&self) -> Pin<Box<dyn Future<Output = Option<Vec<u8>>> + Send + '_>>;
@@ -68,7 +68,12 @@ pub struct MemorySessionStore {
 #[cfg(not(target_family = "wasm"))]
 impl SessionStore for MemorySessionStore {
     fn load(&self) -> Pin<Box<dyn Future<Output = Option<Vec<u8>>> + Send + '_>> {
-        Box::pin(async move { self.bytes.lock().unwrap().clone() })
+        Box::pin(async move {
+            self.bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+        })
     }
 
     fn save(
@@ -76,14 +81,20 @@ impl SessionStore for MemorySessionStore {
         bytes: Vec<u8>,
     ) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send + '_>> {
         Box::pin(async move {
-            *self.bytes.lock().unwrap() = Some(bytes);
+            *self
+                .bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(bytes);
             Ok(())
         })
     }
 
     fn clear(&self) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async move {
-            *self.bytes.lock().unwrap() = None;
+            *self
+                .bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         })
     }
 }
@@ -91,19 +102,30 @@ impl SessionStore for MemorySessionStore {
 #[cfg(target_family = "wasm")]
 impl SessionStore for MemorySessionStore {
     fn load(&self) -> Pin<Box<dyn Future<Output = Option<Vec<u8>>> + '_>> {
-        Box::pin(async move { self.bytes.lock().unwrap().clone() })
+        Box::pin(async move {
+            self.bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+        })
     }
 
     fn save(&self, bytes: Vec<u8>) -> Pin<Box<dyn Future<Output = Result<(), String>> + '_>> {
         Box::pin(async move {
-            *self.bytes.lock().unwrap() = Some(bytes);
+            *self
+                .bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(bytes);
             Ok(())
         })
     }
 
     fn clear(&self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
         Box::pin(async move {
-            *self.bytes.lock().unwrap() = None;
+            *self
+                .bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         })
     }
 }

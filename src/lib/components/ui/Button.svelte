@@ -1,34 +1,43 @@
 <script lang="ts">
   import { Button as BitsButton } from 'bits-ui';
   import type { Snippet } from 'svelte';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
 
   type Props = {
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
+    onclick?: HTMLButtonAttributes['onclick'];
     children?: Snippet;
   };
 
-  let { type = 'button', disabled = false, children }: Props = $props();
+  let { type = 'button', disabled = false, onclick, children }: Props = $props();
 </script>
 
-<BitsButton.Root {type} {disabled} class="sable-button">
+<BitsButton.Root {type} {disabled} {onclick} class="sable-button">
   {@render children?.()}
 </BitsButton.Root>
 
 <style>
   :global(.sable-button) {
+    align-items: center;
     background: var(--sable-primary-container);
     border: 1px solid var(--sable-primary-container-line);
     border-radius: var(--radius);
     color: var(--sable-primary-on-container);
-    font: inherit;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
     min-height: 2.75rem;
+  }
 
-    transition:
-      background-color 150ms ease,
-      border-color 150ms ease,
-      box-shadow 120ms ease,
-      filter 120ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.sable-button) {
+      transition:
+        background-color var(--motion-normal) ease,
+        border-color var(--motion-normal) ease,
+        box-shadow var(--motion-normal) ease,
+        filter var(--motion-normal) ease;
+    }
   }
 
   :global(.sable-button:hover:not(:disabled)) {

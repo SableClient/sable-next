@@ -6,9 +6,10 @@
     ".svelte-kit/non-ambient.d.ts",
     ".svelte-kit/types/**/$types.d.ts",
     "vite.config.ts",
+    "oxfmt.config.ts",
     "src/app.d.ts",
-    "src/routes/**/*.svelte",
-    "src/routes/**/+*.ts"
+    "src/**/*.svelte",
+    "src/**/*.ts"
   ],
   "compilerOptions": {
     "rewriteRelativeImportExtensions": true,

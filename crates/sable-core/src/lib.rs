@@ -17,6 +17,7 @@ use std::{
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
+use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
 use matrix_sdk::encryption::VerificationState;
 use matrix_sdk::encryption::recovery::RecoveryState;
 use matrix_sdk::encryption::verification::{
@@ -30,6 +31,7 @@ use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::session::get_login_types::v3::LoginType;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
+use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
 use matrix_sdk::ruma::events::InitialStateEvent;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::presence::PresenceEvent;
@@ -170,7 +172,7 @@ fn sync_status(state: SyncState) -> SyncStatus {
         SyncState::Error(error) => SyncStatus::Error {
             message: error.to_string(),
         },
-        _ => SyncStatus::Syncing,
+        SyncState::Offline => SyncStatus::Syncing,
     }
 }
 
@@ -192,6 +194,7 @@ pub struct Core {
 }
 
 impl Core {
+    #[allow(clippy::arc_with_non_send_sync)] // WASM keeps the core on one event-loop thread
     pub fn new(
         store_id: impl Into<String>,
         sessions: Box<dyn SessionStore>,
@@ -227,6 +230,62 @@ impl Core {
         CommandErr::Failed { log_id }
     }
 
+    fn login_error(&self, error: matrix_sdk::Error) -> CommandErr {
+        if error.client_api_error_kind() == Some(&ErrorKind::Forbidden) {
+            return CommandErr::Denied;
+        }
+
+        match error {
+            matrix_sdk::Error::Http(error) => self.homeserver_http_error("login", *error),
+            _ => self.failed("login", error),
+        }
+    }
+
+    fn homeserver_http_error(&self, context: &str, error: matrix_sdk::HttpError) -> CommandErr {
+        match error.client_api_error_kind() {
+            Some(ErrorKind::LimitExceeded(limit)) => CommandErr::RateLimited {
+                retry_after_ms: limit.retry_after.as_ref().and_then(|retry_after| {
+                    let RetryAfter::Delay(delay) = retry_after else {
+                        return None;
+                    };
+                    delay.as_millis().try_into().ok()
+                }),
+            },
+            _ if error
+                .as_client_api_error()
+                .is_some_and(|api_error| api_error.status_code.as_u16() == 429) =>
+            {
+                CommandErr::RateLimited {
+                    retry_after_ms: None,
+                }
+            }
+            _ if matches!(error, matrix_sdk::HttpError::Reqwest(_)) => CommandErr::Unavailable,
+            _ if error
+                .as_client_api_error()
+                .is_some_and(|api_error| api_error.status_code.is_server_error()) =>
+            {
+                CommandErr::Unavailable
+            }
+            _ => self.failed(context, error),
+        }
+    }
+
+    fn discovery_error(&self, error: matrix_sdk::ClientBuildError) -> CommandErr {
+        match error {
+            matrix_sdk::ClientBuildError::Http(error) => {
+                self.homeserver_http_error("login_flows: discovery", error)
+            }
+            _ => CommandErr::UnknownHomeserver,
+        }
+    }
+
+    /// Dispatches one protocol command to the Matrix client.
+    ///
+    /// # Errors
+    ///
+    /// Returns a protocol error when the command is invalid, the user is not
+    /// authenticated, or the Matrix operation fails.
+    #[allow(clippy::assigning_clones, clippy::too_many_lines)] // protocol dispatch centralizes one boundary; the SDK response is borrowed
     pub async fn dispatch(self: &Arc<Self>, command: Command) -> Result<CommandOk, CommandErr> {
         match command {
             Command::DiscoverHomeserver { server_name } => {
@@ -275,12 +334,11 @@ impl Core {
             Command::SubscribeTimeline { room_id } => self.subscribe_timeline(room_id).await,
 
             Command::Unsubscribe { subscription } => {
-                if let Some(task) = self.subscriptions.lock().await.remove(&subscription) {
+                let task = self.subscriptions.lock().await.remove(&subscription);
+                task.map_or(Err(CommandErr::UnknownSubscription), |task| {
                     task.abort();
                     Ok(CommandOk::Unsubscribe)
-                } else {
-                    Err(CommandErr::UnknownSubscription)
-                }
+                })
             }
 
             Command::Paginate { room_id, count } => {
@@ -415,7 +473,7 @@ impl Core {
 
             Command::Devices => {
                 let client = self.client().await?;
-                let own_device_id = client.device_id().map(|id| id.to_owned());
+                let own_device_id = client.device_id().map(ToOwned::to_owned);
 
                 let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
                 let devices = client
@@ -1061,7 +1119,7 @@ impl Core {
                     .transaction_id()
                     .is_some_and(|id| id == transaction_id)
             })
-            .and_then(|event| event.local_echo_send_handle())
+            .and_then(matrix_sdk_ui::timeline::EventTimelineItem::local_echo_send_handle)
             .ok_or(CommandErr::UnknownLocalEcho)
     }
 
@@ -1083,7 +1141,7 @@ impl Core {
             .initial_device_display_name("Sable")
             .request_refresh_token()
             .await
-            .map_err(|error| self.failed("login", error))?;
+            .map_err(|error| self.login_error(error))?;
 
         let matrix = client
             .matrix_auth()
@@ -1104,7 +1162,7 @@ impl Core {
     async fn login_flows(self: &Arc<Self>, homeserver: String) -> Result<CommandOk, CommandErr> {
         let client = session::discovery_client(&homeserver)
             .await
-            .map_err(|_| CommandErr::UnknownHomeserver)?;
+            .map_err(|error| self.discovery_error(error))?;
 
         let mut flows = protocol::LoginFlowsView {
             password: false,
@@ -1144,15 +1202,30 @@ impl Core {
                     }
                 }
             }
-            Err(error) => tracing::debug!("no legacy login flows: {error}"),
+            Err(error) if error.is_endpoint_not_implemented() => {
+                tracing::debug!("homeserver has no legacy login flows: {error}");
+            }
+            Err(error) => {
+                return Err(self.homeserver_http_error("login_flows: legacy", error));
+            }
         }
 
         // OAuth is advertised by auth-metadata, not by /login.
-        flows.oidc = client.oauth().server_metadata().await.is_ok();
+        match client.oauth().server_metadata().await {
+            Ok(_) => flows.oidc = true,
+            Err(OAuthDiscoveryError::NotSupported) => {}
+            Err(OAuthDiscoveryError::Http(error)) if !flows.password && !flows.sso => {
+                return Err(self.homeserver_http_error("login_flows: oauth", error));
+            }
+            Err(error) if !flows.password && !flows.sso => {
+                return Err(self.failed("login_flows: oauth", error));
+            }
+            Err(error) => tracing::debug!("OAuth login is unavailable: {error}"),
+        }
 
         // Nothing we can drive. Report it instead of an empty form.
         if !flows.password && !flows.sso && !flows.oidc {
-            return Err(CommandErr::UnknownHomeserver);
+            return Err(CommandErr::Unsupported);
         }
 
         Ok(CommandOk::LoginFlows { flows })
@@ -1277,9 +1350,9 @@ impl Core {
             ));
         }
 
-        let (homeserver, _, client) = pending
-            .take()
-            .expect("pending SSO flow exists after checking it");
+        let Some((homeserver, _, client)) = pending.take() else {
+            return Err(CommandErr::Unavailable);
+        };
         drop(pending);
 
         client
@@ -1353,7 +1426,8 @@ impl Core {
         self.subscriptions.lock().await.clear();
         self.timelines.lock().await.clear();
 
-        if let Some(session) = self.session.write().await.take() {
+        let session = self.session.write().await.take();
+        if let Some(session) = session {
             session.sync_service.stop().await;
 
             // The matrix logout endpoint is absent for OAuth. Tokens stay live.
@@ -1400,7 +1474,7 @@ impl Core {
         homeserver: String,
     ) -> Result<(), CommandErr> {
         let oauth = client.oauth().full_session().is_some();
-        self.watch_session(&client, homeserver.clone());
+        self.watch_session(&client, &homeserver);
         self.watch_ephemeral(&client);
         self.watch_encryption(&client);
         self.watch_incoming_verifications(&client);
@@ -1479,7 +1553,7 @@ impl Core {
             }
         });
 
-        let own_user_id = client.user_id().map(|id| id.to_owned());
+        let own_user_id = client.user_id().map(ToOwned::to_owned);
 
         client.add_event_handler({
             let core = self.clone();
@@ -1614,7 +1688,7 @@ impl Core {
             .encryption()
             .get_verification(user_id, flow_id)
             .await
-            .and_then(|verification| verification.sas())
+            .and_then(matrix_sdk::encryption::verification::Verification::sas)
             .ok_or(CommandErr::UnknownVerification)
     }
 
@@ -1622,7 +1696,7 @@ impl Core {
     /// registration would mean tracking what the UI looks at, and a room list
     /// row needs typing for rooms that are shut.
     fn watch_ephemeral(self: &Arc<Self>, client: &matrix_sdk::Client) {
-        let own_user_id = client.user_id().map(|id| id.to_owned());
+        let own_user_id = client.user_id().map(ToOwned::to_owned);
 
         client.add_event_handler({
             let core = self.clone();
@@ -1674,9 +1748,9 @@ impl Core {
 
     /// The SDK rotates the OAuth refresh token when it refreshes. Without
     /// re-persisting, the next cold start authenticates with a spent one.
-    fn watch_session(self: &Arc<Self>, client: &matrix_sdk::Client, homeserver: String) {
+    fn watch_session(self: &Arc<Self>, client: &matrix_sdk::Client, homeserver: &str) {
         let saver = self.clone();
-        let saved_homeserver = homeserver.clone();
+        let saved_homeserver = homeserver.to_owned();
 
         let save = move |client: matrix_sdk::Client| {
             let Some(persisted) = session::current_session(&client, saved_homeserver.clone())
@@ -1835,6 +1909,11 @@ impl Core {
     }
 
     /// Authenticated media needs the access token, so the fetch happens here.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the media URI is invalid, the user is logged out,
+    /// or the homeserver rejects the request.
     pub async fn media_thumbnail(
         &self,
         source: String,
@@ -1864,6 +1943,11 @@ impl Core {
 
     /// For the avatar commands. Not for attachments: `send_attachment` keeps the
     /// upload and the event in one queue entry so they retry together.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the MIME type is invalid, the user is logged out,
+    /// or the upload fails.
     pub async fn upload_media(&self, mime: String, bytes: Vec<u8>) -> Result<String, CommandErr> {
         let mime: Mime = mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
 
@@ -1880,6 +1964,11 @@ impl Core {
 
     /// Returns once queued, not once uploaded. Progress and failure arrive as
     /// `send_state` on the local echo.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an attachment field is invalid, the room is
+    /// unavailable, or queuing the upload fails.
     pub async fn send_attachment(
         &self,
         room_id: String,
@@ -1915,6 +2004,7 @@ impl Core {
     }
 
     /// Cached: building one twice gives the UI two streams for one room.
+    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
     async fn timeline(&self, room_id: &OwnedRoomId) -> Result<Arc<Timeline>, CommandErr> {
         if let Some(timeline) = self.timelines.lock().await.get(room_id) {
             return Ok(timeline.clone());
@@ -1951,6 +2041,9 @@ mod tests {
 }
 
 #[cfg(test)]
+// These ignored network tests intentionally panic with context on an unexpected
+// server response; production command paths remain panic-free.
+#[allow(clippy::expect_used, clippy::panic)]
 mod live_tests {
     use super::*;
 
@@ -1991,6 +2084,6 @@ mod live_tests {
             .await
             .expect_err("login should fail");
 
-        assert!(matches!(error, CommandErr::Failed { .. }), "got {error:?}");
+        assert!(matches!(error, CommandErr::Denied), "got {error:?}");
     }
 }

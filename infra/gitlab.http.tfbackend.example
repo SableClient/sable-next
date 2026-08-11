@@ -1,0 +1,7 @@
+address = "https://gitlab.com/api/v4/projects/replace-with-gitlab-project-id/terraform/state/sable-next-development"
+lock_address = "https://gitlab.com/api/v4/projects/replace-with-gitlab-project-id/terraform/state/sable-next-development/lock"
+unlock_address = "https://gitlab.com/api/v4/projects/replace-with-gitlab-project-id/terraform/state/sable-next-development/lock"
+username = "replace-with-gitlab-username"
+lock_method = "POST"
+unlock_method = "DELETE"
+retry_wait_min = 5

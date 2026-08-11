@@ -5,7 +5,7 @@ use sable_core::store::SessionStore;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
-/// A SharedWorker has no `localStorage`, so the JS side owns IndexedDB and hands
+/// A `SharedWorker` has no `localStorage`, so the JS side owns `IndexedDB` and hands
 /// it over as three functions.
 pub struct JsSessionStore {
     load: Function,

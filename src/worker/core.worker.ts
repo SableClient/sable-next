@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 
 import init, { SableCore } from '@/generated/wasm/sable_wasm.js';
+import type { CommandErr } from '@/generated/CommandErr';
+import type { CommandOk } from '@/generated/CommandOk';
+import type { CoreEvent } from '@/generated/CoreEvent';
 import { clearSession, loadSession, saveSession } from '@/platform/sessionStorage';
 import type { WorkerMessage, WorkerRequest } from './protocol';
 
@@ -8,6 +11,19 @@ declare const self: SharedWorkerGlobalScope;
 
 // One core per origin: every tab shares this sync loop and store.
 const ports = new Set<MessagePort>();
+
+function parseCoreEvent(json: string): CoreEvent {
+  // The WASM boundary serializes these values from the generated protocol types.
+  return JSON.parse(json) as CoreEvent;
+}
+
+function parseCommandOk(json: string): CommandOk {
+  return JSON.parse(json) as CommandOk;
+}
+
+function parseCommandErr(json: string): CommandErr {
+  return JSON.parse(json) as CommandErr;
+}
 
 const core = init().then(() => {
   const instance = new SableCore(
@@ -21,7 +37,7 @@ const core = init().then(() => {
   );
 
   instance.subscribeEvents((json: string) => {
-    broadcast({ event: JSON.parse(json) });
+    broadcast({ event: parseCoreEvent(json) });
   });
 
   return instance;
@@ -67,13 +83,13 @@ self.onconnect = (connect: MessageEvent) => {
       }
 
       const ok = await instance.submitCommand(JSON.stringify(request.command));
-      port.postMessage({ id, ok: JSON.parse(ok) } satisfies WorkerMessage);
+      port.postMessage({ id, ok: parseCommandOk(ok) } satisfies WorkerMessage);
     } catch (cause) {
       // The core rejects with the JSON of `CommandErr`. Anything else is a
       // carrier bug, reported as `failed` instead of swallowed.
-      const err =
+      const err: CommandErr =
         typeof cause === 'string'
-          ? JSON.parse(cause)
+          ? parseCommandErr(cause)
           : { code: 'failed' as const, log_id: String(cause) };
 
       port.postMessage({ id, err } satisfies WorkerMessage);
