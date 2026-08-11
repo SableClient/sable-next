@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { SessionInfo } from '@/generated/SessionInfo';
@@ -226,4 +227,82 @@ export class CoreClient {
 
 export function createCoreClient(): CoreClient {
   return new CoreClient();
+=======
+import type { Command } from '@/generated/Command';
+import type { CoreEvent } from '@/generated/CoreEvent';
+import type { SessionInfo } from '@/generated/SessionInfo';
+import { createTransport } from '@/transport/create';
+import type { ResponseFor, Transport } from '@/transport';
+
+export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'ready' | 'error';
+
+export class CoreClient {
+	status = $state<CoreStatus>('idle');
+	session = $state<SessionInfo | null>(null);
+	error = $state<unknown>(null);
+
+	#transport: Transport | undefined;
+	#unsubscribe: (() => void) | undefined;
+
+	async start(): Promise<void> {
+		if (this.status === 'starting' || this.status === 'ready' || this.status === 'signed-out') return;
+
+		this.status = 'starting';
+		this.error = null;
+
+		try {
+			const transport = createTransport();
+			this.#transport = transport;
+			this.#unsubscribe = transport.subscribe((event) => this.handleEvent(event));
+
+			const { session } = await transport.send({ type: 'restore' });
+			this.session = session;
+			this.status = session ? 'ready' : 'signed-out';
+		} catch (error) {
+			this.stop();
+			this.error = error;
+			this.status = 'error';
+		}
+	}
+
+	async send<C extends Command>(command: C): Promise<ResponseFor<C['type']>> {
+		if (!this.#transport) throw new Error('Sable core is not running');
+		return this.#transport.send(command);
+	}
+
+	async login(homeserver: string, username: string, password: string): Promise<void> {
+		if (!this.#transport) throw new Error('Sable core is not running');
+
+		this.status = 'starting';
+		this.error = null;
+
+		try {
+			await this.#transport.send({ type: 'login', homeserver, username, password });
+			const { session } = await this.#transport.send({ type: 'restore' });
+			this.session = session;
+			this.status = session ? 'ready' : 'signed-out';
+		} catch (error) {
+			this.error = error;
+			this.status = 'signed-out';
+			throw error;
+		}
+	}
+
+	stop(): void {
+		this.#unsubscribe?.();
+		this.#unsubscribe = undefined;
+		this.#transport?.close();
+		this.#transport = undefined;
+	}
+
+	private handleEvent(event: CoreEvent): void {
+		if (event.type !== 'session_ended') return;
+		this.session = null;
+		this.status = 'signed-out';
+	}
+}
+
+export function createCoreClient(): CoreClient {
+	return new CoreClient();
+>>>>>>> 129601c (add missing file)
 }
