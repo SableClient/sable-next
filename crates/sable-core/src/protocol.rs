@@ -26,6 +26,16 @@ pub enum Command {
     CompleteOidcLogin {
         callback_url: String,
     },
+    /// Returns the URL to open in the system browser.
+    StartSsoLogin {
+        homeserver: String,
+        redirect_uri: String,
+        idp_id: Option<String>,
+    },
+    /// The full redirect URI the browser landed on, query string included.
+    CompleteSsoLogin {
+        callback_url: String,
+    },
     Restore,
     Logout,
 
@@ -337,6 +347,13 @@ pub enum CommandOk {
         authorization_url: String,
     },
     CompleteOidcLogin {
+        #[ts(type = "string")]
+        user_id: OwnedUserId,
+    },
+    StartSsoLogin {
+        authorization_url: String,
+    },
+    CompleteSsoLogin {
         #[ts(type = "string")]
         user_id: OwnedUserId,
     },
@@ -867,6 +884,17 @@ pub struct LoginFlowsView {
     pub password: bool,
     pub oidc: bool,
     pub sso: bool,
+    pub oauth_aware_preferred: bool,
+    pub sso_identity_providers: Vec<SsoIdentityProviderView>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct SsoIdentityProviderView {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+    pub brand: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

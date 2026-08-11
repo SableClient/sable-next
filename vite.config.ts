@@ -3,6 +3,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  server: {
+    // Keep the frontend endpoint aligned with src-tauri/tauri.conf.json.
+    port: 3000,
+    strictPort: true,
+  },
   plugins: [
     sveltekit({
       alias: {

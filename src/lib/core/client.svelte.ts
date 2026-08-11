@@ -1,4 +1,5 @@
 import type { CoreEvent } from '@/generated/CoreEvent';
+import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { SessionInfo } from '@/generated/SessionInfo';
 
 import { createTransport } from '../../transport/create';
@@ -48,6 +49,98 @@ export class CoreClient {
         homeserver,
         username,
         password,
+      });
+
+      if (generation !== this.generation || transport !== this.transport) return;
+
+      this.session = { user_id: response.user_id };
+      this.status = 'ready';
+    } catch (error) {
+      if (generation === this.generation && transport === this.transport) {
+        this.status = 'error';
+      }
+      throw error;
+    }
+  }
+
+  async loginFlows(homeserver: string): Promise<LoginFlowsView> {
+    const transport = this.ensureTransport();
+    const response = await transport.send({
+      type: 'login_flows',
+      homeserver,
+    });
+    return response.flows;
+  }
+
+  async startOidcLogin(homeserver: string, redirectUri: string): Promise<string> {
+    const transport = this.ensureTransport();
+    const response = await transport.send({
+      type: 'start_oidc_login',
+      homeserver,
+      redirect_uri: redirectUri,
+    });
+    return response.authorization_url;
+  }
+
+  async completeOidcLogin(callbackUrl: string): Promise<void> {
+    let transport: Transport;
+    try {
+      transport = this.ensureTransport();
+    } catch (error) {
+      this.status = 'error';
+      throw error;
+    }
+
+    const generation = ++this.generation;
+    this.status = 'starting';
+    this.session = null;
+
+    try {
+      const response = await transport.send({
+        type: 'complete_oidc_login',
+        callback_url: callbackUrl,
+      });
+
+      if (generation !== this.generation || transport !== this.transport) return;
+
+      this.session = { user_id: response.user_id };
+      this.status = 'ready';
+    } catch (error) {
+      if (generation === this.generation && transport === this.transport) {
+        this.status = 'error';
+      }
+      throw error;
+    }
+  }
+
+  async startSsoLogin(homeserver: string, redirectUri: string, idpId?: string): Promise<string> {
+    const transport = this.ensureTransport();
+    const response = await transport.send({
+      type: 'start_sso_login',
+      homeserver,
+      redirect_uri: redirectUri,
+      idp_id: idpId ?? null,
+    });
+    return response.authorization_url;
+  }
+
+  async completeSsoLogin(callbackUrl: string): Promise<void> {
+    let transport: Transport;
+    try {
+      transport = this.ensureTransport();
+    } catch (error) {
+      this.status = 'error';
+      throw error;
+    }
+
+    const generation = ++this.generation;
+    this.status = 'starting';
+    this.session = null;
+
+    try {
+      const response = await transport.send({
+        type: 'complete_sso_login',
+        callback_url: callbackUrl,
       });
 
       if (generation !== this.generation || transport !== this.transport) return;

@@ -101,6 +101,18 @@ fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
     Ok(uri)
 }
 
+fn same_redirect_target(expected: &Url, callback: &Url) -> bool {
+    let mut expected_target = expected.clone();
+    expected_target.set_query(None);
+    expected_target.set_fragment(None);
+
+    let mut callback_target = callback.clone();
+    callback_target.set_query(None);
+    callback_target.set_fragment(None);
+
+    expected_target == callback_target
+}
+
 fn message_content(body: String, formatted: Option<String>) -> RoomMessageEventContent {
     match formatted {
         Some(html) => RoomMessageEventContent::text_html(body, html),
@@ -173,6 +185,8 @@ pub struct Core {
     session: RwLock<Option<Session>>,
     /// Holds the half-finished OIDC client between the two login steps.
     pending_oidc: Mutex<Option<(String, matrix_sdk::Client)>>,
+    /// Holds the half-finished SSO client between the two login steps.
+    pending_sso: Mutex<Option<(String, Url, matrix_sdk::Client)>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Task>>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
 }
@@ -191,6 +205,7 @@ impl Core {
             next_log_id: AtomicU64::new(1),
             session: RwLock::new(None),
             pending_oidc: Mutex::new(None),
+            pending_sso: Mutex::new(None),
             subscriptions: Mutex::new(HashMap::new()),
             timelines: Mutex::new(HashMap::new()),
         });
@@ -239,6 +254,16 @@ impl Core {
 
             Command::CompleteOidcLogin { callback_url } => {
                 self.complete_oidc_login(callback_url).await
+            }
+
+            Command::StartSsoLogin {
+                homeserver,
+                redirect_uri,
+                idp_id,
+            } => self.start_sso_login(homeserver, redirect_uri, idp_id).await,
+
+            Command::CompleteSsoLogin { callback_url } => {
+                self.complete_sso_login(callback_url).await
             }
 
             Command::Restore => self.restore().await,
@@ -1085,6 +1110,8 @@ impl Core {
             password: false,
             oidc: false,
             sso: false,
+            oauth_aware_preferred: false,
+            sso_identity_providers: Vec::new(),
         };
 
         // An OAuth-only homeserver answers 404 `M_UNRECOGNIZED` here, which
@@ -1094,7 +1121,25 @@ impl Core {
                 for flow in &types.flows {
                     match flow {
                         LoginType::Password(_) => flows.password = true,
-                        LoginType::Sso(_) => flows.sso = true,
+                        LoginType::Sso(sso) => {
+                            flows.sso = true;
+                            flows.oauth_aware_preferred |= sso.oauth_aware_preferred;
+                            flows
+                                .sso_identity_providers
+                                .extend(sso.identity_providers.iter().map(|provider| {
+                                    protocol::SsoIdentityProviderView {
+                                        id: provider.id.clone(),
+                                        name: provider.name.clone(),
+                                        icon: provider.icon.as_ref().map(ToString::to_string),
+                                        brand: provider.brand.as_ref().and_then(|brand| {
+                                            serde_json::to_value(brand)
+                                                .ok()?
+                                                .as_str()
+                                                .map(str::to_owned)
+                                        }),
+                                    }
+                                }));
+                        }
                         _ => {}
                     }
                 }
@@ -1176,6 +1221,89 @@ impl Core {
         self.start_session(client, homeserver).await?;
 
         Ok(CommandOk::CompleteOidcLogin { user_id })
+    }
+
+    async fn start_sso_login(
+        self: &Arc<Self>,
+        homeserver: String,
+        redirect_uri: String,
+        idp_id: Option<String>,
+    ) -> Result<CommandOk, CommandErr> {
+        let redirect_uri = Url::parse(&redirect_uri)
+            .map_err(|error| self.failed("start_sso_login: redirect_uri", error))?;
+
+        let client = session::build_client(&self.store_id, &homeserver)
+            .await
+            .map_err(|error| self.failed("start_sso_login: build_client", error))?;
+
+        let authorization_url = client
+            .matrix_auth()
+            .get_sso_login_url(redirect_uri.as_str(), idp_id.as_deref())
+            .await
+            .map_err(|error| self.failed("start_sso_login", error))?;
+
+        let mut authorization_url = Url::parse(&authorization_url)
+            .map_err(|error| self.failed("start_sso_login: authorization_url", error))?;
+        authorization_url
+            .query_pairs_mut()
+            .append_pair("action", "login");
+
+        *self.pending_sso.lock().await = Some((homeserver, redirect_uri, client));
+
+        Ok(CommandOk::StartSsoLogin {
+            authorization_url: authorization_url.to_string(),
+        })
+    }
+
+    async fn complete_sso_login(
+        self: &Arc<Self>,
+        callback_url: String,
+    ) -> Result<CommandOk, CommandErr> {
+        // The login token is single-use, so keep the client that created the
+        // redirect and consume the pending flow exactly once.
+        let callback_url = Url::parse(&callback_url)
+            .map_err(|error| self.failed("complete_sso_login: callback_url", error))?;
+
+        let mut pending = self.pending_sso.lock().await;
+        let Some((_, expected_redirect_uri, _)) = pending.as_ref() else {
+            tracing::warn!("no pending SSO login: it was started elsewhere or the core restarted");
+            return Err(CommandErr::Unavailable);
+        };
+
+        if !same_redirect_target(expected_redirect_uri, &callback_url) {
+            return Err(self.failed(
+                "complete_sso_login: callback_url",
+                "callback URL does not match the redirect URI used to start SSO",
+            ));
+        }
+
+        let (homeserver, _, client) = pending
+            .take()
+            .expect("pending SSO flow exists after checking it");
+        drop(pending);
+
+        client
+            .matrix_auth()
+            .login_with_sso_callback(callback_url.into())
+            .map_err(|error| self.failed("complete_sso_login: callback_url", error))?
+            .initial_device_display_name("Sable")
+            .request_refresh_token()
+            .await
+            .map_err(|error| self.failed("complete_sso_login", error))?;
+
+        let matrix = client.matrix_auth().session().ok_or_else(|| {
+            self.failed("complete_sso_login", "no session after a successful login")
+        })?;
+        let user_id = matrix.meta.user_id.clone();
+
+        self.persist(&PersistedSession {
+            homeserver: homeserver.clone(),
+            credentials: Credentials::Password(matrix),
+        })
+        .await?;
+        self.start_session(client, homeserver).await?;
+
+        Ok(CommandOk::CompleteSsoLogin { user_id })
     }
 
     async fn restore(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {

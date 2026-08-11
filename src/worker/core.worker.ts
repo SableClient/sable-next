@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, { SableCore } from '@/generated/wasm/sable_core.js';
+import init, { SableCore } from '@/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '@/platform/sessionStorage';
 import type { WorkerMessage, WorkerRequest } from './protocol';
 

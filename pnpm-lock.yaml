@@ -32,6 +32,9 @@ importers:
       i18next-browser-languagedetector:
         specifier: ^8.2.1
         version: 8.2.1
+      phosphor-icons-svelte:
+        specifier: ^2.1.0
+        version: 2.1.0(svelte@5.56.8)
       svelte-i18next:
         specifier: ^2.2.2
         version: 2.2.2(i18next@26.3.6(typescript@6.0.3))(svelte@5.56.8)
@@ -920,6 +923,11 @@ packages:
       vite-plus:
         optional: true
 
+  phosphor-icons-svelte@2.1.0:
+    resolution: {integrity: sha512-gTNxjkc3Wth5stZuVrMWrP07Obv5wUxg9zAqe2tujnLIKa+RaVWNgjOzR+Y9RE3l7bV1PN7dGcBAWR+ps7HA+Q==}
+    peerDependencies:
+      svelte: '>= 5'
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -1722,6 +1730,10 @@ snapshots:
       '@oxfmt/binding-win32-arm64-msvc': 0.63.0
       '@oxfmt/binding-win32-ia32-msvc': 0.63.0
       '@oxfmt/binding-win32-x64-msvc': 0.63.0
+      svelte: 5.56.8
+
+  phosphor-icons-svelte@2.1.0(svelte@5.56.8):
+    dependencies:
       svelte: 5.56.8
 
   picocolors@1.1.1: {}
