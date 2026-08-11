@@ -44,7 +44,14 @@ const core = init().then(() => {
 });
 
 function broadcast(message: WorkerMessage) {
-  for (const port of ports) port.postMessage(message);
+  for (const port of ports) {
+    try {
+      port.postMessage(message);
+    } catch {
+      // A tab closed without cleanup: drop its port instead of leaking it.
+      ports.delete(port);
+    }
+  }
 }
 
 self.onconnect = (connect: MessageEvent) => {

@@ -7,10 +7,22 @@ use std::sync::Arc;
 
 use futures_util::StreamExt;
 use js_sys::Function;
-use sable_core::{Core, protocol::Command};
+use sable_core::{
+    Core,
+    protocol::{Command, CommandErr},
+};
 use session_store::JsSessionStore;
 use tokio_stream_compat::UnboundedReceiverStream;
 use wasm_bindgen::{JsValue, prelude::*};
+
+/// The rejection payload must stay valid `CommandErr` JSON, so never
+/// interpolate a message into hand-written JSON.
+fn err_json(error: impl std::fmt::Display) -> String {
+    serde_json::to_string(&CommandErr::Failed {
+        log_id: error.to_string(),
+    })
+    .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
+}
 
 /// Without this the core's `tracing` output is discarded and a
 /// `Failed { log_id }` names a line that was never written.
@@ -73,17 +85,11 @@ impl SableCore {
     /// Returns a JSON-encoded command error when parsing or dispatch fails.
     #[wasm_bindgen(js_name = submitCommand)]
     pub async fn submit_command(&self, command: String) -> Result<String, String> {
-        let command: Command = serde_json::from_str(&command)
-            .map_err(|error| format!(r#"{{"code":"failed","log_id":"{error}"}}"#))?;
+        let command: Command = serde_json::from_str(&command).map_err(err_json)?;
 
         match self.core.dispatch(command).await {
-            Ok(response) => serde_json::to_string(&response)
-                .map_err(|error| format!(r#"{{"code":"failed","log_id":"{error}"}}"#)),
-            Err(error) => Err(
-                serde_json::to_string(&error).unwrap_or_else(|serialization| {
-                    format!(r#"{{"code":"failed","log_id":"{serialization}"}}"#)
-                }),
-            ),
+            Ok(response) => serde_json::to_string(&response).map_err(err_json),
+            Err(error) => Err(serde_json::to_string(&error).unwrap_or_else(err_json)),
         }
     }
 
@@ -102,11 +108,7 @@ impl SableCore {
         self.core
             .media_thumbnail(source, width, height)
             .await
-            .map_err(|error| {
-                serde_json::to_string(&error).unwrap_or_else(|serialization| {
-                    format!(r#"{{"code":"failed","log_id":"{serialization}"}}"#)
-                })
-            })
+            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
 
     /// Resolves once the event is queued, not once the upload completes.
@@ -128,11 +130,7 @@ impl SableCore {
         self.core
             .send_attachment(room_id, filename, mime, bytes, caption, in_reply_to)
             .await
-            .map_err(|error| {
-                serde_json::to_string(&error).unwrap_or_else(|serialization| {
-                    format!(r#"{{"code":"failed","log_id":"{serialization}"}}"#)
-                })
-            })
+            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
 
     /// # Errors
@@ -140,11 +138,10 @@ impl SableCore {
     /// Returns a JSON-encoded command error when the upload fails.
     #[wasm_bindgen(js_name = uploadMedia)]
     pub async fn upload_media(&self, mime: String, bytes: Vec<u8>) -> Result<String, String> {
-        self.core.upload_media(mime, bytes).await.map_err(|error| {
-            serde_json::to_string(&error).unwrap_or_else(|serialization| {
-                format!(r#"{{"code":"failed","log_id":"{serialization}"}}"#)
-            })
-        })
+        self.core
+            .upload_media(mime, bytes)
+            .await
+            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
 
     /// Called once. Each event arrives as the JSON of `CoreEvent`.
@@ -165,10 +162,8 @@ impl SableCore {
                     tracing::error!("failed to serialize a core event");
                     break;
                 };
-                if on_event
-                    .call1(&JsValue::NULL, &JsValue::from_str(&json))
-                    .is_err()
-                {
+                if let Err(error) = on_event.call1(&JsValue::NULL, &JsValue::from_str(&json)) {
+                    tracing::error!(?error, "event callback threw, stopping the event stream");
                     break;
                 }
             }

@@ -2,7 +2,7 @@ use std::{future::Future, pin::Pin};
 
 use js_sys::{Function, Promise, Uint8Array};
 use sable_core::store::SessionStore;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
 /// A `SharedWorker` has no `localStorage`, so the JS side owns `IndexedDB` and hands
@@ -21,7 +21,9 @@ impl JsSessionStore {
 
 async fn call(function: &Function, argument: &JsValue) -> Result<JsValue, JsValue> {
     let returned = function.call1(&JsValue::NULL, argument)?;
-    JsFuture::from(Promise::from(returned)).await
+    // A non-Promise return must fail loudly, not hang on a missing `then`.
+    let promise = returned.dyn_into::<Promise>()?;
+    JsFuture::from(promise).await
 }
 
 impl SessionStore for JsSessionStore {
