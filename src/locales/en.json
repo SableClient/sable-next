@@ -19,6 +19,7 @@
     "account": "Account",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
+    "unreadMessages": "{{count}} unread messages",
     "moreOptions": "More options",
     "openNavigation": "Open navigation",
     "closeNavigation": "Close navigation",

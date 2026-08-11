@@ -1,6 +1,8 @@
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
+import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
+import type { SubscriptionId } from '@/generated/SubscriptionId';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
@@ -14,7 +16,7 @@ export class CoreClient {
   session = $state<CoreSession | null>(null);
 
   private transport: Transport | null = null;
-  private unsubscribe: (() => void) | null = null;
+  private unsubscribeTransport: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
 
@@ -156,6 +158,19 @@ export class CoreClient {
     }
   }
 
+  async subscribeRoomList(): Promise<{ subscription: SubscriptionId; rooms: RoomSummary[] }> {
+    const response = await this.ensureTransport().send({ type: 'subscribe_room_list' });
+    return response;
+  }
+
+  async unsubscribe(subscription: SubscriptionId): Promise<void> {
+    await this.ensureTransport().send({ type: 'unsubscribe', subscription });
+  }
+
+  subscribeEvents(onEvent: (event: CoreEvent) => void): () => void {
+    return this.ensureTransport().subscribe(onEvent);
+  }
+
   stop(): void {
     this.generation += 1;
     this.startPromise = null;
@@ -194,7 +209,7 @@ export class CoreClient {
 
     const transport = createTransport();
     this.transport = transport;
-    this.unsubscribe = transport.subscribe(this.handleEvent);
+    this.unsubscribeTransport = transport.subscribe(this.handleEvent);
     return transport;
   }
 
@@ -219,9 +234,9 @@ export class CoreClient {
   };
 
   private cleanupTransport(): void {
-    const unsubscribe = this.unsubscribe;
+    const unsubscribe = this.unsubscribeTransport;
     const transport = this.transport;
-    this.unsubscribe = null;
+    this.unsubscribeTransport = null;
     this.transport = null;
 
     try {

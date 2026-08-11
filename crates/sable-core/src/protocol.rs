@@ -588,6 +588,7 @@ pub struct SubscriptionId(pub u32);
 pub struct RoomSummary {
     #[ts(type = "string")]
     pub room_id: OwnedRoomId,
+    pub canonical_alias: Option<String>,
     pub name: Option<String>,
     pub avatar_url: Option<String>,
     pub is_direct: bool,
@@ -599,8 +600,8 @@ pub struct RoomSummary {
     /// Spaces are a DAG, so there can be several.
     #[ts(type = "string[]")]
     pub space_parents: Vec<OwnedRoomId>,
-    /// Already sorted by `order`.
-    #[ts(type = "Array<{ room_id: string, order: string | null }>")]
+    /// Already sorted by `order`, then the child event's age.
+    #[ts(type = "Array<{ room_id: string, order: string | null, origin_server_ts: number }>")]
     pub space_children: Vec<SpaceChildEdge>,
     pub unread: u32,
     pub highlight: u32,
@@ -724,6 +725,9 @@ pub struct SpaceChildEdge {
     pub room_id: OwnedRoomId,
     /// `m.space.child.content.order`, unordered children sort last.
     pub order: Option<String>,
+    /// Used to consistently order sibling child edges with equal `order` values.
+    #[ts(type = "number")]
+    pub origin_server_ts: u64,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

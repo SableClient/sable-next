@@ -2,7 +2,7 @@
 import type { LatestEventView } from "./LatestEventView";
 import type { RoomStateView } from "./RoomStateView";
 
-export type RoomSummary = { room_id: string, name: string | null, avatar_url: string | null, is_direct: boolean, 
+export type RoomSummary = { room_id: string, canonical_alias: string | null, name: string | null, avatar_url: string | null, is_direct: boolean,
 /**
  * An `invited` room is an invitation to accept, not a room to open.
  */
@@ -16,6 +16,6 @@ encrypted: boolean | null, is_space: boolean,
  */
 space_parents: string[], 
 /**
- * Already sorted by `order`.
+ * Already sorted by `order`, then the child event's age.
  */
-space_children: Array<{ room_id: string, order: string | null }>, unread: number, highlight: number, latest_event: LatestEventView | null, };
+space_children: Array<{ room_id: string, order: string | null, origin_server_ts: number }>, unread: number, highlight: number, latest_event: LatestEventView | null, };

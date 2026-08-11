@@ -2,6 +2,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
+  import { roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
   import { Tooltip } from 'bits-ui';
   import ChatsIcon from 'phosphor-icons-svelte/IconChatsRegular.svelte';
   import HouseIcon from 'phosphor-icons-svelte/IconHouseRegular.svelte';
@@ -29,9 +30,17 @@
   const ROOM_NAV_WIDTH_STEP = 80;
 
   let { mobile = false, onNavigate, roomNavWidth = $bindable(224) }: Props = $props();
+  const roomList = useRoomList();
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
+  let spaces = $derived.by(() => {
+    const childSpaceIds = roomList.rooms
+      .filter((room) => room.is_space)
+      .flatMap((space) => space.space_children.map((child) => child.room_id));
+
+    return roomList.rooms.filter((room) => room.is_space && !childSpaceIds.includes(room.room_id));
+  });
 
   function clampRoomNavWidth(width: number) {
     const clamped = Math.max(MIN_ROOM_NAV_WIDTH, Math.min(MAX_ROOM_NAV_WIDTH, width));
@@ -77,6 +86,14 @@
       roomNavWidth + (event.key === 'ArrowLeft' ? -ROOM_NAV_WIDTH_STEP : ROOM_NAV_WIDTH_STEP)
     );
   }
+
+  function spaceName(name: string | null, roomId: string) {
+    return name ?? roomId;
+  }
+
+  function initial(name: string) {
+    return name.slice(0, 1).toUpperCase();
+  }
 </script>
 
 <aside class="sidebar">
@@ -98,6 +115,24 @@
                     aria-current={active ? 'page' : undefined}
                   >
                     <span class="icon" aria-hidden="true"><item.icon /></span>
+                  </a>
+                </li>
+              {/each}
+              {#each spaces as space (space.room_id)}
+                {@const name = spaceName(space.name, space.room_id)}
+                {@const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) })}
+                {@const active =
+                  page.url.pathname.startsWith(`${href}/`) || page.url.pathname === href}
+                <li>
+                  <a
+                    class="rail-item space-item"
+                    class:active
+                    {href}
+                    onclick={() => onNavigate?.(href)}
+                    aria-label={name}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <span class="space-initial" aria-hidden="true">{initial(name)}</span>
                   </a>
                 </li>
               {/each}
@@ -147,6 +182,34 @@
                       <Tooltip.Trigger child={trigger} />
                       <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
                         >{$i18n.t(item.label)}</Tooltip.Content
+                      >
+                    </Tooltip.Root>
+                  </li>
+                {/each}
+                {#each spaces as space (space.room_id)}
+                  {@const name = spaceName(space.name, space.room_id)}
+                  {@const href = resolve('/(app)/space/[spaceId]', {
+                    spaceId: roomPathParam(space),
+                  })}
+                  {@const active =
+                    page.url.pathname.startsWith(`${href}/`) || page.url.pathname === href}
+                  <li>
+                    {#snippet trigger({ props }: { props: Record<string, unknown> })}
+                      <a
+                        {...props}
+                        class="rail-item space-item"
+                        class:active
+                        {href}
+                        aria-label={name}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        <span class="space-initial" aria-hidden="true">{initial(name)}</span>
+                      </a>
+                    {/snippet}
+                    <Tooltip.Root>
+                      <Tooltip.Trigger child={trigger} />
+                      <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
+                        >{name}</Tooltip.Content
                       >
                     </Tooltip.Root>
                   </li>
@@ -304,6 +367,18 @@
 
   .icon {
     display: flex;
+  }
+
+  .space-initial {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius);
+    display: flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    height: 1.5rem;
+    justify-content: center;
+    width: 1.5rem;
   }
 
   .icon :global(svg) {

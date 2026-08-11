@@ -32,8 +32,9 @@ use crate::protocol::{
     UploadProgressView, VectorDiff,
 };
 
-pub struct SpaceInfo {
+pub struct RoomInfo {
     pub is_space: bool,
+    pub canonical_alias: Option<String>,
     pub parents: Vec<OwnedRoomId>,
     pub children: Vec<SpaceChildEdge>,
 }
@@ -41,11 +42,12 @@ pub struct SpaceInfo {
 #[must_use]
 pub fn room_summary<S: BuildHasher>(
     item: &RoomListItem,
-    space_cache: &HashMap<OwnedRoomId, SpaceInfo, S>,
+    room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
 ) -> RoomSummary {
-    let info = space_cache.get(item.room_id());
+    let info = room_cache.get(item.room_id());
     RoomSummary {
         room_id: item.room_id().to_owned(),
+        canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
         // Only `display_name()` fills this cache, so `prime_display_names` must
         // have run. `name()` covers an explicit `m.room.name` until then.
         name: item
@@ -142,10 +144,10 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
 
 /// `Room::parent_spaces` hits the state store, so this runs once per room per
 /// subscription.
-pub async fn enrich_space_fields<S: BuildHasher>(
+pub async fn enrich_room_fields<S: BuildHasher>(
     client: &Client,
     diff: &eyeball_im::VectorDiff<RoomListItem>,
-    space_cache: &mut HashMap<OwnedRoomId, SpaceInfo, S>,
+    room_cache: &mut HashMap<OwnedRoomId, RoomInfo, S>,
 ) {
     use eyeball_im::VectorDiff as In;
 
@@ -162,13 +164,14 @@ pub async fn enrich_space_fields<S: BuildHasher>(
         let room_id = item.room_id();
 
         // `Set` re-enriches when the summary changes, including re-parenting.
-        if space_cache.contains_key(room_id) && !matches!(diff, In::Set { .. }) {
+        if room_cache.contains_key(room_id) && !matches!(diff, In::Set { .. }) {
             continue;
         }
 
         let info = match client.get_room(room_id) {
             Some(room) => {
                 let is_space = room.is_space();
+                let canonical_alias = room.canonical_alias().map(|alias| alias.to_string());
 
                 let parents = match room.parent_spaces().await {
                     Ok(stream) => {
@@ -193,23 +196,25 @@ pub async fn enrich_space_fields<S: BuildHasher>(
                     Vec::new()
                 };
 
-                SpaceInfo {
+                RoomInfo {
                     is_space,
+                    canonical_alias,
                     parents,
                     children,
                 }
             }
-            None => SpaceInfo {
+            None => RoomInfo {
                 is_space: false,
+                canonical_alias: None,
                 parents: Vec::new(),
                 children: Vec::new(),
             },
         };
-        space_cache.insert(room_id.to_owned(), info);
+        room_cache.insert(room_id.to_owned(), info);
     }
 }
 
-/// Sorted lexically on `order`, unordered entries last.
+/// Sorted lexically on `order`, then oldest first; unordered entries sort last.
 async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
     let Ok(events) = room
         .get_state_events_static::<SpaceChildEventContent>()
@@ -224,22 +229,21 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
         else {
             continue;
         };
-        // Removal omits `via`, which fails to deserialize since ruma has it
-        // non-optional. This covers a client that clears it to `[]`.
-        if original.content.via.is_empty() {
-            continue;
-        }
         children.push(SpaceChildEdge {
             room_id: original.state_key.clone(),
             order: original.content.order.map(|order| order.to_string()),
+            origin_server_ts: u64::from(original.origin_server_ts.get()),
         });
     }
 
-    children.sort_by(|a, b| match (&a.order, &b.order) {
-        (Some(left), Some(right)) => left.cmp(right),
-        (Some(_), None) => std::cmp::Ordering::Less,
-        (None, Some(_)) => std::cmp::Ordering::Greater,
-        (None, None) => std::cmp::Ordering::Equal,
+    children.sort_by(|a, b| {
+        match (&a.order, &b.order) {
+            (Some(left), Some(right)) => left.cmp(right),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+        .then_with(|| a.origin_server_ts.cmp(&b.origin_server_ts))
     });
     children
 }

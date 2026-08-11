@@ -1832,20 +1832,20 @@ impl Core {
             controller.set_filter(Box::new(new_filter_non_left()));
 
             // Stable over a stream's life, so resolved once per room.
-            let mut space_cache: HashMap<OwnedRoomId, view::SpaceInfo> = HashMap::new();
+            let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();
 
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
-                    view::enrich_space_fields(&client, diff, &mut space_cache).await;
+                    view::enrich_room_fields(&client, diff, &mut room_cache).await;
                 }
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
                     diffs: diffs
                         .into_iter()
                         .map(|diff| {
-                            view::map_diff(diff, |item| view::room_summary(item, &space_cache))
+                            view::map_diff(diff, |item| view::room_summary(item, &room_cache))
                         })
                         .collect(),
                 });

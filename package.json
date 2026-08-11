@@ -58,7 +58,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,mts,cts}": [
-      "eslint --fix --max-warnings 0",
+      "eslint --fix --no-warn-ignored --max-warnings 0",
       "oxfmt"
     ],
     "*.svelte": [
