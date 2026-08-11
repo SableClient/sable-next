@@ -17,32 +17,14 @@ on:
       - 'wrangler.jsonc'
       - '.github/workflows/cloudflare-web-preview.yml'
       - '.github/actions/setup/**'
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'static/**'
-      - 'crates/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rust-toolchain.toml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'vite.config.ts'
-      - 'svelte.config.js'
-      - 'wrangler.jsonc'
-      - '.github/workflows/cloudflare-web-preview.yml'
-      - '.github/actions/setup/**'
 
 concurrency:
-  group: cloudflare-worker-preview-${{ github.event.pull_request.number || github.ref_name }}
+  group: cloudflare-worker-preview-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   deploy:
-    if: (github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'push'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -74,14 +56,7 @@ jobs:
       - name: Set deploy alias
         id: alias
         shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "alias=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          else
-            branch="${GITHUB_REF_NAME}"
-            alias="$(echo "$branch" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')"
-            echo "alias=${alias}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "alias=pr-${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Worker preview
         id: deploy
@@ -127,7 +102,7 @@ jobs:
           MARKER: '<!-- cloudflare-worker-preview -->'
           PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
           PREVIEW_ALIAS: ${{ steps.alias.outputs.alias }}
-          SHORT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SHORT_SHA: ${{ github.event.pull_request.head.sha }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
