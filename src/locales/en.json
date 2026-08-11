@@ -1,8 +1,32 @@
 {
   "nav": {
+    "primary": "Primary navigation",
+    "quickTools": "Quick tools",
     "home": "Home",
+    "messages": "Messages",
     "direct": "Direct messages",
-    "settings": "Settings"
+    "inbox": "Inbox",
+    "explore": "Explore",
+    "navigate": "Navigate",
+    "settings": "Settings",
+    "space": "Space",
+    "lobby": "Lobby",
+    "createRoom": "Create room",
+    "joinWithAddress": "Join with Address",
+    "exploreSpaces": "Explore Spaces",
+    "messageSearch": "Message Search",
+    "profile": "Profile",
+    "account": "Account",
+    "rooms": "Rooms",
+    "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
+    "moreOptions": "More options",
+    "openNavigation": "Open navigation",
+    "closeNavigation": "Close navigation",
+    "resizeRooms": "Resize rooms"
+  },
+  "home": {
+    "welcome": "Welcome to Sable",
+    "empty": "Rooms you join or create will appear here."
   },
   "auth": {
     "welcome": "Welcome to Sable",
