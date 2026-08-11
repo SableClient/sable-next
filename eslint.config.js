@@ -49,7 +49,11 @@ export default defineConfig([
       },
     },
     rules: {
+      'svelte/no-unused-props': 'error',
       'svelte/no-unused-svelte-ignore': 'error',
+      'svelte/no-useless-children-snippet': 'error',
+      'svelte/no-useless-mustaches': 'error',
+      'svelte/prefer-const': 'error',
       'svelte/valid-compile': ['error', { ignoreWarnings: false }],
     },
   },

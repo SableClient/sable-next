@@ -240,7 +240,7 @@
         <span class:closed={roomsClosed} class="category-caret" aria-hidden="true"
           ><CaretDownIcon /></span
         >
-        <h3>{$i18n.t('nav.rooms')}</h3>
+        <span class="rooms-heading-label">{$i18n.t('nav.rooms')}</span>
       </button>
     {/if}
 
@@ -327,7 +327,6 @@
   }
 
   h2,
-  h3,
   p {
     margin: 0;
   }
@@ -449,10 +448,11 @@
     background: var(--sable-bg-container-hover);
   }
 
-  h3 {
+  .rooms-heading-label {
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.06em;
+    margin: 0;
     text-transform: uppercase;
   }
 
