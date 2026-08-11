@@ -41,6 +41,10 @@
   let hasInitializedHomeserver = $state(false);
   let isLaunchingLogin = $state(false);
   let isCompletingLogin = false;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const handledCallbackUrls = new Set<string>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  const authChannels = new Set<BroadcastChannel>();
   let isAuthenticating = $derived(core.status === 'authenticating');
   let hasLoggedInBefore = $state(false);
 
@@ -91,36 +95,44 @@
 
     let disposed = false;
     let removeDeepLinkListener: (() => void) | undefined;
-    let authChannel: BroadcastChannel | undefined;
+    let callbackChannel: BroadcastChannel | undefined;
+    const isDisposed = () => disposed;
 
     const callbackUrl = window.location.href;
     if (!isTauri() && redirectLoginType(callbackUrl)) {
-      authChannel = new BroadcastChannel('sable-auth-callback');
-      authChannel.postMessage(callbackUrl);
+      callbackChannel = new BroadcastChannel(`sable-auth-callback:${window.name}`);
+      callbackChannel.postMessage(callbackUrl);
       window.setTimeout(() => {
         window.close();
       }, 0);
     } else if (isTauri()) {
-      void listen<string[]>('deep-link://new-url', (event) => {
-        const url = event.payload.find((candidate) => redirectLoginType(candidate));
-        if (url) void completeRedirectLogin(url);
-      }).then((unlisten) => {
-        if (disposed) unlisten();
-        else removeDeepLinkListener = unlisten;
-      });
-    } else {
-      authChannel = new BroadcastChannel('sable-auth-callback');
-      authChannel.onmessage = (event: MessageEvent<unknown>) => {
-        if (typeof event.data === 'string' && redirectLoginType(event.data)) {
-          void completeRedirectLogin(event.data);
+      void (async () => {
+        try {
+          const unlisten = await listen<string[]>('deep-link://new-url', (event) => {
+            const url = event.payload.find((candidate) => redirectLoginType(candidate));
+            if (url) void completeRedirectLogin(url);
+          });
+          if (isDisposed()) {
+            unlisten();
+            return;
+          }
+          removeDeepLinkListener = unlisten;
+
+          const urls = await invoke<string[] | null>('plugin:deep-link|get_current');
+          const url = urls?.find((candidate) => redirectLoginType(candidate));
+          if (!isDisposed() && url) void completeRedirectLogin(url);
+        } catch {
+          // The app can run without the deep-link plugin in browser development.
         }
-      };
+      })();
     }
 
     return () => {
       disposed = true;
       removeDeepLinkListener?.();
-      authChannel?.close();
+      callbackChannel?.close();
+      for (const authChannel of authChannels) authChannel.close();
+      authChannels.clear();
     };
   });
 
@@ -150,8 +162,9 @@
   async function completeRedirectLogin(callbackUrl: string): Promise<void> {
     if (isCompletingLogin) return;
     const loginType = redirectLoginType(callbackUrl);
-    if (!loginType) return;
+    if (!loginType || handledCallbackUrls.has(callbackUrl)) return;
 
+    handledCallbackUrls.add(callbackUrl);
     isCompletingLogin = true;
     loginError = null;
     try {
@@ -169,14 +182,29 @@
     loginType: 'oidc' | 'sso',
     identityProviderId?: string
   ): Promise<void> {
+    const popupName = `sable-auth-${crypto.randomUUID()}`;
     const popup = isTauri()
       ? null
-      : window.open('about:blank', 'sable-auth', 'popup,width=520,height=720');
+      : window.open('about:blank', popupName, 'popup,width=520,height=720');
     if (!isTauri() && !popup) {
       loginError = t('auth.allowPopups');
       return;
     }
     if (popup) popup.opener = null;
+
+    let authChannel: BroadcastChannel | undefined;
+    if (popup) {
+      const channel = new BroadcastChannel(`sable-auth-callback:${popupName}`);
+      authChannel = channel;
+      authChannels.add(channel);
+      channel.onmessage = (event: MessageEvent<unknown>) => {
+        if (typeof event.data === 'string' && redirectLoginType(event.data)) {
+          void completeRedirectLogin(event.data);
+          channel.close();
+          authChannels.delete(channel);
+        }
+      };
+    }
 
     isLaunchingLogin = true;
     loginError = null;
@@ -184,6 +212,8 @@
       const flows = await validateHomeserver();
       if (!flows) {
         popup?.close();
+        authChannel?.close();
+        if (authChannel) authChannels.delete(authChannel);
         return;
       }
 
@@ -203,6 +233,8 @@
       }
     } catch (error) {
       popup?.close();
+      authChannel?.close();
+      if (authChannel) authChannels.delete(authChannel);
       loginError = authenticationError(error);
     } finally {
       isLaunchingLogin = false;

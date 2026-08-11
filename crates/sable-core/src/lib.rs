@@ -184,13 +184,17 @@ pub struct Core {
     events: mpsc::UnboundedSender<CoreEvent>,
     next_subscription: AtomicU32,
     next_log_id: AtomicU64,
+    session_generation: AtomicU64,
+    session_store_lock: Mutex<()>,
     session: RwLock<Option<Session>>,
-    /// Holds the half-finished OIDC client between the two login steps.
-    pending_oidc: Mutex<Option<(String, matrix_sdk::Client)>>,
-    /// Holds the half-finished SSO client between the two login steps.
-    pending_sso: Mutex<Option<(String, Url, matrix_sdk::Client)>>,
+    pending_login: Mutex<Option<PendingLogin>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Task>>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
+}
+
+enum PendingLogin {
+    Oidc(String, matrix_sdk::Client),
+    Sso(String, Url, matrix_sdk::Client),
 }
 
 impl Core {
@@ -206,9 +210,10 @@ impl Core {
             events,
             next_subscription: AtomicU32::new(1),
             next_log_id: AtomicU64::new(1),
+            session_generation: AtomicU64::new(1),
+            session_store_lock: Mutex::new(()),
             session: RwLock::new(None),
-            pending_oidc: Mutex::new(None),
-            pending_sso: Mutex::new(None),
+            pending_login: Mutex::new(None),
             subscriptions: Mutex::new(HashMap::new()),
             timelines: Mutex::new(HashMap::new()),
         });
@@ -1149,12 +1154,16 @@ impl Core {
             .ok_or_else(|| self.failed("login", "no session after a successful login"))?;
 
         let user_id = matrix.meta.user_id.clone();
-        self.persist(&PersistedSession {
-            homeserver: homeserver.clone(),
-            credentials: Credentials::Password(matrix),
-        })
+        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.persist(
+            &PersistedSession {
+                homeserver: homeserver.clone(),
+                credentials: Credentials::Password(matrix),
+            },
+            generation,
+        )
         .await?;
-        self.start_session(client, homeserver).await?;
+        self.start_session(client, homeserver, generation).await?;
 
         Ok(CommandOk::Login { user_id })
     }
@@ -1255,7 +1264,11 @@ impl Core {
             .map_err(|error| self.failed("start_oidc_login", error))?;
 
         let authorization_url = data.url.to_string();
-        *self.pending_oidc.lock().await = Some((homeserver, client));
+        let mut pending = self.pending_login.lock().await;
+        if pending.is_some() {
+            return Err(CommandErr::Unavailable);
+        }
+        *pending = Some(PendingLogin::Oidc(homeserver, client));
 
         Ok(CommandOk::StartOidcLogin { authorization_url })
     }
@@ -1264,12 +1277,15 @@ impl Core {
         self: &Arc<Self>,
         callback_url: String,
     ) -> Result<CommandOk, CommandErr> {
-        // In-process only, so a lost pending login restarts the whole flow. On
-        // the web that is the worker being torn down mid-flow.
-        let Some((homeserver, client)) = self.pending_oidc.lock().await.take() else {
+        let mut pending = self.pending_login.lock().await;
+        let Some(PendingLogin::Oidc(_, _)) = pending.as_ref() else {
             tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
+        let Some(PendingLogin::Oidc(homeserver, client)) = pending.take() else {
+            return Err(CommandErr::Unavailable);
+        };
+        drop(pending);
 
         let url = Url::parse(&callback_url)
             .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
@@ -1286,12 +1302,16 @@ impl Core {
             .ok_or_else(|| self.failed("complete_oidc_login", "no session after finish_login"))?;
 
         let user_id = full.user.meta.user_id.clone();
-        self.persist(&PersistedSession {
-            homeserver: homeserver.clone(),
-            credentials: Credentials::oauth(full),
-        })
+        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.persist(
+            &PersistedSession {
+                homeserver: homeserver.clone(),
+                credentials: Credentials::oauth(full),
+            },
+            generation,
+        )
         .await?;
-        self.start_session(client, homeserver).await?;
+        self.start_session(client, homeserver, generation).await?;
 
         Ok(CommandOk::CompleteOidcLogin { user_id })
     }
@@ -1321,7 +1341,11 @@ impl Core {
             .query_pairs_mut()
             .append_pair("action", "login");
 
-        *self.pending_sso.lock().await = Some((homeserver, redirect_uri, client));
+        let mut pending = self.pending_login.lock().await;
+        if pending.is_some() {
+            return Err(CommandErr::Unavailable);
+        }
+        *pending = Some(PendingLogin::Sso(homeserver, redirect_uri, client));
 
         Ok(CommandOk::StartSsoLogin {
             authorization_url: authorization_url.to_string(),
@@ -1337,8 +1361,8 @@ impl Core {
         let callback_url = Url::parse(&callback_url)
             .map_err(|error| self.failed("complete_sso_login: callback_url", error))?;
 
-        let mut pending = self.pending_sso.lock().await;
-        let Some((_, expected_redirect_uri, _)) = pending.as_ref() else {
+        let mut pending = self.pending_login.lock().await;
+        let Some(PendingLogin::Sso(_, expected_redirect_uri, _)) = pending.as_ref() else {
             tracing::warn!("no pending SSO login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
@@ -1350,7 +1374,7 @@ impl Core {
             ));
         }
 
-        let Some((homeserver, _, client)) = pending.take() else {
+        let Some(PendingLogin::Sso(homeserver, _, client)) = pending.take() else {
             return Err(CommandErr::Unavailable);
         };
         drop(pending);
@@ -1369,12 +1393,16 @@ impl Core {
         })?;
         let user_id = matrix.meta.user_id.clone();
 
-        self.persist(&PersistedSession {
-            homeserver: homeserver.clone(),
-            credentials: Credentials::Password(matrix),
-        })
+        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.persist(
+            &PersistedSession {
+                homeserver: homeserver.clone(),
+                credentials: Credentials::Password(matrix),
+            },
+            generation,
+        )
         .await?;
-        self.start_session(client, homeserver).await?;
+        self.start_session(client, homeserver, generation).await?;
 
         Ok(CommandOk::CompleteSsoLogin { user_id })
     }
@@ -1415,7 +1443,9 @@ impl Core {
                 .map_err(|error| self.failed("restore_session: oauth", error))?,
         }
 
-        self.start_session(client, persisted.homeserver).await?;
+        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.start_session(client, persisted.homeserver, generation)
+            .await?;
 
         Ok(CommandOk::Restore {
             session: Some(info),
@@ -1423,14 +1453,9 @@ impl Core {
     }
 
     async fn logout(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
-        self.subscriptions.lock().await.clear();
-        self.timelines.lock().await.clear();
-
-        let session = self.session.write().await.take();
+        self.session_generation.fetch_add(1, Ordering::SeqCst);
+        let session = self.take_session().await;
         if let Some(session) = session {
-            session.sync_service.stop().await;
-
-            // The matrix logout endpoint is absent for OAuth. Tokens stay live.
             let result = if session.oauth {
                 session
                     .client
@@ -1451,16 +1476,27 @@ impl Core {
             if let Err(error) = result {
                 tracing::warn!("server-side logout failed, clearing locally anyway: {error}");
             }
+
+            session.sync_service.stop().await;
         }
 
-        self.sessions.clear().await;
+        self.clear_persisted_session().await;
 
         Ok(CommandOk::Logout)
     }
 
-    async fn persist(&self, persisted: &PersistedSession) -> Result<(), CommandErr> {
+    async fn persist(
+        &self,
+        persisted: &PersistedSession,
+        generation: u64,
+    ) -> Result<(), CommandErr> {
         let bytes = serde_json::to_vec(persisted)
             .map_err(|error| self.failed("persist: serialize", error))?;
+
+        let _guard = self.session_store_lock.lock().await;
+        if self.session_generation.load(Ordering::SeqCst) != generation {
+            return Ok(());
+        }
 
         self.sessions
             .save(bytes)
@@ -1468,13 +1504,25 @@ impl Core {
             .map_err(|error| self.failed("persist: save", error))
     }
 
+    async fn clear_persisted_session(&self) {
+        let _guard = self.session_store_lock.lock().await;
+        self.sessions.clear().await;
+    }
+
+    async fn take_session(&self) -> Option<Session> {
+        self.subscriptions.lock().await.clear();
+        self.timelines.lock().await.clear();
+        self.session.write().await.take()
+    }
+
     async fn start_session(
         self: &Arc<Self>,
         client: matrix_sdk::Client,
         homeserver: String,
+        generation: u64,
     ) -> Result<(), CommandErr> {
         let oauth = client.oauth().full_session().is_some();
-        self.watch_session(&client, &homeserver);
+        self.watch_session(&client, &homeserver, generation);
         self.watch_ephemeral(&client);
         self.watch_encryption(&client);
         self.watch_incoming_verifications(&client);
@@ -1748,7 +1796,12 @@ impl Core {
 
     /// The SDK rotates the OAuth refresh token when it refreshes. Without
     /// re-persisting, the next cold start authenticates with a spent one.
-    fn watch_session(self: &Arc<Self>, client: &matrix_sdk::Client, homeserver: &str) {
+    fn watch_session(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        homeserver: &str,
+        generation: u64,
+    ) {
         let saver = self.clone();
         let saved_homeserver = homeserver.to_owned();
 
@@ -1762,7 +1815,7 @@ impl Core {
             // costs the next restore, so it is logged.
             let core = saver.clone();
             rt::spawn(async move {
-                if let Err(error) = core.persist(&persisted).await {
+                if let Err(error) = core.persist(&persisted, generation).await {
                     tracing::error!("could not persist refreshed session: {error:?}");
                 }
             });
@@ -1786,7 +1839,23 @@ impl Core {
             while let Ok(change) = changes.recv().await {
                 // The session is over. No retry will fix it.
                 if let matrix_sdk::SessionChange::UnknownToken(_) = change {
-                    core.sessions.clear().await;
+                    if core
+                        .session_generation
+                        .compare_exchange(
+                            generation,
+                            generation + 1,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        )
+                        .is_err()
+                    {
+                        return;
+                    }
+
+                    if let Some(session) = core.take_session().await {
+                        session.sync_service.stop().await;
+                    }
+                    core.clear_persisted_session().await;
                     core.emit(CoreEvent::SessionEnded {
                         reason: "token_rejected".to_owned(),
                     });
