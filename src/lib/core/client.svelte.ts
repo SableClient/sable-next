@@ -1,4 +1,6 @@
 import type { CoreEvent } from '@/generated/CoreEvent';
+import type { DeviceView } from '@/generated/DeviceView';
+import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { MemberView } from '@/generated/MemberView';
 import type { RoomSummary } from '@/generated/RoomSummary';
@@ -203,6 +205,61 @@ export class CoreClient {
 
   async markRead(roomId: string, eventId: string): Promise<void> {
     await this.ensureTransport().send({ type: 'mark_read', room_id: roomId, event_id: eventId });
+  }
+
+  async encryptionStatus(): Promise<EncryptionStatusView> {
+    const response = await this.ensureTransport().send({ type: 'encryption_status' });
+    return response.status;
+  }
+
+  async devices(): Promise<DeviceView[]> {
+    const response = await this.ensureTransport().send({ type: 'devices' });
+    return response.devices;
+  }
+
+  async renameDevice(deviceId: string, displayName: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'rename_device',
+      device_id: deviceId,
+      display_name: displayName,
+    });
+  }
+
+  async deleteDevice(deviceId: string, password: string | null): Promise<void> {
+    await this.ensureTransport().send({ type: 'delete_device', device_id: deviceId, password });
+  }
+
+  async requestVerification(userId: string): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'request_verification',
+      user_id: userId,
+    });
+    return response.flow_id;
+  }
+
+  async acceptVerification(userId: string, flowId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'accept_verification',
+      user_id: userId,
+      flow_id: flowId,
+    });
+  }
+
+  async confirmVerification(userId: string, flowId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'confirm_verification',
+      user_id: userId,
+      flow_id: flowId,
+    });
+  }
+
+  async cancelVerification(userId: string, flowId: string, mismatch = false): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'cancel_verification',
+      user_id: userId,
+      flow_id: flowId,
+      mismatch,
+    });
   }
 
   async setTyping(roomId: string, typing: boolean): Promise<void> {

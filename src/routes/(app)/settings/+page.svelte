@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+  import DevicesSettings from '$lib/features/settings/DevicesSettings.svelte';
 </script>
 
-<RoutePlaceholder titleKey="nav.settings" />
+<DevicesSettings />
