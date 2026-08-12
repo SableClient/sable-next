@@ -10,6 +10,14 @@ inputs:
     description: Command used when the app build is enabled.
     required: false
     default: pnpm run build
+  install-wasm-pack:
+    description: Whether to install wasm-pack for callers that build the WASM bundle.
+    required: false
+    default: 'true'
+  install-mise-tools:
+    description: Whether to install tools declared in mise.toml.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -28,6 +36,7 @@ runs:
       with:
         cache: true
         env: false
+        install: ${{ inputs.install-mise-tools }}
 
     - name: Set up Rust for WASM generation
       uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
@@ -44,6 +53,7 @@ runs:
       run: pnpm install --frozen-lockfile
 
     - name: Install wasm-pack
+      if: ${{ inputs.install-wasm-pack == 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}
       run: cargo install wasm-pack --version 0.13.1 --locked

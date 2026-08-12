@@ -68,13 +68,11 @@ tofu -chdir=infra/web plan -var-file="../terraform.tfvars"
 tofu -chdir=infra/web apply -var-file="../terraform.tfvars"
 ```
 
-The GitHub workflows are:
-
-- `.github/workflows/cloudflare-web.yml` plans infrastructure changes and
-  applies the development state on pushes to `main`, publishing to
-  `https://next.sable.moe`.
-- `.github/workflows/cloudflare-web-preview.yml` uploads branch and same-repo PR
-  preview versions using Cloudflare Worker preview aliases.
+The GitHub workflow is `.github/workflows/application.yml`. It builds the web
+assets once per push or pull request, reuses that artifact for frontend checks,
+Playwright, desktop packaging, and Cloudflare operations, plans infrastructure
+changes, applies the development state on pushes to `main`, and uploads
+same-repository PR preview versions using Cloudflare Worker preview aliases.
 
 The Worker is configured with `single-page-application` not-found handling so
 client-side routes continue to resolve to the static SvelteKit shell.
