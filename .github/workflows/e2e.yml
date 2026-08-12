@@ -19,6 +19,8 @@ jobs:
 
       - name: Set up app
         uses: ./.github/actions/setup
+        with:
+          build: 'true'
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
