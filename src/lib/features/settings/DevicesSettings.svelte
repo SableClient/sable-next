@@ -16,6 +16,10 @@
   let editing = $state<string | null>(null);
   let displayName = $state('');
   let password = $state('');
+  let recoveryKey = $state('');
+  let recovering = $state(false);
+  let managingRecovery = $state(false);
+  let newRecoveryKey = $state<string | null>(null);
   let deleting = $state<string | null>(null);
   let verification = $state<{
     flowId: string;
@@ -42,6 +46,13 @@
     if (error.detail.code === 'denied') return t('settings.wrongPassword');
     if (error.detail.code === 'unavailable') return t('settings.verificationUnavailable');
     return t('settings.actionFailed');
+  }
+
+  function recoveryMessageFor(error: unknown): string {
+    if (error instanceof CoreError && error.detail.code === 'denied') {
+      return t('settings.invalidRecoveryKey');
+    }
+    return messageFor(error);
   }
 
   async function refresh(): Promise<void> {
@@ -72,7 +83,7 @@
       editing = null;
       await refresh();
     } catch (cause) {
-      error = messageFor(cause);
+      error = recoveryMessageFor(cause);
     }
   }
 
@@ -84,6 +95,36 @@
       await refresh();
     } catch (cause) {
       error = messageFor(cause);
+    }
+  }
+
+  async function recoverIdentity(): Promise<void> {
+    const key = recoveryKey.trim();
+    if (!key) return;
+
+    recovering = true;
+    error = null;
+    try {
+      await core.recoverIdentity(key);
+      recoveryKey = '';
+      await refresh();
+    } catch (cause) {
+      error = messageFor(cause);
+    } finally {
+      recovering = false;
+    }
+  }
+
+  async function manageRecovery(reset = false): Promise<void> {
+    managingRecovery = true;
+    error = null;
+    try {
+      newRecoveryKey = reset ? await core.resetRecoveryKey() : await core.enableRecovery();
+      await refresh();
+    } catch (cause) {
+      error = messageFor(cause);
+    } finally {
+      managingRecovery = false;
     }
   }
 
@@ -187,6 +228,51 @@
             <p>{$i18n.t('settings.verifySignedInDevice')}</p>
           </div>
           <Button onclick={startVerification}>{$i18n.t('settings.verify')}</Button>
+        </div>
+      {/if}
+      {#if status.recovery === 'incomplete'}
+        <form
+          class="recovery-form"
+          onsubmit={(event) => {
+            event.preventDefault();
+            void recoverIdentity();
+          }}
+        >
+          <label for="recovery-key">{$i18n.t('settings.recoveryKey')}</label>
+          <TextInput
+            id="recovery-key"
+            bind:value={recoveryKey}
+            autocomplete="off"
+            autocapitalize="none"
+            disabled={recovering}
+            spellcheck={false}
+            type="password"
+            placeholder={$i18n.t('settings.recoveryKeyPlaceholder')}
+          />
+          <Button type="submit" disabled={recovering || !recoveryKey.trim()}>
+            {$i18n.t('settings.recover')}
+          </Button>
+        </form>
+      {/if}
+      {#if status.recovery === 'disabled'}
+        <div class="callout">
+          <div>
+            <strong>{$i18n.t('settings.setUpRecovery')}</strong>
+            <p>{$i18n.t('settings.setUpRecoveryDescription')}</p>
+          </div>
+          <Button disabled={managingRecovery} onclick={() => void manageRecovery()}>
+            {$i18n.t('settings.setUpRecovery')}
+          </Button>
+        </div>
+      {:else if status.recovery === 'enabled'}
+        <div class="callout">
+          <div>
+            <strong>{$i18n.t('settings.resetRecoveryKey')}</strong>
+            <p>{$i18n.t('settings.resetRecoveryKeyDescription')}</p>
+          </div>
+          <Button disabled={managingRecovery} onclick={() => void manageRecovery(true)}>
+            {$i18n.t('settings.resetRecoveryKey')}
+          </Button>
         </div>
       {/if}
     {:else if loading}
@@ -316,6 +402,16 @@
         >{/if}
     </section>
   {/if}
+
+  {#if newRecoveryKey}
+    <section class="recovery-key" aria-labelledby="recovery-key-heading">
+      <h2 id="recovery-key-heading">{$i18n.t('settings.saveRecoveryKey')}</h2>
+      <p>{$i18n.t('settings.saveRecoveryKeyDescription')}</p>
+      <code>{newRecoveryKey}</code>
+      <Button onclick={() => (newRecoveryKey = null)}>{$i18n.t('settings.savedRecoveryKey')}</Button
+      >
+    </section>
+  {/if}
 </main>
 
 <style>
@@ -416,6 +512,13 @@
   code {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  .recovery-key code {
+    display: block;
+    margin: 1rem 0;
+    overflow-wrap: anywhere;
+    user-select: all;
   }
 
   .current {

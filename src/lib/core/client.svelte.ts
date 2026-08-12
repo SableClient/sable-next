@@ -320,6 +320,26 @@ export class CoreClient {
     return response.devices;
   }
 
+  async recoverIdentity(recoveryKey: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'recover_identity', recovery_key: recoveryKey });
+  }
+
+  async enableRecovery(): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'enable_recovery',
+      passphrase: null,
+    });
+    return response.recovery_key;
+  }
+
+  async resetRecoveryKey(): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'reset_recovery_key',
+      passphrase: null,
+    });
+    return response.recovery_key;
+  }
+
   async switchAccount(accountId: string): Promise<void> {
     const response = await this.ensureTransport().send({
       type: 'switch_account',

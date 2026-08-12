@@ -298,7 +298,7 @@ macro_rules! dispatch_commands {
                     .recovery()
                     .recover(&recovery_key)
                     .await
-                    .map_err(|error| $self.failed("recover_identity", error))?;
+                    .map_err(|error| $self.recovery_error(error))?;
 
                 Ok(CommandOk::RecoverIdentity)
             }

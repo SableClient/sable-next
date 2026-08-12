@@ -19,10 +19,13 @@ use std::{
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
-use matrix_sdk::encryption::VerificationState;
-use matrix_sdk::encryption::recovery::RecoveryState;
 use matrix_sdk::encryption::verification::{
     SasState, SasVerification, VerificationRequest, VerificationRequestState,
+};
+use matrix_sdk::encryption::{
+    VerificationState,
+    recovery::{RecoveryError, RecoveryState},
+    secret_storage::SecretStorageError,
 };
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
 use matrix_sdk::room::edit::EditedContent;
@@ -330,6 +333,16 @@ impl Core {
             matrix_sdk::Error::Http(error) => self.homeserver_http_error("login", *error),
             _ => self.failed("login", error),
         }
+    }
+
+    fn recovery_error(&self, error: RecoveryError) -> CommandErr {
+        if matches!(
+            error,
+            RecoveryError::SecretStorage(SecretStorageError::SecretStorageKey(_))
+        ) {
+            return CommandErr::Denied;
+        }
+        self.failed("recover_identity", error)
     }
 
     fn homeserver_http_error(&self, context: &str, error: matrix_sdk::HttpError) -> CommandErr {
@@ -1245,9 +1258,7 @@ impl Core {
             while let Some(state) = changes.next().await {
                 match state {
                     VerificationRequestState::Ready { .. } => {
-                        // Two start events would need the spec's tie-break, so
-                        // only the accepter starts.
-                        if !request.we_started()
+                        if request.we_started()
                             && let Err(error) = request.start_sas().await
                         {
                             core.failed("verification: start_sas", error);
