@@ -2,6 +2,7 @@ import type { Command } from '@/generated/Command';
 import type { CommandOk } from '@/generated/CommandOk';
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { WorkerMessage, WorkerRequest } from '@/worker/protocol';
+import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 
 export function createWebTransport(): Transport {
@@ -18,7 +19,7 @@ export function createWebTransport(): Transport {
   function connect(): SharedWorker {
     if (worker) return worker;
 
-    const workerUrl = new URL('../worker/core.worker.ts', import.meta.url);
+    const workerUrl = new URL(coreWorkerUrl, self.location.href);
     const logFilter = new URLSearchParams(self.location.search).get('log');
     if (logFilter) workerUrl.searchParams.set('log', logFilter);
 
