@@ -3,6 +3,12 @@
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
+  import {
+    finishSwipeGesture,
+    startSwipeGesture,
+    updateSwipeGesture,
+    type SwipeGesture,
+  } from './swipe-gesture';
 
   interface Props {
     children: Snippet;
@@ -20,19 +26,7 @@
     );
   }
 
-  const SWIPE_THRESHOLD = 64;
-  const VELOCITY_THRESHOLD = 0.3;
-
-  type Gesture = {
-    startX: number;
-    startY: number;
-    startPosition: number;
-    width: number;
-    lastX: number;
-    lastTime: number;
-    velocityX: number;
-    mode: 'pending' | 'drawer' | 'vertical';
-  };
+  type Gesture = SwipeGesture & { width: number };
 
   let open = $state(isNavigationRoute(page.url.pathname));
   let position = $state<number | undefined>();
@@ -47,68 +41,41 @@
   });
 
   function handleTouchStart(event: TouchEvent) {
-    if (event.touches.length !== 1) return;
-
     const target = event.currentTarget;
     if (!(target instanceof HTMLDivElement)) return;
 
-    const touch = event.touches[0];
     const width = target.clientWidth;
     if (width === 0) return;
 
-    gesture = {
-      startX: touch.clientX,
-      startY: touch.clientY,
-      startPosition: open ? 0 : -width,
-      width,
-      lastX: touch.clientX,
-      lastTime: event.timeStamp,
-      velocityX: 0,
-      mode: 'pending',
-    };
+    const swipe = startSwipeGesture(event, open ? 0 : -width);
+    if (!swipe) return;
+    gesture = { ...swipe, width };
   }
 
   function handleTouchMove(event: TouchEvent) {
-    const touch = event.touches[0];
-    if (!gesture || event.touches.length !== 1) return;
+    if (!gesture) return;
 
-    const distanceX = touch.clientX - gesture.startX;
-    const distanceY = touch.clientY - gesture.startY;
-    const elapsed = event.timeStamp - gesture.lastTime;
-    if (elapsed > 0) {
-      gesture.velocityX = (touch.clientX - gesture.lastX) / elapsed;
-      gesture.lastX = touch.clientX;
-      gesture.lastTime = event.timeStamp;
-    }
+    const update = updateSwipeGesture(gesture, event);
+    if (!update || update.mode !== 'horizontal') return;
 
-    if (gesture.mode === 'pending') {
-      if (distanceX === 0 && distanceY === 0) return;
-      if (Math.abs(distanceX) <= Math.abs(distanceY)) {
-        gesture.mode = 'vertical';
-        return;
-      }
-      gesture.mode = 'drawer';
+    if (!dragging) {
       dragging = true;
     }
-
-    if (gesture.mode !== 'drawer') return;
-    position = Math.max(-gesture.width, Math.min(0, gesture.startPosition + distanceX));
+    position = Math.max(-gesture.width, Math.min(0, gesture.startPosition + update.distanceX));
   }
 
   function finishGesture(cancelled: boolean) {
     const activeGesture = gesture;
     gesture = undefined;
-    if (!activeGesture || activeGesture.mode !== 'drawer') return;
+    if (!activeGesture || activeGesture.mode !== 'horizontal') return;
 
     const currentPosition = position ?? activeGesture.startPosition;
-    const distanceX = currentPosition - activeGesture.startPosition;
-    if (!cancelled) {
-      if (activeGesture.velocityX > VELOCITY_THRESHOLD) {
+    const result = finishSwipeGesture(activeGesture, currentPosition, cancelled);
+    if (result.handled) {
+      if (result.direction === 'right') {
         open = true;
-      } else if (activeGesture.velocityX < -VELOCITY_THRESHOLD) {
+      } else if (result.direction === 'left') {
         open = false;
-      } else if (Math.abs(distanceX) >= SWIPE_THRESHOLD) {
-        open = distanceX > 0;
       } else {
         open = currentPosition > -activeGesture.width / 2;
       }
