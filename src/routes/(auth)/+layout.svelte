@@ -10,7 +10,11 @@
   const core = useCoreClient();
 
   $effect(() => {
-    if (core.status === 'ready' && !page.url.pathname.startsWith('/register')) {
+    if (
+      core.status === 'ready' &&
+      !page.url.pathname.startsWith('/register') &&
+      !page.url.searchParams.has('addAccount')
+    ) {
       void goto(resolve('/home'));
     }
   });

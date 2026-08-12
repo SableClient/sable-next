@@ -53,6 +53,10 @@ pub enum Command {
         callback_url: String,
     },
     Restore,
+    ListAccounts,
+    SwitchAccount {
+        account_id: String,
+    },
     Logout,
 
     SubscribeRoomList,
@@ -392,6 +396,12 @@ pub enum CommandOk {
     },
     Restore {
         session: Option<SessionInfo>,
+    },
+    ListAccounts {
+        accounts: Vec<SessionInfo>,
+    },
+    SwitchAccount {
+        session: SessionInfo,
     },
     Logout,
 
@@ -998,6 +1008,7 @@ pub struct SsoIdentityProviderView {
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct SessionInfo {
+    pub account_id: String,
     #[ts(type = "string")]
     pub user_id: OwnedUserId,
     pub device_id: String,

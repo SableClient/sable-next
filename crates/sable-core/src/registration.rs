@@ -34,6 +34,8 @@ fn map_email_submit_error(body: &[u8]) -> CommandErr {
 }
 
 pub(super) struct PendingRegistration {
+    account_id: String,
+    store_id: String,
     attempt_id: u64,
     homeserver: String,
     client: matrix_sdk::Client,
@@ -157,6 +159,8 @@ impl Core {
         self: &Arc<Self>,
         client: matrix_sdk::Client,
         homeserver: String,
+        account_id: String,
+        store_id: String,
     ) -> Result<RegistrationResultView, CommandErr> {
         let matrix = client
             .matrix_auth()
@@ -165,6 +169,8 @@ impl Core {
         let user_id = matrix.meta.user_id.clone();
         let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.persist(
+            &account_id,
+            &store_id,
             &PersistedSession {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
@@ -172,7 +178,9 @@ impl Core {
             generation,
         )
         .await?;
-        self.start_session(client, homeserver, generation).await?;
+        self.start_session(client, homeserver, account_id.clone(), generation)
+            .await?;
+        self.set_active_account(&account_id).await?;
         Ok(RegistrationResultView::Complete { user_id })
     }
 
@@ -333,7 +341,8 @@ impl Core {
             .fetch_add(1, Ordering::AcqRel)
             + 1;
         self.pending_registration.lock().await.take();
-        let client = session::build_client(&self.store_id, &homeserver)
+        let (account_id, store_id) = self.allocate_account().await?;
+        let client = session::build_client(&store_id, &homeserver)
             .await
             .map_err(|error| self.failed("register: build_client", error))?;
 
@@ -353,7 +362,7 @@ impl Core {
 
         match client.matrix_auth().register(request).await {
             Ok(_) => self
-                .finish_registration(client, homeserver)
+                .finish_registration(client, homeserver, account_id, store_id)
                 .await
                 .map(|result| CommandOk::Register { result }),
             Err(error) => {
@@ -376,6 +385,8 @@ impl Core {
                     .any(|flow| flow.iter().any(|stage| stage == "m.login.email.identity"));
                 let (id_server, id_access_token) = email_params(&info);
                 *self.pending_registration.lock().await = Some(PendingRegistration {
+                    account_id,
+                    store_id,
                     attempt_id,
                     homeserver,
                     client,
@@ -554,7 +565,12 @@ impl Core {
                 Ok(_) => {
                     let client = pending.client.clone();
                     let homeserver = pending.homeserver.clone();
-                    return match self.finish_registration(client, homeserver).await {
+                    let account_id = pending.account_id.clone();
+                    let store_id = pending.store_id.clone();
+                    return match self
+                        .finish_registration(client, homeserver, account_id, store_id)
+                        .await
+                    {
                         Ok(result) => Ok(CommandOk::ContinueRegistration { result }),
                         Err(error) => {
                             self.restore_pending_registration(pending).await;

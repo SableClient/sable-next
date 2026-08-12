@@ -1,7 +1,6 @@
 import type { Command } from '@/generated/Command';
 import type { CommandOk } from '@/generated/CommandOk';
 import type { CoreEvent } from '@/generated/CoreEvent';
-import { resetWebSession } from '@/platform/sessionStorage';
 import type { WorkerMessage, WorkerRequest } from '@/worker/protocol';
 import { CoreError, type ResponseFor, type Transport } from './index';
 
@@ -15,7 +14,6 @@ export function createWebTransport(): Transport {
   >();
   let nextId = 1;
   let worker: SharedWorker | null = null;
-  let resetPromise: Promise<void> | null = null;
 
   function connect(): SharedWorker {
     if (worker) return worker;
@@ -33,7 +31,6 @@ export function createWebTransport(): Transport {
       const data = message.data;
 
       if ('event' in data) {
-        if (data.event.type === 'session_ended') resetAfterTerminalSession();
         for (const listener of listeners) listener(data.event);
         return;
       }
@@ -53,26 +50,11 @@ export function createWebTransport(): Transport {
     return nextWorker;
   }
 
-  function resetAfterTerminalSession(): void {
-    if (resetPromise) return;
-
-    const previousWorker = worker;
-    worker = null;
-    previousWorker?.port.close();
-    for (const waiting of pending.values()) waiting.reject(new Error('Session ended'));
-    pending.clear();
-
-    resetPromise = resetWebSession().finally(() => {
-      resetPromise = null;
-    });
-  }
-
   function request<T extends Reply>(
     body: (id: number) => WorkerRequest,
     transfers: Transferable[] = []
   ): Promise<T> {
     return (async () => {
-      await resetPromise;
       const id = nextId++;
       const activeWorker = connect();
 

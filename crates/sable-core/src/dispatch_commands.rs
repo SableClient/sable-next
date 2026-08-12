@@ -30,14 +30,15 @@ macro_rules! dispatch_commands {
                 registration_email,
                 registration_token,
             } => {
-                $self.register(
-                    homeserver,
-                    username,
-                    password,
-                    registration_email,
-                    registration_token,
-                )
-                .await
+                $self
+                    .register(
+                        homeserver,
+                        username,
+                        password,
+                        registration_email,
+                        registration_token,
+                    )
+                    .await
             }
 
             Command::RequestRegistrationEmail { email } => {
@@ -51,7 +52,8 @@ macro_rules! dispatch_commands {
             Command::ContinueRegistration => $self.continue_registration(true).await,
 
             Command::CancelRegistration => {
-                $self.next_registration_attempt
+                $self
+                    .next_registration_attempt
                     .fetch_add(1, Ordering::AcqRel);
                 $self.pending_registration.lock().await.take();
                 $self.pending_login.lock().await.take();
@@ -63,7 +65,8 @@ macro_rules! dispatch_commands {
                 redirect_uri,
                 intent,
             } => {
-                $self.start_oidc_login(homeserver, redirect_uri, intent)
+                $self
+                    .start_oidc_login(homeserver, redirect_uri, intent)
                     .await
             }
 
@@ -77,7 +80,8 @@ macro_rules! dispatch_commands {
                 idp_id,
                 intent,
             } => {
-                $self.start_sso_login(homeserver, redirect_uri, idp_id, intent)
+                $self
+                    .start_sso_login(homeserver, redirect_uri, idp_id, intent)
                     .await
             }
 
@@ -86,6 +90,10 @@ macro_rules! dispatch_commands {
             }
 
             Command::Restore => $self.restore().await,
+
+            Command::ListAccounts => $self.list_accounts().await,
+
+            Command::SwitchAccount { account_id } => $self.switch_account(account_id).await,
 
             Command::Logout => $self.logout().await,
 
@@ -103,7 +111,8 @@ macro_rules! dispatch_commands {
 
                 let mut active = $self.active_room_subscription.lock().await;
                 if *active == Some(subscription) {
-                    $self.sync_service()
+                    $self
+                        .sync_service()
                         .await?
                         .room_list_service()
                         .subscribe_to_rooms(&[])
@@ -165,7 +174,8 @@ macro_rules! dispatch_commands {
                 body,
                 formatted,
             } => {
-                $self.timeline(&room_id)
+                $self
+                    .timeline(&room_id)
                     .await?
                     .edit(
                         &TimelineEventItemId::EventId(event_id),
@@ -178,7 +188,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::FetchEventDetails { room_id, event_id } => {
-                $self.timeline(&room_id)
+                $self
+                    .timeline(&room_id)
                     .await?
                     .fetch_details_for_event(&event_id)
                     .await
@@ -226,7 +237,8 @@ macro_rules! dispatch_commands {
                 event_id,
                 reason,
             } => {
-                $self.timeline(&room_id)
+                $self
+                    .timeline(&room_id)
                     .await?
                     .redact(&TimelineEventItemId::EventId(event_id), reason.as_deref())
                     .await
@@ -240,7 +252,8 @@ macro_rules! dispatch_commands {
                 event_id,
                 key,
             } => {
-                $self.timeline(&room_id)
+                $self
+                    .timeline(&room_id)
                     .await?
                     .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
                     .await
@@ -278,7 +291,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::RecoverIdentity { recovery_key } => {
-                $self.client()
+                $self
+                    .client()
                     .await?
                     .encryption()
                     .recovery()
@@ -374,7 +388,8 @@ macro_rules! dispatch_commands {
                 device_id,
                 display_name,
             } => {
-                $self.client()
+                $self
+                    .client()
                     .await?
                     .rename_device(&device_id, &display_name)
                     .await
@@ -384,7 +399,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::SetDisplayName { name } => {
-                $self.client()
+                $self
+                    .client()
                     .await?
                     .account()
                     .set_display_name(name.as_deref())
@@ -400,7 +416,8 @@ macro_rules! dispatch_commands {
                     None => None,
                 };
 
-                $self.client()
+                $self
+                    .client()
                     .await?
                     .account()
                     .set_avatar_url(url.as_deref())
@@ -411,7 +428,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::IgnoreUser { user_id } => {
-                $self.client()
+                $self
+                    .client()
                     .await?
                     .account()
                     .ignore_user(&user_id)
@@ -422,7 +440,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::UnignoreUser { user_id } => {
-                $self.client()
+                $self
+                    .client()
                     .await?
                     .account()
                     .unignore_user(&user_id)
@@ -433,7 +452,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::SetTyping { room_id, typing } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .typing_notice(typing)
                     .await
@@ -500,7 +520,8 @@ macro_rules! dispatch_commands {
                     JoinRuleView::Knock => JoinRule::Knock,
                 };
 
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .send_state_event(RoomJoinRulesEventContent::new(rule))
                     .await
@@ -515,7 +536,8 @@ macro_rules! dispatch_commands {
                 state_key,
                 content,
             } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .send_state_event_raw(&event_type, &state_key, &content)
                     .await
@@ -526,7 +548,8 @@ macro_rules! dispatch_commands {
 
             Command::SetRoomName { room_id, name } => {
                 // The spec clears a name with an empty one.
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .set_name(name.unwrap_or_default())
                     .await
@@ -536,7 +559,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::SetRoomTopic { room_id, topic } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .set_room_topic(&topic)
                     .await
@@ -570,7 +594,8 @@ macro_rules! dispatch_commands {
                 user_id,
                 power_level,
             } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .update_power_levels(vec![(&user_id, power_level.into())])
                     .await
@@ -584,7 +609,8 @@ macro_rules! dispatch_commands {
                 user_id,
                 reason,
             } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .kick_user(&user_id, reason.as_deref())
                     .await
@@ -598,7 +624,8 @@ macro_rules! dispatch_commands {
                 user_id,
                 reason,
             } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .ban_user(&user_id, reason.as_deref())
                     .await
@@ -612,7 +639,8 @@ macro_rules! dispatch_commands {
                 user_id,
                 reason,
             } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .unban_user(&user_id, reason.as_deref())
                     .await
@@ -653,7 +681,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::ConfirmVerification { user_id, flow_id } => {
-                $self.sas(&user_id, &flow_id)
+                $self
+                    .sas(&user_id, &flow_id)
                     .await?
                     .confirm()
                     .await
@@ -723,12 +752,10 @@ macro_rules! dispatch_commands {
                     );
                 } else if encrypted && !public {
                     // Anyone can join and read, so encryption only breaks previews.
-                    request.initial_state = vec![
-                        InitialStateEvent::with_empty_state_key(
-                            RoomEncryptionEventContent::with_recommended_defaults(),
-                        )
-                        .to_raw_any(),
-                    ];
+                    request.initial_state = vec![InitialStateEvent::with_empty_state_key(
+                        RoomEncryptionEventContent::with_recommended_defaults(),
+                    )
+                    .to_raw_any()];
                 }
 
                 let room = client
@@ -767,7 +794,8 @@ macro_rules! dispatch_commands {
             Command::RemoveFromSpace { space_id, room_id } => {
                 // The spec delists by omitting `via`. The typed content has it
                 // non-optional and would send `{"via": []}`, a valid array.
-                $self.room(&space_id)
+                $self
+                    .room(&space_id)
                     .await?
                     .send_state_event_raw("m.space.child", room_id.as_str(), &serde_json::json!({}))
                     .await
@@ -798,7 +826,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::LeaveRoom { room_id } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .leave()
                     .await
@@ -811,7 +840,8 @@ macro_rules! dispatch_commands {
             }
 
             Command::InviteUser { room_id, user_id } => {
-                $self.room(&room_id)
+                $self
+                    .room(&room_id)
                     .await?
                     .invite_user_by_id(&user_id)
                     .await
@@ -822,7 +852,8 @@ macro_rules! dispatch_commands {
 
             Command::MarkRead { room_id, event_id } => {
                 // The server drops it unless newer, so the UI may send freely.
-                $self.timeline(&room_id)
+                $self
+                    .timeline(&room_id)
                     .await?
                     .send_single_receipt(ReceiptType::Read, event_id)
                     .await
@@ -835,7 +866,8 @@ macro_rules! dispatch_commands {
                 room_id,
                 transaction_id,
             } => {
-                $self.local_echo(&room_id, &transaction_id)
+                $self
+                    .local_echo(&room_id, &transaction_id)
                     .await?
                     .unwedge()
                     .await

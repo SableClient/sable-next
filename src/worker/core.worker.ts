@@ -38,17 +38,7 @@ const core = init().then(() => {
 
   instance.subscribeEvents((json: string) => {
     const event = parseCoreEvent(json);
-    if (event.type !== 'session_ended') {
-      broadcast({ event });
-      return;
-    }
-
-    void clearSession().finally(() => {
-      broadcast({ event });
-      setTimeout(() => {
-        self.close();
-      }, 0);
-    });
+    broadcast({ event });
   });
 
   return instance;

@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub struct Session {
+    pub account_id: String,
     pub client: Client,
     pub sync_service: Arc<SyncService>,
     /// So a re-persist after a refresh writes the value we established with.
@@ -45,7 +46,7 @@ pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedS
 
 /// The matrix API round-trips one struct. OAuth needs the registered client id
 /// alongside the session, since `OAuthSession` is not serializable.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Credentials {
     Password(MatrixSession),
@@ -55,10 +56,112 @@ pub enum Credentials {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PersistedSession {
     pub homeserver: String,
     pub credentials: Credentials,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct AccountRegistry {
+    version: u8,
+    pub active_account_id: Option<String>,
+    next_account_id: u64,
+    pub accounts: Vec<PersistedAccount>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct PersistedAccount {
+    pub account_id: String,
+    pub store_id: String,
+    pub session: PersistedSession,
+}
+
+impl AccountRegistry {
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            version: 1,
+            active_account_id: None,
+            next_account_id: 1,
+            accounts: Vec::new(),
+        }
+    }
+
+    pub fn from_bytes(
+        bytes: &[u8],
+        legacy_store_id: &str,
+    ) -> Result<(Self, bool), serde_json::Error> {
+        if let Ok(registry) = serde_json::from_slice(bytes) {
+            return Ok((registry, false));
+        }
+
+        let session = serde_json::from_slice(bytes)?;
+        Ok((
+            Self {
+                version: 1,
+                active_account_id: Some("a1".to_owned()),
+                next_account_id: 2,
+                accounts: vec![PersistedAccount {
+                    account_id: "a1".to_owned(),
+                    store_id: legacy_store_id.to_owned(),
+                    session,
+                }],
+            },
+            true,
+        ))
+    }
+
+    #[must_use]
+    pub fn allocate_account(&mut self, base_store_id: &str) -> (String, String) {
+        let account_id = format!("a{}", self.next_account_id);
+        self.next_account_id += 1;
+        let store_id = account_store_id(base_store_id, &account_id);
+        (account_id, store_id)
+    }
+
+    pub fn upsert(&mut self, account: PersistedAccount) {
+        if let Some(existing) = self
+            .accounts
+            .iter_mut()
+            .find(|existing| existing.account_id == account.account_id)
+        {
+            *existing = account;
+        } else {
+            self.accounts.push(account);
+        }
+    }
+}
+
+#[must_use]
+pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
+    format!("{base_store_id}-account-{account_id}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AccountRegistry, account_store_id};
+
+    #[test]
+    fn serializes_an_empty_registry() {
+        let bytes = serde_json::to_vec(&AccountRegistry::empty()).expect("registry serializes");
+        let (accounts, migrated) =
+            AccountRegistry::from_bytes(&bytes, "sable-next").expect("registry deserializes");
+        assert!(!migrated);
+        assert!(accounts.accounts.is_empty());
+    }
+
+    #[test]
+    fn allocates_distinct_store_ids() {
+        assert_ne!(
+            account_store_id("sable-next", "a1"),
+            account_store_id("sable-next", "a2")
+        );
+        let mut accounts = AccountRegistry::empty();
+        let (_, first) = accounts.allocate_account("sable-next");
+        let (_, second) = accounts.allocate_account("sable-next");
+        assert_ne!(first, second);
+    }
 }
 
 impl Credentials {

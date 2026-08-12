@@ -79,7 +79,7 @@ use protocol::{
     SessionInfo, SubscriptionId, SyncStatus, VerificationStateView, VerificationView,
 };
 use rt::Task;
-use session::{Credentials, PersistedSession, Session};
+use session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession, Session};
 use store::SessionStore;
 
 const ROOM_LIST_PAGE_SIZE: usize = 200;
@@ -212,6 +212,7 @@ pub struct Core {
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
     session_store_lock: Mutex<()>,
+    accounts: Mutex<Option<AccountRegistry>>,
     session: RwLock<Option<Session>>,
     pending_login: Mutex<Option<PendingLogin>>,
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
@@ -221,8 +222,8 @@ pub struct Core {
 }
 
 enum PendingLogin {
-    Oidc(String, Url, matrix_sdk::Client),
-    Sso(String, Url, matrix_sdk::Client),
+    Oidc(String, String, String, Url, matrix_sdk::Client),
+    Sso(String, String, String, Url, matrix_sdk::Client),
 }
 
 struct Subscription {
@@ -246,6 +247,7 @@ impl Core {
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
             session_store_lock: Mutex::new(()),
+            accounts: Mutex::new(None),
             session: RwLock::new(None),
             pending_login: Mutex::new(None),
             pending_registration: Mutex::new(None),
@@ -261,8 +263,52 @@ impl Core {
         let _ = self.events.send(event);
     }
 
+    fn emit_if_current(&self, generation: u64, event: CoreEvent) {
+        if self.session_generation.load(Ordering::SeqCst) == generation {
+            self.emit(event);
+        }
+    }
+
     fn allocate_subscription(&self) -> SubscriptionId {
         SubscriptionId(self.next_subscription.fetch_add(1, Ordering::Relaxed))
+    }
+
+    async fn accounts(&self) -> Result<AccountRegistry, CommandErr> {
+        let mut accounts = self.accounts.lock().await;
+        if let Some(accounts) = accounts.as_ref() {
+            return Ok(accounts.clone());
+        }
+
+        let Some(bytes) = self.sessions.load().await else {
+            let registry = AccountRegistry::empty();
+            *accounts = Some(registry.clone());
+            return Ok(registry);
+        };
+        let (registry, migrated) = AccountRegistry::from_bytes(&bytes, &self.store_id)
+            .map_err(|error| self.failed("restore: parse session file", error))?;
+        if migrated {
+            let bytes = serde_json::to_vec(&registry)
+                .map_err(|error| self.failed("migrate session registry", error))?;
+            self.sessions
+                .save(bytes)
+                .await
+                .map_err(|error| self.failed("migrate session registry", error))?;
+        }
+        *accounts = Some(registry.clone());
+        Ok(registry)
+    }
+
+    async fn allocate_account(&self) -> Result<(String, String), CommandErr> {
+        let mut accounts = self.accounts.lock().await;
+        if accounts.is_none() {
+            drop(accounts);
+            self.accounts().await?;
+            accounts = self.accounts.lock().await;
+        }
+        let Some(accounts) = accounts.as_mut() else {
+            return Err(self.failed("allocate account", "account registry is not initialized"));
+        };
+        Ok(accounts.allocate_account(&self.store_id))
     }
 
     fn failed(&self, context: &str, error: impl Display) -> CommandErr {
@@ -403,12 +449,13 @@ impl Core {
         username: String,
         password: String,
     ) -> Result<CommandOk, CommandErr> {
+        let (account_id, account_store_id) = self.allocate_account().await?;
         tracing::info!(
             operation = "password_login",
             homeserver,
             "building Matrix client"
         );
-        let client = session::build_client(&self.store_id, &homeserver)
+        let client = session::build_client(&account_store_id, &homeserver)
             .await
             .map_err(|error| self.failed("build_client", error))?;
 
@@ -433,6 +480,8 @@ impl Core {
         let user_id = matrix.meta.user_id.clone();
         let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.persist(
+            &account_id,
+            &account_store_id,
             &PersistedSession {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
@@ -445,7 +494,9 @@ impl Core {
             homeserver,
             "session persisted; starting sync"
         );
-        self.start_session(client, homeserver, generation).await?;
+        self.start_session(client, homeserver, account_id.clone(), generation)
+            .await?;
+        self.set_active_account(&account_id).await?;
 
         tracing::info!(operation = "password_login", "login completed");
         Ok(CommandOk::Login { user_id })
@@ -548,11 +599,12 @@ impl Core {
         redirect_uri: String,
         intent: AuthIntent,
     ) -> Result<CommandOk, CommandErr> {
+        let (account_id, account_store_id) = self.allocate_account().await?;
         tracing::info!(operation = "oidc_login", intent = ?intent, "starting OAuth login");
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_oidc_login: redirect_uri", error))?;
 
-        let client = session::build_client(&self.store_id, &homeserver)
+        let client = session::build_client(&account_store_id, &homeserver)
             .await
             .map_err(|error| self.failed("start_oidc_login: build_client", error))?;
 
@@ -573,14 +625,20 @@ impl Core {
 
         let authorization_url = data.url.to_string();
         let mut pending = self.pending_login.lock().await;
-        if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _))) {
+        if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _, _, _))) {
             return Err(CommandErr::Unavailable);
         }
 
         if pending.is_some() {
             tracing::warn!("replacing unfinished OIDC login with a new attempt");
         }
-        *pending = Some(PendingLogin::Oidc(homeserver, redirect_uri, client));
+        *pending = Some(PendingLogin::Oidc(
+            account_id,
+            account_store_id,
+            homeserver,
+            redirect_uri,
+            client,
+        ));
 
         tracing::info!(
             operation = "oidc_login",
@@ -598,7 +656,8 @@ impl Core {
             .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Oidc(_, expected_redirect_uri, client)) = pending.as_ref() else {
+        let Some(PendingLogin::Oidc(_, _, _, expected_redirect_uri, client)) = pending.as_ref()
+        else {
             tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
@@ -620,7 +679,9 @@ impl Core {
             .await
             .map_err(|error| self.failed("complete_oidc_login", error))?;
 
-        let Some(PendingLogin::Oidc(homeserver, _, client)) = pending.take() else {
+        let Some(PendingLogin::Oidc(account_id, account_store_id, homeserver, _, client)) =
+            pending.take()
+        else {
             return Err(CommandErr::Unavailable);
         };
         drop(pending);
@@ -633,6 +694,8 @@ impl Core {
         let user_id = full.user.meta.user_id.clone();
         let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.persist(
+            &account_id,
+            &account_store_id,
             &PersistedSession {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::oauth(full),
@@ -640,7 +703,9 @@ impl Core {
             generation,
         )
         .await?;
-        self.start_session(client, homeserver, generation).await?;
+        self.start_session(client, homeserver, account_id.clone(), generation)
+            .await?;
+        self.set_active_account(&account_id).await?;
 
         tracing::info!(operation = "oidc_login", "OAuth login completed");
         Ok(CommandOk::CompleteOidcLogin { user_id })
@@ -653,6 +718,7 @@ impl Core {
         idp_id: Option<String>,
         intent: AuthIntent,
     ) -> Result<CommandOk, CommandErr> {
+        let (account_id, account_store_id) = self.allocate_account().await?;
         tracing::info!(operation = "sso_login", intent = ?intent, "starting SSO login");
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_sso_login: redirect_uri", error))?;
@@ -660,7 +726,7 @@ impl Core {
             return Err(CommandErr::Denied);
         }
 
-        let client = session::build_client(&self.store_id, &homeserver)
+        let client = session::build_client(&account_store_id, &homeserver)
             .await
             .map_err(|error| self.failed("start_sso_login: build_client", error))?;
 
@@ -685,7 +751,13 @@ impl Core {
         if pending.is_some() {
             return Err(CommandErr::Unavailable);
         }
-        *pending = Some(PendingLogin::Sso(homeserver, redirect_uri, client));
+        *pending = Some(PendingLogin::Sso(
+            account_id,
+            account_store_id,
+            homeserver,
+            redirect_uri,
+            client,
+        ));
 
         tracing::info!(
             operation = "sso_login",
@@ -710,7 +782,7 @@ impl Core {
         }
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Sso(_, expected_redirect_uri, _)) = pending.as_ref() else {
+        let Some(PendingLogin::Sso(_, _, _, expected_redirect_uri, _)) = pending.as_ref() else {
             tracing::warn!("no pending SSO login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
@@ -722,7 +794,9 @@ impl Core {
             ));
         }
 
-        let Some(PendingLogin::Sso(homeserver, _, client)) = pending.take() else {
+        let Some(PendingLogin::Sso(account_id, account_store_id, homeserver, _, client)) =
+            pending.take()
+        else {
             return Err(CommandErr::Unavailable);
         };
         drop(pending);
@@ -743,6 +817,8 @@ impl Core {
 
         let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
         self.persist(
+            &account_id,
+            &account_store_id,
             &PersistedSession {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
@@ -750,25 +826,34 @@ impl Core {
             generation,
         )
         .await?;
-        self.start_session(client, homeserver, generation).await?;
+        self.start_session(client, homeserver, account_id.clone(), generation)
+            .await?;
+        self.set_active_account(&account_id).await?;
 
         tracing::info!(operation = "sso_login", "SSO login completed");
         Ok(CommandOk::CompleteSsoLogin { user_id })
     }
 
     async fn restore(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
-        let Some(bytes) = self.sessions.load().await else {
+        let accounts = self.accounts().await?;
+        let Some(account_id) = accounts.active_account_id else {
             return Ok(CommandOk::Restore { session: None });
         };
+        let Some(account) = accounts
+            .accounts
+            .into_iter()
+            .find(|account| account.account_id == account_id)
+        else {
+            return Err(self.failed("restore", "active account is missing"));
+        };
+        let persisted = account.session;
 
-        let persisted: PersistedSession = serde_json::from_slice(&bytes)
-            .map_err(|error| self.failed("restore: parse session file", error))?;
-
-        let client = session::build_client(&self.store_id, &persisted.homeserver)
+        let client = session::build_client(&account.store_id, &persisted.homeserver)
             .await
             .map_err(|error| self.failed("restore: build_client", error))?;
 
         let info = SessionInfo {
+            account_id: account.account_id.clone(),
             user_id: persisted
                 .credentials
                 .user_id()
@@ -793,7 +878,7 @@ impl Core {
         }
 
         let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
-        self.start_session(client, persisted.homeserver, generation)
+        self.start_session(client, persisted.homeserver, account.account_id, generation)
             .await?;
 
         Ok(CommandOk::Restore {
@@ -801,11 +886,77 @@ impl Core {
         })
     }
 
+    async fn list_accounts(&self) -> Result<CommandOk, CommandErr> {
+        let accounts = self.accounts().await?;
+        let accounts = accounts
+            .accounts
+            .into_iter()
+            .map(|account| {
+                Ok(SessionInfo {
+                    account_id: account.account_id,
+                    user_id: account
+                        .session
+                        .credentials
+                        .user_id()
+                        .parse()
+                        .map_err(|error| self.failed("list accounts: user id", error))?,
+                    device_id: account.session.credentials.device_id(),
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(CommandOk::ListAccounts { accounts })
+    }
+
+    async fn switch_account(self: &Arc<Self>, account_id: String) -> Result<CommandOk, CommandErr> {
+        let accounts = self.accounts().await?;
+        let account = accounts
+            .accounts
+            .into_iter()
+            .find(|account| account.account_id == account_id)
+            .ok_or(CommandErr::NotLoggedIn)?;
+        let persisted = account.session;
+        let client = session::build_client(&account.store_id, &persisted.homeserver)
+            .await
+            .map_err(|error| self.failed("switch account: build_client", error))?;
+        let info = SessionInfo {
+            account_id: account.account_id.clone(),
+            user_id: persisted
+                .credentials
+                .user_id()
+                .parse()
+                .map_err(|error| self.failed("switch account: user id", error))?,
+            device_id: persisted.credentials.device_id(),
+        };
+        match persisted.credentials {
+            Credentials::Password(matrix) => client
+                .restore_session(matrix)
+                .await
+                .map_err(|error| self.failed("switch account: restore_session", error))?,
+            Credentials::OAuth { client_id, user } => client
+                .oauth()
+                .restore_session(
+                    session::oauth_session(client_id, user),
+                    matrix_sdk::store::RoomLoadSettings::default(),
+                )
+                .await
+                .map_err(|error| self.failed("switch account: restore_session: oauth", error))?,
+        }
+
+        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        self.pending_registration.lock().await.take();
+        self.pending_login.lock().await.take();
+        self.start_session(client, persisted.homeserver, account.account_id, generation)
+            .await?;
+        self.set_active_account(&info.account_id).await?;
+        Ok(CommandOk::SwitchAccount { session: info })
+    }
+
     async fn logout(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
         self.session_generation.fetch_add(1, Ordering::SeqCst);
         self.pending_registration.lock().await.take();
         self.pending_login.lock().await.take();
         let session = self.take_session().await;
+        let account_id = session.as_ref().map(|session| session.account_id.clone());
         if let Some(session) = session {
             let result = if session.oauth {
                 session
@@ -831,28 +982,59 @@ impl Core {
             session.sync_service.stop().await;
         }
 
-        self.clear_persisted_session().await?;
+        self.remove_account(account_id.as_deref()).await?;
 
         Ok(CommandOk::Logout)
     }
 
     async fn persist(
         &self,
+        account_id: &str,
+        store_id: &str,
         persisted: &PersistedSession,
         generation: u64,
     ) -> Result<(), CommandErr> {
-        let bytes = serde_json::to_vec(persisted)
-            .map_err(|error| self.failed("persist: serialize", error))?;
-
         let _guard = self.session_store_lock.lock().await;
         if self.session_generation.load(Ordering::SeqCst) != generation {
             return Ok(());
         }
-
+        let mut accounts = self.accounts.lock().await;
+        let Some(registry) = accounts.as_mut() else {
+            return Err(self.failed("persist", "account registry is not initialized"));
+        };
+        registry.upsert(PersistedAccount {
+            account_id: account_id.to_owned(),
+            store_id: store_id.to_owned(),
+            session: persisted.clone(),
+        });
+        let bytes = serde_json::to_vec(registry)
+            .map_err(|error| self.failed("persist: serialize", error))?;
         self.sessions
             .save(bytes)
             .await
             .map_err(|error| self.failed("persist: save", error))
+    }
+
+    async fn set_active_account(&self, account_id: &str) -> Result<(), CommandErr> {
+        let _guard = self.session_store_lock.lock().await;
+        let mut accounts = self.accounts.lock().await;
+        let Some(registry) = accounts.as_mut() else {
+            return Err(self.failed("switch account", "account registry is not initialized"));
+        };
+        if !registry
+            .accounts
+            .iter()
+            .any(|account| account.account_id == account_id)
+        {
+            return Err(CommandErr::NotLoggedIn);
+        }
+        registry.active_account_id = Some(account_id.to_owned());
+        let bytes = serde_json::to_vec(registry)
+            .map_err(|error| self.failed("switch account: serialize", error))?;
+        self.sessions
+            .save(bytes)
+            .await
+            .map_err(|error| self.failed("switch account: save", error))
     }
 
     async fn clear_persisted_session(&self) -> Result<(), CommandErr> {
@@ -861,6 +1043,39 @@ impl Core {
             .clear()
             .await
             .map_err(|error| self.failed("clear session", error))
+    }
+
+    async fn remove_account(&self, account_id: Option<&str>) -> Result<(), CommandErr> {
+        let Some(account_id) = account_id else {
+            return self.clear_persisted_session().await;
+        };
+
+        let _guard = self.session_store_lock.lock().await;
+        let mut accounts = self.accounts.lock().await;
+        let Some(registry) = accounts.as_mut() else {
+            return Err(self.failed("remove account", "account registry is not initialized"));
+        };
+        registry
+            .accounts
+            .retain(|account| account.account_id != account_id);
+        registry.active_account_id = registry
+            .accounts
+            .first()
+            .map(|account| account.account_id.clone());
+        if registry.accounts.is_empty() {
+            self.sessions
+                .clear()
+                .await
+                .map_err(|error| self.failed("clear session", error))?;
+        } else {
+            let bytes = serde_json::to_vec(registry)
+                .map_err(|error| self.failed("logout: serialize accounts", error))?;
+            self.sessions
+                .save(bytes)
+                .await
+                .map_err(|error| self.failed("logout: save accounts", error))?;
+        }
+        Ok(())
     }
 
     async fn take_session(&self) -> Option<Session> {
@@ -874,6 +1089,7 @@ impl Core {
         self: &Arc<Self>,
         client: matrix_sdk::Client,
         homeserver: String,
+        account_id: String,
         generation: u64,
     ) -> Result<(), CommandErr> {
         let oauth = client.oauth().full_session().is_some();
@@ -881,22 +1097,26 @@ impl Core {
             .event_cache()
             .subscribe()
             .map_err(|error| self.failed("subscribe_event_cache", error))?;
-        self.watch_session(&client, &homeserver, generation);
-        self.watch_ephemeral(&client);
-        self.watch_encryption(&client);
-        self.watch_incoming_verifications(&client);
+        self.watch_session(&client, &homeserver, &account_id, generation);
+        self.watch_ephemeral(&client, generation);
+        self.watch_encryption(&client, generation);
+        self.watch_incoming_verifications(&client, generation);
 
         let sync_service = session::start_sync(client.clone())
             .await
             .map_err(|error| self.failed("start_sync", error))?;
 
+        if let Some(previous) = self.take_session().await {
+            previous.sync_service.stop().await;
+        }
+
         let core = self.clone();
         let mut states = sync_service.state();
         // `Subscriber::next` yields only on *change*, so emit the first by hand.
-        core.emit(CoreEvent::SyncStatus(sync_status(states.get())));
+        core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
         rt::spawn(async move {
             while let Some(state) = states.next().await {
-                core.emit(CoreEvent::SyncStatus(sync_status(state)));
+                core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
             }
         });
 
@@ -907,6 +1127,7 @@ impl Core {
             return Ok(());
         }
         *session = Some(Session {
+            account_id,
             client,
             sync_service,
             homeserver,
@@ -917,7 +1138,7 @@ impl Core {
     }
 
     /// Two streams, one status, so either firing re-reads both.
-    fn watch_encryption(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    fn watch_encryption(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
         let mut verification = client.encryption().verification_state();
         let recovery = client.encryption().recovery().state_stream();
 
@@ -925,9 +1146,12 @@ impl Core {
         let watched = client.clone();
         rt::spawn(async move {
             while verification.next().await.is_some() {
-                core.emit(CoreEvent::EncryptionStatus {
-                    status: encryption_status(&watched).await,
-                });
+                core.emit_if_current(
+                    generation,
+                    CoreEvent::EncryptionStatus {
+                        status: encryption_status(&watched).await,
+                    },
+                );
             }
         });
 
@@ -936,22 +1160,32 @@ impl Core {
         rt::spawn(async move {
             pin_mut!(recovery);
             while recovery.next().await.is_some() {
-                core.emit(CoreEvent::EncryptionStatus {
-                    status: encryption_status(&watched).await,
-                });
+                core.emit_if_current(
+                    generation,
+                    CoreEvent::EncryptionStatus {
+                        status: encryption_status(&watched).await,
+                    },
+                );
             }
         });
     }
 
     /// Self-verification travels to-device, verifying someone else as a DM
     /// message, so both need a handler or one direction never prompts.
-    fn watch_incoming_verifications(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    fn watch_incoming_verifications(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        generation: u64,
+    ) {
         client.add_event_handler({
             let core = self.clone();
             move |event: ToDeviceKeyVerificationRequestEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
 
                 async move {
+                    if core.session_generation.load(Ordering::SeqCst) != generation {
+                        return;
+                    }
                     if let Some(request) = client
                         .encryption()
                         .get_verification_request(
@@ -975,6 +1209,9 @@ impl Core {
                 let own_user_id = own_user_id.clone();
 
                 async move {
+                    if core.session_generation.load(Ordering::SeqCst) != generation {
+                        return;
+                    }
                     // Our own echoes back, and the command already watches it.
                     if !matches!(event.content.msgtype, MessageType::VerificationRequest(_))
                         || Some(&event.sender) == own_user_id.as_ref()
@@ -1108,7 +1345,7 @@ impl Core {
     /// Ordinary sync events, so one handler each covers every room. Per-room
     /// registration would mean tracking what the UI looks at, and a room list
     /// row needs typing for rooms that are shut.
-    fn watch_ephemeral(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    fn watch_ephemeral(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
         let own_user_id = client.user_id().map(ToOwned::to_owned);
 
         client.add_event_handler({
@@ -1128,10 +1365,13 @@ impl Core {
                         .filter(|id| Some(id) != own_user_id.as_ref())
                         .collect();
 
-                    core.emit(CoreEvent::Typing {
-                        room_id: room.room_id().to_owned(),
-                        user_ids,
-                    });
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::Typing {
+                            room_id: room.room_id().to_owned(),
+                            user_ids,
+                        },
+                    );
                 }
             }
         });
@@ -1142,18 +1382,21 @@ impl Core {
                 let core = core.clone();
 
                 async move {
-                    core.emit(CoreEvent::Presence {
-                        user_id: event.sender,
-                        presence: match event.content.presence {
-                            PresenceState::Online => PresenceView::Online,
-                            PresenceState::Offline => PresenceView::Offline,
-                            // `PresenceState` is non-exhaustive. Anything added
-                            // later reads as away, not online.
-                            _ => PresenceView::Unavailable,
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::Presence {
+                            user_id: event.sender,
+                            presence: match event.content.presence {
+                                PresenceState::Online => PresenceView::Online,
+                                PresenceState::Offline => PresenceView::Offline,
+                                // `PresenceState` is non-exhaustive. Anything added
+                                // later reads as away, not online.
+                                _ => PresenceView::Unavailable,
+                            },
+                            status_message: event.content.status_msg,
+                            last_active_ago: event.content.last_active_ago.map(Into::into),
                         },
-                        status_message: event.content.status_msg,
-                        last_active_ago: event.content.last_active_ago.map(Into::into),
-                    });
+                    );
                 }
             }
         });
@@ -1165,12 +1408,15 @@ impl Core {
         self: &Arc<Self>,
         client: &matrix_sdk::Client,
         homeserver: &str,
+        account_id: &str,
         generation: u64,
     ) {
         let saver = self.clone();
         let saved_homeserver = homeserver.to_owned();
+        let saved_account_id = account_id.to_owned();
 
         let save = move |client: matrix_sdk::Client| {
+            let account_id = saved_account_id.clone();
             let Some(persisted) = session::current_session(&client, saved_homeserver.clone())
             else {
                 return Ok(());
@@ -1180,7 +1426,25 @@ impl Core {
             // costs the next restore, so it is logged.
             let core = saver.clone();
             rt::spawn(async move {
-                if let Err(error) = core.persist(&persisted, generation).await {
+                let store_id = {
+                    let accounts = core.accounts.lock().await;
+                    accounts
+                        .as_ref()
+                        .and_then(|accounts| {
+                            accounts
+                                .accounts
+                                .iter()
+                                .find(|account| account.account_id == account_id)
+                        })
+                        .map(|account| account.store_id.clone())
+                };
+                let Some(store_id) = store_id else {
+                    return;
+                };
+                if let Err(error) = core
+                    .persist(&account_id, &store_id, &persisted, generation)
+                    .await
+                {
                     tracing::error!("could not persist refreshed session: {error:?}");
                 }
             });
@@ -1231,10 +1495,12 @@ impl Core {
             return true;
         }
 
-        if let Some(session) = self.take_session().await {
+        let session = self.take_session().await;
+        let account_id = session.as_ref().map(|session| session.account_id.clone());
+        if let Some(session) = session {
             session.sync_service.stop().await;
         }
-        if let Err(error) = self.clear_persisted_session().await {
+        if let Err(error) = self.remove_account(account_id.as_deref()).await {
             tracing::error!("could not clear rejected session: {error:?}");
         }
         self.emit(CoreEvent::SessionEnded {

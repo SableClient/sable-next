@@ -29,6 +29,7 @@
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
 
   const core = useCoreClient();
+  const isAddingAccount = page.url.searchParams.has('addAccount');
   const stageRegistry = [
     {
       route: resolve('/login'),
@@ -193,7 +194,7 @@
   });
 
   $effect(() => {
-    if (core.status !== 'signed-out' || initialized) return;
+    if ((!isAddingAccount && core.status !== 'signed-out') || initialized) return;
     initialized = true;
     void flow.validateHomeserver(displayedStage).finally(() => {
       hasCompletedInitialHomeserverCheck = true;
@@ -201,7 +202,12 @@
   });
 
   $effect(() => {
-    if (requestedStage !== 2 || isProfileStage || core.status !== 'signed-out') return;
+    if (
+      requestedStage !== 2 ||
+      isProfileStage ||
+      (!isAddingAccount && core.status !== 'signed-out')
+    )
+      return;
     void goto(resolve('/register'));
   });
 

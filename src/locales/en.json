@@ -17,6 +17,8 @@
     "messageSearch": "Message Search",
     "profile": "Profile",
     "account": "Account",
+    "switchAccount": "Switch account",
+    "addAccount": "Add account",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
     "unreadMessages": "{{count}} unread messages",

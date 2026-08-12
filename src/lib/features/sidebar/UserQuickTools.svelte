@@ -1,9 +1,10 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { Tooltip } from 'bits-ui';
+  import { DropdownMenu, Tooltip } from 'bits-ui';
   import BellIcon from 'phosphor-icons-svelte/IconBellRegular.svelte';
   import ChatsIcon from 'phosphor-icons-svelte/IconChatsRegular.svelte';
   import GearIcon from 'phosphor-icons-svelte/IconGearRegular.svelte';
@@ -20,7 +21,7 @@
   const core = useCoreClient();
   let userId = $derived(core.session?.user_id ?? '');
   let initials = $derived(userId.replace(/^@/, '').charAt(0).toUpperCase() || '?');
-  let active = $derived(page.url.pathname.startsWith('/profile'));
+  let switching = $state(false);
   const mobileTools = [
     { href: '/home', icon: ChatsIcon, label: 'nav.messages' },
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
@@ -33,6 +34,17 @@
     { href: '/navigate', icon: MagnifyingGlassIcon, label: 'nav.navigate' },
     ...desktopTools,
   ] as const;
+
+  async function switchAccount(accountId: string): Promise<void> {
+    if (accountId === core.session?.account_id || switching) return;
+    switching = true;
+    try {
+      await core.switchAccount(accountId);
+      await goto(resolve('/home'));
+    } finally {
+      switching = false;
+    }
+  }
 </script>
 
 {#if mobile}
@@ -50,16 +62,26 @@
         <span>{$i18n.t(item.label)}</span>
       </a>
     {/each}
-    <a
-      class="quick-tool mobile-tool"
-      class:active
-      href={resolve('/profile')}
-      onclick={() => onNavigate?.('/profile')}
-      aria-current={active ? 'page' : undefined}
-    >
-      <span class="avatar" aria-hidden="true">{initials}</span>
-      <span>{$i18n.t('nav.account')}</span>
-    </a>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        class="quick-tool mobile-tool"
+        aria-label={$i18n.t('nav.switchAccount')}
+      >
+        <span class="avatar" aria-hidden="true">{initials}</span>
+        <span>{$i18n.t('nav.account')}</span>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content class="account-popover" side="top" sideOffset={8}>
+        {#each core.accounts as account (account.account_id)}
+          <DropdownMenu.Item
+            disabled={switching || account.account_id === core.session?.account_id}
+            onclick={() => switchAccount(account.account_id)}>{account.user_id}</DropdownMenu.Item
+          >
+        {/each}
+        <DropdownMenu.Item onclick={() => goto(resolve('/login?addAccount=1'))}
+          >{$i18n.t('nav.addAccount')}</DropdownMenu.Item
+        >
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   </nav>
 {:else if compact}
   <Tooltip.Provider>
@@ -86,21 +108,32 @@
         </Tooltip.Root>
       {/each}
       {#snippet profileTrigger({ props }: { props: Record<string, unknown> })}
-        <a
-          {...props}
-          class="quick-tool compact-tool"
-          class:active
-          href={resolve('/profile')}
-          aria-label={$i18n.t('nav.profile')}
-          aria-current={active ? 'page' : undefined}
-        >
-          <span class="avatar" aria-hidden="true">{initials}</span>
-        </a>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            {...props}
+            class="quick-tool compact-tool"
+            aria-label={$i18n.t('nav.switchAccount')}
+          >
+            <span class="avatar" aria-hidden="true">{initials}</span>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="account-popover" side="right" sideOffset={8}>
+            {#each core.accounts as account (account.account_id)}
+              <DropdownMenu.Item
+                disabled={switching || account.account_id === core.session?.account_id}
+                onclick={() => switchAccount(account.account_id)}
+                >{account.user_id}</DropdownMenu.Item
+              >
+            {/each}
+            <DropdownMenu.Item onclick={() => goto(resolve('/login?addAccount=1'))}
+              >{$i18n.t('nav.addAccount')}</DropdownMenu.Item
+            >
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
       {/snippet}
       <Tooltip.Root>
         <Tooltip.Trigger child={profileTrigger} />
         <Tooltip.Content class="tooltip" side="right" sideOffset={8}
-          >{$i18n.t('nav.profile')}</Tooltip.Content
+          >{$i18n.t('nav.switchAccount')}</Tooltip.Content
         >
       </Tooltip.Root>
     </nav>
@@ -109,21 +142,32 @@
   <Tooltip.Provider>
     <nav class="desktop-tools" aria-label={$i18n.t('nav.quickTools')}>
       {#snippet profileTrigger({ props }: { props: Record<string, unknown> })}
-        <a
-          {...props}
-          class="quick-tool desktop-tool"
-          class:active
-          href={resolve('/profile')}
-          aria-label={$i18n.t('nav.profile')}
-          aria-current={active ? 'page' : undefined}
-        >
-          <span class="avatar" aria-hidden="true">{initials}</span>
-        </a>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            {...props}
+            class="quick-tool desktop-tool"
+            aria-label={$i18n.t('nav.switchAccount')}
+          >
+            <span class="avatar" aria-hidden="true">{initials}</span>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="account-popover" side="top" sideOffset={8}>
+            {#each core.accounts as account (account.account_id)}
+              <DropdownMenu.Item
+                disabled={switching || account.account_id === core.session?.account_id}
+                onclick={() => switchAccount(account.account_id)}
+                >{account.user_id}</DropdownMenu.Item
+              >
+            {/each}
+            <DropdownMenu.Item onclick={() => goto(resolve('/login?addAccount=1'))}
+              >{$i18n.t('nav.addAccount')}</DropdownMenu.Item
+            >
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
       {/snippet}
       <Tooltip.Root>
         <Tooltip.Trigger child={profileTrigger} />
         <Tooltip.Content class="tooltip" side="top" sideOffset={8}
-          >{$i18n.t('nav.profile')}</Tooltip.Content
+          >{$i18n.t('nav.switchAccount')}</Tooltip.Content
         >
       </Tooltip.Root>
       <div class="desktop-tool-actions">
@@ -159,6 +203,46 @@
     border-radius: var(--radius);
     color: inherit;
     text-decoration: none;
+  }
+
+  .account-popover {
+    background: var(--sable-bg-container);
+    border: 1px solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
+    box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 15%);
+    display: grid;
+    gap: 0.25rem;
+    min-width: 14rem;
+    padding: 0.375rem;
+    z-index: 10;
+  }
+
+  .account-popover :global([role='menuitem']) {
+    background: transparent;
+    border: 0;
+    border-radius: calc(var(--radius) - 0.125rem);
+    color: inherit;
+    cursor: pointer;
+    overflow: hidden;
+    padding: 0.5rem 0.625rem;
+    text-align: left;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .account-popover :global([role='menuitem']:hover),
+  .account-popover :global([role='menuitem'][data-highlighted]) {
+    background: var(--sable-bg-container-hover);
+  }
+
+  .account-popover :global([role='menuitem'][data-disabled]) {
+    color: var(--sable-bg-on-container-muted);
+    cursor: default;
+  }
+
+  .account-popover :global([role='menuitem'][data-disabled]:hover) {
+    background: transparent;
   }
 
   .desktop-tools {
@@ -244,11 +328,6 @@
     width: 2rem;
   }
 
-  .desktop-tool.active .avatar {
-    background: var(--sable-primary-on-container);
-    color: var(--sable-primary-container);
-  }
-
   .mobile-tool {
     display: grid;
     font-size: var(--font-size-small);
@@ -283,10 +362,6 @@
 
   .mobile-tool.active {
     color: var(--sable-primary-on-container);
-  }
-
-  .mobile-tool.active .avatar {
-    background: var(--sable-primary-container);
   }
 
   .tooltip {

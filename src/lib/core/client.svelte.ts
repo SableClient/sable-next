@@ -16,11 +16,12 @@ import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
-export type CoreSession = Pick<SessionInfo, 'user_id'> & Partial<Pick<SessionInfo, 'device_id'>>;
+export type CoreSession = SessionInfo;
 
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
+  accounts = $state<CoreSession[]>([]);
 
   private transport: Transport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
@@ -50,8 +51,8 @@ export class CoreClient {
     }
 
     const generation = ++this.generation;
+    const previousSession = this.session;
     this.status = 'authenticating';
-    this.session = null;
 
     try {
       const response = await transport.send({
@@ -63,11 +64,13 @@ export class CoreClient {
 
       if (generation !== this.generation || transport !== this.transport) return;
 
-      this.session = { user_id: response.user_id };
+      await this.refreshAccounts();
+      this.session = this.accounts.find((account) => account.user_id === response.user_id) ?? null;
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.status = this.statusAfterAuthenticationError(error);
+        this.session = previousSession;
+        this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       }
       throw error;
     }
@@ -105,6 +108,7 @@ export class CoreClient {
       throw error;
     }
 
+    const previousSession = this.session;
     this.status = 'authenticating';
     try {
       const response = await transport.send({
@@ -117,14 +121,17 @@ export class CoreClient {
       });
       const result = response.result;
       if (result.state === 'complete') {
-        this.session = { user_id: result.user_id };
+        await this.refreshAccounts();
+        this.session = this.accounts.find((account) => account.user_id === result.user_id) ?? null;
         this.status = 'ready';
       } else {
-        this.status = 'signed-out';
+        this.session = previousSession;
+        this.status = previousSession ? 'ready' : 'signed-out';
       }
       return result;
     } catch (error) {
-      this.status = this.statusAfterAuthenticationError(error);
+      this.session = previousSession;
+      this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       throw error;
     }
   }
@@ -133,7 +140,8 @@ export class CoreClient {
     const response = await this.ensureTransport().send({ type: 'continue_registration' });
     const result = response.result;
     if (result.state === 'complete') {
-      this.session = { user_id: result.user_id };
+      await this.refreshAccounts();
+      this.session = this.accounts.find((account) => account.user_id === result.user_id) ?? null;
       this.status = 'ready';
     }
     return result;
@@ -184,8 +192,8 @@ export class CoreClient {
     }
 
     const generation = ++this.generation;
+    const previousSession = this.session;
     this.status = 'authenticating';
-    this.session = null;
 
     try {
       const response = await transport.send({
@@ -195,11 +203,13 @@ export class CoreClient {
 
       if (generation !== this.generation || transport !== this.transport) return;
 
-      this.session = { user_id: response.user_id };
+      await this.refreshAccounts();
+      this.session = this.accounts.find((account) => account.user_id === response.user_id) ?? null;
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.status = this.statusAfterAuthenticationError(error);
+        this.session = previousSession;
+        this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       }
       throw error;
     }
@@ -232,8 +242,8 @@ export class CoreClient {
     }
 
     const generation = ++this.generation;
+    const previousSession = this.session;
     this.status = 'authenticating';
-    this.session = null;
 
     try {
       const response = await transport.send({
@@ -243,11 +253,13 @@ export class CoreClient {
 
       if (generation !== this.generation || transport !== this.transport) return;
 
-      this.session = { user_id: response.user_id };
+      await this.refreshAccounts();
+      this.session = this.accounts.find((account) => account.user_id === response.user_id) ?? null;
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.status = this.statusAfterAuthenticationError(error);
+        this.session = previousSession;
+        this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       }
       throw error;
     }
@@ -306,6 +318,16 @@ export class CoreClient {
   async devices(): Promise<DeviceView[]> {
     const response = await this.ensureTransport().send({ type: 'devices' });
     return response.devices;
+  }
+
+  async switchAccount(accountId: string): Promise<void> {
+    const response = await this.ensureTransport().send({
+      type: 'switch_account',
+      account_id: accountId,
+    });
+    this.session = response.session;
+    await this.refreshAccounts();
+    this.status = 'ready';
   }
 
   async renameDevice(deviceId: string, displayName: string): Promise<void> {
@@ -398,9 +420,11 @@ export class CoreClient {
 
       if (response.session) {
         this.session = response.session;
+        await this.refreshAccounts();
         this.status = 'ready';
       } else {
         this.session = null;
+        this.accounts = [];
         this.status = 'signed-out';
       }
     } catch {
@@ -445,8 +469,28 @@ export class CoreClient {
     if (event.type !== 'session_ended') return;
 
     this.session = null;
-    this.status = 'signed-out';
+    this.status = 'authenticating';
+    void this.restoreFallbackAccount();
   };
+
+  private async refreshAccounts(): Promise<void> {
+    const response = await this.ensureTransport().send({ type: 'list_accounts' });
+    this.accounts = response.accounts;
+  }
+
+  private async restoreFallbackAccount(): Promise<void> {
+    try {
+      await this.refreshAccounts();
+      const fallbackAccountId = this.accounts.at(0)?.account_id;
+      if (fallbackAccountId === undefined) {
+        this.status = 'signed-out';
+        return;
+      }
+      await this.switchAccount(fallbackAccountId);
+    } catch {
+      this.status = 'signed-out';
+    }
+  }
 
   private cleanupTransport(): void {
     const unsubscribe = this.unsubscribeTransport;

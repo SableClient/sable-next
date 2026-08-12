@@ -140,6 +140,7 @@ async fn a_stale_unsubscribe_does_not_clear_the_new_room_subscription() {
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
     *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
         client,
         sync_service,
         homeserver: server.server().uri(),
@@ -200,6 +201,7 @@ async fn concurrent_first_access_returns_one_live_timeline() {
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
     *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
         client,
         sync_service,
         homeserver: server.server().uri(),
