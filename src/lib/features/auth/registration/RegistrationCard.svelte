@@ -3,9 +3,10 @@
   import type { LoginFlowsView } from '@/generated/LoginFlowsView';
   import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
   import type { RegistrationResultView } from '@/generated/RegistrationResultView';
-  import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
-  import Label from '$lib/ui/primitives/Label.svelte';
+  import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
+  import AuthField from '../shared/AuthField.svelte';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
   import RegistrationBrowserStep from './RegistrationBrowserStep.svelte';
   import RegistrationMethods from './RegistrationMethods.svelte';
@@ -46,7 +47,6 @@
     onContinueFallback: () => void;
     onRequestRegistrationEmail: (email: string) => void;
     onSubmitRegistrationEmail: (token: string) => void;
-    onEditHomeserver: () => void;
     onUsernameInput: (value: string) => void;
     onRegistrationEmailInput: (value: string) => void;
     onPasswordInput: (value: string) => void;
@@ -80,7 +80,6 @@
     onContinueFallback,
     onRequestRegistrationEmail,
     onSubmitRegistrationEmail,
-    onEditHomeserver,
     onUsernameInput,
     onRegistrationEmailInput,
     onPasswordInput,
@@ -88,12 +87,24 @@
   }: Props = $props();
 </script>
 
-<section class="auth-card-surface" aria-labelledby="registration-title">
-  <div class="auth-card-heading centered">
-    <div>
-      <h2 id="registration-title">{$i18n.t('auth.createAccount')}</h2>
-    </div>
-  </div>
+<section class="registration-card auth-card-surface" aria-labelledby="registration-title">
+  <AuthField labelId="registration-title" label={$i18n.t('auth.createAccount')}>
+    {#if !fallback && !emailStep}
+      <div class="provider-row">
+        <span class="provider-name">
+          <!-- mustache required so formatter doesn't delete the space -->
+          <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
+          {$i18n.t('auth.registeringWith')}{' '}
+          <Tooltip class="provider-tooltip" label={$i18n.t('auth.changeProviderHint')}>
+            {homeserver || 'matrix.org'}
+          </Tooltip>
+        </span>
+        <Tooltip class="provider-info-tooltip" label={$i18n.t('auth.accountProviderHint')}
+          ><InfoIcon /></Tooltip
+        >
+      </div>
+    {/if}
+  </AuthField>
 
   {#if fallback || emailStep}
     <RegistrationBrowserStep
@@ -107,20 +118,12 @@
       {onSubmitRegistrationEmail}
     />
   {:else}
-    <div class="provider-row">
-      <div class="provider-mark" aria-hidden="true"><GlobeIcon /></div>
-      <span class="provider-name">
-        {$i18n.t('auth.registerWith', { server: homeserver || 'matrix.org' })}
-      </span>
-    </div>
-
     {#if isEditingHomeserver}
-      <div class="field">
-        <Label for="registration-homeserver">{$i18n.t('auth.accountProvider')}</Label>
+      <AuthField fieldId="registration-homeserver" label={$i18n.t('auth.accountProvider')}>
         <HomeserverPicker
           id="registration-homeserver"
           value={homeserver}
-          disabled={isRegistering || isCheckingHomeserver}
+          disabled={isRegistering}
           ariaInvalid={invalidRegistrationField === 'homeserver'}
           oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
             onHomeserverInput(event.currentTarget.value);
@@ -131,11 +134,7 @@
           }}
           onblur={onValidateHomeserver}
         />
-      </div>
-    {:else}
-      <button class="edit-server" type="button" onclick={onEditHomeserver}>
-        {$i18n.t('auth.chooseDifferentServer')}
-      </button>
+      </AuthField>
     {/if}
 
     <div class="status-slot" aria-live="polite">
@@ -179,38 +178,50 @@
 <style>
   .provider-row {
     align-items: center;
-    background: var(--sable-surface-var-container);
+    background: var(--sable-bg-container);
+    border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius);
+    box-sizing: border-box;
+    color: var(--sable-bg-on-container);
     display: flex;
     gap: 0.625rem;
-    padding: 0.625rem;
-  }
-
-  .provider-mark {
-    align-items: center;
-    background: var(--sable-primary-container);
-    border-radius: 50%;
-    color: var(--sable-primary-on-container);
-    display: flex;
-    flex: 0 0 2rem;
-    height: 2rem;
-    justify-content: center;
-    width: 2rem;
-  }
-
-  .provider-mark :global(svg) {
-    height: 1.25rem;
-    width: 1.25rem;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.875rem;
   }
 
   .provider-name {
+    flex: 1 1 auto;
     min-width: 0;
     overflow-wrap: anywhere;
   }
 
-  .field {
-    display: grid;
-    gap: 0.5rem;
+  :global(.tooltip-trigger.provider-info-tooltip svg) {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+
+  :global(.tooltip-trigger.provider-tooltip) {
+    align-items: baseline;
+    background: transparent;
+    border-radius: 0.125rem;
+    color: inherit;
+    cursor: default;
+    display: inline;
+    font: inherit;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  :global(.tooltip-trigger.provider-tooltip:hover),
+  :global(.tooltip-trigger.provider-tooltip[data-state='open']) {
+    background: transparent;
+    color: var(--sable-bg-on-container);
+  }
+
+  :global(.tooltip-trigger.provider-tooltip:focus-visible) {
+    box-shadow: 0 0 0 0.2rem var(--sable-focus-ring);
+    outline: none;
   }
 
   .checking {
@@ -240,7 +251,7 @@
   .status-slot {
     align-items: center;
     display: flex;
-    height: 1.5rem;
+    height: calc(var(--font-size-small) * var(--line-height-body));
     overflow: hidden;
   }
 
@@ -249,16 +260,6 @@
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
     margin: 0;
-  }
-
-  .edit-server {
-    background: transparent;
-    border: 0;
-    color: var(--sable-sec-main);
-    cursor: pointer;
-    justify-self: start;
-    padding: 0;
-    text-decoration: underline;
   }
 
   @keyframes error-in {

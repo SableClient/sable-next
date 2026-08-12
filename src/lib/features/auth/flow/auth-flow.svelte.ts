@@ -159,7 +159,11 @@ export class AuthFlowController {
 
   clearLoginHomeserverValidation(): void {
     this.error = null;
-    this.homeserverInput(this.homeserver);
+    this.registrationToken = null;
+    this.validatedHomeserver = null;
+    this.validatedRegistrationHomeserver = null;
+    this.registrationFlows = null;
+    this.registrationValidationKey = '';
   }
 
   shouldValidateRegistration(displayedStage: number, completedInitialCheck: boolean): boolean {

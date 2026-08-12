@@ -5,12 +5,12 @@
   import { i18n } from '$lib/i18n';
   import type { LoginFlowsView } from '@/generated/LoginFlowsView';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from './LoginMethod.svelte';
   import PasswordLoginForm from './PasswordLoginForm.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
+  import AuthField from '../shared/AuthField.svelte';
 
   type LoginField = 'homeserver' | 'username' | 'password';
   type LoginMethodType = 'oidc' | 'sso';
@@ -56,13 +56,10 @@
   const core = useCoreClient();
   let isAuthenticating = $derived(core.status === 'authenticating');
   let showAllLoginMethods = $state(false);
-  let observedHomeserver = homeserver;
-
-  $effect(() => {
-    if (homeserver === observedHomeserver) return;
-    observedHomeserver = homeserver;
-    showAllLoginMethods = false;
-  });
+  let displayedHomeserver = $state(homeserver);
+  let isLoginControlsDisabled = $derived(
+    isCheckingHomeserver || homeserver !== displayedHomeserver
+  );
 
   const loginMethodOrder: Array<'oidc' | 'sso' | 'password'> = ['oidc', 'sso', 'password'];
   let preferredLoginMethod = $derived.by(() => {
@@ -76,19 +73,24 @@
     if (!flows) return 0;
     return loginMethodOrder.filter((method) => flows[method]).length;
   });
-  let firstAvailableLoginMethod = $derived.by(() => {
-    const flows = loginFlows;
-    if (!flows) return null;
-    return loginMethodOrder.find((method) => flows[method]) ?? null;
-  });
   let isPasswordLoginVisible = $derived(
     loginFlows?.password === true && (showAllLoginMethods || preferredLoginMethod === 'password')
   );
+  let hasLoginAction = $derived(loginFlows === null || preferredLoginMethod !== null);
   let statusError = $derived(
     !isPasswordLoginVisible && (fieldError || loginError || core.status === 'error')
       ? (fieldError ?? loginError ?? $i18n.t('auth.unableToStart'))
       : null
   );
+
+  async function validateHomeserver(): Promise<LoginFlowsView | null> {
+    const flows = await onValidateHomeserver();
+    if (flows) {
+      displayedHomeserver = homeserver;
+      showAllLoginMethods = false;
+    }
+    return flows;
+  }
 </script>
 
 <form
@@ -101,8 +103,7 @@
     void onLogin();
   }}
 >
-  <div class="field">
-    <Label for="homeserver">{$i18n.t('auth.accountProvider')}</Label>
+  <AuthField fieldId="homeserver" label={$i18n.t('auth.accountProvider')}>
     <HomeserverPicker
       id="homeserver"
       bind:value={homeserver}
@@ -113,11 +114,11 @@
       onvaluechange={(selectedHomeserver: string) => {
         homeserver = selectedHomeserver;
         onClearHomeserverValidation();
-        void onValidateHomeserver();
+        void validateHomeserver();
       }}
-      onblur={() => void onValidateHomeserver()}
+      onblur={() => void validateHomeserver()}
     />
-  </div>
+  </AuthField>
 
   <div class="status-slot" aria-live="polite">
     {#if isCheckingHomeserver}
@@ -132,93 +133,86 @@
     {/if}
   </div>
 
-  {#if !loginFlows}
-    <div class="actions">
-      <Button variant="primary" type="submit" disabled={isAuthenticating || isCheckingHomeserver}>
-        {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
-      </Button>
-    </div>
-  {/if}
-
-  {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
-    <LoginMethod
-      divider={showAllLoginMethods && firstAvailableLoginMethod !== 'oidc'}
-      reducedMotion={prefersReducedMotion.current}
-    >
+  <div class="method-slot" class:action-slot={hasLoginAction}>
+    {#if !loginFlows}
       <div class="actions">
-        <Button
-          variant="primary"
-          disabled={isAuthenticating || isLaunchingLogin}
-          onclick={() => void onLaunchRedirectLogin('oidc')}
-        >
-          {isLaunchingLogin
-            ? $i18n.t('auth.opening')
-            : $i18n.t('auth.signInWithProvider', { name: homeserver || 'matrix.org' })}
+        <Button type="submit" disabled={isAuthenticating || isLoginControlsDisabled}>
+          {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
         </Button>
       </div>
-    </LoginMethod>
-  {/if}
+    {/if}
 
-  {#if loginFlows?.sso && (showAllLoginMethods || preferredLoginMethod === 'sso')}
-    <LoginMethod
-      divider={showAllLoginMethods && firstAvailableLoginMethod !== 'sso'}
-      reducedMotion={prefersReducedMotion.current}
-    >
-      {#if loginFlows.sso_identity_providers.length > 0}
-        <div class="actions sso-actions">
-          {#each loginFlows.sso_identity_providers as provider (provider.id)}
-            <Button
-              variant="primary"
-              disabled={isAuthenticating || isLaunchingLogin}
-              onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
-            >
-              {$i18n.t('auth.signInWithProvider', { name: provider.name })}
-            </Button>
-          {/each}
-        </div>
-      {:else}
+    {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
+      <LoginMethod reducedMotion={prefersReducedMotion.current}>
         <div class="actions">
           <Button
-            variant="primary"
-            disabled={isAuthenticating || isLaunchingLogin}
-            onclick={() => void onLaunchRedirectLogin('sso')}
+            disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
+            onclick={() => void onLaunchRedirectLogin('oidc')}
           >
-            {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
+            {isLaunchingLogin
+              ? $i18n.t('auth.opening')
+              : $i18n.t('auth.signInWithProvider', {
+                  name: displayedHomeserver || 'matrix.org',
+                })}
           </Button>
         </div>
-      {/if}
-    </LoginMethod>
-  {/if}
+      </LoginMethod>
+    {/if}
 
-  {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
-    <LoginMethod
-      divider={showAllLoginMethods && firstAvailableLoginMethod !== 'password'}
-      reducedMotion={prefersReducedMotion.current}
-    >
-      <PasswordLoginForm
-        {username}
-        {password}
-        invalidField={invalidField === 'homeserver' ? null : invalidField}
-        {fieldError}
-        {loginError}
-        {isAuthenticating}
-        {isCheckingHomeserver}
-        onUsernameInput={(value: string) => {
-          username = value;
-        }}
-        onPasswordInput={(value: string) => {
-          password = value;
-        }}
-        {onClearFieldError}
-      />
-    </LoginMethod>
-  {/if}
+    {#if loginFlows?.sso && (showAllLoginMethods || preferredLoginMethod === 'sso')}
+      <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        {#if loginFlows.sso_identity_providers.length > 0}
+          <div class="actions sso-actions">
+            {#each loginFlows.sso_identity_providers as provider (provider.id)}
+              <Button
+                disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
+                onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
+              >
+                {$i18n.t('auth.signInWithProvider', { name: provider.name })}
+              </Button>
+            {/each}
+          </div>
+        {:else}
+          <div class="actions">
+            <Button
+              disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
+              onclick={() => void onLaunchRedirectLogin('sso')}
+            >
+              {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
+            </Button>
+          </div>
+        {/if}
+      </LoginMethod>
+    {/if}
+
+    {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
+      <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <PasswordLoginForm
+          {username}
+          {password}
+          invalidField={invalidField === 'homeserver' ? null : invalidField}
+          {fieldError}
+          {loginError}
+          {isAuthenticating}
+          isCheckingHomeserver={isLoginControlsDisabled}
+          onUsernameInput={(value: string) => {
+            username = value;
+          }}
+          onPasswordInput={(value: string) => {
+            password = value;
+          }}
+          {onClearFieldError}
+        />
+      </LoginMethod>
+    {/if}
+  </div>
 
   {#if availableLoginMethodCount > 1}
     <AuthMethodToggle
       expanded={showAllLoginMethods}
       showLabel={$i18n.t('auth.moreWaysToSignIn')}
       hideLabel={$i18n.t('auth.hideOtherWaysToSignIn')}
+      disabled={isLoginControlsDisabled}
       onToggle={() => {
         showAllLoginMethods = !showAllLoginMethods;
       }}
@@ -229,7 +223,12 @@
 {#if onCreateAccount}
   <div class="account-switch">
     <span>{$i18n.t('auth.newToMatrixQuestion')}</span>
-    <button class="account-switch-button" type="button" onclick={onCreateAccount}>
+    <button
+      class="account-switch-button"
+      type="button"
+      disabled={isLoginControlsDisabled}
+      onclick={onCreateAccount}
+    >
       {$i18n.t('auth.createAccount')}
     </button>
   </div>
@@ -277,12 +276,18 @@
     outline-offset: 0.15rem;
   }
 
+  .account-switch-button:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+
   .checking {
     align-items: center;
     color: var(--sable-sec-main);
     display: flex;
     font-size: var(--font-size-small);
     gap: 0.5rem;
+    line-height: var(--line-height-body);
     margin: 0;
   }
 
@@ -318,7 +323,7 @@
   .status-slot {
     align-items: center;
     display: flex;
-    height: 1.5rem;
+    height: calc(var(--font-size-small) * var(--line-height-body));
     overflow: hidden;
   }
 
@@ -332,13 +337,22 @@
     }
   }
 
-  .field {
-    display: grid;
-    gap: 0.5rem;
-  }
-
   .login-form {
     min-width: 0;
+  }
+
+  .method-slot {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .method-slot:not(.action-slot) {
+    display: none;
+  }
+
+  .action-slot {
+    min-height: 2.75rem;
   }
 
   .sso-actions {

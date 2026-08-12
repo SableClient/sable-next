@@ -2,10 +2,10 @@
   import { i18n } from '$lib/i18n';
   import { useCoreClient } from '$lib/core/context';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
+  import AuthField from '../shared/AuthField.svelte';
 
   interface Props {
     username: string;
@@ -38,34 +38,32 @@
 </script>
 
 <div class="password-form">
-  <div class="field">
-    <Label for="username">{$i18n.t('auth.username')}</Label>
+  <AuthField fieldId="username" label={$i18n.t('auth.username')}>
     <TextInput
       id="username"
       value={username}
       autocomplete="username"
       required
-      disabled={isAuthenticating}
+      disabled={isAuthenticating || isCheckingHomeserver}
       aria-invalid={invalidField === 'username'}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onUsernameInput(event.currentTarget.value);
         onClearFieldError('username');
       }}
     />
-  </div>
-  <div class="field">
-    <Label for="password">{$i18n.t('auth.password')}</Label>
+  </AuthField>
+  <AuthField fieldId="password" label={$i18n.t('auth.password')}>
     <PasswordField
       value={password}
       bind:showPassword
-      disabled={isAuthenticating}
+      disabled={isAuthenticating || isCheckingHomeserver}
       invalid={invalidField === 'password'}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onPasswordInput(event.currentTarget.value);
         onClearFieldError('password');
       }}
     />
-  </div>
+  </AuthField>
   <div class="submit-area">
     <div class="error-slot" aria-live="polite">
       {#if fieldError || loginError || core.status === 'error'}<p class="error">
@@ -73,10 +71,10 @@
         </p>{/if}
     </div>
     <div class="actions">
-      <Button variant="primary" type="submit" disabled={isAuthenticating || isCheckingHomeserver}
+      <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver}
         >{#if isAuthenticating}<Spinner />{/if}{isAuthenticating
           ? $i18n.t('auth.signingIn')
-          : $i18n.t('auth.signIn')}</Button
+          : $i18n.t('auth.signInWithPassword')}</Button
       >
     </div>
   </div>
@@ -84,7 +82,6 @@
 
 <style>
   .actions,
-  .field,
   .password-form {
     display: grid;
     gap: 0.75rem;

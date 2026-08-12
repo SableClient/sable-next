@@ -3,9 +3,9 @@
   import type { RegistrationResultView } from '@/generated/RegistrationResultView';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import AuthField from '../shared/AuthField.svelte';
 
   interface Props {
     homeserver: string;
@@ -46,7 +46,7 @@
         <Button onclick={onOpenFallback} disabled={isRegistering}>
           {$i18n.t('auth.openServerPage')}
         </Button>
-        <Button variant="primary" onclick={onContinueFallback} disabled={isRegistering}>
+        <Button onclick={onContinueFallback} disabled={isRegistering}>
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>
@@ -62,18 +62,19 @@
             onRequestRegistrationEmail(emailAddress);
           }}
         >
-          <Label for="registration-email">{$i18n.t('auth.email')}</Label>
-          <TextInput
-            id="registration-email"
-            type="email"
-            value={emailAddress}
-            autocomplete="email"
-            required
-            oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-              emailAddress = event.currentTarget.value;
-            }}
-          />
-          <Button variant="primary" type="submit" disabled={isRegistering}>
+          <AuthField fieldId="registration-email" label={$i18n.t('auth.email')}>
+            <TextInput
+              id="registration-email"
+              type="email"
+              value={emailAddress}
+              autocomplete="email"
+              required
+              oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
+                emailAddress = event.currentTarget.value;
+              }}
+            />
+          </AuthField>
+          <Button type="submit" disabled={isRegistering}>
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.sendVerificationEmail')}
           </Button>
@@ -88,17 +89,18 @@
             onSubmitRegistrationEmail(emailToken);
           }}
         >
-          <Label for="registration-email-token">{$i18n.t('auth.emailCode')}</Label>
-          <TextInput
-            id="registration-email-token"
-            value={emailToken}
-            autocomplete="one-time-code"
-            required
-            oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-              emailToken = event.currentTarget.value;
-            }}
-          />
-          <Button variant="primary" type="submit" disabled={isRegistering}>
+          <AuthField fieldId="registration-email-token" label={$i18n.t('auth.emailCode')}>
+            <TextInput
+              id="registration-email-token"
+              value={emailToken}
+              autocomplete="one-time-code"
+              required
+              oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
+                emailToken = event.currentTarget.value;
+              }}
+            />
+          </AuthField>
+          <Button type="submit" disabled={isRegistering}>
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.verifyEmail')}
           </Button>
@@ -111,7 +113,7 @@
             { email: emailStep.email }
           )}
         </p>
-        <Button variant="primary" onclick={onContinueFallback} disabled={isRegistering}>
+        <Button onclick={onContinueFallback} disabled={isRegistering}>
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>

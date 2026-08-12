@@ -92,102 +92,98 @@
   let serverLabel = $derived(homeserver || 'matrix.org');
 </script>
 
-{#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
-  <LoginMethod
-    divider={showAllRegistrationMethods && firstAvailableRegistrationMethod !== 'oidc'}
-    reducedMotion={prefersReducedMotion.current}
-  >
-    <Button
-      variant="primary"
-      disabled={isRegistering || isCheckingHomeserver}
-      onclick={() => {
-        onLaunchRedirectLogin('oidc');
-      }}
-    >
-      {#if isRegistering}<Spinner />{/if}
-      {$i18n.t('auth.createServerAccount', { server: serverLabel })}
-    </Button>
-  </LoginMethod>
-{/if}
+<div class="registration-methods">
+  {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
+    <LoginMethod reducedMotion={prefersReducedMotion.current}>
+      <Button
+        disabled={isRegistering || isCheckingHomeserver}
+        onclick={() => {
+          onLaunchRedirectLogin('oidc');
+        }}
+      >
+        {#if isRegistering}<Spinner />{/if}
+        {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
+      </Button>
+    </LoginMethod>
+  {/if}
 
-{#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
-  <LoginMethod
-    divider={showAllRegistrationMethods && firstAvailableRegistrationMethod !== 'sso'}
-    reducedMotion={prefersReducedMotion.current}
-  >
-    <div class="actions">
-      {#if loginFlows.sso_identity_providers.length > 0}
-        {#each loginFlows.sso_identity_providers as provider (provider.id)}
+  {#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
+    <LoginMethod reducedMotion={prefersReducedMotion.current}>
+      <div class="actions">
+        {#if loginFlows.sso_identity_providers.length > 0}
+          {#each loginFlows.sso_identity_providers as provider (provider.id)}
+            <Button
+              disabled={isRegistering}
+              onclick={() => {
+                onLaunchRedirectLogin('sso', provider.id);
+              }}
+            >
+              {$i18n.t('auth.continueWithProvider', { name: provider.name })}
+            </Button>
+          {/each}
+        {:else}
           <Button
-            variant="primary"
             disabled={isRegistering}
             onclick={() => {
-              onLaunchRedirectLogin('sso', provider.id);
+              onLaunchRedirectLogin('sso');
             }}
           >
-            {$i18n.t('auth.continueWithProvider', { name: provider.name })}
+            {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
           </Button>
-        {/each}
-      {:else}
-        <Button
-          variant="primary"
-          disabled={isRegistering}
-          onclick={() => {
-            onLaunchRedirectLogin('sso');
-          }}
-        >
-          {$i18n.t('auth.createServerAccount', { server: serverLabel })}
-        </Button>
-      {/if}
-    </div>
-  </LoginMethod>
-{/if}
+        {/if}
+      </div>
+    </LoginMethod>
+  {/if}
 
-{#if loginFlows && registrationFlows?.uiaa && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
-  <LoginMethod
-    divider={showAllRegistrationMethods && firstAvailableRegistrationMethod !== 'password'}
-    reducedMotion={prefersReducedMotion.current}
-  >
-    <LegacyRegistrationForm
-      {serverLabel}
-      {registrationToken}
-      {isRegistering}
-      {isCheckingHomeserver}
-      {username}
-      {registrationEmail}
-      {password}
-      {confirmPassword}
-      {emailRequirement}
-      {tokenRequirement}
-      {invalidField}
-      {fieldError}
-      {onRegistrationTokenInput}
-      {onClearFieldError}
-      {onStartRegistration}
-      {onUsernameInput}
-      {onRegistrationEmailInput}
-      {onPasswordInput}
-      {onConfirmPasswordInput}
+  {#if loginFlows && registrationFlows?.uiaa && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
+    <LoginMethod reducedMotion={prefersReducedMotion.current}>
+      <LegacyRegistrationForm
+        {serverLabel}
+        {registrationToken}
+        {isRegistering}
+        {isCheckingHomeserver}
+        {username}
+        {registrationEmail}
+        {password}
+        {confirmPassword}
+        {emailRequirement}
+        {tokenRequirement}
+        {invalidField}
+        {fieldError}
+        {onRegistrationTokenInput}
+        {onClearFieldError}
+        {onStartRegistration}
+        {onUsernameInput}
+        {onRegistrationEmailInput}
+        {onPasswordInput}
+        {onConfirmPasswordInput}
+      />
+    </LoginMethod>
+  {/if}
+
+  {#if availableRegistrationMethodCount > 1}
+    <AuthMethodToggle
+      expanded={showAllRegistrationMethods}
+      showLabel={$i18n.t('auth.moreWaysToCreateAccount')}
+      hideLabel={$i18n.t('auth.hideOtherWaysToCreateAccount')}
+      onToggle={() => {
+        showAllRegistrationMethods = !showAllRegistrationMethods;
+      }}
     />
-  </LoginMethod>
-{/if}
+  {/if}
 
-{#if availableRegistrationMethodCount > 1}
-  <AuthMethodToggle
-    expanded={showAllRegistrationMethods}
-    showLabel={$i18n.t('auth.moreWaysToCreateAccount')}
-    hideLabel={$i18n.t('auth.hideOtherWaysToCreateAccount')}
-    onToggle={() => {
-      showAllRegistrationMethods = !showAllRegistrationMethods;
-    }}
-  />
-{/if}
-
-{#if availableRegistrationMethodCount === 0 && !isCheckingHomeserver}
-  <p class="muted">{$i18n.t('errors.registrationUnavailable')}</p>
-{/if}
+  {#if availableRegistrationMethodCount === 0 && !isCheckingHomeserver}
+    <p class="muted">{$i18n.t('errors.registrationUnavailable')}</p>
+  {/if}
+</div>
 
 <style>
+  .registration-methods {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+  }
+
   .actions {
     display: grid;
     gap: 0.75rem;

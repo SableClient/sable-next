@@ -1,17 +1,19 @@
 <script lang="ts">
   import { Tooltip as BitsTooltip } from 'bits-ui';
+  import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
   interface Props {
     label: string;
+    class?: ClassValue;
     children: Snippet;
   }
 
-  let { label, children }: Props = $props();
+  let { label, class: className = '', children }: Props = $props();
 </script>
 
 {#snippet trigger({ props }: { props: Record<string, unknown> })}
-  <button {...props} class="tooltip-trigger" type="button" aria-label={label}>
+  <button {...props} class={['tooltip-trigger', className]} type="button" aria-label={label}>
     {@render children()}
   </button>
 {/snippet}

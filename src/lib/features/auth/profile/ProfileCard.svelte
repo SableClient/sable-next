@@ -1,9 +1,9 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import AuthField from '../shared/AuthField.svelte';
 
   interface Props {
     userId: string;
@@ -51,10 +51,10 @@
         <span>{displayName.slice(0, 1).toUpperCase() || '?'}</span>
       {/if}
     </div>
-    <div class="avatar-actions">
-      <Label for="profile-avatar">
-        {$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'auth.avatar')}
-      </Label>
+    <AuthField
+      fieldId="profile-avatar"
+      label={$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'auth.avatar')}
+    >
       <input
         id="profile-avatar"
         type="file"
@@ -76,11 +76,10 @@
           {$i18n.t('auth.removeAvatar')}
         </button>
       {/if}
-    </div>
+    </AuthField>
   </div>
 
-  <div class="field">
-    <Label for="profile-display-name">{$i18n.t('auth.displayName')}</Label>
+  <AuthField fieldId="profile-display-name" label={$i18n.t('auth.displayName')}>
     <TextInput
       id="profile-display-name"
       value={displayName}
@@ -90,7 +89,7 @@
         onDisplayName(event.currentTarget.value);
       }}
     />
-  </div>
+  </AuthField>
 
   <details class="more-options" bind:open={moreOpen}>
     <summary>{$i18n.t('auth.moreProfileOptions')}</summary>
@@ -104,7 +103,7 @@
   {#if error}<p class="error" aria-live="polite">{error}</p>{/if}
 
   <div class="actions">
-    <Button variant="primary" onclick={onContinue} disabled={isSaving}>
+    <Button onclick={onContinue} disabled={isSaving}>
       {#if isSaving}<Spinner />{/if}
       {$i18n.t('auth.continue')}
     </Button>
@@ -133,10 +132,8 @@
     padding: 0.625rem 0.75rem;
   }
 
-  .field,
   .actions,
-  .avatar-picker,
-  .avatar-actions {
+  .avatar-picker {
     display: grid;
     gap: 0.5rem;
   }

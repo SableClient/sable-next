@@ -5,13 +5,14 @@
     expanded: boolean;
     showLabel: string;
     hideLabel: string;
+    disabled?: boolean;
     onToggle: () => void;
   }
 
-  let { expanded, showLabel, hideLabel, onToggle }: Props = $props();
+  let { expanded, showLabel, hideLabel, disabled = false, onToggle }: Props = $props();
 </script>
 
-<button class="method-toggle" type="button" aria-expanded={expanded} onclick={onToggle}>
+<button class="method-toggle" type="button" aria-expanded={expanded} {disabled} onclick={onToggle}>
   <span>{expanded ? hideLabel : showLabel}</span>
   <span class:expanded class="method-toggle-icon" aria-hidden="true"><CaretDownIcon /></span>
 </button>
@@ -32,6 +33,11 @@
 
   .method-toggle:hover {
     color: var(--sable-bg-on-container);
+  }
+
+  .method-toggle:disabled {
+    cursor: default;
+    opacity: 0.55;
   }
 
   .method-toggle-icon {

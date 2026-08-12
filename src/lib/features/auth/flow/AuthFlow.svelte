@@ -437,10 +437,6 @@
                   onSubmitRegistrationEmail={(token: string) => {
                     void registration.submitEmail(token);
                   }}
-                  onEditHomeserver={() => {
-                    flow.isEditingHomeserver = true;
-                    void flow.validateRegistrationHomeserver();
-                  }}
                   onUsernameInput={(value: string) => {
                     registration.setUsername(value);
                   }}

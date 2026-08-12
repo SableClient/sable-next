@@ -2,11 +2,11 @@
   import { i18n } from '$lib/i18n';
   import Button from '$lib/ui/primitives/Button.svelte';
   import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
-  import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
+  import AuthField from '../shared/AuthField.svelte';
 
   type Field = 'username' | 'password' | 'confirmPassword' | 'email' | 'registrationToken';
   interface Props {
@@ -62,8 +62,7 @@
     onStartRegistration();
   }}
 >
-  <div class="field">
-    <Label for="registration-username">{$i18n.t('auth.username')}</Label>
+  <AuthField fieldId="registration-username" label={$i18n.t('auth.username')}>
     <TextInput
       id="registration-username"
       value={username}
@@ -76,9 +75,8 @@
         onClearFieldError('username');
       }}
     />
-  </div>
-  <div class="field">
-    <Label for="registration-password">{$i18n.t('auth.password')}</Label>
+  </AuthField>
+  <AuthField fieldId="registration-password" label={$i18n.t('auth.password')}>
     <PasswordField
       id="registration-password"
       value={password}
@@ -90,9 +88,8 @@
         onClearFieldError('password');
       }}
     />
-  </div>
-  <div class="field">
-    <Label for="registration-confirm-password">{$i18n.t('auth.confirmPassword')}</Label>
+  </AuthField>
+  <AuthField fieldId="registration-confirm-password" label={$i18n.t('auth.confirmPassword')}>
     <PasswordField
       id="registration-confirm-password"
       value={confirmPassword}
@@ -104,12 +101,12 @@
         onClearFieldError('confirmPassword');
       }}
     />
-  </div>
+  </AuthField>
   {#if emailRequirement !== 'unavailable'}
-    <div class="field">
-      <Label for="registration-email"
-        >{$i18n.t(emailRequirement === 'required' ? 'auth.email' : 'auth.emailOptional')}</Label
-      >
+    <AuthField
+      fieldId="registration-email"
+      label={$i18n.t(emailRequirement === 'required' ? 'auth.email' : 'auth.emailOptional')}
+    >
       <TextInput
         id="registration-email"
         type="email"
@@ -123,18 +120,18 @@
           onClearFieldError('email');
         }}
       />
-    </div>
+    </AuthField>
   {/if}
   {#if tokenRequirement !== 'unavailable'}
-    <div class="field">
-      <div class="field-label">
-        <Label for="registration-token"
-          >{$i18n.t(
-            tokenRequirement === 'required'
-              ? 'auth.registrationToken'
-              : 'auth.registrationTokenOptional'
-          )}</Label
-        >
+    <AuthField
+      fieldId="registration-token"
+      label={$i18n.t(
+        tokenRequirement === 'required'
+          ? 'auth.registrationToken'
+          : 'auth.registrationTokenOptional'
+      )}
+    >
+      {#snippet labelSuffix()}
         <Tooltip
           label={$i18n.t(
             tokenRequirement === 'required'
@@ -142,7 +139,7 @@
               : 'auth.registrationTokenOptionalExplanation'
           )}><InfoIcon /></Tooltip
         >
-      </div>
+      {/snippet}
       <TextInput
         id="registration-token"
         value={registrationToken ?? ''}
@@ -155,14 +152,14 @@
           onClearFieldError('registrationToken');
         }}
       />
-    </div>
+    </AuthField>
   {/if}
   <div class="submit-area">
     <div class="error-slot" aria-live="polite">
       {#if fieldError && invalidField !== 'homeserver'}<p class="error">{fieldError}</p>{/if}
     </div>
     <div class="actions">
-      <Button variant="primary" type="submit" disabled={isRegistering || isCheckingHomeserver}
+      <Button type="submit" disabled={isRegistering || isCheckingHomeserver}
         >{#if isRegistering}<Spinner />{/if}{$i18n.t('auth.createServerAccount', {
           server: serverLabel,
         })}</Button
@@ -173,21 +170,9 @@
 
 <style>
   .actions,
-  .field,
   .legacy-form {
     display: grid;
     gap: 0.75rem;
-  }
-
-  .field-label {
-    align-items: center;
-    display: flex;
-    gap: 0.375rem;
-  }
-
-  .field-label :global(.tooltip-trigger svg) {
-    height: 1.25rem;
-    width: 1.25rem;
   }
 
   .error {
