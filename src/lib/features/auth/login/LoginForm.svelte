@@ -5,20 +5,16 @@
   import { i18n } from '$lib/i18n';
   import type { LoginFlowsView } from '@/generated/LoginFlowsView';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Combobox from '$lib/ui/primitives/Combobox.svelte';
   import Label from '$lib/ui/primitives/Label.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
-  import CaretDownIcon from 'phosphor-icons-svelte/IconCaretDownRegular.svelte';
+  import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from './LoginMethod.svelte';
-  import PasswordField from './PasswordField.svelte';
+  import PasswordLoginForm from './PasswordLoginForm.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import { smoothSlide } from './login-transitions';
+  import { smoothSlide } from '../flow/login-transitions';
+  import HomeserverPicker from '../shared/HomeserverPicker.svelte';
 
   type LoginField = 'homeserver' | 'username' | 'password';
   type LoginMethodType = 'oidc' | 'sso';
-  const homeservers = ['matrix.org', 'mozilla.org', 'unredacted.org', 'sable.moe', 'kendama.moe'];
-  const homeserverItems = homeservers.map((value) => ({ value, label: value }));
-
   interface Props {
     homeserver?: string;
     username?: string;
@@ -37,6 +33,7 @@
       identityProviderId?: string
     ) => Promise<void>;
     onLogin: () => Promise<void>;
+    onCreateAccount?: () => void;
   }
 
   let {
@@ -54,11 +51,11 @@
     onClearFieldError,
     onLaunchRedirectLogin,
     onLogin,
+    onCreateAccount,
   }: Props = $props();
 
   const core = useCoreClient();
   let isAuthenticating = $derived(core.status === 'authenticating');
-  let showPassword = $state(false);
   let showAllLoginMethods = $state(false);
   let observedHomeserver = homeserver;
 
@@ -91,7 +88,7 @@
 </script>
 
 <form
-  class="login-form"
+  class="login-form auth-card-surface"
   out:fade={{ duration: prefersReducedMotion.current ? 0 : 200 }}
   aria-busy={isAuthenticating}
   novalidate
@@ -100,18 +97,18 @@
     void onLogin();
   }}
 >
+  <div class="auth-card-heading centered">
+    <div>
+      <h2>{$i18n.t('auth.signInTitle')}</h2>
+    </div>
+  </div>
+
   <div class="field">
     <Label for="homeserver">{$i18n.t('auth.homeserver')}</Label>
-    <Combobox
+    <HomeserverPicker
       id="homeserver"
       bind:value={homeserver}
-      items={homeserverItems}
-      autocapitalize="off"
-      autocorrect="off"
-      autocomplete="url"
       disabled={isAuthenticating}
-      placeholder="matrix.org"
-      spellcheck={false}
       required
       ariaInvalid={invalidField === 'homeserver'}
       oninput={onClearHomeserverValidation}
@@ -120,9 +117,7 @@
         onClearHomeserverValidation();
         void onValidateHomeserver();
       }}
-      onblur={() => {
-        void onValidateHomeserver();
-      }}
+      onblur={() => void onValidateHomeserver()}
     />
     <p class:checking-active={isCheckingHomeserver} class="checking" aria-live="polite">
       {#if isCheckingHomeserver}
@@ -182,72 +177,38 @@
       divider={showAllLoginMethods && firstAvailableLoginMethod !== 'password'}
       reducedMotion={prefersReducedMotion.current}
     >
-      <div class="field">
-        <Label for="username">{$i18n.t('auth.username')}</Label>
-        <TextInput
-          id="username"
-          bind:value={username}
-          autocomplete="username"
-          required
-          disabled={isAuthenticating}
-          aria-invalid={invalidField === 'username'}
-          oninput={() => {
-            onClearFieldError('username');
-          }}
-        />
-      </div>
-
-      <div class="field">
-        <Label for="password">{$i18n.t('auth.password')}</Label>
-        <PasswordField
-          bind:value={password}
-          bind:showPassword
-          disabled={isAuthenticating}
-          invalid={invalidField === 'password'}
-          oninput={() => {
-            onClearFieldError('password');
-          }}
-        />
-      </div>
-
-      <div class="submit-area">
-        <div class="error-slot" aria-live="polite">
-          {#if fieldError || loginError || core.status === 'error'}
-            <p class="error">{fieldError ?? loginError ?? $i18n.t('auth.unableToStart')}</p>
-          {/if}
-        </div>
-
-        <div class="actions">
-          <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver}>
-            {#if isAuthenticating}
-              <Spinner />
-            {/if}
-
-            {isAuthenticating ? $i18n.t('auth.signingIn') : $i18n.t('auth.signIn')}
-          </Button>
-        </div>
-      </div>
+      <PasswordLoginForm
+        {username}
+        {password}
+        invalidField={invalidField === 'homeserver' ? null : invalidField}
+        {fieldError}
+        {loginError}
+        {isAuthenticating}
+        {isCheckingHomeserver}
+        onUsernameInput={(value: string) => {
+          username = value;
+        }}
+        onPasswordInput={(value: string) => {
+          password = value;
+        }}
+        {onClearFieldError}
+      />
     </LoginMethod>
   {/if}
 
+  {#if loginFlows && availableLoginMethodCount === 0 && !isCheckingHomeserver}
+    <p class="muted">{$i18n.t('errors.unsupportedSignIn')}</p>
+  {/if}
+
   {#if availableLoginMethodCount > 1}
-    <button
-      class="method-toggle"
-      type="button"
-      aria-expanded={showAllLoginMethods}
-      onclick={() => {
+    <AuthMethodToggle
+      expanded={showAllLoginMethods}
+      showLabel={$i18n.t('auth.moreWaysToSignIn')}
+      hideLabel={$i18n.t('auth.hideOtherWaysToSignIn')}
+      onToggle={() => {
         showAllLoginMethods = !showAllLoginMethods;
       }}
-    >
-      <span
-        >{showAllLoginMethods
-          ? $i18n.t('auth.hideOtherWaysToSignIn')
-          : $i18n.t('auth.moreWaysToSignIn')}</span
-      >
-      <span class:expanded={showAllLoginMethods} class="method-toggle-icon" aria-hidden="true">
-        <CaretDownIcon />
-      </span>
-    </button>
+    />
   {/if}
 
   {#if (!loginFlows && !isCheckingHomeserver) || (!isPasswordLoginVisible && (fieldError || loginError || core.status === 'error'))}
@@ -269,9 +230,54 @@
   {/if}
 </form>
 
+{#if onCreateAccount}
+  <div class="account-switch">
+    <span>{$i18n.t('auth.newToMatrixQuestion')}</span>
+    <button class="account-switch-button" type="button" onclick={onCreateAccount}>
+      {$i18n.t('auth.createAccount')}
+    </button>
+  </div>
+{/if}
+
 <style>
   .actions {
     display: grid;
+  }
+
+  .account-switch {
+    align-items: center;
+    color: var(--sable-sec-main);
+    display: grid;
+    font-size: var(--font-size-small);
+    gap: 0.375rem;
+    justify-content: center;
+    padding-top: 0.875rem;
+    text-align: center;
+  }
+
+  .account-switch-button {
+    background: transparent;
+    border: 0;
+    color: var(--sable-primary-main);
+    cursor: pointer;
+    font: inherit;
+    font-weight: var(--font-weight-bold);
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    transition:
+      color var(--motion-normal) var(--motion-easing-standard),
+      text-decoration-color var(--motion-normal) var(--motion-easing-standard);
+  }
+
+  .account-switch-button:hover {
+    color: var(--sable-primary-main-hover);
+  }
+
+  .account-switch-button:focus-visible {
+    border-radius: 0.125rem;
+    outline: 0.2rem solid var(--sable-focus-ring);
+    outline-offset: 0.15rem;
   }
 
   .checking {
@@ -296,8 +302,15 @@
     margin: 0;
   }
 
+  .muted {
+    color: var(--sable-sec-main);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-body);
+    margin: 0;
+  }
+
   .error-slot {
-    min-height: 0.75rem;
+    min-height: calc(var(--font-size-small) * var(--line-height-body));
   }
 
   @keyframes error-in {
@@ -316,43 +329,11 @@
   }
 
   .login-form {
-    background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
-    border-radius: calc(var(--radius) * 1.5);
-    display: grid;
-    gap: 1.25rem;
-    padding: 1.75rem;
+    min-width: 0;
   }
 
   .sso-actions {
     gap: 0.75rem;
-  }
-
-  .method-toggle {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    color: var(--sable-sec-main);
-    cursor: pointer;
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: 0.5rem;
-    justify-content: center;
-    padding: 0.25rem;
-  }
-
-  .method-toggle:hover {
-    color: var(--sable-bg-on-container);
-  }
-
-  .method-toggle-icon {
-    align-items: center;
-    display: flex;
-  }
-
-  .method-toggle-icon :global(svg) {
-    height: 1rem;
-    width: 1rem;
   }
 
   .submit-area {
@@ -363,14 +344,6 @@
   @media (prefers-reduced-motion: no-preference) {
     .error {
       animation: error-in var(--motion-normal) ease-out;
-    }
-
-    .method-toggle-icon {
-      transition: transform var(--motion-normal) ease;
-    }
-
-    .method-toggle-icon.expanded {
-      transform: rotate(180deg);
     }
   }
 </style>

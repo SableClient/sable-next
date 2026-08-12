@@ -195,6 +195,9 @@ html {
   --motion-fast: 100ms;
   --motion-normal: 150ms;
   --motion-slow: 200ms;
+  --motion-easing-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --layer-popover: 100;
 
   /* Font sizes */
   --font-size-small: 0.8125rem;

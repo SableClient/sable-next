@@ -2,19 +2,19 @@
 import type { LatestEventView } from "./LatestEventView";
 import type { RoomStateView } from "./RoomStateView";
 
-export type RoomSummary = { room_id: string, canonical_alias: string | null, name: string | null, avatar_url: string | null, is_direct: boolean,
+export type RoomSummary = { room_id: string, canonical_alias: string | null, name: string | null, avatar_url: string | null, is_direct: boolean, 
 /**
  * An `invited` room is an invitation to accept, not a room to open.
  */
-state: RoomStateView,
+state: RoomStateView, 
 /**
  * `null` until the state event loads, which is not the same as `false`.
  */
-encrypted: boolean | null, is_space: boolean,
+encrypted: boolean | null, is_space: boolean, 
 /**
  * Spaces are a DAG, so there can be several.
  */
-space_parents: string[],
+space_parents: string[], 
 /**
  * Already sorted by `order`, then the child event's age.
  */

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { smoothSlide } from './login-transitions';
+  import { smoothSlide } from '../flow/login-transitions';
 
   interface Props {
     divider?: boolean;

@@ -17,22 +17,38 @@ pub enum Command {
     LoginFlows {
         homeserver: String,
     },
-    /// Returns the URL to open in the system browser.
+    RegistrationFlows {
+        homeserver: String,
+    },
+    Register {
+        homeserver: String,
+        username: String,
+        password: String,
+        registration_email: Option<String>,
+        registration_token: Option<String>,
+    },
+    RequestRegistrationEmail {
+        email: String,
+    },
+    SubmitRegistrationEmail {
+        token: String,
+    },
+    ContinueRegistration,
+    CancelRegistration,
     StartOidcLogin {
         homeserver: String,
         redirect_uri: String,
+        intent: AuthIntent,
     },
-    /// The full redirect URI the browser landed on, query string included.
     CompleteOidcLogin {
         callback_url: String,
     },
-    /// Returns the URL to open in the system browser.
     StartSsoLogin {
         homeserver: String,
         redirect_uri: String,
         idp_id: Option<String>,
+        intent: AuthIntent,
     },
-    /// The full redirect URI the browser landed on, query string included.
     CompleteSsoLogin {
         callback_url: String,
     },
@@ -344,6 +360,22 @@ pub enum CommandOk {
     LoginFlows {
         flows: LoginFlowsView,
     },
+    RegistrationFlows {
+        flows: RegistrationFlowsView,
+    },
+    Register {
+        result: RegistrationResultView,
+    },
+    ContinueRegistration {
+        result: RegistrationResultView,
+    },
+    RequestRegistrationEmail {
+        result: RegistrationResultView,
+    },
+    SubmitRegistrationEmail {
+        result: RegistrationResultView,
+    },
+    CancelRegistration,
     StartOidcLogin {
         authorization_url: String,
     },
@@ -491,9 +523,50 @@ pub enum CommandErr {
         #[ts(type = "number | null")]
         retry_after_ms: Option<u64>,
     },
+    RegistrationUnavailable,
+    UsernameTaken,
+    InvalidUsername,
+    InvalidEmail,
+    EmailVerificationFailed,
+    WeakPassword,
+    RegistrationStageFailed {
+        stage: String,
+    },
     /// Detail is in the core's log under `log_id`.
     Failed {
         log_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthIntent {
+    Login,
+    Register,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum RegistrationResultView {
+    Complete {
+        #[ts(type = "string")]
+        user_id: OwnedUserId,
+    },
+    Fallback {
+        stage: String,
+        fallback_url: String,
+        completed: Vec<String>,
+        total_stages: usize,
+    },
+    Email {
+        email: Option<String>,
+        submit_url: Option<String>,
+        can_complete_out_of_band: bool,
+        verified: bool,
+        completed: Vec<String>,
+        total_stages: usize,
     },
 }
 
@@ -890,9 +963,27 @@ pub struct ProfileView {
 pub struct LoginFlowsView {
     pub password: bool,
     pub oidc: bool,
+    pub oidc_registration: bool,
     pub sso: bool,
     pub oauth_aware_preferred: bool,
     pub sso_identity_providers: Vec<SsoIdentityProviderView>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct RegistrationFlowsView {
+    pub uiaa: bool,
+    pub email: RegistrationRequirementView,
+    pub registration_token: RegistrationRequirementView,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum RegistrationRequirementView {
+    Unavailable,
+    Optional,
+    Required,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

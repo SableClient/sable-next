@@ -1,12 +1,15 @@
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { DeviceView } from '@/generated/DeviceView';
 import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
+import type { AuthIntent } from '@/generated/AuthIntent';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
+import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
 import type { MemberView } from '@/generated/MemberView';
 import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
+import type { RegistrationResultView } from '@/generated/RegistrationResultView';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
@@ -79,12 +82,94 @@ export class CoreClient {
     return response.flows;
   }
 
-  async startOidcLogin(homeserver: string, redirectUri: string): Promise<string> {
+  async registrationFlows(homeserver: string): Promise<RegistrationFlowsView> {
+    const response = await this.ensureTransport().send({
+      type: 'registration_flows',
+      homeserver,
+    });
+    return response.flows;
+  }
+
+  async register(
+    homeserver: string,
+    username: string,
+    password: string,
+    registrationEmail: string | null = null,
+    registrationToken: string | null = null
+  ): Promise<RegistrationResultView> {
+    let transport: Transport;
+    try {
+      transport = this.ensureTransport();
+    } catch (error) {
+      this.status = 'error';
+      throw error;
+    }
+
+    this.status = 'authenticating';
+    try {
+      const response = await transport.send({
+        type: 'register',
+        homeserver,
+        username,
+        password,
+        registration_email: registrationEmail,
+        registration_token: registrationToken,
+      });
+      const result = response.result;
+      if (result.state === 'complete') {
+        this.session = { user_id: result.user_id };
+        this.status = 'ready';
+      } else {
+        this.status = 'signed-out';
+      }
+      return result;
+    } catch (error) {
+      this.status = this.statusAfterAuthenticationError(error);
+      throw error;
+    }
+  }
+
+  async continueRegistration(): Promise<RegistrationResultView> {
+    const response = await this.ensureTransport().send({ type: 'continue_registration' });
+    const result = response.result;
+    if (result.state === 'complete') {
+      this.session = { user_id: result.user_id };
+      this.status = 'ready';
+    }
+    return result;
+  }
+
+  async requestRegistrationEmail(email: string): Promise<RegistrationResultView> {
+    const response = await this.ensureTransport().send({
+      type: 'request_registration_email',
+      email,
+    });
+    return response.result;
+  }
+
+  async submitRegistrationEmail(token: string): Promise<RegistrationResultView> {
+    const response = await this.ensureTransport().send({
+      type: 'submit_registration_email',
+      token,
+    });
+    return response.result;
+  }
+
+  async cancelRegistration(): Promise<void> {
+    await this.ensureTransport().send({ type: 'cancel_registration' });
+  }
+
+  async startOidcLogin(
+    homeserver: string,
+    redirectUri: string,
+    intent: AuthIntent = 'login'
+  ): Promise<string> {
     const transport = this.ensureTransport();
     const response = await transport.send({
       type: 'start_oidc_login',
       homeserver,
       redirect_uri: redirectUri,
+      intent,
     });
     return response.authorization_url;
   }
@@ -120,13 +205,19 @@ export class CoreClient {
     }
   }
 
-  async startSsoLogin(homeserver: string, redirectUri: string, idpId?: string): Promise<string> {
+  async startSsoLogin(
+    homeserver: string,
+    redirectUri: string,
+    idpId?: string,
+    intent: AuthIntent = 'login'
+  ): Promise<string> {
     const transport = this.ensureTransport();
     const response = await transport.send({
       type: 'start_sso_login',
       homeserver,
       redirect_uri: redirectUri,
       idp_id: idpId ?? null,
+      intent,
     });
     return response.authorization_url;
   }
@@ -266,6 +357,20 @@ export class CoreClient {
     await this.ensureTransport().send({ type: 'set_typing', room_id: roomId, typing });
   }
 
+  async setDisplayName(name: string | null): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_display_name', name });
+  }
+
+  async setAvatarUrl(url: string | null): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_avatar_url', url });
+  }
+
+  async uploadAvatar(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+    const uri = await this.ensureTransport().uploadMedia(mime, bytes);
+    await this.setAvatarUrl(uri);
+    return uri;
+  }
+
   async unsubscribe(subscription: SubscriptionId): Promise<void> {
     await this.ensureTransport().send({ type: 'unsubscribe', subscription });
   }
@@ -323,6 +428,13 @@ export class CoreClient {
         case 'rate_limited':
         case 'unsupported':
         case 'unknown_homeserver':
+        case 'registration_unavailable':
+        case 'username_taken':
+        case 'invalid_username':
+        case 'invalid_email':
+        case 'email_verification_failed':
+        case 'weak_password':
+        case 'registration_stage_failed':
           return 'signed-out';
       }
     }

@@ -68,6 +68,7 @@
   type="single"
   {items}
   bind:value
+  inputValue={value}
   {required}
   onOpenChange={handleOpenChange}
   onValueChange={onvaluechange}
@@ -105,7 +106,7 @@
     <BitsCombobox.Content sideOffset={4}>
       {#snippet child({ wrapperProps, props, open })}
         {#if open && filteredItems.length > 0}
-          <div {...wrapperProps}>
+          <div {...wrapperProps} class="combobox-positioner">
             <div {...props} class="combobox-menu">
               {#each filteredItems as item (item.value)}
                 <BitsCombobox.Item value={item.value} label={item.label} disabled={item.disabled}>
@@ -183,6 +184,11 @@
     border-radius: var(--radius);
     overflow: hidden;
     width: var(--bits-combobox-anchor-width);
+  }
+
+  .combobox-positioner {
+    position: relative;
+    z-index: var(--layer-popover);
   }
 
   .combobox-option {

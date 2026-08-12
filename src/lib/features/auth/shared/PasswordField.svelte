@@ -6,17 +6,21 @@
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   interface Props {
+    id?: string;
     value?: string;
     disabled?: boolean;
     invalid?: boolean;
+    autocomplete?: HTMLInputAttributes['autocomplete'];
     showPassword?: boolean;
     oninput?: HTMLInputAttributes['oninput'];
   }
 
   let {
+    id = 'password',
     value = $bindable(''),
     disabled = false,
     invalid = false,
+    autocomplete = 'current-password',
     showPassword = $bindable(false),
     oninput,
   }: Props = $props();
@@ -24,10 +28,10 @@
 
 <div class="password-input">
   <TextInput
-    id="password"
+    {id}
     type={showPassword ? 'text' : 'password'}
     bind:value
-    autocomplete="current-password"
+    {autocomplete}
     required
     {disabled}
     aria-invalid={invalid}
