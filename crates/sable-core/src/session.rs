@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use matrix_sdk::{
     Client, ClientBuilder,
+    encryption::{BackupDownloadStrategy, EncryptionSettings},
     authentication::{
         matrix::MatrixSession,
         oauth::{
@@ -9,6 +10,7 @@ use matrix_sdk::{
             registration::{ApplicationType, ClientMetadata, Localized, OAuthGrantType},
         },
     },
+    config::RequestConfig,
     ruma::serde::Raw,
 };
 use matrix_sdk_ui::sync_service::SyncService;
@@ -178,7 +180,12 @@ pub async fn build_client(
     store_id: &str,
     homeserver: &str,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
-    let builder = apply_server(Client::builder(), homeserver).handle_refresh_tokens();
+    let builder = apply_server(Client::builder(), homeserver)
+        .handle_refresh_tokens()
+        .with_encryption_settings(EncryptionSettings {
+            backup_download_strategy: BackupDownloadStrategy::OneShot,
+            ..EncryptionSettings::default()
+        });
 
     #[cfg(not(target_family = "wasm"))]
     let builder = builder.sqlite_store(std::path::Path::new(store_id).join("store"), None);
@@ -288,7 +295,9 @@ pub async fn discovery_client(homeserver: &str) -> Result<Client, matrix_sdk::Cl
 /// A scheme is no reason to skip `.well-known`: `https://example.com` is usually
 /// the server *name*, delegating elsewhere.
 fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
-    builder.server_name_or_homeserver_url(homeserver)
+    builder
+        .server_name_or_homeserver_url(homeserver)
+        .request_config(RequestConfig::new().timeout(Duration::from_secs(15)))
 }
 
 #[cfg(test)]
@@ -315,4 +324,6 @@ mod tests {
         let (_, second) = accounts.allocate_account("sable-next");
         assert_ne!(first, second);
     }
+
+    #[test]
 }

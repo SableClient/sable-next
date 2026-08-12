@@ -7,13 +7,20 @@
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
     onclick?: HTMLButtonAttributes['onclick'];
+    class?: string;
     children?: Snippet;
   };
 
-  let { type = 'button', disabled = false, onclick, children }: Props = $props();
+  let {
+    type = 'button',
+    disabled = false,
+    onclick,
+    class: className = '',
+    children,
+  }: Props = $props();
 </script>
 
-<BitsButton.Root {type} {disabled} {onclick} class="sable-button">
+<BitsButton.Root {type} {disabled} {onclick} class={`sable-button ${className}`}>
   {@render children?.()}
 </BitsButton.Root>
 

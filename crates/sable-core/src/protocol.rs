@@ -734,6 +734,9 @@ pub enum VerificationView {
     Requested {
         /// Another of our own sessions, which also unlocks our history.
         is_self: bool,
+        /// The current session sent the request, so it waits for the other
+        /// device instead of showing an accept action.
+        initiated_by_us: bool,
     },
     /// Nothing to do but wait. The side that accepted drives the transition to
     /// SAS.

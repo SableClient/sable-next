@@ -9,4 +9,9 @@ export type VerificationView = { "phase": "requested",
 /**
  * Another of our own sessions, which also unlocks our history.
  */
-is_self: boolean, } | { "phase": "waiting" } | { "phase": "compare", emojis: Array<EmojiView>, decimals: [number, number, number], } | { "phase": "confirmed" } | { "phase": "done" } | { "phase": "cancelled", reason: string, };
+is_self: boolean,
+/**
+ * The current session sent the request, so it waits for the other
+ * device instead of showing an accept action.
+ */
+initiated_by_us: boolean, } | { "phase": "waiting" } | { "phase": "compare", emojis: Array<EmojiView>, decimals: [number, number, number], } | { "phase": "confirmed" } | { "phase": "done" } | { "phase": "cancelled", reason: string, };

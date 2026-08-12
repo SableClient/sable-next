@@ -42,41 +42,41 @@ export interface Transport {
 
 /** Applies a batch of diffs to a local array. The only Matrix state the UI owns. */
 export function applyDiffs<T>(current: readonly T[], diffs: readonly Diff<T>[]): T[] {
-  let next = [...current];
+  const next = [...current];
   for (const diff of diffs) {
     switch (diff.op) {
       case 'append':
-        next = [...next, ...diff.values];
+        next.push(...diff.values);
         break;
       case 'clear':
-        next = [];
+        next.length = 0;
         break;
       case 'push_front':
-        next = [diff.value, ...next];
+        next.unshift(diff.value);
         break;
       case 'push_back':
-        next = [...next, diff.value];
+        next.push(diff.value);
         break;
       case 'pop_front':
-        next = next.slice(1);
+        next.shift();
         break;
       case 'pop_back':
-        next = next.slice(0, -1);
+        next.pop();
         break;
       case 'insert':
-        next = [...next.slice(0, diff.index), diff.value, ...next.slice(diff.index)];
+        next.splice(diff.index, 0, diff.value);
         break;
       case 'set':
-        next = [...next.slice(0, diff.index), diff.value, ...next.slice(diff.index + 1)];
+        next[diff.index] = diff.value;
         break;
       case 'remove':
-        next = [...next.slice(0, diff.index), ...next.slice(diff.index + 1)];
+        next.splice(diff.index, 1);
         break;
       case 'truncate':
-        next = next.slice(0, diff.length);
+        next.length = diff.length;
         break;
       case 'reset':
-        next = [...diff.values];
+        next.splice(0, next.length, ...diff.values);
         break;
     }
   }

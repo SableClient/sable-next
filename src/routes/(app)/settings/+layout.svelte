@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
+  import { useCoreClient } from '$lib/core/context';
   import type { Snippet } from 'svelte';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
@@ -12,6 +13,7 @@
   }
 
   let { children }: Props = $props();
+  const core = useCoreClient();
 
   const sections = [
     { id: 'general', label: 'settings.general', icon: GearIcon },
@@ -25,6 +27,10 @@
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') close();
+  }
+
+  function logout(): void {
+    void core.logout();
   }
 </script>
 
@@ -55,6 +61,7 @@
             </a>
           {/each}
         </nav>
+        <button type="button" class="logout" onclick={logout}>{$i18n.t('settings.logout')}</button>
       </aside>
       <div class="settings-content">{@render children()}</div>
     </div>
@@ -101,7 +108,9 @@
   .settings-nav {
     background: var(--sable-bg-container);
     border-right: 1px solid var(--sable-bg-container-line);
+    display: flex;
     flex: 0 0 15rem;
+    flex-direction: column;
     padding: 1.5rem 1rem;
   }
 
@@ -139,6 +148,23 @@
   nav {
     display: grid;
     gap: 0.25rem;
+  }
+
+  .logout {
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--sable-error);
+    cursor: pointer;
+    font: inherit;
+    font-weight: var(--font-weight-medium);
+    margin-top: auto;
+    padding: 0.75rem;
+    text-align: left;
+  }
+
+  .logout:hover {
+    background: var(--sable-error-container);
   }
 
   a {
@@ -193,6 +219,10 @@
       border-bottom: 1px solid var(--sable-bg-container-line);
       border-right: 0;
       padding: 1rem;
+    }
+
+    .logout {
+      margin-top: 0.5rem;
     }
 
     h1 {

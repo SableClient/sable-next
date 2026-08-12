@@ -13,6 +13,7 @@ export function createWebTransport(): Transport {
     number,
     { resolve: (value: Reply) => void; reject: (error: unknown) => void }
   >();
+  const pendingCommands = new Map<number, Command['type']>();
   let nextId = 1;
   let worker: SharedWorker | null = null;
 
@@ -25,8 +26,16 @@ export function createWebTransport(): Transport {
 
     const nextWorker = new SharedWorker(workerUrl, {
       type: 'module',
-      name: 'sable-core-v2',
+      name: 'sable-core',
     });
+
+    nextWorker.addEventListener('error', (event) => {
+      console.error('[sable transport] shared worker error', event.message);
+    });
+
+    nextWorker.port.onmessageerror = (event) => {
+      console.error('[sable transport] worker message could not be decoded', event);
+    };
 
     nextWorker.port.onmessage = (message: MessageEvent<WorkerMessage>) => {
       const data = message.data;
@@ -39,11 +48,17 @@ export function createWebTransport(): Transport {
       const waiting = pending.get(data.id);
       if (!waiting) return;
       pending.delete(data.id);
+      const command = pendingCommands.get(data.id);
+      pendingCommands.delete(data.id);
 
-      if ('ok' in data) waiting.resolve(data.ok);
-      else if ('bytes' in data) waiting.resolve(data.bytes);
+      if ('ok' in data) {
+        waiting.resolve(data.ok);
+      } else if ('bytes' in data) waiting.resolve(data.bytes);
       else if ('uri' in data) waiting.resolve(data.uri);
-      else waiting.reject(new CoreError(data.err));
+      else {
+        console.warn('[sable transport] command failed', { command, code: data.err.code });
+        waiting.reject(new CoreError(data.err));
+      }
     };
 
     nextWorker.port.start();
@@ -60,8 +75,33 @@ export function createWebTransport(): Transport {
       const activeWorker = connect();
 
       return new Promise<T>((resolve, reject) => {
-        pending.set(id, { resolve: resolve as (value: Reply) => void, reject });
-        activeWorker.port.postMessage(body(id), transfers);
+        const request = body(id);
+        const command = 'command' in request ? request.command.type : undefined;
+        const timeout =
+          command === 'login_flows'
+            ? setTimeout(() => {
+                if (!pending.delete(id)) return;
+                pendingCommands.delete(id);
+                console.error('[sable transport] command timed out waiting for worker', {
+                  command,
+                });
+                reject(new Error('Timed out waiting for homeserver discovery'));
+              }, 20_000)
+            : undefined;
+        pending.set(id, {
+          resolve: (value) => {
+            if (timeout !== undefined) clearTimeout(timeout);
+            resolve(value as T);
+          },
+          reject: (error) => {
+            if (timeout !== undefined) clearTimeout(timeout);
+            reject(error instanceof Error ? error : new Error(String(error)));
+          },
+        });
+        if ('command' in request) {
+          pendingCommands.set(id, request.command.type);
+        }
+        activeWorker.port.postMessage(request, transfers);
       });
     })();
   }

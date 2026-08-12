@@ -24,6 +24,15 @@ where
     Task(handle)
 }
 
+/// Runs finite, best-effort work that does not need session teardown.
+#[cfg(not(target_family = "wasm"))]
+pub fn spawn_detached<F>(future: F)
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    tokio::spawn(future);
+}
+
 #[cfg(target_family = "wasm")]
 pub fn spawn<F>(future: F) -> Task
 where
@@ -34,4 +43,13 @@ where
         let _ = Abortable::new(future, registration).await;
     });
     Task(handle)
+}
+
+/// Runs finite, best-effort work that does not need session teardown.
+#[cfg(target_family = "wasm")]
+pub fn spawn_detached<F>(future: F)
+where
+    F: std::future::Future<Output = ()> + 'static,
+{
+    wasm_bindgen_futures::spawn_local(future);
 }

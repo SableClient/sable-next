@@ -155,8 +155,13 @@ fn request_view(
     state: &VerificationRequestState,
 ) -> VerificationView {
     match state {
+        VerificationRequestState::Created { .. } => VerificationView::Requested {
+            is_self: request.is_self_verification(),
+            initiated_by_us: true,
+        },
         VerificationRequestState::Requested { .. } => VerificationView::Requested {
             is_self: request.is_self_verification(),
+            initiated_by_us: false,
         },
         VerificationRequestState::Done => VerificationView::Done,
         VerificationRequestState::Cancelled(info) => VerificationView::Cancelled {
@@ -193,6 +198,17 @@ fn sas_view(sas: &SasVerification, state: &SasState) -> VerificationView {
     }
 }
 
+fn verification_phase(state: &VerificationView) -> &'static str {
+    match state {
+        VerificationView::Requested { .. } => "requested",
+        VerificationView::Waiting => "waiting",
+        VerificationView::Compare { .. } => "compare",
+        VerificationView::Confirmed => "confirmed",
+        VerificationView::Done => "done",
+        VerificationView::Cancelled { .. } => "cancelled",
+    }
+}
+
 fn sync_status(state: SyncState) -> SyncStatus {
     match state {
         SyncState::Idle | SyncState::Terminated => SyncStatus::Offline,
@@ -219,6 +235,7 @@ pub struct Core {
     session: RwLock<Option<Session>>,
     pending_login: Mutex<Option<PendingLogin>>,
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
+    session_tasks: std::sync::Mutex<Vec<Task>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     active_room_subscription: Mutex<Option<SubscriptionId>>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
@@ -254,6 +271,7 @@ impl Core {
             session: RwLock::new(None),
             pending_login: Mutex::new(None),
             pending_registration: Mutex::new(None),
+            session_tasks: std::sync::Mutex::new(Vec::new()),
             subscriptions: Mutex::new(HashMap::new()),
             active_room_subscription: Mutex::new(None),
             timelines: Mutex::new(HashMap::new()),
@@ -264,6 +282,14 @@ impl Core {
     /// No carrier means no UI, and syncing continues, so a drop is not an error.
     pub fn emit(&self, event: CoreEvent) {
         let _ = self.events.send(event);
+    }
+
+    /// Session tasks must outlive their spawn call. Dropping `Task` aborts it.
+    fn track_session_task(&self, task: Task) {
+        self.session_tasks
+            .lock()
+            .expect("session task lock poisoned")
+            .push(task);
     }
 
     fn emit_if_current(&self, generation: u64, event: CoreEvent) {
@@ -524,7 +550,6 @@ impl Core {
         let client = session::discovery_client(&homeserver)
             .await
             .map_err(|error| self.discovery_error(error))?;
-
         let mut flows = protocol::LoginFlowsView {
             password: false,
             oidc: false,
@@ -1075,23 +1100,20 @@ impl Core {
             .accounts
             .first()
             .map(|account| account.account_id.clone());
-        if registry.accounts.is_empty() {
-            self.sessions
-                .clear()
-                .await
-                .map_err(|error| self.failed("clear session", error))?;
-        } else {
-            let bytes = serde_json::to_vec(registry)
-                .map_err(|error| self.failed("logout: serialize accounts", error))?;
-            self.sessions
-                .save(bytes)
-                .await
-                .map_err(|error| self.failed("logout: save accounts", error))?;
-        }
+        let bytes = serde_json::to_vec(registry)
+            .map_err(|error| self.failed("logout: serialize accounts", error))?;
+        self.sessions
+            .save(bytes)
+            .await
+            .map_err(|error| self.failed("logout: save accounts", error))?;
         Ok(())
     }
 
     async fn take_session(&self) -> Option<Session> {
+        self.session_tasks
+            .lock()
+            .expect("session task lock poisoned")
+            .clear();
         self.subscriptions.lock().await.clear();
         *self.active_room_subscription.lock().await = None;
         self.timelines.lock().await.clear();
@@ -1110,29 +1132,24 @@ impl Core {
             .event_cache()
             .subscribe()
             .map_err(|error| self.failed("subscribe_event_cache", error))?;
-        self.watch_session(&client, &homeserver, &account_id, generation);
+
+        // Event handlers do not spawn until sync starts, and are owned by the
+        // client. Register them now so the first sync response cannot race us.
         self.watch_ephemeral(&client, generation);
-        self.watch_encryption(&client, generation);
-        self.watch_incoming_verifications(&client, generation);
+        self.watch_incoming_verifications(&client);
 
         let sync_service = session::start_sync(client.clone())
             .await
             .map_err(|error| self.failed("start_sync", error))?;
 
+        // Do not disrupt the active session unless its replacement started
+        // successfully. `take_session` also aborts its owned watcher tasks.
         if let Some(previous) = self.take_session().await {
             previous.sync_service.stop().await;
         }
 
-        let core = self.clone();
-        let mut states = sync_service.state();
-        // `Subscriber::next` yields only on *change*, so emit the first by hand.
-        core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
-        rt::spawn(async move {
-            while let Some(state) = states.next().await {
-                core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
-            }
-        });
-
+        let verification_client = client.clone();
+        let verification_user_id = client.user_id().map(ToOwned::to_owned);
         let mut session = self.session.write().await;
         if self.session_generation.load(Ordering::SeqCst) != generation {
             drop(session);
@@ -1140,12 +1157,40 @@ impl Core {
             return Ok(());
         }
         *session = Some(Session {
-            account_id,
-            client,
-            sync_service,
-            homeserver,
+            account_id: account_id.clone(),
+            client: client.clone(),
+            sync_service: sync_service.clone(),
+            homeserver: homeserver.clone(),
             oauth,
         });
+
+        self.watch_session(&client, &homeserver, &account_id, generation);
+        self.watch_encryption(&client, generation);
+
+        let core = self.clone();
+        let mut states = sync_service.state();
+        // `Subscriber::next` yields only on *change*, so emit the first by hand.
+        core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
+        self.track_session_task(rt::spawn(async move {
+            while let Some(state) = states.next().await {
+                core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
+            }
+        }));
+
+        if let Some(user_id) = verification_user_id {
+            rt::spawn_detached(async move {
+                if let Err(error) = verification_client
+                    .encryption()
+                    .request_user_identity(&user_id)
+                    .await
+                {
+                    tracing::warn!(
+                        operation = "verification",
+                        "could not refresh own device list: {error}"
+                    );
+                }
+            });
+        }
 
         Ok(())
     }
@@ -1157,7 +1202,7 @@ impl Core {
 
         let core = self.clone();
         let watched = client.clone();
-        rt::spawn(async move {
+        self.track_session_task(rt::spawn(async move {
             while verification.next().await.is_some() {
                 core.emit_if_current(
                     generation,
@@ -1166,11 +1211,11 @@ impl Core {
                     },
                 );
             }
-        });
+        }));
 
         let core = self.clone();
         let watched = client.clone();
-        rt::spawn(async move {
+        self.track_session_task(rt::spawn(async move {
             pin_mut!(recovery);
             while recovery.next().await.is_some() {
                 core.emit_if_current(
@@ -1180,55 +1225,46 @@ impl Core {
                     },
                 );
             }
-        });
+        }));
     }
 
     /// Self-verification travels to-device, verifying someone else as a DM
     /// message, so both need a handler or one direction never prompts.
-    fn watch_incoming_verifications(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+    fn watch_incoming_verifications(self: &Arc<Self>, client: &matrix_sdk::Client) {
         client.add_event_handler({
             let core = self.clone();
             move |event: ToDeviceKeyVerificationRequestEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
 
                 async move {
-                    if core.session_generation.load(Ordering::SeqCst) != generation {
-                        return;
-                    }
-                    if let Some(request) = client
+                    let request = client
                         .encryption()
                         .get_verification_request(
                             &event.sender,
                             event.content.transaction_id.as_str(),
                         )
-                        .await
-                    {
-                        core.watch_verification(request);
+                        .await;
+
+                    tracing::info!(
+                        operation = "verification",
+                        request_available = request.is_some(),
+                        "received to-device verification request"
+                    );
+
+                    if let Some(request) = request {
+                        core.watch_verification(request).await;
                     }
                 }
             }
         });
 
-        let own_user_id = client.user_id().map(ToOwned::to_owned);
-
         client.add_event_handler({
             let core = self.clone();
             move |event: OriginalSyncRoomMessageEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
-                let own_user_id = own_user_id.clone();
 
                 async move {
-                    if core.session_generation.load(Ordering::SeqCst) != generation {
-                        return;
-                    }
-                    // Our own echoes back, and the command already watches it.
-                    if !matches!(event.content.msgtype, MessageType::VerificationRequest(_))
-                        || Some(&event.sender) == own_user_id.as_ref()
-                    {
+                    if !matches!(event.content.msgtype, MessageType::VerificationRequest(_)) {
                         return;
                     }
 
@@ -1237,7 +1273,7 @@ impl Core {
                         .get_verification_request(&event.sender, event.event_id.as_str())
                         .await
                     {
-                        core.watch_verification(request);
+                        core.watch_verification(request).await;
                     }
                 }
             }
@@ -1246,9 +1282,9 @@ impl Core {
 
     /// The request and the SAS it becomes are two objects with two state enums.
     /// Both funnel into one event stream keyed by the flow id.
-    fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
+    async fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
         let core = self.clone();
-        rt::spawn(async move {
+        let task = rt::spawn(async move {
             let user_id = request.other_user_id().to_owned();
             let flow_id = request.flow_id().to_owned();
 
@@ -1271,7 +1307,9 @@ impl Core {
                         // QR is not compiled in, so any other flow is
                         // undriveable. Say so instead of spinning.
                         match verification.sas() {
-                            Some(sas) => core.watch_sas(user_id.clone(), flow_id.clone(), sas),
+                            Some(sas) => {
+                                core.watch_sas(user_id.clone(), flow_id.clone(), sas).await
+                            }
                             None => core.emit_verification(
                                 &user_id,
                                 &flow_id,
@@ -1299,13 +1337,25 @@ impl Core {
                 }
             }
         });
+        self.track_session_task(task);
     }
 
-    fn watch_sas(self: &Arc<Self>, user_id: OwnedUserId, flow_id: String, sas: SasVerification) {
+    async fn watch_sas(
+        self: &Arc<Self>,
+        user_id: OwnedUserId,
+        flow_id: String,
+        sas: SasVerification,
+    ) {
         let core = self.clone();
-        rt::spawn(async move {
+        let task = rt::spawn(async move {
             let mut changes = sas.changes();
             core.emit_verification(&user_id, &flow_id, sas_view(&sas, &sas.state()));
+
+            if !sas.we_started()
+                && let Err(error) = sas.accept().await
+            {
+                core.failed("verification: accept_sas", error);
+            }
 
             while let Some(state) = changes.next().await {
                 let view = sas_view(&sas, &state);
@@ -1320,9 +1370,15 @@ impl Core {
                 }
             }
         });
+        self.track_session_task(task);
     }
 
     fn emit_verification(&self, user_id: &UserId, flow_id: &str, state: VerificationView) {
+        tracing::info!(
+            operation = "verification",
+            phase = verification_phase(&state),
+            "verification state changed"
+        );
         self.emit(CoreEvent::Verification {
             user_id: user_id.to_owned(),
             flow_id: flow_id.to_owned(),
@@ -1436,7 +1492,7 @@ impl Core {
             // The callback is synchronous and the store is not. A failure only
             // costs the next restore, so it is logged.
             let core = saver.clone();
-            rt::spawn(async move {
+            rt::spawn_detached(async move {
                 let store_id = {
                     let accounts = core.accounts.lock().await;
                     accounts
@@ -1475,13 +1531,13 @@ impl Core {
 
         let core = self.clone();
         let mut changes = client.subscribe_to_session_changes();
-        rt::spawn(async move {
+        self.track_session_task(rt::spawn(async move {
             while let Ok(change) = changes.recv().await {
                 if core.handle_session_change(change, generation).await {
                     return;
                 }
             }
-        });
+        }));
     }
 
     async fn handle_session_change(

@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import MobileNavDrawer from '$lib/ui/MobileNavDrawer.svelte';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
+  import DeviceVerificationDialog from '$lib/features/settings/DeviceVerificationDialog.svelte';
 
   interface Props {
     children: Snippet;
@@ -27,6 +28,8 @@
     </div>
   </div>
 {/if}
+
+<DeviceVerificationDialog />
 
 <style>
   .app-shell {

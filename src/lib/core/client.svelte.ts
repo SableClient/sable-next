@@ -10,18 +10,52 @@ import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { RegistrationResultView } from '@/generated/RegistrationResultView';
+import type { VerificationView } from '@/generated/VerificationView';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 
+type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
+let resolvedHomeservers: Record<string, string> = {};
+
+async function resolveHomeserverInPage(homeserver: string): Promise<string> {
+  const cached = resolvedHomeservers[homeserver];
+  if (cached) return cached;
+
+  let origin: URL;
+  try {
+    origin = new URL(homeserver.includes('://') ? homeserver : `https://${homeserver}`);
+  } catch {
+    return homeserver;
+  }
+
+  try {
+    const response = await fetch(new URL('/.well-known/matrix/client', origin), { mode: 'cors' });
+    if (!response.ok) return homeserver;
+    const body = (await response.json()) as WellKnownResponse;
+    const baseUrl = body['m.homeserver']?.base_url;
+    if (typeof baseUrl !== 'string') return homeserver;
+    const resolved = new URL(baseUrl).toString();
+    resolvedHomeservers = { ...resolvedHomeservers, [homeserver]: resolved };
+    return resolved;
+  } catch (error) {
+    console.warn('[sable auth] page homeserver discovery failed; using entered server', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    return homeserver;
+  }
+}
+
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
+export type ActiveVerification = { flowId: string; state: VerificationView };
 
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
   accounts = $state<CoreSession[]>([]);
+  verification = $state<ActiveVerification | null>(null);
 
   private transport: Transport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
@@ -55,9 +89,10 @@ export class CoreClient {
     this.status = 'authenticating';
 
     try {
+      const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
       const response = await transport.send({
         type: 'login',
-        homeserver,
+        homeserver: resolvedHomeserver,
         username,
         password,
       });
@@ -78,17 +113,19 @@ export class CoreClient {
 
   async loginFlows(homeserver: string): Promise<LoginFlowsView> {
     const transport = this.ensureTransport();
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
     const response = await transport.send({
       type: 'login_flows',
-      homeserver,
+      homeserver: resolvedHomeserver,
     });
     return response.flows;
   }
 
   async registrationFlows(homeserver: string): Promise<RegistrationFlowsView> {
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
     const response = await this.ensureTransport().send({
       type: 'registration_flows',
-      homeserver,
+      homeserver: resolvedHomeserver,
     });
     return response.flows;
   }
@@ -111,9 +148,10 @@ export class CoreClient {
     const previousSession = this.session;
     this.status = 'authenticating';
     try {
+      const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
       const response = await transport.send({
         type: 'register',
-        homeserver,
+        homeserver: resolvedHomeserver,
         username,
         password,
         registration_email: registrationEmail,
@@ -173,9 +211,10 @@ export class CoreClient {
     intent: AuthIntent = 'login'
   ): Promise<string> {
     const transport = this.ensureTransport();
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
     const response = await transport.send({
       type: 'start_oidc_login',
-      homeserver,
+      homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       intent,
     });
@@ -222,9 +261,10 @@ export class CoreClient {
     intent: AuthIntent = 'login'
   ): Promise<string> {
     const transport = this.ensureTransport();
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
     const response = await transport.send({
       type: 'start_sso_login',
-      homeserver,
+      homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       idp_id: idpId ?? null,
       intent,
@@ -350,6 +390,15 @@ export class CoreClient {
     this.status = 'ready';
   }
 
+  async logout(): Promise<void> {
+    await this.ensureTransport().send({ type: 'logout' });
+    this.generation += 1;
+    this.session = null;
+    this.accounts = [];
+    this.verification = null;
+    this.status = 'signed-out';
+  }
+
   async renameDevice(deviceId: string, displayName: string): Promise<void> {
     await this.ensureTransport().send({
       type: 'rename_device',
@@ -367,6 +416,10 @@ export class CoreClient {
       type: 'request_verification',
       user_id: userId,
     });
+    this.verification = {
+      flowId: response.flow_id,
+      state: { phase: 'requested', is_self: true, initiated_by_us: true },
+    };
     return response.flow_id;
   }
 
@@ -418,7 +471,12 @@ export class CoreClient {
   }
 
   subscribeEvents(onEvent: (event: CoreEvent) => void): () => void {
-    return this.ensureTransport().subscribe(onEvent);
+    return this.ensureTransport().subscribe((event) => {
+      if (event.type === 'verification' && event.user_id === this.session?.user_id) {
+        this.verification = { flowId: event.flow_id, state: event.state };
+      }
+      onEvent(event);
+    });
   }
 
   stop(): void {
@@ -426,6 +484,7 @@ export class CoreClient {
     this.startPromise = null;
     this.cleanupTransport();
     this.session = null;
+    this.verification = null;
     this.status = 'idle';
   }
 

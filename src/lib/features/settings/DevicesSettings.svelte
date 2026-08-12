@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { DeviceView } from '@/generated/DeviceView';
   import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
-  import type { VerificationView } from '@/generated/VerificationView';
   import { CoreError } from '@/transport';
   import { useCoreClient } from '$lib/core/context';
   import { i18n, t } from '$lib/i18n';
@@ -21,11 +20,6 @@
   let managingRecovery = $state(false);
   let newRecoveryKey = $state<string | null>(null);
   let deleting = $state<string | null>(null);
-  let verification = $state<{
-    flowId: string;
-    state: VerificationView;
-    initiatedByUs: boolean;
-  } | null>(null);
 
   const verificationLabel = (value: EncryptionStatusView['verification']) =>
     value === 'verified'
@@ -132,36 +126,7 @@
     if (!core.session?.user_id) return;
     error = null;
     try {
-      const flowId = await core.requestVerification(core.session.user_id);
-      verification = { flowId, state: { phase: 'requested', is_self: true }, initiatedByUs: true };
-    } catch (cause) {
-      error = messageFor(cause);
-    }
-  }
-
-  async function accept(): Promise<void> {
-    if (!verification || !core.session?.user_id) return;
-    try {
-      await core.acceptVerification(core.session.user_id, verification.flowId);
-    } catch (cause) {
-      error = messageFor(cause);
-    }
-  }
-
-  async function confirm(): Promise<void> {
-    if (!verification || !core.session?.user_id) return;
-    try {
-      await core.confirmVerification(core.session.user_id, verification.flowId);
-    } catch (cause) {
-      error = messageFor(cause);
-    }
-  }
-
-  async function cancel(mismatch = false): Promise<void> {
-    if (!verification || !core.session?.user_id) return;
-    try {
-      await core.cancelVerification(core.session.user_id, verification.flowId, mismatch);
-      verification = null;
+      await core.requestVerification(core.session.user_id);
     } catch (cause) {
       error = messageFor(cause);
     }
@@ -171,14 +136,6 @@
     void refresh();
     return core.subscribeEvents((event) => {
       if (event.type === 'encryption_status') status = event.status;
-      if (event.type === 'verification' && event.user_id === core.session?.user_id) {
-        verification = {
-          flowId: event.flow_id,
-          state: event.state,
-          initiatedByUs: verification?.flowId === event.flow_id && verification.initiatedByUs,
-        };
-        if (event.state.phase === 'done') void refresh();
-      }
     });
   });
 </script>
@@ -366,43 +323,6 @@
     {/if}
   </section>
 
-  {#if verification}
-    <section class="verification" aria-live="polite" aria-labelledby="verify-heading">
-      <h2 id="verify-heading">{$i18n.t('settings.verification')}</h2>
-      {#if verification.state.phase === 'requested'}
-        {#if verification.initiatedByUs}
-          <p>{$i18n.t('settings.acceptOtherDevice')}</p>
-        {:else}
-          <p>{$i18n.t('settings.verificationRequested')}</p>
-          <Button onclick={accept}>{$i18n.t('settings.acceptVerification')}</Button>
-        {/if}
-      {:else if verification.state.phase === 'waiting'}
-        <p>{$i18n.t('settings.waiting')}</p>
-      {:else if verification.state.phase === 'compare'}
-        <p>{$i18n.t('settings.compareEmoji')}</p>
-        <div class="emoji" aria-label={$i18n.t('settings.verificationEmoji')}>
-          {#each verification.state.emojis as emoji (emoji.symbol)}<span title={emoji.description}
-              >{emoji.symbol}</span
-            >{/each}
-        </div>
-        <p class="decimals">{verification.state.decimals.join(' · ')}</p>
-        <Button onclick={confirm}>{$i18n.t('settings.theyMatch')}</Button>
-        <button type="button" class="danger-button" onclick={() => void cancel(true)}
-          >{$i18n.t('settings.theyDoNotMatch')}</button
-        >
-      {:else if verification.state.phase === 'confirmed'}
-        <p>{$i18n.t('settings.finishing')}</p>
-      {:else if verification.state.phase === 'cancelled'}
-        <p>{$i18n.t('settings.verificationCancelled', { reason: verification.state.reason })}</p>
-      {/if}
-      {#if verification.state.phase !== 'done'}<button
-          type="button"
-          class="text-button"
-          onclick={() => void cancel()}>{$i18n.t('settings.cancelVerification')}</button
-        >{/if}
-    </section>
-  {/if}
-
   {#if newRecoveryKey}
     <section class="recovery-key" aria-labelledby="recovery-key-heading">
       <h2 id="recovery-key-heading">{$i18n.t('settings.saveRecoveryKey')}</h2>
@@ -486,8 +406,7 @@
     color: var(--sable-success-main);
   }
 
-  .callout,
-  .verification {
+  .callout {
     background: var(--sable-primary-container);
     border-color: var(--sable-primary-container-line);
   }
@@ -565,18 +484,6 @@
     border-radius: var(--radius);
     color: var(--sable-crit-on-container);
     padding: 0.75rem;
-  }
-
-  .emoji {
-    display: flex;
-    font-size: 2rem;
-    gap: 0.5rem;
-    margin: 1rem 0;
-  }
-
-  .decimals {
-    font-variant-numeric: tabular-nums;
-    font-weight: var(--font-weight-bold);
   }
 
   @media (width < 42rem) {
