@@ -56,21 +56,21 @@ run = [
   "pnpm stylelint",
   "pnpm check",
   "cargo fmt --all -- --check",
-  "cargo clippy --workspace --all-targets --all-features -- -D warnings",
-  "cargo clippy -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings",
+  "cargo clippy --locked --workspace --all-targets --all-features -- -D warnings",
+  "cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings",
   "cargo deny check",
 ]
 
 [tasks.test]
-description = "Run all workspace Rust tests"
+description = "Run all frontend and Rust tests"
 alias = "t"
-run = "cargo test --workspace --all-features"
+run = ["pnpm test", "cargo test --locked --workspace --all-features"]
 raw = true
 
 [tasks.doc]
 description = "Build Rust documentation with warnings denied"
 env = { RUSTDOCFLAGS = "-D warnings" }
-run = "cargo doc --workspace --all-features --no-deps"
+run = "cargo doc --locked --workspace --all-features --no-deps"
 
 [tasks.ci]
 description = "Full local CI: strict checks, tests, and documentation"
