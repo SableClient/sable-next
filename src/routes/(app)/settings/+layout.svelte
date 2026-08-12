@@ -4,8 +4,8 @@
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
   import type { Snippet } from 'svelte';
-  import GearIcon from 'phosphor-icons-svelte/IconGearRegular.svelte';
-  import LockIcon from 'phosphor-icons-svelte/IconLockKeyRegular.svelte';
+  import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
 
   interface Props {
     children: Snippet;

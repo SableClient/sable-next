@@ -1,5 +1,5 @@
 <script lang="ts">
-  import CaretDownIcon from 'phosphor-icons-svelte/IconCaretDownRegular.svelte';
+  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
 
   interface Props {
     expanded: boolean;

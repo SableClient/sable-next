@@ -3,7 +3,7 @@
   import type { LoginFlowsView } from '@/generated/LoginFlowsView';
   import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
   import type { RegistrationResultView } from '@/generated/RegistrationResultView';
-  import GlobeIcon from 'phosphor-icons-svelte/IconGlobeRegular.svelte';
+  import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
   import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';

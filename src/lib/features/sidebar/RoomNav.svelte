@@ -5,14 +5,14 @@
   import { findRoomByPathId, roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
   import type { RoomSummary } from '@/generated/RoomSummary';
   import { SvelteSet } from 'svelte/reactivity';
-  import CaretDownIcon from 'phosphor-icons-svelte/IconCaretDownRegular.svelte';
-  import ChatsIcon from 'phosphor-icons-svelte/IconChatsRegular.svelte';
-  import CompassIcon from 'phosphor-icons-svelte/IconCompassRegular.svelte';
-  import DotsThreeIcon from 'phosphor-icons-svelte/IconDotsThreeRegular.svelte';
-  import HouseIcon from 'phosphor-icons-svelte/IconHouseRegular.svelte';
-  import LinkIcon from 'phosphor-icons-svelte/IconLinkRegular.svelte';
-  import MagnifyingGlassIcon from 'phosphor-icons-svelte/IconMagnifyingGlassRegular.svelte';
-  import PlusIcon from 'phosphor-icons-svelte/IconPlusRegular.svelte';
+  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
+  import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
+  import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
+  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
   interface Props {
     onNavigate?: (href: string) => void;

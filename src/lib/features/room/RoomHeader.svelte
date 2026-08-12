@@ -1,7 +1,7 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
-  import BackIcon from 'phosphor-icons-svelte/IconCaretLeftRegular.svelte';
-  import UsersIcon from 'phosphor-icons-svelte/IconUsersThreeRegular.svelte';
+  import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
   interface Props {
     roomName: string;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
   import type { RegistrationResultView } from '@/generated/RegistrationResultView';
-  import ArrowSquareOutIcon from 'phosphor-icons-svelte/IconArrowSquareOutRegular.svelte';
+  import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import Button from '$lib/ui/primitives/Button.svelte';
   import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';

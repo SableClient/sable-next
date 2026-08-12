@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PaperPlaneIcon from 'phosphor-icons-svelte/IconPaperPlaneTiltFill.svelte';
+  import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 
   import { i18n } from '$lib/i18n';
 
@@ -81,7 +81,7 @@
     disabled={sending || !draft.trim()}
     aria-label={$i18n.t('timeline.sendMessage')}
   >
-    <PaperPlaneIcon />
+    <PaperPlaneIcon weight="fill" />
   </button>
 </form>
 {#if error}<p class="send-error" role="alert">{error}</p>{/if}

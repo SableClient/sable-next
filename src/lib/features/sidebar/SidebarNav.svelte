@@ -4,10 +4,10 @@
   import { i18n } from '$lib/i18n';
   import { roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
   import { Tooltip } from 'bits-ui';
-  import ChatsIcon from 'phosphor-icons-svelte/IconChatsRegular.svelte';
-  import HouseIcon from 'phosphor-icons-svelte/IconHouseRegular.svelte';
-  import MagnifyingGlassIcon from 'phosphor-icons-svelte/IconMagnifyingGlassRegular.svelte';
-  import PlusIcon from 'phosphor-icons-svelte/IconPlusRegular.svelte';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
 

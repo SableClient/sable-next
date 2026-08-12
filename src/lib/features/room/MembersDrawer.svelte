@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { MemberView } from '@/generated/MemberView';
   import { Dialog } from 'bits-ui';
-  import XIcon from 'phosphor-icons-svelte/IconXRegular.svelte';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '$lib/i18n';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';

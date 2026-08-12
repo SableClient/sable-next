@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from 'svelte/elements';
   import { i18n } from '$lib/i18n';
-  import EyeIcon from 'phosphor-icons-svelte/IconEyeRegular.svelte';
-  import EyeSlashIcon from 'phosphor-icons-svelte/IconEyeSlashRegular.svelte';
+  import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   interface Props {

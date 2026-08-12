@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
-  import CaretLeftIcon from 'phosphor-icons-svelte/IconCaretLeftRegular.svelte';
-  import CaretRightIcon from 'phosphor-icons-svelte/IconCaretRightRegular.svelte';
+  import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import { cubicOut } from 'svelte/easing';
   import { i18n } from '$lib/i18n';
   import { AUTH_CARD_MOTION_MS } from './auth-flow.svelte';

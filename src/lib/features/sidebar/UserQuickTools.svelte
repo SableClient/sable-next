@@ -5,10 +5,10 @@
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
   import { DropdownMenu, Tooltip } from 'bits-ui';
-  import BellIcon from 'phosphor-icons-svelte/IconBellRegular.svelte';
-  import ChatsIcon from 'phosphor-icons-svelte/IconChatsRegular.svelte';
-  import GearIcon from 'phosphor-icons-svelte/IconGearRegular.svelte';
-  import MagnifyingGlassIcon from 'phosphor-icons-svelte/IconMagnifyingGlassRegular.svelte';
+  import BellIcon from 'phosphor-svelte/lib/BellIcon';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 
   interface Props {
     mobile?: boolean;

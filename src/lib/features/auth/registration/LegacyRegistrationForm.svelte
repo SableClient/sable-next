@@ -1,7 +1,7 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import InfoIcon from 'phosphor-icons-svelte/IconInfoRegular.svelte';
+  import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
   import Label from '$lib/ui/primitives/Label.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';

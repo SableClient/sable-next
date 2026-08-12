@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import XIcon from 'phosphor-icons-svelte/IconXRegular.svelte';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
