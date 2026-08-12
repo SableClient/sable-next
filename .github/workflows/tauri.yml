@@ -1,0 +1,54 @@
+name: Desktop builds
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: tauri-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal
+            runner: macos-latest
+            rust-targets: aarch64-apple-darwin x86_64-apple-darwin
+            tauri-args: --target universal-apple-darwin
+            bundle-path: target/universal-apple-darwin/release/bundle
+          - name: Windows x86_64
+            runner: windows-latest
+            rust-targets: ''
+            tauri-args: ''
+            bundle-path: target/release/bundle
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up app
+        uses: ./.github/actions/setup
+
+      - name: Add Rust targets
+        if: ${{ matrix.rust-targets != '' }}
+        shell: bash
+        run: rustup target add ${{ matrix.rust-targets }}
+
+      - name: Build desktop bundle
+        shell: bash
+        run: pnpm tauri build ${{ matrix.tauri-args }}
+
+      - name: Upload desktop bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sable-next-${{ runner.os }}
+          path: ${{ matrix.bundle-path }}
+          if-no-files-found: error
+          retention-days: 14
