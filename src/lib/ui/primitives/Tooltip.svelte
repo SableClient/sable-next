@@ -3,17 +3,25 @@
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
+  export type TooltipVariant = 'icon' | 'inline';
+
   interface Props {
     label: string;
+    variant?: TooltipVariant;
     class?: ClassValue;
     children: Snippet;
   }
 
-  let { label, class: className = '', children }: Props = $props();
+  let { label, variant = 'icon', class: className = '', children }: Props = $props();
 </script>
 
 {#snippet trigger({ props }: { props: Record<string, unknown> })}
-  <button {...props} class={['tooltip-trigger', className]} type="button" aria-label={label}>
+  <button
+    {...props}
+    class={['tooltip-trigger', `tooltip-trigger-${variant}`, className]}
+    type="button"
+    aria-label={label}
+  >
     {@render children()}
   </button>
 {/snippet}
@@ -46,10 +54,38 @@
       box-shadow var(--motion-normal) ease;
   }
 
-  .tooltip-trigger:hover,
-  .tooltip-trigger[data-state='open'] {
+  .tooltip-trigger-icon {
+    border-radius: 50%;
+    padding: 0.125rem;
+  }
+
+  .tooltip-trigger-icon:hover,
+  .tooltip-trigger-icon[data-state='open'] {
     background: var(--sable-primary-container);
     color: var(--sable-primary-on-container);
+  }
+
+  .tooltip-trigger-icon :global(svg) {
+    height: 1.125rem;
+    width: 1.125rem;
+  }
+
+  .tooltip-trigger-inline {
+    align-items: baseline;
+    border-radius: 0.125rem;
+    color: inherit;
+    cursor: default;
+    display: inline;
+    font: inherit;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .tooltip-trigger-inline:hover,
+  .tooltip-trigger-inline[data-state='open'] {
+    background: transparent;
+    color: var(--sable-bg-on-container);
   }
 
   .tooltip-trigger:focus-visible {

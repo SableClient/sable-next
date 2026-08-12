@@ -138,6 +138,12 @@
     }))
   );
   let activeIndex = $derived(furthestReachableStage(requestedStage, stages));
+  let hasSecondaryStage = $derived(
+    furthestReached >= 1 || core.status === 'signed-out' || isAddingAccount
+  );
+  let visibleFurthestStage = $derived(
+    hasSecondaryStage ? Math.max(furthestReached, 1) : furthestReached
+  );
   let isProfileStage = $derived(activeIndex === 2);
   let displayedStage = $derived(pendingStage ?? activeIndex);
   let userId = $derived(core.session?.user_id ?? '');
@@ -243,6 +249,7 @@
 
   function forward(): void {
     if (displayedStage < furthestReached) activateStage(displayedStage + 1);
+    else if (displayedStage === 0 && hasSecondaryStage) activateStage(1);
     else if (displayedStage === 1 && core.status === 'ready') activateStage(2);
   }
 
@@ -326,9 +333,10 @@
       {:else}
         <AuthRail
           activeIndex={displayedStage}
-          total={furthestReached + 1}
+          total={visibleFurthestStage + 1}
           canBack={displayedStage > 0}
           canForward={displayedStage < furthestReached ||
+            (displayedStage === 0 && hasSecondaryStage) ||
             (displayedStage === 1 && core.status === 'ready')}
           onBack={back}
           onForward={forward}
@@ -370,7 +378,7 @@
             />
           </AuthStageCard>
 
-          {#if furthestReached >= 1}
+          {#if visibleFurthestStage >= 1}
             <AuthStageCard
               active={displayedStage === 1}
               before={displayedStage > 1}

@@ -9,10 +9,12 @@
 
 .auth-page .auth-card-surface.login-form {
   gap: 0.5rem;
+  padding-bottom: 1rem;
 }
 
 .auth-page .auth-card-surface.registration-card {
   gap: 0.5rem;
+  padding-bottom: 1rem;
 }
 
 .auth-page .auth-card-surface > * {

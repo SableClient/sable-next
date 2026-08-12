@@ -133,91 +133,93 @@
     {/if}
   </div>
 
-  <div class="method-slot" class:action-slot={hasLoginAction}>
-    {#if !loginFlows}
-      <div class="actions">
-        <Button type="submit" disabled={isAuthenticating || isLoginControlsDisabled}>
-          {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
-        </Button>
-      </div>
-    {/if}
-
-    {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
-      <LoginMethod reducedMotion={prefersReducedMotion.current}>
+  <div class="login-methods">
+    <div class="method-slot" class:action-slot={hasLoginAction}>
+      {#if !loginFlows}
         <div class="actions">
-          <Button
-            disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
-            onclick={() => void onLaunchRedirectLogin('oidc')}
-          >
-            {isLaunchingLogin
-              ? $i18n.t('auth.opening')
-              : $i18n.t('auth.signInWithProvider', {
-                  name: displayedHomeserver || 'matrix.org',
-                })}
+          <Button type="submit" disabled={isAuthenticating || isLoginControlsDisabled}>
+            {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
           </Button>
         </div>
-      </LoginMethod>
-    {/if}
+      {/if}
 
-    {#if loginFlows?.sso && (showAllLoginMethods || preferredLoginMethod === 'sso')}
-      <LoginMethod reducedMotion={prefersReducedMotion.current}>
-        {#if loginFlows.sso_identity_providers.length > 0}
-          <div class="actions sso-actions">
-            {#each loginFlows.sso_identity_providers as provider (provider.id)}
-              <Button
-                disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
-                onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
-              >
-                {$i18n.t('auth.signInWithProvider', { name: provider.name })}
-              </Button>
-            {/each}
-          </div>
-        {:else}
+      {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
+        <LoginMethod reducedMotion={prefersReducedMotion.current}>
           <div class="actions">
             <Button
               disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
-              onclick={() => void onLaunchRedirectLogin('sso')}
+              onclick={() => void onLaunchRedirectLogin('oidc')}
             >
-              {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
+              {isLaunchingLogin
+                ? $i18n.t('auth.opening')
+                : $i18n.t('auth.signInWithProvider', {
+                    name: displayedHomeserver || 'matrix.org',
+                  })}
             </Button>
           </div>
-        {/if}
-      </LoginMethod>
-    {/if}
+        </LoginMethod>
+      {/if}
 
-    {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
-      <LoginMethod reducedMotion={prefersReducedMotion.current}>
-        <PasswordLoginForm
-          {username}
-          {password}
-          invalidField={invalidField === 'homeserver' ? null : invalidField}
-          {fieldError}
-          {loginError}
-          {isAuthenticating}
-          isCheckingHomeserver={isLoginControlsDisabled}
-          onUsernameInput={(value: string) => {
-            username = value;
-          }}
-          onPasswordInput={(value: string) => {
-            password = value;
-          }}
-          {onClearFieldError}
-        />
-      </LoginMethod>
+      {#if loginFlows?.sso && (showAllLoginMethods || preferredLoginMethod === 'sso')}
+        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+          {#if loginFlows.sso_identity_providers.length > 0}
+            <div class="actions sso-actions">
+              {#each loginFlows.sso_identity_providers as provider (provider.id)}
+                <Button
+                  disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
+                  onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
+                >
+                  {$i18n.t('auth.signInWithProvider', { name: provider.name })}
+                </Button>
+              {/each}
+            </div>
+          {:else}
+            <div class="actions">
+              <Button
+                disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
+                onclick={() => void onLaunchRedirectLogin('sso')}
+              >
+                {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
+              </Button>
+            </div>
+          {/if}
+        </LoginMethod>
+      {/if}
+
+      {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
+        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+          <PasswordLoginForm
+            {username}
+            {password}
+            invalidField={invalidField === 'homeserver' ? null : invalidField}
+            {fieldError}
+            {loginError}
+            {isAuthenticating}
+            isCheckingHomeserver={isLoginControlsDisabled}
+            onUsernameInput={(value: string) => {
+              username = value;
+            }}
+            onPasswordInput={(value: string) => {
+              password = value;
+            }}
+            {onClearFieldError}
+          />
+        </LoginMethod>
+      {/if}
+    </div>
+
+    {#if availableLoginMethodCount > 1}
+      <AuthMethodToggle
+        expanded={showAllLoginMethods}
+        showLabel={$i18n.t('auth.moreWaysToSignIn')}
+        hideLabel={$i18n.t('auth.hideOtherWaysToSignIn')}
+        disabled={isLoginControlsDisabled}
+        onToggle={() => {
+          showAllLoginMethods = !showAllLoginMethods;
+        }}
+      />
     {/if}
   </div>
-
-  {#if availableLoginMethodCount > 1}
-    <AuthMethodToggle
-      expanded={showAllLoginMethods}
-      showLabel={$i18n.t('auth.moreWaysToSignIn')}
-      hideLabel={$i18n.t('auth.hideOtherWaysToSignIn')}
-      disabled={isLoginControlsDisabled}
-      onToggle={() => {
-        showAllLoginMethods = !showAllLoginMethods;
-      }}
-    />
-  {/if}
 </form>
 
 {#if onCreateAccount}
@@ -338,6 +340,12 @@
   }
 
   .login-form {
+    min-width: 0;
+  }
+
+  .login-methods {
+    display: grid;
+    gap: 1rem;
     min-width: 0;
   }
 

@@ -5,6 +5,12 @@
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import { cubicOut } from 'svelte/easing';
   import { i18n } from '$lib/i18n';
+  import {
+    finishSwipeGesture,
+    startSwipeGesture,
+    updateSwipeGesture,
+    type SwipeGesture,
+  } from '$lib/ui/swipe-gesture';
   import { AUTH_CARD_MOTION_MS } from './auth-flow.svelte';
 
   interface Props {
@@ -24,6 +30,10 @@
   let lastActiveIndex: number | null = null;
   let scrollTimer: number | undefined;
   let scrollAnimation: number | undefined;
+  let isDragging = $state(false);
+  let swipeGesture: SwipeGesture | undefined;
+  let swipeStartScroll = 0;
+  let swipeOffset = 0;
 
   function cardTarget(rail: HTMLDivElement, card: HTMLElement): number {
     return Math.max(0, card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2);
@@ -59,16 +69,97 @@
   }
 
   function handleScroll(): void {
-    if (!window.matchMedia('(width <= 48rem)').matches) return;
+    if (
+      !window.matchMedia('(width <= 48rem)').matches ||
+      isDragging ||
+      isNavigating ||
+      swipeGesture
+    )
+      return;
     window.clearTimeout(scrollTimer);
     scrollTimer = window.setTimeout(activateNearestCard, 120);
+  }
+
+  function cardElements(rail: HTMLDivElement): HTMLElement[] {
+    return [...rail.querySelectorAll<HTMLElement>(':scope > .auth-card')];
+  }
+
+  function settleToCard(index: number): void {
+    const rail = railElement;
+    if (!rail) return;
+
+    const cards = cardElements(rail);
+    if (index < 0 || index >= cards.length) return;
+    animateToCard(rail, cards[index]);
+  }
+
+  function handleTouchStart(event: TouchEvent): void {
+    const rail = railElement;
+    if (!rail || isNavigating) return;
+    if (!(event.target instanceof Element) || !event.target.closest('.auth-card')) return;
+
+    const gesture = startSwipeGesture(event, 0);
+    if (!gesture) return;
+
+    window.clearTimeout(scrollTimer);
+    window.cancelAnimationFrame(scrollAnimation ?? 0);
+    scrollAnimation = undefined;
+    isNavigating = false;
+    swipeGesture = gesture;
+    swipeStartScroll = rail.scrollLeft;
+    swipeOffset = 0;
+  }
+
+  function handleTouchMove(event: TouchEvent): void {
+    const rail = railElement;
+    const gesture = swipeGesture;
+    if (!rail || !gesture) return;
+
+    const update = updateSwipeGesture(gesture, event);
+    if (!update || update.mode !== 'horizontal') return;
+
+    isDragging = true;
+    swipeOffset = update.distanceX;
+    const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    rail.scrollLeft = Math.max(0, Math.min(maxScroll, swipeStartScroll - swipeOffset));
+  }
+
+  function finishTouchGesture(cancelled: boolean): void {
+    const rail = railElement;
+    const gesture = swipeGesture;
+    if (!rail || !gesture) return;
+
+    swipeGesture = undefined;
+    const wasDragging = isDragging;
+    const result = finishSwipeGesture(gesture, swipeOffset, cancelled);
+    isDragging = false;
+    swipeOffset = 0;
+
+    if (!wasDragging) return;
+    if (!result.handled) {
+      settleToCard(activeIndex);
+      return;
+    }
+
+    let targetIndex: number | undefined;
+    if (result.direction === 'left' && canForward) targetIndex = activeIndex + 1;
+    if (result.direction === 'right' && canBack) targetIndex = activeIndex - 1;
+
+    if (targetIndex === undefined || !cardElements(rail)[targetIndex]) {
+      settleToCard(activeIndex);
+      return;
+    }
+
+    settleToCard(targetIndex);
+    if (targetIndex > activeIndex) onForward();
+    else onBack();
   }
 
   function activateNearestCard(): void {
     const rail = railElement;
     if (!rail) return;
     const railCenter = rail.scrollLeft + rail.clientWidth / 2;
-    const cards = [...rail.querySelectorAll<HTMLElement>(':scope > .auth-card')];
+    const cards = cardElements(rail);
     const nearestIndex = cards.reduce((nearest, card, index) => {
       const center = card.offsetLeft + card.offsetWidth / 2;
       const nearestCard = cards[nearest];
@@ -135,7 +226,18 @@
     class="rail"
     class:motion-ready={motionReady}
     class:is-navigating={isNavigating}
+    class:is-dragging={isDragging}
+    role="group"
+    aria-label={$i18n.t('auth.stageNavigation')}
     aria-live="polite"
+    ontouchstart={handleTouchStart}
+    ontouchmove={handleTouchMove}
+    ontouchend={() => {
+      finishTouchGesture(false);
+    }}
+    ontouchcancel={() => {
+      finishTouchGesture(true);
+    }}
     onscroll={handleScroll}
   >
     {@render children()}
@@ -196,6 +298,10 @@
   }
 
   .rail.is-navigating {
+    scroll-snap-type: none;
+  }
+
+  .rail.is-dragging {
     scroll-snap-type: none;
   }
 
@@ -320,7 +426,7 @@
 
     .rail {
       scroll-snap-type: x mandatory;
-      touch-action: pan-x pan-y;
+      touch-action: pan-y;
     }
   }
 </style>

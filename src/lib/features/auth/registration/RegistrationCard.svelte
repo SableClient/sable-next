@@ -95,13 +95,11 @@
           <!-- mustache required so formatter doesn't delete the space -->
           <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
           {$i18n.t('auth.registeringWith')}{' '}
-          <Tooltip class="provider-tooltip" label={$i18n.t('auth.changeProviderHint')}>
+          <Tooltip variant="inline" label={$i18n.t('auth.changeProviderHint')}>
             {homeserver || 'matrix.org'}
           </Tooltip>
         </span>
-        <Tooltip class="provider-info-tooltip" label={$i18n.t('auth.accountProviderHint')}
-          ><InfoIcon /></Tooltip
-        >
+        <Tooltip variant="icon" label={$i18n.t('auth.accountProviderHint')}><InfoIcon /></Tooltip>
       </div>
     {/if}
   </AuthField>
@@ -193,35 +191,6 @@
     flex: 1 1 auto;
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-
-  :global(.tooltip-trigger.provider-info-tooltip svg) {
-    height: 1.125rem;
-    width: 1.125rem;
-  }
-
-  :global(.tooltip-trigger.provider-tooltip) {
-    align-items: baseline;
-    background: transparent;
-    border-radius: 0.125rem;
-    color: inherit;
-    cursor: default;
-    display: inline;
-    font: inherit;
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-  }
-
-  :global(.tooltip-trigger.provider-tooltip:hover),
-  :global(.tooltip-trigger.provider-tooltip[data-state='open']) {
-    background: transparent;
-    color: var(--sable-bg-on-container);
-  }
-
-  :global(.tooltip-trigger.provider-tooltip:focus-visible) {
-    box-shadow: 0 0 0 0.2rem var(--sable-focus-ring);
-    outline: none;
   }
 
   .checking {
