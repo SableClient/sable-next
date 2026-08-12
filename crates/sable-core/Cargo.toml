@@ -24,7 +24,7 @@ matrix-sdk = { workspace = true, features = ["indexeddb", "js"] }
 matrix-sdk-ui = { workspace = true, features = ["js"] }
 tokio = { version = "1", default-features = false, features = ["sync", "macros"] }
 wasm-bindgen-futures = "0.4"
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 matrix-sdk = { workspace = true, features = ["testing"] }
