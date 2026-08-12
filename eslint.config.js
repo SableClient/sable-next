@@ -1,22 +1,22 @@
 import js from '@eslint/js';
-import { defineConfig } from 'eslint/config';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import svelte from 'eslint-plugin-svelte';
 import tseslint from 'typescript-eslint';
-import svelteConfig from './svelte.config.js';
 
 export default defineConfig([
-  {
-    ignores: [
-      'build/**',
-      'dist/**',
-      'node_modules/**',
-      'src/generated/**',
-      'target/**',
-      'target-local/**',
-      '.svelte-kit/**',
-    ],
-  },
+  globalIgnores([
+    'build/**',
+    'coverage/**',
+    'dist/**',
+    'node_modules/**',
+    'playwright-report/**',
+    'src/generated/**',
+    'target/**',
+    'target-local/**',
+    'test-results/**',
+    '.svelte-kit/**',
+  ]),
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   svelte.configs.recommended,
@@ -44,7 +44,6 @@ export default defineConfig([
         extraFileExtensions: ['.svelte'],
         parser: tseslint.parser,
         projectService: true,
-        svelteConfig,
         tsconfigRootDir: import.meta.dirname,
       },
     },

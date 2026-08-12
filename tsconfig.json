@@ -7,7 +7,9 @@
     ".svelte-kit/types/**/$types.d.ts",
     "vite.config.ts",
     "vitest.config.ts",
+    "playwright.config.ts",
     "oxfmt.config.ts",
+    "tests/**/*.ts",
     "src/app.d.ts",
     "src/**/*.svelte",
     "src/**/*.ts"

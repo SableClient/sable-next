@@ -22,9 +22,9 @@
 {:else}
   <div class="app-shell" style:--room-nav-width={String(roomNavWidth) + 'px'}>
     <SidebarNav bind:roomNavWidth />
-    <main class="app-content">
+    <div class="app-content">
       {@render children()}
-    </main>
+    </div>
   </div>
 {/if}
 

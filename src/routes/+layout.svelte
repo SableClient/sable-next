@@ -23,6 +23,7 @@
 </script>
 
 <svelte:head>
+  <title>Sable</title>
   <link rel="icon" href={favicon} />
 </svelte:head>
 
