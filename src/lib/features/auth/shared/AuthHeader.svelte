@@ -19,7 +19,7 @@
 <style>
   .auth-heading {
     align-self: end;
-    margin-bottom: 2rem;
+    margin-bottom: 1.25rem;
     text-align: center;
   }
 

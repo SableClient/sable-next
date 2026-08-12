@@ -3,8 +3,12 @@
   border: 1px solid var(--sable-surface-container-line);
   border-radius: calc(var(--radius) * 1.5);
   display: grid;
-  gap: 1.25rem;
-  padding: 1.5rem;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.auth-page .auth-card-surface.login-form {
+  gap: 0.5rem;
 }
 
 .auth-page .auth-card-surface > * {

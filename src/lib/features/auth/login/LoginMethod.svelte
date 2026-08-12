@@ -22,11 +22,11 @@
 <style>
   .login-method {
     display: grid;
-    gap: 1.5rem;
+    gap: 1rem;
   }
 
   .method-divider {
     border-top: 1px solid var(--sable-surface-container-line);
-    padding-top: 1.5rem;
+    padding-top: 1rem;
   }
 </style>

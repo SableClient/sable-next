@@ -21,7 +21,7 @@
   <p>{$i18n.t('auth.accountProviderSummary', { server: homeserver })}</p>
   <p class="user-id">{userId}</p>
   <div class="summary-actions">
-    <Button onclick={onSetUpProfile}>{$i18n.t('auth.setUpProfile')}</Button>
+    <Button variant="primary" onclick={onSetUpProfile}>{$i18n.t('auth.setUpProfile')}</Button>
   </div>
 </section>
 

@@ -98,6 +98,7 @@
     reducedMotion={prefersReducedMotion.current}
   >
     <Button
+      variant="primary"
       disabled={isRegistering || isCheckingHomeserver}
       onclick={() => {
         onLaunchRedirectLogin('oidc');
@@ -118,6 +119,7 @@
       {#if loginFlows.sso_identity_providers.length > 0}
         {#each loginFlows.sso_identity_providers as provider (provider.id)}
           <Button
+            variant="primary"
             disabled={isRegistering}
             onclick={() => {
               onLaunchRedirectLogin('sso', provider.id);
@@ -128,6 +130,7 @@
         {/each}
       {:else}
         <Button
+          variant="primary"
           disabled={isRegistering}
           onclick={() => {
             onLaunchRedirectLogin('sso');

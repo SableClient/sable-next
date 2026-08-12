@@ -46,7 +46,7 @@
         <Button onclick={onOpenFallback} disabled={isRegistering}>
           {$i18n.t('auth.openServerPage')}
         </Button>
-        <Button onclick={onContinueFallback} disabled={isRegistering}>
+        <Button variant="primary" onclick={onContinueFallback} disabled={isRegistering}>
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>
@@ -73,7 +73,7 @@
               emailAddress = event.currentTarget.value;
             }}
           />
-          <Button type="submit" disabled={isRegistering}>
+          <Button variant="primary" type="submit" disabled={isRegistering}>
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.sendVerificationEmail')}
           </Button>
@@ -98,7 +98,7 @@
               emailToken = event.currentTarget.value;
             }}
           />
-          <Button type="submit" disabled={isRegistering}>
+          <Button variant="primary" type="submit" disabled={isRegistering}>
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.verifyEmail')}
           </Button>
@@ -111,7 +111,7 @@
             { email: emailStep.email }
           )}
         </p>
-        <Button onclick={onContinueFallback} disabled={isRegistering}>
+        <Button variant="primary" onclick={onContinueFallback} disabled={isRegistering}>
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>

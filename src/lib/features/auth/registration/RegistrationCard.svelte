@@ -107,8 +107,6 @@
       {onSubmitRegistrationEmail}
     />
   {:else}
-    <p class="intro">{$i18n.t('auth.createAccountIntro')}</p>
-
     <div class="provider-row">
       <div class="provider-mark" aria-hidden="true"><GlobeIcon /></div>
       <span class="provider-name">
@@ -118,7 +116,7 @@
 
     {#if isEditingHomeserver}
       <div class="field">
-        <Label for="registration-homeserver">{$i18n.t('auth.homeserver')}</Label>
+        <Label for="registration-homeserver">{$i18n.t('auth.accountProvider')}</Label>
         <HomeserverPicker
           id="registration-homeserver"
           value={homeserver}
@@ -133,11 +131,6 @@
           }}
           onblur={onValidateHomeserver}
         />
-        <div class="error-slot" aria-live="polite">
-          {#if invalidRegistrationField === 'homeserver' && registrationFieldError}
-            <p class="error">{registrationFieldError}</p>
-          {/if}
-        </div>
       </div>
     {:else}
       <button class="edit-server" type="button" onclick={onEditHomeserver}>
@@ -145,9 +138,18 @@
       </button>
     {/if}
 
-    {#if isCheckingHomeserver}
-      <p class="checking"><Spinner small /> {$i18n.t('auth.checkingHomeserver')}</p>
-    {/if}
+    <div class="status-slot" aria-live="polite">
+      {#if isCheckingHomeserver}
+        <div class="status-message checking">
+          <Spinner small />
+          {$i18n.t('auth.checkingProvider')}
+        </div>
+      {:else if invalidRegistrationField === 'homeserver' && registrationFieldError}
+        <p class="status-message error" title={registrationFieldError}>{registrationFieldError}</p>
+      {:else if error && !registrationFieldError}
+        <p class="status-message error" title={error}>{error}</p>
+      {/if}
+    </div>
 
     <RegistrationMethods
       {homeserver}
@@ -172,12 +174,6 @@
       {onConfirmPasswordInput}
     />
   {/if}
-
-  {#if error && !registrationFieldError}
-    <div class="card-error-slot" aria-live="polite">
-      <p class="error">{error}</p>
-    </div>
-  {/if}
 </section>
 
 <style>
@@ -186,8 +182,8 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     display: flex;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: 0.625rem;
+    padding: 0.625rem;
   }
 
   .provider-mark {
@@ -214,7 +210,7 @@
 
   .field {
     display: grid;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .checking {
@@ -227,23 +223,32 @@
     margin: 0;
   }
 
-  .error-slot {
-    min-height: calc(var(--font-size-small) * var(--line-height-body));
+  .status-message {
+    margin: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .card-error-slot {
-    min-height: calc(var(--font-size-small) * var(--line-height-body));
+  .status-message.error {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
-  .intro,
+  .status-slot {
+    align-items: center;
+    display: flex;
+    height: 1.5rem;
+    overflow: hidden;
+  }
+
   .error {
+    color: var(--sable-crit-main);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
     margin: 0;
-  }
-
-  .intro {
-    color: var(--sable-sec-main);
   }
 
   .edit-server {
@@ -254,10 +259,6 @@
     justify-self: start;
     padding: 0;
     text-decoration: underline;
-  }
-
-  .error {
-    color: var(--sable-crit-main);
   }
 
   @keyframes error-in {

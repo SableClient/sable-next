@@ -162,7 +162,7 @@
       {#if fieldError && invalidField !== 'homeserver'}<p class="error">{fieldError}</p>{/if}
     </div>
     <div class="actions">
-      <Button type="submit" disabled={isRegistering || isCheckingHomeserver}
+      <Button variant="primary" type="submit" disabled={isRegistering || isCheckingHomeserver}
         >{#if isRegistering}<Spinner />{/if}{$i18n.t('auth.createServerAccount', {
           server: serverLabel,
         })}</Button

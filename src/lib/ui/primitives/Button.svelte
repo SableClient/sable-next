@@ -5,6 +5,7 @@
 
   type Props = {
     type?: 'button' | 'submit' | 'reset';
+    variant?: 'soft' | 'primary';
     disabled?: boolean;
     onclick?: HTMLButtonAttributes['onclick'];
     class?: string;
@@ -13,6 +14,7 @@
 
   let {
     type = 'button',
+    variant = 'soft',
     disabled = false,
     onclick,
     class: className = '',
@@ -20,7 +22,12 @@
   }: Props = $props();
 </script>
 
-<BitsButton.Root {type} {disabled} {onclick} class={`sable-button ${className}`}>
+<BitsButton.Root
+  {type}
+  {disabled}
+  {onclick}
+  class={`sable-button ${variant === 'primary' ? 'primary' : ''} ${className}`}
+>
   {@render children?.()}
 </BitsButton.Root>
 
@@ -51,10 +58,24 @@
     background: var(--sable-primary-container-hover);
   }
 
+  :global(.sable-button.primary) {
+    background: var(--sable-primary-main);
+    border-color: var(--sable-primary-main-line);
+    color: var(--sable-primary-on-main);
+  }
+
+  :global(.sable-button.primary:hover:not(:disabled)) {
+    background: var(--sable-primary-main-hover);
+  }
+
   :global(.sable-button:active:not(:disabled)) {
     background: var(--sable-primary-container-hover);
     box-shadow: inset 0 1px 3px rgb(0 0 0 / 12%);
     filter: brightness(0.96);
+  }
+
+  :global(.sable-button.primary:active:not(:disabled)) {
+    background: var(--sable-primary-main-active);
   }
 
   :global(.sable-button:disabled) {

@@ -104,7 +104,7 @@
   {#if error}<p class="error" aria-live="polite">{error}</p>{/if}
 
   <div class="actions">
-    <Button onclick={onContinue} disabled={isSaving}>
+    <Button variant="primary" onclick={onContinue} disabled={isSaving}>
       {#if isSaving}<Spinner />{/if}
       {$i18n.t('auth.continue')}
     </Button>

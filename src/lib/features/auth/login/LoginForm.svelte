@@ -10,7 +10,6 @@
   import LoginMethod from './LoginMethod.svelte';
   import PasswordLoginForm from './PasswordLoginForm.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import { smoothSlide } from '../flow/login-transitions';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
 
   type LoginField = 'homeserver' | 'username' | 'password';
@@ -85,6 +84,11 @@
   let isPasswordLoginVisible = $derived(
     loginFlows?.password === true && (showAllLoginMethods || preferredLoginMethod === 'password')
   );
+  let statusError = $derived(
+    !isPasswordLoginVisible && (fieldError || loginError || core.status === 'error')
+      ? (fieldError ?? loginError ?? $i18n.t('auth.unableToStart'))
+      : null
+  );
 </script>
 
 <form
@@ -97,14 +101,8 @@
     void onLogin();
   }}
 >
-  <div class="auth-card-heading centered">
-    <div>
-      <h2>{$i18n.t('auth.signInTitle')}</h2>
-    </div>
-  </div>
-
   <div class="field">
-    <Label for="homeserver">{$i18n.t('auth.homeserver')}</Label>
+    <Label for="homeserver">{$i18n.t('auth.accountProvider')}</Label>
     <HomeserverPicker
       id="homeserver"
       bind:value={homeserver}
@@ -119,13 +117,28 @@
       }}
       onblur={() => void onValidateHomeserver()}
     />
-    <p class:checking-active={isCheckingHomeserver} class="checking" aria-live="polite">
-      {#if isCheckingHomeserver}
-        <Spinner small />
-        {$i18n.t('auth.checkingHomeserver')}
-      {/if}
-    </p>
   </div>
+
+  <div class="status-slot" aria-live="polite">
+    {#if isCheckingHomeserver}
+      <div class="status-message checking">
+        <Spinner small />
+        {$i18n.t('auth.checkingProvider')}
+      </div>
+    {:else if statusError}
+      <p class="status-message error" title={statusError}>{statusError}</p>
+    {:else if loginFlows && availableLoginMethodCount === 0}
+      <p class="status-message muted">{$i18n.t('errors.unsupportedSignIn')}</p>
+    {/if}
+  </div>
+
+  {#if !loginFlows}
+    <div class="actions">
+      <Button variant="primary" type="submit" disabled={isAuthenticating || isCheckingHomeserver}>
+        {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
+      </Button>
+    </div>
+  {/if}
 
   {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
     <LoginMethod
@@ -134,10 +147,13 @@
     >
       <div class="actions">
         <Button
+          variant="primary"
           disabled={isAuthenticating || isLaunchingLogin}
           onclick={() => void onLaunchRedirectLogin('oidc')}
         >
-          {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithHomeserver')}
+          {isLaunchingLogin
+            ? $i18n.t('auth.opening')
+            : $i18n.t('auth.signInWithProvider', { name: homeserver || 'matrix.org' })}
         </Button>
       </div>
     </LoginMethod>
@@ -152,6 +168,7 @@
         <div class="actions sso-actions">
           {#each loginFlows.sso_identity_providers as provider (provider.id)}
             <Button
+              variant="primary"
               disabled={isAuthenticating || isLaunchingLogin}
               onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
             >
@@ -162,6 +179,7 @@
       {:else}
         <div class="actions">
           <Button
+            variant="primary"
             disabled={isAuthenticating || isLaunchingLogin}
             onclick={() => void onLaunchRedirectLogin('sso')}
           >
@@ -196,10 +214,6 @@
     </LoginMethod>
   {/if}
 
-  {#if loginFlows && availableLoginMethodCount === 0 && !isCheckingHomeserver}
-    <p class="muted">{$i18n.t('errors.unsupportedSignIn')}</p>
-  {/if}
-
   {#if availableLoginMethodCount > 1}
     <AuthMethodToggle
       expanded={showAllLoginMethods}
@@ -209,24 +223,6 @@
         showAllLoginMethods = !showAllLoginMethods;
       }}
     />
-  {/if}
-
-  {#if (!loginFlows && !isCheckingHomeserver) || (!isPasswordLoginVisible && (fieldError || loginError || core.status === 'error'))}
-    <div class="submit-area" out:smoothSlide={{ duration: prefersReducedMotion.current ? 0 : 200 }}>
-      <div class="error-slot" aria-live="polite">
-        {#if fieldError || loginError || core.status === 'error'}
-          <p class="error">{fieldError ?? loginError ?? $i18n.t('auth.unableToStart')}</p>
-        {/if}
-      </div>
-
-      {#if !loginFlows}
-        <div class="actions">
-          <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver}>
-            {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
-          </Button>
-        </div>
-      {/if}
-    </div>
   {/if}
 </form>
 
@@ -247,11 +243,12 @@
   .account-switch {
     align-items: center;
     color: var(--sable-sec-main);
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     font-size: var(--font-size-small);
-    gap: 0.375rem;
+    gap: 0.25rem;
     justify-content: center;
-    padding-top: 0.875rem;
+    padding-top: 0.5rem;
     text-align: center;
   }
 
@@ -287,12 +284,6 @@
     font-size: var(--font-size-small);
     gap: 0.5rem;
     margin: 0;
-    min-height: 1.25rem;
-    visibility: hidden;
-  }
-
-  .checking-active {
-    visibility: visible;
   }
 
   .error {
@@ -309,8 +300,26 @@
     margin: 0;
   }
 
-  .error-slot {
-    min-height: calc(var(--font-size-small) * var(--line-height-body));
+  .status-message {
+    margin: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-message.error,
+  .status-message.muted {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .status-slot {
+    align-items: center;
+    display: flex;
+    height: 1.5rem;
+    overflow: hidden;
   }
 
   @keyframes error-in {
@@ -334,11 +343,6 @@
 
   .sso-actions {
     gap: 0.75rem;
-  }
-
-  .submit-area {
-    display: grid;
-    gap: 0.5rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {

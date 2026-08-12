@@ -73,7 +73,7 @@
         </p>{/if}
     </div>
     <div class="actions">
-      <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver}
+      <Button variant="primary" type="submit" disabled={isAuthenticating || isCheckingHomeserver}
         >{#if isAuthenticating}<Spinner />{/if}{isAuthenticating
           ? $i18n.t('auth.signingIn')
           : $i18n.t('auth.signIn')}</Button
