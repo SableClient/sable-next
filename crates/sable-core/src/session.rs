@@ -88,6 +88,10 @@ impl AccountRegistry {
         }
     }
 
+    /// # Errors
+    ///
+    /// Returns a JSON error when `bytes` are neither an account registry nor a
+    /// legacy persisted session.
     pub fn from_bytes(
         bytes: &[u8],
         legacy_store_id: &str,
@@ -136,32 +140,6 @@ impl AccountRegistry {
 #[must_use]
 pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
     format!("{base_store_id}-account-{account_id}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{AccountRegistry, account_store_id};
-
-    #[test]
-    fn serializes_an_empty_registry() {
-        let bytes = serde_json::to_vec(&AccountRegistry::empty()).expect("registry serializes");
-        let (accounts, migrated) =
-            AccountRegistry::from_bytes(&bytes, "sable-next").expect("registry deserializes");
-        assert!(!migrated);
-        assert!(accounts.accounts.is_empty());
-    }
-
-    #[test]
-    fn allocates_distinct_store_ids() {
-        assert_ne!(
-            account_store_id("sable-next", "a1"),
-            account_store_id("sable-next", "a2")
-        );
-        let mut accounts = AccountRegistry::empty();
-        let (_, first) = accounts.allocate_account("sable-next");
-        let (_, second) = accounts.allocate_account("sable-next");
-        assert_ne!(first, second);
-    }
 }
 
 impl Credentials {
@@ -311,4 +289,30 @@ pub async fn discovery_client(homeserver: &str) -> Result<Client, matrix_sdk::Cl
 /// the server *name*, delegating elsewhere.
 fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
     builder.server_name_or_homeserver_url(homeserver)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AccountRegistry, account_store_id};
+
+    #[test]
+    fn serializes_an_empty_registry() -> Result<(), serde_json::Error> {
+        let bytes = serde_json::to_vec(&AccountRegistry::empty())?;
+        let (accounts, migrated) = AccountRegistry::from_bytes(&bytes, "sable-next")?;
+        assert!(!migrated);
+        assert!(accounts.accounts.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn allocates_distinct_store_ids() {
+        assert_ne!(
+            account_store_id("sable-next", "a1"),
+            account_store_id("sable-next", "a2")
+        );
+        let mut accounts = AccountRegistry::empty();
+        let (_, first) = accounts.allocate_account("sable-next");
+        let (_, second) = accounts.allocate_account("sable-next");
+        assert_ne!(first, second);
+    }
 }
