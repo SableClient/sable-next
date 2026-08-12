@@ -154,7 +154,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-error);
+    color: var(--sable-crit-main);
     cursor: pointer;
     font: inherit;
     font-weight: var(--font-weight-medium);
@@ -164,7 +164,7 @@
   }
 
   .logout:hover {
-    background: var(--sable-error-container);
+    background: var(--sable-crit-container);
   }
 
   a {

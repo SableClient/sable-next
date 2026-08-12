@@ -12,6 +12,7 @@
     type SwipeGesture,
   } from '$lib/ui/swipe-gesture';
   import { AUTH_CARD_MOTION_MS } from './auth-flow.svelte';
+  import { BREAKPOINTS } from '$lib/ui/breakpoints';
 
   interface Props {
     activeIndex: number;
@@ -70,7 +71,7 @@
 
   function handleScroll(): void {
     if (
-      !window.matchMedia('(width <= 48rem)').matches ||
+      window.matchMedia(BREAKPOINTS.appLayout).matches ||
       isDragging ||
       isNavigating ||
       swipeGesture

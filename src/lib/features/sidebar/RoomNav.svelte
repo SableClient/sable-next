@@ -570,7 +570,7 @@
   }
 
   .room-badge.highlight {
-    background: var(--sable-primary);
+    background: var(--sable-primary-main);
     color: var(--sable-primary-on-container);
   }
 

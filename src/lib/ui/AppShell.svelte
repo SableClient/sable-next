@@ -3,18 +3,18 @@
   import MobileNavDrawer from '$lib/ui/MobileNavDrawer.svelte';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
   import DeviceVerificationDialog from '$lib/features/settings/DeviceVerificationDialog.svelte';
+  import { BREAKPOINTS } from './breakpoints';
+  import { createMediaQuery } from './media-query.svelte';
 
   interface Props {
     children: Snippet;
   }
 
   let { children }: Props = $props();
-  let innerWidth = $state(0);
   let roomNavWidth = $state(224);
-  let mobile = $derived(innerWidth < 768);
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  let mobile = $derived(!appLayout.matches);
 </script>
-
-<svelte:window bind:innerWidth />
 
 {#if mobile}
   <MobileNavDrawer>

@@ -442,7 +442,7 @@
 
     .resize-handle:hover,
     .resize-handle.dragging {
-      background: var(--sable-primary);
+      background: var(--sable-primary-main);
     }
 
     .resize-handle:focus-visible {

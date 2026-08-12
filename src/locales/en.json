@@ -29,6 +29,12 @@
     "welcome": "Welcome to Sable",
     "empty": "Rooms you join or create will appear here."
   },
+  "app": {
+    "starting": "Starting Sable…",
+    "unableToStart": "Sable could not start. Check your connection and try again.",
+    "startFailed": "The client could not connect to its core or restore your session.",
+    "tryAgain": "Try again"
+  },
   "timeline": {
     "label": "Timeline",
     "back": "Go back",

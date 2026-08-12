@@ -237,7 +237,7 @@
   }
 
   .account-popover :global([role='menuitem'][data-disabled]) {
-    color: var(--sable-bg-on-container-muted);
+    color: var(--sable-surface-var-on-container);
     cursor: default;
   }
 

@@ -8,6 +8,8 @@
   import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
   import { RoomTimeline } from '$lib/rooms/timeline.svelte';
   import RoomComposer from '$lib/features/composer/RoomComposer.svelte';
+  import { BREAKPOINTS } from '$lib/ui/breakpoints';
+  import { createMediaQuery } from '$lib/ui/media-query.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -23,7 +25,6 @@
   const core = useCoreClient();
   const roomList = useRoomList();
   const timeline = new RoomTimeline(core);
-  let innerWidth = $state(0);
   const memberLoader = new RoomMemberLoader();
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
@@ -32,7 +33,8 @@
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
-  let desktop = $derived(innerWidth >= 768);
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  let desktop = $derived(appLayout.matches);
   let typingLabel = $derived.by(() => {
     if (typingUserIds.length === 0) return null;
     const names = typingUserIds.slice(0, 3).map(typingMemberName);
@@ -115,8 +117,6 @@
     await core.markRead(resolvedRoomId, eventId);
   }
 </script>
-
-<svelte:window bind:innerWidth />
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
