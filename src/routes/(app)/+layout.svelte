@@ -70,8 +70,8 @@
     align-items: center;
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-bg-container-line);
-    border-radius: calc(var(--radius) * 1.5);
-    box-shadow: 0 1rem 3rem var(--sable-shadow);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;

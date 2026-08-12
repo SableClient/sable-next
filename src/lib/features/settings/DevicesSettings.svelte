@@ -4,7 +4,9 @@
   import { CoreError } from '@/transport';
   import { useCoreClient } from '$lib/core/context';
   import { i18n, t } from '$lib/i18n';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
+  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   const core = useCoreClient();
@@ -148,7 +150,7 @@
     <p>{$i18n.t('settings.devicesDescription')}</p>
   </header>
 
-  {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if error}<Alert class="settings-error" variant="critical" role="alert">{error}</Alert>{/if}
 
   <section aria-labelledby="encryption-heading">
     <div class="section-heading">
@@ -161,31 +163,50 @@
       <dl class="status-grid">
         <div>
           <dt>{$i18n.t('settings.thisDevice')}</dt>
-          <dd class:good={status.verification === 'verified'}>
-            {verificationLabel(status.verification)}
+          <dd>
+            <StatusBadge
+              variant={status.verification === 'verified'
+                ? 'success'
+                : status.verification === 'unverified'
+                  ? 'warning'
+                  : 'neutral'}
+              label={verificationLabel(status.verification)}
+            />
           </dd>
         </div>
         <div>
           <dt>{$i18n.t('settings.recovery')}</dt>
-          <dd class:good={status.recovery === 'enabled'}>{recoveryLabel(status.recovery)}</dd>
+          <dd>
+            <StatusBadge
+              variant={status.recovery === 'enabled'
+                ? 'success'
+                : status.recovery === 'incomplete'
+                  ? 'warning'
+                  : 'neutral'}
+              label={recoveryLabel(status.recovery)}
+            />
+          </dd>
         </div>
         <div>
           <dt>{$i18n.t('settings.crossSigning')}</dt>
-          <dd class:good={status.cross_signing_ready}>
-            {status.cross_signing_ready
-              ? $i18n.t('settings.ready')
-              : $i18n.t('settings.verifyOtherDevice')}
+          <dd>
+            <StatusBadge
+              variant={status.cross_signing_ready ? 'success' : 'warning'}
+              label={status.cross_signing_ready
+                ? $i18n.t('settings.ready')
+                : $i18n.t('settings.verifyOtherDevice')}
+            />
           </dd>
         </div>
       </dl>
       {#if status.verification !== 'verified'}
-        <div class="callout">
+        <Alert class="settings-callout" variant="info">
           <div>
             <strong>{$i18n.t('settings.verifyThisDevice')}</strong>
             <p>{$i18n.t('settings.verifySignedInDevice')}</p>
           </div>
           <Button onclick={startVerification}>{$i18n.t('settings.verify')}</Button>
-        </div>
+        </Alert>
       {/if}
       {#if status.recovery === 'incomplete'}
         <form
@@ -212,25 +233,25 @@
         </form>
       {/if}
       {#if status.recovery === 'disabled'}
-        <div class="callout">
+        <Alert class="settings-callout" variant="info">
           <div>
             <strong>{$i18n.t('settings.setUpRecovery')}</strong>
             <p>{$i18n.t('settings.setUpRecoveryDescription')}</p>
           </div>
-          <Button disabled={managingRecovery} onclick={() => void manageRecovery()}>
+          <Button loading={managingRecovery} onclick={() => void manageRecovery()}>
             {$i18n.t('settings.setUpRecovery')}
           </Button>
-        </div>
+        </Alert>
       {:else if status.recovery === 'enabled'}
-        <div class="callout">
+        <Alert class="settings-callout" variant="info">
           <div>
             <strong>{$i18n.t('settings.resetRecoveryKey')}</strong>
             <p>{$i18n.t('settings.resetRecoveryKeyDescription')}</p>
           </div>
-          <Button disabled={managingRecovery} onclick={() => void manageRecovery(true)}>
+          <Button loading={managingRecovery} onclick={() => void manageRecovery(true)}>
             {$i18n.t('settings.resetRecoveryKey')}
           </Button>
-        </div>
+        </Alert>
       {/if}
     {:else if loading}
       <p>{$i18n.t('settings.loadingEncryption')}</p>
@@ -261,8 +282,8 @@
                   <label for={'device-' + device.device_id}>{$i18n.t('settings.deviceName')}</label>
                   <TextInput id={'device-' + device.device_id} bind:value={displayName} required />
                   <Button type="submit">{$i18n.t('settings.save')}</Button>
-                  <button type="button" class="text-button" onclick={() => (editing = null)}
-                    >{$i18n.t('settings.cancel')}</button
+                  <Button variant="ghost" size="small" onclick={() => (editing = null)}
+                    >{$i18n.t('settings.cancel')}</Button
                   >
                 </form>
               {:else}
@@ -271,28 +292,29 @@
                   {#if device.is_own}<span class="current">{$i18n.t('settings.currentDevice')}</span
                     >{/if}</strong
                 >
-                <span class:verified={device.is_verified}
-                  >{device.is_verified
+                <StatusBadge
+                  variant={device.is_verified ? 'success' : 'warning'}
+                  label={device.is_verified
                     ? $i18n.t('settings.verified')
-                    : $i18n.t('settings.notVerified')}</span
-                >
+                    : $i18n.t('settings.notVerified')}
+                />
                 <code>{device.device_id}</code>
               {/if}
             </div>
             {#if !device.is_own && editing !== device.device_id}
               <div class="actions">
-                <button
-                  type="button"
-                  class="text-button"
+                <Button
+                  variant="ghost"
+                  size="small"
                   onclick={() => {
                     beginRename(device);
-                  }}>{$i18n.t('settings.rename')}</button
-                ><button
-                  type="button"
-                  class="danger-button"
+                  }}>{$i18n.t('settings.rename')}</Button
+                ><Button
+                  variant="danger"
+                  size="small"
                   onclick={() => {
                     deleting = device.device_id;
-                  }}>{$i18n.t('settings.remove')}</button
+                  }}>{$i18n.t('settings.remove')}</Button
                 >
               </div>
             {/if}
@@ -312,8 +334,8 @@
                   autocomplete="current-password"
                 />
                 <Button type="submit">{$i18n.t('settings.removeDevice')}</Button>
-                <button type="button" class="text-button" onclick={() => (deleting = null)}
-                  >{$i18n.t('settings.cancel')}</button
+                <Button variant="ghost" size="small" onclick={() => (deleting = null)}
+                  >{$i18n.t('settings.cancel')}</Button
                 >
               </form>
             {/if}
@@ -370,7 +392,6 @@
   }
 
   .section-heading,
-  .callout,
   .device,
   .actions {
     align-items: center;
@@ -380,7 +401,7 @@
   }
 
   .section-heading p,
-  .callout p {
+  :global(.sable-alert.settings-callout p) {
     margin-bottom: 0;
   }
 
@@ -401,14 +422,11 @@
     margin: 0.125rem 0 0;
   }
 
-  .good,
-  .verified {
-    color: var(--sable-success-main);
-  }
-
-  .callout {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
+  :global(.sable-alert.settings-callout) {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
   }
 
   .device-list {
@@ -446,20 +464,6 @@
     font-weight: var(--font-weight-medium);
   }
 
-  .text-button,
-  .danger-button {
-    background: none;
-    border: 0;
-    color: var(--sable-primary-main);
-    cursor: pointer;
-    font: inherit;
-    padding: 0.5rem;
-  }
-
-  .danger-button {
-    color: var(--sable-crit-main);
-  }
-
   form {
     align-items: end;
     display: flex;
@@ -479,11 +483,8 @@
     width: 100%;
   }
 
-  .error {
-    background: var(--sable-crit-container);
-    border-radius: var(--radius);
-    color: var(--sable-crit-on-container);
-    padding: 0.75rem;
+  :global(.settings-error) {
+    margin-bottom: 1rem;
   }
 
   @media (width < 42rem) {
@@ -496,7 +497,7 @@
     }
 
     .section-heading,
-    .callout {
+    :global(.sable-alert.settings-callout) {
       align-items: stretch;
       flex-direction: column;
     }

@@ -1,63 +1,35 @@
 <script lang="ts">
   import { Button as BitsButton } from 'bits-ui';
-  import type { Snippet } from 'svelte';
-  import type { HTMLButtonAttributes } from 'svelte/elements';
 
-  type Props = {
-    type?: 'button' | 'submit' | 'reset';
-    disabled?: boolean;
-    onclick?: HTMLButtonAttributes['onclick'];
-    class?: string;
-    children?: Snippet;
-  };
+  import Spinner from './Spinner.svelte';
+  import type { ButtonProps } from './button-types';
+  import './button.css';
 
   let {
     type = 'button',
     disabled = false,
-    onclick,
+    variant = 'secondary',
+    size = 'medium',
+    loading = false,
     class: className = '',
     children,
-  }: Props = $props();
+    ...rest
+  }: ButtonProps = $props();
 </script>
 
-<BitsButton.Root {type} {disabled} {onclick} class={`sable-button ${className}`}>
+<BitsButton.Root
+  {...rest}
+  {type}
+  disabled={disabled || loading}
+  aria-busy={loading ? 'true' : undefined}
+  class={[
+    'sable-button',
+    `sable-button-${variant}`,
+    `sable-button-${size}`,
+    { 'sable-button-loading': loading },
+    className,
+  ]}
+>
+  {#if loading}<Spinner small />{/if}
   {@render children?.()}
 </BitsButton.Root>
-
-<style>
-  :global(.sable-button) {
-    align-items: center;
-    background: var(--sable-primary-container);
-    border: 1px solid var(--sable-primary-container-line);
-    border-radius: var(--radius);
-    color: var(--sable-primary-on-container);
-    display: flex;
-    gap: 0.5rem;
-    justify-content: center;
-    min-height: 2.75rem;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    :global(.sable-button) {
-      transition:
-        background-color var(--motion-normal) ease,
-        border-color var(--motion-normal) ease,
-        box-shadow var(--motion-normal) ease,
-        filter var(--motion-normal) ease;
-    }
-  }
-
-  :global(.sable-button:hover:not(:disabled)) {
-    background: var(--sable-primary-container-hover);
-  }
-
-  :global(.sable-button:active:not(:disabled)) {
-    background: var(--sable-primary-container-hover);
-    box-shadow: inset 0 1px 3px rgb(0 0 0 / 12%);
-    filter: brightness(0.96);
-  }
-
-  :global(.sable-button:disabled) {
-    opacity: 0.65;
-  }
-</style>

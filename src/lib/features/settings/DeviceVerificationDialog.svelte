@@ -4,6 +4,7 @@
   import { CoreError } from '@/transport';
   import { useCoreClient } from '$lib/core/context';
   import { i18n, t } from '$lib/i18n';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
 
   const core = useCoreClient();
@@ -69,7 +70,7 @@
             <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
           {:else}
             <p>{$i18n.t('settings.verificationRequested')}</p>
-            <Button class="verification-primary" onclick={accept}
+            <Button class="verification-action" onclick={accept}
               >{$i18n.t('settings.acceptVerification')}</Button
             >
           {/if}
@@ -88,13 +89,14 @@
           </div>
           <p class="decimals">{core.verification.state.decimals.join(' · ')}</p>
           <div class="verification-actions">
-            <Button class="verification-primary" onclick={confirm}
+            <Button class="verification-action" onclick={confirm}
               >{$i18n.t('settings.theyMatch')}</Button
             >
-            <button
-              type="button"
-              class="verification-secondary danger-button"
-              onclick={() => void cancel(true)}>{$i18n.t('settings.theyDoNotMatch')}</button
+            <Button
+              variant="danger"
+              size="small"
+              class="verification-action"
+              onclick={() => void cancel(true)}>{$i18n.t('settings.theyDoNotMatch')}</Button
             >
           </div>
         {:else if core.verification.state.phase === 'confirmed'}
@@ -102,23 +104,24 @@
           <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
         {:else if core.verification.state.phase === 'done'}
           <p>{$i18n.t('settings.verificationComplete')}</p>
-          <Button class="verification-primary" onclick={() => (core.verification = null)}
+          <Button class="verification-action" onclick={() => (core.verification = null)}
             >{$i18n.t('settings.close')}</Button
           >
         {:else if core.verification.state.phase === 'cancelled'}
           <p>
             {$i18n.t('settings.verificationCancelled', { reason: core.verification.state.reason })}
           </p>
-          <Button class="verification-primary" onclick={() => (core.verification = null)}
+          <Button class="verification-action" onclick={() => (core.verification = null)}
             >{$i18n.t('settings.close')}</Button
           >
         {/if}
-        {#if error}<p class="error" role="alert">{error}</p>{/if}
+        {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
         {#if core.verification.state.phase !== 'done' && core.verification.state.phase !== 'cancelled'}
-          <button
-            type="button"
-            class="verification-secondary text-button"
-            onclick={() => void cancel()}>{$i18n.t('settings.cancelVerification')}</button
+          <Button
+            variant="ghost"
+            size="small"
+            class="verification-action verification-cancel"
+            onclick={() => void cancel()}>{$i18n.t('settings.cancelVerification')}</Button
           >
         {/if}
       {/if}
@@ -139,7 +142,7 @@
     border: 1px solid var(--sable-primary-container-line);
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
-    box-shadow: 0 1.5rem 3rem var(--sable-shadow);
+    box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
     max-height: calc(100dvh - 1.5rem);
     overflow: auto;
@@ -183,27 +186,12 @@
     gap: 0.5rem;
   }
 
-  :global(.verification-primary),
-  .verification-secondary {
+  :global(.verification-action) {
     width: 100%;
   }
 
-  .text-button,
-  .danger-button {
-    background: none;
-    border: 0;
-    cursor: pointer;
-    font: inherit;
-    padding: 0.75rem;
-  }
-
-  .text-button {
-    color: var(--sable-primary-main);
+  :global(.verification-cancel) {
     margin-top: 0.5rem;
-  }
-
-  .danger-button {
-    color: var(--sable-crit-main);
   }
 
   .verification-wait::before {
@@ -227,13 +215,6 @@
     font-weight: var(--font-weight-bold);
   }
 
-  .error {
-    background: var(--sable-crit-container);
-    border-radius: var(--radius);
-    color: var(--sable-crit-on-container);
-    padding: 0.75rem;
-  }
-
   @keyframes pulse {
     50% {
       opacity: 0.3;
@@ -255,8 +236,7 @@
       display: flex;
     }
 
-    :global(.verification-primary),
-    .verification-secondary {
+    :global(.verification-action) {
       width: auto;
     }
   }

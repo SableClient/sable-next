@@ -4,6 +4,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '$lib/i18n';
+  import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   import { initials, senderColor } from './timeline-format';
@@ -74,9 +75,11 @@
         {#each filteredMembers as member (member.user_id)}
           {@const label = powerLevel(member)}
           <li>
-            <span class="avatar" aria-hidden="true" style:background={senderColor(member.user_id)}
-              >{initials(memberName(member))}</span
-            >
+            <Avatar
+              size="small"
+              initials={initials(memberName(member))}
+              color={senderColor(member.user_id)}
+            />
             <span class="name">{memberName(member)}</span>
             {#if label}<span class="power-level">{label}</span>{/if}
           </li>
@@ -182,19 +185,6 @@
     gap: 0.625rem;
     min-height: 3rem;
     padding: 0 0.5rem;
-  }
-
-  .avatar {
-    align-items: center;
-    border-radius: 50%;
-    color: var(--sable-primary-on-main);
-    display: flex;
-    flex: 0 0 2rem;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: 2rem;
-    justify-content: center;
-    width: 2rem;
   }
 
   .name {

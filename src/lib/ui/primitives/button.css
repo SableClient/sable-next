@@ -1,0 +1,128 @@
+.sable-button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  gap: var(--space-1);
+  justify-content: center;
+  min-height: var(--control-height-medium);
+  padding: var(--space-1) var(--space-3);
+  text-decoration: none;
+}
+
+.sable-button-primary {
+  background: var(--sable-primary-main);
+  border-color: var(--sable-primary-main-line);
+  color: var(--sable-primary-on-main);
+}
+
+.sable-button-secondary {
+  background: var(--sable-sec-container);
+  border-color: var(--sable-sec-container-line);
+  color: var(--sable-sec-on-container);
+}
+
+.sable-button-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--sable-bg-on-container);
+}
+
+.sable-button-danger {
+  background: var(--sable-crit-main);
+  border-color: var(--sable-crit-main-line);
+  color: var(--sable-crit-on-main);
+}
+
+.sable-button-small {
+  min-height: var(--control-height-small);
+  padding: 0.375rem var(--space-2);
+}
+
+.sable-button-large {
+  min-height: var(--control-height-large);
+  padding: 0.625rem var(--space-4);
+}
+
+.sable-button-icon {
+  min-height: var(--control-height-medium);
+  padding: 0;
+  width: var(--control-height-medium);
+}
+
+.sable-button-loading {
+  cursor: wait;
+}
+
+.sable-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.sable-button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.sable-button-primary:hover:not(:disabled) {
+  background: var(--sable-primary-main-hover);
+}
+
+.sable-button-secondary:hover:not(:disabled) {
+  background: var(--sable-sec-container-hover);
+}
+
+.sable-button-ghost:hover:not(:disabled) {
+  background: var(--sable-bg-container-hover);
+}
+
+.sable-button-danger:hover:not(:disabled) {
+  background: var(--sable-crit-main-hover);
+}
+
+.sable-button-primary:active:not(:disabled) {
+  background: var(--sable-primary-main-active);
+  box-shadow: var(--shadow-inset);
+}
+
+.sable-button-secondary:active:not(:disabled) {
+  background: var(--sable-sec-container-active);
+  box-shadow: var(--shadow-inset);
+}
+
+.sable-button-ghost:active:not(:disabled) {
+  background: var(--sable-bg-container-active);
+  box-shadow: var(--shadow-inset);
+}
+
+.sable-button-danger:active:not(:disabled) {
+  background: var(--sable-crit-main-active);
+  box-shadow: var(--shadow-inset);
+}
+
+.sable-icon-button {
+  padding: 0;
+}
+
+.sable-icon-button-small {
+  min-height: var(--control-height-small);
+  width: var(--control-height-small);
+}
+
+.sable-icon-button-large {
+  min-height: var(--control-height-large);
+  width: var(--control-height-large);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sable-button {
+    transition:
+      background-color var(--motion-normal) ease,
+      border-color var(--motion-normal) ease,
+      box-shadow var(--motion-normal) ease;
+  }
+}

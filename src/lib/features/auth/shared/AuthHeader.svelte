@@ -29,7 +29,7 @@
   }
 
   .logo {
-    filter: drop-shadow(0 0.375rem 0.625rem rgb(0 0 0 / 20%));
+    filter: drop-shadow(0 0.375rem 0.625rem var(--sable-shadow));
     height: 4rem;
     width: 4rem;
   }

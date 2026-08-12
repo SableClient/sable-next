@@ -209,7 +209,7 @@
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius);
-    box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 15%);
+    box-shadow: var(--shadow-float);
     display: grid;
     gap: 0.25rem;
     min-width: 14rem;
@@ -373,7 +373,7 @@
   }
 
   .quick-tool:focus-visible {
-    outline: 3px solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 2px;
   }
 

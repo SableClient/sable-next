@@ -82,8 +82,8 @@
   }
 
   .stage-activation:focus-visible {
-    border-radius: calc(var(--radius) * 1.5);
-    box-shadow: 0 0 0 0.2rem var(--sable-focus-ring);
+    border-radius: var(--radius-card);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
     outline: none;
   }
 

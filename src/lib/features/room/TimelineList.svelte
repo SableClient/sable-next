@@ -5,6 +5,8 @@
 
   import { i18n } from '$lib/i18n';
   import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
 
   import TimelineItem from './TimelineItem.svelte';
   import { isCollapsed, readReceiptEventId } from './timeline-format';
@@ -151,7 +153,9 @@
 {/if}
 
 {#if timeline.error}
-  <div class="timeline-error" role="alert">{$i18n.t('timeline.loadFailed')}</div>
+  <Alert class="timeline-error" variant="critical" role="alert"
+    >{$i18n.t('timeline.loadFailed')}</Alert
+  >
 {/if}
 
 <div bind:this={viewport} bind:clientHeight={viewportHeight} class="viewport" onscroll={onScroll}>
@@ -177,8 +181,8 @@
 {/if}
 
 {#if !nearLatest && timeline.items.length > 0}
-  <button type="button" class="jump-to-latest" onclick={jumpToLatest}
-    >{$i18n.t('timeline.jumpToLatest')}</button
+  <Button type="button" class="jump-to-latest" variant="primary" size="small" onclick={jumpToLatest}
+    >{$i18n.t('timeline.jumpToLatest')}</Button
   >
 {/if}
 
@@ -191,12 +195,9 @@
     padding: 0.75rem 1rem;
   }
 
-  .timeline-error {
-    background: var(--sable-crit-container);
-    color: var(--sable-crit-on-container);
+  :global(.timeline-error) {
     flex: 0 0 auto;
     font-size: var(--font-size-small);
-    padding: 0.5rem 1rem;
   }
 
   .viewport {
@@ -220,16 +221,10 @@
     width: 100%;
   }
 
-  .jump-to-latest {
-    background: var(--sable-primary-main);
-    border: 0;
-    border-radius: var(--radius);
+  :global(.jump-to-latest) {
     bottom: 1rem;
-    box-shadow: 0 0.25rem 0.75rem var(--sable-shadow);
-    color: var(--sable-primary-on-main);
-    cursor: pointer;
+    box-shadow: var(--shadow-float);
     left: 50%;
-    padding: 0.5rem 0.75rem;
     position: absolute;
     transform: translateX(-50%);
     z-index: 1;

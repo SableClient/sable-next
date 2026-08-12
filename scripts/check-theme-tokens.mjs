@@ -4,9 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sourceRoot = join(root, 'src');
-const tokenPattern = /--sable-[a-z0-9-]+/g;
-const declarationPattern = /--sable-[a-z0-9-]+\s*:/g;
-const sourceExtensions = new Set(['.css', '.svelte', '.ts']);
+const sourceExtensions = new Set(['.css', '.svelte', '.ts', '.js', '.mjs']);
+const declarationPattern = /(--[a-z0-9_-]+)\s*:/gi;
+const runtimeDeclarationPattern = /style:\s*(--[a-z0-9_-]+)\s*=/gi;
+const setPropertyPattern = /setProperty\(\s*['"](--[a-z0-9_-]+)['"]/gi;
+const variableReferencePattern = /var\(\s*(--[a-z0-9_-]+)/gi;
+
+// Manually verified dependency-provided properties that source scanning cannot detect.
+const externalProperties = new Set(['--bits-combobox-anchor-width']);
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -24,34 +29,55 @@ async function sourceFiles(directory) {
   return files;
 }
 
+function lineNumber(source, index) {
+  return source.slice(0, index).split('\n').length;
+}
+
+function addLocation(map, property, file, source, index) {
+  const locations = map.get(property) ?? [];
+  locations.push(`${relative(root, file)}:${lineNumber(source, index)}`);
+  map.set(property, locations);
+}
+
 const files = await sourceFiles(sourceRoot);
-const declared = new Set();
+const declared = new Map();
 const referenced = new Map();
 
 for (const file of files) {
   const source = await readFile(file, 'utf8');
 
   for (const match of source.matchAll(declarationPattern)) {
-    declared.add(match[0].replace(/\s*:/, ''));
+    const property = match[1].toLowerCase();
+    addLocation(declared, property, file, source, match.index);
   }
 
-  for (const match of source.matchAll(tokenPattern)) {
-    const token = match[0];
-    const line = source.slice(0, match.index).split('\n').length;
-    const locations = referenced.get(token) ?? [];
-    locations.push(`${relative(root, file)}:${line}`);
-    referenced.set(token, locations);
+  for (const match of source.matchAll(runtimeDeclarationPattern)) {
+    const property = match[1].toLowerCase();
+    addLocation(declared, property, file, source, match.index);
+  }
+
+  for (const match of source.matchAll(setPropertyPattern)) {
+    const property = match[1].toLowerCase();
+    addLocation(declared, property, file, source, match.index);
+  }
+
+  for (const match of source.matchAll(variableReferencePattern)) {
+    const property = match[1].toLowerCase();
+    addLocation(referenced, property, file, source, match.index);
   }
 }
 
-const missing = [...referenced.keys()].filter((token) => !declared.has(token)).sort();
+const missing = [...referenced.keys()]
+  .filter((property) => !declared.has(property) && !externalProperties.has(property))
+  .sort();
 
 if (missing.length > 0) {
-  console.error('Unknown Sable theme tokens:');
-  for (const token of missing) {
-    console.error(`  ${token} (${referenced.get(token).join(', ')})`);
+  console.error('Unknown project custom properties:');
+  for (const property of missing) {
+    console.error(`  ${property} (${referenced.get(property).join(', ')})`);
   }
   process.exitCode = 1;
 } else {
-  console.log(`Checked ${referenced.size} Sable theme tokens; all are declared.`);
+  const checked = [...new Set([...declared.keys(), ...referenced.keys()])].sort();
+  console.log(`Checked ${checked.length} project custom properties; all references are declared.`);
 }

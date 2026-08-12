@@ -1,0 +1,47 @@
+.form-control {
+  --form-control-background: var(--sable-bg-container);
+  --form-control-border: var(--sable-bg-container-line);
+  --form-control-color: var(--sable-bg-on-container);
+  --form-control-padding-inline: 0.875rem;
+  --form-control-padding-inline-end: var(--form-control-padding-inline);
+
+  background: var(--form-control-background);
+  border: 1px solid var(--form-control-border);
+  border-radius: var(--radius);
+  box-sizing: border-box;
+  color: var(--form-control-color);
+  font: inherit;
+  min-height: var(--control-height-medium);
+  padding: 0.625rem var(--form-control-padding-inline-end) 0.625rem
+    var(--form-control-padding-inline);
+}
+
+.form-control:focus-visible {
+  border-color: var(--sable-primary-main);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+  outline: none;
+}
+
+.form-control[aria-invalid='true'],
+.form-control-error {
+  border-color: var(--sable-crit-main);
+}
+
+.form-control[aria-invalid='true']:focus-visible,
+.form-control-error:focus-visible {
+  border-color: var(--sable-crit-main);
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+}
+
+.form-control:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .form-control {
+    transition:
+      border-color var(--motion-normal) ease,
+      box-shadow var(--motion-normal) ease;
+  }
+}

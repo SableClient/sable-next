@@ -13,6 +13,8 @@
     border: 2px solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     border-right-color: var(--sable-primary-main);
+    display: inline-block;
+    flex: 0 0 auto;
     height: 1.25rem;
     width: 1.25rem;
   }

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
+  import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
 
@@ -44,13 +45,13 @@
   <p class="user-id">{userId}</p>
 
   <div class="avatar-picker">
-    <div class="avatar-preview" aria-hidden="true">
-      {#if avatarPreview}
-        <img src={avatarPreview} alt="" />
-      {:else}
-        <span>{displayName.slice(0, 1).toUpperCase() || '?'}</span>
-      {/if}
-    </div>
+    <Avatar
+      class="avatar-preview"
+      src={avatarPreview}
+      alt=""
+      initials={displayName.slice(0, 1).toUpperCase() || '?'}
+      size="large"
+    />
     <AuthField
       fieldId="profile-avatar"
       label={$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'auth.avatar')}
@@ -100,11 +101,10 @@
     </div>
   </details>
 
-  {#if error}<p class="error" aria-live="polite">{error}</p>{/if}
+  {#if error}<Alert variant="critical" aria-live="polite">{error}</Alert>{/if}
 
   <div class="actions">
-    <Button onclick={onContinue} disabled={isSaving}>
-      {#if isSaving}<Spinner />{/if}
+    <Button onclick={onContinue} loading={isSaving}>
       {$i18n.t('auth.continue')}
     </Button>
     <button class="auth-link-button skip" type="button" onclick={onSkip} disabled={isSaving}>
@@ -144,20 +144,10 @@
     grid-template-columns: auto 1fr;
   }
 
-  .avatar-preview {
-    align-items: center;
-    background: var(--sable-primary-container);
-    border-radius: 50%;
-    color: var(--sable-primary-on-container);
-    display: flex;
-    font-size: 1.5rem;
-    height: 4rem;
-    justify-content: center;
-    overflow: hidden;
+  :global(.sable-avatar.avatar-preview) {
     transition:
       background-color var(--motion-normal) ease,
       transform var(--motion-normal) ease;
-    width: 4rem;
   }
 
   @keyframes avatar-in {
@@ -167,11 +157,8 @@
     }
   }
 
-  .avatar-preview img {
+  :global(.sable-avatar.avatar-preview img) {
     animation: avatar-in var(--motion-normal) ease both;
-    height: 100%;
-    object-fit: cover;
-    width: 100%;
   }
 
   .more-options {
@@ -216,13 +203,8 @@
     justify-self: center;
   }
 
-  .error {
-    color: var(--sable-crit-main);
-    font-size: var(--font-size-small);
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .avatar-preview,
+    :global(.sable-avatar.avatar-preview),
     .more-options[open] .placeholder-list {
       animation: none;
       transition: none;

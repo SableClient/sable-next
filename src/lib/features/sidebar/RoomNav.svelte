@@ -598,7 +598,7 @@
     .room-category,
     .rooms-heading
   ):focus-visible {
-    outline: 3px solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 2px;
   }
 

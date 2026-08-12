@@ -90,8 +90,8 @@
   .settings-dialog {
     background: var(--sable-surface-container);
     border: 1px solid var(--sable-surface-container-line);
-    border-radius: calc(var(--radius) * 1.5);
-    box-shadow: 0 1rem 3rem var(--sable-shadow);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-dialog);
     height: min(48rem, calc(100dvh - 4rem));
     max-width: 72rem;
     overflow: hidden;

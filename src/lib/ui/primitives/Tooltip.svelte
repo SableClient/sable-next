@@ -89,7 +89,7 @@
   }
 
   .tooltip-trigger:focus-visible {
-    box-shadow: 0 0 0 0.2rem var(--sable-focus-ring);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
     outline: none;
   }
 

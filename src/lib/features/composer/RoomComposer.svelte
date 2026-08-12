@@ -2,6 +2,9 @@
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 
   import { i18n } from '$lib/i18n';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
+  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import TextArea from '$lib/ui/primitives/TextArea.svelte';
 
   interface Props {
     roomId: string;
@@ -69,22 +72,29 @@
     void send();
   }}
 >
-  <textarea
+  <TextArea
+    class="composer-input"
     bind:value={draft}
-    rows="1"
+    rows={1}
+    maxlength={4000}
     placeholder={$i18n.t('timeline.messagePlaceholder')}
     aria-label={$i18n.t('timeline.messagePlaceholder')}
     oninput={updateTyping}
-    onkeydown={handleKeydown}></textarea>
-  <button
+    onkeydown={handleKeydown}
+  />
+  <IconButton
     type="submit"
-    disabled={sending || !draft.trim()}
-    aria-label={$i18n.t('timeline.sendMessage')}
+    variant="ghost"
+    size="small"
+    class="composer-send"
+    loading={sending}
+    disabled={!draft.trim()}
+    label={$i18n.t('timeline.sendMessage')}
   >
     <PaperPlaneIcon weight="fill" />
-  </button>
+  </IconButton>
 </form>
-{#if error}<p class="send-error" role="alert">{error}</p>{/if}
+{#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
 
 <style>
   .composer {
@@ -92,7 +102,7 @@
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-surface-container-line);
     border-radius: 1.25rem;
-    box-shadow: 0 0.25rem 0.75rem var(--sable-shadow);
+    box-shadow: var(--shadow-float);
     display: flex;
     flex: 0 0 auto;
     gap: 0.25rem;
@@ -100,7 +110,7 @@
     padding: 0.375rem 0.5rem 0.375rem 0.875rem;
   }
 
-  textarea {
+  :global(.composer-input) {
     background: transparent;
     border: 0;
     border-radius: 0;
@@ -112,44 +122,31 @@
     resize: vertical;
   }
 
-  textarea:focus-visible {
+  :global(.composer-input:focus-visible) {
+    border-color: transparent;
     outline: 0;
   }
 
-  button {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: 50%;
+  :global(.composer-send) {
     color: var(--sable-primary-main);
-    cursor: pointer;
-    display: flex;
-    height: 2.25rem;
-    justify-content: center;
-    padding: 0;
-    width: 2.25rem;
   }
 
-  button:disabled {
+  :global(.composer-send:disabled) {
     color: var(--sable-sec-main);
-    cursor: default;
   }
 
-  button:not(:disabled):hover,
-  button:not(:disabled):focus-visible {
+  :global(.composer-send:not(:disabled):hover),
+  :global(.composer-send:not(:disabled):focus-visible) {
     background: var(--sable-surface-container-hover);
   }
 
-  button :global(svg) {
+  :global(.composer-send svg) {
     height: 1.125rem;
     width: 1.125rem;
   }
 
-  .send-error {
-    background: var(--sable-crit-container);
-    color: var(--sable-crit-on-container);
+  :global(.send-error) {
     font-size: var(--font-size-small);
     margin: 0;
-    padding: 0.5rem 1rem;
   }
 </style>

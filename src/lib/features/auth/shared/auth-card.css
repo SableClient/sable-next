@@ -1,7 +1,7 @@
 .auth-page .auth-card-surface {
   background: var(--sable-surface-container);
   border: 1px solid var(--sable-surface-container-line);
-  border-radius: calc(var(--radius) * 1.5);
+  border-radius: var(--radius-card);
   display: grid;
   gap: 1rem;
   padding: 1.25rem;
@@ -77,7 +77,7 @@
 
 .auth-page .auth-link-button:focus-visible {
   border-radius: 0.125rem;
-  outline: 0.2rem solid var(--sable-focus-ring);
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
   outline-offset: 0.15rem;
 }
 

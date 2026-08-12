@@ -62,7 +62,7 @@
 
 <style>
   .password-input {
-    --input-padding-right: 2.75rem;
+    --form-control-padding-inline-end: var(--control-height-medium);
 
     display: grid;
     position: relative;
@@ -94,7 +94,7 @@
 
   .password-toggle:focus-visible {
     border-radius: var(--radius);
-    outline: 2px solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: -4px;
   }
 

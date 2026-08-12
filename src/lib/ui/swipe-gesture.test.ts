@@ -60,7 +60,9 @@ describe('swipe gesture helper', () => {
   });
 
   it('leaves short, vertical, and cancelled gestures for the consumer to settle', () => {
-    const short = horizontalGesture();
+    const short = startSwipeGesture(touchEvent(100, 100, 0), 0);
+    if (!short) throw new Error('expected a gesture');
+    updateSwipeGesture(short, touchEvent(120, 100, 1000));
     expect(finishSwipeGesture(short, 20)).toMatchObject({ handled: true, direction: undefined });
 
     const vertical = startSwipeGesture(touchEvent(100, 100, 0), 0);

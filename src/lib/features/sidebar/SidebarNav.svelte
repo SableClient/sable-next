@@ -395,7 +395,7 @@
   }
 
   .rail-item:focus-visible {
-    outline: 3px solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 2px;
   }
 
@@ -446,7 +446,7 @@
     }
 
     .resize-handle:focus-visible {
-      outline: 3px solid var(--sable-focus-ring);
+      outline: var(--focus-ring-width) solid var(--sable-focus-ring);
       outline-offset: -3px;
     }
   }

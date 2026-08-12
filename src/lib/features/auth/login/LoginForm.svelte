@@ -274,7 +274,7 @@
 
   .account-switch-button:focus-visible {
     border-radius: 0.125rem;
-    outline: 0.2rem solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 0.15rem;
   }
 

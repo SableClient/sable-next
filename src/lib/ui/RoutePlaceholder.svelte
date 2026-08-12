@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
+  import AppPageShell from './primitives/AppPageShell.svelte';
 
   interface Props {
     title?: string;
@@ -11,15 +12,4 @@
   let pageTitle = $derived(title ?? (titleKey ? $i18n.t(titleKey) : ''));
 </script>
 
-<svelte:head>
-  <title>{pageTitle} · Sable</title>
-</svelte:head>
-
-{#if description}
-  <main>
-    <h1>{pageTitle}</h1>
-    <p>{description}</p>
-  </main>
-{:else}
-  <h1>{pageTitle}</h1>
-{/if}
+<AppPageShell title={pageTitle} {description} />
