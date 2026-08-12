@@ -28,7 +28,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@fontsource-variable/nunito": "5.2.7",
+    "@fontsource-variable/nunito": "5.3.0",
     "@tanstack/svelte-devtools": "^0.1.2",
     "@tanstack/svelte-query": "^6.1.38",
     "@tanstack/svelte-virtual": "^3.13.35",
