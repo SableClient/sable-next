@@ -664,7 +664,7 @@ macro_rules! dispatch_commands {
                     .map_err(|error| $self.failed("request_verification", error))?;
 
                 let flow_id = request.flow_id().to_owned();
-                $self.watch_verification(request).await;
+                $self.watch_verification(request);
 
                 Ok(CommandOk::RequestVerification { flow_id })
             }

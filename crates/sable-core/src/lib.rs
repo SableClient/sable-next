@@ -198,7 +198,7 @@ fn sas_view(sas: &SasVerification, state: &SasState) -> VerificationView {
     }
 }
 
-fn verification_phase(state: &VerificationView) -> &'static str {
+const fn verification_phase(state: &VerificationView) -> &'static str {
     match state {
         VerificationView::Requested { .. } => "requested",
         VerificationView::Waiting => "waiting",
@@ -288,7 +288,7 @@ impl Core {
     fn track_session_task(&self, task: Task) {
         self.session_tasks
             .lock()
-            .expect("session task lock poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(task);
     }
 
@@ -1112,7 +1112,7 @@ impl Core {
     async fn take_session(&self) -> Option<Session> {
         self.session_tasks
             .lock()
-            .expect("session task lock poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
         self.subscriptions.lock().await.clear();
         *self.active_room_subscription.lock().await = None;
@@ -1252,7 +1252,7 @@ impl Core {
                     );
 
                     if let Some(request) = request {
-                        core.watch_verification(request).await;
+                        core.watch_verification(request);
                     }
                 }
             }
@@ -1273,7 +1273,7 @@ impl Core {
                         .get_verification_request(&event.sender, event.event_id.as_str())
                         .await
                     {
-                        core.watch_verification(request).await;
+                        core.watch_verification(request);
                     }
                 }
             }
@@ -1282,7 +1282,7 @@ impl Core {
 
     /// The request and the SAS it becomes are two objects with two state enums.
     /// Both funnel into one event stream keyed by the flow id.
-    async fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
+    fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
         let core = self.clone();
         let task = rt::spawn(async move {
             let user_id = request.other_user_id().to_owned();
@@ -1307,9 +1307,7 @@ impl Core {
                         // QR is not compiled in, so any other flow is
                         // undriveable. Say so instead of spinning.
                         match verification.sas() {
-                            Some(sas) => {
-                                core.watch_sas(user_id.clone(), flow_id.clone(), sas).await
-                            }
+                            Some(sas) => core.watch_sas(user_id.clone(), flow_id.clone(), sas),
                             None => core.emit_verification(
                                 &user_id,
                                 &flow_id,
@@ -1340,12 +1338,7 @@ impl Core {
         self.track_session_task(task);
     }
 
-    async fn watch_sas(
-        self: &Arc<Self>,
-        user_id: OwnedUserId,
-        flow_id: String,
-        sas: SasVerification,
-    ) {
+    fn watch_sas(self: &Arc<Self>, user_id: OwnedUserId, flow_id: String, sas: SasVerification) {
         let core = self.clone();
         let task = rt::spawn(async move {
             let mut changes = sas.changes();
@@ -1493,7 +1486,7 @@ impl Core {
             // costs the next restore, so it is logged.
             let core = saver.clone();
             rt::spawn_detached(async move {
-                let store_id = {
+                let store_id: Option<String> = {
                     let accounts = core.accounts.lock().await;
                     accounts
                         .as_ref()
@@ -1615,7 +1608,7 @@ impl Core {
             // Stable over a stream's life, so resolved once per room.
             let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();
 
-            pin_mut!(stream);
+            let mut stream = Box::pin(stream);
             while let Some(diffs) = stream.next().await {
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
@@ -1864,6 +1857,7 @@ async fn build_room_timeline(
 }
 
 #[cfg(test)]
+#[allow(clippy::large_futures)]
 mod tests {
     use super::*;
 
@@ -2050,13 +2044,18 @@ mod tests {
 
 #[cfg(all(test, not(target_family = "wasm")))]
 // These timeline tests use panic-based assertions to keep async test failures readable.
-#[allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::large_futures,
+    clippy::panic,
+    clippy::unwrap_used
+)]
 mod sdk_timeline_tests;
 
 #[cfg(test)]
 // These ignored network tests intentionally panic with context on an unexpected
 // server response; production command paths remain panic-free.
-#[allow(clippy::expect_used, clippy::panic)]
+#[allow(clippy::expect_used, clippy::large_futures, clippy::panic)]
 mod live_tests {
     use super::*;
 

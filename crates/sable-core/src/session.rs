@@ -2,7 +2,6 @@ use std::{sync::Arc, time::Duration};
 
 use matrix_sdk::{
     Client, ClientBuilder,
-    encryption::{BackupDownloadStrategy, EncryptionSettings},
     authentication::{
         matrix::MatrixSession,
         oauth::{
@@ -11,6 +10,7 @@ use matrix_sdk::{
         },
     },
     config::RequestConfig,
+    encryption::{BackupDownloadStrategy, EncryptionSettings},
     ruma::serde::Raw,
 };
 use matrix_sdk_ui::sync_service::SyncService;
@@ -324,6 +324,4 @@ mod tests {
         let (_, second) = accounts.allocate_account("sable-next");
         assert_ne!(first, second);
     }
-
-    #[test]
 }

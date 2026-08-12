@@ -84,7 +84,7 @@ export function applyDiffs<T>(current: readonly T[], diffs: readonly Diff<T>[]):
 }
 
 type Diff<T> =
-  | { op: 'append'; values: T[] }
+  | { op: 'append'; values: readonly T[] }
   | { op: 'clear' }
   | { op: 'push_front'; value: T }
   | { op: 'push_back'; value: T }
@@ -94,4 +94,4 @@ type Diff<T> =
   | { op: 'set'; index: number; value: T }
   | { op: 'remove'; index: number }
   | { op: 'truncate'; length: number }
-  | { op: 'reset'; values: T[] };
+  | { op: 'reset'; values: readonly T[] };
