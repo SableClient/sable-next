@@ -273,6 +273,10 @@ impl Core {
 
     fn login_error(&self, error: matrix_sdk::Error) -> CommandErr {
         if error.client_api_error_kind() == Some(&ErrorKind::Forbidden) {
+            tracing::warn!(
+                operation = "password_login",
+                "homeserver rejected the credentials"
+            );
             return CommandErr::Denied;
         }
 
@@ -284,27 +288,43 @@ impl Core {
 
     fn homeserver_http_error(&self, context: &str, error: matrix_sdk::HttpError) -> CommandErr {
         match error.client_api_error_kind() {
-            Some(ErrorKind::LimitExceeded(limit)) => CommandErr::RateLimited {
-                retry_after_ms: limit.retry_after.as_ref().and_then(|retry_after| {
-                    let RetryAfter::Delay(delay) = retry_after else {
-                        return None;
-                    };
-                    delay.as_millis().try_into().ok()
-                }),
-            },
+            Some(ErrorKind::LimitExceeded(limit)) => {
+                tracing::warn!(
+                    context,
+                    category = "rate_limited",
+                    "homeserver request failed"
+                );
+                CommandErr::RateLimited {
+                    retry_after_ms: limit.retry_after.as_ref().and_then(|retry_after| {
+                        let RetryAfter::Delay(delay) = retry_after else {
+                            return None;
+                        };
+                        delay.as_millis().try_into().ok()
+                    }),
+                }
+            }
             _ if error
                 .as_client_api_error()
                 .is_some_and(|api_error| api_error.status_code.as_u16() == 429) =>
             {
+                tracing::warn!(
+                    context,
+                    category = "rate_limited",
+                    "homeserver request failed"
+                );
                 CommandErr::RateLimited {
                     retry_after_ms: None,
                 }
             }
-            _ if matches!(error, matrix_sdk::HttpError::Reqwest(_)) => CommandErr::Unavailable,
+            _ if matches!(error, matrix_sdk::HttpError::Reqwest(_)) => {
+                tracing::warn!(context, category = "network", "homeserver request failed");
+                CommandErr::Unavailable
+            }
             _ if error
                 .as_client_api_error()
                 .is_some_and(|api_error| api_error.status_code.is_server_error()) =>
             {
+                tracing::warn!(context, category = "server", "homeserver request failed");
                 CommandErr::Unavailable
             }
             _ => self.failed(context, error),
@@ -383,10 +403,20 @@ impl Core {
         username: String,
         password: String,
     ) -> Result<CommandOk, CommandErr> {
+        tracing::info!(
+            operation = "password_login",
+            homeserver,
+            "building Matrix client"
+        );
         let client = session::build_client(&self.store_id, &homeserver)
             .await
             .map_err(|error| self.failed("build_client", error))?;
 
+        tracing::info!(
+            operation = "password_login",
+            homeserver,
+            "requesting an authenticated session"
+        );
         client
             .matrix_auth()
             .login_username(&username, &password)
@@ -410,12 +440,23 @@ impl Core {
             generation,
         )
         .await?;
+        tracing::info!(
+            operation = "password_login",
+            homeserver,
+            "session persisted; starting sync"
+        );
         self.start_session(client, homeserver, generation).await?;
 
+        tracing::info!(operation = "password_login", "login completed");
         Ok(CommandOk::Login { user_id })
     }
 
     async fn login_flows(self: &Arc<Self>, homeserver: String) -> Result<CommandOk, CommandErr> {
+        tracing::info!(
+            operation = "login_flows",
+            homeserver,
+            "discovering sign-in methods"
+        );
         let client = session::discovery_client(&homeserver)
             .await
             .map_err(|error| self.discovery_error(error))?;
@@ -489,6 +530,13 @@ impl Core {
             return Err(CommandErr::Unsupported);
         }
 
+        tracing::info!(
+            operation = "login_flows",
+            password = flows.password,
+            oidc = flows.oidc,
+            sso = flows.sso,
+            "sign-in methods discovered"
+        );
         Ok(CommandOk::LoginFlows { flows })
     }
 
@@ -500,6 +548,7 @@ impl Core {
         redirect_uri: String,
         intent: AuthIntent,
     ) -> Result<CommandOk, CommandErr> {
+        tracing::info!(operation = "oidc_login", intent = ?intent, "starting OAuth login");
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_oidc_login: redirect_uri", error))?;
 
@@ -533,6 +582,10 @@ impl Core {
         }
         *pending = Some(PendingLogin::Oidc(homeserver, redirect_uri, client));
 
+        tracing::info!(
+            operation = "oidc_login",
+            "OAuth login ready for browser redirect"
+        );
         Ok(CommandOk::StartOidcLogin { authorization_url })
     }
 
@@ -540,6 +593,7 @@ impl Core {
         self: &Arc<Self>,
         callback_url: String,
     ) -> Result<CommandOk, CommandErr> {
+        tracing::info!(operation = "oidc_login", "completing OAuth login callback");
         let url = Url::parse(&callback_url)
             .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
 
@@ -588,6 +642,7 @@ impl Core {
         .await?;
         self.start_session(client, homeserver, generation).await?;
 
+        tracing::info!(operation = "oidc_login", "OAuth login completed");
         Ok(CommandOk::CompleteOidcLogin { user_id })
     }
 
@@ -598,6 +653,7 @@ impl Core {
         idp_id: Option<String>,
         intent: AuthIntent,
     ) -> Result<CommandOk, CommandErr> {
+        tracing::info!(operation = "sso_login", intent = ?intent, "starting SSO login");
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_sso_login: redirect_uri", error))?;
         if !has_single_nonempty_query_parameter(&redirect_uri, "sable_sso_state") {
@@ -631,6 +687,10 @@ impl Core {
         }
         *pending = Some(PendingLogin::Sso(homeserver, redirect_uri, client));
 
+        tracing::info!(
+            operation = "sso_login",
+            "SSO login ready for browser redirect"
+        );
         Ok(CommandOk::StartSsoLogin {
             authorization_url: authorization_url.to_string(),
         })
@@ -640,6 +700,7 @@ impl Core {
         self: &Arc<Self>,
         callback_url: String,
     ) -> Result<CommandOk, CommandErr> {
+        tracing::info!(operation = "sso_login", "completing SSO login callback");
         // The login token is single-use, so keep the client that created the
         // redirect and consume the pending flow exactly once.
         let callback_url = Url::parse(&callback_url)
@@ -691,6 +752,7 @@ impl Core {
         .await?;
         self.start_session(client, homeserver, generation).await?;
 
+        tracing::info!(operation = "sso_login", "SSO login completed");
         Ok(CommandOk::CompleteSsoLogin { user_id })
     }
 

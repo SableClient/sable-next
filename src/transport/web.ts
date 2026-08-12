@@ -20,7 +20,11 @@ export function createWebTransport(): Transport {
   function connect(): SharedWorker {
     if (worker) return worker;
 
-    const nextWorker = new SharedWorker(new URL('../worker/core.worker.ts', import.meta.url), {
+    const workerUrl = new URL('../worker/core.worker.ts', import.meta.url);
+    const logFilter = new URLSearchParams(self.location.search).get('log');
+    if (logFilter) workerUrl.searchParams.set('log', logFilter);
+
+    const nextWorker = new SharedWorker(workerUrl, {
       type: 'module',
       name: 'sable-core-v2',
     });

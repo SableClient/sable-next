@@ -1,6 +1,11 @@
 import { CoreError } from '@/transport';
 import { t } from '$lib/i18n';
 
+export function logAuthenticationFailure(operation: string, value: unknown): void {
+  const error = value instanceof CoreError ? value.detail : { code: 'unexpected' };
+  console.error('[sable:auth] authentication failed', { operation, error });
+}
+
 export function registrationError(value: unknown): string {
   if (!(value instanceof CoreError)) return t('errors.connectionError');
 

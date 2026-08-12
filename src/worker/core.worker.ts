@@ -31,8 +31,8 @@ const core = init().then(() => {
     () => loadSession(),
     (bytes: Uint8Array) => saveSession(bytes),
     () => clearSession(),
-    // `?log=` in the page URL raises it, e.g. `?log=info,matrix_sdk::http_client=debug`
-    // to see every request the SDK makes.
+    // The page forwards `?log=` here, e.g. `?log=info,matrix_sdk::http_client=debug`
+    // to include the SDK's HTTP diagnostics in this SharedWorker's console.
     new URLSearchParams(self.location.search).get('log') ?? 'info'
   );
 

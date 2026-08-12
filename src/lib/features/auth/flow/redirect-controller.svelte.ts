@@ -7,6 +7,7 @@ import { t } from '$lib/i18n';
 import { SvelteSet, SvelteURL } from 'svelte/reactivity';
 import {
   authenticationError,
+  logAuthenticationFailure,
   registrationError,
 } from '$lib/features/auth/registration/registration-errors';
 
@@ -109,6 +110,7 @@ export class RedirectController {
         popup.location.replace(authorizationUrl);
       }
     } catch (value) {
+      logAuthenticationFailure(`${type}_${intent}_start`, value);
       this.setError(intent, value);
     } finally {
       if (this.popup && !navigationStarted) {
@@ -140,6 +142,7 @@ export class RedirectController {
         await this.options.onNavigateProfile();
       }
     } catch (value) {
+      logAuthenticationFailure(`${type}_${this.pendingIntent}_complete`, value);
       this.setError(this.pendingIntent, value);
     } finally {
       this.pendingOnboardingTransition = false;

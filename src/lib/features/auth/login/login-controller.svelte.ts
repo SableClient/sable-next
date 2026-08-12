@@ -1,7 +1,10 @@
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { CoreClient } from '$lib/core/client.svelte';
 import { t } from '$lib/i18n';
-import { authenticationError } from '$lib/features/auth/registration/registration-errors';
+import {
+  authenticationError,
+  logAuthenticationFailure,
+} from '$lib/features/auth/registration/registration-errors';
 
 export type LoginField = 'homeserver' | 'username' | 'password';
 
@@ -56,6 +59,7 @@ export class LoginController {
       );
       this.options.onMarkLoggedIn();
     } catch (value) {
+      logAuthenticationFailure('password_login', value);
       this.error = authenticationError(value);
     }
   }
