@@ -292,9 +292,17 @@ pub async fn discovery_client(homeserver: &str) -> Result<Client, matrix_sdk::Cl
     apply_server(Client::builder(), homeserver).build().await
 }
 
-/// A scheme is no reason to skip `.well-known`: `https://example.com` is usually
-/// the server *name*, delegating elsewhere.
 fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
+    if let Ok(url) = Url::parse(homeserver)
+        && url.scheme() == "http"
+        && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))
+    {
+        // Development and test servers on loopback are already the endpoint.
+        return builder.homeserver_url(url);
+    }
+
+    // A scheme is no reason to skip `.well-known`: `https://example.com` is
+    // usually the server *name*, delegating elsewhere.
     builder
         .server_name_or_homeserver_url(homeserver)
         .request_config(RequestConfig::new().timeout(Duration::from_secs(15)))

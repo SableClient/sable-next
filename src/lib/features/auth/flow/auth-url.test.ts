@@ -9,6 +9,14 @@ describe('auth URL prefill', () => {
     );
   });
 
+  it('reads a homeserver URL from the query string', () => {
+    expect(
+      homeserverFromAuthUrl(
+        new URL('https://sable.test/login?server=http%3A%2F%2Flocalhost%3A8008')
+      )
+    ).toBe('http://localhost:8008');
+  });
+
   it('does not treat profile as a homeserver', () => {
     expect(homeserverFromAuthUrl(new URL('https://sable.test/register/profile'))).toBeNull();
   });

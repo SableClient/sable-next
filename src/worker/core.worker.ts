@@ -95,10 +95,14 @@ self.onconnect = (connect: MessageEvent) => {
     } catch (cause) {
       // The core rejects with the JSON of `CommandErr`. Anything else is a
       // carrier bug, reported as `failed` instead of swallowed.
-      const err: CommandErr =
-        typeof cause === 'string'
-          ? parseCommandErr(cause)
-          : { code: 'failed' as const, log_id: String(cause) };
+      let err: CommandErr = { code: 'failed', log_id: String(cause) };
+      if (typeof cause === 'string') {
+        try {
+          err = parseCommandErr(cause);
+        } catch {
+          console.error('[sable worker] core rejected with a non-protocol error', cause);
+        }
+      }
 
       port.postMessage({ id, err } satisfies WorkerMessage);
     }

@@ -1,6 +1,9 @@
 const AUTH_ROUTES = new Set(['login', 'register']);
 
 export function homeserverFromAuthUrl(url: URL): string | null {
+  const queryHomeserver = url.searchParams.get('server')?.trim();
+  if (queryHomeserver) return queryHomeserver;
+
   const segments = url.pathname.split('/').filter(Boolean);
   const routeIndex = segments.findIndex((segment) => AUTH_ROUTES.has(segment));
   const candidate = routeIndex < 0 ? undefined : segments[routeIndex + 1];
