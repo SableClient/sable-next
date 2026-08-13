@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/test';
 
 test('starts at the sign-in flow', async ({ page }) => {
   const workerErrors: string[] = [];

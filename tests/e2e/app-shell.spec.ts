@@ -1,9 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/test';
 
-import { installFakeCore } from './fake-core';
-
-test('shows the authenticated app shell on desktop', async ({ page }) => {
-  await installFakeCore(page, 'ready');
+test('shows the authenticated app shell on desktop', async ({ page, installFakeCore }) => {
+  await installFakeCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/home');
 
@@ -26,8 +24,8 @@ test('shows the authenticated app shell on desktop', async ({ page }) => {
   expect(appScrollbars.roomNavigation).toBe('thin');
 });
 
-test('persists the keyboard-adjusted room navigation width', async ({ page }) => {
-  await installFakeCore(page, 'ready');
+test('persists the keyboard-adjusted room navigation width', async ({ page, installFakeCore }) => {
+  await installFakeCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/home');
 
@@ -43,8 +41,8 @@ test('persists the keyboard-adjusted room navigation width', async ({ page }) =>
   );
 });
 
-test('shows the authenticated app shell on mobile', async ({ page }) => {
-  await installFakeCore(page, 'ready');
+test('shows the authenticated app shell on mobile', async ({ page, installFakeCore }) => {
+  await installFakeCore('ready');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/home');
 
@@ -57,8 +55,8 @@ test('shows the authenticated app shell on mobile', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: 'Quick tools' })).toBeVisible();
 });
 
-test('keeps mobile bottom navigation with the room list panel', async ({ page }) => {
-  await installFakeCore(page, 'ready');
+test('keeps mobile bottom navigation with the room list panel', async ({ page, installFakeCore }) => {
+  await installFakeCore('ready');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/home');
 
@@ -74,8 +72,8 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page })
   await expect(quickTools).toBeInViewport();
 });
 
-test('renders a startup state while the core is restoring', async ({ page }) => {
-  await installFakeCore(page, 'loading');
+test('renders a startup state while the core is restoring', async ({ page, installFakeCore }) => {
+  await installFakeCore('loading');
   await page.goto('/home');
 
   await expect(page.getByRole('status')).toContainText('Starting Sable');
@@ -89,8 +87,11 @@ test('redirects signed-out protected routes to login', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
-test('renders a recoverable error when the core cannot start', async ({ page }) => {
-  await installFakeCore(page, 'error');
+test('renders a recoverable error when the core cannot start', async ({
+  page,
+  installFakeCore,
+}) => {
+  await installFakeCore('error');
   await page.goto('/home');
 
   await expect(page.getByRole('alert')).toContainText('Sable could not start');
