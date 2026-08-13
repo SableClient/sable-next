@@ -1,5 +1,7 @@
 <script lang="ts">
-  import HomeEmptyState from '$lib/features/home/HomeEmptyState.svelte';
+  import { i18n } from '$lib/i18n';
 </script>
 
-<HomeEmptyState />
+<svelte:head>
+  <title>{$i18n.t('nav.home')} · Sable</title>
+</svelte:head>

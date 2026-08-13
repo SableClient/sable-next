@@ -205,6 +205,32 @@
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
+    scrollbar-color: transparent transparent;
+    scrollbar-width: thin;
+  }
+
+  .viewport::-webkit-scrollbar {
+    height: 0.5rem;
+    width: 0.5rem;
+  }
+
+  .viewport::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: var(--radius-pill);
+  }
+
+  .viewport::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .viewport:hover,
+  .viewport:focus-within {
+    scrollbar-color: var(--sable-surface-container-line) transparent;
+  }
+
+  .viewport:hover::-webkit-scrollbar-thumb,
+  .viewport:focus-within::-webkit-scrollbar-thumb {
+    background: var(--sable-surface-container-line);
   }
 
   .items {
@@ -215,8 +241,9 @@
   .item {
     box-sizing: border-box;
     left: 0;
-    padding: 0.25rem 1rem;
+    padding: 0.25rem var(--page-gutter);
     position: absolute;
+    right: 0;
     top: 0;
     width: 100%;
   }

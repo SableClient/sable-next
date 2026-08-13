@@ -6,8 +6,6 @@
    on <html> at runtime; `src/styles/theme.css.ts` is the typed contract over
    them. */
 html {
-  scrollbar-gutter: stable;
-
   /* Background */
   --sable-bg-container: #fff;
   --sable-bg-container-hover: #f4f4f5;
@@ -201,6 +199,12 @@ html {
   --control-height-small: 2.25rem;
   --control-height-medium: 2.75rem;
   --control-height-large: 3rem;
+  --icon-size-small: 1.25rem;
+  --icon-size-medium: 1.5rem;
+  --icon-size-large: 1.75rem;
+  --avatar-size-small: 2.5rem;
+  --avatar-size-medium: 3rem;
+  --avatar-size-large: 4.5rem;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --motion-fast: 100ms;
@@ -212,6 +216,8 @@ html {
   --shadow-float: 0 0.25rem 0.75rem var(--sable-shadow);
   --shadow-dialog: 0 1rem 3rem var(--sable-shadow);
   --layer-popover: 100;
+  --page-gutter: var(--space-3);
+  --navigation-rail-width: 4.125rem;
 
   /* Font sizes */
   --font-size-small: 0.8125rem;
@@ -242,8 +248,35 @@ body {
 }
 
 * {
-  scrollbar-color: var(--sable-surface-container-line) transparent;
+  scrollbar-color: transparent transparent;
   scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: 0.5rem;
+  width: 0.5rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+}
+
+*:hover,
+*:focus-within {
+  scrollbar-color: var(--sable-surface-container-line) transparent;
+}
+
+*:hover::-webkit-scrollbar-thumb,
+*:focus-within::-webkit-scrollbar-thumb {
+  background: var(--sable-surface-container-line);
+  background-clip: padding-box;
 }
 
 body {
@@ -284,10 +317,26 @@ button,
 input,
 select,
 textarea {
+  color: inherit;
   font: inherit;
 }
 
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+a:not([class]) {
+  color: var(--sable-primary-main);
+  text-underline-offset: 0.15em;
+}
+
+a:not([class]):hover {
+  color: var(--sable-primary-main-hover);
+}
+
+@media (width >= 42rem) {
+  :root {
+    --page-gutter: 2rem;
+  }
 }

@@ -34,8 +34,8 @@
   }
 
   .auth-field-label :global(.tooltip-trigger svg) {
-    height: 1rem;
-    width: 1rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .auth-field-label :global(.tooltip-trigger) {

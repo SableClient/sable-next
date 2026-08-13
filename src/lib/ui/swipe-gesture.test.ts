@@ -49,6 +49,14 @@ describe('swipe gesture helper', () => {
     expect(updateSwipeGesture(vertical, touchEvent(160, 120, 32))?.mode).toBe('vertical');
   });
 
+  it('waits for deliberate movement before locking an axis', () => {
+    const gesture = startSwipeGesture(touchEvent(100, 100, 0), 0);
+    if (!gesture) throw new Error('expected a gesture');
+
+    expect(updateSwipeGesture(gesture, touchEvent(104, 103, 16))?.mode).toBe('pending');
+    expect(updateSwipeGesture(gesture, touchEvent(112, 104, 32))?.mode).toBe('horizontal');
+  });
+
   it('resolves fast and distance-based swipes', () => {
     const fastRight = horizontalGesture();
     expect(finishSwipeGesture(fastRight, 20).direction).toBe('right');

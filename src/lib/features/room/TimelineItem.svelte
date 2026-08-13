@@ -3,6 +3,7 @@
 
   import { i18n } from '$lib/i18n';
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
+  import Avatar from '$lib/ui/primitives/Avatar.svelte';
 
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
@@ -26,9 +27,12 @@
     ]}
   >
     {#if !collapsed}
-      <span class="message-avatar" aria-hidden="true" style:background={senderColor(item.sender)}>
-        {initials(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'))}
-      </span>
+      <Avatar
+        class="message-avatar"
+        size="small"
+        color={senderColor(item.sender)}
+        initials={initials(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'))}
+      />
     {/if}
     <div class="message-content">
       {#if !collapsed}
@@ -98,7 +102,7 @@
   }
 
   .message.collapsed {
-    padding-left: 2.875rem;
+    padding-left: calc(var(--avatar-size-small) + 0.625rem);
   }
 
   .message.sending {
@@ -112,17 +116,8 @@
     padding: 0.5rem;
   }
 
-  .message-avatar {
-    align-items: center;
-    border-radius: 50%;
+  :global(.sable-avatar.message-avatar) {
     color: var(--sable-primary-on-main);
-    display: flex;
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: 2.25rem;
-    justify-content: center;
-    width: 2.25rem;
   }
 
   .message-content {
@@ -162,6 +157,7 @@
 
   .body {
     line-height: var(--line-height-body);
+    max-width: 72ch;
     white-space: pre-wrap;
   }
 

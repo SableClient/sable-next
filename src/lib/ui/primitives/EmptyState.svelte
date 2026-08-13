@@ -35,7 +35,7 @@
     align-items: center;
     display: flex;
     min-height: 100%;
-    padding: 2rem 1.25rem;
+    padding: 2rem var(--page-gutter);
   }
 
   .empty-state-content {
@@ -50,30 +50,30 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-1);
     text-transform: uppercase;
   }
 
   .empty-state h1 {
-    font-size: clamp(2rem, 8vw, 2.5rem);
+    font-size: var(--font-size-xlarge);
     line-height: var(--line-height-heading);
     margin: 0;
   }
 
   .empty-state-description {
     color: var(--sable-surface-var-on-container);
-    margin: 1rem 0 0;
+    margin: var(--space-3) 0 0;
   }
 
   .empty-state-actions {
     display: grid;
-    gap: 0.75rem;
-    margin-top: 2rem;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
   }
 
   @media (width >= 32rem) {
     .empty-state-actions {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
     }
   }
 </style>

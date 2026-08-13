@@ -9,6 +9,7 @@
     initials?: string;
     size?: AvatarSize;
     color?: string;
+    decorative?: boolean;
     class?: ClassValue;
   };
 
@@ -18,10 +19,11 @@
     initials = '?',
     size = 'medium',
     color,
+    decorative = alt === undefined,
     class: className = '',
   }: Props = $props();
 
-  let decorative = $derived(!alt);
+  let accessibleLabel = $derived(alt ?? initials);
 </script>
 
 <span
@@ -29,7 +31,7 @@
   style:background={color}
   aria-hidden={decorative ? 'true' : undefined}
   role={decorative || src ? undefined : 'img'}
-  aria-label={decorative || src ? undefined : alt}
+  aria-label={decorative || src ? undefined : accessibleLabel}
 >
   {#if src}
     <img {src} alt={alt ?? ''} />
@@ -40,7 +42,7 @@
 
 <style>
   :global(.sable-avatar) {
-    --avatar-size: var(--control-height-medium);
+    --avatar-size: var(--avatar-size-medium);
 
     align-items: center;
     background: var(--sable-primary-container);
@@ -48,7 +50,7 @@
     color: var(--sable-primary-on-container);
     display: inline-flex;
     flex: 0 0 var(--avatar-size);
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-medium);
     font-weight: var(--font-weight-bold);
     height: var(--avatar-size);
     justify-content: center;
@@ -58,13 +60,13 @@
   }
 
   :global(.sable-avatar-small) {
-    --avatar-size: var(--control-height-small);
+    --avatar-size: var(--avatar-size-small);
   }
 
   :global(.sable-avatar-large) {
-    --avatar-size: 4rem;
+    --avatar-size: var(--avatar-size-large);
 
-    font-size: 1.5rem;
+    font-size: var(--font-size-xlarge);
   }
 
   :global(.sable-avatar img) {

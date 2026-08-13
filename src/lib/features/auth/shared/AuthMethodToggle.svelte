@@ -51,8 +51,8 @@
   }
 
   .method-toggle-icon :global(svg) {
-    height: 1rem;
-    width: 1rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   @media (prefers-reduced-motion: reduce) {

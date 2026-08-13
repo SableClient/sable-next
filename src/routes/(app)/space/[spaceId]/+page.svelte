@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
+  import { page } from '$app/state';
+  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
+  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+
+  const roomList = useRoomList();
+  let space = $derived(findRoomByPathId(roomList.rooms, page.params.spaceId));
 </script>
 
-<h1>{$i18n.t('nav.space')}</h1>
+<RoutePlaceholder title={space?.name ?? page.params.spaceId} />

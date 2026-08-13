@@ -88,7 +88,7 @@
   }
 
   .app-status-card h1 {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-medium);
   }
 
   .app-status-card p {

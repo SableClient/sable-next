@@ -172,7 +172,7 @@
   }
 
   .fallback-icon :global(svg) {
-    height: 1.25rem;
-    width: 1.25rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 </style>

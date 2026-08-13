@@ -14,10 +14,20 @@
   text-decoration: none;
 }
 
+.sable-button > svg {
+  flex: 0 0 auto;
+  height: var(--icon-size-small);
+  width: var(--icon-size-small);
+}
+
+.sable-button-block {
+  width: 100%;
+}
+
 .sable-button-primary {
-  background: var(--sable-primary-main);
-  border-color: var(--sable-primary-main-line);
-  color: var(--sable-primary-on-main);
+  background: var(--sable-primary-container);
+  border-color: var(--sable-primary-container-line);
+  color: var(--sable-primary-on-container);
 }
 
 .sable-button-secondary {
@@ -27,15 +37,15 @@
 }
 
 .sable-button-ghost {
-  background: transparent;
-  border-color: transparent;
+  background: var(--sable-surface-container);
+  border-color: var(--sable-surface-container-line);
   color: var(--sable-bg-on-container);
 }
 
 .sable-button-danger {
-  background: var(--sable-crit-main);
-  border-color: var(--sable-crit-main-line);
-  color: var(--sable-crit-on-main);
+  background: var(--sable-crit-container);
+  border-color: var(--sable-crit-container-line);
+  color: var(--sable-crit-on-container);
 }
 
 .sable-button-small {
@@ -46,6 +56,11 @@
 .sable-button-large {
   min-height: var(--control-height-large);
   padding: 0.625rem var(--space-4);
+}
+
+.sable-button-large > svg {
+  height: var(--icon-size-medium);
+  width: var(--icon-size-medium);
 }
 
 .sable-button-icon {
@@ -68,8 +83,14 @@
   opacity: 0.65;
 }
 
+.sable-button[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 .sable-button-primary:hover:not(:disabled) {
-  background: var(--sable-primary-main-hover);
+  background: var(--sable-primary-container-hover);
 }
 
 .sable-button-secondary:hover:not(:disabled) {
@@ -81,11 +102,11 @@
 }
 
 .sable-button-danger:hover:not(:disabled) {
-  background: var(--sable-crit-main-hover);
+  background: var(--sable-crit-container-hover);
 }
 
 .sable-button-primary:active:not(:disabled) {
-  background: var(--sable-primary-main-active);
+  background: var(--sable-primary-container-active);
   box-shadow: var(--shadow-inset);
 }
 
@@ -100,7 +121,7 @@
 }
 
 .sable-button-danger:active:not(:disabled) {
-  background: var(--sable-crit-main-active);
+  background: var(--sable-crit-container-active);
   box-shadow: var(--shadow-inset);
 }
 
@@ -116,6 +137,34 @@
 .sable-icon-button-large {
   min-height: var(--control-height-large);
   width: var(--control-height-large);
+}
+
+.sable-icon-button > svg {
+  height: var(--icon-size-medium);
+  width: var(--icon-size-medium);
+}
+
+.sable-icon-button-small > svg {
+  height: var(--icon-size-small);
+  width: var(--icon-size-small);
+}
+
+.sable-icon-button-large > svg {
+  height: var(--icon-size-large);
+  width: var(--icon-size-large);
+}
+
+.sable-icon-button.sable-button-ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.sable-icon-button.sable-button-ghost:hover:not(:disabled) {
+  background: var(--sable-bg-container-hover);
+}
+
+.sable-icon-button.sable-button-ghost:active:not(:disabled) {
+  background: var(--sable-bg-container-active);
 }
 
 @media (prefers-reduced-motion: no-preference) {

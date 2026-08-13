@@ -9,6 +9,7 @@
     href: string;
     variant?: ButtonVariant;
     size?: ButtonSize;
+    block?: boolean;
     class?: ClassValue;
     children?: Snippet;
   };
@@ -16,12 +17,22 @@
   let {
     variant = 'secondary',
     size = 'medium',
+    block = false,
     class: className = '',
     children,
     ...rest
   }: Props = $props();
 </script>
 
-<a {...rest} class={['sable-button', `sable-button-${variant}`, `sable-button-${size}`, className]}>
+<a
+  {...rest}
+  class={[
+    'sable-button',
+    `sable-button-${variant}`,
+    `sable-button-${size}`,
+    { 'sable-button-block': block },
+    className,
+  ]}
+>
   {@render children?.()}
 </a>

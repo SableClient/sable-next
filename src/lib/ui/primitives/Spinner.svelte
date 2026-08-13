@@ -15,13 +15,13 @@
     border-right-color: var(--sable-primary-main);
     display: inline-block;
     flex: 0 0 auto;
-    height: 1.25rem;
-    width: 1.25rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .spinner.small {
-    height: 1rem;
-    width: 1rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   @media (prefers-reduced-motion: no-preference) {

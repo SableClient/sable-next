@@ -3,6 +3,11 @@
   import MobileNavDrawer from '$lib/ui/MobileNavDrawer.svelte';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
   import DeviceVerificationDialog from '$lib/features/settings/DeviceVerificationDialog.svelte';
+  import SettingsPanel from '$lib/features/settings/SettingsPanel.svelte';
+  import {
+    closeSettingsOverlay,
+    settingsOverlay,
+  } from '$lib/features/settings/settings-overlay.svelte';
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
 
@@ -31,6 +36,10 @@
 
 <DeviceVerificationDialog />
 
+{#if !mobile && settingsOverlay.open}
+  <SettingsPanel mode="overlay" open={settingsOverlay.open} onClose={closeSettingsOverlay} />
+{/if}
+
 <style>
   .app-shell {
     height: 100dvh;
@@ -47,7 +56,7 @@
 
   @media (width >= 48rem) {
     .app-content {
-      margin-left: calc(4.125rem + var(--room-nav-width));
+      margin-left: calc(var(--navigation-rail-width) + var(--room-nav-width));
       padding-bottom: 0;
     }
   }

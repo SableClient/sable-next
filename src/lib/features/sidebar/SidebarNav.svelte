@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
+  import { onMount } from 'svelte';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
@@ -15,18 +16,31 @@
   const COLLAPSED_ROOM_NAV_WIDTH = 190;
   const MAX_ROOM_NAV_WIDTH = 500;
   const ROOM_NAV_WIDTH_STEP = 80;
+  const ROOM_NAV_STORAGE_KEY = 'sable-room-navigation-width';
 
   let { mobile = false, onNavigate, roomNavWidth = $bindable(224) }: Props = $props();
   const roomList = useRoomList();
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
+  let widthReady = $state(false);
   let spaces = $derived.by(() => {
     const childSpaceIds = roomList.rooms
       .filter((room) => room.is_space)
       .flatMap((space) => space.space_children.map((child) => child.room_id));
 
     return roomList.rooms.filter((room) => room.is_space && !childSpaceIds.includes(room.room_id));
+  });
+
+  onMount(() => {
+    const storedWidth = Number.parseInt(localStorage.getItem(ROOM_NAV_STORAGE_KEY) ?? '', 10);
+    if (Number.isFinite(storedWidth)) roomNavWidth = clampRoomNavWidth(storedWidth);
+    widthReady = true;
+  });
+
+  $effect(() => {
+    if (!widthReady || mobile) return;
+    localStorage.setItem(ROOM_NAV_STORAGE_KEY, String(roomNavWidth));
   });
 
   function clampRoomNavWidth(width: number) {
@@ -93,6 +107,11 @@
           type="button"
           class="resize-handle"
           class:dragging
+          role="slider"
+          aria-orientation="horizontal"
+          aria-valuemin={MIN_ROOM_NAV_WIDTH}
+          aria-valuemax={MAX_ROOM_NAV_WIDTH}
+          aria-valuenow={roomNavWidth}
           aria-label={$i18n.t('nav.resizeRooms')}
           onpointerdown={handleResizeStart}
           onpointermove={handleResizeMove}
@@ -146,7 +165,7 @@
       left: 0;
       position: fixed;
       top: 0;
-      width: calc(4.125rem + var(--room-nav-width));
+      width: calc(var(--navigation-rail-width) + var(--room-nav-width));
       z-index: 1;
     }
 
@@ -170,7 +189,8 @@
     }
 
     .resize-handle:hover,
-    .resize-handle.dragging {
+    .resize-handle.dragging,
+    .resize-handle:focus-visible {
       background: var(--sable-primary-main);
     }
 

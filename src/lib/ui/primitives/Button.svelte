@@ -11,6 +11,7 @@
     variant = 'secondary',
     size = 'medium',
     loading = false,
+    block = false,
     class: className = '',
     children,
     ...rest
@@ -27,6 +28,7 @@
     `sable-button-${variant}`,
     `sable-button-${size}`,
     { 'sable-button-loading': loading },
+    { 'sable-button-block': block },
     className,
   ]}
 >

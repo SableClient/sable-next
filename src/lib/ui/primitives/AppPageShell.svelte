@@ -44,25 +44,24 @@
     margin: 0 auto;
     max-width: 52rem;
     overflow: auto;
-    padding: 2rem;
+    padding: var(--page-gutter);
     width: 100%;
   }
 
   .app-page-header {
-    margin-bottom: 2rem;
-  }
-
-  .app-page-header h1,
-  .app-page-header p {
-    margin-top: 0;
+    margin-bottom: var(--page-gutter);
   }
 
   .app-page-header h1 {
     font-size: var(--font-size-xlarge);
+    line-height: var(--line-height-heading);
+    margin: 0;
   }
 
   .app-page-header p {
     color: var(--sable-surface-var-on-container);
+    margin: var(--space-1) 0 0;
+    max-width: 65ch;
   }
 
   .app-page-eyebrow {
@@ -70,6 +69,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
+    margin: 0 0 var(--space-1);
     text-transform: uppercase;
   }
 
@@ -77,15 +77,11 @@
   .app-page-actions {
     align-items: center;
     display: flex;
-    gap: 1rem;
+    gap: var(--space-3);
     justify-content: space-between;
   }
 
   @media (width < 42rem) {
-    .app-page-shell {
-      padding: 1rem;
-    }
-
     .app-page-header {
       align-items: stretch;
       flex-direction: column;

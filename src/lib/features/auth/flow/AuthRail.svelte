@@ -398,8 +398,8 @@
   }
 
   .panel-nav :global(svg) {
-    height: 1.5rem;
-    width: 1.5rem;
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
   }
 
   .panel-nav.previous {

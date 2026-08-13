@@ -44,7 +44,7 @@
     flex: 0 0 auto;
     gap: 0.625rem;
     min-height: 3.75rem;
-    padding: 0 1rem;
+    padding: 0 var(--page-gutter);
   }
 
   .room-header h1 {
@@ -76,8 +76,8 @@
 
   :global(.back-button svg),
   :global(.members-button svg) {
-    height: 1.25rem;
-    width: 1.25rem;
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
   }
 
   @media (width < 48rem) {

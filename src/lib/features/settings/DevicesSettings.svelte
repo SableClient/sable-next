@@ -330,7 +330,7 @@
                   bind:value={password}
                   autocomplete="current-password"
                 />
-                <Button type="submit">{$i18n.t('settings.removeDevice')}</Button>
+                <Button type="submit" variant="danger">{$i18n.t('settings.removeDevice')}</Button>
                 <Button variant="ghost" size="small" onclick={() => (deleting = null)}
                   >{$i18n.t('settings.cancel')}</Button
                 >
@@ -366,9 +366,9 @@
   section {
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    margin-top: 1rem;
-    padding: 1.25rem;
+    border-radius: var(--radius-card);
+    margin-top: var(--space-3);
+    padding: var(--space-4);
   }
 
   .section-heading,
@@ -376,7 +376,7 @@
   .actions {
     align-items: center;
     display: flex;
-    gap: 1rem;
+    gap: var(--space-3);
     justify-content: space-between;
   }
 
@@ -387,9 +387,9 @@
 
   .status-grid {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-2);
     grid-template-columns: repeat(3, 1fr);
-    margin: 1.25rem 0;
+    margin: var(--space-4) 0;
   }
 
   dt {
@@ -405,7 +405,7 @@
   :global(.sable-alert.settings-callout) {
     align-items: center;
     display: flex;
-    gap: 1rem;
+    gap: var(--space-3);
     justify-content: space-between;
   }
 
@@ -418,7 +418,12 @@
   .device {
     border-top: 1px solid var(--sable-bg-container-line);
     flex-wrap: wrap;
-    padding: 1rem 0;
+    min-height: var(--control-height-large);
+    padding: var(--space-3) 0;
+  }
+
+  .device:first-child {
+    border-top: 0;
   }
 
   .device-info {
@@ -433,7 +438,7 @@
 
   .recovery-key code {
     display: block;
-    margin: 1rem 0;
+    margin: var(--space-3) 0;
     overflow-wrap: anywhere;
     user-select: all;
   }
@@ -448,7 +453,7 @@
     align-items: end;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-1);
   }
 
   label {
@@ -459,12 +464,13 @@
 
   .remove-confirmation {
     background: var(--sable-surface-container);
-    padding: 0.75rem;
+    border-radius: var(--radius);
+    padding: var(--space-2);
     width: 100%;
   }
 
   :global(.settings-error) {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-3);
   }
 
   @media (width < 42rem) {
@@ -476,6 +482,15 @@
     :global(.sable-alert.settings-callout) {
       align-items: stretch;
       flex-direction: column;
+    }
+
+    form {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    form :global(.sable-button) {
+      width: 100%;
     }
   }
 </style>

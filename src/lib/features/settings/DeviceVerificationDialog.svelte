@@ -72,7 +72,7 @@
         <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
       {:else}
         <p>{$i18n.t('settings.verificationRequested')}</p>
-        <Button class="verification-action" onclick={accept}
+        <Button variant="primary" class="verification-action" onclick={accept}
           >{$i18n.t('settings.acceptVerification')}</Button
         >
       {/if}
@@ -91,7 +91,7 @@
       </div>
       <p class="decimals">{core.verification.state.decimals.join(' · ')}</p>
       <div class="verification-actions">
-        <Button class="verification-action" onclick={confirm}
+        <Button variant="primary" class="verification-action" onclick={confirm}
           >{$i18n.t('settings.theyMatch')}</Button
         >
         <Button
@@ -106,15 +106,19 @@
       <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'done'}
       <p>{$i18n.t('settings.verificationComplete')}</p>
-      <Button class="verification-action" onclick={() => (core.verification = null)}
-        >{$i18n.t('settings.close')}</Button
+      <Button
+        variant="primary"
+        class="verification-action"
+        onclick={() => (core.verification = null)}>{$i18n.t('settings.close')}</Button
       >
     {:else if core.verification.state.phase === 'cancelled'}
       <p>
         {$i18n.t('settings.verificationCancelled', { reason: core.verification.state.reason })}
       </p>
-      <Button class="verification-action" onclick={() => (core.verification = null)}
-        >{$i18n.t('settings.close')}</Button
+      <Button
+        variant="primary"
+        class="verification-action"
+        onclick={() => (core.verification = null)}>{$i18n.t('settings.close')}</Button
       >
     {/if}
     {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
@@ -132,6 +136,8 @@
 <style>
   :global(.verification-title) {
     font-size: var(--font-size-large);
+    font-weight: var(--font-weight-bold);
+    margin: 0;
   }
 
   .emoji {

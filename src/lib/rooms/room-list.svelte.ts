@@ -15,8 +15,12 @@ export function roomPathId(room: RoomSummary): string {
 }
 
 /** `resolve()` inserts route parameters verbatim, including `#`. */
+export function roomPathParamFromId(roomId: string): string {
+  return encodeURIComponent(roomId);
+}
+
 export function roomPathParam(room: RoomSummary): string {
-  return encodeURIComponent(roomPathId(room));
+  return roomPathParamFromId(roomPathId(room));
 }
 
 export function findRoomByPathId(

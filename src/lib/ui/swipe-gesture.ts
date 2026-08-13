@@ -1,5 +1,6 @@
 export const SWIPE_THRESHOLD = 64;
 export const VELOCITY_THRESHOLD = 0.3;
+export const AXIS_LOCK_THRESHOLD = 8;
 
 export type SwipeMode = 'pending' | 'horizontal' | 'vertical';
 export type SwipeDirection = 'left' | 'right';
@@ -64,7 +65,7 @@ export function updateSwipeGesture(
   }
 
   if (gesture.mode === 'pending') {
-    if (distanceX === 0 && distanceY === 0) {
+    if (Math.max(Math.abs(distanceX), Math.abs(distanceY)) < AXIS_LOCK_THRESHOLD) {
       return { distanceX, distanceY, mode: gesture.mode };
     }
     gesture.mode = Math.abs(distanceX) <= Math.abs(distanceY) ? 'vertical' : 'horizontal';

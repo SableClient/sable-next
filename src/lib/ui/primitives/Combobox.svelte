@@ -170,8 +170,8 @@
 
   :global(.combobox-icon) {
     display: block;
-    height: 18px;
-    width: 18px;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .combobox-trigger[data-state='open'] :global(.combobox-icon) {

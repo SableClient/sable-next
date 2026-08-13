@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Snippet } from 'svelte';
+  import { Tooltip } from 'bits-ui';
   import '../styles.css';
   import { createCoreClient } from '$lib/core/client.svelte';
   import { provideCoreClient } from '$lib/core/context';
@@ -27,4 +28,6 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children()}
+<Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
+  {@render children()}
+</Tooltip.Provider>

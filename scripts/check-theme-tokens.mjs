@@ -9,6 +9,7 @@ const declarationPattern = /(--[a-z0-9_-]+)\s*:/gi;
 const runtimeDeclarationPattern = /style:\s*(--[a-z0-9_-]+)\s*=/gi;
 const setPropertyPattern = /setProperty\(\s*['"](--[a-z0-9_-]+)['"]/gi;
 const variableReferencePattern = /var\(\s*(--[a-z0-9_-]+)/gi;
+const literalColorPattern = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\()/gi;
 
 // Manually verified dependency-provided properties that source scanning cannot detect.
 const externalProperties = new Set(['--bits-combobox-anchor-width']);
@@ -42,6 +43,7 @@ function addLocation(map, property, file, source, index) {
 const files = await sourceFiles(sourceRoot);
 const declared = new Map();
 const referenced = new Map();
+const literalColors = [];
 
 for (const file of files) {
   const source = await readFile(file, 'utf8');
@@ -65,16 +67,28 @@ for (const file of files) {
     const property = match[1].toLowerCase();
     addLocation(referenced, property, file, source, match.index);
   }
+
+  if (relative(root, file) !== 'src\\styles.css' && relative(root, file) !== 'src/styles.css') {
+    for (const match of source.matchAll(literalColorPattern)) {
+      literalColors.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
+    }
+  }
 }
 
 const missing = [...referenced.keys()]
   .filter((property) => !declared.has(property) && !externalProperties.has(property))
   .sort();
 
-if (missing.length > 0) {
-  console.error('Unknown project custom properties:');
-  for (const property of missing) {
-    console.error(`  ${property} (${referenced.get(property).join(', ')})`);
+if (missing.length > 0 || literalColors.length > 0) {
+  if (missing.length > 0) {
+    console.error('Unknown project custom properties:');
+    for (const property of missing) {
+      console.error(`  ${property} (${referenced.get(property).join(', ')})`);
+    }
+  }
+  if (literalColors.length > 0) {
+    console.error('Literal colors must be declared as theme tokens in src/styles.css:');
+    for (const location of literalColors) console.error(`  ${location}`);
   }
   process.exitCode = 1;
 } else {

@@ -20,7 +20,7 @@ afterEach(() => {
 test('button variants expose loading and disabled state consistently', () => {
   mount(Button, {
     target: document.body,
-    props: { variant: 'primary', size: 'large', loading: true },
+    props: { variant: 'primary', size: 'large', loading: true, block: true },
   });
 
   const button = document.querySelector('button');
@@ -28,6 +28,7 @@ test('button variants expose loading and disabled state consistently', () => {
   expect(button?.className).toContain('sable-button-primary');
   expect(button?.className).toContain('sable-button-large');
   expect(button?.className).toContain('sable-button-loading');
+  expect(button?.className).toContain('sable-button-block');
   expect(button?.disabled).toBe(true);
   expect(button?.getAttribute('aria-busy')).toBe('true');
 });
@@ -39,13 +40,14 @@ test('icon and link buttons retain accessible labels and shared styling', () => 
   });
   mount(LinkButton, {
     target: document.body,
-    props: { href: '/home', variant: 'primary' },
+    props: { href: '/home', variant: 'primary', block: true },
   });
 
   expect(document.querySelector('button')?.getAttribute('aria-label')).toBe('Close');
   expect(document.querySelector('button')?.className).toContain('sable-icon-button-small');
   expect(document.querySelector('a')?.getAttribute('href')).toBe('/home');
   expect(document.querySelector('a')?.className).toContain('sable-button-primary');
+  expect(document.querySelector('a')?.className).toContain('sable-button-block');
 });
 
 test('content primitives expose semantic state and input affordances', () => {
@@ -72,6 +74,16 @@ test('content primitives expose semantic state and input affordances', () => {
   expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBe('Sable');
   expect(document.querySelector('[role="alert"]')?.className).toContain('sable-alert-critical');
   expect(document.querySelector('.status-badge')?.className).toContain('status-badge-success');
+});
+
+test('decorative avatars stay out of the accessibility tree', () => {
+  mount(Avatar, {
+    target: document.body,
+    props: { initials: 'S', decorative: true },
+  });
+
+  expect(document.querySelector('.sable-avatar')?.getAttribute('aria-hidden')).toBe('true');
+  expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBeNull();
 });
 
 test('page composition primitives provide labelled layout landmarks', () => {

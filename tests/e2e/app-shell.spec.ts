@@ -1,62 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-type WorkerMode = 'ready' | 'loading' | 'error';
-
-async function installFakeCore(page: Page, mode: WorkerMode): Promise<void> {
-  await page.addInitScript((workerMode: WorkerMode) => {
-    const session = {
-      account_id: 'e2e-account',
-      user_id: '@e2e:example.test',
-      device_id: 'E2EDEVICE',
-    };
-
-    class FakePort {
-      onmessage: ((event: MessageEvent) => void) | null = null;
-      onmessageerror: ((event: MessageEvent) => void) | null = null;
-
-      start(): void {}
-
-      close(): void {}
-
-      postMessage(request: { id: number; command?: { type: string } }): void {
-        const command = request.command?.type;
-        if (workerMode === 'loading' && command === 'restore') return;
-
-        const response =
-          workerMode === 'error' && command === 'restore'
-            ? { id: request.id, err: { code: 'unavailable' } }
-            : {
-                id: request.id,
-                ok:
-                  command === 'restore'
-                    ? { type: 'restore', session }
-                    : command === 'list_accounts'
-                      ? { type: 'list_accounts', accounts: [session] }
-                      : command === 'subscribe_room_list'
-                        ? { type: 'subscribe_room_list', subscription: 1, rooms: [] }
-                        : command === 'unsubscribe'
-                          ? { type: 'unsubscribe' }
-                          : { type: command },
-              };
-
-        window.setTimeout(() => {
-          this.onmessage?.({ data: response } as MessageEvent);
-        }, 0);
-      }
-    }
-
-    class FakeSharedWorker {
-      port = new FakePort();
-
-      addEventListener(): void {}
-    }
-
-    Object.defineProperty(window, 'SharedWorker', {
-      configurable: true,
-      value: FakeSharedWorker,
-    });
-  }, mode);
-}
+import { installFakeCore } from './fake-core';
 
 test('shows the authenticated app shell on desktop', async ({ page }) => {
   await installFakeCore(page, 'ready');
@@ -70,6 +14,33 @@ test('shows the authenticated app shell on desktop', async ({ page }) => {
     'page'
   );
   await expect(page.getByRole('navigation', { name: 'Quick tools' })).toBeVisible();
+
+  const appScrollbars = await page.evaluate(() => {
+    const roomNavigation = document.querySelector('.room-nav-content');
+    return {
+      gutter: getComputedStyle(document.documentElement).scrollbarGutter,
+      roomNavigation: roomNavigation ? getComputedStyle(roomNavigation).scrollbarWidth : null,
+    };
+  });
+  expect(appScrollbars.gutter).toBe('auto');
+  expect(appScrollbars.roomNavigation).toBe('thin');
+});
+
+test('persists the keyboard-adjusted room navigation width', async ({ page }) => {
+  await installFakeCore(page, 'ready');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/home');
+
+  const resize = page.getByRole('slider', { name: 'Resize rooms' });
+  await expect(resize).toHaveAttribute('aria-valuenow', '224');
+  await resize.press('ArrowRight');
+  await expect(resize).toHaveAttribute('aria-valuenow', '304');
+
+  await page.reload();
+  await expect(page.getByRole('slider', { name: 'Resize rooms' })).toHaveAttribute(
+    'aria-valuenow',
+    '304'
+  );
 });
 
 test('shows the authenticated app shell on mobile', async ({ page }) => {
@@ -84,6 +55,23 @@ test('shows the authenticated app shell on mobile', async ({ page }) => {
     'page'
   );
   await expect(page.getByRole('navigation', { name: 'Quick tools' })).toBeVisible();
+});
+
+test('keeps mobile bottom navigation with the room list panel', async ({ page }) => {
+  await installFakeCore(page, 'ready');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/home');
+
+  const quickTools = page.getByRole('navigation', { name: 'Quick tools' });
+  await expect(quickTools).toBeInViewport();
+  await page.getByRole('link', { name: 'General' }).click();
+
+  await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to rooms' })).toBeVisible();
+  await expect(quickTools).not.toBeInViewport();
+
+  await page.getByRole('button', { name: 'Back to rooms' }).click();
+  await expect(quickTools).toBeInViewport();
 });
 
 test('renders a startup state while the core is restoring', async ({ page }) => {

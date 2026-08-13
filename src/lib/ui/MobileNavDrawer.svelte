@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
+  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
   import {
     finishSwipeGesture,
@@ -15,32 +16,37 @@
   }
 
   let { children }: Props = $props();
+  const roomList = useRoomList();
 
-  function isNavigationRoute(pathname: string) {
-    return (
-      pathname === '/home' ||
-      pathname === '/direct' ||
-      pathname === '/explore' ||
-      pathname === '/navigate' ||
-      /^\/space\/[^/]+$/.test(pathname)
-    );
+  function hasLoadedRoom(pathId: string | undefined): boolean {
+    if (!pathId) return false;
+    if (findRoomByPathId(roomList.rooms, pathId)) return true;
+
+    try {
+      return Boolean(findRoomByPathId(roomList.rooms, decodeURIComponent(pathId)));
+    } catch {
+      return false;
+    }
   }
 
   type Gesture = SwipeGesture & { width: number };
 
-  let open = $state(isNavigationRoute(page.url.pathname));
+  let open = $state(true);
   let position = $state<number | undefined>();
   let dragging = $state(false);
   let gesture: Gesture | undefined;
+  let canShowConversation = $derived(hasLoadedRoom(page.params.roomId));
 
   $effect(() => {
-    open = isNavigationRoute(page.url.pathname);
+    open = !canShowConversation;
     position = undefined;
     dragging = false;
     gesture = undefined;
   });
 
   function handleTouchStart(event: TouchEvent) {
+    if (!canShowConversation) return;
+
     const target = event.currentTarget;
     if (!(target instanceof HTMLDivElement)) return;
 
@@ -67,7 +73,11 @@
   function finishGesture(cancelled: boolean) {
     const activeGesture = gesture;
     gesture = undefined;
-    if (!activeGesture || activeGesture.mode !== 'horizontal') return;
+    if (!activeGesture || activeGesture.mode !== 'horizontal' || !canShowConversation) {
+      dragging = false;
+      position = undefined;
+      return;
+    }
 
     const currentPosition = position ?? activeGesture.startPosition;
     const result = finishSwipeGesture(activeGesture, currentPosition, cancelled);
@@ -87,6 +97,7 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'ArrowLeft') {
+      if (!canShowConversation) return;
       event.preventDefault();
       open = false;
     } else if (event.key === 'ArrowRight') {
@@ -112,17 +123,18 @@
   <button
     class="screen-reader-only"
     type="button"
-    aria-label={open ? 'Close navigation' : 'Open navigation'}
+    aria-label={open ? $i18n.t('nav.showConversation') : $i18n.t('nav.showRoomList')}
     aria-pressed={open}
+    disabled={!canShowConversation}
     aria-describedby="drawer-instructions"
     onclick={() => {
+      if (!canShowConversation) return;
       open = !open;
     }}
     onkeydown={handleKeydown}
   ></button>
   <p id="drawer-instructions" class="screen-reader-only">
-    Swipe right to show navigation or left to show content. Use the left and right arrow keys to
-    switch panels.
+    {$i18n.t('nav.mobilePanelInstructions')}
   </p>
   <div
     class="drawer-track"

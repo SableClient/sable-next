@@ -105,8 +105,8 @@
   }
 
   .password-toggle-icon :global(svg) {
-    height: 18px;
-    width: 18px;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   @media (prefers-reduced-motion: no-preference) {

@@ -4,38 +4,49 @@
   import type { Snippet } from 'svelte';
 
   export type TooltipVariant = 'icon' | 'inline';
+  type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
+  type TriggerSnippet = Snippet<[{ props: Record<string, unknown> }]>;
 
   interface Props {
     label: string;
     variant?: TooltipVariant;
+    side?: TooltipSide;
+    align?: 'start' | 'center' | 'end';
     class?: ClassValue;
-    children: Snippet;
+    trigger?: TriggerSnippet;
+    children?: Snippet;
   }
 
-  let { label, variant = 'icon', class: className = '', children }: Props = $props();
+  let {
+    label,
+    variant = 'icon',
+    side = 'top',
+    align = 'center',
+    class: className = '',
+    trigger,
+    children,
+  }: Props = $props();
 </script>
 
-{#snippet trigger({ props }: { props: Record<string, unknown> })}
+{#snippet defaultTrigger({ props }: { props: Record<string, unknown> })}
   <button
     {...props}
     class={['tooltip-trigger', `tooltip-trigger-${variant}`, className]}
     type="button"
     aria-label={label}
   >
-    {@render children()}
+    {@render children?.()}
   </button>
 {/snippet}
 
-<BitsTooltip.Provider delayDuration={0} skipDelayDuration={0}>
-  <BitsTooltip.Root>
-    <BitsTooltip.Trigger child={trigger} />
-    <BitsTooltip.Portal>
-      <BitsTooltip.Content class="sable-tooltip" side="top" align="end" sideOffset={8}>
-        {label}
-      </BitsTooltip.Content>
-    </BitsTooltip.Portal>
-  </BitsTooltip.Root>
-</BitsTooltip.Provider>
+<BitsTooltip.Root>
+  <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
+  <BitsTooltip.Portal>
+    <BitsTooltip.Content class="sable-tooltip" {side} {align} sideOffset={8}>
+      {label}
+    </BitsTooltip.Content>
+  </BitsTooltip.Portal>
+</BitsTooltip.Root>
 
 <style>
   .tooltip-trigger {
@@ -48,15 +59,6 @@
     display: flex;
     justify-content: center;
     padding: 0.125rem;
-    transition:
-      background-color var(--motion-normal) ease,
-      color var(--motion-normal) ease,
-      box-shadow var(--motion-normal) ease;
-  }
-
-  .tooltip-trigger-icon {
-    border-radius: 50%;
-    padding: 0.125rem;
   }
 
   .tooltip-trigger-icon:hover,
@@ -66,8 +68,8 @@
   }
 
   .tooltip-trigger-icon :global(svg) {
-    height: 1.125rem;
-    width: 1.125rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .tooltip-trigger-inline {
@@ -84,7 +86,6 @@
 
   .tooltip-trigger-inline:hover,
   .tooltip-trigger-inline[data-state='open'] {
-    background: transparent;
     color: var(--sable-bg-on-container);
   }
 
@@ -98,16 +99,15 @@
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius);
-    box-shadow: 0 0.5rem 1.25rem var(--sable-shadow);
+    box-shadow: var(--shadow-float);
     box-sizing: border-box;
     color: var(--sable-bg-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
-    max-width: calc(100vw - 2rem);
+    max-width: min(15rem, calc(100vw - 2rem));
     overflow-wrap: anywhere;
-    padding: 0.75rem;
+    padding: 0.5rem 0.625rem;
     white-space: normal;
-    width: 15rem;
     z-index: var(--layer-popover);
   }
 
@@ -118,11 +118,18 @@
     }
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .tooltip-trigger {
+      transition:
+        background-color var(--motion-normal) ease,
+        color var(--motion-normal) ease,
+        box-shadow var(--motion-normal) ease;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .tooltip-trigger,
     :global(.sable-tooltip) {
       animation: none;
-      transition: none;
     }
   }
 </style>

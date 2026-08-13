@@ -2,7 +2,11 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
-  import { Tooltip } from 'bits-ui';
+  import {
+    openSettingsOverlay,
+    settingsOverlay,
+  } from '$lib/features/settings/settings-overlay.svelte';
+  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
@@ -30,17 +34,33 @@
     { href: '/navigate', icon: MagnifyingGlassIcon, label: 'nav.navigate' },
     ...desktopTools,
   ] as const;
+
+  function activateTool(event: MouseEvent, href: string): void {
+    if (href === '/settings' && !mobile) {
+      event.preventDefault();
+      openSettingsOverlay();
+      return;
+    }
+
+    onNavigate?.(href);
+  }
+
+  function isToolActive(href: string): boolean {
+    return page.url.pathname.startsWith(href) || (href === '/settings' && settingsOverlay.open);
+  }
 </script>
 
 {#if mobile}
   <nav class="mobile-tools" aria-label={$i18n.t('nav.quickTools')}>
     {#each mobileTools as item (item.href)}
-      {@const toolActive = page.url.pathname.startsWith(item.href)}
+      {@const toolActive = isToolActive(item.href)}
       <a
         class="quick-tool mobile-tool"
         class:active={toolActive}
         href={resolve(item.href)}
-        onclick={() => onNavigate?.(item.href)}
+        onclick={(event) => {
+          activateTool(event, item.href);
+        }}
         aria-current={toolActive ? 'page' : undefined}
       >
         <span class="mobile-icon" aria-hidden="true"><item.icon /></span>
@@ -50,61 +70,53 @@
     <AccountSwitcher mode="mobile" />
   </nav>
 {:else if compact}
-  <Tooltip.Provider>
-    <nav class="compact-tools" aria-label={$i18n.t('nav.quickTools')}>
-      {#each compactTools as item (item.href)}
-        {@const toolActive = page.url.pathname.startsWith(item.href)}
+  <nav class="compact-tools" aria-label={$i18n.t('nav.quickTools')}>
+    {#each compactTools as item (item.href)}
+      {@const toolActive = isToolActive(item.href)}
+      {#snippet trigger({ props }: { props: Record<string, unknown> })}
+        <a
+          {...props}
+          class="quick-tool compact-tool"
+          class:active={toolActive}
+          href={resolve(item.href)}
+          onclick={(event) => {
+            activateTool(event, item.href);
+          }}
+          aria-label={$i18n.t(item.label)}
+          aria-current={toolActive ? 'page' : undefined}
+        >
+          <span aria-hidden="true"><item.icon /></span>
+        </a>
+      {/snippet}
+      <Tooltip label={$i18n.t(item.label)} side="right" {trigger} />
+    {/each}
+    <AccountSwitcher mode="compact" />
+  </nav>
+{:else}
+  <nav class="desktop-tools" aria-label={$i18n.t('nav.quickTools')}>
+    <AccountSwitcher mode="desktop" />
+    <div class="desktop-tool-actions">
+      {#each desktopTools as item (item.href)}
+        {@const toolActive = isToolActive(item.href)}
         {#snippet trigger({ props }: { props: Record<string, unknown> })}
           <a
             {...props}
-            class="quick-tool compact-tool"
+            class="quick-tool desktop-tool"
             class:active={toolActive}
             href={resolve(item.href)}
+            onclick={(event) => {
+              activateTool(event, item.href);
+            }}
             aria-label={$i18n.t(item.label)}
             aria-current={toolActive ? 'page' : undefined}
           >
             <span aria-hidden="true"><item.icon /></span>
           </a>
         {/snippet}
-        <Tooltip.Root>
-          <Tooltip.Trigger child={trigger} />
-          <Tooltip.Content class="tooltip" side="right" sideOffset={8}
-            >{$i18n.t(item.label)}</Tooltip.Content
-          >
-        </Tooltip.Root>
+        <Tooltip label={$i18n.t(item.label)} {trigger} />
       {/each}
-      <AccountSwitcher mode="compact" />
-    </nav>
-  </Tooltip.Provider>
-{:else}
-  <Tooltip.Provider>
-    <nav class="desktop-tools" aria-label={$i18n.t('nav.quickTools')}>
-      <AccountSwitcher mode="desktop" />
-      <div class="desktop-tool-actions">
-        {#each desktopTools as item (item.href)}
-          {@const toolActive = page.url.pathname.startsWith(item.href)}
-          {#snippet trigger({ props }: { props: Record<string, unknown> })}
-            <a
-              {...props}
-              class="quick-tool desktop-tool"
-              class:active={toolActive}
-              href={resolve(item.href)}
-              aria-label={$i18n.t(item.label)}
-              aria-current={toolActive ? 'page' : undefined}
-            >
-              <span aria-hidden="true"><item.icon /></span>
-            </a>
-          {/snippet}
-          <Tooltip.Root>
-            <Tooltip.Trigger child={trigger} />
-            <Tooltip.Content class="tooltip" side="top" sideOffset={8}
-              >{$i18n.t(item.label)}</Tooltip.Content
-            >
-          </Tooltip.Root>
-        {/each}
-      </div>
-    </nav>
-  </Tooltip.Provider>
+    </div>
+  </nav>
 {/if}
 
 <style>
@@ -131,11 +143,11 @@
     border-right: 1px solid var(--sable-bg-container-line);
     box-sizing: border-box;
     display: flex;
-    flex: 0 0 4.125rem;
+    flex: 0 0 var(--navigation-rail-width);
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.5rem 0 0.75rem;
-    width: 4.125rem;
+    width: var(--navigation-rail-width);
   }
 
   .mobile-tools {
@@ -156,7 +168,7 @@
   }
 
   .mobile-icon :global(svg) {
-    height: 1.375rem;
-    width: 1.375rem;
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
   }
 </style>

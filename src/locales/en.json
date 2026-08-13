@@ -19,15 +19,15 @@
     "account": "Account",
     "switchAccount": "Switch account",
     "addAccount": "Add account",
+    "currentAccount": "Current",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
     "unreadMessages": "{{count}} unread messages",
     "moreOptions": "More options",
-    "resizeRooms": "Resize rooms"
-  },
-  "home": {
-    "welcome": "Welcome to Sable",
-    "empty": "Rooms you join or create will appear here."
+    "resizeRooms": "Resize rooms",
+    "showRoomList": "Show room list",
+    "showConversation": "Show conversation",
+    "mobilePanelInstructions": "Swipe right to show the room list or left to show the conversation. Use the left and right arrow keys to switch panels."
   },
   "app": {
     "starting": "Starting Sable…",
@@ -37,7 +37,7 @@
   },
   "timeline": {
     "label": "Timeline",
-    "back": "Go back",
+    "back": "Back to rooms",
     "loading": "Loading messages...",
     "loadFailed": "Unable to load messages. Your session may have expired.",
     "messagePlaceholder": "Send a message...",
@@ -232,6 +232,8 @@
     "verificationUnavailable": "Verification is not available yet. Make sure another signed-in device is online."
   },
   "errors": {
+    "pageTitle": "Something went wrong",
+    "reload": "Reload",
     "homeserverNotFound": "Unable to find a Matrix homeserver at this address.",
     "unsupportedSignIn": "This homeserver does not offer a sign-in method supported by Sable.",
     "passwordUnsupported": "This homeserver does not support password sign-in.",

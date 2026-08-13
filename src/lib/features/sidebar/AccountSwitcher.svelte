@@ -3,7 +3,10 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { DropdownMenu, Tooltip } from 'bits-ui';
+  import { openSettingsOverlay } from '$lib/features/settings/settings-overlay.svelte';
+  import { DropdownMenu } from 'bits-ui';
+  import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
   import './sidebar-tools.css';
 
@@ -34,12 +37,21 @@
   function openAddAccount(): void {
     void goto(resolve('/login?addAccount=1'));
   }
+
+  function openProfile(): void {
+    void goto(resolve('/profile'));
+  }
+
+  function openSettings(): void {
+    if (mode === 'mobile') void goto(resolve('/settings'));
+    else openSettingsOverlay();
+  }
 </script>
 
 {#if mode === 'mobile'}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger class="quick-tool mobile-tool" aria-label={$i18n.t('nav.switchAccount')}>
-      <span class="avatar" aria-hidden="true">{initials}</span>
+      <Avatar size="small" {initials} />
       <span>{$i18n.t('nav.account')}</span>
     </DropdownMenu.Trigger>
     <DropdownMenu.Content class="account-popover" side="top" sideOffset={8}>
@@ -48,6 +60,8 @@
         currentAccountId={core.session?.account_id}
         {switching}
         onSwitch={switchAccount}
+        onProfile={openProfile}
+        onSettings={openSettings}
         onAddAccount={openAddAccount}
       />
     </DropdownMenu.Content>
@@ -60,7 +74,7 @@
         class="quick-tool {mode === 'compact' ? 'compact-tool' : 'desktop-tool'}"
         aria-label={$i18n.t('nav.switchAccount')}
       >
-        <span class="avatar" aria-hidden="true">{initials}</span>
+        <Avatar size="small" {initials} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
         class="account-popover"
@@ -72,15 +86,16 @@
           currentAccountId={core.session?.account_id}
           {switching}
           onSwitch={switchAccount}
+          onProfile={openProfile}
+          onSettings={openSettings}
           onAddAccount={openAddAccount}
         />
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   {/snippet}
-  <Tooltip.Root>
-    <Tooltip.Trigger child={profileTrigger} />
-    <Tooltip.Content class="tooltip" side={mode === 'compact' ? 'right' : 'top'} sideOffset={8}
-      >{$i18n.t('nav.switchAccount')}</Tooltip.Content
-    >
-  </Tooltip.Root>
+  <Tooltip
+    label={$i18n.t('nav.switchAccount')}
+    side={mode === 'compact' ? 'right' : 'top'}
+    trigger={profileTrigger}
+  />
 {/if}

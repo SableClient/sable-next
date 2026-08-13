@@ -116,6 +116,9 @@
     justify-content: space-between;
     min-height: 3.75rem;
     padding: 0.5rem 0.75rem 0.5rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
 
   .title,
@@ -139,7 +142,11 @@
   }
 
   .search {
+    background: var(--sable-bg-container);
     padding: 0.75rem;
+    position: sticky;
+    top: 3.75rem;
+    z-index: 1;
   }
 
   :global(.member-search-input) {

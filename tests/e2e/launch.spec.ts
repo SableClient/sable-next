@@ -11,5 +11,8 @@ test('starts at the sign-in flow', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).scrollbarGutter))
+    .toBe('stable');
   expect(workerErrors).toEqual([]);
 });

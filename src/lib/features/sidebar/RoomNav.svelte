@@ -2,16 +2,18 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
-  import { findRoomByPathId, roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
+  import {
+    findRoomByPathId,
+    roomPathParam,
+    roomPathParamFromId,
+    useRoomList,
+  } from '$lib/rooms/room-list.svelte';
   import type { RoomSummary } from '@/generated/RoomSummary';
   import { SvelteSet } from 'svelte/reactivity';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
-  import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
-  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
   interface Props {
@@ -49,7 +51,10 @@
     const { pathname } = page.url;
 
     if (pathname.startsWith('/direct')) return $i18n.t('nav.direct');
-    if (pathname.startsWith('/space')) return $i18n.t('nav.space');
+    if (pathname.startsWith('/space')) {
+      const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
+      return space?.name ?? $i18n.t('nav.space');
+    }
 
     return $i18n.t('nav.home');
   });
@@ -131,7 +136,7 @@
   }
 
   function roomHref(row: RoomNavRow) {
-    const routeId = row.room ? roomPathParam(row.room) : row.roomId;
+    const routeId = row.room ? roomPathParam(row.room) : roomPathParamFromId(row.roomId);
     if (page.url.pathname.startsWith('/direct')) {
       return resolve('/(app)/direct/[roomId]', { roomId: routeId });
     }
@@ -139,7 +144,7 @@
     if (row.parentSpaceId) {
       const parentSpace = findRoomByPathId(roomList.rooms, row.parentSpaceId);
       return resolve('/(app)/space/[spaceId]/[roomId]', {
-        spaceId: parentSpace ? roomPathParam(parentSpace) : row.parentSpaceId,
+        spaceId: parentSpace ? roomPathParam(parentSpace) : roomPathParamFromId(row.parentSpaceId),
         roomId: routeId,
       });
     }
@@ -187,9 +192,6 @@
         {title}
       {/if}
     </h2>
-    <button class="overflow-button" type="button" aria-label={$i18n.t('nav.moreOptions')}>
-      <span aria-hidden="true"><DotsThreeIcon /></span>
-    </button>
   </header>
 
   <div class="room-nav-content">
@@ -202,14 +204,6 @@
         <span class="action-icon" aria-hidden="true"><PlusIcon /></span>
         {#if !collapsed}<span>{$i18n.t('nav.createRoom')}</span>{/if}
       </a>
-      <button
-        type="button"
-        disabled
-        aria-label={collapsed ? $i18n.t('nav.joinWithAddress') : undefined}
-      >
-        <span class="action-icon" aria-hidden="true"><LinkIcon /></span>
-        {#if !collapsed}<span>{$i18n.t('nav.joinWithAddress')}</span>{/if}
-      </button>
       <a
         href={resolve('/explore')}
         onclick={() => onNavigate?.('/explore')}
@@ -218,14 +212,6 @@
         <span class="action-icon" aria-hidden="true"><CompassIcon /></span>
         {#if !collapsed}<span>{$i18n.t('nav.exploreSpaces')}</span>{/if}
       </a>
-      <button
-        type="button"
-        disabled
-        aria-label={collapsed ? $i18n.t('nav.messageSearch') : undefined}
-      >
-        <span class="action-icon" aria-hidden="true"><MagnifyingGlassIcon /></span>
-        {#if !collapsed}<span>{$i18n.t('nav.messageSearch')}</span>{/if}
-      </button>
     </div>
 
     {#if !collapsed}
@@ -339,32 +325,13 @@
     white-space: nowrap;
   }
 
-  .overflow-button {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    height: 2rem;
-    justify-content: center;
-    width: 2rem;
-  }
-
-  .overflow-button:hover,
-  .overflow-button:focus-visible {
-    background: var(--sable-bg-container-hover);
-  }
-
   .room-nav-actions {
     display: grid;
     gap: 0.25rem;
     padding: 0.25rem 0.5rem 0.5rem;
   }
 
-  .room-nav-actions :is(a, button) {
+  .room-nav-actions a {
     align-items: center;
     background: transparent;
     border: 0;
@@ -375,20 +342,15 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
     gap: 0.5rem;
-    height: 2rem;
+    height: var(--control-height-small);
     padding: 0 0.5rem;
     text-align: left;
     text-decoration: none;
   }
 
-  .room-nav-actions :is(a, button):not(:disabled):hover,
-  .room-nav-actions :is(a, button):not(:disabled):focus-visible {
+  .room-nav-actions a:hover,
+  .room-nav-actions a:focus-visible {
     background: var(--sable-bg-container-hover);
-  }
-
-  .room-nav-actions button:disabled {
-    cursor: default;
-    opacity: 1;
   }
 
   .room-nav-header.collapsed {
@@ -400,27 +362,22 @@
     display: flex;
   }
 
-  .room-nav-header.collapsed .overflow-button {
-    display: none;
-  }
-
   .room-nav-actions.collapsed {
     justify-items: center;
     padding: 0.25rem 0;
   }
 
-  .room-nav-actions.collapsed :is(a, button) {
+  .room-nav-actions.collapsed a {
     justify-content: center;
     padding: 0;
-    width: 2rem;
+    width: var(--control-height-small);
   }
 
   .room-nav-actions :global(svg),
-  .rooms-heading :global(svg),
-  .overflow-button :global(svg) {
+  .rooms-heading :global(svg) {
     flex: 0 0 auto;
-    height: 1rem;
-    width: 1rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .room-nav-content {
@@ -465,7 +422,7 @@
 
   .room-list {
     display: grid;
-    gap: 0.125rem;
+    gap: var(--space-1);
     min-width: 0;
     padding: 0 0.5rem 0.5rem;
   }
@@ -475,8 +432,8 @@
     border-radius: var(--radius);
     color: inherit;
     display: flex;
-    gap: 0.5rem;
-    min-height: 2.25rem;
+    gap: var(--space-2);
+    min-height: var(--control-height-medium);
     min-width: 0;
     padding: 0 0.5rem 0 calc(0.5rem + var(--room-depth) * 1rem);
     text-decoration: none;
@@ -497,12 +454,12 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     display: flex;
-    flex: 0 0 1.5rem;
+    flex: 0 0 1.75rem;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
-    height: 1.5rem;
+    height: 1.75rem;
     justify-content: center;
-    width: 1.5rem;
+    width: 1.75rem;
   }
 
   .room-category {
@@ -538,8 +495,8 @@
   }
 
   .category-caret :global(svg) {
-    height: 0.875rem;
-    width: 0.875rem;
+    height: 1rem;
+    width: 1rem;
   }
 
   .category-name,
@@ -582,22 +539,17 @@
   .room-list.collapsed .room-row {
     justify-content: center;
     padding: 0;
-    width: 2rem;
+    width: var(--avatar-size-small);
   }
 
   .room-list.collapsed .room-category {
     justify-content: center;
     margin: 0 auto;
     padding: 0;
-    width: 2rem;
+    width: var(--avatar-size-small);
   }
 
-  :is(
-    .overflow-button,
-    .room-nav-actions :is(a, button),
-    .room-category,
-    .rooms-heading
-  ):focus-visible {
+  :is(.room-nav-actions a, .room-category, .rooms-heading):focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 2px;
   }

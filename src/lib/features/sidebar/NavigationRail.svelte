@@ -6,7 +6,7 @@
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
   import { roomPathParam } from '$lib/rooms/room-list.svelte';
-  import { Tooltip } from 'bits-ui';
+  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
@@ -134,11 +134,13 @@
       <li>
         <a
           class="rail-item"
+          class:active={isActive(createItem)}
           href={resolve((createItem.route ?? createItem.href) as Pathname)}
           onclick={() => {
             navigate(createItem);
           }}
           aria-label={$i18n.t(createItem.label)}
+          aria-current={isActive(createItem) ? 'page' : undefined}
         >
           <span class="icon" aria-hidden="true"><PlusIcon /></span>
         </a>
@@ -146,65 +148,55 @@
     </ul>
   </div>
 {:else}
-  <Tooltip.Provider>
-    <div class="rail">
-      <div class="rail-scroll">
-        <ul class="rail-stack">
-          {#each [...items, ...spaceItems] as item (item.href)}
-            {@const active = isActive(item)}
-            {@const label = $i18n.t(item.label)}
-            <li>
-              {#snippet trigger({ props }: { props: Record<string, unknown> })}
-                <a
-                  {...props}
-                  class="rail-item"
-                  class:space-item={Boolean(item.initial)}
-                  class:active
-                  href={resolve((item.route ?? item.href) as Pathname)}
-                  aria-label={label}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  {#if item.icon}
-                    <span class="icon" aria-hidden="true"><item.icon /></span>
-                  {:else}
-                    <span class="space-initial" aria-hidden="true">{item.initial}</span>
-                  {/if}
-                </a>
-              {/snippet}
-              <Tooltip.Root>
-                <Tooltip.Trigger child={trigger} />
-                <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
-                  >{label}</Tooltip.Content
-                >
-              </Tooltip.Root>
-            </li>
-          {/each}
-        </ul>
-        <div class="dynamic-rail-region" aria-hidden="true"></div>
-      </div>
-      <ul class="rail-stack rail-bottom">
-        <li>
-          {#snippet trigger({ props }: { props: Record<string, unknown> })}
-            {@const label = $i18n.t(createItem.label)}
-            <a
-              {...props}
-              class="rail-item"
-              href={resolve((createItem.route ?? createItem.href) as Pathname)}
-              aria-label={label}
-            >
-              <span class="icon" aria-hidden="true"><PlusIcon /></span>
-            </a>
-          {/snippet}
-          <Tooltip.Root>
-            <Tooltip.Trigger child={trigger} />
-            <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
-              >{$i18n.t(createItem.label)}</Tooltip.Content
-            >
-          </Tooltip.Root>
-        </li>
+  <div class="rail">
+    <div class="rail-scroll">
+      <ul class="rail-stack">
+        {#each [...items, ...spaceItems] as item (item.href)}
+          {@const active = isActive(item)}
+          {@const label = $i18n.t(item.label)}
+          <li>
+            {#snippet trigger({ props }: { props: Record<string, unknown> })}
+              <a
+                {...props}
+                class="rail-item"
+                class:space-item={Boolean(item.initial)}
+                class:active
+                href={resolve((item.route ?? item.href) as Pathname)}
+                aria-label={label}
+                aria-current={active ? 'page' : undefined}
+              >
+                {#if item.icon}
+                  <span class="icon" aria-hidden="true"><item.icon /></span>
+                {:else}
+                  <span class="space-initial" aria-hidden="true">{item.initial}</span>
+                {/if}
+              </a>
+            {/snippet}
+            <Tooltip {label} side="right" {trigger} />
+          </li>
+        {/each}
       </ul>
+      <div class="dynamic-rail-region" aria-hidden="true"></div>
     </div>
-  </Tooltip.Provider>
+    <ul class="rail-stack rail-bottom">
+      <li>
+        {#snippet trigger({ props }: { props: Record<string, unknown> })}
+          {@const label = $i18n.t(createItem.label)}
+          <a
+            {...props}
+            class="rail-item"
+            class:active={isActive(createItem)}
+            href={resolve((createItem.route ?? createItem.href) as Pathname)}
+            aria-label={label}
+            aria-current={isActive(createItem) ? 'page' : undefined}
+          >
+            <span class="icon" aria-hidden="true"><PlusIcon /></span>
+          </a>
+        {/snippet}
+        <Tooltip label={$i18n.t(createItem.label)} side="right" {trigger} />
+      </li>
+    </ul>
+  </div>
 {/if}
 
 <style>
@@ -214,16 +206,16 @@
     box-sizing: border-box;
     color: var(--sable-bg-on-container);
     display: flex;
-    flex: 0 0 4.125rem;
+    flex: 0 0 var(--navigation-rail-width);
     flex-direction: column;
     min-height: 0;
-    width: 4.125rem;
+    width: var(--navigation-rail-width);
   }
 
   .rail-scroll {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden auto;
   }
 
   .dynamic-rail-region {
@@ -240,6 +232,11 @@
     list-style: none;
     margin: 0;
     padding: 0.5rem 0;
+  }
+
+  .rail-scroll > .rail-stack,
+  .rail-scroll > .dynamic-rail-region {
+    transform: translateX(0.25rem);
   }
 
   .rail-bottom {
@@ -293,22 +290,14 @@
     display: flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
-    height: 1.5rem;
+    height: var(--avatar-size-small);
     justify-content: center;
-    width: 1.5rem;
+    width: var(--avatar-size-small);
   }
 
   .icon :global(svg) {
-    height: 1.375rem;
-    width: 1.375rem;
-  }
-
-  .rail-tooltip {
-    background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    color: var(--sable-bg-on-container);
-    padding: 0.375rem 0.625rem;
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
   }
 
   .rail-item:focus-visible {
@@ -320,11 +309,8 @@
     .rail-item {
       transition:
         background-color var(--motion-normal) ease,
-        transform var(--motion-slow) cubic-bezier(0, 0.8, 0.67, 0.97);
-    }
-
-    .rail-item:hover {
-      transform: translateX(0.125rem);
+        border-color var(--motion-normal) ease,
+        color var(--motion-normal) ease;
     }
   }
 </style>

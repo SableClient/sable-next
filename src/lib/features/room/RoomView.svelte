@@ -1,9 +1,12 @@
 <script lang="ts">
   import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import { page } from '$app/state';
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
+  import { findRoomByPathId, roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
   import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
   import { RoomTimeline } from '$lib/rooms/timeline.svelte';
   import RoomComposer from '$lib/features/composer/RoomComposer.svelte';
@@ -99,7 +102,19 @@
   }
 
   function goBack(): void {
-    window.history.back();
+    if (page.url.pathname.startsWith('/direct/')) {
+      void goto(resolve('/direct'));
+      return;
+    }
+    if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
+      void goto(
+        resolve('/(app)/space/[spaceId]', {
+          spaceId: roomPathParamFromId(page.params.spaceId),
+        })
+      );
+      return;
+    }
+    void goto(resolve('/home'));
   }
 
   async function sendMessage(targetRoomId: string, body: string): Promise<void> {

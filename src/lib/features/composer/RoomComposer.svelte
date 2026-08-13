@@ -106,24 +106,33 @@
     display: flex;
     flex: 0 0 auto;
     gap: 0.25rem;
-    margin: 0.5rem 0.75rem 0.75rem;
+    margin: 0.5rem auto calc(0.75rem + env(safe-area-inset-bottom));
     padding: 0.375rem 0.5rem 0.375rem 0.875rem;
+    width: calc(100% - var(--page-gutter) - var(--page-gutter));
   }
 
-  :global(.composer-input) {
+  .composer:focus-within {
+    border-color: var(--sable-primary-main);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+  }
+
+  .composer :global(textarea.composer-input) {
     background: transparent;
     border: 0;
     border-radius: 0;
     color: inherit;
+    field-sizing: content;
     flex: 1;
     max-height: 10rem;
-    min-height: 2.25rem;
+    min-height: var(--control-height-small);
+    overflow-y: auto;
     padding: 0.375rem 0;
-    resize: vertical;
+    resize: none;
   }
 
-  :global(.composer-input:focus-visible) {
+  .composer :global(textarea.composer-input:focus-visible) {
     border-color: transparent;
+    box-shadow: none;
     outline: 0;
   }
 
@@ -141,8 +150,8 @@
   }
 
   :global(.composer-send svg) {
-    height: 1.125rem;
-    width: 1.125rem;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   :global(.send-error) {
