@@ -9,6 +9,8 @@
     updateSwipeGesture,
     type SwipeGesture,
   } from './swipe-gesture';
+  import { BREAKPOINTS } from './breakpoints';
+  import { createMediaQuery } from './media-query.svelte';
 
   interface Props {
     children: Snippet;
@@ -22,6 +24,7 @@
   let position = $state<number | undefined>();
   let dragging = $state(false);
   let gesture: Gesture | undefined;
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   // A room route is enough to render its timeline; room-list hydration must not flash the sidebar.
   let roomId = $derived(page.params.roomId);
   let canShowConversation = $derived(Boolean(roomId));
@@ -133,10 +136,10 @@
       ? undefined
       : `translate3d(${String(position)}px, 0, 0)`}
   >
-    <section class="drawer-panel navigation-panel" inert={!open}>
+    <section class="drawer-panel navigation-panel" inert={!open || appLayout.matches}>
       <SidebarNav mobile />
     </section>
-    <section class="drawer-panel content-panel" inert={open}>
+    <section class="drawer-panel content-panel" inert={open && !appLayout.matches}>
       <main class="content">
         {@render children()}
       </main>

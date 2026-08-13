@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
+  import HomeLanding from '$lib/features/home/HomeLanding.svelte';
 </script>
 
-<svelte:head>
-  <title>{$i18n.t('nav.home')} · Sable</title>
-</svelte:head>
+<HomeLanding />

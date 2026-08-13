@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { SABLE_SOURCE_URL } from '$lib/config/links';
   import { i18n } from '$lib/i18n';
 </script>
 
 <footer class="auth-footer">
-  <a href="https://github.com/SableClient/sable-next" rel="noreferrer" target="_blank">
+  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external project URL -->
+  <a href={SABLE_SOURCE_URL} rel="noreferrer" target="_blank">
     {$i18n.t('footer.sourceCode')}
   </a>
   <span aria-hidden="true">·</span>

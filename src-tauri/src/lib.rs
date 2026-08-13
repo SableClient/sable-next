@@ -26,7 +26,7 @@ async fn submit_command(
     state: State<'_, AppState>,
     command: Command,
 ) -> Result<CommandOk, CommandErr> {
-    state.core.dispatch(command).await
+    Box::pin(state.core.dispatch(command)).await
 }
 
 /// `Response` keeps the bytes out of JSON.

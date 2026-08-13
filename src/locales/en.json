@@ -35,6 +35,19 @@
     "startFailed": "The client could not connect to its core or restore your session.",
     "tryAgain": "Try again"
   },
+  "home": {
+    "resourcesLabel": "Sable resources",
+    "getSupport": "Get support",
+    "viewSource": "View source",
+    "supportDevelopment": "Donate",
+    "nextStepsTitle": "What would you like to do?",
+    "findCommunityTitle": "Find a community",
+    "findCommunityDescription": "Browse public rooms and spaces to find a group with similar interests.",
+    "startRoomTitle": "Start a room",
+    "startRoomDescription": "Create a room or space for your own friend group or community.",
+    "joinConversationTitle": "Join a room or DM",
+    "joinConversationDescription": "Enter a room address or Matrix user ID to start chatting."
+  },
   "timeline": {
     "label": "Timeline",
     "back": "Back to rooms",

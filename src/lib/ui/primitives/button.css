@@ -98,7 +98,7 @@
 }
 
 .sable-button-ghost:hover:not(:disabled) {
-  background: var(--sable-bg-container-hover);
+  background: var(--sable-surface-container-hover);
 }
 
 .sable-button-danger:hover:not(:disabled) {
@@ -116,7 +116,7 @@
 }
 
 .sable-button-ghost:active:not(:disabled) {
-  background: var(--sable-bg-container-active);
+  background: var(--sable-surface-container-active);
   box-shadow: var(--shadow-inset);
 }
 

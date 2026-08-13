@@ -20,7 +20,7 @@ function run(command, args) {
 }
 
 const lockfile = readFileSync('Cargo.lock', 'utf8');
-const version = lockfile.match(/name = "wasm-bindgen"\nversion = "([^"]+)"/)?.[1];
+const version = lockfile.match(/name = "wasm-bindgen"\r?\nversion = "([^"]+)"/)?.[1];
 const cli = spawnSync('wasm-bindgen', ['--version'], { encoding: 'utf8' });
 
 if (!version || cli.status !== 0 || cli.stdout.trim() !== `wasm-bindgen ${version}`) {

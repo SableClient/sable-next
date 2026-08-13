@@ -1,6 +1,6 @@
 <script lang="ts">
-  import logo from '$lib/assets/res/svg/logo.svg';
   import { i18n } from '$lib/i18n';
+  import SableBrandMark from '$lib/ui/SableBrandMark.svelte';
 
   interface Props {
     hasLoggedInBefore: boolean;
@@ -10,7 +10,7 @@
 </script>
 
 <header class="auth-heading">
-  <img class="logo" src={logo} alt="" />
+  <SableBrandMark />
   <h1 id="sable-title">
     {hasLoggedInBefore ? $i18n.t('auth.welcomeBack') : $i18n.t('auth.welcome')}
   </h1>
@@ -26,11 +26,5 @@
   .auth-heading h1 {
     font-size: var(--font-size-xlarge);
     margin: 1rem 0 0;
-  }
-
-  .logo {
-    filter: drop-shadow(0 0.375rem 0.625rem var(--sable-shadow));
-    height: 4rem;
-    width: 4rem;
   }
 </style>
