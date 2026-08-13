@@ -10,10 +10,6 @@ inputs:
     description: Command used when the app build is enabled.
     required: false
     default: pnpm run build
-  install-wasm-pack:
-    description: Whether to install wasm-pack for callers that build the WASM bundle.
-    required: false
-    default: 'true'
   install-mise-tools:
     description: Whether to install tools declared in mise.toml.
     required: false
@@ -51,12 +47,6 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: pnpm install --frozen-lockfile
-
-    - name: Install wasm-pack
-      if: ${{ inputs.install-wasm-pack == 'true' }}
-      shell: bash
-      working-directory: ${{ github.workspace }}
-      run: cargo install wasm-pack --version 0.13.1 --locked
 
     - name: Build app
       if: ${{ inputs.build == 'true' }}

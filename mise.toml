@@ -13,7 +13,8 @@ experimental = true
 includes = ["scripts"]
 
 [tools]
-"aqua:wasm-bindgen/wasm-pack" = "0.13.1"
+"cargo:wasm-bindgen-cli" = "0.2.127"
+"aqua:WebAssembly/binaryen" = "132"
 "aqua:watchexec/watchexec" = "2.5.1"
 
 [tasks.setup]

@@ -44,3 +44,8 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# wasm-bindgen processes the linked module before wasm-opt strips its metadata.
+[profile.wasm-release]
+inherits = "release"
+strip = "debuginfo"

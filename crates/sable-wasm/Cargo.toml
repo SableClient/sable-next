@@ -24,10 +24,5 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
   "env-filter",
 ] }
 
-# rustc emits bulk-memory ops that the wasm-opt wasm-pack ships does not enable
-# by default, so it rejects its own input without these flags.
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-Oz', '--enable-bulk-memory', '--enable-nontrapping-float-to-int']
-
 [lints]
 workspace = true

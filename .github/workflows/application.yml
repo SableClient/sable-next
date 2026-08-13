@@ -146,7 +146,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           build: 'false'
-          install-wasm-pack: 'false'
           install-mise-tools: 'false'
 
       - name: Check Oxfmt formatting
@@ -183,7 +182,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           build: 'false'
-          install-wasm-pack: 'false'
           install-mise-tools: 'false'
 
       - name: Install Playwright browser
@@ -260,7 +258,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           build: 'false'
-          install-wasm-pack: 'false'
           install-mise-tools: 'false'
 
       - name: Add Rust targets
@@ -319,7 +316,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           build: 'false'
-          install-wasm-pack: 'false'
           install-mise-tools: 'false'
 
       - name: Set up Android SDK and NDK
@@ -382,7 +378,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           build: 'false'
-          install-wasm-pack: 'false'
           install-mise-tools: 'false'
 
       - name: Set up iOS project
@@ -586,7 +581,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           build: 'false'
-          install-wasm-pack: 'false'
           install-mise-tools: 'false'
 
       - name: Prepare preview metadata

@@ -5,7 +5,7 @@ node_modules
 devAssets
 .svelte-kit
 
-# wasm-pack build output (`mise run wasm:build`)
+# WASM build output (`mise run wasm:build`)
 src/generated/wasm/
 
 .DS_Store

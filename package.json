@@ -23,8 +23,8 @@
     "stylelint:fix": "stylelint \"src/**/*.{css,svelte}\" --fix",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check .",
-    "wasm:build": "mise exec -- wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --release",
-    "wasm:dev": "mise exec -- wasm-pack build crates/sable-wasm --target web --out-dir ../../src/generated/wasm --dev",
+    "wasm:build": "mise exec -- node scripts/build-wasm.mjs --release",
+    "wasm:dev": "mise exec -- node scripts/build-wasm.mjs",
     "wasm:watch": "mise exec -- watchexec --restart --watch crates/sable-core --watch crates/sable-wasm -- pnpm wasm:dev",
     "tauri": "tauri"
   },
