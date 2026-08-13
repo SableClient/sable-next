@@ -7,6 +7,9 @@
   import type { Snippet } from 'svelte';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
+
+  import IconButton from '$lib/ui/primitives/IconButton.svelte';
 
   interface Props {
     children: Snippet;
@@ -44,8 +47,8 @@
       <aside class="settings-nav" aria-label={$i18n.t('settings.title')}>
         <div class="settings-title">
           <h1 id="settings-title">{$i18n.t('settings.title')}</h1>
-          <button type="button" class="close" aria-label={$i18n.t('settings.close')} onclick={close}
-            >×</button
+          <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={close}
+            ><XIcon /></IconButton
           >
         </div>
         <nav>
@@ -124,25 +127,6 @@
     font-size: var(--font-size-xlarge);
     margin: 0 0 1.5rem;
     padding: 0 0.75rem;
-  }
-
-  .close {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: 50%;
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    font-size: 1.75rem;
-    height: 2.25rem;
-    justify-content: center;
-    line-height: 1;
-    width: 2.25rem;
-  }
-
-  .close:hover {
-    background: var(--sable-bg-container-hover);
   }
 
   nav {

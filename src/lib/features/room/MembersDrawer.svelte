@@ -5,6 +5,8 @@
 
   import { i18n } from '$lib/i18n';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   import { initials, senderColor } from './timeline-format';
@@ -46,15 +48,16 @@
       <p>{$i18n.t('timeline.memberCount', { count: members.length })}</p>
     </div>
     {#if modal}
-      <Dialog.Close class="close" aria-label={$i18n.t('timeline.closeMembers')}
-        ><XIcon /></Dialog.Close
+      <Dialog.Close
+        class="sable-button sable-button-ghost sable-icon-button sable-icon-button-small"
+        aria-label={$i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
       >
     {:else}
-      <button
-        class="close"
-        type="button"
-        aria-label={$i18n.t('timeline.closeMembers')}
-        onclick={onClose}><XIcon /></button
+      <IconButton
+        variant="ghost"
+        size="small"
+        label={$i18n.t('timeline.closeMembers')}
+        onclick={onClose}><XIcon /></IconButton
       >
     {/if}
   </header>
@@ -81,7 +84,9 @@
               color={senderColor(member.user_id)}
             />
             <span class="name">{memberName(member)}</span>
-            {#if label}<span class="power-level">{label}</span>{/if}
+            {#if label}
+              <span class="power-level"><StatusBadge {label} variant="secondary" /></span>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -128,29 +133,6 @@
     font-size: var(--font-size-small);
   }
 
-  .close {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  .close:hover,
-  .close:focus-visible {
-    background: var(--sable-bg-container-hover);
-  }
-
-  .close :global(svg) {
-    height: 1.25rem;
-    width: 1.25rem;
-  }
-
   .status {
     margin: 0;
     padding: 0.75rem 1rem;
@@ -194,12 +176,7 @@
   }
 
   .power-level {
-    background: var(--sable-sec-container);
-    border-radius: 999px;
-    color: var(--sable-sec-on-container);
-    font-size: var(--font-size-small);
     margin-left: auto;
-    padding: 0.125rem 0.5rem;
   }
 
   @media (width >= 48rem) {

@@ -10,6 +10,7 @@
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '$lib/ui/primitives/IconButton.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -133,10 +134,12 @@
       <div class="typing" aria-live="polite">
         <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>{typingLabel}</span>
-        <button
-          type="button"
-          aria-label={$i18n.t('timeline.dismissTyping')}
-          onclick={() => (typingUserIds = [])}><XIcon /></button
+        <IconButton
+          class="typing-dismiss"
+          variant="ghost"
+          size="small"
+          label={$i18n.t('timeline.dismissTyping')}
+          onclick={() => (typingUserIds = [])}><XIcon /></IconButton
         >
       </div>
     {/if}
@@ -197,24 +200,8 @@
     padding: 0.375rem 1rem;
   }
 
-  .typing button {
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: inherit;
-    cursor: pointer;
+  :global(.typing-dismiss) {
     margin-left: auto;
-    padding: 0.25rem;
-  }
-
-  .typing button:hover,
-  .typing button:focus-visible {
-    background: var(--sable-bg-container-hover);
-  }
-
-  .typing button :global(svg) {
-    height: 1.25rem;
-    width: 1.25rem;
   }
 
   .typing-dots {

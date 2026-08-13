@@ -1,7 +1,13 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
 
-  type StatusBadgeVariant = 'neutral' | 'primary' | 'success' | 'warning' | 'critical';
+  type StatusBadgeVariant =
+    | 'neutral'
+    | 'secondary'
+    | 'primary'
+    | 'success'
+    | 'warning'
+    | 'critical';
 
   type Props = {
     label: string;
@@ -35,6 +41,12 @@
     background: var(--sable-primary-container);
     border-color: var(--sable-primary-container-line);
     color: var(--sable-primary-on-container);
+  }
+
+  :global(.status-badge-secondary) {
+    background: var(--sable-sec-container);
+    border-color: var(--sable-sec-container-line);
+    color: var(--sable-sec-on-container);
   }
 
   :global(.status-badge-success) {

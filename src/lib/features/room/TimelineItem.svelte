@@ -2,6 +2,7 @@
   import type { TimelineItemView } from '@/generated/TimelineItemView';
 
   import { i18n } from '$lib/i18n';
+  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
 
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
@@ -54,7 +55,10 @@
       {#if item.reactions.length > 0}
         <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
           {#each item.reactions as reaction (reaction.key)}
-            <span class="reaction">{reaction.key} {reaction.senders.length}</span>
+            <StatusBadge
+              label={reaction.key + ' ' + reaction.senders.length.toString()}
+              variant="neutral"
+            />
           {/each}
         </div>
       {/if}
@@ -182,13 +186,6 @@
     flex-wrap: wrap;
     gap: 0.25rem;
     margin-top: 0.375rem;
-  }
-
-  .reaction {
-    background: var(--sable-surface-var-container);
-    border-radius: 999px;
-    font-size: var(--font-size-small);
-    padding: 0.125rem 0.5rem;
   }
 
   .separator {
