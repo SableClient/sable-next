@@ -104,20 +104,17 @@ macro_rules! dispatch_commands {
             }
 
             Command::Unsubscribe { subscription } => {
+                let _update = $self.room_subscription_lock.lock().await;
                 let Some(removed) = $self.subscriptions.lock().await.remove(&subscription) else {
                     return Err(CommandErr::UnknownSubscription);
                 };
-                removed.task.abort();
+                let was_live_timeline = matches!(removed.kind, SubscriptionKind::LiveTimeline(_));
+                for task in removed.tasks {
+                    task.abort();
+                }
 
-                let mut active = $self.active_room_subscription.lock().await;
-                if *active == Some(subscription) {
-                    $self
-                        .sync_service()
-                        .await?
-                        .room_list_service()
-                        .subscribe_to_rooms(&[])
-                        .await;
-                    *active = None;
+                if was_live_timeline {
+                    $self.sync_timeline_rooms_locked(None).await?;
                 }
 
                 Ok(CommandOk::Unsubscribe)
@@ -125,21 +122,36 @@ macro_rules! dispatch_commands {
 
             Command::Paginate {
                 subscription,
+                direction,
                 count,
             } => {
-                let timeline = $self
+                let (timeline, focused) = $self
                     .subscriptions
                     .lock()
                     .await
                     .get(&subscription)
-                    .and_then(|subscription| subscription.timeline.clone())
+                    .and_then(|subscription| {
+                        subscription.timeline.clone().map(|timeline| {
+                            (
+                                timeline,
+                                matches!(subscription.kind, SubscriptionKind::FocusedTimeline),
+                            )
+                        })
+                    })
                     .ok_or(CommandErr::UnknownSubscription)?;
-                let reached_start = timeline
-                    .paginate_backwards(count)
-                    .await
-                    .map_err(|error| $self.failed("paginate", error))?;
+                if matches!(direction, PaginationDirection::Forward) && !focused {
+                    return Err(CommandErr::InvalidPaginationDirection);
+                }
+                let reached_end = match direction {
+                    PaginationDirection::Backward => timeline.paginate_backwards(count).await,
+                    PaginationDirection::Forward => timeline.paginate_forwards(count).await,
+                }
+                .map_err(|error| $self.failed("paginate", error))?;
 
-                Ok(CommandOk::Paginate { reached_start })
+                Ok(CommandOk::Paginate {
+                    direction,
+                    reached_end,
+                })
             }
 
             Command::SendMessage {

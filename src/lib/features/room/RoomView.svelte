@@ -1,5 +1,5 @@
 <script lang="ts">
-  import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { onDestroy, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -8,12 +8,11 @@
   import { i18n } from '$lib/i18n';
   import { findRoomByPathId, roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
   import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
-  import { RoomTimeline } from '$lib/rooms/timeline.svelte';
+  import { activeRoomTimeline } from '$lib/rooms/timeline.svelte';
   import RoomComposer from '$lib/features/composer/RoomComposer.svelte';
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -28,11 +27,17 @@
   let { roomId, eventId = null }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
-  const timeline = new RoomTimeline(core);
+  const timelineOwner = Symbol('room-view');
+  const activeTimeline = activeRoomTimeline(core);
+  const timeline = activeTimeline.timeline;
   const memberLoader = new RoomMemberLoader();
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
   let typingUserIds = $state.raw<string[]>([]);
+
+  onDestroy(() => {
+    void activeTimeline.stop(timelineOwner);
+  });
 
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
@@ -73,11 +78,9 @@
   });
 
   $effect(() => {
-    const activeRoomId = resolvedRoomId;
-    void timeline.start(activeRoomId, eventId);
-    return () => {
-      timeline.stop();
-    };
+    const activeRoomId = roomId.startsWith('!') ? roomId : resolvedRoom?.room_id;
+    if (!activeRoomId) return;
+    void untrack(() => activeTimeline.start(timelineOwner, activeRoomId, eventId));
   });
 
   async function loadMembers(): Promise<void> {
@@ -125,8 +128,12 @@
     await core.setTyping(targetRoomId, typing);
   }
 
-  async function requestHistory(): Promise<void> {
-    await timeline.paginate(50);
+  function requestHistory(): Promise<boolean> {
+    return timeline.paginateBackward(25);
+  }
+
+  async function requestFuture(): Promise<void> {
+    await timeline.paginateForward(25);
   }
 
   async function markRead(eventId: string): Promise<void> {
@@ -137,27 +144,23 @@
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
     <RoomHeader {roomName} onBack={goBack} onMembers={toggleMembers} {initials} />
-    {#key `${resolvedRoomId}:${eventId ?? ''}`}
+    {#key `${roomId}:${eventId ?? ''}`}
       <TimelineList
         {timeline}
         focusEventId={eventId}
         onRequestHistory={requestHistory}
+        onRequestFuture={requestFuture}
         onRead={markRead}
       />
     {/key}
-    {#if typingLabel}
-      <div class="typing" aria-live="polite">
-        <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span>{typingLabel}</span>
-        <IconButton
-          class="typing-dismiss"
-          variant="ghost"
-          size="small"
-          label={$i18n.t('timeline.dismissTyping')}
-          onclick={() => (typingUserIds = [])}><XIcon /></IconButton
-        >
-      </div>
-    {/if}
+    <div class="typing-slot" aria-live="polite" role="status">
+      {#if typingLabel}
+        <div class="typing">
+          <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>{typingLabel}</span>
+        </div>
+      {/if}
+    </div>
     {#key resolvedRoomId}
       <RoomComposer roomId={resolvedRoomId} onSend={sendMessage} onTyping={setTyping} />
     {/key}
@@ -203,20 +206,24 @@
     position: relative;
   }
 
-  .typing {
-    align-items: center;
-    background: var(--sable-bg-container);
-    border-top: 1px solid var(--sable-surface-var-container);
+  .typing-slot {
+    box-sizing: border-box;
     display: flex;
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-    gap: 0.5rem;
-    min-height: 2.75rem;
-    padding: 0.375rem 1rem;
+    flex: 0 0 1.25rem;
+    min-width: 0;
+    padding: 0 var(--page-gutter);
   }
 
-  :global(.typing-dismiss) {
-    margin-left: auto;
+  .typing {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.375rem;
+    line-height: 1.25rem;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
   }
 
   .typing-dots {
@@ -227,8 +234,8 @@
   .typing-dots i {
     background: var(--sable-primary-main);
     border-radius: 50%;
-    height: 0.375rem;
-    width: 0.375rem;
+    height: 0.25rem;
+    width: 0.25rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {

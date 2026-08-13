@@ -2,7 +2,6 @@
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
-  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
   import {
     finishSwipeGesture,
@@ -16,29 +15,19 @@
   }
 
   let { children }: Props = $props();
-  const roomList = useRoomList();
-
-  function hasLoadedRoom(pathId: string | undefined): boolean {
-    if (!pathId) return false;
-    if (findRoomByPathId(roomList.rooms, pathId)) return true;
-
-    try {
-      return Boolean(findRoomByPathId(roomList.rooms, decodeURIComponent(pathId)));
-    } catch {
-      return false;
-    }
-  }
 
   type Gesture = SwipeGesture & { width: number };
 
-  let open = $state(true);
+  let open = $state(!page.params.roomId);
   let position = $state<number | undefined>();
   let dragging = $state(false);
   let gesture: Gesture | undefined;
-  let canShowConversation = $derived(hasLoadedRoom(page.params.roomId));
+  // A room route is enough to render its timeline; room-list hydration must not flash the sidebar.
+  let roomId = $derived(page.params.roomId);
+  let canShowConversation = $derived(Boolean(roomId));
 
   $effect(() => {
-    open = !canShowConversation;
+    open = !roomId;
     position = undefined;
     dragging = false;
     gesture = undefined;
@@ -211,6 +200,29 @@
   @media (prefers-reduced-motion: no-preference) {
     .drawer-track:not(.dragging) {
       transition: transform 220ms cubic-bezier(0.33, 1, 0.68, 1);
+    }
+  }
+
+  @media (width >= 48rem) {
+    .drawer-viewport {
+      margin-left: calc(var(--navigation-rail-width) + var(--room-nav-width));
+    }
+
+    .screen-reader-only,
+    .navigation-panel {
+      display: none;
+    }
+
+    .drawer-track,
+    .drawer-track.open {
+      transform: none;
+      width: 100%;
+    }
+
+    .drawer-panel,
+    .content-panel {
+      flex-basis: 100%;
+      width: 100%;
     }
   }
 </style>

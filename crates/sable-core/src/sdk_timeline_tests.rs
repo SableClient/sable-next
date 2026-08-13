@@ -8,7 +8,7 @@ use matrix_sdk::{
     },
 };
 use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
-use matrix_sdk_ui::sync_service::SyncService;
+use matrix_sdk_ui::sync_service::{State as SyncState, SyncService};
 use serde_json::json;
 use wiremock::{
     Mock, ResponseTemplate,
@@ -17,10 +17,39 @@ use wiremock::{
 
 use super::{
     Core, build_room_timeline,
-    protocol::{Command, CommandOk},
-    session::Session,
+    protocol::{Command, CommandOk, CoreEvent},
+    session::{self, Session},
     store::MemorySessionStore,
 };
+
+#[tokio::test]
+async fn started_sync_enters_offline_recovery_after_failure() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server
+        .mock_sliding_sync()
+        .error_unrecognized()
+        .expect(1..)
+        .mount()
+        .await;
+    server.mock_versions().error500().expect(1..).mount().await;
+
+    let sync_service = session::start_sync(client).await.unwrap();
+    let mut states = sync_service.state();
+    let terminal_state = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let state = states.next().await.expect("open sync state stream");
+            if matches!(state, SyncState::Offline | SyncState::Error(_)) {
+                break state;
+            }
+        }
+    })
+    .await
+    .expect("sync failure state");
+
+    assert!(matches!(terminal_state, SyncState::Offline));
+    sync_service.stop().await;
+}
 
 fn event_ids(
     items: impl IntoIterator<Item = Arc<matrix_sdk_ui::timeline::TimelineItem>>,
@@ -127,7 +156,7 @@ async fn permalink_timeline_loads_and_contains_its_target() {
 }
 
 #[tokio::test]
-async fn a_stale_unsubscribe_does_not_clear_the_new_room_subscription() {
+async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     client.event_cache().subscribe().unwrap();
@@ -174,19 +203,67 @@ async fn a_stale_unsubscribe_does_not_clear_the_new_room_subscription() {
         panic!("wrong response");
     };
 
+    assert!(core.subscriptions.lock().await.contains_key(&first));
+    assert!(core.subscriptions.lock().await.contains_key(&second));
+
     core.dispatch(Command::Unsubscribe {
         subscription: first,
     })
     .await
     .unwrap();
-    assert_eq!(*core.active_room_subscription.lock().await, Some(second));
+    assert!(!core.subscriptions.lock().await.contains_key(&first));
+    assert!(core.subscriptions.lock().await.contains_key(&second));
 
     core.dispatch(Command::Unsubscribe {
         subscription: second,
     })
     .await
     .unwrap();
-    assert_eq!(*core.active_room_subscription.lock().await, None);
+    assert!(core.subscriptions.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn live_timeline_reports_its_back_pagination_status() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!pagination-status:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server.mock_room_state_encryption().plain().mount().await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    let CommandOk::SubscribeTimeline { subscription, .. } = core
+        .dispatch(Command::SubscribeTimeline {
+            room_id: room_id.to_owned(),
+            event_id: None,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("wrong response");
+    };
+
+    let event = tokio::time::timeout(Duration::from_secs(1), events.recv())
+        .await
+        .expect("pagination status event")
+        .expect("open event stream");
+    assert!(matches!(
+        event,
+        CoreEvent::TimelinePagination {
+            subscription: event_subscription,
+            loading: false,
+            reached_start: false,
+        } if event_subscription == subscription
+    ));
 }
 
 #[tokio::test]

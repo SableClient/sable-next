@@ -18,25 +18,20 @@
   let { children }: Props = $props();
   let roomNavWidth = $state(224);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  let mobile = $derived(!appLayout.matches);
 </script>
 
-{#if mobile}
+<div class="app-shell" style:--room-nav-width={String(roomNavWidth) + 'px'}>
+  <div class="desktop-navigation" inert={!appLayout.matches}>
+    <SidebarNav bind:roomNavWidth />
+  </div>
   <MobileNavDrawer>
     {@render children()}
   </MobileNavDrawer>
-{:else}
-  <div class="app-shell" style:--room-nav-width={String(roomNavWidth) + 'px'}>
-    <SidebarNav bind:roomNavWidth />
-    <div class="app-content">
-      {@render children()}
-    </div>
-  </div>
-{/if}
+</div>
 
 <DeviceVerificationDialog />
 
-{#if !mobile && settingsOverlay.open}
+{#if appLayout.matches && settingsOverlay.open}
   <SettingsPanel mode="overlay" open={settingsOverlay.open} onClose={closeSettingsOverlay} />
 {/if}
 
@@ -45,19 +40,13 @@
     height: 100dvh;
   }
 
-  .app-content {
-    background: var(--sable-surface-container);
-    box-sizing: border-box;
-    display: flex;
-    height: 100%;
-    min-width: 0;
-    overflow: hidden;
+  .desktop-navigation {
+    display: none;
   }
 
   @media (width >= 48rem) {
-    .app-content {
-      margin-left: calc(var(--navigation-rail-width) + var(--room-nav-width));
-      padding-bottom: 0;
+    .desktop-navigation {
+      display: contents;
     }
   }
 </style>

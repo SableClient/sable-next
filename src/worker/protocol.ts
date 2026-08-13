@@ -15,6 +15,7 @@ export type AttachmentRequest = {
 /** Page → worker. `id` correlates the reply; the worker never reorders. */
 export type WorkerRequest =
   | { id: number; command: Command }
+  | { disconnect: true }
   | { id: number; media: { source: string; width: number; height: number } }
   | { id: number; attachment: AttachmentRequest }
   | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } };

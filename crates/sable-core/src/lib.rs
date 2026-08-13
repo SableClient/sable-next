@@ -27,6 +27,7 @@ use matrix_sdk::encryption::{
     recovery::{RecoveryError, RecoveryState},
     secret_storage::SecretStorageError,
 };
+use matrix_sdk::event_cache::PaginationStatus;
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
 use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::ruma::api::client::account::IdentityServerInfo;
@@ -78,8 +79,9 @@ include!("dispatch_commands.rs");
 
 use protocol::{
     AuthIntent, Command, CommandErr, CommandOk, CoreEvent, EmojiView, EncryptionStatusView,
-    JoinRuleView, PresenceView, ProfileView, RecoveryStateView, RegistrationResultView, RoomTag,
-    SessionInfo, SubscriptionId, SyncStatus, VerificationStateView, VerificationView,
+    JoinRuleView, PaginationDirection, PresenceView, ProfileView, RecoveryStateView,
+    RegistrationResultView, RoomTag, SessionInfo, SubscriptionId, SyncStatus,
+    VerificationStateView, VerificationView,
 };
 use rt::Task;
 use session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession, Session};
@@ -220,6 +222,21 @@ fn sync_status(state: SyncState) -> SyncStatus {
     }
 }
 
+fn timeline_pagination_event(subscription: SubscriptionId, status: PaginationStatus) -> CoreEvent {
+    match status {
+        PaginationStatus::Paginating => CoreEvent::TimelinePagination {
+            subscription,
+            loading: true,
+            reached_start: false,
+        },
+        PaginationStatus::Idle { hit_timeline_start } => CoreEvent::TimelinePagination {
+            subscription,
+            loading: false,
+            reached_start: hit_timeline_start,
+        },
+    }
+}
+
 /// Owns every piece of Matrix state. A carrier only moves `Command`s in and
 /// `CoreEvent`s out.
 pub struct Core {
@@ -231,13 +248,14 @@ pub struct Core {
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
     session_store_lock: Mutex<()>,
+    restore_lock: Mutex<()>,
     accounts: Mutex<Option<AccountRegistry>>,
     session: RwLock<Option<Session>>,
     pending_login: Mutex<Option<PendingLogin>>,
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
     session_tasks: std::sync::Mutex<Vec<Task>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
-    active_room_subscription: Mutex<Option<SubscriptionId>>,
+    room_subscription_lock: Mutex<()>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
 }
 
@@ -247,8 +265,15 @@ enum PendingLogin {
 }
 
 struct Subscription {
-    task: Task,
+    tasks: Vec<Task>,
     timeline: Option<Arc<Timeline>>,
+    kind: SubscriptionKind,
+}
+
+enum SubscriptionKind {
+    Other,
+    LiveTimeline(OwnedRoomId),
+    FocusedTimeline,
 }
 
 impl Core {
@@ -267,13 +292,14 @@ impl Core {
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
             session_store_lock: Mutex::new(()),
+            restore_lock: Mutex::new(()),
             accounts: Mutex::new(None),
             session: RwLock::new(None),
             pending_login: Mutex::new(None),
             pending_registration: Mutex::new(None),
             session_tasks: std::sync::Mutex::new(Vec::new()),
             subscriptions: Mutex::new(HashMap::new()),
-            active_room_subscription: Mutex::new(None),
+            room_subscription_lock: Mutex::new(()),
             timelines: Mutex::new(HashMap::new()),
         });
         (core, rx)
@@ -873,6 +899,13 @@ impl Core {
     }
 
     async fn restore(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
+        let _restore = self.restore_lock.lock().await;
+        if let Some(session) = self.active_session_info().await {
+            return Ok(CommandOk::Restore {
+                session: Some(session),
+            });
+        }
+
         let accounts = self.accounts().await?;
         let Some(account_id) = accounts.active_account_id else {
             return Ok(CommandOk::Restore { session: None });
@@ -921,6 +954,16 @@ impl Core {
 
         Ok(CommandOk::Restore {
             session: Some(info),
+        })
+    }
+
+    async fn active_session_info(&self) -> Option<SessionInfo> {
+        let session = self.session.read().await;
+        let session = session.as_ref()?;
+        Some(SessionInfo {
+            account_id: session.account_id.clone(),
+            user_id: session.client.user_id()?.to_owned(),
+            device_id: session.client.device_id()?.to_string(),
         })
     }
 
@@ -1112,7 +1155,6 @@ impl Core {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
         self.subscriptions.lock().await.clear();
-        *self.active_room_subscription.lock().await = None;
         self.timelines.lock().await.clear();
         self.session.write().await.take()
     }
@@ -1626,8 +1668,9 @@ impl Core {
         self.subscriptions.lock().await.insert(
             subscription,
             Subscription {
-                task,
+                tasks: vec![task],
                 timeline: None,
+                kind: SubscriptionKind::Other,
             },
         );
 
@@ -1645,6 +1688,7 @@ impl Core {
         event_id: Option<OwnedEventId>,
     ) -> Result<CommandOk, CommandErr> {
         let subscription = self.allocate_subscription();
+        let live_room_id = event_id.is_none().then(|| room_id.clone());
         let timeline = match event_id {
             Some(event_id) => Arc::new(
                 build_room_timeline(&self.room(&room_id).await?, Some(event_id))
@@ -1654,19 +1698,27 @@ impl Core {
             None => self.timeline(&room_id).await?,
         };
 
-        let sync_service = self.sync_service().await?;
-        let mut active = self.active_room_subscription.lock().await;
-        sync_service
-            .room_list_service()
-            .subscribe_to_rooms(&[room_id.as_ref()])
-            .await;
-        *active = Some(subscription);
-        drop(active);
-
+        // The SDK replaces its explicit-room set wholesale. Register before
+        // computing the union so concurrent live subscriptions see each other.
+        let _update = self.room_subscription_lock.lock().await;
+        self.subscriptions.lock().await.insert(
+            subscription,
+            Subscription {
+                tasks: Vec::new(),
+                timeline: Some(timeline.clone()),
+                kind: live_room_id.clone().map_or(
+                    SubscriptionKind::FocusedTimeline,
+                    SubscriptionKind::LiveTimeline,
+                ),
+            },
+        );
+        if let Err(error) = self.sync_timeline_rooms_locked(live_room_id.as_ref()).await {
+            self.subscriptions.lock().await.remove(&subscription);
+            return Err(error);
+        }
         let (items, stream) = timeline.subscribe().await;
-
+        let pagination = timeline.live_back_pagination_status().await;
         let core = self.clone();
-
         let task = rt::spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
@@ -1679,14 +1731,27 @@ impl Core {
                 });
             }
         });
-
-        self.subscriptions.lock().await.insert(
-            subscription,
-            Subscription {
-                task,
-                timeline: Some(timeline),
-            },
-        );
+        let (initial_status, status_task) = pagination.map_or((None, None), |(status, stream)| {
+            let core = self.clone();
+            (
+                Some(status),
+                Some(rt::spawn(async move {
+                    let mut status = Box::pin(stream);
+                    while let Some(status) = status.next().await {
+                        core.emit(timeline_pagination_event(subscription, status));
+                    }
+                })),
+            )
+        });
+        self.subscriptions
+            .lock()
+            .await
+            .get_mut(&subscription)
+            .expect("subscription registered before stream tasks start")
+            .tasks = status_task.into_iter().chain([task]).collect();
+        if let Some(status) = initial_status {
+            self.emit(timeline_pagination_event(subscription, status));
+        }
 
         Ok(CommandOk::SubscribeTimeline {
             subscription,
@@ -1719,6 +1784,29 @@ impl Core {
             .await?
             .get_room(room_id)
             .ok_or(CommandErr::UnknownRoom)
+    }
+
+    async fn sync_timeline_rooms_locked(
+        &self,
+        pending_room: Option<&OwnedRoomId>,
+    ) -> Result<(), CommandErr> {
+        let subscriptions = self.subscriptions.lock().await;
+        let room_ids = subscriptions
+            .values()
+            .filter_map(|subscription| match &subscription.kind {
+                SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
+                SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+            })
+            .chain(pending_room.cloned())
+            .collect::<std::collections::HashSet<_>>();
+        drop(subscriptions);
+        let room_refs = room_ids.iter().map(OwnedRoomId::as_ref).collect::<Vec<_>>();
+        self.sync_service()
+            .await?
+            .room_list_service()
+            .subscribe_to_rooms(&room_refs)
+            .await;
+        Ok(())
     }
 
     /// Authenticated media needs the access token, so the fetch happens here.

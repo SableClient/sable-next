@@ -1,156 +1,357 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import { createVirtualizer } from '@tanstack/svelte-virtual';
 
+  import type { TimelineItemView } from '@/generated/TimelineItemView';
   import { i18n } from '$lib/i18n';
   import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
+  import Spinner from '$lib/ui/primitives/Spinner.svelte';
 
   import TimelineItem from './TimelineItem.svelte';
-  import { isCollapsed, readReceiptEventId } from './timeline-format';
+  import { isCollapsed } from './timeline-format';
+  import TimelineReadReceipt from './TimelineReadReceipt.svelte';
+
+  const HISTORY_PREFETCH_ITEMS = 10;
+  const JUMP_TO_LATEST_THRESHOLD = 80;
+  const HISTORY_LOAD_VIEWPORT_FRACTION = 1 / 3;
 
   interface Props {
     timeline: RoomTimeline;
     focusEventId?: string | null;
-    onRequestHistory: () => Promise<void>;
+    onRequestHistory: () => Promise<boolean>;
+    onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
   }
 
-  let { timeline, focusEventId = null, onRequestHistory, onRead }: Props = $props();
+  let {
+    timeline,
+    focusEventId = null,
+    onRequestHistory,
+    onRequestFuture,
+    onRead,
+  }: Props = $props();
   let viewport = $state<HTMLDivElement | null>(null);
-  let viewportHeight = $state(0);
-  let paddingStart = $state(0);
   let nearLatest = $state(true);
-  let documentVisible = $state(true);
-  let initialAnchorComplete = $state(false);
-  let didScrollToEnd = false;
-  let didRequestInitialHistory = false;
-  let lastReadEventId: string | null = null;
-
+  let userScrollPending = false;
+  let upwardScrollPending = false;
+  let lastTouchY: number | null = null;
+  let initialHistoryRequested = $state(false);
+  let historyRequestPending = $state(false);
+  let focusAnchored = false;
+  type ScrollMode =
+    | { kind: 'initialLive' }
+    | { kind: 'followingLive' }
+    | { kind: 'readingHistory' }
+    | { kind: 'focused'; eventId: string };
+  let scrollMode = $state<ScrollMode>(
+    untrack(() =>
+      focusEventId === null ? { kind: 'initialLive' } : { kind: 'focused', eventId: focusEventId }
+    )
+  );
+  const initialItems: readonly TimelineItemView[] = [];
+  let configuredItems = initialItems;
+  let anchorGeneration = 0;
+  let historyViewportAnchor: Omit<ViewportAnchor, 'index'> | null = null;
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: 0,
     getScrollElement: () => viewport,
     estimateSize: () => 72,
-    getItemKey: (index) => timeline.items[index]?.id ?? 'missing',
-    paddingStart: 0,
+    getItemKey: (index) => initialItems[index]?.id ?? 'missing',
     anchorTo: 'end',
     followOnAppend: true,
-    scrollEndThreshold: 80,
+    scrollEndThreshold: JUMP_TO_LATEST_THRESHOLD,
     overscan: 8,
   });
 
-  $effect(() => {
-    get(virtualizer).setOptions({
-      count: timeline.items.length,
-      getScrollElement: () => viewport,
-      estimateSize: () => 72,
-      getItemKey: (index) => timeline.items[index]?.id ?? 'missing',
-      paddingStart,
-      anchorTo: 'end',
-      followOnAppend: true,
-      scrollEndThreshold: 80,
-      overscan: 8,
-    });
-  });
-
-  $effect(() => {
-    const contentHeight = $virtualizer.getTotalSize() - paddingStart;
-    const nextPaddingStart = Math.max(0, viewportHeight - contentHeight);
-    if (nextPaddingStart !== paddingStart) paddingStart = nextPaddingStart;
-  });
-
-  $effect(() => {
-    if (didScrollToEnd || timeline.loading || timeline.items.length === 0) return;
-    didScrollToEnd = true;
-    void (async () => {
-      await tick();
-      await new Promise(requestAnimationFrame);
-      await new Promise(requestAnimationFrame);
-      const focusIndex = focusEventId
-        ? timeline.items.findIndex((item) => item.event_id === focusEventId)
-        : -1;
-      if (focusIndex >= 0) get(virtualizer).scrollToIndex(focusIndex, { align: 'center' });
-      else {
-        get(virtualizer).scrollToEnd({ behavior: 'auto' });
-        nearLatest = true;
-      }
-      initialAnchorComplete = true;
-
-      if (focusIndex < 0 && !didRequestInitialHistory) {
-        didRequestInitialHistory = true;
-        void onRequestHistory();
-      }
-    })();
-  });
-
-  $effect(() => {
-    if (
-      focusEventId !== null ||
-      !initialAnchorComplete ||
-      !nearLatest ||
-      timeline.items.length === 0
-    )
-      return;
-    void (async () => {
-      await tick();
-      await new Promise(requestAnimationFrame);
-      await new Promise(requestAnimationFrame);
-      get(virtualizer).scrollToEnd({ behavior: 'auto' });
-      nearLatest = true;
-    })();
-  });
-
-  $effect(() => {
-    const updateVisibility = () => {
-      documentVisible = document.visibilityState === 'visible';
-    };
-    updateVisibility();
-    document.addEventListener('visibilitychange', updateVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', updateVisibility);
-    };
-  });
-
-  $effect(() => {
-    const eventId = readReceiptEventId(timeline.items, {
-      focusEventId,
-      initialAnchorComplete,
-      nearLatest,
-      documentVisible,
-      lastReadEventId,
-    });
-    if (!eventId) return;
-    lastReadEventId = eventId;
-    void onRead(eventId);
-  });
-
-  function measure(node: HTMLDivElement): () => void {
-    get(virtualizer).measureElement(node);
-    return () => {
-      get(virtualizer).measureElement(null);
-    };
+  interface ViewportAnchor {
+    id: string;
+    index: number;
+    offset: number;
   }
 
-  function onScroll(): void {
-    const instance = get(virtualizer);
-    nearLatest = instance.isAtEnd();
-    const oldestVisibleIndex = instance.getVirtualItems().at(0)?.index;
-    if (oldestVisibleIndex !== undefined && oldestVisibleIndex <= 10) {
-      void onRequestHistory();
+  function captureVisibleAnchor(
+    items: readonly TimelineItemView[]
+  ): Omit<ViewportAnchor, 'index'> | null {
+    if (!viewport) return null;
+
+    const eventIds = new Set(items.filter((item) => item.event_id !== null).map((item) => item.id));
+    const viewportRect = viewport.getBoundingClientRect();
+    let partialAnchor: Omit<ViewportAnchor, 'index'> | null = null;
+    for (const element of viewport.querySelectorAll<HTMLElement>('.item')) {
+      const id = element.dataset.itemId;
+      if (!id || !eventIds.has(id)) continue;
+
+      const rect = element.getBoundingClientRect();
+      if (rect.bottom <= viewportRect.top || rect.top >= viewportRect.bottom) continue;
+      const anchor = { id, offset: rect.top - viewportRect.top };
+      if (rect.top >= viewportRect.top) return anchor;
+      partialAnchor ??= anchor;
+    }
+    return partialAnchor;
+  }
+
+  function resolveViewportAnchor(
+    anchor: Omit<ViewportAnchor, 'index'>,
+    items: readonly TimelineItemView[]
+  ): ViewportAnchor | null {
+    const index = items.findIndex((item) => item.id === anchor.id);
+    return index < 0 ? null : { ...anchor, index };
+  }
+
+  function captureViewportAnchor(
+    previousItems: readonly TimelineItemView[],
+    nextItems: readonly TimelineItemView[]
+  ): ViewportAnchor | null {
+    if (!viewport || previousItems.length === 0 || scrollMode.kind === 'initialLive') return null;
+
+    const anchor = captureVisibleAnchor(previousItems);
+    if (!anchor) return null;
+    const previousIndex = previousItems.findIndex((item) => item.id === anchor.id);
+    const resolved = resolveViewportAnchor(anchor, nextItems);
+    return resolved && resolved.index > previousIndex ? resolved : null;
+  }
+
+  async function restoreViewportAnchor(anchor: ViewportAnchor, generation: number): Promise<void> {
+    await tick();
+    const activeViewport = viewport;
+    if (!activeViewport || generation !== anchorGeneration) return;
+
+    get(virtualizer).scrollToIndex(anchor.index, { align: 'start' });
+    await tick();
+    for (let frame = 0; frame < 6; frame += 1) {
+      await new Promise(requestAnimationFrame);
+      if (generation !== anchorGeneration) return;
+
+      const element = Array.from(activeViewport.querySelectorAll<HTMLElement>('.item')).find(
+        (item) => item.dataset.itemId === anchor.id
+      );
+      if (!element) return;
+      const offset =
+        element.getBoundingClientRect().top - activeViewport.getBoundingClientRect().top;
+      const delta = offset - anchor.offset;
+      if (Math.abs(delta) > 0.5) get(virtualizer).scrollBy(delta);
     }
   }
 
+  function cancelAnchorRestore(): void {
+    anchorGeneration += 1;
+    historyViewportAnchor = null;
+  }
+
+  $effect.pre(() => {
+    const items = timeline.items;
+    const anchor = historyViewportAnchor
+      ? resolveViewportAnchor(historyViewportAnchor, items)
+      : captureViewportAnchor(configuredItems, items);
+    const instance = get(virtualizer);
+    instance.setOptions({
+      count: items.length,
+      getScrollElement: () => viewport,
+      estimateSize: () => 72,
+      // TanStack compares the previous and next key functions during prepends.
+      // Each function must retain the item ordering it was created for.
+      getItemKey: (index) => items[index]?.id ?? 'missing',
+      anchorTo: 'end',
+      followOnAppend: true,
+      scrollEndThreshold: JUMP_TO_LATEST_THRESHOLD,
+      overscan: 8,
+    });
+    configuredItems = items;
+    const generation = ++anchorGeneration;
+    if (anchor) void restoreViewportAnchor(anchor, generation);
+  });
+
+  $effect(() => {
+    if (timeline.backwardPagination === 'loading' || !historyViewportAnchor) return;
+    const anchor = resolveViewportAnchor(historyViewportAnchor, timeline.items);
+    if (!anchor) {
+      historyViewportAnchor = null;
+      return;
+    }
+
+    const generation = ++anchorGeneration;
+    void restoreViewportAnchor(anchor, generation).finally(() => {
+      if (generation === anchorGeneration) historyViewportAnchor = null;
+    });
+  });
+
+  $effect(() => {
+    if (timeline.loading || timeline.items.length === 0 || !viewport) return;
+
+    const controller = new AbortController();
+    void (async () => {
+      await tick();
+      await new Promise(requestAnimationFrame);
+      if (controller.signal.aborted) return;
+      const focusedEventId = scrollMode.kind === 'focused' ? scrollMode.eventId : null;
+      const focusIndex = focusedEventId
+        ? timeline.items.findIndex((item) => item.event_id === focusedEventId)
+        : -1;
+      if (focusIndex >= 0 && !focusAnchored) {
+        get(virtualizer).scrollToIndex(focusIndex, { align: 'center' });
+        focusAnchored = true;
+      } else if (scrollMode.kind === 'initialLive') {
+        const initialAnchorCancelled = (): boolean =>
+          controller.signal.aborted || scrollMode.kind !== 'initialLive';
+        get(virtualizer).scrollToEnd({ behavior: 'auto' });
+        await new Promise(requestAnimationFrame);
+        if (initialAnchorCancelled()) return;
+        const needsMoreHistory = viewport.scrollHeight <= viewport.clientHeight + 1;
+        if (
+          !initialHistoryRequested &&
+          needsMoreHistory &&
+          timeline.backwardPagination === 'idle'
+        ) {
+          initialHistoryRequested = true;
+          requestHistory();
+          return;
+        }
+        if (historyRequestPending || timeline.backwardPagination === 'loading') return;
+        get(virtualizer).scrollToEnd({ behavior: 'auto' });
+        nearLatest = true;
+        scrollMode = { kind: 'followingLive' };
+      }
+    })();
+    return () => {
+      controller.abort();
+    };
+  });
+
+  function measure(node: HTMLDivElement): void {
+    get(virtualizer).measureElement(node);
+  }
+
+  function onScroll(): void {
+    if (!viewport) return;
+    const historyLoadThreshold = viewport.clientHeight * HISTORY_LOAD_VIEWPORT_FRACTION;
+    const requestedOlderHistory = upwardScrollPending;
+    nearLatest = get(virtualizer).isAtEnd();
+    if (timeline.mode.kind === 'live' && scrollMode.kind !== 'initialLive') {
+      if (nearLatest) scrollMode = { kind: 'followingLive' };
+      else if (userScrollPending || scrollMode.kind === 'readingHistory') {
+        scrollMode = { kind: 'readingHistory' };
+      }
+    }
+    userScrollPending = false;
+    upwardScrollPending = false;
+    if (requestedOlderHistory) requestHistoryAtTop(historyLoadThreshold);
+    const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
+    if (
+      scrollMode.kind === 'focused' &&
+      timeline.forwardPagination === 'idle' &&
+      newestVisibleIndex !== undefined &&
+      newestVisibleIndex >= timeline.items.length - HISTORY_PREFETCH_ITEMS
+    ) {
+      void onRequestFuture();
+    }
+  }
+
+  function requestHistoryAtTop(
+    threshold = (viewport?.clientHeight ?? 0) * HISTORY_LOAD_VIEWPORT_FRACTION
+  ): void {
+    if (
+      !viewport ||
+      historyRequestPending ||
+      timeline.backwardPagination !== 'idle' ||
+      viewport.scrollTop > threshold
+    ) {
+      return;
+    }
+    requestHistory();
+  }
+
+  function markWheelScroll(event: WheelEvent): void {
+    cancelAnchorRestore();
+    userScrollPending = true;
+    upwardScrollPending = event.deltaY < 0;
+    if (upwardScrollPending) requestHistoryAtTop();
+  }
+
+  function requestHistory(): void {
+    if (historyRequestPending || timeline.backwardPagination !== 'idle') return;
+    if (scrollMode.kind !== 'initialLive') {
+      historyViewportAnchor = captureVisibleAnchor(configuredItems);
+    }
+    historyRequestPending = true;
+    const settle = (): void => {
+      historyRequestPending = false;
+    };
+    void onRequestHistory().then(settle, settle);
+  }
+
+  function markKeyScroll(event: KeyboardEvent): void {
+    if (
+      event.key === 'ArrowUp' ||
+      event.key === 'ArrowDown' ||
+      event.key === 'PageUp' ||
+      event.key === 'PageDown' ||
+      event.key === 'Home' ||
+      event.key === 'End' ||
+      event.key === ' '
+    ) {
+      cancelAnchorRestore();
+      userScrollPending = true;
+      upwardScrollPending =
+        event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home';
+      if (upwardScrollPending) {
+        requestHistoryAtTop();
+      }
+    }
+  }
+
+  function markTouchStart(event: TouchEvent): void {
+    cancelAnchorRestore();
+    userScrollPending = true;
+    lastTouchY = event.touches.item(0)?.clientY ?? null;
+  }
+
+  function markTouchMove(event: TouchEvent): void {
+    const touchY = event.touches.item(0)?.clientY;
+    if (touchY === undefined || lastTouchY === null) return;
+    userScrollPending = true;
+    upwardScrollPending = touchY > lastTouchY;
+    lastTouchY = touchY;
+    if (upwardScrollPending) requestHistoryAtTop();
+  }
+
+  function markTouchEnd(): void {
+    lastTouchY = null;
+  }
+
+  function userScrollMarker(node: HTMLDivElement): () => void {
+    node.addEventListener('wheel', markWheelScroll);
+    node.addEventListener('touchstart', markTouchStart);
+    node.addEventListener('touchmove', markTouchMove);
+    node.addEventListener('touchend', markTouchEnd);
+    node.addEventListener('touchcancel', markTouchEnd);
+    node.addEventListener('keydown', markKeyScroll);
+    return () => {
+      node.removeEventListener('wheel', markWheelScroll);
+      node.removeEventListener('touchstart', markTouchStart);
+      node.removeEventListener('touchmove', markTouchMove);
+      node.removeEventListener('touchend', markTouchEnd);
+      node.removeEventListener('touchcancel', markTouchEnd);
+      node.removeEventListener('keydown', markKeyScroll);
+    };
+  }
+
   function jumpToLatest(): void {
+    scrollMode = { kind: 'followingLive' };
     get(virtualizer).scrollToEnd({ behavior: 'smooth' });
     nearLatest = true;
   }
 </script>
 
-{#if timeline.loading}
-  <p class="loading">{$i18n.t('timeline.loading')}</p>
-{/if}
+<TimelineReadReceipt
+  {timeline}
+  {focusEventId}
+  initialAnchorComplete={scrollMode.kind === 'followingLive'}
+  {nearLatest}
+  {onRead}
+/>
 
 {#if timeline.error}
   <Alert class="timeline-error" variant="critical" role="alert"
@@ -158,46 +359,72 @@
   >
 {/if}
 
-<div bind:this={viewport} bind:clientHeight={viewportHeight} class="viewport" onscroll={onScroll}>
-  <div class="items" style:height={String($virtualizer.getTotalSize()) + 'px'}>
-    {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
-      {@const item = timeline.items[virtualItem.index]}
-      {#if item}
-        <div
-          class="item"
-          data-index={virtualItem.index}
-          style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
-          {@attach measure}
-        >
-          <TimelineItem {item} collapsed={isCollapsed(timeline.items, virtualItem.index)} />
-        </div>
-      {/if}
-    {/each}
+<div class="timeline-content">
+  <div class="timeline-viewport">
+    <div
+      bind:this={viewport}
+      class="viewport"
+      aria-label={$i18n.t('timeline.label')}
+      onscroll={onScroll}
+      {@attach userScrollMarker}
+      role="log"
+    >
+      <div class="items" style:height={String($virtualizer.getTotalSize()) + 'px'}>
+        {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
+          {@const item = timeline.items[virtualItem.index]}
+          {#if item}
+            <div
+              class="item"
+              data-event-id={item.event_id ?? undefined}
+              data-item-id={item.id}
+              data-index={virtualItem.index}
+              style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
+              {@attach measure}
+            >
+              <TimelineItem {item} collapsed={isCollapsed(timeline.items, virtualItem.index)} />
+            </div>
+          {/if}
+        {/each}
+      </div>
+    </div>
   </div>
+
+  {#if scrollMode.kind === 'initialLive'}
+    <div class="loading" aria-label={$i18n.t('timeline.loading')} role="status">
+      <Spinner />
+    </div>
+  {/if}
+
+  {#if timeline.mode.kind === 'live' && scrollMode.kind === 'readingHistory' && timeline.items.length > 0}
+    <Button
+      type="button"
+      class="jump-to-latest"
+      variant="primary"
+      size="small"
+      onclick={jumpToLatest}>{$i18n.t('timeline.jumpToLatest')}</Button
+    >
+  {/if}
 </div>
 
-{#if timeline.backwardPagination === 'loading'}
-  <p class="history-status">{$i18n.t('timeline.loading')}</p>
-{/if}
-
-{#if !nearLatest && timeline.items.length > 0}
-  <Button type="button" class="jump-to-latest" variant="primary" size="small" onclick={jumpToLatest}
-    >{$i18n.t('timeline.jumpToLatest')}</Button
-  >
-{/if}
-
 <style>
-  .loading,
-  .history-status {
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-    padding: 0.75rem 1rem;
-  }
-
   :global(.timeline-error) {
     flex: 0 0 auto;
     font-size: var(--font-size-small);
+  }
+
+  .timeline-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+  }
+
+  .timeline-viewport {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .viewport {
@@ -207,6 +434,16 @@
     overscroll-behavior: contain;
     scrollbar-color: transparent transparent;
     scrollbar-width: thin;
+  }
+
+  .loading {
+    align-items: center;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
   }
 
   .viewport::-webkit-scrollbar {

@@ -270,7 +270,12 @@ fn origin_url(redirect_uri: &Url) -> Url {
 pub async fn start_sync(
     client: Client,
 ) -> Result<Arc<SyncService>, matrix_sdk_ui::sync_service::Error> {
-    let sync_service = Arc::new(SyncService::builder(client).build().await?);
+    let sync_service = Arc::new(
+        SyncService::builder(client)
+            .with_offline_mode()
+            .build()
+            .await?,
+    );
     sync_service.start().await;
     Ok(sync_service)
 }

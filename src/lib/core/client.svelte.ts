@@ -8,6 +8,7 @@ import type { MemberView } from '@/generated/MemberView';
 import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
+import type { PaginationDirection } from '@/generated/PaginationDirection';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { RegistrationResultView } from '@/generated/RegistrationResultView';
 import type { VerificationView } from '@/generated/VerificationView';
@@ -322,13 +323,18 @@ export class CoreClient {
     return response;
   }
 
-  async paginate(subscription: SubscriptionId, count: number): Promise<{ reached_start: boolean }> {
+  async paginate(
+    subscription: SubscriptionId,
+    direction: PaginationDirection,
+    count: number
+  ): Promise<{ reached_end: boolean }> {
     const response = await this.ensureTransport().send({
       type: 'paginate',
       subscription,
+      direction,
       count,
     });
-    return response;
+    return { reached_end: response.reached_end };
   }
 
   async roomMembers(roomId: string): Promise<MemberView[]> {

@@ -1,4 +1,7 @@
-export function createMediaQuery(query: string, initialMatches = false) {
+export function createMediaQuery(
+  query: string,
+  initialMatches = typeof window !== 'undefined' && window.matchMedia(query).matches
+) {
   let matches = $state(initialMatches);
 
   $effect(() => {

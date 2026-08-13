@@ -154,6 +154,7 @@ export function createWebTransport(): Transport {
       listeners.clear();
       // The worker outlives the tab: others may be using it, and it is what
       // keeps sync running.
+      worker?.port.postMessage({ disconnect: true });
       worker?.port.close();
       worker = null;
     },

@@ -53,7 +53,6 @@
     "threeTyping": "{{name1}}, {{name2}} and {{name3}} are typing...",
     "manyTyping": "{{name1}}, {{name2}} and {{count}} others are typing...",
     "unknownTyping": "Someone is typing...",
-    "dismissTyping": "Dismiss typing indicator",
     "unknownSender": "Unknown sender",
     "membership": "{{user}} {{change}}",
     "unableToDecrypt": "Unable to decrypt: {{reason}}",

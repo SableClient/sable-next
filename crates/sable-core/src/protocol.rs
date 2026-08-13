@@ -72,6 +72,7 @@ pub enum Command {
 
     Paginate {
         subscription: SubscriptionId,
+        direction: PaginationDirection,
         count: u16,
     },
     RoomMembers {
@@ -417,7 +418,8 @@ pub enum CommandOk {
     Unsubscribe,
 
     Paginate {
-        reached_start: bool,
+        direction: PaginationDirection,
+        reached_end: bool,
     },
     RoomMembers {
         members: Vec<MemberView>,
@@ -512,6 +514,7 @@ pub enum CommandOk {
 pub enum CommandErr {
     NotLoggedIn,
     UnknownSubscription,
+    InvalidPaginationDirection,
     UnknownRoom,
     UnknownHomeserver,
     UnknownLocalEcho,
@@ -556,6 +559,14 @@ pub enum AuthIntent {
     Register,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum PaginationDirection {
+    Backward,
+    Forward,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -598,6 +609,11 @@ pub enum CoreEvent {
     TimelineDiff {
         subscription: SubscriptionId,
         diffs: Vec<VectorDiff<TimelineItemView>>,
+    },
+    TimelinePagination {
+        subscription: SubscriptionId,
+        loading: bool,
+        reached_start: bool,
     },
 
     /// Our own user excluded. Absolute, so an empty list replaces the previous
