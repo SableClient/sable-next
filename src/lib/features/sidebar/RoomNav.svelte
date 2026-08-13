@@ -472,6 +472,7 @@
     font-weight: var(--font-weight-bold);
     height: 1.75rem;
     justify-content: center;
+    overflow: hidden;
     width: 1.75rem;
   }
 

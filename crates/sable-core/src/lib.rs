@@ -222,7 +222,10 @@ fn sync_status(state: SyncState) -> SyncStatus {
     }
 }
 
-fn timeline_pagination_event(subscription: SubscriptionId, status: PaginationStatus) -> CoreEvent {
+const fn timeline_pagination_event(
+    subscription: SubscriptionId,
+    status: PaginationStatus,
+) -> CoreEvent {
     match status {
         PaginationStatus::Paginating => CoreEvent::TimelinePagination {
             subscription,
@@ -1743,12 +1746,11 @@ impl Core {
                 })),
             )
         });
-        self.subscriptions
-            .lock()
-            .await
-            .get_mut(&subscription)
-            .expect("subscription registered before stream tasks start")
-            .tasks = status_task.into_iter().chain([task]).collect();
+        let mut subscriptions = self.subscriptions.lock().await;
+        let Some(entry) = subscriptions.get_mut(&subscription) else {
+            return Err(CommandErr::Unavailable);
+        };
+        entry.tasks = status_task.into_iter().chain([task]).collect();
         if let Some(status) = initial_status {
             self.emit(timeline_pagination_event(subscription, status));
         }
@@ -1823,10 +1825,10 @@ impl Core {
     ) -> Result<Vec<u8>, CommandErr> {
         let source: MediaSource = serde_json::from_str(&source)
             .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(source)));
-        if let MediaSource::Plain(uri) = &source {
-            if uri.parts().is_err() {
-                return Err(CommandErr::InvalidMedia);
-            }
+        if let MediaSource::Plain(uri) = &source
+            && uri.parts().is_err()
+        {
+            return Err(CommandErr::InvalidMedia);
         }
 
         let request = MediaRequestParameters {

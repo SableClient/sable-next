@@ -319,6 +319,7 @@
     font-weight: var(--font-weight-bold);
     height: var(--avatar-size-small);
     justify-content: center;
+    overflow: hidden;
     width: var(--avatar-size-small);
   }
 
