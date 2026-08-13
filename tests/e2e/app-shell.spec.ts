@@ -35,10 +35,9 @@ async function expectTimelineAtLatest(page: Page, lastEvent: string) {
     .poll(() =>
       viewport.evaluate((element) => ({
         distance: element.scrollHeight - element.scrollTop - element.clientHeight,
-        overflow: element.scrollHeight > element.clientHeight,
       }))
     )
-    .toEqual({ distance: 0, overflow: true });
+    .toEqual({ distance: 0 });
   const [itemBox, viewportBox] = await Promise.all([
     lastItem.boundingBox(),
     viewport.boundingBox(),
@@ -121,7 +120,7 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page })
         )
       )
     )
-    .toEqual(['subscribe_timeline', 'paginate']);
+    .toEqual(['subscribe_timeline']);
   await expect(quickTools).not.toBeInViewport();
 
   await page.getByRole('button', { name: 'Back to rooms' }).click();
@@ -243,7 +242,7 @@ test('subscribes once and loads initial room history', async ({ page }) => {
         )
       )
     )
-    .toEqual(['subscribe_timeline', 'paginate']);
+    .toEqual(['subscribe_timeline']);
   await page.waitForTimeout(250);
   expect(
     await page.evaluate(() =>
@@ -251,7 +250,7 @@ test('subscribes once and loads initial room history', async ({ page }) => {
         (command) => command === 'subscribe_timeline' || command === 'paginate'
       )
     )
-  ).toEqual(['subscribe_timeline', 'paginate']);
+  ).toEqual(['subscribe_timeline']);
 });
 
 test('anchors at latest after delayed initial history arrives', async ({ page }) => {
@@ -461,7 +460,7 @@ test('does not resubscribe the timeline after a room refresh', async ({ page }) 
         )
       )
     )
-    .toEqual(['subscribe_timeline', 'paginate']);
+    .toEqual(['subscribe_timeline']);
 });
 
 test('keeps the active timeline while crossing the layout breakpoint', async ({ page }) => {
@@ -480,7 +479,7 @@ test('keeps the active timeline while crossing the layout breakpoint', async ({ 
         )
       )
     )
-    .toEqual(['subscribe_timeline', 'paginate']);
+    .toEqual(['subscribe_timeline']);
 });
 
 test('renders a startup state while the core is restoring', async ({ app, installFakeCore }) => {

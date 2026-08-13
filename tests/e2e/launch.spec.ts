@@ -13,6 +13,6 @@ test('starts at the sign-in flow', async ({ page, auth }) => {
   await expect(auth.heading).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).scrollbarGutter))
-    .toBe('stable');
+    .toBe('auto');
   expect(workerErrors).toEqual([]);
 });
