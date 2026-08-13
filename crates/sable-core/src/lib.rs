@@ -1096,10 +1096,7 @@ impl Core {
         registry
             .accounts
             .retain(|account| account.account_id != account_id);
-        registry.active_account_id = registry
-            .accounts
-            .first()
-            .map(|account| account.account_id.clone());
+        registry.active_account_id = None;
         let bytes = serde_json::to_vec(registry)
             .map_err(|error| self.failed("logout: serialize accounts", error))?;
         self.sessions
