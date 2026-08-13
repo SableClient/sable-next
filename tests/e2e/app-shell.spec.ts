@@ -1,17 +1,13 @@
 import { expect, test } from './fixtures/test';
 
-test('shows the authenticated app shell on desktop', async ({ page, installFakeCore }) => {
+test('shows the authenticated app shell on desktop', async ({ page, app, installFakeCore }) => {
   await installFakeCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/home');
+  await app.openHome();
 
-  const primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
-  await expect(primaryNavigation).toBeVisible();
-  await expect(primaryNavigation.getByRole('link', { name: 'Home' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  );
-  await expect(page.getByRole('navigation', { name: 'Quick tools' })).toBeVisible();
+  await expect(app.primaryNavigation).toBeVisible();
+  await expect(app.homeLink()).toHaveAttribute('aria-current', 'page');
+  await expect(app.quickTools).toBeVisible();
 
   const appScrollbars = await page.evaluate(() => {
     const roomNavigation = document.querySelector('.room-nav-content');
@@ -24,10 +20,10 @@ test('shows the authenticated app shell on desktop', async ({ page, installFakeC
   expect(appScrollbars.roomNavigation).toBe('thin');
 });
 
-test('persists the keyboard-adjusted room navigation width', async ({ page, installFakeCore }) => {
+test('persists the keyboard-adjusted room navigation width', async ({ page, app, installFakeCore }) => {
   await installFakeCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/home');
+  await app.openHome();
 
   const resize = page.getByRole('slider', { name: 'Resize rooms' });
   await expect(resize).toHaveAttribute('aria-valuenow', '224');
@@ -41,18 +37,14 @@ test('persists the keyboard-adjusted room navigation width', async ({ page, inst
   );
 });
 
-test('shows the authenticated app shell on mobile', async ({ page, installFakeCore }) => {
+test('shows the authenticated app shell on mobile', async ({ page, app, installFakeCore }) => {
   await installFakeCore('ready');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/home');
+  await app.openHome();
 
-  const primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
-  await expect(primaryNavigation).toBeVisible();
-  await expect(primaryNavigation.getByRole('link', { name: 'Home' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  );
-  await expect(page.getByRole('navigation', { name: 'Quick tools' })).toBeVisible();
+  await expect(app.primaryNavigation).toBeVisible();
+  await expect(app.homeLink()).toHaveAttribute('aria-current', 'page');
+  await expect(app.quickTools).toBeVisible();
 });
 
 test('keeps mobile bottom navigation with the room list panel', async ({ page, installFakeCore }) => {
@@ -72,12 +64,12 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page, i
   await expect(quickTools).toBeInViewport();
 });
 
-test('renders a startup state while the core is restoring', async ({ page, installFakeCore }) => {
+test('renders a startup state while the core is restoring', async ({ app, installFakeCore }) => {
   await installFakeCore('loading');
-  await page.goto('/home');
+  await app.openHome();
 
-  await expect(page.getByRole('status')).toContainText('Starting Sable');
-  await expect(page.getByRole('heading', { name: 'Starting Sable' })).toBeVisible();
+  await expect(app.startupStatus).toContainText('Starting Sable');
+  await expect(app.startupHeading).toBeVisible();
 });
 
 test('redirects signed-out protected routes to login', async ({ page }) => {
@@ -87,13 +79,10 @@ test('redirects signed-out protected routes to login', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
-test('renders a recoverable error when the core cannot start', async ({
-  page,
-  installFakeCore,
-}) => {
+test('renders a recoverable error when the core cannot start', async ({ app, installFakeCore }) => {
   await installFakeCore('error');
-  await page.goto('/home');
+  await app.openHome();
 
-  await expect(page.getByRole('alert')).toContainText('Sable could not start');
-  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(app.startupError).toContainText('Sable could not start');
+  await expect(app.retryButton).toBeVisible();
 });

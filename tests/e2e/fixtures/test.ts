@@ -1,4 +1,6 @@
 import { test as base, type Page } from '@playwright/test';
+import { AuthFlow } from '../pages/AuthFlow';
+import { AppShell } from '../pages/AppShell';
 
 type WorkerMode = 'ready' | 'loading' | 'error';
 
@@ -9,6 +11,8 @@ type Session = {
 };
 
 type Fixtures = {
+  app: AppShell;
+  auth: AuthFlow;
   installFakeCore: (mode: WorkerMode) => Promise<void>;
 };
 
@@ -32,6 +36,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   ],
   installFakeCore: async ({ page, workerSession }, use) => {
     await use((mode) => installFakeCore(page, mode, workerSession));
+  },
+  app: async ({ page }, use) => {
+    await use(new AppShell(page));
+  },
+  auth: async ({ page }, use) => {
+    await use(new AuthFlow(page));
   },
 });
 

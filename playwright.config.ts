@@ -10,11 +10,29 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: devices['Desktop Chrome'] }],
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /global\.setup\.ts/,
+      teardown: 'teardown',
+      retries: 0,
+    },
+    { name: 'teardown', testMatch: /global\.teardown\.ts/ },
+    {
+      name: 'chromium',
+      dependencies: ['setup'],
+      testIgnore: /global\.(setup|teardown)\.ts/,
+      use: devices['Desktop Chrome'],
+    },
+  ],
   webServer: {
     command: 'pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
+    gracefulShutdown: {
+      signal: 'SIGTERM',
+      timeout: 5_000,
+    },
   },
 });
