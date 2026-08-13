@@ -212,6 +212,38 @@ test('requests history from upward input when already at the top', async () => {
   await unmount(instance);
 });
 
+test('requests history when continuous upward scrolling reaches the top', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+  const history = vi.fn(() => Promise.resolve(false));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  const element = viewport();
+  Object.defineProperties(element, {
+    scrollHeight: { configurable: true, value: 1_000 },
+    scrollTop: { configurable: true, writable: true, value: 200 },
+  });
+  await tick();
+  await runAnimationFrames();
+  history.mockClear();
+
+  element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
+  element.scrollTop = 0;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(history).toHaveBeenCalledTimes(1);
+  await unmount(instance);
+});
+
 test('a fresh upward input requests the next settled history page', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));

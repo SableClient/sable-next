@@ -15,8 +15,8 @@
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
   const HISTORY_PREFETCH_ITEMS = 10;
+  const HISTORY_LOAD_THRESHOLD = 80;
   const JUMP_TO_LATEST_THRESHOLD = 80;
-  const HISTORY_LOAD_VIEWPORT_FRACTION = 1 / 3;
 
   interface Props {
     timeline: RoomTimeline;
@@ -121,7 +121,7 @@
 
     get(virtualizer).scrollToIndex(anchor.index, { align: 'start' });
     await tick();
-    for (let frame = 0; frame < 6; frame += 1) {
+    for (let frame = 0; frame < 2; frame += 1) {
       await new Promise(requestAnimationFrame);
       if (generation !== anchorGeneration) return;
 
@@ -143,9 +143,7 @@
 
   $effect.pre(() => {
     const items = timeline.items;
-    const anchor = historyViewportAnchor
-      ? resolveViewportAnchor(historyViewportAnchor, items)
-      : captureViewportAnchor(configuredItems, items);
+    const anchor = historyViewportAnchor ? null : captureViewportAnchor(configuredItems, items);
     const instance = get(virtualizer);
     instance.setOptions({
       count: items.length,
@@ -226,7 +224,6 @@
 
   function onScroll(): void {
     if (!viewport) return;
-    const historyLoadThreshold = viewport.clientHeight * HISTORY_LOAD_VIEWPORT_FRACTION;
     const requestedOlderHistory = upwardScrollPending;
     nearLatest = get(virtualizer).isAtEnd();
     if (timeline.mode.kind === 'live' && scrollMode.kind !== 'initialLive') {
@@ -236,8 +233,7 @@
       }
     }
     userScrollPending = false;
-    upwardScrollPending = false;
-    if (requestedOlderHistory) requestHistoryAtTop(historyLoadThreshold);
+    if (requestedOlderHistory) requestHistoryAtTop();
     const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
     if (
       scrollMode.kind === 'focused' &&
@@ -249,14 +245,12 @@
     }
   }
 
-  function requestHistoryAtTop(
-    threshold = (viewport?.clientHeight ?? 0) * HISTORY_LOAD_VIEWPORT_FRACTION
-  ): void {
+  function requestHistoryAtTop(): void {
     if (
       !viewport ||
       historyRequestPending ||
       timeline.backwardPagination !== 'idle' ||
-      viewport.scrollTop > threshold
+      viewport.scrollTop > HISTORY_LOAD_THRESHOLD
     ) {
       return;
     }
@@ -272,6 +266,7 @@
 
   function requestHistory(): void {
     if (historyRequestPending || timeline.backwardPagination !== 'idle') return;
+    upwardScrollPending = false;
     if (scrollMode.kind !== 'initialLive') {
       historyViewportAnchor = captureVisibleAnchor(configuredItems);
     }
