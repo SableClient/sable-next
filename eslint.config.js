@@ -15,6 +15,7 @@ export default defineConfig([
     'target/**',
     'target-local/**',
     'test-results/**',
+    'wasm/**',
     '.svelte-kit/**',
   ]),
   js.configs.recommended,
