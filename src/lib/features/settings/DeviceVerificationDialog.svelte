@@ -6,6 +6,7 @@
   import { i18n, t } from '$lib/i18n';
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
+  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
 
   const core = useCoreClient();
   let error = $state<string | null>(null);
@@ -58,100 +59,77 @@
   }
 </script>
 
-<Dialog.Root open={core.verification !== null} onOpenChange={handleOpenChange}>
-  <Dialog.Portal>
-    <Dialog.Overlay class="verification-backdrop" />
-    <Dialog.Content class="verification-dialog">
-      <Dialog.Title class="verification-title">{$i18n.t('settings.verification')}</Dialog.Title>
-      {#if core.verification}
-        {#if core.verification.state.phase === 'requested'}
-          {#if core.verification.state.initiated_by_us}
-            <p>{$i18n.t('settings.acceptOtherDevice')}</p>
-            <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
-          {:else}
-            <p>{$i18n.t('settings.verificationRequested')}</p>
-            <Button class="verification-action" onclick={accept}
-              >{$i18n.t('settings.acceptVerification')}</Button
-            >
-          {/if}
-        {:else if core.verification.state.phase === 'waiting'}
-          <p>{$i18n.t('settings.startingEmojiComparison')}</p>
-          <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
-        {:else if core.verification.state.phase === 'compare'}
-          <p>{$i18n.t('settings.compareEmoji')}</p>
-          <div class="emoji" aria-label={$i18n.t('settings.verificationEmoji')}>
-            {#each core.verification.state.emojis as emoji (emoji.symbol)}
-              <div class="emoji-item">
-                <span>{emoji.symbol}</span>
-                <small>{emoji.description}</small>
-              </div>
-            {/each}
-          </div>
-          <p class="decimals">{core.verification.state.decimals.join(' · ')}</p>
-          <div class="verification-actions">
-            <Button class="verification-action" onclick={confirm}
-              >{$i18n.t('settings.theyMatch')}</Button
-            >
-            <Button
-              variant="danger"
-              size="small"
-              class="verification-action"
-              onclick={() => void cancel(true)}>{$i18n.t('settings.theyDoNotMatch')}</Button
-            >
-          </div>
-        {:else if core.verification.state.phase === 'confirmed'}
-          <p>{$i18n.t('settings.finishing')}</p>
-          <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
-        {:else if core.verification.state.phase === 'done'}
-          <p>{$i18n.t('settings.verificationComplete')}</p>
-          <Button class="verification-action" onclick={() => (core.verification = null)}
-            >{$i18n.t('settings.close')}</Button
-          >
-        {:else if core.verification.state.phase === 'cancelled'}
-          <p>
-            {$i18n.t('settings.verificationCancelled', { reason: core.verification.state.reason })}
-          </p>
-          <Button class="verification-action" onclick={() => (core.verification = null)}
-            >{$i18n.t('settings.close')}</Button
-          >
-        {/if}
-        {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
-        {#if core.verification.state.phase !== 'done' && core.verification.state.phase !== 'cancelled'}
-          <Button
-            variant="ghost"
-            size="small"
-            class="verification-action verification-cancel"
-            onclick={() => void cancel()}>{$i18n.t('settings.cancelVerification')}</Button
-          >
-        {/if}
+<DialogFrame
+  open={core.verification !== null}
+  onOpenChange={handleOpenChange}
+  variant="verification"
+>
+  <Dialog.Title class="verification-title">{$i18n.t('settings.verification')}</Dialog.Title>
+  {#if core.verification}
+    {#if core.verification.state.phase === 'requested'}
+      {#if core.verification.state.initiated_by_us}
+        <p>{$i18n.t('settings.acceptOtherDevice')}</p>
+        <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
+      {:else}
+        <p>{$i18n.t('settings.verificationRequested')}</p>
+        <Button class="verification-action" onclick={accept}
+          >{$i18n.t('settings.acceptVerification')}</Button
+        >
       {/if}
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+    {:else if core.verification.state.phase === 'waiting'}
+      <p>{$i18n.t('settings.startingEmojiComparison')}</p>
+      <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
+    {:else if core.verification.state.phase === 'compare'}
+      <p>{$i18n.t('settings.compareEmoji')}</p>
+      <div class="emoji" aria-label={$i18n.t('settings.verificationEmoji')}>
+        {#each core.verification.state.emojis as emoji (emoji.symbol)}
+          <div class="emoji-item">
+            <span>{emoji.symbol}</span>
+            <small>{emoji.description}</small>
+          </div>
+        {/each}
+      </div>
+      <p class="decimals">{core.verification.state.decimals.join(' · ')}</p>
+      <div class="verification-actions">
+        <Button class="verification-action" onclick={confirm}
+          >{$i18n.t('settings.theyMatch')}</Button
+        >
+        <Button
+          variant="danger"
+          size="small"
+          class="verification-action"
+          onclick={() => void cancel(true)}>{$i18n.t('settings.theyDoNotMatch')}</Button
+        >
+      </div>
+    {:else if core.verification.state.phase === 'confirmed'}
+      <p>{$i18n.t('settings.finishing')}</p>
+      <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
+    {:else if core.verification.state.phase === 'done'}
+      <p>{$i18n.t('settings.verificationComplete')}</p>
+      <Button class="verification-action" onclick={() => (core.verification = null)}
+        >{$i18n.t('settings.close')}</Button
+      >
+    {:else if core.verification.state.phase === 'cancelled'}
+      <p>
+        {$i18n.t('settings.verificationCancelled', { reason: core.verification.state.reason })}
+      </p>
+      <Button class="verification-action" onclick={() => (core.verification = null)}
+        >{$i18n.t('settings.close')}</Button
+      >
+    {/if}
+    {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
+    {#if core.verification.state.phase !== 'done' && core.verification.state.phase !== 'cancelled'}
+      <Button
+        variant="ghost"
+        size="small"
+        class="verification-action verification-cancel"
+        onclick={() => void cancel()}>{$i18n.t('settings.cancelVerification')}</Button
+      >
+    {/if}
+  {/if}
+</DialogFrame>
 
 <style>
-  :global(.verification-backdrop) {
-    background: var(--sable-overlay);
-    inset: 0;
-    position: fixed;
-    z-index: 40;
-  }
-
-  :global(.verification-dialog) {
-    background: var(--sable-primary-container);
-    border: 1px solid var(--sable-primary-container-line);
-    border-radius: var(--radius) var(--radius) 0 0;
-    bottom: 0;
-    box-shadow: var(--shadow-dialog);
-    box-sizing: border-box;
-    max-height: calc(100dvh - 1.5rem);
-    overflow: auto;
-    padding: 1.25rem;
-    position: fixed;
-    width: 100%;
-    z-index: 41;
-  }
-
   :global(.verification-title) {
     font-size: var(--font-size-large);
   }
@@ -222,16 +200,6 @@
   }
 
   @media (width >= 42rem) {
-    :global(.verification-dialog) {
-      border-radius: var(--radius);
-      bottom: auto;
-      left: 50%;
-      max-width: 34rem;
-      padding: 1.5rem;
-      top: 50%;
-      transform: translate(-50%, -50%);
-    }
-
     .verification-actions {
       display: flex;
     }

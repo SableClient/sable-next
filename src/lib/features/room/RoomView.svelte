@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Dialog } from 'bits-ui';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '$lib/core/context';
@@ -10,6 +9,7 @@
   import RoomComposer from '$lib/features/composer/RoomComposer.svelte';
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
+  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -154,19 +154,14 @@
       />
     {/if}
   {:else}
-    <Dialog.Root bind:open={membersOpen}>
-      <Dialog.Portal>
-        <Dialog.Overlay class="members-backdrop" />
-        <Dialog.Content class="members-dialog">
-          <MembersDrawer
-            members={memberLoader.members}
-            loading={memberLoader.loading}
-            modal
-            onClose={closeMembers}
-          />
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <DialogFrame bind:open={membersOpen} variant="drawer">
+      <MembersDrawer
+        members={memberLoader.members}
+        loading={memberLoader.loading}
+        modal
+        onClose={closeMembers}
+      />
+    </DialogFrame>
   {/if}
 </section>
 
@@ -232,24 +227,6 @@
     border-radius: 50%;
     height: 0.375rem;
     width: 0.375rem;
-  }
-
-  :global(.members-backdrop) {
-    background: var(--sable-overlay);
-    border: 0;
-    inset: 0;
-    position: fixed;
-    z-index: 10;
-  }
-
-  :global(.members-dialog) {
-    border: 0;
-    inset: 0 0 0 auto;
-    max-width: min(22rem, 85%);
-    padding: 0;
-    position: fixed;
-    width: 100%;
-    z-index: 11;
   }
 
   @media (prefers-reduced-motion: no-preference) {
