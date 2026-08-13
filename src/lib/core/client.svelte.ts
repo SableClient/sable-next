@@ -352,6 +352,20 @@ export class CoreClient {
     });
   }
 
+  async sendImage(roomId: string, image: File): Promise<void> {
+    const bytes = new Uint8Array(await image.arrayBuffer());
+    await this.ensureTransport().sendAttachment({
+      roomId,
+      filename: image.name,
+      mime: image.type || 'image/*',
+      bytes,
+    });
+  }
+
+  fetchMedia(source: string, width: number, height: number): Promise<Uint8Array<ArrayBuffer>> {
+    return this.ensureTransport().fetchMedia(source, width, height);
+  }
+
   async markRead(roomId: string, eventId: string): Promise<void> {
     await this.ensureTransport().send({ type: 'mark_read', room_id: roomId, event_id: eventId });
   }

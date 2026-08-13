@@ -42,6 +42,7 @@
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
+  let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
   let typingLabel = $derived.by(() => {
@@ -124,6 +125,10 @@
     await core.sendMessage(targetRoomId, body);
   }
 
+  async function sendImage(targetRoomId: string, image: File): Promise<void> {
+    await core.sendImage(targetRoomId, image);
+  }
+
   async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
     await core.setTyping(targetRoomId, typing);
   }
@@ -143,7 +148,7 @@
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
-    <RoomHeader {roomName} onBack={goBack} onMembers={toggleMembers} {initials} />
+    <RoomHeader {roomName} {roomAvatar} onBack={goBack} onMembers={toggleMembers} {initials} />
     {#key `${roomId}:${eventId ?? ''}`}
       <TimelineList
         {timeline}
@@ -162,7 +167,12 @@
       {/if}
     </div>
     {#key resolvedRoomId}
-      <RoomComposer roomId={resolvedRoomId} onSend={sendMessage} onTyping={setTyping} />
+      <RoomComposer
+        roomId={resolvedRoomId}
+        onSend={sendMessage}
+        onSendImage={sendImage}
+        onTyping={setTyping}
+      />
     {/key}
   </div>
 

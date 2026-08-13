@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
 
+  import MediaImage from '$lib/ui/MediaImage.svelte';
+
   type AvatarSize = 'small' | 'medium' | 'large';
 
   type Props = {
@@ -33,7 +35,9 @@
   role={decorative || src ? undefined : 'img'}
   aria-label={decorative || src ? undefined : accessibleLabel}
 >
-  {#if src}
+  {#if src?.startsWith('mxc://')}
+    <MediaImage class="avatar-image" source={src} alt={alt ?? ''} width={96} height={96} />
+  {:else if src}
     <img {src} alt={alt ?? ''} />
   {:else}
     <span>{initials}</span>
@@ -70,6 +74,12 @@
   }
 
   :global(.sable-avatar img) {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  :global(.sable-avatar .avatar-image) {
     height: 100%;
     object-fit: cover;
     width: 100%;

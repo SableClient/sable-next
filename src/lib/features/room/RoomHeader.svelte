@@ -9,12 +9,13 @@
 
   interface Props {
     roomName: string;
+    roomAvatar: string | null;
     onBack: () => void;
     onMembers: () => void;
     initials: (name: string) => string;
   }
 
-  let { roomName, onBack, onMembers, initials }: Props = $props();
+  let { roomName, roomAvatar, onBack, onMembers, initials }: Props = $props();
 </script>
 
 <header class="room-header">
@@ -27,7 +28,7 @@
   >
     <BackIcon />
   </IconButton>
-  <Avatar class="room-avatar" initials={initials(roomName)} size="small" />
+  <Avatar class="room-avatar" src={roomAvatar} initials={initials(roomName)} size="small" />
   <h1>{roomName}</h1>
   <Button class="members-button" variant="ghost" size="small" onclick={onMembers}>
     <UsersIcon />

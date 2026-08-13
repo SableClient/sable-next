@@ -20,7 +20,12 @@ test('typing cleanup and drafts stay scoped to their room', async () => {
   const send = vi.fn(async () => {});
   const first = mount(RoomComposer, {
     target: document.body,
-    props: { roomId: '!first:example.org', onSend: send, onTyping: typing },
+    props: {
+      roomId: '!first:example.org',
+      onSend: send,
+      onSendImage: send,
+      onTyping: typing,
+    },
   });
   const firstInput = textarea();
   firstInput.value = 'private draft';
@@ -33,7 +38,12 @@ test('typing cleanup and drafts stay scoped to their room', async () => {
 
   const second = mount(RoomComposer, {
     target: document.body,
-    props: { roomId: '!second:example.org', onSend: send, onTyping: typing },
+    props: {
+      roomId: '!second:example.org',
+      onSend: send,
+      onSendImage: send,
+      onTyping: typing,
+    },
   });
   expect(textarea().value).toBe('');
   await unmount(second);

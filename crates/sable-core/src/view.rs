@@ -339,10 +339,16 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
 
     match content {
         TimelineItemContent::MsgLike(msg) => match &msg.kind {
-            MsgLikeKind::Message(message) => TimelineItemContentView::Message {
-                body: message.body().to_owned(),
-                formatted: formatted_body(message.msgtype()),
-                edited: message.is_edited(),
+            MsgLikeKind::Message(message) => match message.msgtype() {
+                MessageType::Image(image) => TimelineItemContentView::Image {
+                    body: image.body.clone(),
+                    source: serde_json::to_string(&image.source).unwrap_or_default(),
+                },
+                _ => TimelineItemContentView::Message {
+                    body: message.body().to_owned(),
+                    formatted: formatted_body(message.msgtype()),
+                    edited: message.is_edited(),
+                },
             },
             MsgLikeKind::Redacted => TimelineItemContentView::Redacted,
             MsgLikeKind::UnableToDecrypt(_) => TimelineItemContentView::UnableToDecrypt {

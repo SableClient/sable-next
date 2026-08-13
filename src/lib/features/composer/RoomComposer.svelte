@@ -1,5 +1,6 @@
 <script lang="ts">
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+  import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 
   import { i18n } from '$lib/i18n';
   import Alert from '$lib/ui/primitives/Alert.svelte';
@@ -9,10 +10,11 @@
   interface Props {
     roomId: string;
     onSend: (roomId: string, body: string) => Promise<void>;
+    onSendImage: (roomId: string, image: File) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
   }
 
-  let { roomId, onSend, onTyping }: Props = $props();
+  let { roomId, onSend, onSendImage, onTyping }: Props = $props();
   let draft = $state('');
   let sending = $state(false);
   let error = $state<string | null>(null);
@@ -58,6 +60,24 @@
     }
   }
 
+  async function sendImage(event: Event): Promise<void> {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) return;
+    const image = input.files?.[0];
+    input.value = '';
+    if (!image || sending) return;
+
+    sending = true;
+    error = null;
+    try {
+      await onSendImage(roomId, image);
+    } catch {
+      error = $i18n.t('timeline.sendFailed');
+    } finally {
+      sending = false;
+    }
+  }
+
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key !== 'Enter' || event.shiftKey) return;
     event.preventDefault();
@@ -82,6 +102,10 @@
     oninput={updateTyping}
     onkeydown={handleKeydown}
   />
+  <label class="composer-image" aria-label={$i18n.t('timeline.sendImage')}>
+    <ImageIcon />
+    <input type="file" accept="image/*" onchange={sendImage} disabled={sending} />
+  </label>
   <IconButton
     type="submit"
     variant="ghost"
@@ -138,6 +162,38 @@
 
   :global(.composer-send) {
     color: var(--sable-primary-main);
+  }
+
+  .composer-image {
+    align-items: center;
+    border-radius: var(--radius);
+    color: var(--sable-primary-main);
+    cursor: pointer;
+    display: flex;
+    height: var(--control-height-small);
+    justify-content: center;
+    width: var(--control-height-small);
+  }
+
+  .composer-image:hover {
+    background: var(--sable-surface-container-hover);
+  }
+
+  .composer-image:has(input:disabled) {
+    color: var(--sable-sec-main);
+    cursor: default;
+  }
+
+  .composer-image input {
+    height: 1px;
+    opacity: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .composer-image :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   :global(.composer-send:disabled) {

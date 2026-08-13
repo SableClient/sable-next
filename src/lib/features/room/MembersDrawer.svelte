@@ -80,6 +80,7 @@
           <li>
             <Avatar
               size="small"
+              src={member.avatar_url}
               initials={initials(memberName(member))}
               color={senderColor(member.user_id)}
             />

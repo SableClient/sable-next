@@ -15,6 +15,7 @@
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import MediaImage from '$lib/ui/MediaImage.svelte';
 
   interface Props {
     onNavigate?: (href: string) => void;
@@ -272,7 +273,19 @@
               aria-label={collapsed ? name : undefined}
               aria-current={page.url.pathname === href ? 'page' : undefined}
             >
-              <span class="room-icon" aria-hidden="true">{initial(name)}</span>
+              <span class="room-icon" aria-hidden="true">
+                {#if room?.avatar_url}
+                  <MediaImage
+                    source={room.avatar_url}
+                    alt=""
+                    width={56}
+                    height={56}
+                    class="room-image"
+                  />
+                {:else}
+                  {initial(name)}
+                {/if}
+              </span>
               {#if !collapsed}
                 <span class="room-name">{name}</span>
                 {#if unread > 0}
@@ -460,6 +473,12 @@
     height: 1.75rem;
     justify-content: center;
     width: 1.75rem;
+  }
+
+  :global(.room-image) {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
   }
 
   .room-category {

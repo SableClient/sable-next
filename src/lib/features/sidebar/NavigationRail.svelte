@@ -7,6 +7,7 @@
   import { i18n } from '$lib/i18n';
   import { roomPathParam } from '$lib/rooms/room-list.svelte';
   import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
+  import MediaImage from '$lib/ui/MediaImage.svelte';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
@@ -19,6 +20,7 @@
     route?: Pathname;
     icon?: Component;
     initial?: string;
+    avatar?: string | null;
     navigateHref?: string;
   };
 
@@ -64,6 +66,7 @@
         activePrefix: href,
         navigateHref: href,
         initial: initial(name),
+        avatar: space.avatar_url,
         label: name,
       };
     })
@@ -122,7 +125,19 @@
               {#if item.icon}
                 <span class="icon" aria-hidden="true"><item.icon /></span>
               {:else}
-                <span class="space-initial" aria-hidden="true">{item.initial}</span>
+                <span class="space-initial" aria-hidden="true">
+                  {#if item.avatar}
+                    <MediaImage
+                      source={item.avatar}
+                      alt=""
+                      width={56}
+                      height={56}
+                      class="space-image"
+                    />
+                  {:else}
+                    {item.initial}
+                  {/if}
+                </span>
               {/if}
             </a>
           </li>
@@ -168,7 +183,19 @@
                 {#if item.icon}
                   <span class="icon" aria-hidden="true"><item.icon /></span>
                 {:else}
-                  <span class="space-initial" aria-hidden="true">{item.initial}</span>
+                  <span class="space-initial" aria-hidden="true">
+                    {#if item.avatar}
+                      <MediaImage
+                        source={item.avatar}
+                        alt=""
+                        width={56}
+                        height={56}
+                        class="space-image"
+                      />
+                    {:else}
+                      {item.initial}
+                    {/if}
+                  </span>
                 {/if}
               </a>
             {/snippet}
@@ -293,6 +320,12 @@
     height: var(--avatar-size-small);
     justify-content: center;
     width: var(--avatar-size-small);
+  }
+
+  :global(.space-image) {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
   }
 
   .icon :global(svg) {

@@ -924,6 +924,10 @@ pub enum TimelineItemContentView {
         formatted: Option<String>,
         edited: bool,
     },
+    Image {
+        body: String,
+        source: String,
+    },
     Redacted,
     UnableToDecrypt {
         reason: String,

@@ -42,6 +42,7 @@
     "loadFailed": "Unable to load messages. Your session may have expired.",
     "messagePlaceholder": "Send a message...",
     "sendMessage": "Send message",
+    "sendImage": "Send image",
     "members": "Members",
     "closeMembers": "Close members",
     "loadingMembers": "Loading members...",

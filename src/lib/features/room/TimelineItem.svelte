@@ -4,6 +4,7 @@
   import { i18n } from '$lib/i18n';
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import MediaImage from '$lib/ui/MediaImage.svelte';
 
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
@@ -15,7 +16,7 @@
   let { item, collapsed }: Props = $props();
 </script>
 
-{#if item.content.kind === 'message'}
+{#if item.content.kind === 'message' || item.content.kind === 'image'}
   <article
     class={[
       'message',
@@ -29,6 +30,7 @@
     {#if !collapsed}
       <Avatar
         class="message-avatar"
+        src={item.sender_avatar}
         size="small"
         color={senderColor(item.sender)}
         initials={initials(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'))}
@@ -42,7 +44,9 @@
           >
           <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time
           >
-          {#if item.content.edited}<span class="edited">{$i18n.t('timeline.edited')}</span>{/if}
+          {#if item.content.kind === 'message' && item.content.edited}
+            <span class="edited">{$i18n.t('timeline.edited')}</span>
+          {/if}
         </header>
       {/if}
       {#if item.in_reply_to}
@@ -55,7 +59,18 @@
           {item.in_reply_to.body ?? ''}
         </p>
       {/if}
-      <p class="body">{item.content.body}</p>
+      {#if item.content.kind === 'message'}
+        <p class="body">{item.content.body}</p>
+      {:else}
+        <MediaImage
+          class="image"
+          source={item.content.source}
+          alt={item.content.body}
+          width={800}
+          height={600}
+        />
+        {#if item.content.body}<p class="body">{item.content.body}</p>{/if}
+      {/if}
       {#if item.reactions.length > 0}
         <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
           {#each item.reactions as reaction (reaction.key)}
@@ -159,6 +174,15 @@
     line-height: var(--line-height-body);
     max-width: 72ch;
     white-space: pre-wrap;
+  }
+
+  :global(.image) {
+    border-radius: var(--radius);
+    display: block;
+    margin-top: 0.25rem;
+    max-height: 32rem;
+    max-width: min(100%, 32rem);
+    object-fit: contain;
   }
 
   .reply-preview {

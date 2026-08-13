@@ -1821,13 +1821,16 @@ impl Core {
         width: u32,
         height: u32,
     ) -> Result<Vec<u8>, CommandErr> {
-        let uri = OwnedMxcUri::from(source);
-        if uri.parts().is_err() {
-            return Err(CommandErr::InvalidMedia);
+        let source: MediaSource = serde_json::from_str(&source)
+            .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(source)));
+        if let MediaSource::Plain(uri) = &source {
+            if uri.parts().is_err() {
+                return Err(CommandErr::InvalidMedia);
+            }
         }
 
         let request = MediaRequestParameters {
-            source: MediaSource::Plain(uri),
+            source,
             format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(
                 width.into(),
                 height.into(),
