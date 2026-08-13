@@ -5,6 +5,7 @@
   import { useCoreClient } from '$lib/core/context';
   import { i18n, t } from '$lib/i18n';
   import Alert from '$lib/ui/primitives/Alert.svelte';
+  import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
@@ -142,14 +143,10 @@
   });
 </script>
 
-<svelte:head><title>{$i18n.t('settings.devices')} · Sable</title></svelte:head>
-
-<main class="settings-page">
-  <header>
-    <h1>{$i18n.t('settings.devicesTitle')}</h1>
-    <p>{$i18n.t('settings.devicesDescription')}</p>
-  </header>
-
+<AppPageShell
+  title={$i18n.t('settings.devicesTitle')}
+  description={$i18n.t('settings.devicesDescription')}
+>
   {#if error}<Alert class="settings-error" variant="critical" role="alert">{error}</Alert>{/if}
 
   <section aria-labelledby="encryption-heading">
@@ -354,29 +351,12 @@
       >
     </section>
   {/if}
-</main>
+</AppPageShell>
 
 <style>
-  .settings-page {
-    margin: 0 auto;
-    max-width: 52rem;
-    overflow: auto;
-    padding: 2rem;
-    width: 100%;
-  }
-
-  header {
-    margin-bottom: 2rem;
-  }
-
-  h1,
   h2,
   p {
     margin-top: 0;
-  }
-
-  h1 {
-    font-size: var(--font-size-xlarge);
   }
 
   h2 {
@@ -488,10 +468,6 @@
   }
 
   @media (width < 42rem) {
-    .settings-page {
-      padding: 1rem;
-    }
-
     .status-grid {
       grid-template-columns: 1fr;
     }

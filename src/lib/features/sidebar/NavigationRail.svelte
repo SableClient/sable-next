@@ -1,0 +1,330 @@
+<script lang="ts">
+  import type { Component } from 'svelte';
+  import type { RoomSummary } from '@/generated/RoomSummary';
+  import type { Pathname } from '$app/types';
+  import { resolve } from '$app/paths';
+  import { page } from '$app/state';
+  import { i18n } from '$lib/i18n';
+  import { roomPathParam } from '$lib/rooms/room-list.svelte';
+  import { Tooltip } from 'bits-ui';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+
+  type RailItem = {
+    href: string;
+    activePrefix: string;
+    label: string;
+    route?: Pathname;
+    icon?: Component;
+    initial?: string;
+    navigateHref?: string;
+  };
+
+  interface Props {
+    spaces: readonly RoomSummary[];
+    mobile?: boolean;
+    onNavigate?: (href: string) => void;
+  }
+
+  let { spaces, mobile = false, onNavigate }: Props = $props();
+
+  const items: readonly RailItem[] = [
+    {
+      href: resolve('/home'),
+      activePrefix: '/home',
+      icon: HouseIcon,
+      label: 'nav.home',
+      route: '/home',
+    },
+    {
+      href: resolve('/navigate'),
+      activePrefix: '/navigate',
+      icon: MagnifyingGlassIcon,
+      label: 'nav.navigate',
+      route: '/navigate',
+    },
+    {
+      href: resolve('/direct'),
+      activePrefix: '/direct',
+      icon: ChatsIcon,
+      label: 'nav.direct',
+      route: '/direct',
+    },
+  ];
+
+  let spaceItems = $derived.by<RailItem[]>(() =>
+    spaces.map((space) => {
+      const name = spaceName(space.name, space.room_id);
+      const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) });
+
+      return {
+        href,
+        activePrefix: href,
+        navigateHref: href,
+        initial: initial(name),
+        label: name,
+      };
+    })
+  );
+
+  const createItem: RailItem = {
+    href: resolve('/create-room'),
+    activePrefix: '/create-room',
+    icon: PlusIcon,
+    label: 'nav.createRoom',
+    route: '/create-room',
+  };
+
+  function spaceName(name: string | null, roomId: string): string {
+    return name ?? roomId;
+  }
+
+  function initial(name: string): string {
+    return name.slice(0, 1).toUpperCase();
+  }
+
+  function isActive(item: RailItem): boolean {
+    if (item.initial) {
+      return (
+        page.url.pathname.startsWith(`${item.activePrefix}/`) ||
+        page.url.pathname === item.activePrefix
+      );
+    }
+
+    return page.url.pathname.startsWith(item.activePrefix);
+  }
+
+  function navigate(item: RailItem): void {
+    onNavigate?.(item.navigateHref ?? item.href);
+  }
+</script>
+
+{#if mobile}
+  <div class="rail">
+    <div class="rail-scroll">
+      <ul class="rail-stack">
+        {#each [...items, ...spaceItems] as item (item.href)}
+          {@const active = isActive(item)}
+          <li>
+            <a
+              class="rail-item"
+              class:space-item={Boolean(item.initial)}
+              class:active
+              href={resolve((item.route ?? item.href) as Pathname)}
+              onclick={() => {
+                navigate(item);
+              }}
+              aria-label={$i18n.t(item.label)}
+              aria-current={active ? 'page' : undefined}
+            >
+              {#if item.icon}
+                <span class="icon" aria-hidden="true"><item.icon /></span>
+              {:else}
+                <span class="space-initial" aria-hidden="true">{item.initial}</span>
+              {/if}
+            </a>
+          </li>
+        {/each}
+      </ul>
+      <div class="dynamic-rail-region" aria-hidden="true"></div>
+    </div>
+    <ul class="rail-stack rail-bottom">
+      <li>
+        <a
+          class="rail-item"
+          href={resolve((createItem.route ?? createItem.href) as Pathname)}
+          onclick={() => {
+            navigate(createItem);
+          }}
+          aria-label={$i18n.t(createItem.label)}
+        >
+          <span class="icon" aria-hidden="true"><PlusIcon /></span>
+        </a>
+      </li>
+    </ul>
+  </div>
+{:else}
+  <Tooltip.Provider>
+    <div class="rail">
+      <div class="rail-scroll">
+        <ul class="rail-stack">
+          {#each [...items, ...spaceItems] as item (item.href)}
+            {@const active = isActive(item)}
+            {@const label = $i18n.t(item.label)}
+            <li>
+              {#snippet trigger({ props }: { props: Record<string, unknown> })}
+                <a
+                  {...props}
+                  class="rail-item"
+                  class:space-item={Boolean(item.initial)}
+                  class:active
+                  href={resolve((item.route ?? item.href) as Pathname)}
+                  aria-label={label}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  {#if item.icon}
+                    <span class="icon" aria-hidden="true"><item.icon /></span>
+                  {:else}
+                    <span class="space-initial" aria-hidden="true">{item.initial}</span>
+                  {/if}
+                </a>
+              {/snippet}
+              <Tooltip.Root>
+                <Tooltip.Trigger child={trigger} />
+                <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
+                  >{label}</Tooltip.Content
+                >
+              </Tooltip.Root>
+            </li>
+          {/each}
+        </ul>
+        <div class="dynamic-rail-region" aria-hidden="true"></div>
+      </div>
+      <ul class="rail-stack rail-bottom">
+        <li>
+          {#snippet trigger({ props }: { props: Record<string, unknown> })}
+            {@const label = $i18n.t(createItem.label)}
+            <a
+              {...props}
+              class="rail-item"
+              href={resolve((createItem.route ?? createItem.href) as Pathname)}
+              aria-label={label}
+            >
+              <span class="icon" aria-hidden="true"><PlusIcon /></span>
+            </a>
+          {/snippet}
+          <Tooltip.Root>
+            <Tooltip.Trigger child={trigger} />
+            <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
+              >{$i18n.t(createItem.label)}</Tooltip.Content
+            >
+          </Tooltip.Root>
+        </li>
+      </ul>
+    </div>
+  </Tooltip.Provider>
+{/if}
+
+<style>
+  .rail {
+    background: var(--sable-bg-container);
+    border-right: 1px solid var(--sable-bg-container-line);
+    box-sizing: border-box;
+    color: var(--sable-bg-on-container);
+    display: flex;
+    flex: 0 0 4.125rem;
+    flex-direction: column;
+    min-height: 0;
+    width: 4.125rem;
+  }
+
+  .rail-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .dynamic-rail-region {
+    border-top: 1px solid var(--sable-bg-container-line);
+    margin: 0.25rem auto;
+    width: 2rem;
+  }
+
+  .rail-stack {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+
+  .rail-bottom {
+    gap: 0.5rem;
+    padding: 0.5rem 0 0.75rem;
+  }
+
+  .rail-item {
+    align-items: center;
+    border-radius: var(--radius);
+    color: inherit;
+    display: flex;
+    height: 2.625rem;
+    justify-content: center;
+    position: relative;
+    width: 2.625rem;
+  }
+
+  .rail-item::before {
+    background: currentcolor;
+    border-radius: 0 0.25rem 0.25rem 0;
+    content: '';
+    height: 1.5rem;
+    left: -0.75rem;
+    position: absolute;
+    transform: translateX(-50%);
+    width: 3px;
+  }
+
+  .rail-item:not(.active)::before {
+    display: none;
+  }
+
+  .rail-item:hover {
+    background: var(--sable-bg-container-hover);
+  }
+
+  .rail-item.active {
+    background: var(--sable-primary-container);
+    color: var(--sable-primary-on-container);
+  }
+
+  .icon {
+    display: flex;
+  }
+
+  .space-initial {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius);
+    display: flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    height: 1.5rem;
+    justify-content: center;
+    width: 1.5rem;
+  }
+
+  .icon :global(svg) {
+    height: 1.375rem;
+    width: 1.375rem;
+  }
+
+  .rail-tooltip {
+    background: var(--sable-bg-container);
+    border: 1px solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
+    color: var(--sable-bg-on-container);
+    padding: 0.375rem 0.625rem;
+  }
+
+  .rail-item:focus-visible {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rail-item {
+      transition:
+        background-color var(--motion-normal) ease,
+        transform var(--motion-slow) cubic-bezier(0, 0.8, 0.67, 0.97);
+    }
+
+    .rail-item:hover {
+      transform: translateX(0.125rem);
+    }
+  }
+</style>

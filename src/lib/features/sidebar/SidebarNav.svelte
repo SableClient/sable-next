@@ -1,22 +1,9 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
-  import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
-  import { roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
-  import { Tooltip } from 'bits-ui';
-  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
-  import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
-  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
-  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import { useRoomList } from '$lib/rooms/room-list.svelte';
+  import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
-
-  const items = [
-    { href: '/home', icon: HouseIcon, label: 'nav.home' },
-    { href: '/navigate', icon: MagnifyingGlassIcon, label: 'nav.navigate' },
-    { href: '/direct', icon: ChatsIcon, label: 'nav.direct' },
-  ] as const;
-  const createItem = { href: '/create-room', icon: PlusIcon, label: 'nav.createRoom' } as const;
 
   interface Props {
     mobile?: boolean;
@@ -86,178 +73,40 @@
       roomNavWidth + (event.key === 'ArrowLeft' ? -ROOM_NAV_WIDTH_STEP : ROOM_NAV_WIDTH_STEP)
     );
   }
-
-  function spaceName(name: string | null, roomId: string) {
-    return name ?? roomId;
-  }
-
-  function initial(name: string) {
-    return name.slice(0, 1).toUpperCase();
-  }
 </script>
 
 <aside class="sidebar">
   {#if mobile}
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="navigation-main">
-        <div class="rail">
-          <div class="rail-scroll">
-            <ul class="rail-stack">
-              {#each items as item (item.href)}
-                {@const active = page.url.pathname.startsWith(item.href)}
-                <li>
-                  <a
-                    class="rail-item"
-                    class:active
-                    href={resolve(item.href)}
-                    onclick={() => onNavigate?.(item.href)}
-                    aria-label={$i18n.t(item.label)}
-                    aria-current={active ? 'page' : undefined}
-                  >
-                    <span class="icon" aria-hidden="true"><item.icon /></span>
-                  </a>
-                </li>
-              {/each}
-              {#each spaces as space (space.room_id)}
-                {@const name = spaceName(space.name, space.room_id)}
-                {@const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) })}
-                {@const active =
-                  page.url.pathname.startsWith(`${href}/`) || page.url.pathname === href}
-                <li>
-                  <a
-                    class="rail-item space-item"
-                    class:active
-                    {href}
-                    onclick={() => onNavigate?.(href)}
-                    aria-label={name}
-                    aria-current={active ? 'page' : undefined}
-                  >
-                    <span class="space-initial" aria-hidden="true">{initial(name)}</span>
-                  </a>
-                </li>
-              {/each}
-            </ul>
-            <div class="dynamic-rail-region" aria-hidden="true"></div>
-          </div>
-          <ul class="rail-stack rail-bottom">
-            <li>
-              <a
-                class="rail-item"
-                href={resolve(createItem.href)}
-                onclick={() => onNavigate?.(createItem.href)}
-                aria-label={$i18n.t(createItem.label)}
-              >
-                <span class="icon" aria-hidden="true"><createItem.icon /></span>
-              </a>
-            </li>
-          </ul>
-        </div>
+        <NavigationRail {spaces} mobile {onNavigate} />
         <RoomNav {onNavigate} />
       </div>
       <UserQuickTools mobile {onNavigate} />
     </nav>
   {:else}
-    <Tooltip.Provider>
-      <nav class="desktop-navigation" aria-label={$i18n.t('nav.primary')}>
-        <div class="desktop-navigation-main">
-          <div class="rail">
-            <div class="rail-scroll">
-              <ul class="rail-stack">
-                {#each items as item (item.href)}
-                  {@const active = page.url.pathname.startsWith(item.href)}
-                  <li>
-                    {#snippet trigger({ props }: { props: Record<string, unknown> })}
-                      <a
-                        {...props}
-                        class="rail-item"
-                        class:active
-                        href={resolve(item.href)}
-                        aria-label={$i18n.t(item.label)}
-                        aria-current={active ? 'page' : undefined}
-                      >
-                        <span class="icon" aria-hidden="true"><item.icon /></span>
-                      </a>
-                    {/snippet}
-                    <Tooltip.Root>
-                      <Tooltip.Trigger child={trigger} />
-                      <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
-                        >{$i18n.t(item.label)}</Tooltip.Content
-                      >
-                    </Tooltip.Root>
-                  </li>
-                {/each}
-                {#each spaces as space (space.room_id)}
-                  {@const name = spaceName(space.name, space.room_id)}
-                  {@const href = resolve('/(app)/space/[spaceId]', {
-                    spaceId: roomPathParam(space),
-                  })}
-                  {@const active =
-                    page.url.pathname.startsWith(`${href}/`) || page.url.pathname === href}
-                  <li>
-                    {#snippet trigger({ props }: { props: Record<string, unknown> })}
-                      <a
-                        {...props}
-                        class="rail-item space-item"
-                        class:active
-                        {href}
-                        aria-label={name}
-                        aria-current={active ? 'page' : undefined}
-                      >
-                        <span class="space-initial" aria-hidden="true">{initial(name)}</span>
-                      </a>
-                    {/snippet}
-                    <Tooltip.Root>
-                      <Tooltip.Trigger child={trigger} />
-                      <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
-                        >{name}</Tooltip.Content
-                      >
-                    </Tooltip.Root>
-                  </li>
-                {/each}
-              </ul>
-              <div class="dynamic-rail-region" aria-hidden="true"></div>
-            </div>
-            <ul class="rail-stack rail-bottom">
-              <li>
-                {#snippet trigger({ props }: { props: Record<string, unknown> })}
-                  <a
-                    {...props}
-                    class="rail-item"
-                    href={resolve(createItem.href)}
-                    aria-label={$i18n.t(createItem.label)}
-                  >
-                    <span class="icon" aria-hidden="true"><createItem.icon /></span>
-                  </a>
-                {/snippet}
-                <Tooltip.Root>
-                  <Tooltip.Trigger child={trigger} />
-                  <Tooltip.Content class="rail-tooltip" side="right" sideOffset={8}
-                    >{$i18n.t(createItem.label)}</Tooltip.Content
-                  >
-                </Tooltip.Root>
-              </li>
-            </ul>
-          </div>
-          <RoomNav width={roomNavWidth} {collapsed} />
-          <button
-            type="button"
-            class="resize-handle"
-            class:dragging
-            aria-label={$i18n.t('nav.resizeRooms')}
-            onpointerdown={handleResizeStart}
-            onpointermove={handleResizeMove}
-            onpointerup={finishResize}
-            onpointercancel={finishResize}
-            onkeydown={handleResizeKeydown}
-          ></button>
-        </div>
-        {#if collapsed}
-          <UserQuickTools compact />
-        {:else}
-          <UserQuickTools />
-        {/if}
-      </nav>
-    </Tooltip.Provider>
+    <nav class="desktop-navigation" aria-label={$i18n.t('nav.primary')}>
+      <div class="desktop-navigation-main">
+        <NavigationRail {spaces} />
+        <RoomNav width={roomNavWidth} {collapsed} />
+        <button
+          type="button"
+          class="resize-handle"
+          class:dragging
+          aria-label={$i18n.t('nav.resizeRooms')}
+          onpointerdown={handleResizeStart}
+          onpointermove={handleResizeMove}
+          onpointerup={finishResize}
+          onpointercancel={finishResize}
+          onkeydown={handleResizeKeydown}
+        ></button>
+      </div>
+      {#if collapsed}
+        <UserQuickTools compact />
+      {:else}
+        <UserQuickTools />
+      {/if}
+    </nav>
   {/if}
 </aside>
 
@@ -289,126 +138,6 @@
     display: flex;
     flex: 1;
     min-height: 0;
-  }
-
-  .rail {
-    background: var(--sable-bg-container);
-    border-right: 1px solid var(--sable-bg-container-line);
-    box-sizing: border-box;
-    color: var(--sable-bg-on-container);
-    display: flex;
-    flex: 0 0 4.125rem;
-    flex-direction: column;
-    min-height: 0;
-    width: 4.125rem;
-  }
-
-  .rail-scroll {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-  }
-
-  .dynamic-rail-region {
-    border-top: 1px solid var(--sable-bg-container-line);
-    margin: 0.25rem auto;
-    width: 2rem;
-  }
-
-  .rail-stack {
-    align-items: center;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    list-style: none;
-    margin: 0;
-    padding: 0.5rem 0;
-  }
-
-  .rail-bottom {
-    gap: 0.5rem;
-    padding: 0.5rem 0 0.75rem;
-  }
-
-  .rail-item {
-    align-items: center;
-    border-radius: var(--radius);
-    color: inherit;
-    display: flex;
-    height: 2.625rem;
-    justify-content: center;
-    position: relative;
-    width: 2.625rem;
-  }
-
-  .rail-item::before {
-    background: currentcolor;
-    border-radius: 0 0.25rem 0.25rem 0;
-    content: '';
-    height: 1.5rem;
-    left: -0.75rem;
-    position: absolute;
-    transform: translateX(-50%);
-    width: 3px;
-  }
-
-  .rail-item:not(.active)::before {
-    display: none;
-  }
-
-  .rail-item:hover {
-    background: var(--sable-bg-container-hover);
-  }
-
-  .rail-item.active {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
-  }
-
-  .icon {
-    display: flex;
-  }
-
-  .space-initial {
-    align-items: center;
-    background: var(--sable-surface-var-container);
-    border-radius: var(--radius);
-    display: flex;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: 1.5rem;
-    justify-content: center;
-    width: 1.5rem;
-  }
-
-  .icon :global(svg) {
-    height: 1.375rem;
-    width: 1.375rem;
-  }
-
-  .rail-tooltip {
-    background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    color: var(--sable-bg-on-container);
-    padding: 0.375rem 0.625rem;
-  }
-
-  .rail-item:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: 2px;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .rail-item {
-      transition:
-        background-color var(--motion-normal) ease,
-        transform var(--motion-slow) cubic-bezier(0, 0.8, 0.67, 0.97);
-    }
-
-    .rail-item:hover {
-      transform: translateX(0.125rem);
-    }
   }
 
   @media (width >= 48rem) {
