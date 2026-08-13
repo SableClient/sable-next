@@ -1,5 +1,9 @@
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
+  import { SvelteMap } from 'svelte/reactivity';
+
+  const mediaUrls = new SvelteMap<string, string>();
+  const pendingMedia = new SvelteMap<string, Promise<string>>();
 
   interface Props {
     source: string;
@@ -15,21 +19,32 @@
 
   $effect(() => {
     let active = true;
-    let objectUrl: string | null = null;
-    url = null;
+    const key = `${source}:${String(width)}:${String(height)}`;
+    const cached = mediaUrls.get(key);
+    if (cached) {
+      url = cached;
+      return;
+    }
 
-    void core
-      .fetchMedia(source, width, height)
-      .then((bytes) => {
+    const pending =
+      pendingMedia.get(key) ??
+      core.fetchMedia(source, width, height).then((bytes) => {
+        const objectUrl = URL.createObjectURL(new Blob([bytes]));
+        mediaUrls.set(key, objectUrl);
+        pendingMedia.delete(key);
+        return objectUrl;
+      });
+    pendingMedia.set(key, pending);
+
+    void pending
+      .then((nextUrl) => {
         if (!active) return;
-        objectUrl = URL.createObjectURL(new Blob([bytes]));
-        url = objectUrl;
+        url = nextUrl;
       })
-      .catch(() => {});
+      .catch(() => pendingMedia.delete(key));
 
     return () => {
       active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   });
 </script>
