@@ -131,6 +131,29 @@
     padding: 0.5rem;
   }
 
+  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+    .message {
+      margin-inline: calc(-1 * var(--page-gutter));
+      padding-inline: var(--page-gutter);
+    }
+
+    .message.failed {
+      padding-inline: var(--page-gutter);
+    }
+
+    .message.collapsed {
+      padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + 0.625rem);
+    }
+
+    .message:hover {
+      background-color: var(--sable-surface-container-hover);
+    }
+
+    .message.failed:hover {
+      background-color: var(--sable-crit-container-hover);
+    }
+  }
+
   :global(.sable-avatar.message-avatar) {
     color: var(--sable-primary-on-main);
   }
