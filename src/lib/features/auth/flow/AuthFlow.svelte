@@ -15,11 +15,14 @@
   import { AuthFlowController, LOGGED_IN_MARKER, readReturningUser } from './auth-flow.svelte';
   import { LoginController, type LoginField } from '../login/login-controller.svelte';
   import LoginForm from '../login/LoginForm.svelte';
+  import DeviceVerificationCard from '../login/DeviceVerificationCard.svelte';
+  import DeviceVerificationDialog from '$lib/features/settings/DeviceVerificationDialog.svelte';
   import {
     RegistrationController,
     type RegistrationField,
   } from '../registration/registration-controller.svelte';
   import RegistrationCard from '../registration/RegistrationCard.svelte';
+  import RecoverySetupCard from '../recovery/RecoverySetupCard.svelte';
   import AccountSummaryCard from '../profile/AccountSummaryCard.svelte';
   import { ProfileController, profileOnboardingMarker } from '../profile/profile-controller.svelte';
   import ProfileCard from '../profile/ProfileCard.svelte';
@@ -42,6 +45,12 @@
       title: 'Create account',
       completed: false,
       accessibilityLabel: 'Create your Matrix account',
+    },
+    {
+      route: resolve('/register/recovery'),
+      title: 'Recovery setup',
+      completed: false,
+      accessibilityLabel: 'Set up account recovery',
     },
     {
       route: resolve('/register/profile'),
@@ -67,6 +76,7 @@
   );
   let restoredMarkerFor: string | null = null;
   let lastUrlPrefill = '';
+  let recoveryOnboardingComplete = $state(false);
 
   function markLoggedIn(): void {
     localStorage.setItem(LOGGED_IN_MARKER, 'true');
@@ -76,7 +86,7 @@
   function markOnboardingPending(matrixId: string): void {
     localStorage.setItem(
       profileOnboardingMarker(matrixId),
-      JSON.stringify({ stage: 'profile', homeserver: flow.homeserver })
+      JSON.stringify({ stage: 'recovery', homeserver: flow.homeserver })
     );
   }
 
@@ -87,8 +97,8 @@
     validateHomeserver: () => flow.validateHomeserver(0),
     onMarkLoggedIn: markLoggedIn,
     onMarkOnboardingPending: markOnboardingPending,
-    onNavigateHome: () => goto(resolve('/home')),
-    onNavigateProfile: () => goto(resolve('/register/profile')),
+    onNavigateLoginVerification: navigateToLoginVerification,
+    onNavigateRegistrationRecovery: () => goto(resolve('/register/recovery')),
   });
 
   const registration = new RegistrationController(
@@ -102,7 +112,7 @@
         flow.isEditingHomeserver = true;
       },
       onMarkOnboardingPending: markOnboardingPending,
-      onRegistrationComplete: () => goto(resolve('/register/profile')),
+      onRegistrationComplete: () => goto(resolve('/register/recovery')),
       onOpenFallback: (fallback, onComplete) => {
         redirect.openFallback(fallback, onComplete);
       },
@@ -134,7 +144,10 @@
   let stages = $derived(
     stageRegistry.map((stage, index) => ({
       ...stage,
-      completed: index === 0 || (index === 1 && core.status === 'ready'),
+      completed:
+        index === 0 ||
+        (index === 1 && core.status === 'ready') ||
+        (index === 2 && recoveryOnboardingComplete),
     }))
   );
   let activeIndex = $derived(furthestReachableStage(requestedStage, stages));
@@ -144,7 +157,7 @@
   let visibleFurthestStage = $derived(
     hasSecondaryStage ? Math.max(furthestReached, 1) : furthestReached
   );
-  let isProfileStage = $derived(activeIndex === 2);
+  let isProfileStage = $derived(activeIndex === 3);
   let displayedStage = $derived(pendingStage ?? activeIndex);
   let userId = $derived(core.session?.user_id ?? '');
   let pendingOnboardingTransition = $derived(
@@ -158,6 +171,22 @@
     registration.isRegistering || (redirect.pendingIntent === 'register' && redirect.isLaunching)
   );
   let isLaunchingLogin = $derived(redirect.pendingIntent === 'login' && redirect.isLaunching);
+  let loginVerificationPending = $state(false);
+  let isDeviceVerificationStage = $derived(page.url.pathname === resolve('/login/verify'));
+  let loginVerificationActive = $state(page.url.pathname === resolve('/login/verify'));
+  let verificationDisplayedStage = $derived(isDeviceVerificationStage ? 1 : 0);
+  let carouselDisplayedStage = $derived(
+    loginVerificationActive ? verificationDisplayedStage : displayedStage
+  );
+  let carouselTotal = $derived(loginVerificationActive ? 2 : visibleFurthestStage + 1);
+  let carouselCanForward = $derived(
+    loginVerificationActive
+      ? verificationDisplayedStage === 0
+      : displayedStage < furthestReached ||
+          (displayedStage === 0 && hasSecondaryStage) ||
+          (displayedStage === 1 && core.status === 'ready') ||
+          (displayedStage === 2 && recoveryOnboardingComplete)
+  );
 
   $effect(() => {
     if (flow.shouldValidateRegistration(displayedStage, hasCompletedInitialHomeserverCheck)) {
@@ -208,17 +237,21 @@
   });
 
   $effect(() => {
-    if (
-      requestedStage !== 2 ||
-      isProfileStage ||
-      (!isAddingAccount && core.status !== 'signed-out')
-    )
-      return;
+    if (requestedStage < 2 || core.status !== 'signed-out') return;
     void goto(resolve('/register'));
   });
 
   $effect(() => {
+    if (isDeviceVerificationStage && core.status === 'signed-out') {
+      loginVerificationActive = false;
+      void goto(resolve('/login'));
+    }
+  });
+
+  $effect(() => {
     if (core.status !== 'ready' || !userId || pendingOnboardingTransition) return;
+    if (loginVerificationActive || loginVerificationPending) return;
+    if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     const rawMarker = localStorage.getItem(profileOnboardingMarker(userId));
     if (!rawMarker) {
       void goto(resolve('/home'));
@@ -227,12 +260,72 @@
     if (restoredMarkerFor === userId) return;
     restoredMarkerFor = userId;
     try {
-      const marker = JSON.parse(rawMarker) as { homeserver?: string };
+      const marker = JSON.parse(rawMarker) as { homeserver?: string; stage?: string };
       if (marker.homeserver) flow.homeserver = marker.homeserver;
+      if (marker.stage === 'profile') recoveryOnboardingComplete = true;
     } catch {
       return;
     }
   });
+
+  async function signInWithPassword(): Promise<void> {
+    loginVerificationPending = true;
+    await login.login();
+    if (core.status === 'ready') {
+      await navigateToLoginVerification();
+    } else {
+      loginVerificationPending = false;
+    }
+  }
+
+  async function navigateToLoginVerification(): Promise<void> {
+    loginVerificationActive = true;
+    await goto(resolve('/login/verify'), { keepFocus: true, noScroll: true });
+    loginVerificationPending = false;
+  }
+
+  function showLoginStage(): void {
+    void goto(resolve('/login'), { keepFocus: true, noScroll: true });
+  }
+
+  function showRegistrationStage(): void {
+    activateStage(1);
+  }
+
+  function finishLoginVerification(): void {
+    loginVerificationActive = false;
+    loginVerificationPending = false;
+    void goto(resolve('/home'));
+  }
+
+  function finishRecoveryOnboarding(): void {
+    if (!userId) return;
+    localStorage.setItem(
+      profileOnboardingMarker(userId),
+      JSON.stringify({ stage: 'profile', homeserver: flow.homeserver })
+    );
+    recoveryOnboardingComplete = true;
+    activateStage(3);
+  }
+
+  function carouselBack(): void {
+    if (loginVerificationActive) showLoginStage();
+    else back();
+  }
+
+  function carouselForward(): void {
+    if (loginVerificationActive) void navigateToLoginVerification();
+    else forward();
+  }
+
+  function activateCarouselStage(index: number): void {
+    if (!loginVerificationActive) {
+      activateStage(index);
+      return;
+    }
+    if (index === 0) showLoginStage();
+    else void navigateToLoginVerification();
+  }
 
   onMount(() => {
     return () => {
@@ -251,6 +344,7 @@
     if (displayedStage < furthestReached) activateStage(displayedStage + 1);
     else if (displayedStage === 0 && hasSecondaryStage) activateStage(1);
     else if (displayedStage === 1 && core.status === 'ready') activateStage(2);
+    else if (displayedStage === 2 && recoveryOnboardingComplete) activateStage(3);
   }
 
   function activateStage(index: number): void {
@@ -262,10 +356,15 @@
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) enteringStage = null;
     }
     pendingStage = index;
-    void goto(resolve(stageRoute(index) as '/login' | '/register' | '/register/profile'), {
-      keepFocus: true,
-      noScroll: true,
-    });
+    void goto(
+      resolve(
+        stageRoute(index) as '/login' | '/register' | '/register/recovery' | '/register/profile'
+      ),
+      {
+        keepFocus: true,
+        noScroll: true,
+      }
+    );
   }
 
   function stageRoute(index: number): string {
@@ -304,9 +403,47 @@
 
 <svelte:head>
   <title>
-    {$i18n.t(displayedStage === 0 ? 'auth.signInTitle' : 'auth.createAccount')} - Sable
+    {$i18n.t(
+      isDeviceVerificationStage
+        ? 'auth.verifyDevice'
+        : displayedStage === 0
+          ? 'auth.signInTitle'
+          : displayedStage === 2
+            ? 'auth.setUpRecovery'
+            : displayedStage === 3
+              ? 'auth.makeItYours'
+              : 'auth.createAccount'
+    )} - Sable
   </title>
 </svelte:head>
+
+{#snippet loginStageContent(showCreateAccount: boolean)}
+  <LoginForm
+    bind:homeserver={flow.homeserver}
+    bind:username={login.username}
+    bind:password={login.password}
+    loginFlows={flow.loginFlows}
+    invalidField={login.invalidField}
+    fieldError={login.fieldError}
+    {loginError}
+    isCheckingHomeserver={flow.isCheckingHomeserver}
+    {isLaunchingLogin}
+    onClearHomeserverValidation={() => {
+      invalidateAfter(0);
+      login.clearHomeserverValidation();
+    }}
+    onValidateHomeserver={() => flow.validateHomeserver(0)}
+    onClearFieldError={(field: Exclude<LoginField, 'homeserver'>) => {
+      invalidateAfter(0);
+      login.clearFieldError(field);
+    }}
+    onLaunchRedirectLogin={async (type: 'oidc' | 'sso', id?: string) => {
+      await redirect.launch(type, id, 'login');
+    }}
+    onLogin={signInWithPassword}
+    onCreateAccount={showCreateAccount ? showRegistrationStage : undefined}
+  />
+{/snippet}
 
 <main class="auth-page">
   <AuthRedirectBridge
@@ -315,7 +452,7 @@
     }}
     onRegistrationComplete={() => {
       void core.start().then(() => {
-        if (core.status === 'ready') void goto(resolve('/register/profile'));
+        if (core.status === 'ready') void goto(resolve('/register/recovery'));
       });
     }}
     onCallbackWindow={() => {
@@ -332,72 +469,52 @@
         </div>
       {:else}
         <AuthRail
-          activeIndex={displayedStage}
-          total={visibleFurthestStage + 1}
-          canBack={displayedStage > 0}
-          canForward={displayedStage < furthestReached ||
-            (displayedStage === 0 && hasSecondaryStage) ||
-            (displayedStage === 1 && core.status === 'ready')}
-          onBack={back}
-          onForward={forward}
+          activeIndex={carouselDisplayedStage}
+          total={carouselTotal}
+          canBack={carouselDisplayedStage > 0}
+          canForward={carouselCanForward}
+          onBack={carouselBack}
+          onForward={carouselForward}
         >
           <AuthStageCard
-            active={displayedStage === 0}
-            before={displayedStage > 0}
+            active={carouselDisplayedStage === 0}
+            before={carouselDisplayedStage > 0}
             accessibilityLabel={stages[0].accessibilityLabel}
             onActivate={() => {
-              activateStage(0);
+              activateCarouselStage(0);
             }}
           >
-            <LoginForm
-              bind:homeserver={flow.homeserver}
-              bind:username={login.username}
-              bind:password={login.password}
-              loginFlows={flow.loginFlows}
-              invalidField={login.invalidField}
-              fieldError={login.fieldError}
-              {loginError}
-              isCheckingHomeserver={flow.isCheckingHomeserver}
-              {isLaunchingLogin}
-              onClearHomeserverValidation={() => {
-                invalidateAfter(0);
-                login.clearHomeserverValidation();
-              }}
-              onValidateHomeserver={() => flow.validateHomeserver(0)}
-              onClearFieldError={(field: Exclude<LoginField, 'homeserver'>) => {
-                invalidateAfter(0);
-                login.clearFieldError(field);
-              }}
-              onLaunchRedirectLogin={async (type: 'oidc' | 'sso', id?: string) => {
-                await redirect.launch(type, id, 'login');
-              }}
-              onLogin={() => login.login()}
-              onCreateAccount={() => {
-                activateStage(1);
-              }}
-            />
+            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+            {@render loginStageContent(!loginVerificationActive)}
           </AuthStageCard>
 
-          {#if visibleFurthestStage >= 1}
+          {#if loginVerificationActive || visibleFurthestStage >= 1}
             <AuthStageCard
-              active={displayedStage === 1}
-              before={displayedStage > 1}
-              after={displayedStage < 1}
-              entering={enteringStage === 1}
-              removing={retiringAfter === 0}
-              accessibilityLabel={stages[1].accessibilityLabel}
+              active={carouselDisplayedStage === 1}
+              before={carouselDisplayedStage > 1}
+              after={carouselDisplayedStage < 1}
+              entering={!loginVerificationActive && enteringStage === 1}
+              removing={!loginVerificationActive && retiringAfter === 0}
+              accessibilityLabel={loginVerificationActive
+                ? $i18n.t('auth.verifyDevice')
+                : stages[1].accessibilityLabel}
               onActivate={() => {
-                activateStage(1);
+                activateCarouselStage(1);
               }}
               onMotionComplete={() => {
-                completeStageMotion(retiringAfter ?? 1);
+                if (!loginVerificationActive) completeStageMotion(retiringAfter ?? 1);
               }}
             >
-              {#if isProfileStage || core.status === 'ready'}
+              {#if loginVerificationActive}
+                <DeviceVerificationCard
+                  onComplete={finishLoginVerification}
+                  onSkip={finishLoginVerification}
+                />
+              {:else if displayedStage >= 2 || core.status === 'ready'}
                 <AccountSummaryCard
                   homeserver={flow.homeserver}
                   {userId}
-                  onSetUpProfile={() => {
+                  onContinue={() => {
                     activateStage(2);
                   }}
                 />
@@ -462,7 +579,7 @@
             </AuthStageCard>
           {/if}
 
-          {#if furthestReached >= 2}
+          {#if !loginVerificationActive && furthestReached >= 2}
             <AuthStageCard
               active={displayedStage === 2}
               before={displayedStage > 2}
@@ -475,6 +592,28 @@
               }}
               onMotionComplete={() => {
                 completeStageMotion(retiringAfter ?? 2);
+              }}
+            >
+              <RecoverySetupCard
+                onComplete={finishRecoveryOnboarding}
+                onSkip={finishRecoveryOnboarding}
+              />
+            </AuthStageCard>
+          {/if}
+
+          {#if !loginVerificationActive && furthestReached >= 3}
+            <AuthStageCard
+              active={displayedStage === 3}
+              before={displayedStage > 3}
+              after={displayedStage < 3}
+              entering={enteringStage === 3}
+              removing={retiringAfter !== null && retiringAfter < 3}
+              accessibilityLabel={stages[3].accessibilityLabel}
+              onActivate={() => {
+                activateStage(3);
+              }}
+              onMotionComplete={() => {
+                completeStageMotion(retiringAfter ?? 3);
               }}
             >
               <ProfileCard
@@ -500,6 +639,8 @@
   </section>
   <AuthFooter />
 </main>
+
+<DeviceVerificationDialog />
 
 <style>
   .auth-page {

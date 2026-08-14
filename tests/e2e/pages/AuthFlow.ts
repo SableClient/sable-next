@@ -6,6 +6,9 @@ export class AuthFlow {
   readonly password: Locator;
   readonly moreMethodsButton: Locator;
   readonly passwordSignInButton: Locator;
+  readonly skipVerificationButton: Locator;
+  readonly previousStageButton: Locator;
+  readonly nextStageButton: Locator;
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { level: 1 });
@@ -13,6 +16,9 @@ export class AuthFlow {
     this.password = page.getByRole('textbox', { name: 'Password' });
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
+    this.skipVerificationButton = page.getByRole('button', { name: 'Skip for now' });
+    this.previousStageButton = page.getByRole('button', { name: 'Back' });
+    this.nextStageButton = page.getByRole('button', { name: 'Next' });
   }
 
   async open(homeserver?: string): Promise<void> {

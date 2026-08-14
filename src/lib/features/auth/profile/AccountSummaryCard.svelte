@@ -5,10 +5,10 @@
   interface Props {
     homeserver: string;
     userId: string;
-    onSetUpProfile: () => void;
+    onContinue: () => void;
   }
 
-  let { homeserver, userId, onSetUpProfile }: Props = $props();
+  let { homeserver, userId, onContinue }: Props = $props();
 </script>
 
 <section class="auth-card-surface summary-card" aria-labelledby="account-created-title">
@@ -21,7 +21,7 @@
   <p>{$i18n.t('auth.accountProviderSummary', { server: homeserver })}</p>
   <p class="user-id">{userId}</p>
   <div class="summary-actions">
-    <Button onclick={onSetUpProfile}>{$i18n.t('auth.setUpProfile')}</Button>
+    <Button onclick={onContinue}>{$i18n.t('auth.continue')}</Button>
   </div>
 </section>
 

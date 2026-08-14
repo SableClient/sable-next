@@ -154,16 +154,6 @@
     touch-action: pan-y;
   }
 
-  .screen-reader-only {
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    padding: 0;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-  }
-
   .drawer-track {
     display: flex;
     height: 100%;

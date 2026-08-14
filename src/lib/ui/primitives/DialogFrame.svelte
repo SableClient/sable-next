@@ -42,7 +42,7 @@
 
   :global(.sable-dialog-backdrop-drawer) {
     border: 0;
-    z-index: 10;
+    z-index: var(--layer-popover);
   }
 
   :global(.sable-dialog-content-drawer) {
@@ -51,15 +51,15 @@
     max-width: min(22rem, 85%);
     padding: 0;
     width: 100%;
-    z-index: 11;
+    z-index: calc(var(--layer-popover) + 1);
   }
 
   :global(.sable-dialog-backdrop-verification) {
-    z-index: 40;
+    z-index: calc(var(--layer-popover) + 2);
   }
 
   :global(.sable-dialog-backdrop-settings) {
-    z-index: 20;
+    z-index: var(--layer-popover);
   }
 
   :global(.sable-dialog-content-settings) {
@@ -67,14 +67,14 @@
     border: 1px solid var(--sable-surface-container-line);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-dialog);
-    height: min(48rem, calc(100dvh - 4rem));
+    height: min(52rem, calc(100dvh - 3rem));
     left: 50%;
-    max-width: 72rem;
+    max-width: 68rem;
     overflow: hidden;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: calc(100% - 4rem);
-    z-index: 21;
+    width: calc(100% - 3rem);
+    z-index: calc(var(--layer-popover) + 1);
   }
 
   :global(.sable-dialog-content-verification) {
@@ -83,11 +83,11 @@
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
     box-shadow: var(--shadow-dialog);
-    max-height: calc(100dvh - 1.5rem);
+    max-height: calc(100dvh - var(--space-2) * 2);
     overflow: auto;
-    padding: 1.25rem;
+    padding: var(--space-4);
     width: 100%;
-    z-index: 41;
+    z-index: calc(var(--layer-popover) + 3);
   }
 
   @media (width >= 42rem) {
@@ -96,7 +96,7 @@
       bottom: auto;
       left: 50%;
       max-width: 34rem;
-      padding: 1.5rem;
+      padding: calc(var(--space-2) * 2);
       top: 50%;
       transform: translate(-50%, -50%);
     }
@@ -120,20 +120,20 @@
   @keyframes dialog-in {
     from {
       opacity: 0;
-      transform: translate(-50%, calc(-50% + 0.5rem)) scale(0.98);
+      transform: translate(-50%, calc(-50% + var(--space-1))) scale(0.98);
     }
   }
 
   @keyframes sheet-in {
     from {
       opacity: 0;
-      transform: translateY(0.75rem);
+      transform: translateY(var(--space-2));
     }
   }
 
   @keyframes drawer-in {
     from {
-      transform: translateX(1rem);
+      transform: translateX(var(--space-3));
     }
   }
 

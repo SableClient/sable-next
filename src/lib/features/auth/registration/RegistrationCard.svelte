@@ -4,9 +4,11 @@
   import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
   import type { RegistrationResultView } from '@/generated/RegistrationResultView';
   import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import AuthField from '../shared/AuthField.svelte';
+  import AuthInfoBox from '../shared/AuthInfoBox.svelte';
+  import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
+  import { DEFAULT_HOMESERVER } from '../shared/homeservers';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
   import RegistrationBrowserStep from './RegistrationBrowserStep.svelte';
   import RegistrationMethods from './RegistrationMethods.svelte';
@@ -87,20 +89,23 @@
   }: Props = $props();
 </script>
 
+{#snippet accountProviderInfo()}
+  <Tooltip variant="icon" label={$i18n.t('auth.accountProviderHint')}><InfoIcon /></Tooltip>
+{/snippet}
+
 <section class="registration-card auth-card-surface" aria-labelledby="registration-title">
   <AuthField labelId="registration-title" label={$i18n.t('auth.createAccount')}>
     {#if !fallback && !emailStep}
-      <div class="provider-row">
+      <AuthInfoBox trailing={accountProviderInfo}>
         <span class="provider-name">
           <!-- mustache required so formatter doesn't delete the space -->
           <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
           {$i18n.t('auth.registeringWith')}{' '}
           <Tooltip variant="inline" label={$i18n.t('auth.changeProviderHint')}>
-            {homeserver || 'matrix.org'}
+            {homeserver || DEFAULT_HOMESERVER}
           </Tooltip>
         </span>
-        <Tooltip variant="icon" label={$i18n.t('auth.accountProviderHint')}><InfoIcon /></Tooltip>
-      </div>
+      </AuthInfoBox>
     {/if}
   </AuthField>
 
@@ -135,18 +140,16 @@
       </AuthField>
     {/if}
 
-    <div class="status-slot" aria-live="polite">
-      {#if isCheckingHomeserver}
-        <div class="status-message checking">
-          <Spinner small />
-          {$i18n.t('auth.checkingProvider')}
-        </div>
-      {:else if invalidRegistrationField === 'homeserver' && registrationFieldError}
-        <p class="status-message error" title={registrationFieldError}>{registrationFieldError}</p>
-      {:else if error && !registrationFieldError}
-        <p class="status-message error" title={error}>{error}</p>
-      {/if}
-    </div>
+    <AuthStatusSlot
+      loading={isCheckingHomeserver}
+      loadingMessage={$i18n.t('auth.checkingProvider')}
+      message={invalidRegistrationField === 'homeserver' && registrationFieldError
+        ? registrationFieldError
+        : error && !registrationFieldError
+          ? error
+          : null}
+      multiline
+    />
 
     <RegistrationMethods
       {homeserver}
@@ -174,76 +177,7 @@
 </section>
 
 <style>
-  .provider-row {
-    align-items: center;
-    background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    box-sizing: border-box;
-    color: var(--sable-bg-on-container);
-    display: flex;
-    gap: 0.625rem;
-    min-height: 2.75rem;
-    padding: 0.625rem 0.875rem;
-  }
-
   .provider-name {
-    flex: 1 1 auto;
-    min-width: 0;
     overflow-wrap: anywhere;
-  }
-
-  .checking {
-    align-items: center;
-    color: var(--sable-sec-main);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: 0.5rem;
-    line-height: var(--line-height-body);
-    margin: 0;
-  }
-
-  .status-message {
-    margin: 0;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .status-message.error {
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
-  .status-slot {
-    align-items: center;
-    display: flex;
-    height: calc(var(--font-size-small) * var(--line-height-body));
-    overflow: hidden;
-  }
-
-  .error {
-    color: var(--sable-crit-main);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
-    margin: 0;
-  }
-
-  @keyframes error-in {
-    from {
-      opacity: 0;
-    }
-
-    to {
-      opacity: 1;
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .error {
-      animation: error-in var(--motion-normal) ease-out;
-    }
   }
 </style>

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
 
-  import { CoreError } from '@/transport';
   import { useCoreClient } from '$lib/core/context';
-  import { i18n, t } from '$lib/i18n';
+  import { verificationErrorMessage } from '$lib/core/verification-errors';
+  import { i18n } from '$lib/i18n';
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
@@ -15,19 +15,12 @@
   // route-specific feature currently subscribes to the core transport.
   $effect(() => core.subscribeEvents(() => {}));
 
-  function messageFor(cause: unknown): string {
-    if (cause instanceof CoreError && cause.detail.code === 'unavailable') {
-      return t('settings.verificationUnavailable');
-    }
-    return t('settings.actionFailed');
-  }
-
   async function accept(): Promise<void> {
     if (!core.verification || !core.session?.user_id) return;
     try {
       await core.acceptVerification(core.session.user_id, core.verification.flowId);
     } catch (cause) {
-      error = messageFor(cause);
+      error = verificationErrorMessage(cause);
     }
   }
 
@@ -36,7 +29,7 @@
     try {
       await core.confirmVerification(core.session.user_id, core.verification.flowId);
     } catch (cause) {
-      error = messageFor(cause);
+      error = verificationErrorMessage(cause);
     }
   }
 
@@ -45,7 +38,7 @@
     try {
       await core.cancelVerification(core.session.user_id, core.verification.flowId, mismatch);
     } catch (cause) {
-      error = messageFor(cause);
+      error = verificationErrorMessage(cause);
     }
   }
 
@@ -68,19 +61,27 @@
   {#if core.verification}
     {#if core.verification.state.phase === 'requested'}
       {#if core.verification.state.initiated_by_us}
-        <p>{$i18n.t('settings.acceptOtherDevice')}</p>
+        <Dialog.Description class="verification-description">
+          {$i18n.t('settings.acceptOtherDevice')}
+        </Dialog.Description>
         <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
       {:else}
-        <p>{$i18n.t('settings.verificationRequested')}</p>
+        <Dialog.Description class="verification-description">
+          {$i18n.t('settings.verificationRequested')}
+        </Dialog.Description>
         <Button variant="primary" class="verification-action" onclick={accept}
           >{$i18n.t('settings.acceptVerification')}</Button
         >
       {/if}
     {:else if core.verification.state.phase === 'waiting'}
-      <p>{$i18n.t('settings.startingEmojiComparison')}</p>
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.startingEmojiComparison')}
+      </Dialog.Description>
       <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'compare'}
-      <p>{$i18n.t('settings.compareEmoji')}</p>
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.compareEmoji')}
+      </Dialog.Description>
       <div class="emoji" aria-label={$i18n.t('settings.verificationEmoji')}>
         {#each core.verification.state.emojis as emoji (emoji.symbol)}
           <div class="emoji-item">
@@ -102,19 +103,23 @@
         >
       </div>
     {:else if core.verification.state.phase === 'confirmed'}
-      <p>{$i18n.t('settings.finishing')}</p>
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.finishing')}
+      </Dialog.Description>
       <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'done'}
-      <p>{$i18n.t('settings.verificationComplete')}</p>
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.verificationComplete')}
+      </Dialog.Description>
       <Button
         variant="primary"
         class="verification-action"
         onclick={() => (core.verification = null)}>{$i18n.t('settings.close')}</Button
       >
     {:else if core.verification.state.phase === 'cancelled'}
-      <p>
+      <Dialog.Description class="verification-description">
         {$i18n.t('settings.verificationCancelled', { reason: core.verification.state.reason })}
-      </p>
+      </Dialog.Description>
       <Button
         variant="primary"
         class="verification-action"
@@ -140,11 +145,15 @@
     margin: 0;
   }
 
+  :global(.verification-description) {
+    margin-bottom: var(--space-2);
+  }
+
   .emoji {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin: 1rem 0;
+    gap: var(--space-2);
+    margin: var(--space-3) 0;
   }
 
   .emoji-item {
@@ -152,7 +161,7 @@
     display: flex;
     flex: 1 1 4.5rem;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: calc(var(--space-1) / 2);
     text-align: center;
   }
 
@@ -167,7 +176,7 @@
 
   .verification-actions {
     display: grid;
-    gap: 0.5rem;
+    gap: var(--space-1);
   }
 
   :global(.verification-action) {
@@ -175,7 +184,7 @@
   }
 
   :global(.verification-cancel) {
-    margin-top: 0.5rem;
+    margin-top: var(--space-1);
   }
 
   .verification-wait::before {
@@ -184,7 +193,7 @@
     content: '';
     display: inline-block;
     height: 0.55rem;
-    margin-right: 0.5rem;
+    margin-right: var(--space-1);
     width: 0.55rem;
   }
 

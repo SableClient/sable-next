@@ -22,8 +22,8 @@ interface RedirectControllerOptions {
   validateHomeserver: () => Promise<LoginFlowsView | null>;
   onMarkLoggedIn: () => void;
   onMarkOnboardingPending: (userId: string) => void;
-  onNavigateHome: () => Promise<void>;
-  onNavigateProfile: () => Promise<void>;
+  onNavigateLoginVerification: () => Promise<void>;
+  onNavigateRegistrationRecovery: () => Promise<void>;
 }
 
 export function reserveRedirectPopup(intent: RedirectIntent): Window | null {
@@ -135,11 +135,11 @@ export class RedirectController {
 
       if (this.pendingIntent === 'login') {
         this.options.onMarkLoggedIn();
-        await this.options.onNavigateHome();
+        await this.options.onNavigateLoginVerification();
       } else {
         const userId = this.options.core.session?.user_id;
         if (userId) this.options.onMarkOnboardingPending(userId);
-        await this.options.onNavigateProfile();
+        await this.options.onNavigateRegistrationRecovery();
       }
     } catch (value) {
       logAuthenticationFailure(`${type}_${this.pendingIntent}_complete`, value);

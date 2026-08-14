@@ -15,6 +15,12 @@ const stages: readonly AuthStage[] = [
     accessibilityLabel: 'Register',
   },
   {
+    route: '/register/recovery',
+    title: 'Recovery',
+    completed: false,
+    accessibilityLabel: 'Recovery',
+  },
+  {
     route: '/register/profile',
     title: 'Profile',
     completed: false,
@@ -24,16 +30,17 @@ const stages: readonly AuthStage[] = [
 
 describe('auth stage registry', () => {
   test('prefers the most specific route', () => {
-    expect(stageIndexForPath('/register/profile', stages)).toBe(2);
+    expect(stageIndexForPath('/register/recovery', stages)).toBe(2);
+    expect(stageIndexForPath('/register/profile', stages)).toBe(3);
   });
 
   test('clamps a URL to the first unfinished stage', () => {
-    expect(furthestReachableStage(2, stages)).toBe(1);
+    expect(furthestReachableStage(3, stages)).toBe(1);
     expect(
       furthestReachableStage(
-        2,
-        stages.map((stage, index) => ({ ...stage, completed: index < 2 }))
+        3,
+        stages.map((stage, index) => ({ ...stage, completed: index < 3 }))
       )
-    ).toBe(2);
+    ).toBe(3);
   });
 });

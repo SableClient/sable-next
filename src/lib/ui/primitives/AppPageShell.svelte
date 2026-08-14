@@ -10,6 +10,7 @@
     class?: ClassValue;
     actions?: Snippet;
     children?: Snippet;
+    density?: 'default' | 'compact';
   };
 
   let {
@@ -20,6 +21,7 @@
     class: className = '',
     actions,
     children,
+    density = 'default',
   }: Props = $props();
 </script>
 
@@ -27,7 +29,7 @@
   <title>{title} - Sable</title>
 </svelte:head>
 
-<main class={['app-page-shell', className]}>
+<main class={['app-page-shell', `app-page-shell-${density}`, className]}>
   <header class="app-page-header">
     <div>
       {#if eyebrow}<p class="app-page-eyebrow">{eyebrow}</p>{/if}
@@ -64,6 +66,10 @@
     max-width: 65ch;
   }
 
+  .app-page-header > div:first-child {
+    min-width: 0;
+  }
+
   .app-page-eyebrow {
     color: var(--sable-primary-main);
     font-size: var(--font-size-small);
@@ -81,10 +87,27 @@
     justify-content: space-between;
   }
 
+  .app-page-shell-compact {
+    padding: var(--space-4);
+  }
+
+  .app-page-shell-compact .app-page-header {
+    margin-bottom: var(--space-3);
+  }
+
   @media (width < 42rem) {
     .app-page-header {
       align-items: stretch;
       flex-direction: column;
+    }
+
+    .app-page-shell-compact {
+      padding: var(--space-3);
+    }
+
+    .app-page-shell-compact .app-page-header {
+      align-items: center;
+      flex-direction: row;
     }
   }
 </style>

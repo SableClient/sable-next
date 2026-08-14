@@ -13,5 +13,13 @@ test('signs in with a password', async ({ auth, page }) => {
   await expect(auth.username).toBeVisible();
   await auth.signInWithPassword(LOGIN_USERNAME, LOGIN_PASSWORD);
 
+  await expect(page).toHaveURL(/\/login\/verify$/);
+  await expect(page.getByRole('form', { name: 'Verify your device' })).toBeVisible();
+  await auth.previousStageButton.click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(auth.username).toBeVisible();
+  await auth.nextStageButton.click();
+  await expect(page).toHaveURL(/\/login\/verify$/);
+  await auth.skipVerificationButton.click();
   await expect(page).toHaveURL(/\/home$/);
 });

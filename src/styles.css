@@ -199,6 +199,8 @@ html {
   --control-height-small: 2.25rem;
   --control-height-medium: 2.75rem;
   --control-height-large: 3rem;
+  --control-padding-block: 0.625rem;
+  --control-padding-inline: 0.875rem;
   --icon-size-small: 1.25rem;
   --icon-size-medium: 1.5rem;
   --icon-size-large: 1.75rem;
@@ -306,6 +308,18 @@ textarea {
 ::selection {
   background: var(--sable-primary-main);
   color: var(--sable-primary-on-main);
+}
+
+.screen-reader-only {
+  border: 0;
+  clip-path: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 :focus-visible {

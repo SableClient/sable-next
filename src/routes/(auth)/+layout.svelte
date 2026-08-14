@@ -13,6 +13,7 @@
     if (
       core.status === 'ready' &&
       !page.url.pathname.startsWith('/register') &&
+      !page.url.pathname.startsWith('/login') &&
       !page.url.searchParams.has('addAccount')
     ) {
       void goto(resolve('/home'));

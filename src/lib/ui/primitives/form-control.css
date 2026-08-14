@@ -2,7 +2,7 @@
   --form-control-background: var(--sable-bg-container);
   --form-control-border: var(--sable-bg-container-line);
   --form-control-color: var(--sable-bg-on-container);
-  --form-control-padding-inline: 0.875rem;
+  --form-control-padding-inline: var(--control-padding-inline);
   --form-control-padding-inline-end: var(--form-control-padding-inline);
 
   background: var(--form-control-background);
@@ -12,8 +12,8 @@
   color: var(--form-control-color);
   font: inherit;
   min-height: var(--control-height-medium);
-  padding: 0.625rem var(--form-control-padding-inline-end) 0.625rem
-    var(--form-control-padding-inline);
+  padding: var(--control-padding-block) var(--form-control-padding-inline-end)
+    var(--control-padding-block) var(--form-control-padding-inline);
 }
 
 .form-control:focus-visible {
@@ -40,8 +40,6 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .form-control {
-    transition:
-      border-color var(--motion-normal) ease,
-      box-shadow var(--motion-normal) ease;
+    transition: border-color var(--motion-normal) ease;
   }
 }

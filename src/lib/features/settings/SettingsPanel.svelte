@@ -6,6 +6,7 @@
   import type { Snippet } from 'svelte';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
+  import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '$lib/core/context';
@@ -32,7 +33,7 @@
 
   const sections = [
     { id: 'general' as const, label: 'settings.general', icon: GearIcon },
-    { id: 'devices' as const, label: 'settings.devices', icon: LockIcon },
+    { id: 'devices' as const, label: 'settings.security', icon: LockIcon },
   ] as const;
   let overlaySection = $state<SettingsSection>('devices');
   let activeSection = $derived(
@@ -76,11 +77,14 @@
     <aside class="settings-nav" aria-label={$i18n.t('settings.title')}>
       <div class="settings-title">
         <Dialog.Title class="settings-heading">{$i18n.t('settings.title')}</Dialog.Title>
+        <Dialog.Description class="screen-reader-only">
+          {$i18n.t('settings.dialogDescription')}
+        </Dialog.Description>
         <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={close}
           ><XIcon /></IconButton
         >
       </div>
-      <nav>
+      <nav aria-label={$i18n.t('settings.sections')}>
         {#each sections as section (section.id)}
           {@const active = activeSection === section.id}
           <a
@@ -89,7 +93,8 @@
             class:active
             aria-current={active ? 'page' : undefined}
             onclick={(event) => {
-              if (mode === 'overlay') event.preventDefault();
+              if (mode !== 'overlay') return;
+              event.preventDefault();
               selectSection(section.id);
             }}
           >
@@ -98,8 +103,13 @@
           </a>
         {/each}
       </nav>
-      <Button block class="settings-logout" variant="danger" onclick={logout}
-        >{$i18n.t('settings.logout')}</Button
+      <Button
+        block
+        class="settings-logout"
+        variant="danger"
+        aria-label={$i18n.t('settings.logout')}
+        onclick={logout}
+        ><SignOutIcon /><span class="logout-label">{$i18n.t('settings.logout')}</span></Button
       >
     </aside>
     <div class="settings-content">
@@ -124,50 +134,60 @@
   }
 
   .settings-nav {
-    background: var(--sable-bg-container);
-    border-right: 1px solid var(--sable-bg-container-line);
+    background: var(--sable-surface-container);
+    border-right: 1px solid var(--sable-surface-container-line);
     display: flex;
-    flex: 0 0 15rem;
+    flex: 0 0 13.5rem;
     flex-direction: column;
-    padding: var(--space-4) var(--space-3);
+    padding-bottom: var(--space-3);
   }
 
   .settings-title {
     align-items: center;
     display: flex;
     justify-content: space-between;
+    min-height: 4rem;
+    padding: var(--space-2) var(--space-3);
   }
 
   :global(.settings-heading) {
     font-size: var(--font-size-xlarge);
     font-weight: var(--font-weight-bold);
-    margin: 0 0 var(--space-4);
-    padding: 0 var(--space-2);
+    margin: 0;
+    padding: 0;
   }
 
   nav {
     display: grid;
-    gap: 0.25rem;
+    gap: 0;
   }
 
   a {
     align-items: center;
-    border-radius: var(--radius);
+    border-left: 0.1875rem solid transparent;
     color: inherit;
     display: flex;
     font-weight: var(--font-weight-medium);
     gap: var(--space-2);
     min-height: var(--control-height-medium);
-    padding: var(--space-1) var(--space-2);
+    padding: 0 var(--space-3);
     text-decoration: none;
   }
 
   a:hover {
-    background: var(--sable-bg-container-hover);
+    background: var(--sable-surface-container-hover);
   }
 
   a.active {
+    border-left-color: var(--sable-primary-main);
     color: var(--sable-bg-on-container);
+  }
+
+  .icon {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: center;
   }
 
   a :global(svg) {
@@ -177,7 +197,8 @@
 
   :global(.settings-logout) {
     justify-content: flex-start;
-    margin-top: auto;
+    margin: auto var(--space-3) 0;
+    width: auto;
   }
 
   .settings-content {
@@ -194,13 +215,17 @@
     }
 
     .settings-nav {
-      border-bottom: 1px solid var(--sable-bg-container-line);
+      border-bottom: 1px solid var(--sable-surface-container-line);
       border-right: 0;
-      padding: var(--space-3);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      padding: 0;
     }
 
     .settings-title {
+      grid-column: 1 / -1;
       min-height: var(--control-height-medium);
+      padding: var(--space-1) var(--space-3);
     }
 
     :global(.settings-heading) {
@@ -211,16 +236,36 @@
 
     nav {
       display: flex;
-      margin-top: var(--space-1);
       overflow-x: auto;
     }
 
     a {
+      border-bottom: 0.1875rem solid transparent;
+      border-left: 0;
       flex: 0 0 auto;
+      min-height: var(--control-height-medium);
+      padding: 0 var(--space-3);
+    }
+
+    a.active {
+      border-bottom-color: var(--sable-primary-main);
     }
 
     :global(.settings-logout) {
-      margin-top: var(--space-1);
+      align-self: center;
+      margin: 0 var(--space-2) 0 0;
+      width: auto;
+    }
+  }
+
+  @media (width < 28rem) {
+    :global(.settings-logout) {
+      min-height: var(--control-height-medium);
+      padding-inline: var(--space-2);
+    }
+
+    .logout-label {
+      display: none;
     }
   }
 </style>
