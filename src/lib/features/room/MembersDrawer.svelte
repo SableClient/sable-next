@@ -248,7 +248,7 @@
   }
 
   @media (width >= 48rem) {
-    .members-drawer {
+    .members-drawer:not(.compact) {
       border-left: 1px solid var(--sable-surface-var-container);
       box-shadow: none;
       flex: 0 0 16.625rem;
