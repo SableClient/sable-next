@@ -131,6 +131,7 @@
   let historyLastRequestStartedAt = 0;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
+  let virtualizerViewportSize = 0;
   let wheelGestureTimer: ReturnType<typeof setTimeout> | null = null;
   let wheelGestureActive = false;
   let wheelUsesNativeScrollEnd = false;
@@ -289,9 +290,12 @@
   function handleVirtualizerChange(): void {
     const instance = get(virtualizer);
     const totalSize = instance.getTotalSize();
+    const viewportSize = instance.scrollRect?.height ?? 0;
     const contentSizeChanged = totalSize !== virtualizerTotalSize;
+    const viewportSizeChanged = viewportSize !== virtualizerViewportSize;
     virtualizerTotalSize = totalSize;
-    if (scrollMode.kind === 'followingLive' && contentSizeChanged) {
+    virtualizerViewportSize = viewportSize;
+    if (scrollMode.kind === 'followingLive' && (contentSizeChanged || viewportSizeChanged)) {
       scheduleFollowingEndReconciliation();
     }
     scheduleInitialEndReconciliation();

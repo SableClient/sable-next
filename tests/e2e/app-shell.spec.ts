@@ -186,6 +186,64 @@ test('keeps the latest message visible when the typing indicator appears', async
   await expectTimelineAtLatest(page, 'General message 19');
 });
 
+test('keeps the latest message visible when the mobile viewport resizes', async ({ page }) => {
+  await installRoomFakeCore(page, 'ready');
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto('/home/!room%3Aexample.test');
+  await expectTimelineAtLatest(page, 'General message 19');
+
+  await page.setViewportSize({ width: 390, height: 420 });
+  await expectTimelineAtLatest(page, 'General message 19');
+
+  await page.setViewportSize({ width: 390, height: 700 });
+  await expectTimelineAtLatest(page, 'General message 19');
+});
+
+test('keeps the latest message visible when the composer grows', async ({ page }) => {
+  await installRoomFakeCore(page, 'ready');
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.goto('/home/!room%3Aexample.test');
+  await expectTimelineAtLatest(page, 'General message 19');
+
+  await page
+    .getByRole('textbox', { name: 'Send a message...' })
+    .fill(Array.from({ length: 6 }, (_, index) => `Line ${String(index + 1)}`).join('\n'));
+
+  await expectTimelineAtLatest(page, 'General message 19');
+});
+
+test('preserves the visible history position when the mobile viewport resizes', async ({
+  page,
+}) => {
+  await installRoomFakeCore(page, 'ready');
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.goto('/home/!room%3Aexample.test');
+  await expectTimelineAtLatest(page, 'General message 19');
+
+  const viewport = page.locator('.timeline-viewport .viewport');
+  await viewport.hover();
+  await page.mouse.wheel(0, -300);
+  await expect
+    .poll(() =>
+      viewport.evaluate(
+        (element) => element.scrollHeight - element.scrollTop - element.clientHeight
+      )
+    )
+    .toBeGreaterThan(80);
+
+  const anchor = page.locator('.timeline-viewport .item').filter({ visible: true }).first();
+  const anchorId = await anchor.getAttribute('data-item-id');
+  if (!anchorId) throw new Error('missing resize anchor item id');
+  const before = await anchor.boundingBox();
+  if (!before) throw new Error('missing resize anchor bounds');
+
+  await page.setViewportSize({ width: 390, height: 320 });
+
+  await expect
+    .poll(async () => (await page.locator(`[data-item-id="${anchorId}"]`).boundingBox())?.y)
+    .toBeCloseTo(before.y, 0);
+});
+
 test('opens a mobile room from the list at latest', async ({ page }) => {
   await installRoomFakeCore(page, 'ready');
   await page.setViewportSize({ width: 390, height: 420 });
