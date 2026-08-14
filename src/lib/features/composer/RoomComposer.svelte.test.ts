@@ -72,3 +72,33 @@ test('queues any selected attachment, not only images', async () => {
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file);
   await unmount(instance);
 });
+
+test('queues files pasted into or dropped on the composer', async () => {
+  const attachment = vi.fn(async () => {});
+  const instance = mount(RoomComposer, {
+    target: document.body,
+    props: {
+      roomId: '!room:example.org',
+      onSend: async () => {},
+      onSendAttachment: attachment,
+      onTyping: async () => {},
+    },
+  });
+  const pastedFile = new File(['pasted'], 'pasted.png', { type: 'image/png' });
+  const droppedFile = new File(['dropped'], 'dropped.png', { type: 'image/png' });
+  const paste = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(paste, 'clipboardData', { value: { files: [pastedFile] } });
+  const drop = new Event('drop', { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, 'dataTransfer', { value: { files: [droppedFile] } });
+
+  textarea().dispatchEvent(paste);
+  await tick();
+  document.querySelector('.composer')?.dispatchEvent(drop);
+  await tick();
+
+  expect(paste.defaultPrevented).toBe(true);
+  expect(drop.defaultPrevented).toBe(true);
+  expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', pastedFile);
+  expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', droppedFile);
+  await unmount(instance);
+});

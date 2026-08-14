@@ -61,22 +61,49 @@
     }
   }
 
-  async function sendAttachment(event: Event): Promise<void> {
-    const input = event.currentTarget;
-    if (!(input instanceof HTMLInputElement)) return;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file || sending) return;
+  async function sendAttachments(files: File[]): Promise<void> {
+    if (files.length === 0 || sending) return;
 
     sending = true;
     error = null;
     try {
-      await onSendAttachment(roomId, file);
+      for (const file of files) await onSendAttachment(roomId, file);
     } catch {
       error = $i18n.t('timeline.sendFailed');
     } finally {
       sending = false;
     }
+  }
+
+  function filesFrom(dataTransfer: DataTransfer | null): File[] {
+    if (!dataTransfer) return [];
+    return Array.from(dataTransfer.files).filter((file): file is File => file instanceof File);
+  }
+
+  function sendAttachment(event: Event): void {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) return;
+    const files = input.files ? Array.from(input.files) : [];
+    input.value = '';
+    void sendAttachments(files);
+  }
+
+  function handlePaste(event: ClipboardEvent): void {
+    const files = filesFrom(event.clipboardData);
+    if (files.length === 0) return;
+    event.preventDefault();
+    void sendAttachments(files);
+  }
+
+  function handleDrop(event: DragEvent): void {
+    const files = filesFrom(event.dataTransfer);
+    if (files.length === 0) return;
+    event.preventDefault();
+    void sendAttachments(files);
+  }
+
+  function handleDragover(event: DragEvent): void {
+    if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -94,7 +121,13 @@
     {/if}
   </div>
   <div class="composer-shell">
-    <div class="composer">
+    <div
+      class="composer"
+      role="group"
+      aria-label={$i18n.t('timeline.messagePlaceholder')}
+      ondrop={handleDrop}
+      ondragover={handleDragover}
+    >
       <form
         class="composer-row"
         onsubmit={(event) => {
@@ -115,6 +148,7 @@
           aria-label={$i18n.t('timeline.messagePlaceholder')}
           oninput={updateTyping}
           onkeydown={handleKeydown}
+          onpaste={handlePaste}
         />
         <IconButton
           type="submit"
