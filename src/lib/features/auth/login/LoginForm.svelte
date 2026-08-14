@@ -137,7 +137,11 @@
     <div class="method-slot" class:action-slot={hasLoginAction}>
       {#if !loginFlows}
         <div class="actions">
-          <Button type="submit" disabled={isAuthenticating || isLoginControlsDisabled}>
+          <Button
+            type="submit"
+            disabled={isAuthenticating || isLoginControlsDisabled}
+            variant="primary"
+          >
             {isCheckingHomeserver ? $i18n.t('auth.checking') : $i18n.t('auth.continue')}
           </Button>
         </div>
@@ -149,6 +153,7 @@
             <Button
               disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
               onclick={() => void onLaunchRedirectLogin('oidc')}
+              variant="primary"
             >
               {isLaunchingLogin
                 ? $i18n.t('auth.opening')
@@ -168,6 +173,7 @@
                 <Button
                   disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
                   onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
+                  variant="primary"
                 >
                   {$i18n.t('auth.signInWithProvider', { name: provider.name })}
                 </Button>
@@ -178,6 +184,7 @@
               <Button
                 disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
                 onclick={() => void onLaunchRedirectLogin('sso')}
+                variant="primary"
               >
                 {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
               </Button>

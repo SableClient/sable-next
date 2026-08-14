@@ -34,6 +34,9 @@
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
   let typingUserIds = $state.raw<string[]>([]);
+  let timelineElement = $state<HTMLDivElement | null>(null);
+  let composerDock = $state<HTMLDivElement | null>(null);
+  let composerBottomPadding = $state(0);
 
   onDestroy(() => {
     void activeTimeline.stop(timelineOwner);
@@ -76,6 +79,31 @@
 
   $effect(() => {
     if (desktop && desktopMembersOpen) void loadMembers();
+  });
+
+  $effect(() => {
+    const timelineNode = timelineElement;
+    const dock = composerDock;
+    if (!timelineNode || !dock || typeof ResizeObserver === 'undefined') return;
+
+    const measureComposer = (): void => {
+      const composerShell = dock.querySelector<HTMLElement>('.composer-shell');
+      if (!composerShell) return;
+
+      const timelineBottom = timelineNode.getBoundingClientRect().bottom;
+      const composerTop = composerShell.getBoundingClientRect().top;
+      composerBottomPadding = Math.max(0, Math.ceil(timelineBottom - composerTop));
+    };
+
+    const observer = new ResizeObserver(measureComposer);
+    observer.observe(timelineNode);
+    observer.observe(dock);
+    const composerShell = dock.querySelector<HTMLElement>('.composer-shell');
+    if (composerShell) observer.observe(composerShell);
+    measureComposer();
+    return () => {
+      observer.disconnect();
+    };
   });
 
   $effect(() => {
@@ -147,7 +175,7 @@
 </script>
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
-  <div class="timeline">
+  <div bind:this={timelineElement} class="timeline">
     <RoomHeader {roomName} {roomAvatar} onBack={goBack} onMembers={toggleMembers} {initials} />
     {#key `${roomId}:${eventId ?? ''}`}
       <TimelineList
@@ -156,24 +184,20 @@
         onRequestHistory={requestHistory}
         onRequestFuture={requestFuture}
         onRead={markRead}
+        bottomPadding={composerBottomPadding}
       />
     {/key}
-    <div class="typing-slot" aria-live="polite" role="status">
-      {#if typingLabel}
-        <div class="typing">
-          <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span>{typingLabel}</span>
-        </div>
-      {/if}
+    <div bind:this={composerDock} class="composer-dock">
+      {#key resolvedRoomId}
+        <RoomComposer
+          roomId={resolvedRoomId}
+          onSend={sendMessage}
+          onSendImage={sendImage}
+          onTyping={setTyping}
+          {typingLabel}
+        />
+      {/key}
     </div>
-    {#key resolvedRoomId}
-      <RoomComposer
-        roomId={resolvedRoomId}
-        onSend={sendMessage}
-        onSendImage={sendImage}
-        onTyping={setTyping}
-      />
-    {/key}
   </div>
 
   {#if desktop}
@@ -216,63 +240,16 @@
     position: relative;
   }
 
-  .typing-slot {
-    box-sizing: border-box;
-    display: flex;
-    flex: 0 0 1.25rem;
-    min-width: 0;
-    padding: 0 var(--page-gutter);
+  .composer-dock {
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    z-index: 2;
   }
 
-  .typing {
-    align-items: center;
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: 0.375rem;
-    line-height: 1.25rem;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-
-  .typing-dots {
-    display: inline-flex;
-    gap: 0.1875rem;
-  }
-
-  .typing-dots i {
-    background: var(--sable-primary-main);
-    border-radius: 50%;
-    height: 0.25rem;
-    width: 0.25rem;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .typing-dots i {
-      animation: typing-dot 1.2s infinite ease-in-out;
-    }
-
-    .typing-dots i:nth-child(2) {
-      animation-delay: 0.15s;
-    }
-
-    .typing-dots i:nth-child(3) {
-      animation-delay: 0.3s;
-    }
-  }
-
-  @keyframes typing-dot {
-    0%,
-    60%,
-    100% {
-      opacity: 0.3;
-      transform: translateY(0);
-    }
-
-    30% {
-      opacity: 1;
-      transform: translateY(-0.1875rem);
-    }
+  .composer-dock :global(.composer-stack) {
+    pointer-events: auto;
   }
 </style>

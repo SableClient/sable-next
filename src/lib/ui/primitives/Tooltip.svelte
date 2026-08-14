@@ -121,9 +121,13 @@
   @media (prefers-reduced-motion: no-preference) {
     .tooltip-trigger {
       transition:
-        background-color var(--motion-normal) ease,
-        color var(--motion-normal) ease,
-        box-shadow var(--motion-normal) ease;
+        color var(--motion-normal) var(--motion-easing-standard),
+        box-shadow var(--motion-normal) var(--motion-easing-standard);
+    }
+
+    .tooltip-trigger-icon:active,
+    .tooltip-trigger-icon[data-state='open'] {
+      transition: background-color var(--motion-normal) var(--motion-easing-standard);
     }
   }
 

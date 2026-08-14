@@ -83,28 +83,26 @@
 }
 
 .compact-tool:hover,
-.compact-tool.active,
-.desktop-tool:hover,
-.desktop-tool.active {
+.desktop-tool:hover {
   background: var(--sable-bg-container-hover);
 }
 
-.desktop-tool.active {
-  color: var(--sable-primary-on-container);
+.compact-tool.active,
+.desktop-tool.active,
+.mobile-tool.active {
+  color: var(--sable-bg-on-container);
 }
 
 .mobile-tool {
-  display: grid;
-  font-size: var(--font-size-small);
-  gap: 0.125rem;
-  justify-items: center;
-  line-height: 1.1;
-  min-width: 3.5rem;
-  padding: 0.25rem;
-}
-
-.mobile-tool.active {
-  color: var(--sable-primary-on-container);
+  align-items: center;
+  border-radius: var(--radius-pill);
+  display: flex;
+  flex: 0 0 var(--control-height-large);
+  height: var(--control-height-large);
+  justify-content: center;
+  min-width: var(--control-height-large);
+  padding: 0;
+  width: var(--control-height-large);
 }
 
 .quick-tool:focus-visible {
@@ -116,8 +114,6 @@
   .compact-tool,
   .desktop-tool,
   .mobile-tool {
-    transition:
-      background-color var(--motion-normal) ease,
-      color var(--motion-normal) ease;
+    transition: color var(--motion-normal) var(--motion-easing-standard);
   }
 }

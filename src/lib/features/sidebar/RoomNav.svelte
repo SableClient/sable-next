@@ -198,6 +198,7 @@
   <div class="room-nav-content">
     <div class="room-nav-actions" class:collapsed>
       <a
+        class="sable-selection-layer"
         href={resolve('/create-room')}
         onclick={() => onNavigate?.('/create-room')}
         aria-label={collapsed ? $i18n.t('nav.createRoom') : undefined}
@@ -206,6 +207,7 @@
         {#if !collapsed}<span>{$i18n.t('nav.createRoom')}</span>{/if}
       </a>
       <a
+        class="sable-selection-layer"
         href={resolve('/explore')}
         onclick={() => onNavigate?.('/explore')}
         aria-label={collapsed ? $i18n.t('nav.exploreSpaces') : undefined}
@@ -218,7 +220,7 @@
     {#if !collapsed}
       <button
         type="button"
-        class="rooms-heading"
+        class="rooms-heading sable-selection-layer"
         aria-expanded={!roomsClosed}
         onclick={() => {
           roomsClosed = !roomsClosed;
@@ -245,7 +247,7 @@
             {@const isClosed = closedCategories.has(item.key)}
             <button
               type="button"
-              class="room-category"
+              class="room-category sable-selection-layer"
               class:collapsed
               style:--room-depth={collapsed ? 0 : item.depth}
               aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
@@ -265,7 +267,7 @@
             {@const href = roomHref(item)}
             {@const unread = room?.highlight || room?.unread || 0}
             <a
-              class="room-row"
+              class="room-row sable-selection-layer"
               class:active={page.url.pathname === href}
               {href}
               style:--room-depth={collapsed ? 0 : item.depth}
@@ -352,10 +354,10 @@
     color: inherit;
     cursor: pointer;
     display: flex;
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-body);
     font-weight: var(--font-weight-medium);
-    gap: 0.5rem;
-    height: var(--control-height-small);
+    gap: var(--space-2);
+    height: var(--control-height-medium);
     padding: 0 0.5rem;
     text-align: left;
     text-decoration: none;
@@ -383,14 +385,25 @@
   .room-nav-actions.collapsed a {
     justify-content: center;
     padding: 0;
-    width: var(--control-height-small);
+    width: var(--control-height-medium);
+  }
+
+  .action-icon,
+  .category-caret {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 var(--icon-size-large);
+    height: var(--icon-size-large);
+    justify-content: center;
+    line-height: 0;
+    width: var(--icon-size-large);
   }
 
   .room-nav-actions :global(svg),
   .rooms-heading :global(svg) {
-    flex: 0 0 auto;
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
+    display: block;
+    height: var(--icon-size-large);
+    width: var(--icon-size-large);
   }
 
   .room-nav-content {
@@ -407,8 +420,9 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    gap: 0.25rem;
-    padding: 0.75rem 1rem 0.5rem;
+    gap: var(--space-2);
+    height: var(--control-height-medium);
+    padding: 0 0.5rem;
     text-align: left;
     width: 100%;
   }
@@ -419,11 +433,9 @@
   }
 
   .rooms-heading-label {
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-body);
     font-weight: var(--font-weight-bold);
-    letter-spacing: 0.06em;
     margin: 0;
-    text-transform: uppercase;
   }
 
   .empty-rooms {
@@ -435,7 +447,7 @@
 
   .room-list {
     display: grid;
-    gap: var(--space-1);
+    gap: 0.25rem;
     min-width: 0;
     padding: 0 0.5rem 0.5rem;
   }
@@ -458,8 +470,7 @@
   }
 
   .room-row.active {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+    color: var(--sable-bg-on-container);
   }
 
   .room-icon {
@@ -494,7 +505,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     gap: 0.25rem;
-    min-height: 2rem;
+    min-height: var(--control-height-medium);
     padding: 0 0.5rem 0 calc(0.5rem + var(--room-depth) * 1rem);
     text-align: left;
     text-transform: uppercase;
@@ -506,10 +517,6 @@
     background: var(--sable-bg-container-hover);
   }
 
-  .category-caret {
-    display: flex;
-  }
-
   .category-caret.closed {
     transform: rotate(-90deg);
   }
@@ -517,6 +524,11 @@
   .category-caret :global(svg) {
     height: 1rem;
     width: 1rem;
+  }
+
+  .rooms-heading .category-caret :global(svg) {
+    height: var(--icon-size-large);
+    width: var(--icon-size-large);
   }
 
   .category-name,
@@ -578,6 +590,23 @@
     .room-nav {
       flex: 0 0 var(--room-nav-width);
       width: var(--room-nav-width);
+    }
+
+    .room-nav-actions a,
+    .rooms-heading {
+      height: var(--control-height-small);
+    }
+
+    .room-nav-actions.collapsed a {
+      width: var(--control-height-small);
+    }
+
+    .room-row {
+      min-height: var(--control-height-small);
+    }
+
+    .room-category {
+      min-height: 2rem;
     }
   }
 </style>

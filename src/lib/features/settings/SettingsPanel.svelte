@@ -84,6 +84,7 @@
         {#each sections as section (section.id)}
           {@const active = activeSection === section.id}
           <a
+            class="sable-selection-layer"
             href={resolve(section.id === 'devices' ? '/settings' : `/settings/${section.id}`)}
             class:active
             aria-current={active ? 'page' : undefined}
@@ -166,8 +167,7 @@
   }
 
   a.active {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+    color: var(--sable-bg-on-container);
   }
 
   a :global(svg) {

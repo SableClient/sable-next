@@ -12,9 +12,10 @@
     onSend: (roomId: string, body: string) => Promise<void>;
     onSendImage: (roomId: string, image: File) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
+    typingLabel?: string | null;
   }
 
-  let { roomId, onSend, onSendImage, onTyping }: Props = $props();
+  let { roomId, onSend, onSendImage, onTyping, typingLabel = null }: Props = $props();
   let draft = $state('');
   let sending = $state(false);
   let error = $state<string | null>(null);
@@ -85,59 +86,152 @@
   }
 </script>
 
-<form
-  class="composer"
-  onsubmit={(event) => {
-    event.preventDefault();
-    void send();
-  }}
->
-  <TextArea
-    class="composer-input"
-    bind:value={draft}
-    rows={1}
-    maxlength={4000}
-    placeholder={$i18n.t('timeline.messagePlaceholder')}
-    aria-label={$i18n.t('timeline.messagePlaceholder')}
-    oninput={updateTyping}
-    onkeydown={handleKeydown}
-  />
-  <label class="composer-image" aria-label={$i18n.t('timeline.sendImage')}>
-    <ImageIcon />
-    <input type="file" accept="image/*" onchange={sendImage} disabled={sending} />
-  </label>
-  <IconButton
-    type="submit"
-    variant="ghost"
-    size="small"
-    class="composer-send"
-    loading={sending}
-    disabled={!draft.trim()}
-    label={$i18n.t('timeline.sendMessage')}
-  >
-    <PaperPlaneIcon weight="fill" />
-  </IconButton>
-</form>
-{#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
+<div class="composer-stack">
+  <div class="composer-shell">
+    <form
+      class="composer"
+      class:typing-visible={typingLabel !== null}
+      onsubmit={(event) => {
+        event.preventDefault();
+        void send();
+      }}
+    >
+      <div
+        class="typing-indicator"
+        class:visible={typingLabel !== null}
+        aria-hidden={typingLabel === null}
+        aria-live="polite"
+        role="status"
+      >
+        <div class="typing-content">
+          {#if typingLabel}
+            <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="typing-label">{typingLabel}</span>
+          {/if}
+        </div>
+      </div>
+      <div class="composer-row">
+        <label class="composer-image" aria-label={$i18n.t('timeline.sendImage')}>
+          <ImageIcon />
+          <input type="file" accept="image/*" onchange={sendImage} disabled={sending} />
+        </label>
+        <TextArea
+          class="composer-input"
+          bind:value={draft}
+          rows={1}
+          maxlength={4000}
+          placeholder={$i18n.t('timeline.messagePlaceholder')}
+          aria-label={$i18n.t('timeline.messagePlaceholder')}
+          oninput={updateTyping}
+          onkeydown={handleKeydown}
+        />
+        <IconButton
+          type="submit"
+          variant="ghost"
+          size="small"
+          class="composer-send"
+          loading={sending}
+          disabled={!draft.trim()}
+          label={$i18n.t('timeline.sendMessage')}
+        >
+          <PaperPlaneIcon weight="fill" />
+        </IconButton>
+      </div>
+    </form>
+  </div>
+  {#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
+</div>
 
 <style>
-  .composer {
+  .composer-stack {
+    margin: 0 auto calc(0.5rem + env(safe-area-inset-bottom));
+    position: relative;
+    width: calc(100% - var(--page-gutter) - var(--page-gutter));
+  }
+
+  .composer-shell {
     align-items: end;
+    display: flex;
+    min-height: calc(var(--control-height-medium) + 1.375rem);
+    position: relative;
+  }
+
+  .composer {
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-surface-container-line);
-    border-radius: 1.25rem;
+    border-radius: var(--radius-pill);
     box-shadow: var(--shadow-float);
     display: flex;
     flex: 0 0 auto;
-    gap: 0.25rem;
-    margin: 0.5rem auto calc(0.75rem + env(safe-area-inset-bottom));
-    padding: 0.375rem 0.5rem 0.375rem 0.875rem;
-    width: calc(100% - var(--page-gutter) - var(--page-gutter));
+    flex-direction: column;
+    padding: 0.375rem 0.5rem;
+    position: relative;
+    width: 100%;
+  }
+
+  .composer.typing-visible {
+    padding-top: 0.5rem;
   }
 
   .composer:focus-within {
     border-color: var(--sable-primary-main);
     box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+  }
+
+  .typing-indicator {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    line-height: 1rem;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateY(0.25rem);
+    white-space: nowrap;
+  }
+
+  .typing-indicator.visible {
+    max-height: 1.125rem;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .typing-content {
+    align-items: center;
+    display: flex;
+    gap: var(--space-1);
+    height: 1.125rem;
+    justify-content: flex-start;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 var(--space-3) 0.125rem calc(var(--control-height-small) + 0.25rem);
+  }
+
+  .typing-dots {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 0.1875rem;
+  }
+
+  .typing-dots i {
+    background: var(--sable-sec-main);
+    border-radius: 50%;
+    height: 0.25rem;
+    width: 0.25rem;
+  }
+
+  .typing-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .composer-row {
+    align-items: end;
+    display: flex;
+    gap: 0.25rem;
+    width: 100%;
   }
 
   .composer :global(textarea.composer-input) {
@@ -147,6 +241,7 @@
     color: inherit;
     field-sizing: content;
     flex: 1;
+    interpolate-size: allow-keywords;
     max-height: 10rem;
     min-height: var(--control-height-small);
     overflow-y: auto;
@@ -179,6 +274,10 @@
     background: var(--sable-surface-container-hover);
   }
 
+  .composer-image:active {
+    background: var(--sable-surface-container-active);
+  }
+
   .composer-image:has(input:disabled) {
     color: var(--sable-sec-main);
     cursor: default;
@@ -208,6 +307,56 @@
   :global(.composer-send svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .composer {
+      transition:
+        border-color var(--motion-fast) var(--motion-easing-standard),
+        box-shadow var(--motion-fast) var(--motion-easing-standard),
+        padding var(--motion-slow) var(--motion-easing-emphasized);
+    }
+
+    .typing-indicator {
+      transition:
+        max-height var(--motion-slow) var(--motion-easing-emphasized),
+        opacity var(--motion-normal) var(--motion-easing-standard),
+        transform var(--motion-slow) var(--motion-easing-emphasized);
+    }
+
+    .composer :global(textarea.composer-input) {
+      transition: block-size var(--motion-normal) var(--motion-easing-emphasized);
+    }
+
+    .composer-image:active {
+      transition: background-color var(--motion-normal) var(--motion-easing-standard);
+    }
+
+    .typing-dots i {
+      animation: typing-dot 1.2s infinite ease-in-out;
+    }
+
+    .typing-dots i:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .typing-dots i:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+  }
+
+  @keyframes typing-dot {
+    0%,
+    60%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.8);
+    }
+
+    30% {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   :global(.send-error) {

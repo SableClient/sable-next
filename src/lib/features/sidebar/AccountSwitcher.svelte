@@ -50,9 +50,11 @@
 
 {#if mode === 'mobile'}
   <DropdownMenu.Root>
-    <DropdownMenu.Trigger class="quick-tool mobile-tool" aria-label={$i18n.t('nav.switchAccount')}>
+    <DropdownMenu.Trigger
+      class="quick-tool mobile-tool sable-selection-layer"
+      aria-label={$i18n.t('nav.switchAccount')}
+    >
       <Avatar size="small" {initials} />
-      <span>{$i18n.t('nav.account')}</span>
     </DropdownMenu.Trigger>
     <DropdownMenu.Content class="account-popover" side="top" sideOffset={8}>
       <AccountMenuItems
@@ -71,7 +73,9 @@
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         {...props}
-        class="quick-tool {mode === 'compact' ? 'compact-tool' : 'desktop-tool'}"
+        class="quick-tool sable-selection-layer {mode === 'compact'
+          ? 'compact-tool'
+          : 'desktop-tool'}"
         aria-label={$i18n.t('nav.switchAccount')}
       >
         <Avatar size="small" {initials} />

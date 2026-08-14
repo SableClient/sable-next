@@ -199,19 +199,23 @@
     background: var(--sable-surface-container-hover);
   }
 
+  .combobox-option:active {
+    background: var(--sable-surface-container-active);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .combobox-trigger {
       transition:
-        color var(--motion-normal) ease,
-        transform var(--motion-fast) ease;
+        color var(--motion-normal) var(--motion-easing-standard),
+        transform var(--motion-fast) var(--motion-easing-standard);
     }
 
     :global(.combobox-icon) {
-      transition: transform var(--motion-normal) ease;
+      transition: transform var(--motion-normal) var(--motion-easing-standard);
     }
 
-    .combobox-option {
-      transition: background-color var(--motion-fast) ease;
+    .combobox-option:active {
+      transition: background-color var(--motion-fast) var(--motion-easing-standard);
     }
   }
 </style>

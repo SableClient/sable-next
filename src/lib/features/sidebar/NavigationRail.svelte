@@ -112,7 +112,7 @@
           {@const active = isActive(item)}
           <li>
             <a
-              class="rail-item"
+              class="rail-item sable-selection-layer"
               class:space-item={Boolean(item.initial)}
               class:active
               href={resolve((item.route ?? item.href) as Pathname)}
@@ -123,7 +123,9 @@
               aria-current={active ? 'page' : undefined}
             >
               {#if item.icon}
-                <span class="icon" aria-hidden="true"><item.icon /></span>
+                <span class="icon" aria-hidden="true"
+                  ><item.icon weight={active ? 'fill' : 'regular'} /></span
+                >
               {:else}
                 <span class="space-initial" aria-hidden="true">
                   {#if item.avatar}
@@ -148,7 +150,7 @@
     <ul class="rail-stack rail-bottom">
       <li>
         <a
-          class="rail-item"
+          class="rail-item sable-selection-layer"
           class:active={isActive(createItem)}
           href={resolve((createItem.route ?? createItem.href) as Pathname)}
           onclick={() => {
@@ -157,7 +159,9 @@
           aria-label={$i18n.t(createItem.label)}
           aria-current={isActive(createItem) ? 'page' : undefined}
         >
-          <span class="icon" aria-hidden="true"><PlusIcon /></span>
+          <span class="icon" aria-hidden="true"
+            ><PlusIcon weight={isActive(createItem) ? 'fill' : 'regular'} /></span
+          >
         </a>
       </li>
     </ul>
@@ -173,7 +177,7 @@
             {#snippet trigger({ props }: { props: Record<string, unknown> })}
               <a
                 {...props}
-                class="rail-item"
+                class="rail-item sable-selection-layer"
                 class:space-item={Boolean(item.initial)}
                 class:active
                 href={resolve((item.route ?? item.href) as Pathname)}
@@ -181,7 +185,9 @@
                 aria-current={active ? 'page' : undefined}
               >
                 {#if item.icon}
-                  <span class="icon" aria-hidden="true"><item.icon /></span>
+                  <span class="icon" aria-hidden="true"
+                    ><item.icon weight={active ? 'fill' : 'regular'} /></span
+                  >
                 {:else}
                   <span class="space-initial" aria-hidden="true">
                     {#if item.avatar}
@@ -211,13 +217,15 @@
           {@const label = $i18n.t(createItem.label)}
           <a
             {...props}
-            class="rail-item"
+            class="rail-item sable-selection-layer"
             class:active={isActive(createItem)}
             href={resolve((createItem.route ?? createItem.href) as Pathname)}
             aria-label={label}
             aria-current={isActive(createItem) ? 'page' : undefined}
           >
-            <span class="icon" aria-hidden="true"><PlusIcon /></span>
+            <span class="icon" aria-hidden="true"
+              ><PlusIcon weight={isActive(createItem) ? 'fill' : 'regular'} /></span
+            >
           </a>
         {/snippet}
         <Tooltip label={$i18n.t(createItem.label)} side="right" {trigger} />
@@ -302,8 +310,7 @@
   }
 
   .rail-item.active {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+    color: var(--sable-bg-on-container);
   }
 
   .icon {
@@ -342,9 +349,8 @@
   @media (prefers-reduced-motion: no-preference) {
     .rail-item {
       transition:
-        background-color var(--motion-normal) ease,
-        border-color var(--motion-normal) ease,
-        color var(--motion-normal) ease;
+        border-color var(--motion-normal) var(--motion-easing-standard),
+        color var(--motion-normal) var(--motion-easing-standard);
     }
   }
 </style>

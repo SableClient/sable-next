@@ -100,6 +100,7 @@
         onclick={() => {
           onLaunchRedirectLogin('oidc');
         }}
+        variant="primary"
       >
         {#if isRegistering}<Spinner />{/if}
         {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
@@ -117,6 +118,7 @@
               onclick={() => {
                 onLaunchRedirectLogin('sso', provider.id);
               }}
+              variant="primary"
             >
               {$i18n.t('auth.continueWithProvider', { name: provider.name })}
             </Button>
@@ -127,6 +129,7 @@
             onclick={() => {
               onLaunchRedirectLogin('sso');
             }}
+            variant="primary"
           >
             {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
           </Button>

@@ -24,6 +24,7 @@
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
+    bottomPadding?: number;
   }
 
   let {
@@ -32,6 +33,7 @@
     onRequestHistory,
     onRequestFuture,
     onRead,
+    bottomPadding = 0,
   }: Props = $props();
   let viewport = $state<HTMLDivElement | null>(null);
   let nearLatest = $state(true);
@@ -143,6 +145,7 @@
 
   $effect.pre(() => {
     const items = timeline.items;
+    const paddingEnd = bottomPadding;
     const anchor = historyViewportAnchor ? null : captureViewportAnchor(configuredItems, items);
     const instance = get(virtualizer);
     instance.setOptions({
@@ -156,6 +159,7 @@
       followOnAppend: true,
       scrollEndThreshold: JUMP_TO_LATEST_THRESHOLD,
       overscan: 8,
+      paddingEnd,
     });
     configuredItems = items;
     const generation = ++anchorGeneration;
@@ -173,6 +177,17 @@
     const generation = ++anchorGeneration;
     void restoreViewportAnchor(anchor, generation).finally(() => {
       if (generation === anchorGeneration) historyViewportAnchor = null;
+    });
+  });
+
+  $effect(() => {
+    const paddingEnd = bottomPadding;
+    if (!viewport || !untrack(() => nearLatest)) return;
+
+    void tick().then(() => {
+      if (paddingEnd === bottomPadding && untrack(() => nearLatest)) {
+        get(virtualizer).scrollToEnd({ behavior: 'auto' });
+      }
     });
   });
 

@@ -43,10 +43,10 @@
       <h3>{$i18n.t('auth.finishInBrowser')}</h3>
       <p>{$i18n.t('auth.finishInBrowserDescription', { server: homeserver })}</p>
       <div class="actions">
-        <Button onclick={onOpenFallback} disabled={isRegistering}>
+        <Button onclick={onOpenFallback} disabled={isRegistering} variant="primary">
           {$i18n.t('auth.openServerPage')}
         </Button>
-        <Button onclick={onContinueFallback} disabled={isRegistering}>
+        <Button onclick={onContinueFallback} disabled={isRegistering} variant="primary">
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>
@@ -74,7 +74,7 @@
               }}
             />
           </AuthField>
-          <Button type="submit" disabled={isRegistering}>
+          <Button type="submit" disabled={isRegistering} variant="primary">
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.sendVerificationEmail')}
           </Button>
@@ -100,7 +100,7 @@
               }}
             />
           </AuthField>
-          <Button type="submit" disabled={isRegistering}>
+          <Button type="submit" disabled={isRegistering} variant="primary">
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.verifyEmail')}
           </Button>
@@ -113,7 +113,7 @@
             { email: emailStep.email }
           )}
         </p>
-        <Button onclick={onContinueFallback} disabled={isRegistering}>
+        <Button onclick={onContinueFallback} disabled={isRegistering} variant="primary">
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>

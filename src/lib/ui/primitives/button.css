@@ -168,10 +168,9 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .sable-button {
+  .sable-button:active:not(:disabled) {
     transition:
-      background-color var(--motion-normal) ease,
-      border-color var(--motion-normal) ease,
-      box-shadow var(--motion-normal) ease;
+      background-color var(--motion-normal) var(--motion-easing-standard),
+      box-shadow var(--motion-normal) var(--motion-easing-standard);
   }
 }
