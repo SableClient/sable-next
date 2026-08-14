@@ -4,12 +4,15 @@
   import MediaImage from '$lib/ui/MediaImage.svelte';
 
   type AvatarSize = 'small' | 'medium' | 'large';
+  /** Rooms and spaces are round so they read as a place, people as a square. */
+  type AvatarShape = 'person' | 'room';
 
   type Props = {
     src?: string | null;
     alt?: string;
     initials?: string;
     size?: AvatarSize;
+    shape?: AvatarShape;
     color?: string;
     decorative?: boolean;
     class?: ClassValue;
@@ -20,6 +23,7 @@
     alt,
     initials = '?',
     size = 'medium',
+    shape = 'person',
     color,
     decorative = alt === undefined,
     class: className = '',
@@ -29,7 +33,7 @@
 </script>
 
 <span
-  class={['sable-avatar', `sable-avatar-${size}`, className]}
+  class={['sable-avatar', `sable-avatar-${size}`, `sable-avatar-${shape}`, className]}
   style:background={color}
   aria-hidden={decorative ? 'true' : undefined}
   role={decorative || src ? undefined : 'img'}
@@ -47,10 +51,11 @@
 <style>
   :global(.sable-avatar) {
     --avatar-size: var(--avatar-size-medium);
+    --avatar-radius: var(--radius);
 
     align-items: center;
     background: var(--sable-primary-container);
-    border-radius: 50%;
+    border-radius: var(--avatar-radius);
     color: var(--sable-primary-on-container);
     display: inline-flex;
     flex: 0 0 var(--avatar-size);
@@ -65,12 +70,20 @@
 
   :global(.sable-avatar-small) {
     --avatar-size: var(--avatar-size-small);
+
+    /* Keeps the corner-to-size ratio of the larger sizes. */
+    --avatar-radius: 0.3125rem;
   }
 
   :global(.sable-avatar-large) {
     --avatar-size: var(--avatar-size-large);
 
     font-size: var(--font-size-xlarge);
+  }
+
+  /* Last, so it also rounds the small and large sizes. */
+  :global(.sable-avatar-room) {
+    --avatar-radius: var(--radius-pill);
   }
 
   :global(.sable-avatar img) {

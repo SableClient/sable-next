@@ -217,6 +217,18 @@
   async function markRead(eventId: string): Promise<void> {
     await core.markRead(resolvedRoomId, eventId);
   }
+
+  function onRetrySend(transactionId: string): void {
+    void core.retrySend(resolvedRoomId, transactionId);
+  }
+
+  function onCancelSend(transactionId: string): void {
+    void core.cancelSend(resolvedRoomId, transactionId);
+  }
+
+  function onToggleReaction(eventId: string, key: string): void {
+    void core.toggleReaction(resolvedRoomId, eventId, key);
+  }
 </script>
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
@@ -231,9 +243,10 @@
         onRead={markRead}
         onMatrixLink={handleMatrixLink}
         onSenderProfile={openProfile}
-        onRetrySend={(transactionId: string) => void core.retrySend(resolvedRoomId, transactionId)}
-        onCancelSend={(transactionId: string) =>
-          void core.cancelSend(resolvedRoomId, transactionId)}
+        {onRetrySend}
+        {onCancelSend}
+        {onToggleReaction}
+        currentUserId={core.session?.user_id ?? null}
         scrollLocked={profileOpen}
       />
     {/key}

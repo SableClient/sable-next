@@ -110,6 +110,8 @@
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
+    currentUserId?: string | null;
+    onToggleReaction?: (eventId: string, key: string) => void;
     scrollLocked?: boolean;
   }
 
@@ -123,6 +125,8 @@
     onSenderProfile,
     onRetrySend,
     onCancelSend,
+    currentUserId,
+    onToggleReaction,
     scrollLocked = false,
   }: Props = $props();
   let visibleItems = $derived(visibleTimelineItems(timeline.items, timelinePreferences));
@@ -873,6 +877,8 @@
                 {onSenderProfile}
                 {onRetrySend}
                 {onCancelSend}
+                {currentUserId}
+                {onToggleReaction}
               />
             </div>
           {/if}

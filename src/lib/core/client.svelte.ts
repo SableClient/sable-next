@@ -458,6 +458,16 @@ export class CoreClient {
     });
   }
 
+  /** The core toggles, so sending the same key twice redacts the reaction. */
+  async toggleReaction(roomId: string, eventId: string, key: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'react',
+      room_id: roomId,
+      event_id: eventId,
+      key,
+    });
+  }
+
   async retrySend(roomId: string, transactionId: string): Promise<void> {
     await this.ensureTransport().send({
       type: 'retry_send',

@@ -2,7 +2,6 @@
   import type { TimelineItemView } from '@/generated/TimelineItemView';
 
   import { i18n } from '$lib/i18n';
-  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import MediaImage from '$lib/ui/MediaImage.svelte';
   import MediaContent from '$lib/ui/MediaContent.svelte';
@@ -18,10 +17,20 @@
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
+    currentUserId?: string | null;
+    onToggleReaction?: (eventId: string, key: string) => void;
   }
 
-  let { item, collapsed, onMatrixLink, onSenderProfile, onRetrySend, onCancelSend }: Props =
-    $props();
+  let {
+    item,
+    collapsed,
+    onMatrixLink,
+    onSenderProfile,
+    onRetrySend,
+    onCancelSend,
+    currentUserId = null,
+    onToggleReaction,
+  }: Props = $props();
   let senderName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   // A recoverable failure resumes by itself, so only a parked one gets a prompt.
@@ -146,12 +155,26 @@
         />
       {/if}
       {#if item.reactions.length > 0}
+        {@const eventId = item.event_id}
         <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
           {#each item.reactions as reaction (reaction.key)}
-            <StatusBadge
-              label={reaction.key + ' ' + reaction.senders.length.toString()}
-              variant="neutral"
-            />
+            {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
+            <button
+              class={['reaction', { mine }]}
+              type="button"
+              aria-pressed={mine}
+              aria-label={$i18n.t('timeline.toggleReaction', {
+                key: reaction.key,
+                count: reaction.senders.length,
+              })}
+              disabled={eventId === null}
+              onclick={() => {
+                if (eventId) onToggleReaction?.(eventId, reaction.key);
+              }}
+            >
+              <em>{reaction.key}</em>
+              {reaction.senders.length}
+            </button>
           {/each}
         </div>
       {/if}
@@ -361,19 +384,90 @@
   }
 
   .reply-preview {
-    border-left: 2px solid var(--sable-primary-main);
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-inline-start: 3px solid var(--sable-primary-main-line);
+    border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+    line-height: 1.4;
     margin-bottom: 0.25rem;
     overflow: hidden;
-    padding-left: 0.5rem;
+    padding: 0.25rem 0.5rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .reply-preview strong {
-    color: var(--sable-bg-on-container);
+    color: var(--sable-sec-on-container);
     margin-right: 0.25rem;
+  }
+
+  .reaction {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-medium);
+    gap: 0.25rem;
+    min-height: 1.5rem;
+
+    /* Sits the glyph nearer the leading edge than the count. */
+    padding: 2px 0.5rem 2px 0.375rem;
+    position: relative;
+  }
+
+  /* Keeps the pill visually 24px while meeting the 36px touch target. */
+  .reaction::after {
+    border-radius: inherit;
+    content: '';
+    inset: -0.375rem -2px;
+    position: absolute;
+  }
+
+  .reaction em {
+    font-size: var(--font-size-body);
+    font-style: normal;
+    line-height: 1;
+  }
+
+  .reaction.mine {
+    background: var(--sable-primary-container);
+    border-color: var(--sable-primary-container-line);
+    color: var(--sable-primary-on-container);
+  }
+
+  .reaction:disabled {
+    cursor: default;
+  }
+
+  .reaction:focus-visible {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reaction {
+      transition:
+        background-color var(--motion-normal) var(--motion-easing-standard),
+        border-color var(--motion-normal) var(--motion-easing-standard);
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .reaction:hover:not(:disabled) {
+      background: var(--sable-surface-var-container-hover);
+    }
+
+    .reaction.mine:hover:not(:disabled) {
+      background: var(--sable-primary-container-hover);
+    }
   }
 
   .reactions {

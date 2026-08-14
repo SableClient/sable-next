@@ -28,7 +28,13 @@
   >
     <BackIcon />
   </IconButton>
-  <Avatar class="room-avatar" src={roomAvatar} initials={initials(roomName)} size="small" />
+  <Avatar
+    class="room-avatar"
+    src={roomAvatar}
+    initials={initials(roomName)}
+    size="small"
+    shape="room"
+  />
   <h1>{roomName}</h1>
   <Button class="members-button" variant="ghost" size="small" onclick={onMembers}>
     <UsersIcon />

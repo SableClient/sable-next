@@ -1,8 +1,3 @@
-/**
- * Which non-message events the timeline renders. The defaults match Sable v1:
- * joins and leaves are worth seeing, a display-name change is not, and raw
- * state events stay behind a developer switch.
- */
 export interface TimelinePreferences {
   hideMembershipEvents: boolean;
   hideProfileChanges: boolean;
@@ -11,6 +6,7 @@ export interface TimelinePreferences {
 
 const STORAGE_KEY = 'sable-timeline-preferences';
 
+/** Hiding profile changes by default follows Sable v1's `hideNickAvatarEvents`. */
 const DEFAULTS: TimelinePreferences = {
   hideMembershipEvents: false,
   hideProfileChanges: true,

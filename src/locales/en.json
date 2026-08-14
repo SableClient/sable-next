@@ -107,6 +107,7 @@
     "powerLevelModerator": "Moderator",
     "powerLevelMember": "Member",
     "reactions": "Reactions",
+    "toggleReaction": "{{key}}, {{count}} reactions. Toggle yours.",
     "readReceipts": "Read receipts",
     "closeReadReceipts": "Close read receipts",
     "seenBy": "Seen by",
