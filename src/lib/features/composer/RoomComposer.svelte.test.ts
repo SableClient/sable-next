@@ -49,7 +49,7 @@ test('typing cleanup and drafts stay scoped to their room', async () => {
   await unmount(second);
 });
 
-test('queues any selected attachment, not only images', async () => {
+test('stages any selected attachment, not only images, and sends it on submit', async () => {
   const attachment = vi.fn(async () => {});
   const instance = mount(RoomComposer, {
     target: document.body,
@@ -68,12 +68,17 @@ test('queues any selected attachment, not only images', async () => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
   await tick();
 
-  expect(input.accept).toBe('');
+  expect(document.querySelector('.staged-name')?.textContent).toBe('report.pdf');
+  expect(attachment).not.toHaveBeenCalled();
+
+  document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true }));
+  await tick();
+
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file);
   await unmount(instance);
 });
 
-test('queues files pasted into or dropped on the composer', async () => {
+test('stages files pasted into or dropped on the composer, and drops one on demand', async () => {
   const attachment = vi.fn(async () => {});
   const instance = mount(RoomComposer, {
     target: document.body,
@@ -98,7 +103,42 @@ test('queues files pasted into or dropped on the composer', async () => {
 
   expect(paste.defaultPrevented).toBe(true);
   expect(drop.defaultPrevented).toBe(true);
-  expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', pastedFile);
-  expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', droppedFile);
+  expect(
+    Array.from(document.querySelectorAll('.staged-name')).map((node) => node.textContent)
+  ).toEqual(['pasted.png', 'dropped.png']);
+
+  const remove = document.querySelector('.staged-item button');
+  if (!(remove instanceof HTMLButtonElement)) throw new Error('remove control not found');
+  remove.click();
+  await tick();
+
+  document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true }));
+  await tick();
+
+  expect(attachment).toHaveBeenCalledTimes(1);
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', droppedFile);
+  await unmount(instance);
+});
+
+test('the send verb stays disabled until there is something to send', async () => {
+  const instance = mount(RoomComposer, {
+    target: document.body,
+    props: {
+      roomId: '!room:example.org',
+      onSend: async () => {},
+      onSendAttachment: async () => {},
+      onTyping: async () => {},
+    },
+  });
+  const send = document.querySelector('button[type="submit"]');
+  if (!(send instanceof HTMLButtonElement)) throw new Error('send control not found');
+  expect(send.disabled).toBe(true);
+
+  const input = textarea();
+  input.value = 'ready';
+  input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  await tick();
+
+  expect(send.disabled).toBe(false);
   await unmount(instance);
 });
