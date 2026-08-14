@@ -87,30 +87,21 @@
 </script>
 
 <div class="composer-stack">
+  <div class="typing" aria-hidden={typingLabel === null} aria-live="polite" role="status">
+    {#if typingLabel}
+      <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>{typingLabel}</span>
+    {/if}
+  </div>
   <div class="composer-shell">
-    <form
-      class="composer"
-      class:typing-visible={typingLabel !== null}
-      onsubmit={(event) => {
-        event.preventDefault();
-        void send();
-      }}
-    >
-      <div
-        class="typing-indicator"
-        class:visible={typingLabel !== null}
-        aria-hidden={typingLabel === null}
-        aria-live="polite"
-        role="status"
+    <div class="composer">
+      <form
+        class="composer-row"
+        onsubmit={(event) => {
+          event.preventDefault();
+          void send();
+        }}
       >
-        <div class="typing-content">
-          {#if typingLabel}
-            <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="typing-label">{typingLabel}</span>
-          {/if}
-        </div>
-      </div>
-      <div class="composer-row">
         <label class="composer-image" aria-label={$i18n.t('timeline.sendImage')}>
           <ImageIcon />
           <input type="file" accept="image/*" onchange={sendImage} disabled={sending} />
@@ -136,8 +127,8 @@
         >
           <PaperPlaneIcon weight="fill" />
         </IconButton>
-      </div>
-    </form>
+      </form>
+    </div>
   </div>
   {#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
 </div>
@@ -149,10 +140,43 @@
     width: calc(100% - var(--page-gutter) - var(--page-gutter));
   }
 
+  .typing {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.375rem;
+    line-height: 1.25rem;
+    min-height: 1.25rem;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .typing-dots {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 0.1875rem;
+  }
+
+  .typing-dots i {
+    background: var(--sable-primary-main);
+    border-radius: 50%;
+    height: 0.25rem;
+    width: 0.25rem;
+  }
+
+  .typing-dots i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .typing-dots i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
   .composer-shell {
     align-items: end;
     display: flex;
-    min-height: calc(var(--control-height-medium) + 1.375rem);
     position: relative;
   }
 
@@ -164,67 +188,14 @@
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
-    padding: 0.375rem 0.5rem;
+    padding: 0 0.5rem 0.375rem;
     position: relative;
     width: 100%;
-  }
-
-  .composer.typing-visible {
-    padding-top: 0.5rem;
   }
 
   .composer:focus-within {
     border-color: var(--sable-primary-main);
     box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
-  }
-
-  .typing-indicator {
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    line-height: 1rem;
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    pointer-events: none;
-    transform: translateY(0.25rem);
-    white-space: nowrap;
-  }
-
-  .typing-indicator.visible {
-    max-height: 1.125rem;
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  .typing-content {
-    align-items: center;
-    display: flex;
-    gap: var(--space-1);
-    height: 1.125rem;
-    justify-content: flex-start;
-    min-width: 0;
-    overflow: hidden;
-    padding: 0 var(--space-3) 0.125rem calc(var(--control-height-small) + 0.25rem);
-  }
-
-  .typing-dots {
-    align-items: center;
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: 0.1875rem;
-  }
-
-  .typing-dots i {
-    background: var(--sable-sec-main);
-    border-radius: 50%;
-    height: 0.25rem;
-    width: 0.25rem;
-  }
-
-  .typing-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .composer-row {
@@ -317,13 +288,6 @@
         padding var(--motion-slow) var(--motion-easing-emphasized);
     }
 
-    .typing-indicator {
-      transition:
-        max-height var(--motion-slow) var(--motion-easing-emphasized),
-        opacity var(--motion-normal) var(--motion-easing-standard),
-        transform var(--motion-slow) var(--motion-easing-emphasized);
-    }
-
     .composer :global(textarea.composer-input) {
       transition: block-size var(--motion-normal) var(--motion-easing-emphasized);
     }
@@ -349,13 +313,13 @@
     0%,
     60%,
     100% {
-      opacity: 0.35;
-      transform: scale(0.8);
+      opacity: 0.3;
+      transform: translateY(0);
     }
 
     30% {
       opacity: 1;
-      transform: scale(1);
+      transform: translateY(-0.1875rem);
     }
   }
 

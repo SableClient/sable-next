@@ -375,9 +375,12 @@ export class CoreClient {
     return response.status;
   }
 
-  async devices(): Promise<DeviceView[]> {
+  async devices(): Promise<{ devices: DeviceView[]; accountManagement: boolean }> {
     const response = await this.ensureTransport().send({ type: 'devices' });
-    return response.devices;
+    return {
+      devices: response.devices,
+      accountManagement: response.account_management,
+    };
   }
 
   async recoverIdentity(recoveryKey: string): Promise<void> {
@@ -427,8 +430,13 @@ export class CoreClient {
     });
   }
 
-  async deleteDevice(deviceId: string, password: string | null): Promise<void> {
-    await this.ensureTransport().send({ type: 'delete_device', device_id: deviceId, password });
+  async deleteDevice(deviceId: string, password: string | null): Promise<string | null> {
+    const response = await this.ensureTransport().send({
+      type: 'delete_device',
+      device_id: deviceId,
+      password,
+    });
+    return response.management_url;
   }
 
   async requestVerification(userId: string): Promise<string> {

@@ -281,6 +281,14 @@ macro_rules! dispatch_commands {
             Command::Devices => {
                 let client = $self.client().await?;
                 let own_device_id = client.device_id().map(ToOwned::to_owned);
+                let account_management = client.oauth().full_session().is_some()
+                    && client
+                        .oauth()
+                        .server_metadata()
+                        .await
+                        .ok()
+                        .and_then(|metadata| metadata.account_management_uri)
+                        .is_some();
 
                 let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
                 let devices = client
@@ -299,6 +307,7 @@ macro_rules! dispatch_commands {
                             is_verified: device.is_verified(),
                         })
                         .collect(),
+                    account_management,
                 })
             }
 
@@ -350,9 +359,24 @@ macro_rules! dispatch_commands {
                 let client = $self.client().await?;
                 let devices = [device_id];
 
+                if client.oauth().full_session().is_some()
+                    && let Ok(metadata) = client.oauth().server_metadata().await
+                    && let Some(url) = metadata.account_management_url_with_action(
+                        matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
+                            matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
+                        ),
+                    )
+                {
+                    return Ok(CommandOk::DeleteDevice {
+                        management_url: Some(url.to_string()),
+                    });
+                }
+
                 // The flows cannot be asked for up front.
                 let Err(error) = client.delete_devices(&devices, None).await else {
-                    return Ok(CommandOk::DeleteDevice);
+                    return Ok(CommandOk::DeleteDevice {
+                        management_url: None,
+                    });
                 };
 
                 let Some(uiaa) = error.as_uiaa_response() else {
@@ -393,7 +417,9 @@ macro_rules! dispatch_commands {
                         None => $self.failed("delete_device: auth", error),
                     })?;
 
-                Ok(CommandOk::DeleteDevice)
+                Ok(CommandOk::DeleteDevice {
+                    management_url: None,
+                })
             }
 
             Command::RenameDevice {

@@ -4,6 +4,7 @@
   import DesktopTowerIcon from 'phosphor-svelte/lib/DesktopTowerIcon';
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
+  import { invoke, isTauri } from '@tauri-apps/api/core';
 
   import type { DeviceView } from '@/generated/DeviceView';
   import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
@@ -22,6 +23,7 @@
 
   const core = useCoreClient();
   let devices = $state<DeviceView[]>([]);
+  let accountManagement = $state(false);
   let status = $state<EncryptionStatusView | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -68,7 +70,8 @@
         core.devices(),
       ]);
       status = nextStatus;
-      devices = nextDevices;
+      devices = nextDevices.devices;
+      accountManagement = nextDevices.accountManagement;
     } catch (cause) {
       error = messageFor(cause);
     } finally {
@@ -101,14 +104,41 @@
     }
   }
 
-  async function removeDevice(deviceId: string): Promise<void> {
+  async function removeDevice(deviceId: string, popup: Window | null = null): Promise<void> {
     try {
-      await core.deleteDevice(deviceId, password || null);
+      const managementUrl = await core.deleteDevice(deviceId, password || null);
       cancelRemoval();
-      await refresh();
+      if (managementUrl) {
+        if (isTauri()) await invoke('open_auth_url', { url: managementUrl });
+        else if (popup) popup.location.replace(managementUrl);
+        else window.open(managementUrl, '_blank', 'noopener');
+      } else {
+        await refresh();
+      }
     } catch (cause) {
+      popup?.close();
       error = messageFor(cause);
     }
+  }
+
+  function beginRemoval(deviceId: string): void {
+    if (!accountManagement) {
+      deleting = deviceId;
+      return;
+    }
+
+    const popup = isTauri()
+      ? null
+      : window.open(
+          'about:blank',
+          `sable-device-${crypto.randomUUID()}`,
+          'popup,width=520,height=720'
+        );
+    if (!isTauri() && !popup) {
+      error = t('settings.actionFailed');
+      return;
+    }
+    void removeDevice(deviceId, popup);
   }
 
   async function manageRecovery(reset = false): Promise<void> {
@@ -289,7 +319,9 @@
                     <Button
                       variant="danger"
                       size="small"
-                      onclick={() => (deleting = device.device_id)}
+                      onclick={() => {
+                        beginRemoval(device.device_id);
+                      }}
                     >
                       {$i18n.t('settings.remove')}
                     </Button>
@@ -333,14 +365,18 @@
                     <strong>{$i18n.t('settings.removeDeviceConfirm')}</strong>
                     <p>{$i18n.t('settings.removeDeviceDescription')}</p>
                   </div>
-                  <label for={'password-' + device.device_id}>{$i18n.t('settings.password')}</label>
-                  <TextInput
-                    id={'password-' + device.device_id}
-                    type="password"
-                    bind:value={password}
-                    autocomplete="current-password"
-                    autofocus
-                  />
+                  {#if !accountManagement}
+                    <label for={'password-' + device.device_id}
+                      >{$i18n.t('settings.password')}</label
+                    >
+                    <TextInput
+                      id={'password-' + device.device_id}
+                      type="password"
+                      bind:value={password}
+                      autocomplete="current-password"
+                      autofocus
+                    />
+                  {/if}
                   <div class="form-actions">
                     <Button type="submit" variant="danger"
                       >{$i18n.t('settings.removeDevice')}</Button

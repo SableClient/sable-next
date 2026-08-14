@@ -464,6 +464,7 @@ pub enum CommandOk {
     },
     Devices {
         devices: Vec<DeviceView>,
+        account_management: bool,
     },
     RecoverIdentity,
     /// Unrecoverable once discarded.
@@ -473,7 +474,9 @@ pub enum CommandOk {
     ResetRecoveryKey {
         recovery_key: String,
     },
-    DeleteDevice,
+    DeleteDevice {
+        management_url: Option<String>,
+    },
     RenameDevice,
 
     SetDisplayName,

@@ -104,7 +104,6 @@
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
-    bottomPadding?: number;
   }
 
   let {
@@ -113,7 +112,6 @@
     onRequestHistory,
     onRequestFuture,
     onRead,
-    bottomPadding = 0,
   }: Props = $props();
   let viewport = $state<HTMLDivElement | null>(null);
   let nearLatest = $state(true);
@@ -348,7 +346,6 @@
 
   $effect.pre(() => {
     const items = timeline.items;
-    const paddingEnd = bottomPadding;
     const instance = get(virtualizer);
     const previousItems = historyDebugItems;
     historyDebugItems = items;
@@ -385,7 +382,6 @@
       scrollEndThreshold: JUMP_TO_LATEST_THRESHOLD,
       useScrollendEvent: true,
       overscan: 8,
-      paddingEnd,
       onChange: handleVirtualizerChange,
     });
     if (edgesChanged) {
@@ -402,17 +398,6 @@
         });
       });
     }
-  });
-
-  $effect(() => {
-    const paddingEnd = bottomPadding;
-    if (!viewport || !untrack(() => nearLatest)) return;
-
-    void tick().then(() => {
-      if (paddingEnd === bottomPadding && untrack(() => nearLatest)) {
-        get(virtualizer).scrollToEnd({ behavior: 'auto' });
-      }
-    });
   });
 
   $effect(() => {

@@ -34,9 +34,6 @@
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
   let typingUserIds = $state.raw<string[]>([]);
-  let timelineElement = $state<HTMLDivElement | null>(null);
-  let composerDock = $state<HTMLDivElement | null>(null);
-  let composerBottomPadding = $state(0);
 
   onDestroy(() => {
     void activeTimeline.stop(timelineOwner);
@@ -79,31 +76,6 @@
 
   $effect(() => {
     if (desktop && desktopMembersOpen) void loadMembers();
-  });
-
-  $effect(() => {
-    const timelineNode = timelineElement;
-    const dock = composerDock;
-    if (!timelineNode || !dock || typeof ResizeObserver === 'undefined') return;
-
-    const measureComposer = (): void => {
-      const composerShell = dock.querySelector<HTMLElement>('.composer-shell');
-      if (!composerShell) return;
-
-      const timelineBottom = timelineNode.getBoundingClientRect().bottom;
-      const composerTop = composerShell.getBoundingClientRect().top;
-      composerBottomPadding = Math.max(0, Math.ceil(timelineBottom - composerTop));
-    };
-
-    const observer = new ResizeObserver(measureComposer);
-    observer.observe(timelineNode);
-    observer.observe(dock);
-    const composerShell = dock.querySelector<HTMLElement>('.composer-shell');
-    if (composerShell) observer.observe(composerShell);
-    measureComposer();
-    return () => {
-      observer.disconnect();
-    };
   });
 
   $effect(() => {
@@ -175,7 +147,7 @@
 </script>
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
-  <div bind:this={timelineElement} class="timeline">
+  <div class="timeline">
     <RoomHeader {roomName} {roomAvatar} onBack={goBack} onMembers={toggleMembers} {initials} />
     {#key `${roomId}:${eventId ?? ''}`}
       <TimelineList
@@ -184,10 +156,9 @@
         onRequestHistory={requestHistory}
         onRequestFuture={requestFuture}
         onRead={markRead}
-        bottomPadding={composerBottomPadding}
       />
     {/key}
-    <div bind:this={composerDock} class="composer-dock">
+    <div class="composer-dock">
       {#key resolvedRoomId}
         <RoomComposer
           roomId={resolvedRoomId}
@@ -241,15 +212,6 @@
   }
 
   .composer-dock {
-    bottom: 0;
-    left: 0;
-    pointer-events: none;
-    position: absolute;
-    right: 0;
-    z-index: 2;
-  }
-
-  .composer-dock :global(.composer-stack) {
-    pointer-events: auto;
+    flex: 0 0 auto;
   }
 </style>

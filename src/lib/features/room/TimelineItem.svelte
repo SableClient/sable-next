@@ -198,7 +198,6 @@
 
   .body {
     line-height: var(--line-height-body);
-    max-width: 72ch;
     white-space: pre-wrap;
   }
 
