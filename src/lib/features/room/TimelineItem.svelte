@@ -15,9 +15,16 @@
     item: TimelineItemView;
     collapsed: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { item, collapsed, onMatrixLink }: Props = $props();
+  let { item, collapsed, onMatrixLink, onSenderProfile }: Props = $props();
+  let senderName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
+  let emote = $derived(item.content.kind === 'message' && item.content.emote);
+
+  function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
+    if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
+  }
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
@@ -32,20 +39,38 @@
     ]}
   >
     {#if !collapsed}
-      <Avatar
-        class="message-avatar"
-        src={item.sender_avatar}
-        size="small"
-        color={senderColor(item.sender)}
-        initials={initials(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'))}
-      />
+      {#if item.sender && onSenderProfile}
+        <button
+          class="avatar-button"
+          type="button"
+          aria-label={$i18n.t('timeline.senderProfile', { name: senderName })}
+          onclick={openSenderProfile}
+        >
+          <Avatar
+            class="message-avatar"
+            src={item.sender_avatar}
+            size="small"
+            color={senderColor(item.sender)}
+            initials={initials(senderName)}
+          />
+        </button>
+      {:else}
+        <Avatar
+          class="message-avatar"
+          src={item.sender_avatar}
+          size="small"
+          color={senderColor(item.sender)}
+          initials={initials(senderName)}
+        />
+      {/if}
     {/if}
     <div class="message-content">
       {#if !collapsed}
         <header>
-          <span class="sender" style:color={senderColor(item.sender)}
-            >{item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender')}</span
-          >
+          <!-- An emote carries the name in its own text, so the header omits it. -->
+          {#if !emote}
+            <span class="sender" style:color={senderColor(item.sender)}>{senderName}</span>
+          {/if}
           <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time
           >
           {#if item.content.kind === 'message' && item.content.edited}
@@ -63,9 +88,25 @@
           {item.in_reply_to.body ?? ''}
         </p>
       {/if}
-      {#if item.content.kind === 'message'}
-        <FormattedBody body={item.content.body} formatted={item.content.formatted} {onMatrixLink} />
-      {:else if item.content.kind === 'image' || item.content.kind === 'sticker'}
+      {#if item.content.kind === 'message' && item.content.emote}
+        <div class="emote">
+          <span class="sender" style:color={senderColor(item.sender)}>* {senderName}</span>
+          <FormattedBody html={item.content.html} {onMatrixLink} />
+        </div>
+      {:else if item.content.kind === 'message'}
+        <FormattedBody html={item.content.html} {onMatrixLink} />
+      {:else if item.content.kind === 'sticker'}
+        <MediaImage
+          class="sticker"
+          source={item.content.source}
+          alt={item.content.body}
+          width={304}
+          height={304}
+          intrinsicWidth={item.content.width}
+          intrinsicHeight={item.content.height}
+          mime={item.content.mime}
+        />
+      {:else if item.content.kind === 'image'}
         <MediaImage
           class="image"
           source={item.content.source}
@@ -173,6 +214,17 @@
     color: var(--sable-primary-on-main);
   }
 
+  .avatar-button {
+    background: none;
+    border: 0;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    display: block;
+    flex: 0 0 auto;
+    height: var(--avatar-size-small);
+    padding: 0;
+  }
+
   .message-content {
     flex: 1;
     min-width: 0;
@@ -187,6 +239,16 @@
 
   .sender {
     font-weight: var(--font-weight-bold);
+  }
+
+  /* An emote reads as one sentence, so the name sits in the text flow. */
+  .emote {
+    font-style: italic;
+    line-height: var(--line-height-body);
+  }
+
+  .emote :global(.formatted-body) {
+    display: inline;
   }
 
   time,
@@ -221,6 +283,14 @@
     max-height: 32rem;
     object-fit: contain;
     width: min(100%, 32rem);
+  }
+
+  /* A sticker is glyph-sized, so it ignores the picture box width. */
+  :global(.sticker) {
+    border-radius: var(--radius);
+    display: block;
+    margin-top: 0.25rem;
+    width: 9.5rem;
   }
 
   :global(.media) {

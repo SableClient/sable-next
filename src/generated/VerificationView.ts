@@ -9,7 +9,7 @@ export type VerificationView = { "phase": "requested",
 /**
  * Another of our own sessions, which also unlocks our history.
  */
-is_self: boolean,
+is_self: boolean, 
 /**
  * The current session sent the request, so it waits for the other
  * device instead of showing an accept action.

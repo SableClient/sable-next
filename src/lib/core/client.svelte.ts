@@ -9,10 +9,12 @@ import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
 import type { PaginationDirection } from '@/generated/PaginationDirection';
+import type { MutualRoomView } from '@/generated/MutualRoomView';
 import type { ProfileView } from '@/generated/ProfileView';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { RegistrationResultView } from '@/generated/RegistrationResultView';
 import type { VerificationView } from '@/generated/VerificationView';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
@@ -20,6 +22,7 @@ import { CoreError } from '../../transport';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 const maxAttachmentBytes = 100 * 1024 * 1024;
+const profileCacheFreshMs = 10 * 60 * 1000;
 let resolvedHomeservers: Record<string, string> = {};
 
 async function resolveHomeserverInPage(homeserver: string): Promise<string> {
@@ -64,6 +67,14 @@ export class CoreClient {
   private unsubscribeTransport: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
+  private readonly profileCache = new SvelteMap<
+    string,
+    { accountId: string | null; fetchedAt: number; profile: ProfileView }
+  >();
+  private readonly profileRequests = new SvelteMap<
+    string,
+    { accountId: string | null; request: Promise<ProfileView> }
+  >();
 
   async start(): Promise<void> {
     if (this.startPromise) return this.startPromise;
@@ -345,8 +356,58 @@ export class CoreClient {
   }
 
   async userProfile(userId: string): Promise<ProfileView> {
-    const response = await this.ensureTransport().send({ type: 'user_profile', user_id: userId });
-    return response.profile;
+    const accountId = this.session?.account_id ?? null;
+    const cached = this.profileCache.get(userId);
+    if (cached?.accountId === accountId && Date.now() - cached.fetchedAt < profileCacheFreshMs) {
+      return cached.profile;
+    }
+
+    const pending = this.profileRequests.get(userId);
+    if (pending?.accountId === accountId) return pending.request;
+
+    const request = this.ensureTransport()
+      .send({ type: 'user_profile', user_id: userId })
+      .then((response) => {
+        this.profileCache.set(userId, {
+          accountId,
+          fetchedAt: Date.now(),
+          profile: response.profile,
+        });
+        return response.profile;
+      });
+    this.profileRequests.set(userId, { accountId, request });
+    const clearRequest = () => {
+      if (this.profileRequests.get(userId)?.request === request) {
+        this.profileRequests.delete(userId);
+      }
+    };
+    void request.then(clearRequest, clearRequest);
+    return request;
+  }
+
+  /** Rooms shared with this user, plus whether the account ignores them. */
+  async userRelations(
+    userId: string
+  ): Promise<{ mutualRooms: MutualRoomView[]; ignored: boolean }> {
+    const response = await this.ensureTransport().send({
+      type: 'user_relations',
+      user_id: userId,
+    });
+    return { mutualRooms: response.mutual_rooms, ignored: response.ignored };
+  }
+
+  async setUserIgnored(userId: string, ignored: boolean): Promise<void> {
+    await this.ensureTransport().send(
+      ignored
+        ? { type: 'ignore_user', user_id: userId }
+        : { type: 'unignore_user', user_id: userId }
+    );
+  }
+
+  /** Reuses the existing DM with this user when there is one. */
+  async createDm(userId: string): Promise<string> {
+    const response = await this.ensureTransport().send({ type: 'create_dm', user_id: userId });
+    return response.room_id;
   }
 
   async sendMessage(roomId: string, body: string): Promise<void> {

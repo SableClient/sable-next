@@ -9,15 +9,14 @@
   import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
 
   import MentionProfileCard from './MentionProfileCard.svelte';
-  import type { MatrixLink } from './matrix-link';
 
   interface Props {
     open?: boolean;
     userId: string | null;
     member: MemberView | null;
     profile?: ProfileView | null;
+    failed?: boolean;
     anchor: HTMLElement | null;
-    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onOpenChange?: (open: boolean) => void;
   }
 
@@ -26,14 +25,34 @@
     userId,
     member,
     profile = null,
+    failed = false,
     anchor,
-    onMatrixLink,
     onOpenChange,
   }: Props = $props();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
+
+  // The virtualiser recycles the anchor node into another message once it leaves
+  // the viewport, and the timeline still scrolls itself when a message arrives.
+  $effect(() => {
+    if (!open || !desktop || !anchor) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => !entry.isIntersecting)) onOpenChange?.(false);
+    });
+    observer.observe(anchor);
+    return () => {
+      observer.disconnect();
+    };
+  });
+
   function handleOpenChange(next: boolean): void {
     onOpenChange?.(next);
+  }
+
+  /** Restoring focus with a scroll would drag the timeline back to the anchor. */
+  function handleCloseAutoFocus(event: Event): void {
+    event.preventDefault();
+    anchor?.focus({ preventScroll: true });
   }
 </script>
 
@@ -45,9 +64,10 @@
         customAnchor={anchor}
         side="top"
         align="start"
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         {#if userId}
-          <MentionProfileCard {userId} {member} {profile} {onMatrixLink} />
+          <MentionProfileCard {userId} {member} {profile} {failed} />
         {/if}
       </Popover.Content>
     </Popover.Portal>
@@ -60,7 +80,7 @@
     onOpenChange={handleOpenChange}
   >
     {#if userId}
-      <MentionProfileCard {userId} {member} {profile} {onMatrixLink} />
+      <MentionProfileCard {userId} {member} {profile} {failed} variant="sheet" />
     {/if}
   </BottomSheet>
 {/if}

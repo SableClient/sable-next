@@ -83,6 +83,12 @@ pub enum Command {
         #[ts(type = "string")]
         user_id: OwnedUserId,
     },
+    /// What this account shares with another user: both answers come from local
+    /// state, so the profile card's action row needs one call rather than two.
+    UserRelations {
+        #[ts(type = "string")]
+        user_id: OwnedUserId,
+    },
     SendMessage {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -424,8 +430,13 @@ pub enum CommandOk {
     RoomMembers {
         members: Vec<MemberView>,
     },
+    /// Boxed: the extended fields make this the widest variant by far.
     UserProfile {
-        profile: ProfileView,
+        profile: Box<ProfileView>,
+    },
+    UserRelations {
+        mutual_rooms: Vec<MutualRoomView>,
+        ignored: bool,
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
@@ -923,8 +934,12 @@ pub struct UploadProgressView {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TimelineItemContentView {
     Message {
+        /// Plain text, for previews and notifications.
         body: String,
-        formatted: Option<String>,
+        /// Sanitised display HTML, safe to inject as-is.
+        html: String,
+        /// `m.emote`, which reads as an action by the sender rather than speech.
+        emote: bool,
         edited: bool,
     },
     Image {
@@ -1023,8 +1038,73 @@ pub struct ProfileView {
     pub user_id: OwnedUserId,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    /// Sanitised display HTML, safe to inject as-is.
     pub bio: Option<String>,
     pub hero_color: Option<String>,
+    /// Whether the writer meant the hero colour to be read as a light or a dark
+    /// surface. Absent means the UI has to decide for itself.
+    pub hero_brightness: Option<BrightnessView>,
+    pub banner_url: Option<String>,
+    pub status: Option<StatusView>,
+    pub pronouns: Vec<PronounView>,
+    /// IANA zone name; the UI turns it into the member's local time.
+    pub timezone: Option<String>,
+    /// Already resolved against the deprecated per-theme fields, so the UI only
+    /// has to pick by the theme it is rendering.
+    pub name_color_light: Option<String>,
+    pub name_color_dark: Option<String>,
+    pub animal: Option<AnimalIdentityView>,
+    /// Extended fields this client has no rendering for, kept so a profile that
+    /// another client wrote is still readable here.
+    pub extra: Vec<ProfileFieldView>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum BrightnessView {
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct MutualRoomView {
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    pub name: Option<String>,
+}
+
+/// MSC4426 `m.status`. The emoji is optional here even though the MSC requires
+/// it, because the older single-string status fields carry no emoji.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct StatusView {
+    pub text: String,
+    pub emoji: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct PronounView {
+    pub summary: String,
+    /// Absent when the writer did not tag the set with a language.
+    pub language: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct AnimalIdentityView {
+    pub is_animal: Option<String>,
+    pub has_animal: Option<String>,
+    pub animal_need: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ProfileFieldView {
+    pub key: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

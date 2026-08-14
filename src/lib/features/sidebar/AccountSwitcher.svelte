@@ -83,8 +83,11 @@
         userId={core.session?.user_id ?? ''}
         {avatarUrl}
         color={activeProfile?.hero_color ?? 'var(--sable-primary-container)'}
+        heroColor={activeProfile?.hero_color}
+        heroBrightness={activeProfile?.hero_brightness}
         bannerUrl={activeProfile?.banner_url}
-        status={activeProfile?.status}
+        status={activeProfile?.status?.text}
+        statusEmoji={activeProfile?.status?.emoji}
         nameColorLight={activeProfile?.name_color_light}
         nameColorDark={activeProfile?.name_color_dark}
       />
@@ -122,8 +125,11 @@
           userId={core.session?.user_id ?? ''}
           {avatarUrl}
           color={activeProfile?.hero_color ?? 'var(--sable-primary-container)'}
+          heroColor={activeProfile?.hero_color}
+          heroBrightness={activeProfile?.hero_brightness}
           bannerUrl={activeProfile?.banner_url}
-          status={activeProfile?.status}
+          status={activeProfile?.status?.text}
+          statusEmoji={activeProfile?.status?.emoji}
           nameColorLight={activeProfile?.name_color_light}
           nameColorDark={activeProfile?.name_color_dark}
         />

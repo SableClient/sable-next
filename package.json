@@ -36,6 +36,7 @@
     "bits-ui": "^2.18.1",
     "i18next": "^26.3.6",
     "i18next-browser-languagedetector": "^8.2.1",
+    "katex": "0.18.4",
     "phosphor-svelte": "^3.1.0",
     "svelte-i18next": "^2.2.2"
   },
@@ -46,6 +47,7 @@
     "@sveltejs/kit": "^2.63.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tauri-apps/cli": "2.11.4",
+    "@types/katex": "^0.16.8",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.8.1",
     "eslint-plugin-svelte": "^3.22.0",

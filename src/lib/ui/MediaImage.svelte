@@ -1,12 +1,6 @@
-<script module lang="ts">
-  import { SvelteMap } from 'svelte/reactivity';
-
-  const mediaUrls = new SvelteMap<string, string>();
-  const pendingMedia = new SvelteMap<string, Promise<string>>();
-</script>
-
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
+  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
 
   interface Props {
     source: string;
@@ -49,24 +43,13 @@
     const original = mime === 'image/svg+xml';
     const requestWidth = original ? 0 : width;
     const requestHeight = original ? 0 : height;
-    const key = `${source}:${String(requestWidth)}:${String(requestHeight)}`;
-    const cached = mediaUrls.get(key);
-    if (cached) {
+    const cached = cachedMediaUrl(source, requestWidth, requestHeight);
+    if (cached !== undefined) {
       url = cached;
       return;
     }
 
-    const pending =
-      pendingMedia.get(key) ??
-      core.fetchMedia(source, requestWidth, requestHeight).then((bytes) => {
-        const objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime ?? '' }));
-        mediaUrls.set(key, objectUrl);
-        pendingMedia.delete(key);
-        return objectUrl;
-      });
-    pendingMedia.set(key, pending);
-
-    void pending
+    void loadMediaUrl(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
         url = nextUrl;

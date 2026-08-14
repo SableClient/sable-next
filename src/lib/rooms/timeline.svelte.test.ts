@@ -16,7 +16,7 @@ function item(id: string): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: id, formatted: null, edited: false },
+    content: { kind: 'message', body: id, html: id, emote: false, edited: false },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,

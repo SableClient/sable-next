@@ -18,6 +18,7 @@
   import MembersDrawer from './MembersDrawer.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
+  import RoomReadReceipts from './RoomReadReceipts.svelte';
   import TimelineList from './TimelineList.svelte';
   import type { MatrixLink } from './matrix-link';
   import { initials } from './timeline-format';
@@ -40,7 +41,21 @@
   let profileUserId = $state<string | null>(null);
   let profileAnchor = $state<HTMLElement | null>(null);
   let profile = $state<ProfileView | null>(null);
+  let profileFailed = $state(false);
+  let profileRequestId = 0;
   let typingUserIds = $state.raw<string[]>([]);
+  let latestReadBy = $derived.by(() => {
+    const userId = core.session?.user_id;
+    for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
+      const item = timeline.items[index];
+      if (!item.event_id) continue;
+      return item.read_by.filter((readerId) => readerId !== userId);
+    }
+    return [];
+  });
+  let receiptMembers = $derived(
+    memberLoader.members.filter((member) => latestReadBy.includes(member.user_id))
+  );
 
   onDestroy(() => {
     void activeTimeline.stop(timelineOwner);
@@ -73,6 +88,7 @@
     const activeRoomId = resolvedRoomId;
     memberLoader.reset();
     typingUserIds = [];
+    closeProfile();
 
     return core.subscribeEvents((event) => {
       if (event.type !== 'typing' || event.room_id !== activeRoomId) return;
@@ -83,6 +99,10 @@
 
   $effect(() => {
     if (desktop && desktopMembersOpen) void loadMembers();
+  });
+
+  $effect(() => {
+    if (latestReadBy.length > 0) void loadMembers();
   });
 
   $effect(() => {
@@ -108,19 +128,36 @@
     else membersOpen = false;
   }
 
+  function closeProfile(): void {
+    profileRequestId += 1;
+    profileOpen = false;
+    profileUserId = null;
+    profileAnchor = null;
+    profile = null;
+    profileFailed = false;
+  }
+
+  function openProfile(userId: string, anchor: HTMLElement): void {
+    const requestId = ++profileRequestId;
+    profileUserId = userId;
+    profileAnchor = anchor;
+    profileOpen = true;
+    profile = null;
+    profileFailed = false;
+    void loadMembers();
+    void core
+      .userProfile(userId)
+      .then((nextProfile) => {
+        if (profileRequestId === requestId) profile = nextProfile;
+      })
+      .catch(() => {
+        if (profileRequestId === requestId) profileFailed = true;
+      });
+  }
+
   function handleMatrixLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
     if (link.kind === 'user') {
-      profileUserId = link.userId;
-      profileAnchor = anchor;
-      profileOpen = true;
-      profile = null;
-      void loadMembers();
-      void core
-        .userProfile(link.userId)
-        .then((nextProfile) => {
-          if (profileUserId === link.userId) profile = nextProfile;
-        })
-        .catch(() => {});
+      openProfile(link.userId, anchor);
       return;
     }
 
@@ -193,6 +230,8 @@
         onRequestFuture={requestFuture}
         onRead={markRead}
         onMatrixLink={handleMatrixLink}
+        onSenderProfile={openProfile}
+        scrollLocked={profileOpen}
       />
     {/key}
     <div class="composer-dock">
@@ -204,6 +243,12 @@
           onTyping={setTyping}
           {typingLabel}
         />
+        <RoomReadReceipts
+          readers={latestReadBy}
+          members={receiptMembers}
+          loading={memberLoader.loading}
+          onMemberProfile={openProfile}
+        />
       {/key}
     </div>
   </div>
@@ -214,6 +259,7 @@
         members={memberLoader.members}
         loading={memberLoader.loading}
         onClose={closeMembers}
+        onMemberProfile={openProfile}
       />
     {/if}
   {:else}
@@ -223,6 +269,7 @@
         loading={memberLoader.loading}
         modal
         onClose={closeMembers}
+        onMemberProfile={openProfile}
       />
     </DialogFrame>
   {/if}
@@ -230,18 +277,14 @@
   <MentionProfile
     open={profileOpen}
     onOpenChange={(open: boolean) => {
-      profileOpen = open;
-      if (!open) {
-        profileUserId = null;
-        profileAnchor = null;
-        profile = null;
-      }
+      if (open) profileOpen = true;
+      else closeProfile();
     }}
     userId={profileUserId}
     anchor={profileAnchor}
     member={memberLoader.members.find((member) => member.user_id === profileUserId) ?? null}
     {profile}
-    onMatrixLink={handleMatrixLink}
+    failed={profileFailed}
   />
 </section>
 

@@ -15,15 +15,35 @@
     members: readonly MemberView[];
     loading: boolean;
     modal?: boolean;
+    compact?: boolean;
+    searchable?: boolean;
+    title?: string;
     onClose: () => void;
+    onMemberProfile: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { members, loading, modal = false, onClose }: Props = $props();
+  let {
+    members,
+    loading,
+    modal = false,
+    compact = false,
+    searchable = true,
+    title = $i18n.t('timeline.members'),
+    onClose,
+    onMemberProfile,
+  }: Props = $props();
   let search = $state('');
+  let sortedMembers = $derived(
+    [...members].toSorted(
+      (left, right) =>
+        right.power_level - left.power_level ||
+        memberName(left).localeCompare(memberName(right), undefined, { sensitivity: 'base' })
+    )
+  );
   let filteredMembers = $derived.by(() => {
     const query = search.trim().toLocaleLowerCase();
-    if (!query) return members;
-    return members.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
+    if (!query) return sortedMembers;
+    return sortedMembers.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
   });
 
   function memberName(member: MemberView): string {
@@ -35,15 +55,22 @@
     if (member.power_level >= 50) return $i18n.t('timeline.powerLevelModerator');
     return null;
   }
+
+  function openMemberProfile(
+    member: MemberView,
+    event: MouseEvent & { currentTarget: HTMLButtonElement }
+  ): void {
+    onMemberProfile(member.user_id, event.currentTarget);
+  }
 </script>
 
-<aside class="members-drawer" aria-label={$i18n.t('timeline.members')}>
+<aside class={['members-drawer', { compact }]} aria-label={title}>
   <header>
     <div>
       {#if modal}
-        <Dialog.Title class="title">{$i18n.t('timeline.members')}</Dialog.Title>
+        <Dialog.Title class="title">{title}</Dialog.Title>
       {:else}
-        <h2 class="title">{$i18n.t('timeline.members')}</h2>
+        <h2 class="title">{title}</h2>
       {/if}
       <p>{$i18n.t('timeline.memberCount', { count: members.length })}</p>
     </div>
@@ -65,29 +92,40 @@
   {#if loading}
     <p class="status">{$i18n.t('timeline.loadingMembers')}</p>
   {:else}
-    <div class="search">
-      <TextInput
-        bind:value={search}
-        class="member-search-input"
-        placeholder={$i18n.t('timeline.searchMembers')}
-        aria-label={$i18n.t('timeline.searchMembers')}
-      />
-    </div>
+    {#if searchable}
+      <div class="search">
+        <TextInput
+          bind:value={search}
+          class="member-search-input"
+          placeholder={$i18n.t('timeline.searchMembers')}
+          aria-label={$i18n.t('timeline.searchMembers')}
+        />
+      </div>
+    {/if}
     {#if filteredMembers.length > 0}
       <ul>
         {#each filteredMembers as member (member.user_id)}
           {@const label = powerLevel(member)}
           <li>
-            <Avatar
-              size="small"
-              src={member.avatar_url}
-              initials={initials(memberName(member))}
-              color={senderColor(member.user_id)}
-            />
-            <span class="name">{memberName(member)}</span>
-            {#if label}
-              <span class="power-level"><StatusBadge {label} variant="secondary" /></span>
-            {/if}
+            <button
+              class="member"
+              type="button"
+              aria-label={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
+              onclick={(event) => {
+                openMemberProfile(member, event);
+              }}
+            >
+              <Avatar
+                size="small"
+                src={member.avatar_url}
+                initials={initials(memberName(member))}
+                color={senderColor(member.user_id)}
+              />
+              <span class="name">{memberName(member)}</span>
+              {#if label}
+                <span class="power-level"><StatusBadge {label} variant="secondary" /></span>
+              {/if}
+            </button>
           </li>
         {/each}
       </ul>
@@ -108,6 +146,14 @@
     position: absolute;
     width: 100%;
     z-index: 2;
+  }
+
+  .members-drawer.compact {
+    box-shadow: none;
+    inset: auto;
+    max-width: none;
+    position: static;
+    width: 100%;
   }
 
   header {
@@ -170,11 +216,25 @@
   }
 
   li {
+    min-height: 3rem;
+  }
+
+  .member {
     align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
     display: flex;
     gap: 0.625rem;
     min-height: 3rem;
     padding: 0 0.5rem;
+    text-align: left;
+    width: 100%;
+  }
+
+  .member:hover {
+    background: var(--sable-surface-container);
   }
 
   .name {
