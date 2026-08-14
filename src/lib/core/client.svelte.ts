@@ -9,6 +9,7 @@ import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
 import type { PaginationDirection } from '@/generated/PaginationDirection';
+import type { ProfileView } from '@/generated/ProfileView';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { RegistrationResultView } from '@/generated/RegistrationResultView';
 import type { VerificationView } from '@/generated/VerificationView';
@@ -341,6 +342,11 @@ export class CoreClient {
   async roomMembers(roomId: string): Promise<MemberView[]> {
     const response = await this.ensureTransport().send({ type: 'room_members', room_id: roomId });
     return response.members;
+  }
+
+  async userProfile(userId: string): Promise<ProfileView> {
+    const response = await this.ensureTransport().send({ type: 'user_profile', user_id: userId });
+    return response.profile;
   }
 
   async sendMessage(roomId: string, body: string): Promise<void> {

@@ -240,6 +240,8 @@ macro_rules! dispatch_commands {
                             .ok()
                             .flatten()
                             .map(|url| url.to_string()),
+                        bio: profile_bio(&response),
+                        hero_color: profile_hero_color(&response),
                     },
                 })
             }

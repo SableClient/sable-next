@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
+  import type { ProfileView } from '@/generated/ProfileView';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -15,8 +16,10 @@
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
+  import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
   import TimelineList from './TimelineList.svelte';
+  import type { MatrixLink } from './matrix-link';
   import { initials } from './timeline-format';
 
   interface Props {
@@ -33,6 +36,10 @@
   const memberLoader = new RoomMemberLoader();
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
+  let profileOpen = $state(false);
+  let profileUserId = $state<string | null>(null);
+  let profileAnchor = $state<HTMLElement | null>(null);
+  let profile = $state<ProfileView | null>(null);
   let typingUserIds = $state.raw<string[]>([]);
 
   onDestroy(() => {
@@ -101,6 +108,35 @@
     else membersOpen = false;
   }
 
+  function handleMatrixLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
+    if (link.kind === 'user') {
+      profileUserId = link.userId;
+      profileAnchor = anchor;
+      profileOpen = true;
+      profile = null;
+      void loadMembers();
+      void core
+        .userProfile(link.userId)
+        .then((nextProfile) => {
+          if (profileUserId === link.userId) profile = nextProfile;
+        })
+        .catch(() => {});
+      return;
+    }
+
+    const roomId = roomPathParamFromId(link.roomId);
+    if (link.kind === 'event') {
+      void goto(
+        resolve('/(app)/home/[roomId]/[eventId]', {
+          roomId,
+          eventId: roomPathParamFromId(link.eventId),
+        })
+      );
+      return;
+    }
+    void goto(resolve('/(app)/home/[roomId]', { roomId }));
+  }
+
   function typingMemberName(userId: string): string | null {
     return memberLoader.members.find((member) => member.user_id === userId)?.display_name ?? null;
   }
@@ -156,6 +192,7 @@
         onRequestHistory={requestHistory}
         onRequestFuture={requestFuture}
         onRead={markRead}
+        onMatrixLink={handleMatrixLink}
       />
     {/key}
     <div class="composer-dock">
@@ -189,6 +226,23 @@
       />
     </DialogFrame>
   {/if}
+
+  <MentionProfile
+    open={profileOpen}
+    onOpenChange={(open: boolean) => {
+      profileOpen = open;
+      if (!open) {
+        profileUserId = null;
+        profileAnchor = null;
+        profile = null;
+      }
+    }}
+    userId={profileUserId}
+    anchor={profileAnchor}
+    member={memberLoader.members.find((member) => member.user_id === profileUserId) ?? null}
+    {profile}
+    onMatrixLink={handleMatrixLink}
+  />
 </section>
 
 <style>
