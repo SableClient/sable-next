@@ -15,24 +15,49 @@
   const core = useCoreClient();
 
   function resolveImages(node: HTMLElement): void {
-    for (const image of node.querySelectorAll<HTMLImageElement>('img[src^="mxc://"]')) {
+    for (const image of node.querySelectorAll('img')) {
+      if (image.dataset.mediaHandled !== undefined) continue;
+      image.dataset.mediaHandled = '';
+
       const source = image.getAttribute('src') ?? '';
       const emoticon = image.dataset.mxEmoticon !== undefined;
+      const scheme = source.slice(0, source.indexOf(':') + 1).toLowerCase();
+      if (scheme === 'http:' || scheme === 'https:') {
+        image.onerror = () => {
+          console.warn('[sable media] remote image unavailable', source);
+          image.replaceWith(fallbackLabel(image, emoticon));
+        };
+        image.src = source;
+        continue;
+      }
+      if (scheme !== 'mxc:') {
+        image.replaceWith(fallbackLabel(image, emoticon));
+        continue;
+      }
+
       // Emoji are small enough to take whole; anything else is scaled down.
       const [width, height] = emoticon ? [0, 0] : [640, 480];
+      image.dataset.mediaPending = '';
+      image.removeAttribute('src');
       const cached = cachedMediaUrl(source, width, height);
       if (cached !== undefined) {
-        image.src = cached;
+        paint(image, cached);
         continue;
       }
       void loadMediaUrl(core, source, width, height)
         .then((url) => {
-          if (image.isConnected) image.src = url;
+          if (image.isConnected) paint(image, url);
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          console.warn('[sable media] inline image unavailable', source, error);
           if (image.isConnected) image.replaceWith(fallbackLabel(image, emoticon));
         });
     }
+  }
+
+  function paint(image: HTMLImageElement, url: string): void {
+    image.src = url;
+    delete image.dataset.mediaPending;
   }
 
   /** An unresolvable emoji reads better as its shortcode than as nothing. */
@@ -174,7 +199,7 @@
   }
 
   /* Still an `mxc:` URI, so the browser has nothing to load yet. */
-  .formatted-body :global(img[src^='mxc://']) {
+  .formatted-body :global(img[data-media-pending]) {
     display: none;
   }
 

@@ -18,6 +18,8 @@
   let suppressClick = false;
 
   function close(): void {
+    // Left set, this transform reopens the sheet already pushed off screen.
+    dragProgress = 0;
     open = false;
     onOpenChange?.(false);
   }
@@ -81,17 +83,31 @@
 
 <style>
   .handle {
-    background: var(--sable-surface-var-container);
+    background: transparent;
     border: 0;
-    border-radius: var(--radius-pill);
-    display: block;
-    height: 0.25rem;
+    display: grid;
+    height: 2rem;
     left: 50%;
+    place-items: center;
     position: absolute;
-    top: var(--space-2);
+    top: 0;
     touch-action: none;
     transform: translateX(-50%);
-    width: 2.5rem;
+    width: 4rem;
     z-index: 1;
+  }
+
+  .handle::after {
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius-pill);
+    content: '';
+    height: 0.25rem;
+    opacity: 0.45;
+    width: 2.5rem;
+  }
+
+  .handle:focus-visible {
+    outline: 2px solid var(--sable-primary-main);
+    outline-offset: -0.25rem;
   }
 </style>

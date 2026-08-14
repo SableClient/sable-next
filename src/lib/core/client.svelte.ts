@@ -23,6 +23,7 @@ import { CoreError } from '../../transport';
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 const maxAttachmentBytes = 100 * 1024 * 1024;
 const profileCacheFreshMs = 10 * 60 * 1000;
+const relationsCacheFreshMs = 60 * 1000;
 let resolvedHomeservers: Record<string, string> = {};
 
 async function resolveHomeserverInPage(homeserver: string): Promise<string> {
@@ -53,6 +54,7 @@ async function resolveHomeserverInPage(homeserver: string): Promise<string> {
   }
 }
 
+export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
 export type ActiveVerification = { flowId: string; state: VerificationView };
@@ -74,6 +76,10 @@ export class CoreClient {
   private readonly profileRequests = new SvelteMap<
     string,
     { accountId: string | null; request: Promise<ProfileView> }
+  >();
+  private readonly relationsCache = new SvelteMap<
+    string,
+    { accountId: string | null; fetchedAt: number; relations: UserRelations }
   >();
 
   async start(): Promise<void> {
@@ -385,15 +391,24 @@ export class CoreClient {
     return request;
   }
 
-  /** Rooms shared with this user, plus whether the account ignores them. */
-  async userRelations(
-    userId: string
-  ): Promise<{ mutualRooms: MutualRoomView[]; ignored: boolean }> {
+  /**
+   * Rooms shared with this user, plus whether the account ignores them. Cached
+   * because the core reads membership once per joined room to answer it.
+   */
+  async userRelations(userId: string): Promise<UserRelations> {
+    const accountId = this.session?.account_id ?? null;
+    const cached = this.relationsCache.get(userId);
+    if (cached?.accountId === accountId && Date.now() - cached.fetchedAt < relationsCacheFreshMs) {
+      return cached.relations;
+    }
+
     const response = await this.ensureTransport().send({
       type: 'user_relations',
       user_id: userId,
     });
-    return { mutualRooms: response.mutual_rooms, ignored: response.ignored };
+    const relations = { mutualRooms: response.mutual_rooms, ignored: response.ignored };
+    this.relationsCache.set(userId, { accountId, fetchedAt: Date.now(), relations });
+    return relations;
   }
 
   async setUserIgnored(userId: string, ignored: boolean): Promise<void> {
@@ -402,6 +417,29 @@ export class CoreClient {
         ? { type: 'ignore_user', user_id: userId }
         : { type: 'unignore_user', user_id: userId }
     );
+    this.relationsCache.delete(userId);
+  }
+
+  async inviteUser(roomId: string, userId: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'invite_user', room_id: roomId, user_id: userId });
+  }
+
+  async kickUser(roomId: string, userId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'kick_user',
+      room_id: roomId,
+      user_id: userId,
+      reason: null,
+    });
+  }
+
+  async banUser(roomId: string, userId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'ban_user',
+      room_id: roomId,
+      user_id: userId,
+      reason: null,
+    });
   }
 
   /** Reuses the existing DM with this user when there is one. */

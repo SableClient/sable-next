@@ -9,6 +9,24 @@ function cacheKey(source: string, width: number, height: number): string {
   return `${source}:${String(width)}:${String(height)}`;
 }
 
+function startsWith(bytes: Uint8Array, signature: number[], offset = 0): boolean {
+  return signature.every((byte, index) => bytes[offset + index] === byte);
+}
+
+function imageMime(bytes: Uint8Array): string | undefined {
+  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47])) return 'image/png';
+  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (startsWith(bytes, [0x47, 0x49, 0x46])) return 'image/gif';
+  if (startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8))
+    return 'image/webp';
+
+  const head = new TextDecoder().decode(bytes.subarray(0, 256)).trimStart().toLowerCase();
+  if (head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg'))) {
+    return 'image/svg+xml';
+  }
+  return undefined;
+}
+
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
 export function cachedMediaUrl(source: string, width: number, height: number): string | undefined {
   return objectUrls.get(cacheKey(source, width, height));
@@ -30,7 +48,8 @@ export function loadMediaUrl(
   const request =
     pending.get(key) ??
     core.fetchMedia(source, width, height).then((bytes) => {
-      const objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime ?? '' }));
+      const type = mime ?? imageMime(bytes) ?? '';
+      const objectUrl = URL.createObjectURL(new Blob([bytes], { type }));
       objectUrls.set(key, objectUrl);
       pending.delete(key);
       return objectUrl;

@@ -11,22 +11,17 @@
     userId: string;
     avatarUrl?: string | null;
     color: string;
-    /** Chosen by the profile's owner, unlike `color`, so this is what may tint
-        the whole card rather than only the banner. */
+    /** The owner's own choice, so only this one tints the card. `color` also
+        covers the id-derived fallback. */
     heroColor?: string | null;
     heroBrightness?: 'light' | 'dark' | null;
     bannerUrl?: string | null;
     status?: string | null;
     statusEmoji?: string | null;
-    /** Arbitrary user-chosen colours, so each theme gets its own or none. */
     nameColorLight?: string | null;
     nameColorDark?: string | null;
-    /** Without both labels the bio stays fully expanded: a clamp with no way to
-        undo it would hide text for good. */
     bioMoreLabel?: string;
     bioLessLabel?: string;
-    /** A sheet is read at arm's length: taller banner, bigger targets, and the
-        bio clamp relaxes because there is room for it. */
     variant?: 'popover' | 'sheet';
     class?: ClassValue;
     meta?: Snippet;
@@ -60,23 +55,17 @@
   }: Props = $props();
   let initials = $derived(displayName.slice(0, 1).toUpperCase() || '?');
   let banner = $derived(bannerUrl?.startsWith('mxc://') ? bannerUrl : null);
-  // The fallback colour is derived from the user id, which is not a choice the
-  // owner made, so only a real hero colour is allowed to tint the surfaces.
   let tinted = $derived(heroColor !== null && heroColor !== '');
-  // Each theme falls back to the other rather than to the theme's text colour:
-  // a name written for one theme still beats an untinted name.
   let nameColor = $derived(nameColorLight ?? nameColorDark);
   let nameColorForDark = $derived(nameColorDark ?? nameColorLight);
   let clampable = $derived(Boolean(bioMoreLabel && bioLessLabel));
-  let bioNode = $state<HTMLElement | null>(null);
   let expanded = $state(false);
   let truncated = $state(false);
 
   // The bio arrives with the profile fetch, so the overflow check has to outlive
   // the first render.
-  $effect(() => {
-    const node = bioNode;
-    if (!node || typeof ResizeObserver === 'undefined') return;
+  function measureOverflow(node: HTMLElement): (() => void) | undefined {
+    if (typeof ResizeObserver === 'undefined') return;
 
     const observer = new ResizeObserver(() => {
       if (!expanded) truncated = node.scrollHeight > node.clientHeight + 1;
@@ -85,7 +74,7 @@
     return () => {
       observer.disconnect();
     };
-  });
+  }
 </script>
 
 <section
@@ -97,7 +86,7 @@
 >
   <div class="profile-card-cover" style:background={color}>
     {#if banner}
-      <MediaImage class="profile-card-banner" source={banner} alt="" width={352} height={72} />
+      <MediaImage class="profile-card-banner" source={banner} alt="" width={720} height={240} />
     {/if}
   </div>
   <div class="profile-card-crest">
@@ -135,18 +124,24 @@
   {#if children || footer}
     <div class="profile-card-panel" class:framed={children}>
       {#if children}
-        <div bind:this={bioNode} class="profile-card-bio" class:clamped={clampable && !expanded}>
-          {@render children()}
-        </div>
-        {#if clampable && (truncated || expanded)}
-          <button
-            class="profile-card-bio-toggle"
-            type="button"
-            onclick={() => (expanded = !expanded)}
+        <div class="profile-card-bio-block">
+          <div
+            class="profile-card-bio"
+            class:clamped={clampable && !expanded}
+            {@attach measureOverflow}
           >
-            {expanded ? bioLessLabel : bioMoreLabel}
-          </button>
-        {/if}
+            {@render children()}
+          </div>
+          {#if clampable && (truncated || expanded)}
+            <button
+              class="profile-card-bio-toggle"
+              type="button"
+              onclick={() => (expanded = !expanded)}
+            >
+              {expanded ? bioLessLabel : bioMoreLabel}
+            </button>
+          {/if}
+        </div>
       {/if}
       {#if footer}
         <div class="profile-card-footer" class:divided={children}>{@render footer()}</div>
@@ -180,10 +175,6 @@
     position: relative;
   }
 
-  /* The owner's colour tints every surface, mixed into the theme's own so the
-     text keeps the contrast it was designed against. A colour the writer meant
-     as a dark surface takes a thicker mix than one meant as light, which in the
-     dark theme would wash the card out. */
   .sable-profile-card.tinted {
     --profile-tint: 20%;
     --profile-card-ground: color-mix(
@@ -206,19 +197,19 @@
     --profile-tint: 12%;
   }
 
-  /* Matches the avatar diameter, so the avatar's centre lands on the banner edge. */
   .profile-card-cover {
     height: var(--profile-cover-height);
   }
 
-  /* The sheet's banner is its header, so it earns the extra height. */
   .sable-profile-card-sheet {
     --profile-cover-height: 6rem;
     --profile-bio-lines: 6;
   }
 
+  /* Both dimensions, so the ratio MediaImage sets inline stops applying. */
   .profile-card-cover :global(.profile-card-banner) {
     height: 100%;
+    width: 100%;
   }
 
   .profile-card-cover :global(.profile-card-banner img) {
@@ -235,39 +226,36 @@
     position: relative;
   }
 
-  /* Ring as a shadow, not a border: the avatar keeps its declared size and
-     punches a hole in the banner. It bleeds outside the text gutter on purpose,
-     so the avatar's glyph edge lines up with the name. */
   :global(.sable-avatar.profile-card-avatar) {
     --avatar-size: var(--profile-avatar-size);
 
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
   }
 
-  /* A pill rather than a speech bubble: a tail fights the avatar ring, and the
-     fill is what keeps a wrapped status legible over an arbitrary banner. */
+  /* Rounded like the bio panel, not pill like the action row: this is something
+     the owner wrote, not a control. */
   .profile-card-status {
     background: var(--profile-panel-ground);
     border: 1px solid var(--sable-surface-container-line);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius);
     -webkit-box-orient: vertical;
     display: -webkit-box;
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-body);
     -webkit-line-clamp: 2;
     line-clamp: 2;
+    line-height: var(--line-height-body);
     margin: 0 0 var(--space-1);
     min-width: 0;
     overflow: hidden;
     overflow-wrap: anywhere;
-    padding: 0.125rem var(--space-1);
+    padding: var(--space-1) var(--space-2);
   }
 
   .profile-card-status-emoji {
-    margin-right: 0.25rem;
+    font-size: var(--font-size-medium);
+    margin-right: 0.375rem;
   }
 
-  /* No fill of its own: the bare card ground under the identity is what
-     separates it from the panel below, in place of a divider. */
   .profile-card-identity {
     padding: var(--space-2) var(--space-3) var(--space-3);
   }
@@ -288,8 +276,6 @@
     color: var(--profile-name-color);
   }
 
-  /* The identity anchor stays neutral: if the name is a colour the user picked,
-     the ID has to be the part you can trust. */
   .profile-card-user-id {
     color: var(--profile-text-muted);
     font-size: var(--font-size-small);
@@ -297,8 +283,8 @@
     overflow-wrap: anywhere;
   }
 
-  /* Column gap has to beat the icon-to-label gap inside an item, or wrapped
-     items read as one sentence. */
+  /* Items sit next to each other and wrap. Equal grid columns left a short fact
+     like "she/her" stranded half a card away from the next one. */
   .profile-card-meta {
     color: var(--profile-text-muted);
     display: flex;
@@ -314,26 +300,33 @@
     flex: none;
   }
 
-  /* Only framed when there is a bio to hold: a lone misc-data line inside a
-     panel reads as an empty box with a label in it. */
+  /* Same gutter as the identity text, and framed only with a bio to hold: a lone
+     misc-data line in a panel reads as an empty box. */
   .profile-card-panel {
-    margin: 0 var(--space-2) var(--space-1);
+    margin: 0 var(--space-3) var(--space-2);
   }
 
-  /* --radius, not --radius-card: a nested box sharing the parent radius looks
-     unseated. */
+  /* Padding sits on the rows, not here, so the divider between them can reach
+     both edges of the panel. */
   .profile-card-panel.framed {
     background: var(--profile-panel-ground);
     border: 1px solid var(--sable-surface-container-line);
     border-radius: var(--radius);
-    margin: 0 var(--space-1) var(--space-1);
+    overflow: clip;
+  }
+
+  .profile-card-bio-block {
+    display: grid;
     padding: var(--space-2);
   }
 
+  /* One toolbar of equal targets, which is what separates verbs from the facts
+     above rather than the presence of a border. */
   .profile-card-actions {
+    align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1);
+    gap: 0.25rem;
     margin-top: var(--space-2);
   }
 
@@ -343,8 +336,6 @@
     overflow-wrap: break-word;
   }
 
-  /* Clamped rather than scrolled: a scroll area in a popover steals the wheel
-     from the timeline underneath and hides how much is left. */
   .profile-card-bio.clamped {
     -webkit-box-orient: vertical;
     display: -webkit-box;
@@ -357,25 +348,26 @@
     white-space: normal;
   }
 
+  /* A link, so it keeps an underline instead of a button's shape. */
   .profile-card-bio-toggle {
     background: none;
     border: 0;
-    border-radius: var(--radius-pill);
     color: var(--sable-primary-main);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
-    margin: var(--space-1) 0 0 -0.5rem;
-    padding: 0.125rem var(--space-1);
+    justify-self: start;
+    margin: var(--space-1) 0 0;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
   }
 
-  /* Hover moves the background, never the foreground, so contrast can only rise. */
   .profile-card-bio-toggle:hover {
-    background: color-mix(in oklab, var(--sable-primary-main) 14%, var(--profile-panel-ground));
+    text-decoration-thickness: 2px;
   }
 
-  /* Touch target, not decoration. */
   .sable-profile-card-sheet .profile-card-bio-toggle {
     align-items: center;
     display: inline-flex;
@@ -387,22 +379,14 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  /* Card ground and a hairline, not the panel surface, so it reads as card
-     furniture rather than something the profile's owner wrote. */
+  /* No hairline: the framed panel above already draws one edge, and two reads as
+     a double rule. */
   .profile-card-composer {
-    border-top: 1px solid var(--sable-bg-container-line);
-    padding: var(--space-2);
+    padding: 0 var(--space-3) var(--space-3);
   }
 
-  .sable-profile-card-sheet .profile-card-composer {
-    padding: var(--space-2) var(--space-3) var(--space-3);
-  }
-
-  /* Same box as the bio: it is metadata about the same person. */
   .profile-card-footer.divided {
     border-top: 1px solid var(--sable-surface-container-line);
-    margin-top: var(--space-2);
-    padding-top: var(--space-1);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -411,9 +395,6 @@
     }
   }
 
-  /* Keeping the hue but clamping lightness and chroma leaves the user's choice
-     recognisable while guaranteeing contrast, where blending toward the
-     background would mute it and could still fail. */
   @supports (color: oklch(from red l c h)) {
     .profile-card-name.tinted {
       color: oklch(from var(--profile-name-color) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);

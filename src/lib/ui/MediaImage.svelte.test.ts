@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { mount, tick, unmount, type ComponentProps } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const core = vi.hoisted(() => ({
@@ -86,11 +86,61 @@ test('loads SVG images from the original rather than a thumbnail', async () => {
   await unmount(instance);
 });
 
+async function mountAndLoad(
+  props: ComponentProps<typeof MediaImage>
+): Promise<() => Promise<void>> {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:served');
+  const instance = mount(MediaImage, { target: document.body, props });
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  const image = document.querySelector('img');
+  if (!image) throw new Error('image never rendered');
+  Object.defineProperty(image, 'naturalWidth', { value: 1000 });
+  Object.defineProperty(image, 'naturalHeight', { value: 400 });
+  image.dispatchEvent(new Event('load'));
+  await tick();
+
+  return () => unmount(instance);
+}
+
+test('takes its shape from the served file when the event has no dimensions', async () => {
+  const dispose = await mountAndLoad({
+    source: 'mxc://example.org/no-dimensions',
+    alt: 'Image',
+    width: 800,
+    height: 600,
+  });
+
+  expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
+    `--media-ratio: ${String(1000 / 400)}`
+  );
+  await dispose();
+});
+
+test('keeps the event dimensions when it has them, so the timeline does not shift', async () => {
+  const dispose = await mountAndLoad({
+    source: 'mxc://example.org/portrait-event',
+    alt: 'Image',
+    width: 800,
+    height: 600,
+    intrinsicWidth: 600,
+    intrinsicHeight: 900,
+  });
+
+  expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
+    `--media-ratio: ${String(600 / 900)}`
+  );
+  await dispose();
+});
+
 test.each([
-  { intrinsicWidth: 1600, intrinsicHeight: 900, expected: '1600 / 900' },
-  { intrinsicWidth: 1600, intrinsicHeight: null, expected: '800 / 600' },
-  { intrinsicWidth: null, intrinsicHeight: 900, expected: '800 / 600' },
-  { intrinsicWidth: 0, intrinsicHeight: 900, expected: '800 / 600' },
+  { intrinsicWidth: 1600, intrinsicHeight: 900, expected: 1600 / 900 },
+  { intrinsicWidth: 1600, intrinsicHeight: null, expected: 800 / 600 },
+  { intrinsicWidth: null, intrinsicHeight: 900, expected: 800 / 600 },
+  { intrinsicWidth: 0, intrinsicHeight: 900, expected: 800 / 600 },
 ])('reserves a valid aspect ratio for $intrinsicWidth x $intrinsicHeight', async (size) => {
   core.fetchMedia.mockRejectedValue(new Error('not needed'));
   const instance = mount(MediaImage, {
@@ -107,7 +157,7 @@ test.each([
   await tick();
 
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
-    `aspect-ratio: ${size.expected}`
+    `--media-ratio: ${String(size.expected)}`
   );
   await unmount(instance);
 });

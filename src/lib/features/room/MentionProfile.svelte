@@ -14,6 +14,8 @@
     open?: boolean;
     userId: string | null;
     member: MemberView | null;
+    roomId: string;
+    ownPowerLevel?: number;
     profile?: ProfileView | null;
     failed?: boolean;
     anchor: HTMLElement | null;
@@ -24,6 +26,8 @@
     open = $bindable(false),
     userId,
     member,
+    roomId,
+    ownPowerLevel = 0,
     profile = null,
     failed = false,
     anchor,
@@ -67,7 +71,7 @@
         onCloseAutoFocus={handleCloseAutoFocus}
       >
         {#if userId}
-          <MentionProfileCard {userId} {member} {profile} {failed} />
+          <MentionProfileCard {userId} {member} {roomId} {ownPowerLevel} {profile} {failed} />
         {/if}
       </Popover.Content>
     </Popover.Portal>
@@ -80,7 +84,15 @@
     onOpenChange={handleOpenChange}
   >
     {#if userId}
-      <MentionProfileCard {userId} {member} {profile} {failed} variant="sheet" />
+      <MentionProfileCard
+        {userId}
+        {member}
+        {roomId}
+        {ownPowerLevel}
+        {profile}
+        {failed}
+        variant="sheet"
+      />
     {/if}
   </BottomSheet>
 {/if}

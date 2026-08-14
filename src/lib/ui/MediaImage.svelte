@@ -25,7 +25,10 @@
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
-  let aspectRatio = $derived.by(() => {
+  /* Tagged with its source: the virtualiser recycles this node into another
+     message, and a stale ratio would size that one. */
+  let decoded = $state.raw<{ source: string; ratio: number } | null>(null);
+  let eventRatio = $derived.by(() => {
     const hasIntrinsicSize =
       intrinsicWidth !== null &&
       intrinsicHeight !== null &&
@@ -33,10 +36,20 @@
       Number.isFinite(intrinsicHeight) &&
       intrinsicWidth > 0 &&
       intrinsicHeight > 0;
-    return hasIntrinsicSize
-      ? `${String(intrinsicWidth)} / ${String(intrinsicHeight)}`
-      : `${String(width)} / ${String(height)}`;
+    return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
+  /* The event's own dimensions win even if the served file disagrees: the
+     timeline sizes its rows from them, so revising the box after load would
+     shift everything below it. Only a dimensionless event waits for the file. */
+  let aspectRatio = $derived(
+    eventRatio ?? (decoded?.source === source ? decoded.ratio : width / height)
+  );
+
+  function onload(event: Event): void {
+    const image = event.currentTarget;
+    if (!(image instanceof HTMLImageElement) || image.naturalHeight === 0) return;
+    decoded = { source, ratio: image.naturalWidth / image.naturalHeight };
+  }
 
   $effect(() => {
     let active = true;
@@ -62,14 +75,15 @@
   });
 </script>
 
-<span class={[className, 'media-image']} style:aspect-ratio={aspectRatio}>
+<span class={[className, 'media-image']} style:--media-ratio={aspectRatio}>
   {#if url}
-    <img class="media-image-content" src={url} {alt} />
+    <img class="media-image-content" src={url} {alt} {onload} />
   {/if}
 </span>
 
 <style>
   .media-image {
+    aspect-ratio: var(--media-ratio);
     display: block;
     overflow: hidden;
   }

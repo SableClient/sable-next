@@ -122,3 +122,22 @@ test('falls back to the shortcode when an emoticon cannot be resolved', async ()
   expect(document.body.textContent).toContain(':party:');
   await unmount(instance);
 });
+
+test('leaves a remote image for the browser and drops a source with no scheme behind it', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: {
+      html:
+        '<img src="https://example.org/badge.png" alt="no-ai">' +
+        '<img src="cid:attached" alt="party" data-mx-emoticon="">',
+    },
+  });
+  await tick();
+
+  const images = document.querySelectorAll('img');
+  expect(images).toHaveLength(1);
+  expect(images[0].getAttribute('src')).toBe('https://example.org/badge.png');
+  expect(core.fetchMedia).not.toHaveBeenCalled();
+  expect(document.body.textContent).toContain(':party:');
+  await unmount(instance);
+});

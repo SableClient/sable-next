@@ -238,18 +238,18 @@
     {/key}
     <div class="composer-dock">
       {#key resolvedRoomId}
+        <RoomReadReceipts
+          readers={latestReadBy}
+          members={receiptMembers}
+          loading={memberLoader.loading}
+          onMemberProfile={openProfile}
+        />
         <RoomComposer
           roomId={resolvedRoomId}
           onSend={sendMessage}
           onSendAttachment={sendAttachment}
           onTyping={setTyping}
           {typingLabel}
-        />
-        <RoomReadReceipts
-          readers={latestReadBy}
-          members={receiptMembers}
-          loading={memberLoader.loading}
-          onMemberProfile={openProfile}
         />
       {/key}
     </div>
@@ -285,6 +285,9 @@
     userId={profileUserId}
     anchor={profileAnchor}
     member={memberLoader.members.find((member) => member.user_id === profileUserId) ?? null}
+    {roomId}
+    ownPowerLevel={memberLoader.members.find((member) => member.user_id === core.session?.user_id)
+      ?.power_level ?? 0}
     {profile}
     failed={profileFailed}
   />

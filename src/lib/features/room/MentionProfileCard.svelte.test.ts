@@ -48,6 +48,7 @@ test('keeps the clicked room member identity when the global profile loads', asy
     target: document.body,
     props: {
       userId: '@alice:example.org',
+      roomId: '!room:example.org',
       member: {
         user_id: '@alice:example.org',
         display_name: 'Room Alice',
@@ -71,7 +72,12 @@ test('keeps the clicked room member identity when the global profile loads', asy
 test('leaves out the bio and metadata panels when the profile has neither', async () => {
   const instance = mount(MentionProfileCard, {
     target: document.body,
-    props: { userId: '@alice:example.org', member: null, profile: emptyProfile },
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: emptyProfile,
+    },
   });
   await tick();
 
@@ -86,7 +92,12 @@ test('sends a direct message from the composer', async () => {
   core.sendMessage.mockResolvedValue(undefined);
   const instance = mount(MentionProfileCard, {
     target: document.body,
-    props: { userId: '@alice:example.org', member: null, profile: emptyProfile },
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: emptyProfile,
+    },
   });
   await tick();
 
@@ -109,6 +120,7 @@ test('renders the extended profile fields', async () => {
     target: document.body,
     props: {
       userId: '@alice:example.org',
+      roomId: '!room:example.org',
       member: null,
       profile: {
         ...emptyProfile,
@@ -133,7 +145,7 @@ test('renders the extended profile fields', async () => {
     '🌙beyond the shore'
   );
   expect(document.querySelector('.profile-extra summary')?.textContent.trim()).toBe(
-    'Show misc. data (1)'
+    'Show misc. data (1 value)'
   );
   expect(document.querySelector('.profile-extra dt')?.textContent).toBe('net.example.mood');
   await unmount(instance);

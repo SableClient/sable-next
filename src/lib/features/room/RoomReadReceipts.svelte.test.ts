@@ -5,32 +5,68 @@ import { expect, test } from 'vitest';
 
 import RoomReadReceipts from './RoomReadReceipts.svelte';
 
-test('shows the people following the conversation', async () => {
+const members = [
+  { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null, power_level: 0 },
+  { user_id: '@carol:example.org', display_name: 'Carol', avatar_url: null, power_level: 0 },
+];
+
+test('shows a face stack and opens the seen-by list', async () => {
   const instance = mount(RoomReadReceipts, {
     target: document.body,
     props: {
       readers: ['@bob:example.org', '@carol:example.org'],
-      members: [
-        { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null, power_level: 0 },
-        { user_id: '@carol:example.org', display_name: 'Carol', avatar_url: null, power_level: 0 },
-      ],
+      members,
       loading: false,
       onMemberProfile: () => {},
     },
   });
   await tick();
 
-  expect(document.querySelector('button')?.textContent.trim()).toBe(
-    'bob, carol are following the conversation.'
-  );
-  expect(document.querySelector('button')?.getAttribute('title')).toBe(
-    '@bob:example.org, @carol:example.org'
-  );
-  (document.querySelector('button') as HTMLButtonElement).click();
+  const trigger = document.querySelector('button') as HTMLButtonElement;
+  expect(trigger.getAttribute('aria-label')).toBe('Seen by Bob, Carol. Open the list.');
+  expect(trigger.querySelectorAll('.sable-avatar')).toHaveLength(2);
+  expect(trigger.querySelector('.count')?.textContent).toBe('2');
+
+  trigger.click();
   await tick();
   expect(document.querySelector('.members-drawer')?.textContent).toContain('Bob');
   expect(document.querySelector('.members-drawer')?.textContent).toContain('Carol');
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  (document.querySelector('[aria-label="Close members"]') as HTMLButtonElement).click();
   await tick();
+
   await unmount(instance);
+});
+
+test('caps the stack at three faces and keeps the row reserved when empty', async () => {
+  const many = Array.from({ length: 12 }, (_, index) => `@user${String(index)}:example.org`);
+  const instance = mount(RoomReadReceipts, {
+    target: document.body,
+    props: {
+      readers: many,
+      members: many.map((user_id) => ({
+        user_id,
+        display_name: user_id,
+        avatar_url: null,
+        power_level: 0,
+      })),
+      loading: false,
+      onMemberProfile: () => {},
+    },
+  });
+  await tick();
+
+  expect(document.querySelectorAll('.stack .sable-avatar')).toHaveLength(3);
+  expect(document.querySelector('.count')?.textContent).toBe('12');
+
+  await unmount(instance);
+
+  const empty = mount(RoomReadReceipts, {
+    target: document.body,
+    props: { readers: [], members: [], loading: false, onMemberProfile: () => {} },
+  });
+  await tick();
+
+  expect(document.querySelector('.room-read-receipts')?.children).toHaveLength(0);
+
+  await unmount(empty);
 });

@@ -4,14 +4,19 @@
   import { DropdownMenu } from 'bits-ui';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
-  import HardDrivesIcon from 'phosphor-svelte/lib/HardDrivesIcon';
+  import GavelIcon from 'phosphor-svelte/lib/GavelIcon';
+  import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import PaperPlaneRightIcon from 'phosphor-svelte/lib/PaperPlaneRightIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
+  import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
+  import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
 
   import { goto } from '$app/navigation';
@@ -22,6 +27,7 @@
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
   import ProfileCard from '$lib/ui/primitives/ProfileCard.svelte';
+  import Skeleton from '$lib/ui/primitives/Skeleton.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
@@ -30,18 +36,26 @@
   interface Props {
     userId: string;
     member: MemberView | null;
+    roomId: string;
+    ownPowerLevel?: number;
     profile: ProfileView | null;
     failed?: boolean;
     variant?: 'popover' | 'sheet';
   }
 
-  let { userId, member, profile, failed = false, variant = 'popover' }: Props = $props();
+  let {
+    userId,
+    member,
+    roomId,
+    ownPowerLevel = 0,
+    profile,
+    failed = false,
+    variant = 'popover',
+  }: Props = $props();
   const core = useCoreClient();
-  // Bounded at roughly one unclamped bio, so swapping the panel cannot make the
-  // card taller than the profile it replaced.
   const mutualRoomsShown = 5;
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
-  // A room member overrides their global profile for that room.
+
   let displayName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
   let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
@@ -60,7 +74,7 @@
       }).format(new Date());
       return { time, timezone };
     } catch {
-      // An unknown zone name is another client's data, not a fault here.
+      // An unknown zone name is another client's data.
       return null;
     }
   });
@@ -79,8 +93,6 @@
       return null;
     }
 
-    // v1 always suggests something, so an animal with no stated need still gets
-    // the default one rather than a bare "Is cat!".
     return $i18n.t('timeline.animalNeed', {
       identity,
       need: animal.animal_need ?? $i18n.t('timeline.animalDefaultNeed'),
@@ -88,8 +100,9 @@
   });
   let extra = $derived(currentProfile?.extra ?? []);
   let showFailure = $derived(failed && !currentProfile);
-  // Messaging yourself is a room the account cannot be invited to.
-  let canMessage = $derived(core.session !== null && core.session.user_id !== userId);
+  let profileLoading = $derived(!currentProfile && !failed);
+  let isSelf = $derived(core.session?.user_id === userId);
+  let canMessage = $derived(core.session !== null && !isSelf);
   let messageLabel = $derived($i18n.t('timeline.messageUser', { name: displayName }));
   let draft = $state('');
   let sending = $state(false);
@@ -101,20 +114,29 @@
     if (member.power_level >= 50) return $i18n.t('timeline.powerLevelModerator');
     return $i18n.t('timeline.powerLevelMember');
   });
-  // Elevated power is the one fact a reader may need to spot without reading, so
-  // it is the only metadata item allowed a fill.
   let elevated = $derived(member !== null && member.power_level >= 50);
+  let canModerate = $derived(
+    !isSelf && ownPowerLevel >= 50 && ownPowerLevel > (member?.power_level ?? 0)
+  );
+  let canInvite = $derived(!isSelf && member === null && ownPowerLevel >= 50);
   let profileLink = $derived(`https://matrix.to/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
   let mutualRooms = $state<MutualRoomView[]>([]);
   let ignored = $state(false);
-  let showMutualRooms = $state(false);
+  let shared = $state<'rooms' | 'spaces' | null>(null);
+  let miscOpen = $state(false);
+  let sharedRooms = $derived(mutualRooms.filter((room) => !room.is_space));
+  let sharedSpaces = $derived(mutualRooms.filter((room) => room.is_space));
+  let sharedList = $derived(shared === 'spaces' ? sharedSpaces : sharedRooms);
+  let sharedExpanded = $state(false);
+  let sharedShown = $derived(sharedExpanded ? sharedList : sharedList.slice(0, mutualRoomsShown));
+  let sharedRemainder = $derived(sharedList.length - sharedShown.length);
   let hasMeta = $derived(Boolean(pronouns || localTime || animalText || roleLabel));
 
-  // Both answers come from local state, so this is cheap enough to redo whenever
-  // the card points at someone else.
   $effect(() => {
     const target = userId;
+    if (isSelf) return;
+
     let cancelled = false;
     void core.userRelations(target).then(
       (relations) => {
@@ -122,11 +144,13 @@
         mutualRooms = relations.mutualRooms;
         ignored = relations.ignored;
       },
-      () => {}
+      (error: unknown) => {
+        console.warn('[sable profile] user relations unavailable', error);
+      }
     );
     return () => {
       cancelled = true;
-      showMutualRooms = false;
+      shared = null;
     };
   });
 
@@ -134,7 +158,7 @@
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // Nothing to report if the clipboard is unavailable to this document.
+      // No clipboard in this document.
     }
   }
 
@@ -154,7 +178,7 @@
     try {
       await navigator.share({ url: profileLink, title: displayName });
     } catch {
-      // A dismissed share sheet rejects, which is not a failure to report.
+      // A dismissed share sheet rejects.
     }
   }
 
@@ -168,12 +192,25 @@
       await core.setUserIgnored(userId, next);
       ignored = next;
     } catch {
-      // Leaving `ignored` alone keeps the menu honest about server state.
+      // `ignored` stays as the server last reported it.
     }
   }
 
-  function openRoom(roomId: string): void {
-    void goto(resolve('/(app)/home/[roomId]', { roomId }));
+  function moderate(action: (roomId: string, userId: string) => Promise<void>): () => void {
+    return () => {
+      void action.call(core, roomId, userId).catch((error: unknown) => {
+        console.warn('[sable profile] moderation action failed', error);
+      });
+    };
+  }
+
+  function showShared(kind: 'rooms' | 'spaces' | null): void {
+    shared = shared === kind ? null : kind;
+    sharedExpanded = false;
+  }
+
+  function openRoom(target: string): void {
+    void goto(resolve('/(app)/home/[roomId]', { roomId: target }));
   }
 
   async function sendDirectMessage(event: SubmitEvent): Promise<void> {
@@ -210,18 +247,14 @@
   {#if animalText}
     <span class="profile-meta-item"><HeartIcon size={16} />{animalText}</span>
   {/if}
-  <span class="profile-meta-item profile-meta-server" title={homeserver}>
-    <HardDrivesIcon size={16} />
-    <span class="profile-meta-server-name">{homeserver}</span>
-  </span>
   {#if roleLabel}
-    <span class="profile-meta-item" class:profile-meta-elevated={elevated}>{roleLabel}</span>
+    <span class="profile-meta-item" class:profile-meta-elevated={elevated}>
+      <ShieldIcon size={16} />
+      {roleLabel}
+    </span>
   {/if}
 {/snippet}
 
-<!-- Only the verbs live here. The homeserver and the room role are facts, so they
-     stay unfilled in the metadata row above; a border, not a fill, is what marks
-     these three as pressable. -->
 {#snippet actionRow()}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger class="profile-action">
@@ -242,15 +275,32 @@
       {/if}
     </DropdownMenu.Content>
   </DropdownMenu.Root>
-  {#if mutualRooms.length > 0}
+  {#if sharedRooms.length > 0}
     <button
       class="profile-action"
-      class:pressed={showMutualRooms}
+      class:pressed={shared === 'rooms'}
       type="button"
-      aria-expanded={showMutualRooms}
-      onclick={() => (showMutualRooms = !showMutualRooms)}
+      aria-expanded={shared === 'rooms'}
+      onclick={() => {
+        showShared('rooms');
+      }}
     >
-      {$i18n.t('timeline.profileMutualRooms', { count: mutualRooms.length })}
+      <ChatsIcon size={14} />
+      {$i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length })}
+    </button>
+  {/if}
+  {#if sharedSpaces.length > 0}
+    <button
+      class="profile-action"
+      class:pressed={shared === 'spaces'}
+      type="button"
+      aria-expanded={shared === 'spaces'}
+      onclick={() => {
+        showShared('spaces');
+      }}
+    >
+      <UsersThreeIcon size={14} />
+      {$i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })}
     </button>
   {/if}
   <DropdownMenu.Root>
@@ -261,8 +311,6 @@
       <DotsThreeIcon size={14} />
     </DropdownMenu.Trigger>
     <DropdownMenu.Content class="profile-menu" side="bottom" align="end" sideOffset={4}>
-      <!-- The safe items come first so opening the menu with a keyboard lands
-           focus somewhere harmless. -->
       <DropdownMenu.Item class="profile-menu-item" onSelect={copyServer}>
         <CopyIcon size={16} />
         {$i18n.t('timeline.profileCopyServer')}
@@ -271,15 +319,55 @@
         <ArrowSquareOutIcon size={16} />
         {$i18n.t('timeline.profileOpenServer')}
       </DropdownMenu.Item>
-      <DropdownMenu.Item
-        class="profile-menu-item profile-menu-destructive"
-        onSelect={toggleIgnored}
-      >
-        <ProhibitIcon size={16} />
-        {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
-      </DropdownMenu.Item>
+      {#if canInvite}
+        <DropdownMenu.Item
+          class="profile-menu-item"
+          onSelect={moderate(core.inviteUser.bind(core))}
+        >
+          <UserPlusIcon size={16} />
+          {$i18n.t('timeline.profileInvite')}
+        </DropdownMenu.Item>
+      {/if}
+      {#if canModerate}
+        <DropdownMenu.Item
+          class="profile-menu-item profile-menu-destructive"
+          onSelect={moderate(core.kickUser.bind(core))}
+        >
+          <SignOutIcon size={16} />
+          {$i18n.t('timeline.profileKick')}
+        </DropdownMenu.Item>
+        <DropdownMenu.Item
+          class="profile-menu-item profile-menu-destructive profile-menu-grouped"
+          onSelect={moderate(core.banUser.bind(core))}
+        >
+          <GavelIcon size={16} />
+          {$i18n.t('timeline.profileBan')}
+        </DropdownMenu.Item>
+      {/if}
+      {#if !isSelf}
+        <DropdownMenu.Item
+          class={[
+            'profile-menu-item profile-menu-destructive',
+            canModerate && 'profile-menu-grouped',
+          ]}
+          onSelect={toggleIgnored}
+        >
+          <ProhibitIcon size={16} />
+          {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
+        </DropdownMenu.Item>
+      {/if}
     </DropdownMenu.Content>
   </DropdownMenu.Root>
+{/snippet}
+
+<!-- Holds the panel's height while the profile is in flight, so the card does not
+     jump when the bio lands. -->
+{#snippet bioPlaceholder()}
+  <div class="profile-bio-placeholder">
+    <Skeleton style="height: 0.8125rem; width: 90%" />
+    <Skeleton style="height: 0.8125rem; width: 75%" />
+    <Skeleton style="height: 0.8125rem; width: 45%" />
+  </div>
 {/snippet}
 
 {#snippet bioPanel()}
@@ -290,11 +378,14 @@
   {/if}
 {/snippet}
 
-<!-- The room list replaces the panel's contents rather than expanding under it:
-     a third in-place expander would turn the card into an accordion. -->
-{#snippet mutualRoomsPanel()}
+{#snippet sharedPanel()}
+  <p class="profile-rooms-title">
+    {shared === 'spaces'
+      ? $i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })
+      : $i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length })}
+  </p>
   <ul class="profile-rooms">
-    {#each mutualRooms.slice(0, mutualRoomsShown) as room (room.room_id)}
+    {#each sharedShown as room (room.room_id)}
       <li>
         <button
           type="button"
@@ -302,19 +393,32 @@
             openRoom(room.room_id);
           }}
         >
+          <span class="profile-rooms-monogram" aria-hidden="true">
+            {(room.name ?? room.room_id).replace(/^[#!]/, '').slice(0, 1).toUpperCase()}
+          </span>
           {room.name ?? room.room_id}
         </button>
       </li>
     {/each}
   </ul>
-  {#if mutualRooms.length > mutualRoomsShown}
-    <p class="profile-rooms-remainder">
-      {$i18n.t('timeline.profileMoreRooms', { count: mutualRooms.length - mutualRoomsShown })}
-    </p>
-  {/if}
-  <button class="profile-rooms-back" type="button" onclick={() => (showMutualRooms = false)}>
-    {$i18n.t('timeline.profileBackToProfile')}
-  </button>
+  <div class="profile-rooms-links">
+    {#if sharedRemainder > 0}
+      <button class="profile-rooms-link" type="button" onclick={() => (sharedExpanded = true)}>
+        {shared === 'spaces'
+          ? $i18n.t('timeline.profileSeeAllSpaces', { count: sharedList.length })
+          : $i18n.t('timeline.profileSeeAllRooms', { count: sharedList.length })}
+      </button>
+    {/if}
+    <button
+      class="profile-rooms-link"
+      type="button"
+      onclick={() => {
+        showShared(null);
+      }}
+    >
+      {$i18n.t('timeline.profileBackToProfile')}
+    </button>
+  </div>
 {/snippet}
 
 {#snippet composer()}
@@ -342,10 +446,17 @@
 {/snippet}
 
 {#snippet miscData()}
-  <details class="profile-extra">
+  <details
+    class="profile-extra"
+    ontoggle={(event) => {
+      miscOpen = event.currentTarget.open;
+    }}
+  >
     <summary>
       <CaretRightIcon size={16} />
-      {$i18n.t('timeline.profileMiscData', { count: extra.length })}
+      {miscOpen
+        ? $i18n.t('timeline.profileHideMiscData', { count: extra.length })
+        : $i18n.t('timeline.profileMiscData', { count: extra.length })}
     </summary>
     <dl>
       {#each extra as field (field.key)}
@@ -356,8 +467,8 @@
   </details>
 {/snippet}
 
-<!-- Each panel is passed only when it has something in it: an empty snippet
-     would still draw its padding, background and separator. -->
+<!-- Panels are passed only when filled; an empty snippet still draws its padding,
+     background and separator. -->
 <ProfileCard
   {displayName}
   {userId}
@@ -370,55 +481,52 @@
   statusEmoji={currentProfile?.status?.emoji}
   nameColorLight={currentProfile?.name_color_light}
   nameColorDark={currentProfile?.name_color_dark}
-  bioMoreLabel={showMutualRooms ? undefined : $i18n.t('timeline.profileBioMore')}
-  bioLessLabel={showMutualRooms ? undefined : $i18n.t('timeline.profileBioLess')}
+  bioMoreLabel={shared ? undefined : $i18n.t('timeline.profileBioMore')}
+  bioLessLabel={shared ? undefined : $i18n.t('timeline.profileBioLess')}
   meta={hasMeta ? metaRow : undefined}
   actions={actionRow}
-  children={showMutualRooms
-    ? mutualRoomsPanel
+  children={shared
+    ? sharedPanel
     : showFailure || currentProfile?.bio
       ? bioPanel
-      : undefined}
-  footer={!showMutualRooms && extra.length > 0 ? miscData : undefined}
+      : profileLoading
+        ? bioPlaceholder
+        : undefined}
+  footer={!shared && extra.length > 0 ? miscData : undefined}
   composer={canMessage ? composer : undefined}
   {variant}
 />
 
 <style>
   .profile-meta-item {
-    align-items: center;
+    align-items: start;
     display: inline-flex;
-    gap: var(--space-1);
+    gap: 0.25rem;
     max-width: 100%;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .profile-meta-item :global(svg) {
+    margin-top: 0.125rem;
   }
 
   .profile-meta-aside {
     color: var(--sable-sec-main);
   }
 
-  /* The only truncatable string in either row: it is both unbounded and already
-     printed in full in the Matrix ID above. */
-  .profile-meta-server-name {
-    display: block;
-    max-width: 11rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
+  /* Weight and full contrast mark an elevated role. A bordered chip here would
+     put a third shape between the plain facts and the action pills. */
   .profile-meta-elevated {
-    background: var(--sable-surface-var-container);
-    border-radius: var(--radius-pill);
     color: var(--sable-bg-on-container);
     font-weight: var(--font-weight-medium);
-    padding: 0 var(--space-1);
   }
 
-  /* Bordered, never filled: an outline is the at-rest shape everyone reads as
-     pressable, and staying ghost leaves Send as the only solid button here. */
-  .profile-action {
+  .profile-meta-elevated :global(svg) {
+    color: var(--sable-bg-on-container);
+  }
+
+  :global(.profile-action) {
     align-items: center;
     background: none;
     border: 1px solid var(--sable-surface-container-line);
@@ -430,38 +538,45 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
     gap: 0.25rem;
-
-    /* A clipped verb is a broken button, so labels never truncate. */
-    padding: 0.125rem var(--space-2);
+    justify-content: center;
+    min-height: 2rem;
+    padding: 0 var(--space-2);
     white-space: nowrap;
   }
 
-  .profile-action :global(svg) {
+  /* Only the sheet needs a full touch target; at 22rem it makes the row loom. */
+  :global(.sable-profile-card-sheet .profile-action) {
+    min-height: 2.75rem;
+  }
+
+  :global(.profile-action svg) {
     color: var(--sable-sec-main);
     flex: none;
   }
 
-  .profile-action:hover {
+  :global(.profile-action:hover) {
     background: color-mix(in oklab, var(--sable-bg-on-container) 7%, transparent);
   }
 
-  .profile-action:focus-visible {
+  :global(.profile-action:focus-visible) {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
-  .profile-action.pressed {
+  :global(.profile-action.pressed) {
     background: var(--sable-surface-var-container);
     border-color: var(--sable-sec-main);
   }
 
-  /* Fixed width and always last, so it sits at the right edge of whichever line
-     the row wraps onto. */
-
-  /* On a bits-ui trigger, so it needs the same `:global` as the menu classes. */
   :global(.profile-action-overflow) {
     margin-left: auto;
     padding: 0.125rem var(--space-1);
+  }
+
+  .profile-rooms-title {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    margin: 0 0 var(--space-1);
   }
 
   .profile-rooms {
@@ -474,42 +589,60 @@
   }
 
   .profile-rooms button {
+    align-items: center;
     background: none;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-primary-main);
+    color: var(--sable-bg-on-container);
     cursor: pointer;
+    display: flex;
     font: inherit;
     font-size: var(--font-size-small);
+    gap: var(--space-1);
     padding: 0.25rem var(--space-1);
     text-align: left;
     width: 100%;
+  }
+
+  .profile-rooms-monogram {
+    align-items: center;
+    background: var(--sable-primary-container);
+    border-radius: var(--radius-pill);
+    color: var(--sable-primary-on-container);
+    display: inline-flex;
+    flex: none;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    height: 1.5rem;
+    justify-content: center;
+    width: 1.5rem;
   }
 
   .profile-rooms button:hover {
     background: color-mix(in oklab, var(--sable-bg-on-container) 7%, transparent);
   }
 
-  .profile-rooms-remainder {
-    color: var(--sable-sec-main);
-    font-size: var(--font-size-small);
-    margin: var(--space-1) 0 0 var(--space-1);
+  .profile-rooms-links {
+    display: grid;
+    gap: 0.25rem;
+    justify-items: start;
+    margin-top: var(--space-1);
   }
 
-  .profile-rooms-back {
+  .profile-rooms-link {
     background: none;
     border: 0;
-    border-radius: var(--radius-pill);
     color: var(--sable-primary-main);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
-    margin: var(--space-1) 0 0;
-    padding: 0.125rem var(--space-1);
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
   }
 
-  .profile-rooms-back:focus-visible {
+  .profile-rooms-link:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
@@ -540,13 +673,15 @@
     background: var(--sable-bg-container-hover);
   }
 
-  /* Neutral at rest, behind a hairline and a taller target: a red row at rest
-     turns a two-item menu into a warning box and pulls the eye to the one thing
-     nobody should hit by accident. The colour arrives on hover, where it helps. */
   :global(.profile-menu-destructive) {
     border-top: 1px solid var(--sable-bg-container-line);
     margin-top: 0.25rem;
     min-height: var(--control-height-medium);
+  }
+
+  :global(.profile-menu-grouped) {
+    border-top: 0;
+    margin-top: 0;
   }
 
   :global(.profile-menu-destructive svg) {
@@ -564,9 +699,6 @@
     gap: var(--space-1);
   }
 
-  /* The popover is 22rem wide: a full-height control would dominate it, and the
-     control's own block padding is what makes it tall, so the height is set
-     outright rather than nudged with min-height. The sheet keeps 2.75rem. */
   .profile-composer :global(.profile-composer-input) {
     flex: 1 1 auto;
     font-size: var(--font-size-small);
@@ -591,22 +723,28 @@
     margin: var(--space-1) 0 0;
   }
 
+  .profile-bio-placeholder {
+    display: grid;
+    gap: 0.375rem;
+  }
+
   .profile-extra {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
   }
 
+  /* Inline padding matches the bio block above, so both rows share a text origin,
+     and the row is its own touch target. */
   .profile-extra summary {
     align-items: center;
-    border-radius: var(--radius);
     cursor: pointer;
     display: flex;
     font-weight: var(--font-weight-medium);
     gap: var(--space-1);
     list-style: none;
-    margin: 0 -0.5rem;
-    min-height: 2.25rem;
-    padding: 0 var(--space-1);
+    margin: 0;
+    min-height: 2.75rem;
+    padding: 0 var(--space-2);
   }
 
   .profile-extra summary::-webkit-details-marker {
@@ -614,11 +752,7 @@
   }
 
   .profile-extra summary:hover {
-    background: color-mix(
-      in oklab,
-      var(--sable-bg-on-container) 7%,
-      var(--sable-surface-container)
-    );
+    color: var(--sable-bg-on-container);
   }
 
   .profile-extra summary:focus-visible {
@@ -639,10 +773,10 @@
   .profile-extra dl {
     display: grid;
     gap: 0.125rem;
-    margin: var(--space-1) 0 0;
+    margin: 0;
+    padding: 0 var(--space-2) var(--space-2);
   }
 
-  /* Key is the quiet half, value the readable one. */
   .profile-extra dt {
     color: var(--sable-sec-main);
     font-weight: var(--font-weight-medium);
