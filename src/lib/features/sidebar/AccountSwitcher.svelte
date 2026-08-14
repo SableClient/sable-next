@@ -1,11 +1,12 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import type { ProfileView } from '@/generated/ProfileView';
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { openSettingsOverlay } from '$lib/features/settings/settings-overlay.svelte';
   import { DropdownMenu } from 'bits-ui';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import ProfileCard from '$lib/ui/primitives/ProfileCard.svelte';
   import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
   import './sidebar-tools.css';
@@ -19,9 +20,29 @@
   let { mode }: Props = $props();
   const core = useCoreClient();
   let switching = $state(false);
+  let profile = $state<ProfileView | null>(null);
   let initials = $derived(
     core.session ? core.session.user_id.replace(/^@/, '').charAt(0).toUpperCase() || '?' : '?'
   );
+  let activeProfile = $derived(profile?.user_id === core.session?.user_id ? profile : null);
+  let displayName = $derived(activeProfile?.display_name ?? core.session?.user_id ?? '?');
+  let avatarUrl = $derived(activeProfile?.avatar_url ?? null);
+
+  $effect(() => {
+    const userId = core.session?.user_id;
+    if (!userId) return;
+
+    let cancelled = false;
+    void core.userProfile(userId).then(
+      (nextProfile) => {
+        if (!cancelled) profile = nextProfile;
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
 
   async function switchAccount(accountId: string): Promise<void> {
     if (accountId === core.session?.account_id || switching) return;
@@ -42,9 +63,8 @@
     void goto(resolve('/profile'));
   }
 
-  function openSettings(): void {
-    if (mode === 'mobile') void goto(resolve('/settings'));
-    else openSettingsOverlay();
+  function logout(): void {
+    void core.logout();
   }
 </script>
 
@@ -54,16 +74,27 @@
       class="quick-tool mobile-tool sable-selection-layer"
       aria-label={$i18n.t('nav.switchAccount')}
     >
-      <Avatar size="small" {initials} />
+      <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
     </DropdownMenu.Trigger>
     <DropdownMenu.Content class="account-popover" side="top" sideOffset={8}>
+      <ProfileCard
+        class="account-profile-header"
+        {displayName}
+        userId={core.session?.user_id ?? ''}
+        {avatarUrl}
+        color={activeProfile?.hero_color ?? 'var(--sable-primary-container)'}
+        bannerUrl={activeProfile?.banner_url}
+        status={activeProfile?.status}
+        nameColorLight={activeProfile?.name_color_light}
+        nameColorDark={activeProfile?.name_color_dark}
+      />
       <AccountMenuItems
         accounts={core.accounts}
         currentAccountId={core.session?.account_id}
         {switching}
         onSwitch={switchAccount}
         onProfile={openProfile}
-        onSettings={openSettings}
+        onLogout={logout}
         onAddAccount={openAddAccount}
       />
     </DropdownMenu.Content>
@@ -78,20 +109,31 @@
           : 'desktop-tool'}"
         aria-label={$i18n.t('nav.switchAccount')}
       >
-        <Avatar size="small" {initials} />
+        <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
         class="account-popover"
         side={mode === 'compact' ? 'right' : 'top'}
         sideOffset={8}
       >
+        <ProfileCard
+          class="account-profile-header"
+          {displayName}
+          userId={core.session?.user_id ?? ''}
+          {avatarUrl}
+          color={activeProfile?.hero_color ?? 'var(--sable-primary-container)'}
+          bannerUrl={activeProfile?.banner_url}
+          status={activeProfile?.status}
+          nameColorLight={activeProfile?.name_color_light}
+          nameColorDark={activeProfile?.name_color_dark}
+        />
         <AccountMenuItems
           accounts={core.accounts}
           currentAccountId={core.session?.account_id}
           {switching}
           onSwitch={switchAccount}
           onProfile={openProfile}
-          onSettings={openSettings}
+          onLogout={logout}
           onAddAccount={openAddAccount}
         />
       </DropdownMenu.Content>
