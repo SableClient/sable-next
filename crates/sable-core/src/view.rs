@@ -26,6 +26,7 @@ use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
 
+use crate::matrix_html::display_html;
 use crate::protocol::{
     LatestEventView, MemberView, ReactionGroup, ReplyView, RoomStateView, RoomSummary,
     SendStateView, SpaceChildEdge, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
@@ -382,7 +383,11 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
                 },
                 _ => TimelineItemContentView::Message {
                     body: message.body().to_owned(),
-                    formatted: formatted_body(message.msgtype()),
+                    html: display_html(
+                        message.body(),
+                        formatted_body(message.msgtype()).as_deref(),
+                    ),
+                    emote: matches!(message.msgtype(), MessageType::Emote(_)),
                     edited: message.is_edited(),
                 },
             },

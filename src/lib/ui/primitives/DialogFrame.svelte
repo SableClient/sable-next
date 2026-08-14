@@ -2,16 +2,25 @@
   import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
 
-  type DialogVariant = 'drawer' | 'settings' | 'verification';
+  type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet';
 
   interface Props {
     open?: boolean;
     variant: DialogVariant;
+    label?: string;
+    contentStyle?: string;
     onOpenChange?: (open: boolean) => void;
     children: Snippet;
   }
 
-  let { open = $bindable(), variant, onOpenChange, children }: Props = $props();
+  let {
+    open = $bindable(),
+    variant,
+    label,
+    contentStyle,
+    onOpenChange,
+    children,
+  }: Props = $props();
 
   function handleOpenChange(next: boolean): void {
     open = next;
@@ -22,7 +31,11 @@
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay class={['sable-dialog-backdrop', `sable-dialog-backdrop-${variant}`]} />
-    <Dialog.Content class={['sable-dialog-content', `sable-dialog-content-${variant}`]}>
+    <Dialog.Content
+      class={['sable-dialog-content', `sable-dialog-content-${variant}`]}
+      style={contentStyle}
+      aria-label={label}
+    >
       {@render children()}
     </Dialog.Content>
   </Dialog.Portal>
@@ -54,7 +67,8 @@
     z-index: calc(var(--layer-popover) + 1);
   }
 
-  :global(.sable-dialog-backdrop-verification) {
+  :global(.sable-dialog-backdrop-verification),
+  :global(.sable-dialog-backdrop-sheet) {
     z-index: calc(var(--layer-popover) + 2);
   }
 
@@ -77,7 +91,8 @@
     z-index: calc(var(--layer-popover) + 1);
   }
 
-  :global(.sable-dialog-content-verification) {
+  :global(.sable-dialog-content-verification),
+  :global(.sable-dialog-content-sheet) {
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius) var(--radius) 0 0;
@@ -88,6 +103,11 @@
     padding: var(--space-4);
     width: 100%;
     z-index: calc(var(--layer-popover) + 3);
+  }
+
+  :global(.sable-dialog-content-sheet) {
+    overscroll-behavior: contain;
+    padding: 0;
   }
 
   @media (width >= 42rem) {
@@ -150,7 +170,8 @@
       animation: dialog-in var(--motion-slow) var(--motion-easing-emphasized);
     }
 
-    :global(.sable-dialog-content-verification) {
+    :global(.sable-dialog-content-verification),
+    :global(.sable-dialog-content-sheet) {
       animation: sheet-in var(--motion-slow) var(--motion-easing-emphasized);
     }
   }

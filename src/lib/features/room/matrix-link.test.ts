@@ -20,3 +20,14 @@ test.each([
 test('does not treat arbitrary URLs as Matrix links', () => {
   expect(parseMatrixLink('https://example.org/#/!room:example.org')).toBeNull();
 });
+
+test.each([
+  'matrix:u/alice:example.org/e/event',
+  'matrix:roomid/room:example.org/e/event/extra',
+  'matrix:roomid/room:example.org/x/event',
+  'matrix:person/alice:example.org',
+  'https://matrix.to/#/',
+  'https://matrix.to/#/alice:example.org',
+])('rejects %s', (href) => {
+  expect(parseMatrixLink(href)).toBeNull();
+});

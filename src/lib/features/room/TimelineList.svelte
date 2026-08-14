@@ -106,6 +106,10 @@
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onRetrySend?: (transactionId: string) => void;
+    onCancelSend?: (transactionId: string) => void;
+    scrollLocked?: boolean;
   }
 
   let {
@@ -115,6 +119,10 @@
     onRequestFuture,
     onRead,
     onMatrixLink,
+    onSenderProfile,
+    onRetrySend,
+    onCancelSend,
+    scrollLocked = false,
   }: Props = $props();
   let viewport = $state<HTMLDivElement | null>(null);
   let nearLatest = $state(true);
@@ -769,6 +777,24 @@
     };
   }
 
+  // `overflow: hidden` would drop the scrollbar and reflow the messages, so the
+  // gestures are cancelled instead. Svelte makes `ontouchmove` passive, hence
+  // the explicit listeners.
+  function scrollLock(locked: boolean) {
+    return (node: HTMLElement) => {
+      if (!locked) return;
+      const block = (event: Event): void => {
+        event.preventDefault();
+      };
+      node.addEventListener('wheel', block, { passive: false });
+      node.addEventListener('touchmove', block, { passive: false });
+      return () => {
+        node.removeEventListener('wheel', block);
+        node.removeEventListener('touchmove', block);
+      };
+    };
+  }
+
   function jumpToLatest(): void {
     finishHistoryFill();
     historyRequestQueued = false;
@@ -823,6 +849,7 @@
       aria-label={$i18n.t('timeline.label')}
       onscroll={onScroll}
       {@attach userScrollMarker}
+      {@attach scrollLock(scrollLocked)}
       role="log"
     >
       <div class="items" style:height={String($virtualizer.getTotalSize()) + 'px'}>
@@ -841,6 +868,9 @@
                 {item}
                 collapsed={isCollapsed(visibleItems, virtualItem.index)}
                 {onMatrixLink}
+                {onSenderProfile}
+                {onRetrySend}
+                {onCancelSend}
               />
             </div>
           {/if}

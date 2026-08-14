@@ -232,17 +232,42 @@ macro_rules! dispatch_commands {
                     .map_err(|error| $self.failed("user_profile", error))?;
 
                 Ok(CommandOk::UserProfile {
-                    profile: ProfileView {
-                        user_id,
-                        display_name: response.get_static::<DisplayName>().ok().flatten(),
-                        avatar_url: response
-                            .get_static::<AvatarUrl>()
-                            .ok()
-                            .flatten()
-                            .map(|url| url.to_string()),
-                        bio: profile_bio(&response),
-                        hero_color: profile_hero_color(&response),
-                    },
+                    profile: Box::new(profile_view(user_id, &response)),
+                })
+            }
+
+            Command::UserRelations { user_id } => {
+                let client = $self.client().await?;
+                let ignored = client
+                    .subscribe_to_ignore_user_list_changes()
+                    .get()
+                    .iter()
+                    .any(|ignored| ignored == user_id.as_str());
+                let mut mutual_rooms = Vec::new();
+
+                for room in client.joined_rooms() {
+                    // Local state only: a room whose members are not loaded yet
+                    // is left out rather than counted on a guess.
+                    let joined = room
+                        .get_member_no_sync(&user_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some_and(|member| member.membership() == &MembershipState::Join);
+                    if joined {
+                        mutual_rooms.push(MutualRoomView {
+                            name: room
+                                .cached_display_name()
+                                .map(|name| name.to_string())
+                                .or_else(|| room.name()),
+                            room_id: room.room_id().to_owned(),
+                        });
+                    }
+                }
+
+                Ok(CommandOk::UserRelations {
+                    mutual_rooms,
+                    ignored,
                 })
             }
 
