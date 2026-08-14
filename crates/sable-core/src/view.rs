@@ -16,8 +16,8 @@ use matrix_sdk_ui::{
     eyeball_im,
     room_list_service::RoomListItem,
     timeline::{
-        EventSendState, MsgLikeContent, MsgLikeKind, Profile, TimelineDetails, TimelineItem,
-        TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+        EventSendState, EventTimelineItem, MembershipChange, MsgLikeContent, MsgLikeKind, Profile,
+        TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
     },
 };
 
@@ -26,10 +26,12 @@ use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
 
-use crate::matrix_html::display_html;
+use crate::matrix_html::{display_html, strip_profile_fallback_body, strip_profile_fallback_html};
+use crate::pronoun_sets;
 use crate::protocol::{
-    LatestEventView, MemberView, ReactionGroup, ReplyView, RoomStateView, RoomSummary,
-    SendStateView, SpaceChildEdge, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
+    DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView,
+    PerMessageProfileView, ReactionGroup, ReplyView, RoomStateView, RoomSummary, SendStateView,
+    SpaceChildEdge, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
     UploadProgressView, VectorDiff,
 };
 
@@ -259,6 +261,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
                 TimelineDetails::Ready(profile) => Some(profile),
                 _ => None,
             };
+            let message_profile = per_message_profile(event);
 
             TimelineItemView {
                 id,
@@ -271,13 +274,14 @@ pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
                     .and_then(|p: &Profile| p.avatar_url.as_ref())
                     .map(ToString::to_string),
                 timestamp: event.timestamp().0.into(),
-                content: content(event.content()),
+                content: content(event.content(), message_profile.as_ref()),
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
                 reactions: reactions(event.content()),
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
+                per_message_profile: message_profile,
             }
         }
 
@@ -309,6 +313,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
                 reactions: Vec::new(),
                 is_own: false,
                 read_by: Vec::new(),
+                per_message_profile: None,
             }
         }
     }
@@ -333,7 +338,88 @@ fn send_state(state: &EventSendState) -> SendStateView {
     }
 }
 
-fn content(content: &TimelineItemContent) -> TimelineItemContentView {
+/// MSC4144 is still unstable, so the Beeper key is what servers actually emit
+/// today; the `m.` key is read too so nothing breaks when it stabilises.
+const PMP_KEYS: [&str; 2] = ["com.beeper.per_message_profile", "m.per_message_profile"];
+
+fn per_message_profile(event: &EventTimelineItem) -> Option<PerMessageProfileView> {
+    // An edit replaces the content, carrying its own profile, so the latest
+    // event wins over the original.
+    let raw = event.latest_json().or_else(|| event.original_json())?;
+    let json: serde_json::Value = raw.deserialize_as_unchecked().ok()?;
+    let content = json.get("content")?;
+    let profile = PMP_KEYS.iter().find_map(|key| content.get(*key))?;
+
+    let text = |key: &str| {
+        profile
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .map(ToOwned::to_owned)
+    };
+    let color = |key: &str| {
+        profile
+            .get("eu.she-a.color")
+            .and_then(|color| color.get(key))
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned)
+    };
+
+    Some(PerMessageProfileView {
+        id: text("id"),
+        display_name: text("displayname"),
+        avatar_url: text("avatar_url"),
+        pronouns: pronoun_sets(profile.get("io.fsky.nyx.pronouns")),
+        color_on_light: color("on_light"),
+        color_on_dark: color("on_dark"),
+    })
+}
+
+const fn membership_change(change: Option<MembershipChange>) -> MembershipChangeView {
+    match change {
+        Some(MembershipChange::Joined) => MembershipChangeView::Joined,
+        Some(MembershipChange::Left) => MembershipChangeView::Left,
+        Some(MembershipChange::Banned) => MembershipChangeView::Banned,
+        Some(MembershipChange::Unbanned) => MembershipChangeView::Unbanned,
+        Some(MembershipChange::Kicked) => MembershipChangeView::Kicked,
+        Some(MembershipChange::Invited) => MembershipChangeView::Invited,
+        Some(MembershipChange::KickedAndBanned) => MembershipChangeView::KickedAndBanned,
+        Some(MembershipChange::InvitationAccepted) => MembershipChangeView::InvitationAccepted,
+        Some(MembershipChange::InvitationRejected) => MembershipChangeView::InvitationRejected,
+        Some(MembershipChange::InvitationRevoked) => MembershipChangeView::InvitationRevoked,
+        Some(MembershipChange::Knocked) => MembershipChangeView::Knocked,
+        Some(MembershipChange::KnockAccepted) => MembershipChangeView::KnockAccepted,
+        Some(MembershipChange::KnockRetracted) => MembershipChangeView::KnockRetracted,
+        Some(MembershipChange::KnockDenied) => MembershipChangeView::KnockDenied,
+        _ => MembershipChangeView::Other,
+    }
+}
+
+fn text_message(
+    message: &matrix_sdk_ui::timeline::Message,
+    profile: Option<&PerMessageProfileView>,
+) -> TimelineItemContentView {
+    let body = strip_profile_fallback_body(
+        message.body(),
+        profile.and_then(|profile| profile.display_name.as_deref()),
+    );
+    let formatted = formatted_body(message.msgtype()).map(|formatted| match profile {
+        Some(_) => strip_profile_fallback_html(&formatted),
+        None => formatted,
+    });
+
+    TimelineItemContentView::Message {
+        html: display_html(&body, formatted.as_deref()),
+        body,
+        emote: matches!(message.msgtype(), MessageType::Emote(_)),
+        edited: message.is_edited(),
+    }
+}
+
+fn content(
+    content: &TimelineItemContent,
+    profile: Option<&PerMessageProfileView>,
+) -> TimelineItemContentView {
     let unsupported = |what: &str| TimelineItemContentView::Unsupported {
         description: what.to_owned(),
     };
@@ -381,15 +467,7 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
                     source: serde_json::to_string(&file.source).unwrap_or_default(),
                     mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
                 },
-                _ => TimelineItemContentView::Message {
-                    body: message.body().to_owned(),
-                    html: display_html(
-                        message.body(),
-                        formatted_body(message.msgtype()).as_deref(),
-                    ),
-                    emote: matches!(message.msgtype(), MessageType::Emote(_)),
-                    edited: message.is_edited(),
-                },
+                _ => text_message(message, profile),
             },
             MsgLikeKind::Redacted => TimelineItemContentView::Redacted,
             MsgLikeKind::UnableToDecrypt(_) => TimelineItemContentView::UnableToDecrypt {
@@ -412,11 +490,25 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
 
         TimelineItemContent::MembershipChange(change) => TimelineItemContentView::Membership {
             user_id: change.user_id().to_owned(),
-            change: format!("{:?}", change.change()),
+            change: membership_change(change.change()),
+            display_name: change.display_name(),
         },
 
-        TimelineItemContent::ProfileChange(_) => unsupported("profile change"),
-        TimelineItemContent::OtherState(_) => unsupported("state event"),
+        TimelineItemContent::ProfileChange(change) => TimelineItemContentView::ProfileChange {
+            user_id: change.user_id().to_owned(),
+            display_name: change
+                .displayname_change()
+                .map(|change| DisplayNameChangeView {
+                    old: change.old.clone(),
+                    new: change.new.clone(),
+                }),
+            avatar_changed: change.avatar_url_change().is_some(),
+        },
+
+        TimelineItemContent::OtherState(state) => TimelineItemContentView::StateEvent {
+            event_type: state.content().event_type().to_string(),
+            state_key: state.state_key().to_owned(),
+        },
         TimelineItemContent::CallInvite => unsupported("call invite"),
         _ => unsupported("event"),
     }

@@ -36,6 +36,7 @@ function item(emote: boolean): TimelineItemView {
     reactions: [],
     is_own: false,
     read_by: [],
+    per_message_profile: null,
   };
 }
 

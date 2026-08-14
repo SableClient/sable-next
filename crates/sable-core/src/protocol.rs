@@ -83,8 +83,6 @@ pub enum Command {
         #[ts(type = "string")]
         user_id: OwnedUserId,
     },
-    /// What this account shares with another user: both answers come from local
-    /// state, so the profile card's action row needs one call rather than two.
     UserRelations {
         #[ts(type = "string")]
         user_id: OwnedUserId,
@@ -877,6 +875,25 @@ pub struct TimelineItemView {
     /// Already reduced by the SDK to one receipt per user.
     #[ts(type = "string[]")]
     pub read_by: Vec<OwnedUserId>,
+    /// MSC4144. When set, this is the identity to show as the sender; `sender`
+    /// stays the account that actually sent it and must remain reachable.
+    pub per_message_profile: Option<PerMessageProfileView>,
+}
+
+/// MSC4144 per-message profile, letting one account send under several
+/// identities. Read from the unstable `com.beeper.per_message_profile` key,
+/// falling back to the stable `m.per_message_profile` once servers emit it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct PerMessageProfileView {
+    pub id: Option<String>,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub pronouns: Vec<PronounView>,
+    /// Author-chosen, so it is arbitrary and not theme-aware. The UI has to
+    /// hold it to a legibility floor against whatever surface is active.
+    pub color_on_light: Option<String>,
+    pub color_on_dark: Option<String>,
 }
 
 /// The SDK loads the body lazily, so it is absent for an event we have never
@@ -986,7 +1003,25 @@ pub enum TimelineItemContentView {
     Membership {
         #[ts(type = "string")]
         user_id: OwnedUserId,
-        change: String,
+        change: MembershipChangeView,
+        /// The member's name at the time, so the copy does not have to fall
+        /// back to a raw user id.
+        display_name: Option<String>,
+    },
+    /// A display name or avatar change on an already-joined member. Separate
+    /// from `Membership` because clients hide these by default.
+    ProfileChange {
+        #[ts(type = "string")]
+        user_id: OwnedUserId,
+        display_name: Option<DisplayNameChangeView>,
+        avatar_changed: bool,
+    },
+    /// Any other state event. Reported rather than dropped so the UI can decide
+    /// what to render and what to keep behind a "show hidden events" setting.
+    StateEvent {
+        /// e.g. `m.room.topic`.
+        event_type: String,
+        state_key: String,
     },
     DateDivider {
         #[ts(type = "number")]
@@ -998,6 +1033,38 @@ pub enum TimelineItemContentView {
     Unsupported {
         description: String,
     },
+}
+
+/// The SDK's `MembershipChange`, narrowed to the transitions worth wording.
+/// Anything unrecognised collapses to `Other`, which the UI hides.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum MembershipChangeView {
+    Joined,
+    Left,
+    Banned,
+    Unbanned,
+    Kicked,
+    Invited,
+    KickedAndBanned,
+    InvitationAccepted,
+    InvitationRejected,
+    InvitationRevoked,
+    Knocked,
+    KnockAccepted,
+    KnockRetracted,
+    KnockDenied,
+    Other,
+}
+
+/// `None` on either side means the name was unset, which reads differently from
+/// a rename.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct DisplayNameChangeView {
+    pub old: Option<String>,
+    pub new: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -1073,6 +1140,7 @@ pub struct MutualRoomView {
     #[ts(type = "string")]
     pub room_id: OwnedRoomId,
     pub name: Option<String>,
+    pub is_space: bool,
 }
 
 /// MSC4426 `m.status`. The emoji is optional here even though the MSC requires

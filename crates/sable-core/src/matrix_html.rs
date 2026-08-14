@@ -119,7 +119,10 @@ fn sanitizer() -> Builder<'static> {
             }
             // An `mxc:` link would navigate the webview to bytes it cannot load.
             ("a", "href") => (!has_scheme(value, "mxc:")).then(|| value.into()),
-            ("img", "src") => is_mxc_uri(value).then(|| value.into()),
+            ("img", "src") => {
+                (is_mxc_uri(value) || has_scheme(value, "https:") || has_scheme(value, "http:"))
+                    .then(|| value.into())
+            }
             ("img", "width" | "height") | (_, "start") => value
                 .parse::<u32>()
                 .ok()
@@ -230,6 +233,42 @@ fn linkify_plain_text(text: &str) -> String {
     html
 }
 
+/// MSC4144 senders prepend the profile name so clients that cannot read the
+/// profile still show who spoke. Sable renders the profile itself, so leaving
+/// the prefix in would print the name twice.
+///
+/// Must run before sanitising, which drops the marker attribute.
+#[must_use]
+pub fn strip_profile_fallback_html(formatted: &str) -> String {
+    let trimmed = formatted.trim_start();
+    let Some(tag_end) = trimmed.find('>') else {
+        return formatted.to_owned();
+    };
+    let open_tag = &trimmed[..=tag_end];
+    if !open_tag.starts_with("<strong") || !open_tag.contains("data-mx-profile-fallback") {
+        return formatted.to_owned();
+    }
+    trimmed[tag_end..].find("</strong>").map_or_else(
+        || formatted.to_owned(),
+        |close| {
+            trimmed[tag_end + close + "</strong>".len()..]
+                .trim_start()
+                .to_owned()
+        },
+    )
+}
+
+/// The plain-text half of the same fallback, which arrives as `Name: `.
+#[must_use]
+pub fn strip_profile_fallback_body(body: &str, display_name: Option<&str>) -> String {
+    let Some(name) = display_name.map(str::trim).filter(|name| !name.is_empty()) else {
+        return body.to_owned();
+    };
+    let prefix = format!("{name}: ");
+    body.strip_prefix(&prefix)
+        .map_or_else(|| body.to_owned(), ToOwned::to_owned)
+}
+
 /// The HTML the UI renders for a message: the sender's `formatted_body` once
 /// sanitised, or the plain body linkified.
 #[must_use]
@@ -244,7 +283,47 @@ pub fn display_html(body: &str, formatted: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_html, linkify_plain_text};
+    use super::{
+        display_html, linkify_plain_text, strip_profile_fallback_body, strip_profile_fallback_html,
+    };
+
+    #[test]
+    fn strips_the_per_message_profile_fallback() {
+        assert_eq!(
+            strip_profile_fallback_html(
+                "<strong data-mx-profile-fallback>Kris: </strong>hello there"
+            ),
+            "hello there"
+        );
+        assert_eq!(
+            strip_profile_fallback_body("Kris: hello there", Some("Kris")),
+            "hello there"
+        );
+    }
+
+    #[test]
+    fn leaves_markup_without_the_fallback_marker_alone() {
+        // A plain bold opener is the sender's own emphasis, not a fallback.
+        assert_eq!(
+            strip_profile_fallback_html("<strong>Kris: </strong>hello"),
+            "<strong>Kris: </strong>hello"
+        );
+        // Only the exact `Name: ` prefix is a fallback; a mention is not.
+        assert_eq!(
+            strip_profile_fallback_body("Kris: hello", Some("Robin")),
+            "Kris: hello"
+        );
+        assert_eq!(
+            strip_profile_fallback_body("Kris: hello", None),
+            "Kris: hello"
+        );
+    }
+
+    #[test]
+    fn keeps_the_body_when_the_fallback_tag_is_unclosed() {
+        let malformed = "<strong data-mx-profile-fallback>Kris: hello";
+        assert_eq!(strip_profile_fallback_html(malformed), malformed);
+    }
 
     #[test]
     fn strips_executable_markup_and_unsafe_links() {
@@ -305,12 +384,13 @@ mod tests {
     }
 
     #[test]
-    fn keeps_mxc_image_sources_and_drops_every_other_kind() {
+    fn keeps_mxc_and_web_image_sources_and_drops_every_other_kind() {
         let html = display_html(
             "",
             Some(
                 "<img src=\"mxc://example.org/emoji\" alt=\"party\" height=\"32\" data-mx-emoticon=\"\">\
-                 <img src=\"https://example.org/tracker.gif\" alt=\"pixel\">\
+                 <img src=\"https://example.org/badge.png\" alt=\"badge\">\
+                 <img src=\"data:image/png;base64,AAAA\" alt=\"inline\">\
                  <img src=\"mxc://example.org\" alt=\"no media id\">",
             ),
         );
@@ -318,7 +398,8 @@ mod tests {
         assert!(html.contains("src=\"mxc://example.org/emoji\""));
         assert!(html.contains("data-mx-emoticon"));
         assert!(html.contains("height=\"32\""));
-        assert!(!html.contains("tracker.gif"));
+        assert!(html.contains("src=\"https://example.org/badge.png\""));
+        assert!(!html.contains("data:image"));
         assert!(!html.contains("src=\"mxc://example.org\""));
     }
 

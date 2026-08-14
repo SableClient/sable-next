@@ -243,27 +243,30 @@ macro_rules! dispatch_commands {
                     .get()
                     .iter()
                     .any(|ignored| ignored == user_id.as_str());
-                let mut mutual_rooms = Vec::new();
-
-                for room in client.joined_rooms() {
-                    // Local state only: a room whose members are not loaded yet
-                    // is left out rather than counted on a guess.
+                // One store read per joined room, sent together because awaiting
+                // them in turn is hundreds of IndexedDB round trips.
+                let target = &user_id;
+                let lookups = client.joined_rooms().into_iter().map(|room| async move {
                     let joined = room
-                        .get_member_no_sync(&user_id)
+                        .get_member_no_sync(target)
                         .await
                         .ok()
                         .flatten()
                         .is_some_and(|member| member.membership() == &MembershipState::Join);
-                    if joined {
-                        mutual_rooms.push(MutualRoomView {
-                            name: room
-                                .cached_display_name()
-                                .map(|name| name.to_string())
-                                .or_else(|| room.name()),
-                            room_id: room.room_id().to_owned(),
-                        });
-                    }
-                }
+                    joined.then(|| MutualRoomView {
+                        name: room
+                            .cached_display_name()
+                            .map(|name| name.to_string())
+                            .or_else(|| room.name()),
+                        room_id: room.room_id().to_owned(),
+                        is_space: room.is_space(),
+                    })
+                });
+                let mutual_rooms = futures_util::future::join_all(lookups)
+                    .await
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
 
                 Ok(CommandOk::UserRelations {
                     mutual_rooms,

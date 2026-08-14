@@ -38,6 +38,19 @@
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
   }
+
+  /** A single event can rename, unset a name, or change the avatar. */
+  function profileChangeText(
+    change: Extract<TimelineItemView['content'], { kind: 'profile_change' }>
+  ): string {
+    const user = change.display_name?.old ?? change.user_id;
+    if (change.display_name?.new) {
+      const key = change.display_name.old ? 'profileNameChanged' : 'profileNameSet';
+      return $i18n.t(`timeline.${key}`, { user, name: change.display_name.new });
+    }
+    if (change.display_name) return $i18n.t('timeline.profileNameRemoved', { user });
+    return $i18n.t('timeline.profileAvatarChanged', { user });
+  }
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
@@ -159,7 +172,15 @@
   </article>
 {:else if item.content.kind === 'membership'}
   <p class="separator">
-    {$i18n.t('timeline.membership', { user: item.content.user_id, change: item.content.change })}
+    {$i18n.t(`timeline.membership.${item.content.change}`, {
+      user: item.content.display_name ?? item.content.user_id,
+    })}
+  </p>
+{:else if item.content.kind === 'profile_change'}
+  <p class="separator">{profileChangeText(item.content)}</p>
+{:else if item.content.kind === 'state_event'}
+  <p class="separator">
+    {$i18n.t('timeline.stateEvent', { type: item.content.event_type })}
   </p>
 {:else if item.content.kind === 'unable_to_decrypt'}
   <p class="separator">{$i18n.t('timeline.unableToDecrypt', { reason: item.content.reason })}</p>
@@ -289,13 +310,13 @@
     white-space: pre-wrap;
   }
 
+  /* The third term is the width a 32rem-tall image would take: it caps height
+     without letterboxing a portrait picture. */
   :global(.image) {
     border-radius: var(--radius);
     display: block;
     margin-top: 0.25rem;
-    max-height: 32rem;
-    object-fit: contain;
-    width: min(100%, 32rem);
+    width: min(100%, 32rem, calc(32rem * var(--media-ratio)));
   }
 
   /* A sticker is glyph-sized, so it ignores the picture box width. */

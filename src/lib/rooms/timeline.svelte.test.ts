@@ -23,6 +23,7 @@ function item(id: string): TimelineItemView {
     reactions: [],
     is_own: false,
     read_by: [],
+    per_message_profile: null,
   };
 }
 

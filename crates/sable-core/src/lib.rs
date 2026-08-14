@@ -82,8 +82,6 @@ const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
 
 type ProfileResponse = matrix_sdk::ruma::api::client::profile::get_profile::v3::Response;
 
-/// Fields the profile card renders itself. Anything else the server holds is
-/// passed through as `extra` instead.
 const RENDERED_PROFILE_FIELDS: [&str; 22] = [
     "displayname",
     "avatar_url",
@@ -109,8 +107,6 @@ const RENDERED_PROFILE_FIELDS: [&str; 22] = [
     "pet.plz.gib",
 ];
 
-/// Extended profile keys are client conventions layered on MSC4133, so a value
-/// of the wrong shape is routine and must never fail the whole fetch.
 fn profile_field<'a>(response: &'a ProfileResponse, name: &str) -> Option<&'a serde_json::Value> {
     response
         .iter()
@@ -152,11 +148,17 @@ fn profile_bio(response: &ProfileResponse) -> Option<String> {
         })
     };
 
-    let plain = profile_text(profile_field(response, "moe.sable.app.bio"))
-        .or_else(|| profile_text(profile_field(response, "chat.commet.profile_bio")))
+    let legacy = profile_text(profile_field(response, "moe.sable.app.bio"))
+        .or_else(|| profile_text(profile_field(response, "chat.commet.profile_bio")));
+    let (legacy_plain, legacy_html) = match legacy {
+        Some(bio) if bio.contains('<') => (None, Some(bio)),
+        other => (other, None),
+    };
+
+    let plain = legacy_plain
         .or_else(|| representation(None))
         .or_else(|| representation(Some("text/plain")));
-    let html = representation(Some("text/html"));
+    let html = legacy_html.or_else(|| representation(Some("text/html")));
 
     (plain.is_some() || html.is_some())
         .then(|| display_html(plain.as_deref().unwrap_or_default(), html.as_deref()))
@@ -209,10 +211,11 @@ fn profile_status(response: &ProfileResponse) -> Option<StatusView> {
         })
 }
 
-fn profile_pronouns(response: &ProfileResponse) -> Vec<PronounView> {
+/// Shared with per-message profiles, which carry pronouns in the same shape.
+pub(crate) fn pronoun_sets(value: Option<&serde_json::Value>) -> Vec<PronounView> {
     const MAX_SUMMARY_CHARS: usize = 16;
 
-    profile_field(response, "io.fsky.nyx.pronouns")
+    value
         .and_then(serde_json::Value::as_array)
         .map(|sets| {
             sets.iter()
@@ -231,6 +234,10 @@ fn profile_pronouns(response: &ProfileResponse) -> Vec<PronounView> {
         .unwrap_or_default()
 }
 
+fn profile_pronouns(response: &ProfileResponse) -> Vec<PronounView> {
+    pronoun_sets(profile_field(response, "io.fsky.nyx.pronouns"))
+}
+
 fn profile_timezone(response: &ProfileResponse) -> Option<String> {
     profile_text(profile_field(response, "us.cloke.msc4175.tz"))
         .or_else(|| profile_text(profile_field(response, "m.tz")))
@@ -239,8 +246,7 @@ fn profile_timezone(response: &ProfileResponse) -> Option<String> {
         .filter(|zone| !zone.is_empty())
 }
 
-/// Returns the light-theme colour then the dark-theme one, each already falling
-/// back to the theme-agnostic field.
+/// Light-theme colour then dark, each falling back to the theme-agnostic field.
 fn profile_name_colors(response: &ProfileResponse) -> (Option<String>, Option<String>) {
     let colors = profile_field(response, "eu.she-a.color");
     let shared = profile_hex_color(profile_field(response, "moe.sable.app.name_color"));
