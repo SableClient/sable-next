@@ -8,6 +8,7 @@
 
   import FormattedBody from './FormattedBody.svelte';
   import MessageActions from './MessageActions.svelte';
+  import MessageActionSheet from './MessageActionSheet.svelte';
   import type { MatrixLink } from './matrix-link';
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
@@ -93,6 +94,37 @@
     };
   });
 
+  const LONG_PRESS_MS = 450;
+  const LONG_PRESS_SLOP_PX = 10;
+  let sheetOpen = $state(false);
+  let pressTimer: ReturnType<typeof setTimeout> | undefined;
+  let pressOrigin: { x: number; y: number } | null = null;
+
+  // Touch has no hover, so the bar never appears; a long press is the only way
+  // in. A mouse keeps the bar and must not trigger this.
+  function startPress(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' || !actionable) return;
+    pressOrigin = { x: event.clientX, y: event.clientY };
+    pressTimer = setTimeout(() => {
+      sheetOpen = true;
+      pressOrigin = null;
+    }, LONG_PRESS_MS);
+  }
+
+  function movePress(event: PointerEvent): void {
+    if (!pressOrigin) return;
+    const moved =
+      Math.abs(event.clientX - pressOrigin.x) > LONG_PRESS_SLOP_PX ||
+      Math.abs(event.clientY - pressOrigin.y) > LONG_PRESS_SLOP_PX;
+    if (moved) endPress();
+  }
+
+  function endPress(): void {
+    if (pressTimer) clearTimeout(pressTimer);
+    pressTimer = undefined;
+    pressOrigin = null;
+  }
+
   async function copyText(): Promise<void> {
     if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
   }
@@ -122,9 +154,20 @@
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
-  <article class={['message', { collapsed, pending }]}>
+  <article
+    class={['message', { collapsed, pending }]}
+    onpointerdown={startPress}
+    onpointermove={movePress}
+    onpointerup={endPress}
+    onpointercancel={endPress}
+  >
     {#if actionable}
       <MessageActions {...actions} />
+      <MessageActionSheet
+        bind:open={sheetOpen}
+        preview={item.content.kind === 'message' ? item.content.body : null}
+        {...actions}
+      />
     {/if}
     {#if !collapsed}
       {#if item.sender && onSenderProfile}

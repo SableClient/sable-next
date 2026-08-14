@@ -114,6 +114,7 @@
     "copyMessage": "Copy message",
     "copyLink": "Copy link",
     "moreActions": "More actions",
+    "closeMenu": "Close menu",
     "toggleReaction": "{{key}}, {{count}} reactions. Toggle yours.",
     "readReceipts": "Read receipts",
     "closeReadReceipts": "Close read receipts",
@@ -369,6 +370,8 @@
     "noMatches": "Nothing matches that shortcode.",
     "packsFailed": "Could not load packs.",
     "previewHint": "Point at an image for its shortcode.",
+    "recent": "Recent",
+    "closeBoard": "Close emotes and stickers",
     "replyingTo": "Replying to {{name}}",
     "editing": "Editing",
     "cancelContext": "Cancel"
