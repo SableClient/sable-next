@@ -95,6 +95,7 @@
     display: block;
     height: 100%;
     object-fit: contain;
+    object-position: left top;
     width: 100%;
   }
 </style>
