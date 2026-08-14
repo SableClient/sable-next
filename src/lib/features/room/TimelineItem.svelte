@@ -152,6 +152,8 @@
           mime={item.content.mime}
           body={item.content.body}
           kind={item.content.kind}
+          width={item.content.kind === 'video' ? item.content.width : null}
+          height={item.content.kind === 'video' ? item.content.height : null}
         />
       {/if}
       {#if item.reactions.length > 0}

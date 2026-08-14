@@ -51,32 +51,86 @@
     return `item:${item.id}`;
   }
 
+  // Mirrors TimelineItem's stylesheet, which is written in `rem`: pixel
+  // constants here would drift on any root font size but 16px.
+  const MEDIA_MAX_REM = 32;
+  const MEDIA_MIN_REM = 15;
+  const STICKER_WIDTH_REM = 9.5;
+  const MESSAGE_INSET_REM = 4;
+  const FILE_HEIGHT_REM = 1.75;
+  const MESSAGE_CHROME_REM = 2.75;
+  const CAPTION_HEIGHT_REM = 1.5;
+  const REPLY_PREVIEW_REM = 1.875;
+  const REACTIONS_REM = 1.875;
+  const COLLAPSED_MESSAGE_REM = 3;
+  const MESSAGE_REM = 4.5;
+  const DATE_DIVIDER_REM = 3.5;
+  const READ_MARKER_REM = 2;
+  const SEPARATOR_REM = 2.5;
+  // The UA audio control does not scale with the font size.
+  const AUDIO_HEIGHT_PX = 58;
+  // Track MediaImage's 800x600 default and MediaContent's 16/9 video box.
+  const PICTURE_RATIO = 0.75;
+  const VIDEO_RATIO = 9 / 16;
+
+  function rootFontSize(): number {
+    if (typeof document === 'undefined') return 16;
+    const size = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return Number.isFinite(size) && size > 0 ? size : 16;
+  }
+
+  function inverseAspectRatio(
+    width: number | null,
+    height: number | null,
+    fallback: number
+  ): number {
+    if (width === null || height === null || width <= 0 || height <= 0) return fallback;
+    return height / width;
+  }
+
   function estimateTimelineItemSize(
     items: readonly TimelineItemView[],
     index: number,
-    viewportWidth = 512
+    viewportWidth: number,
+    rem: number
   ): number {
     const item = items[index];
-    if (item.content.kind === 'image') {
-      const width: unknown = item.content.width;
-      const height: unknown = item.content.height;
-      const ratio =
-        typeof width === 'number' &&
-        typeof height === 'number' &&
-        Number.isFinite(width) &&
-        Number.isFinite(height) &&
-        width > 0 &&
-        height > 0
-          ? height / width
-          : 0.75;
-      const imageWidth = Math.min(512, Math.max(240, viewportWidth - 64));
-      const captionSize = item.content.body ? 24 : 0;
-      return Math.min(512, imageWidth * ratio) + 44 + captionSize;
+    // The avatar column and the page gutters sit outside the message box.
+    const contentWidth = Math.min(
+      MEDIA_MAX_REM * rem,
+      Math.max(MEDIA_MIN_REM * rem, viewportWidth - MESSAGE_INSET_REM * rem)
+    );
+    const chrome = MESSAGE_CHROME_REM * rem;
+    const trimmings =
+      (item.in_reply_to ? REPLY_PREVIEW_REM * rem : 0) +
+      (item.reactions.length > 0 ? REACTIONS_REM * rem : 0);
+    switch (item.content.kind) {
+      case 'message':
+        return (isCollapsed(items, index) ? COLLAPSED_MESSAGE_REM : MESSAGE_REM) * rem + trimmings;
+      case 'image': {
+        const ratio = inverseAspectRatio(item.content.width, item.content.height, PICTURE_RATIO);
+        const caption = item.content.body ? CAPTION_HEIGHT_REM * rem : 0;
+        return Math.min(MEDIA_MAX_REM * rem, contentWidth * ratio) + chrome + caption + trimmings;
+      }
+      case 'sticker': {
+        const ratio = inverseAspectRatio(item.content.width, item.content.height, PICTURE_RATIO);
+        return STICKER_WIDTH_REM * rem * ratio + chrome + trimmings;
+      }
+      case 'video': {
+        const ratio = inverseAspectRatio(item.content.width, item.content.height, VIDEO_RATIO);
+        return contentWidth * ratio + chrome + trimmings;
+      }
+      case 'audio':
+        return AUDIO_HEIGHT_PX + chrome + trimmings;
+      case 'file':
+        return FILE_HEIGHT_REM * rem + chrome + trimmings;
+      case 'date_divider':
+        return DATE_DIVIDER_REM * rem;
+      case 'read_marker':
+        return READ_MARKER_REM * rem;
+      default:
+        return SEPARATOR_REM * rem;
     }
-    if (item.content.kind === 'message') return isCollapsed(items, index) ? 48 : 72;
-    if (item.content.kind === 'date_divider') return 56;
-    if (item.content.kind === 'read_marker') return 32;
-    return 40;
   }
 
   interface TimelineDebugSample {
@@ -172,7 +226,7 @@
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: 0,
     getScrollElement: () => viewport,
-    estimateSize: (index) => estimateTimelineItemSize(initialItems, index),
+    estimateSize: (index) => estimateTimelineItemSize(initialItems, index, 512, 16),
     getItemKey: (index) => timelineItemKey(initialItems, index),
     anchorTo: 'end',
     followOnAppend: true,
@@ -388,10 +442,13 @@
         viewport: historyDebugSnapshot(),
       });
     }
+    // `getComputedStyle` flushes style and the estimator runs per row.
+    const rem = rootFontSize();
     instance.setOptions({
       count: items.length,
       getScrollElement: () => viewport,
-      estimateSize: (index) => estimateTimelineItemSize(items, index, viewport?.clientWidth ?? 512),
+      estimateSize: (index) =>
+        estimateTimelineItemSize(items, index, viewport?.clientWidth ?? MEDIA_MAX_REM * rem, rem),
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
       getItemKey: (index) => timelineItemKey(items, index),

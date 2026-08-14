@@ -1,9 +1,9 @@
-import { SvelteMap } from 'svelte/reactivity';
-
 import type { CoreClient } from '$lib/core/client.svelte';
 
-const objectUrls = new SvelteMap<string, string>();
-const pending = new SvelteMap<string, Promise<string>>();
+/* Not `SvelteMap`: callers read the cache from inside an effect, so a reactive
+   miss re-runs every waiting media element each time any other one resolves. */
+const objectUrls = new Map<string, string>();
+const pending = new Map<string, Promise<string>>();
 
 function cacheKey(source: string, width: number, height: number): string {
   return `${source}:${String(width)}:${String(height)}`;
