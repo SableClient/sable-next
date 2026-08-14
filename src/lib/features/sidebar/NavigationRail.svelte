@@ -332,8 +332,12 @@
 
   :global(.space-image) {
     height: 100%;
-    object-fit: cover;
     width: 100%;
+  }
+
+  :global(.space-image .media-image-content) {
+    object-fit: cover;
+    object-position: center;
   }
 
   .icon :global(svg) {
