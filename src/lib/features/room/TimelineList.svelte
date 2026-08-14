@@ -951,6 +951,7 @@
               <TimelineItem
                 {item}
                 collapsed={isCollapsed(visibleItems, virtualItem.index)}
+                highlighted={focusEventId !== null && item.event_id === focusEventId}
                 {onMatrixLink}
                 {onSenderProfile}
                 {onRetrySend}

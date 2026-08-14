@@ -4,7 +4,7 @@ import type { TimelineItemView } from '@/generated/TimelineItemView';
 
 import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
 
-import { readReceiptEventId, visibleTimelineItems } from './timeline-format';
+import { jumboEmojiLevel, readReceiptEventId, visibleTimelineItems } from './timeline-format';
 
 const items = [{ event_id: '$latest' }] as TimelineItemView[];
 const visibleAtLatest = {
@@ -71,4 +71,19 @@ test('drops a divider whose whole run was filtered out', () => {
 test('keeps an unclassified membership change out of the timeline', () => {
   const other = item({ kind: 'membership', user_id: '@a:b', change: 'other', display_name: null });
   expect(visibleTimelineItems([other, message], defaults)).toEqual([message]);
+});
+
+test('sizes emoji-only bodies by how many there are', () => {
+  expect(jumboEmojiLevel('👍')).toBe(1);
+  expect(jumboEmojiLevel('👍🎉')).toBe(2);
+  expect(jumboEmojiLevel('👍🎉🔥')).toBe(3);
+  expect(jumboEmojiLevel('👍🎉🔥😀😀')).toBe(4);
+});
+
+test('leaves ordinary text alone', () => {
+  expect(jumboEmojiLevel('nice 👍')).toBeNull();
+  expect(jumboEmojiLevel('')).toBeNull();
+  // Digits are Emoji_Component, so a bare number must not count as emoji.
+  expect(jumboEmojiLevel('123')).toBeNull();
+  expect(jumboEmojiLevel('👍👍👍👍👍👍👍👍👍')).toBeNull();
 });

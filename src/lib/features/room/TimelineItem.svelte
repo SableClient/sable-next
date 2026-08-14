@@ -10,12 +10,19 @@
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
   import type { MatrixLink } from './matrix-link';
-  import { formatDate, formatTime, initials, senderColor } from './timeline-format';
+  import {
+    formatDate,
+    formatTime,
+    initials,
+    jumboEmojiLevel,
+    senderColor,
+  } from './timeline-format';
 
   interface Props {
     item: TimelineItemView;
     collapsed: boolean;
     roomId?: string;
+    highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onRetrySend?: (transactionId: string) => void;
@@ -31,6 +38,7 @@
     item,
     collapsed,
     roomId = '',
+    highlighted = false,
     onMatrixLink,
     onSenderProfile,
     onRetrySend,
@@ -43,6 +51,11 @@
   }: Props = $props();
   let senderName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
+  let jumbo = $derived(
+    item.content.kind === 'message' && !item.content.emote
+      ? jumboEmojiLevel(item.content.body)
+      : null
+  );
   // A recoverable failure resumes by itself, so only a parked one gets a prompt.
   let stalled = $derived(
     item.send_state?.status === 'failed' && !item.send_state.recoverable ? item.send_state : null
@@ -100,8 +113,6 @@
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
 
-  // Touch has no hover, so the bar never appears; a long press is the only way
-  // in. A mouse keeps the bar and must not trigger this.
   function startPress(event: PointerEvent): void {
     if (event.pointerType === 'mouse' || !actionable) return;
     pressOrigin = { x: event.clientX, y: event.clientY };
@@ -155,7 +166,7 @@
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
   <article
-    class={['message', { collapsed, pending }]}
+    class={['message', { collapsed, pending, highlighted }]}
     onpointerdown={startPress}
     onpointermove={movePress}
     onpointerup={endPress}
@@ -225,7 +236,9 @@
           <FormattedBody html={item.content.html} {onMatrixLink} />
         </div>
       {:else if item.content.kind === 'message'}
-        <FormattedBody html={item.content.html} {onMatrixLink} />
+        <div class={jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`}>
+          <FormattedBody html={item.content.html} {onMatrixLink} />
+        </div>
       {:else if item.content.kind === 'sticker'}
         <MediaImage
           class="sticker"
@@ -371,6 +384,57 @@
     opacity: 0.65;
   }
 
+  .message.highlighted {
+    border-radius: var(--radius);
+  }
+
+  .jumbo-1 {
+    font-size: 2.4rem;
+    line-height: 1.15;
+  }
+
+  .jumbo-2 {
+    font-size: 1.9rem;
+    line-height: 1.2;
+  }
+
+  .jumbo-3 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+  }
+
+  .jumbo-4 {
+    font-size: 1.25rem;
+    line-height: 1.35;
+  }
+
+  @keyframes jump {
+    0% {
+      background-color: var(--sable-primary-container);
+    }
+
+    16% {
+      background-color: var(--sable-primary-container-active);
+    }
+
+    33%,
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .message.highlighted {
+      animation: jump 6s var(--motion-easing-standard) infinite;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .message.highlighted {
+      background-color: var(--sable-primary-container);
+    }
+  }
+
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
     .message {
       margin-inline: calc(-1 * var(--page-gutter));
@@ -424,8 +488,13 @@
 
   /* An emote reads as one sentence, so the name sits in the text flow. */
   .emote {
+    color: var(--sable-success-main);
     font-style: italic;
     line-height: var(--line-height-body);
+  }
+
+  .emote .sender {
+    font-style: normal;
   }
 
   .emote :global(.formatted-body) {

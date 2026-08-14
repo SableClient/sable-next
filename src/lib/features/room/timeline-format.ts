@@ -1,6 +1,25 @@
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
 
+// Digits and a few ASCII marks are Emoji_Component, so a pictographic
+// character has to be present for a body to count as emoji-only.
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
+const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+const JUMBO_MAX = 8;
+
+/** Emoji-only bodies render larger, stepping down as the count grows. */
+export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
+  const trimmed = body.trim();
+  if (!trimmed || !PICTOGRAPHIC.test(trimmed) || !EMOJI_ONLY.test(trimmed)) return null;
+
+  const segmenter = new Intl.Segmenter();
+  const count = [...segmenter.segment(trimmed)].filter((unit) => unit.segment.trim()).length;
+  if (count > JUMBO_MAX) return null;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  return count <= 4 ? 3 : 4;
+}
+
 /** Dividers and markers annotate a run of events; they cannot justify one. */
 function isAnnotation(item: TimelineItemView): boolean {
   const kind = item.content.kind;

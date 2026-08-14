@@ -4,7 +4,6 @@
   import MediaImage from '$lib/ui/MediaImage.svelte';
 
   type AvatarSize = 'small' | 'medium' | 'large';
-  /** Rooms and spaces are round so they read as a place, people as a square. */
   type AvatarShape = 'person' | 'room';
 
   type Props = {
