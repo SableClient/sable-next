@@ -32,6 +32,10 @@ export function createRedirectUri(
   return url.toString();
 }
 
+export function tauriRedirectUri(loginType: RedirectLoginType): string {
+  return loginType === 'oidc' ? 'moe.sable.next:/login' : 'sable://login';
+}
+
 export function callbackChannelName(callbackUrl: string, windowName: string): string {
   const url = new URL(callbackUrl);
   const state = url.searchParams.get('state') ?? url.searchParams.get('sable_sso_state');

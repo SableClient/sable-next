@@ -40,11 +40,11 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["moe.sable.next"]
+        "schemes": ["moe.sable.next", "sable"]
       },
       "mobile": [
         {
-          "scheme": ["moe.sable.next"],
+          "scheme": ["moe.sable.next", "sable"],
           "appLink": false
         }
       ]

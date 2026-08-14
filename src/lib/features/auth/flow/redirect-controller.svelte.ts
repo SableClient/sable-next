@@ -1,5 +1,10 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { callbackChannelName, createRedirectUri, redirectLoginType } from '$lib/auth/redirect';
+import {
+  callbackChannelName,
+  createRedirectUri,
+  redirectLoginType,
+  tauriRedirectUri,
+} from '$lib/auth/redirect';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { RegistrationResultView } from '@/generated/RegistrationResultView';
 import type { CoreClient } from '$lib/core/client.svelte';
@@ -208,7 +213,7 @@ export class RedirectController {
 
   private redirectUri(type: RedirectType): string {
     const baseUrl = isTauri()
-      ? 'moe.sable.next://login'
+      ? tauriRedirectUri(type)
       : new SvelteURL(window.location.pathname, window.location.origin).toString();
     return createRedirectUri(type, baseUrl, crypto.randomUUID());
   }

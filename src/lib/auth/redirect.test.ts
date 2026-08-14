@@ -5,6 +5,7 @@ import {
   createRedirectUri,
   redirectLoginType,
   scrubbedCallbackPath,
+  tauriRedirectUri,
 } from './redirect';
 
 describe('redirect authentication', () => {
@@ -31,6 +32,14 @@ describe('redirect authentication', () => {
     expect(createRedirectUri('oidc', 'https://next.sable.moe/login', 'nonce')).toBe(
       'https://next.sable.moe/login'
     );
+    expect(createRedirectUri('oidc', 'moe.sable.next:/login', 'nonce')).toBe(
+      'moe.sable.next:/login'
+    );
+  });
+
+  test('uses valid native callback URI forms', () => {
+    expect(tauriRedirectUri('oidc')).toBe('moe.sable.next:/login');
+    expect(tauriRedirectUri('sso')).toBe('sable://login');
   });
 
   test('uses protocol state to isolate callback channels', () => {
