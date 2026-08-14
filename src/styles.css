@@ -217,7 +217,13 @@ html {
   --shadow-inset: inset 0 1px 3px var(--sable-shadow);
   --shadow-float: 0 0.25rem 0.75rem var(--sable-shadow);
   --shadow-dialog: 0 1rem 3rem var(--sable-shadow);
-  --layer-popover: 100;
+
+  /* Overlay layers, ascending. Same layer stacks by DOM order. */
+  --layer-dialog: 100;
+  --layer-sheet: 200;
+  --layer-popover: 300;
+  --layer-menu: 400;
+  --layer-tooltip: 500;
   --page-gutter: var(--space-3);
   --navigation-rail-width: 4.125rem;
 

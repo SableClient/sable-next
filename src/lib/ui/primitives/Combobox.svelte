@@ -188,7 +188,7 @@
 
   .combobox-positioner {
     position: relative;
-    z-index: var(--layer-popover);
+    z-index: var(--layer-menu);
   }
 
   .combobox-option {

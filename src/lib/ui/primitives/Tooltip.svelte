@@ -108,7 +108,7 @@
     overflow-wrap: anywhere;
     padding: 0.5rem 0.625rem;
     white-space: normal;
-    z-index: var(--layer-popover);
+    z-index: var(--layer-tooltip);
   }
 
   @keyframes tooltip-in {

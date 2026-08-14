@@ -492,7 +492,7 @@
     gap: 0.25rem;
     padding: 0.375rem;
     width: min(15rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
+    z-index: var(--layer-menu);
   }
 
   :global(.composer-menu [role='menuitem']) {

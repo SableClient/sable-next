@@ -55,7 +55,7 @@
 
   :global(.sable-dialog-backdrop-drawer) {
     border: 0;
-    z-index: var(--layer-popover);
+    z-index: var(--layer-dialog);
   }
 
   :global(.sable-dialog-content-drawer) {
@@ -64,16 +64,16 @@
     max-width: min(22rem, 85%);
     padding: 0;
     width: 100%;
-    z-index: calc(var(--layer-popover) + 1);
+    z-index: var(--layer-dialog);
   }
 
   :global(.sable-dialog-backdrop-verification),
   :global(.sable-dialog-backdrop-sheet) {
-    z-index: calc(var(--layer-popover) + 2);
+    z-index: var(--layer-sheet);
   }
 
   :global(.sable-dialog-backdrop-settings) {
-    z-index: var(--layer-popover);
+    z-index: var(--layer-dialog);
   }
 
   :global(.sable-dialog-content-settings) {
@@ -88,7 +88,7 @@
     top: 50%;
     transform: translate(-50%, -50%);
     width: calc(100% - 3rem);
-    z-index: calc(var(--layer-popover) + 1);
+    z-index: var(--layer-dialog);
   }
 
   :global(.sable-dialog-content-verification),
@@ -102,7 +102,7 @@
     overflow: auto;
     padding: var(--space-4);
     width: 100%;
-    z-index: calc(var(--layer-popover) + 3);
+    z-index: var(--layer-sheet);
   }
 
   :global(.sable-dialog-content-sheet) {

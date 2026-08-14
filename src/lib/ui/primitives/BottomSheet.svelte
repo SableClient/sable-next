@@ -82,6 +82,7 @@
 </DialogFrame>
 
 <style>
+  /* Above sticky headers (z-index 1) in sheet content. */
   .handle {
     background: transparent;
     border: 0;
@@ -94,7 +95,7 @@
     touch-action: none;
     transform: translateX(-50%);
     width: 4rem;
-    z-index: 1;
+    z-index: 2;
   }
 
   .handle::after {

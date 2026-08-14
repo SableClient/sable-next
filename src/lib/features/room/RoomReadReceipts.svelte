@@ -10,7 +10,7 @@
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
+  import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
   import { initials, senderColor } from './timeline-format';
@@ -109,7 +109,11 @@
     </Popover.Portal>
   </Popover.Root>
 {:else}
-  <DialogFrame bind:open variant="sheet" label={$i18n.t('timeline.readReceipts')}>
+  <BottomSheet
+    bind:open
+    label={$i18n.t('timeline.readReceipts')}
+    closeLabel={$i18n.t('timeline.closeReadReceipts')}
+  >
     <MembersDrawer
       {members}
       {loading}
@@ -121,7 +125,7 @@
       }}
       {onMemberProfile}
     />
-  </DialogFrame>
+  </BottomSheet>
 {/if}
 
 <style>
@@ -230,7 +234,7 @@
     overflow: hidden;
     padding: 0;
     width: min(22rem, calc(100vw - 2rem));
-    z-index: calc(var(--layer-popover) + 1);
+    z-index: var(--layer-popover);
   }
 
   /* Bounding the drawer is what lets its own list scroll under a fixed header,

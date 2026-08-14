@@ -102,6 +102,6 @@
     box-shadow: var(--shadow-dialog);
     padding: 0;
     width: min(22rem, calc(100vw - 2rem));
-    z-index: calc(var(--layer-popover) + 1);
+    z-index: var(--layer-popover);
   }
 </style>

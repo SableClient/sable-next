@@ -655,7 +655,7 @@
     display: grid;
     min-width: 11rem;
     padding: 0.25rem;
-    z-index: calc(var(--layer-popover) + 2);
+    z-index: var(--layer-menu);
   }
 
   :global(.profile-menu-item) {
