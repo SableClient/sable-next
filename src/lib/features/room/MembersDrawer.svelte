@@ -158,6 +158,7 @@
 
   header {
     align-items: center;
+    background: var(--sable-bg-container);
     border-bottom: 1px solid var(--sable-surface-var-container);
     display: flex;
     justify-content: space-between;
