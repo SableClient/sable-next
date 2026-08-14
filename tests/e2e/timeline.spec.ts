@@ -50,6 +50,10 @@ test('loads a real room at latest and preserves the viewport while paginating', 
     .toEqual({ distance: 0, overflow: true });
   await expect(page.locator('.timeline-content > .loading')).toHaveCount(0);
 
+  await viewport.hover();
+  await page.mouse.wheel(0, -200);
+  await expect(page.locator('.jump-to-latest')).toBeVisible();
+  await viewport.dispatchEvent('wheel', { deltaY: 1 });
   await viewport.evaluate((element) => {
     element.scrollTop = 0;
     element.dispatchEvent(new Event('scroll', { bubbles: true }));
@@ -78,13 +82,18 @@ test('loads a real room at latest and preserves the viewport while paginating', 
   if (!anchorId) throw new Error('timeline did not render an anchor item');
   const anchor = page.locator(`.timeline-viewport .item[data-item-id=${JSON.stringify(anchorId)}]`);
   const before = await anchor.boundingBox();
-  const beforeHeight = await viewport.evaluate((element) => element.scrollHeight);
+  const oldestRenderedMessage = async (): Promise<number> =>
+    page.locator('.timeline-viewport .item').evaluateAll((items) => {
+      const indexes = items.flatMap((item) => {
+        const match = item.textContent.match(/Timeline message (\d+)/);
+        return match ? [Number(match[1])] : [];
+      });
+      return Math.min(...indexes);
+    });
+  const beforeOldestMessage = await oldestRenderedMessage();
 
-  await viewport.hover();
   await page.mouse.wheel(0, -200);
-  await expect
-    .poll(() => viewport.evaluate((element) => element.scrollHeight))
-    .toBeGreaterThan(beforeHeight);
+  await expect.poll(oldestRenderedMessage, { timeout: 15_000 }).toBeLessThan(beforeOldestMessage);
   await page.waitForTimeout(500);
   const after = await anchor.boundingBox();
   expect(after?.y).toBeCloseTo(before?.y ?? 0, 0);

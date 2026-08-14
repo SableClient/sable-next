@@ -4,6 +4,14 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@tanstack/svelte-virtual@3.13.35':
+    hash: 69dea9ae7004a1588a002a2e508b6370af1c7b055b3845787675cd094b3aec58
+    path: patches/@tanstack__svelte-virtual@3.13.35.patch
+  '@tanstack/virtual-core@3.17.7':
+    hash: 6373ddd6edf948666c843232ca99c0e19bda31c234f36124248cfd96cf770fec
+    path: patches/@tanstack__virtual-core@3.17.7.patch
+
 importers:
 
   .:
@@ -16,7 +24,7 @@ importers:
         version: 6.1.38(svelte@5.56.8(@typescript-eslint/types@8.67.0))
       '@tanstack/svelte-virtual':
         specifier: ^3.13.35
-        version: 3.13.35(svelte@5.56.8(@typescript-eslint/types@8.67.0))
+        version: 3.13.35(patch_hash=69dea9ae7004a1588a002a2e508b6370af1c7b055b3845787675cd094b3aec58)(svelte@5.56.8(@typescript-eslint/types@8.67.0))
       '@tauri-apps/api':
         specifier: 2.11.1
         version: 2.11.1
@@ -3861,12 +3869,12 @@ snapshots:
       '@tanstack/query-core': 5.101.4
       svelte: 5.56.8(@typescript-eslint/types@8.67.0)
 
-  '@tanstack/svelte-virtual@3.13.35(svelte@5.56.8(@typescript-eslint/types@8.67.0))':
+  '@tanstack/svelte-virtual@3.13.35(patch_hash=69dea9ae7004a1588a002a2e508b6370af1c7b055b3845787675cd094b3aec58)(svelte@5.56.8(@typescript-eslint/types@8.67.0))':
     dependencies:
-      '@tanstack/virtual-core': 3.17.7
+      '@tanstack/virtual-core': 3.17.7(patch_hash=6373ddd6edf948666c843232ca99c0e19bda31c234f36124248cfd96cf770fec)
       svelte: 5.56.8(@typescript-eslint/types@8.67.0)
 
-  '@tanstack/virtual-core@3.17.7': {}
+  '@tanstack/virtual-core@3.17.7(patch_hash=6373ddd6edf948666c843232ca99c0e19bda31c234f36124248cfd96cf770fec)': {}
 
   '@tauri-apps/api@2.11.1': {}
 

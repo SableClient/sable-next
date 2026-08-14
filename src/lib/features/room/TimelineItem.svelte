@@ -68,6 +68,8 @@
           alt={item.content.body}
           width={800}
           height={600}
+          intrinsicWidth={item.content.width}
+          intrinsicHeight={item.content.height}
         />
         {#if item.content.body}<p class="body">{item.content.body}</p>{/if}
       {/if}
@@ -159,6 +161,7 @@
   }
 
   .message-content {
+    flex: 1;
     min-width: 0;
   }
 
@@ -204,8 +207,8 @@
     display: block;
     margin-top: 0.25rem;
     max-height: 32rem;
-    max-width: min(100%, 32rem);
     object-fit: contain;
+    width: min(100%, 32rem);
   }
 
   .reply-preview {

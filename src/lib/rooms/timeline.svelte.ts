@@ -8,6 +8,7 @@ export type BackwardPaginationState = 'idle' | 'loading' | 'end';
 export type ForwardPaginationState = 'idle' | 'loading' | 'end';
 export type TimelineMode = { kind: 'live' } | { kind: 'focused'; eventId: string };
 type SubscriptionState = 'pending' | 'active' | 'stopped';
+const PAGINATION_DIFF_SETTLE_TIMEOUT = 2_000;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
 
@@ -57,6 +58,11 @@ export class RoomTimeline {
   private startRequest = 0;
   private session = 0;
   private state: SubscriptionState = 'stopped';
+  private backwardPaginationPending = false;
+  private backwardPaginationCompletion: BackwardPaginationState | null = null;
+  private backwardPaginationStartFirstEventId: string | null = null;
+  private backwardPaginationBoundaryChanged = false;
+  private backwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(private readonly core: CoreClient) {}
 
   async start(roomId: string, eventId: string | null = null): Promise<void> {
@@ -94,20 +100,41 @@ export class RoomTimeline {
     if (subscription === null || this.backwardPagination !== 'idle') return true;
 
     const session = this.session;
+    this.clearBackwardPaginationSettleTimer();
+    this.backwardPaginationPending = true;
+    this.backwardPaginationCompletion = null;
+    this.backwardPaginationStartFirstEventId =
+      this.items.find((item) => item.event_id)?.event_id ?? null;
+    this.backwardPaginationBoundaryChanged = false;
     this.backwardPagination = 'loading';
 
     try {
       const response = await this.core.paginate(subscription, 'backward', count);
-      if (
-        this.mode.kind === 'focused' &&
-        session === this.session &&
-        subscription === this.subscription
-      ) {
-        this.backwardPagination = response.reached_end ? 'end' : 'idle';
+      if (session === this.session && subscription === this.subscription) {
+        const state = response.reached_end ? 'end' : 'idle';
+        if (this.mode.kind === 'focused') {
+          this.backwardPaginationPending = false;
+          this.backwardPaginationStartFirstEventId = null;
+          this.backwardPaginationBoundaryChanged = false;
+          this.backwardPagination = state;
+        } else {
+          this.backwardPaginationCompletion = state;
+          if (!this.settleBackwardPagination(response.reached_end)) {
+            this.backwardPaginationSettleTimer = setTimeout(() => {
+              this.backwardPaginationSettleTimer = null;
+              this.settleBackwardPagination(true);
+            }, PAGINATION_DIFF_SETTLE_TIMEOUT);
+          }
+        }
       }
       return response.reached_end;
     } catch {
       if (session === this.session && subscription === this.subscription) {
+        this.backwardPaginationPending = false;
+        this.backwardPaginationCompletion = null;
+        this.backwardPaginationStartFirstEventId = null;
+        this.backwardPaginationBoundaryChanged = false;
+        this.clearBackwardPaginationSettleTimer();
         this.error = 'load_failed';
         this.backwardPagination = 'idle';
       }
@@ -153,6 +180,11 @@ export class RoomTimeline {
     this.startPromise = null;
     this.items = [];
     this.loading = false;
+    this.backwardPaginationPending = false;
+    this.backwardPaginationCompletion = null;
+    this.backwardPaginationStartFirstEventId = null;
+    this.backwardPaginationBoundaryChanged = false;
+    this.clearBackwardPaginationSettleTimer();
     this.backwardPagination = 'idle';
     this.forwardPagination = 'idle';
     this.error = null;
@@ -190,9 +222,19 @@ export class RoomTimeline {
         const before = this.items;
         const items = applyDiffs(before, event.diffs);
         this.items = items;
+        const firstEventId = items.find((item) => item.event_id)?.event_id ?? null;
+        this.backwardPaginationBoundaryChanged ||=
+          firstEventId !== this.backwardPaginationStartFirstEventId;
+        this.settleBackwardPagination();
       }
       if (event.type === 'timeline_pagination' && this.mode.kind === 'live') {
-        this.backwardPagination = event.loading ? 'loading' : event.reached_start ? 'end' : 'idle';
+        if (event.loading || !this.backwardPaginationPending) {
+          this.backwardPagination = event.loading
+            ? 'loading'
+            : event.reached_start
+              ? 'end'
+              : 'idle';
+        }
       }
     });
 
@@ -215,5 +257,25 @@ export class RoomTimeline {
     this.items = response.items;
     this.state = 'active';
     this.unsubscribeEvents = stopEvents;
+  }
+
+  private settleBackwardPagination(force = false): boolean {
+    const completion = this.backwardPaginationCompletion;
+    if (!this.backwardPaginationPending || !completion) return false;
+    if (!force && !this.backwardPaginationBoundaryChanged) return false;
+
+    this.backwardPaginationPending = false;
+    this.backwardPaginationCompletion = null;
+    this.backwardPaginationStartFirstEventId = null;
+    this.backwardPaginationBoundaryChanged = false;
+    this.clearBackwardPaginationSettleTimer();
+    this.backwardPagination = completion;
+    return true;
+  }
+
+  private clearBackwardPaginationSettleTimer(): void {
+    if (this.backwardPaginationSettleTimer === null) return;
+    clearTimeout(this.backwardPaginationSettleTimer);
+    this.backwardPaginationSettleTimer = null;
   }
 }

@@ -10,6 +10,7 @@ import Button from './Button.svelte';
 import EmptyState from './EmptyState.svelte';
 import IconButton from './IconButton.svelte';
 import LinkButton from './LinkButton.svelte';
+import Skeleton from './Skeleton.svelte';
 import StatusBadge from './StatusBadge.svelte';
 import TextArea from './TextArea.svelte';
 
@@ -84,6 +85,18 @@ test('decorative avatars stay out of the accessibility tree', () => {
 
   expect(document.querySelector('.sable-avatar')?.getAttribute('aria-hidden')).toBe('true');
   expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBeNull();
+});
+
+test('skeletons are decorative and forward presentation attributes', () => {
+  mount(Skeleton, {
+    target: document.body,
+    props: { class: 'message-placeholder', style: 'width: 12rem' },
+  });
+
+  const skeleton = document.querySelector('.sable-skeleton');
+  expect(skeleton?.getAttribute('aria-hidden')).toBe('true');
+  expect(skeleton?.className).toContain('message-placeholder');
+  expect(skeleton?.getAttribute('style')).toContain('width: 12rem');
 });
 
 test('page composition primitives provide labelled layout landmarks', () => {

@@ -28,6 +28,12 @@ function timeline(): RoomTimeline {
   return new RoomTimeline({} as CoreClient);
 }
 
+async function finishWheelGesture(element?: HTMLElement): Promise<void> {
+  element?.dispatchEvent(new Event('scrollend'));
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await tick();
+}
+
 function item(id: string): TimelineItemView {
   return {
     id,
@@ -174,8 +180,9 @@ test('requests one history page until the viewport leaves the top threshold', as
   element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
   element.scrollTop = 20;
   element.dispatchEvent(new Event('scroll'));
+  element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
   element.dispatchEvent(new Event('scroll'));
-  await tick();
+  await finishWheelGesture(element);
 
   expect(history).toHaveBeenCalledTimes(1);
   await unmount(instance);
@@ -206,13 +213,13 @@ test('requests history from upward input when already at the top', async () => {
   element.scrollTop = 0;
 
   element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
-  await tick();
+  await finishWheelGesture(element);
 
   expect(history).toHaveBeenCalledTimes(1);
   await unmount(instance);
 });
 
-test('requests history when continuous upward scrolling reaches the top', async () => {
+test('requests history before an upward wheel gesture settles', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
@@ -240,6 +247,8 @@ test('requests history when continuous upward scrolling reaches the top', async 
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
+  expect(history).toHaveBeenCalledTimes(1);
+  await finishWheelGesture(element);
   expect(history).toHaveBeenCalledTimes(1);
   await unmount(instance);
 });
@@ -269,15 +278,104 @@ test('a fresh upward input requests the next settled history page', async () => 
   element.scrollTop = 0;
 
   element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
+  await finishWheelGesture(element);
+  expect(history).toHaveBeenCalledTimes(1);
   roomTimeline.items = [item('older'), ...roomTimeline.items];
   await tick();
   await runAnimationFrames();
+  element.scrollTop = 20;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
   element.scrollTop = 0;
   element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
-  await tick();
+  await finishWheelGesture(element);
 
   expect(history).toHaveBeenCalledTimes(2);
   await unmount(instance);
+});
+
+test('rate limits and bounds sparse history fill', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  try {
+    const roomTimeline = timeline();
+    roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+    const history = vi.fn(() => Promise.resolve(false));
+    const instance = mount(TimelineList, {
+      target: document.body,
+      props: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    });
+
+    const element = viewport();
+    Object.defineProperties(element, {
+      scrollHeight: { configurable: true, value: 1_000 },
+      scrollTop: { configurable: true, writable: true, value: 900 },
+    });
+    await tick();
+    await runAnimationFrames();
+    history.mockClear();
+    element.scrollTop = 0;
+
+    element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
+    await tick();
+    await Promise.resolve();
+    expect(history).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(299);
+    expect(history).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(history).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(history).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(history).toHaveBeenCalledTimes(4);
+
+    await unmount(instance);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('cancels sparse history fill on downward input', async () => {
+  vi.useFakeTimers();
+  try {
+    const roomTimeline = timeline();
+    roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+    const history = vi.fn(() => Promise.resolve(false));
+    const instance = mount(TimelineList, {
+      target: document.body,
+      props: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    });
+
+    const element = viewport();
+    Object.defineProperties(element, {
+      scrollHeight: { configurable: true, value: 1_000 },
+      scrollTop: { configurable: true, writable: true, value: 900 },
+    });
+    await tick();
+    await runAnimationFrames();
+    history.mockClear();
+    element.scrollTop = 0;
+
+    element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
+    await tick();
+    element.dispatchEvent(new WheelEvent('wheel', { deltaY: 200 }));
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(history).toHaveBeenCalledTimes(1);
+    await unmount(instance);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('retries marking the latest event read after a failed request', async () => {

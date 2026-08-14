@@ -1,0 +1,455 @@
+diff --git a/dist/cjs/index.cjs b/dist/cjs/index.cjs
+index aab0e59..de61afc 100644
+--- a/dist/cjs/index.cjs
++++ b/dist/cjs/index.cjs
+@@ -180,6 +180,8 @@ class Virtualizer {
+     this.lanesChangedFlag = false;
+     this.lanesSettling = false;
+     this.pendingScrollAnchor = null;
++    this.committedScrollAnchorIndex = null;
++    this.committedScrollAnchorClearScheduled = false;
+     this.scrollRect = null;
+     this.scrollOffset = null;
+     this.scrollDirection = null;
+@@ -285,6 +287,7 @@ class Virtualizer {
+       }
+       const prevOptions = this.options;
+       let anchor = null;
++      const anchorCandidates = [];
+       let followOnAppend = null;
+       let edgeKeysChanged = false;
+       if (prevOptions !== void 0 && prevOptions.enabled && merged.enabled && merged.anchorTo === "end" && this.scrollElement !== null) {
+@@ -299,7 +302,17 @@ class Virtualizer {
+           edgeKeysChanged = true;
+           const item = prevCount > 0 ? this.getVirtualItemForOffset(this.getScrollOffset()) ?? measurements[0] : null;
+           if (item) {
+-            anchor = [item.key, this.getScrollOffset() - item.start];
++            const scrollOffset = this.getScrollOffset();
++            const viewportEnd = scrollOffset + this.getSize();
++            let partialCandidate = null;
++            for (let index = item.index; index < measurements.length; index++) {
++              const candidate = measurements[index];
++              if (!candidate || candidate.start >= viewportEnd) break;
++              const trackedCandidate = [candidate.key, scrollOffset - candidate.start];
++              if (candidate.start < scrollOffset) partialCandidate = trackedCandidate;
++              else anchorCandidates.push(trackedCandidate);
++            }
++            if (partialCandidate) anchorCandidates.push(partialCandidate);
+           }
+           const behavior = merged.followOnAppend === true ? "auto" : merged.followOnAppend || null;
+           if (behavior && nextCount > prevCount && this.isAtEnd(prevOptions.scrollEndThreshold) && (prevCount === 0 || merged.getItemKey(nextCount - 1) !== prevLastKey)) {
+@@ -314,23 +327,26 @@ class Virtualizer {
+       }
+       let anchorResolved = false;
+       let anchorDelta = 0;
+-      if (anchor && this.scrollOffset !== null) {
+-        const [anchorKey, anchorOffset] = anchor;
++      let anchorIndex = null;
++      if (anchorCandidates.length > 0 && this.scrollOffset !== null) {
+         const newMeasurements = this.getMeasurements();
+         const { count, getItemKey } = this.options;
+-        let idx = 0;
+-        while (idx < count && getItemKey(idx) !== anchorKey) {
+-          idx++;
+-        }
+-        if (idx < count) {
++        for (const candidate of anchorCandidates) {
++          const [anchorKey, anchorOffset] = candidate;
++          let idx = 0;
++          while (idx < count && getItemKey(idx) !== anchorKey) idx++;
++          if (idx >= count) continue;
+           const anchorItem = newMeasurements[idx];
+           if (anchorItem) {
++            anchor = candidate;
++            anchorIndex = idx;
+             const newOffset = Math.max(0, anchorItem.start + anchorOffset);
+             if (newOffset !== this.scrollOffset) {
+               anchorDelta = newOffset - this.scrollOffset;
+               this.scrollOffset = newOffset;
+               anchorResolved = true;
+             }
++            break;
+           }
+         }
+       }
+@@ -339,7 +355,8 @@ class Virtualizer {
+           anchorResolved ? anchor[0] : null,
+           anchorResolved ? anchor[1] : 0,
+           followOnAppend,
+-          anchorDelta
++          anchorDelta,
++          anchorIndex
+         ];
+       }
+     };
+@@ -482,6 +499,9 @@ class Virtualizer {
+       }
+       const anchor = this.pendingScrollAnchor;
+       this.pendingScrollAnchor = null;
++      if (anchor?.[4] !== null && anchor?.[4] !== void 0) {
++        this.committedScrollAnchorIndex = anchor[4];
++      }
+       if (anchor && this.scrollElement && this.options.enabled) {
+         const [key, _offset, followOnAppend, anchorDelta] = anchor;
+         if (key !== null && !followOnAppend) {
+@@ -854,7 +874,16 @@ class Virtualizer {
+         const prevTotalSize = wasAtEnd ? this.getTotalSize() : 0;
+         const scrollOffsetWithAdj = this.getScrollOffset() + this.scrollAdjustments;
+         const isFirstMeasure = !this.itemSizeCache.has(key);
+-        const defaultShouldAdjust = isFirstMeasure ? (
++        const pendingAnchorIndex = this.pendingScrollAnchor?.[4] ?? this.committedScrollAnchorIndex;
++        const isAnchoredPrefix = pendingAnchorIndex !== null && index < pendingAnchorIndex;
++        if (this.committedScrollAnchorIndex !== null && !this.committedScrollAnchorClearScheduled) {
++          this.committedScrollAnchorClearScheduled = true;
++          queueMicrotask(() => {
++            this.committedScrollAnchorIndex = null;
++            this.committedScrollAnchorClearScheduled = false;
++          });
++        }
++        const defaultShouldAdjust = isAnchoredPrefix || (isFirstMeasure ? (
+           // First measurement: compensate any item whose top sits above the
+           // fold — the estimate→actual delta must be corrected regardless of
+           // scroll direction, since the whole estimated block was above it.
+@@ -868,7 +897,7 @@ class Virtualizer {
+           // Also skip during backward scroll to avoid the "items jump while
+           // scrolling up" cascade.
+           itemStart + itemSize <= scrollOffsetWithAdj && this.scrollDirection !== "backward"
+-        );
++        ));
+         const shouldAdjustScroll = ((_b = this.scrollState) == null ? void 0 : _b.behavior) !== "smooth" && (this.shouldAdjustScrollPositionOnItemSizeChange !== void 0 ? this.shouldAdjustScrollPositionOnItemSizeChange(
+           // The callback expects a VirtualItem; build one lazily only
+           // when the consumer actually supplied a custom predicate.
+@@ -889,7 +918,9 @@ class Virtualizer {
+         this.itemSizeCache.set(key, size);
+         this.itemSizeCacheVersion++;
+         let adjustedSync = false;
+-        if (wasAtEnd) {
++        if (isAnchoredPrefix) {
++          adjustedSync = this.applyScrollAdjustment(delta);
++        } else if (wasAtEnd) {
+           adjustedSync = this.applyScrollAdjustment(
+             this.getTotalSize() - prevTotalSize
+           );
+@@ -897,6 +928,12 @@ class Virtualizer {
+           adjustedSync = this.applyScrollAdjustment(delta);
+         }
+         this.notify(adjustedSync);
++        if (isAnchoredPrefix && adjustedSync) {
++          queueMicrotask(() => this._scrollToOffset(this.getScrollOffset(), {
++            adjustments: void 0,
++            behavior: void 0
++          }));
++        }
+       }
+     };
+     this.getVirtualItems = utils.memo(
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 015d77d..6585fbc 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -178,6 +178,8 @@ class Virtualizer {
+     this.lanesChangedFlag = false;
+     this.lanesSettling = false;
+     this.pendingScrollAnchor = null;
++    this.committedScrollAnchorIndex = null;
++    this.committedScrollAnchorClearScheduled = false;
+     this.scrollRect = null;
+     this.scrollOffset = null;
+     this.scrollDirection = null;
+@@ -283,6 +285,7 @@ class Virtualizer {
+       }
+       const prevOptions = this.options;
+       let anchor = null;
++      const anchorCandidates = [];
+       let followOnAppend = null;
+       let edgeKeysChanged = false;
+       if (prevOptions !== void 0 && prevOptions.enabled && merged.enabled && merged.anchorTo === "end" && this.scrollElement !== null) {
+@@ -297,7 +300,17 @@ class Virtualizer {
+           edgeKeysChanged = true;
+           const item = prevCount > 0 ? this.getVirtualItemForOffset(this.getScrollOffset()) ?? measurements[0] : null;
+           if (item) {
+-            anchor = [item.key, this.getScrollOffset() - item.start];
++            const scrollOffset = this.getScrollOffset();
++            const viewportEnd = scrollOffset + this.getSize();
++            let partialCandidate = null;
++            for (let index = item.index; index < measurements.length; index++) {
++              const candidate = measurements[index];
++              if (!candidate || candidate.start >= viewportEnd) break;
++              const trackedCandidate = [candidate.key, scrollOffset - candidate.start];
++              if (candidate.start < scrollOffset) partialCandidate = trackedCandidate;
++              else anchorCandidates.push(trackedCandidate);
++            }
++            if (partialCandidate) anchorCandidates.push(partialCandidate);
+           }
+           const behavior = merged.followOnAppend === true ? "auto" : merged.followOnAppend || null;
+           if (behavior && nextCount > prevCount && this.isAtEnd(prevOptions.scrollEndThreshold) && (prevCount === 0 || merged.getItemKey(nextCount - 1) !== prevLastKey)) {
+@@ -312,23 +325,26 @@ class Virtualizer {
+       }
+       let anchorResolved = false;
+       let anchorDelta = 0;
+-      if (anchor && this.scrollOffset !== null) {
+-        const [anchorKey, anchorOffset] = anchor;
++      let anchorIndex = null;
++      if (anchorCandidates.length > 0 && this.scrollOffset !== null) {
+         const newMeasurements = this.getMeasurements();
+         const { count, getItemKey } = this.options;
+-        let idx = 0;
+-        while (idx < count && getItemKey(idx) !== anchorKey) {
+-          idx++;
+-        }
+-        if (idx < count) {
++        for (const candidate of anchorCandidates) {
++          const [anchorKey, anchorOffset] = candidate;
++          let idx = 0;
++          while (idx < count && getItemKey(idx) !== anchorKey) idx++;
++          if (idx >= count) continue;
+           const anchorItem = newMeasurements[idx];
+           if (anchorItem) {
++            anchor = candidate;
++            anchorIndex = idx;
+             const newOffset = Math.max(0, anchorItem.start + anchorOffset);
+             if (newOffset !== this.scrollOffset) {
+               anchorDelta = newOffset - this.scrollOffset;
+               this.scrollOffset = newOffset;
+               anchorResolved = true;
+             }
++            break;
+           }
+         }
+       }
+@@ -337,7 +353,8 @@ class Virtualizer {
+           anchorResolved ? anchor[0] : null,
+           anchorResolved ? anchor[1] : 0,
+           followOnAppend,
+-          anchorDelta
++          anchorDelta,
++          anchorIndex
+         ];
+       }
+     };
+@@ -480,6 +497,9 @@ class Virtualizer {
+       }
+       const anchor = this.pendingScrollAnchor;
+       this.pendingScrollAnchor = null;
++      if (anchor?.[4] !== null && anchor?.[4] !== void 0) {
++        this.committedScrollAnchorIndex = anchor[4];
++      }
+       if (anchor && this.scrollElement && this.options.enabled) {
+         const [key, _offset, followOnAppend, anchorDelta] = anchor;
+         if (key !== null && !followOnAppend) {
+@@ -852,7 +872,16 @@ class Virtualizer {
+         const prevTotalSize = wasAtEnd ? this.getTotalSize() : 0;
+         const scrollOffsetWithAdj = this.getScrollOffset() + this.scrollAdjustments;
+         const isFirstMeasure = !this.itemSizeCache.has(key);
+-        const defaultShouldAdjust = isFirstMeasure ? (
++        const pendingAnchorIndex = this.pendingScrollAnchor?.[4] ?? this.committedScrollAnchorIndex;
++        const isAnchoredPrefix = pendingAnchorIndex !== null && index < pendingAnchorIndex;
++        if (this.committedScrollAnchorIndex !== null && !this.committedScrollAnchorClearScheduled) {
++          this.committedScrollAnchorClearScheduled = true;
++          queueMicrotask(() => {
++            this.committedScrollAnchorIndex = null;
++            this.committedScrollAnchorClearScheduled = false;
++          });
++        }
++        const defaultShouldAdjust = isAnchoredPrefix || (isFirstMeasure ? (
+           // First measurement: compensate any item whose top sits above the
+           // fold — the estimate→actual delta must be corrected regardless of
+           // scroll direction, since the whole estimated block was above it.
+@@ -866,7 +895,7 @@ class Virtualizer {
+           // Also skip during backward scroll to avoid the "items jump while
+           // scrolling up" cascade.
+           itemStart + itemSize <= scrollOffsetWithAdj && this.scrollDirection !== "backward"
+-        );
++        ));
+         const shouldAdjustScroll = ((_b = this.scrollState) == null ? void 0 : _b.behavior) !== "smooth" && (this.shouldAdjustScrollPositionOnItemSizeChange !== void 0 ? this.shouldAdjustScrollPositionOnItemSizeChange(
+           // The callback expects a VirtualItem; build one lazily only
+           // when the consumer actually supplied a custom predicate.
+@@ -887,7 +916,9 @@ class Virtualizer {
+         this.itemSizeCache.set(key, size);
+         this.itemSizeCacheVersion++;
+         let adjustedSync = false;
+-        if (wasAtEnd) {
++        if (isAnchoredPrefix) {
++          adjustedSync = this.applyScrollAdjustment(delta);
++        } else if (wasAtEnd) {
+           adjustedSync = this.applyScrollAdjustment(
+             this.getTotalSize() - prevTotalSize
+           );
+@@ -895,6 +926,12 @@ class Virtualizer {
+           adjustedSync = this.applyScrollAdjustment(delta);
+         }
+         this.notify(adjustedSync);
++        if (isAnchoredPrefix && adjustedSync) {
++          queueMicrotask(() => this._scrollToOffset(this.getScrollOffset(), {
++            adjustments: void 0,
++            behavior: void 0
++          }));
++        }
+       }
+     };
+     this.getVirtualItems = memo(
+diff --git a/src/index.ts b/src/index.ts
+index e209208..015506a 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -392,6 +392,7 @@ type PendingScrollAnchor = [
+   offset: number,
+   followOnAppend: ScrollBehavior | null,
+   anchorDelta: number,
++  anchorIndex: number | null,
+ ]
+ 
+ export class Virtualizer<
+@@ -417,6 +418,8 @@ export class Virtualizer<
+   private lanesChangedFlag = false
+   private lanesSettling = false
+   private pendingScrollAnchor: PendingScrollAnchor | null = null
++  private committedScrollAnchorIndex: number | null = null
++  private committedScrollAnchorClearScheduled = false
+   scrollRect: Rect | null = null
+   scrollOffset: number | null = null
+   scrollDirection: ScrollDirection | null = null
+@@ -562,6 +565,7 @@ export class Virtualizer<
+       | Required<VirtualizerOptions<TScrollElement, TItemElement>>
+       | undefined
+     let anchor: [Key, number] | null = null
++    const anchorCandidates: Array<[Key, number]> = []
+     let followOnAppend: ScrollBehavior | null = null
+     let edgeKeysChanged = false
+ 
+@@ -601,7 +605,20 @@ export class Virtualizer<
+             : null
+ 
+         if (item) {
+-          anchor = [item.key, this.getScrollOffset() - item.start]
++          const scrollOffset = this.getScrollOffset()
++          const viewportEnd = scrollOffset + this.getSize()
++          let partialCandidate: [Key, number] | null = null
++          for (let index = item.index; index < measurements.length; index++) {
++            const candidate = measurements[index]
++            if (!candidate || candidate.start >= viewportEnd) break
++            const trackedCandidate: [Key, number] = [
++              candidate.key,
++              scrollOffset - candidate.start,
++            ]
++            if (candidate.start < scrollOffset) partialCandidate = trackedCandidate
++            else anchorCandidates.push(trackedCandidate)
++          }
++          if (partialCandidate) anchorCandidates.push(partialCandidate)
+         }
+ 
+         const behavior =
+@@ -640,17 +657,20 @@ export class Virtualizer<
+     // frame, producing a visible "jump" on prepend with dynamic sizes.
+     let anchorResolved = false
+     let anchorDelta = 0
+-    if (anchor && this.scrollOffset !== null) {
+-      const [anchorKey, anchorOffset] = anchor
++    let anchorIndex: number | null = null
++    if (anchorCandidates.length > 0 && this.scrollOffset !== null) {
+       const newMeasurements = this.getMeasurements()
+       const { count, getItemKey } = this.options
+-      let idx = 0
+-      while (idx < count && getItemKey(idx) !== anchorKey) {
+-        idx++
+-      }
+-      if (idx < count) {
++      for (const candidate of anchorCandidates) {
++        const [anchorKey, anchorOffset] = candidate
++        let idx = 0
++        while (idx < count && getItemKey(idx) !== anchorKey) idx++
++        if (idx >= count) continue
++
+         const anchorItem = newMeasurements[idx]
+         if (anchorItem) {
++          anchor = candidate
++          anchorIndex = idx
+           // Clamp to the reachable range's lower bound — anchorOffset may
+           // have been derived from a transiently negative scrollOffset
+           // (rubber-band), and a negative tracked offset never self-heals
+@@ -661,6 +681,7 @@ export class Virtualizer<
+             this.scrollOffset = newOffset
+             anchorResolved = true
+           }
++          break
+         }
+       }
+     }
+@@ -671,6 +692,7 @@ export class Virtualizer<
+         anchorResolved ? anchor![1] : 0,
+         followOnAppend,
+         anchorDelta,
++        anchorIndex,
+       ]
+     }
+   }
+@@ -934,6 +956,9 @@ export class Virtualizer<
+ 
+     const anchor = this.pendingScrollAnchor
+     this.pendingScrollAnchor = null
++    if (anchor?.[4] !== null && anchor?.[4] !== undefined) {
++      this.committedScrollAnchorIndex = anchor[4]
++    }
+ 
+     if (anchor && this.scrollElement && this.options.enabled) {
+       const [key, _offset, followOnAppend, anchorDelta] = anchor
+@@ -1569,7 +1594,23 @@ export class Virtualizer<
+       const scrollOffsetWithAdj =
+         this.getScrollOffset() + this.scrollAdjustments
+       const isFirstMeasure = !this.itemSizeCache.has(key)
+-      const defaultShouldAdjust = isFirstMeasure
++      const pendingAnchorIndex =
++        this.pendingScrollAnchor?.[4] ?? this.committedScrollAnchorIndex
++      const isAnchoredPrefix =
++        pendingAnchorIndex !== null && index < pendingAnchorIndex
++      if (
++        this.committedScrollAnchorIndex !== null &&
++        !this.committedScrollAnchorClearScheduled
++      ) {
++        this.committedScrollAnchorClearScheduled = true
++        queueMicrotask(() => {
++          this.committedScrollAnchorIndex = null
++          this.committedScrollAnchorClearScheduled = false
++        })
++      }
++      const defaultShouldAdjust =
++        isAnchoredPrefix ||
++        (isFirstMeasure
+         ? // First measurement: compensate any item whose top sits above the
+           // fold — the estimate→actual delta must be corrected regardless of
+           // scroll direction, since the whole estimated block was above it.
+@@ -1582,7 +1623,7 @@ export class Virtualizer<
+           // Also skip during backward scroll to avoid the "items jump while
+           // scrolling up" cascade.
+           itemStart + itemSize <= scrollOffsetWithAdj &&
+-          this.scrollDirection !== 'backward'
++          this.scrollDirection !== 'backward')
+       const shouldAdjustScroll =
+         this.scrollState?.behavior !== 'smooth' &&
+         (this.shouldAdjustScrollPositionOnItemSizeChange !== undefined
+@@ -1609,7 +1650,9 @@ export class Virtualizer<
+       this.itemSizeCacheVersion++
+ 
+       let adjustedSync = false
+-      if (wasAtEnd) {
++      if (isAnchoredPrefix) {
++        adjustedSync = this.applyScrollAdjustment(delta)
++      } else if (wasAtEnd) {
+         adjustedSync = this.applyScrollAdjustment(
+           this.getTotalSize() - prevTotalSize,
+         )
+@@ -1628,6 +1671,14 @@ export class Virtualizer<
+       // land in one paint. When nothing moved (or the write was deferred on
+       // iOS), keep the cheaper async notify.
+       this.notify(adjustedSync)
++      if (isAnchoredPrefix && adjustedSync) {
++        queueMicrotask(() =>
++          this._scrollToOffset(this.getScrollOffset(), {
++            adjustments: undefined,
++            behavior: undefined,
++          }),
++        )
++      }
+     }
+   }
+ 

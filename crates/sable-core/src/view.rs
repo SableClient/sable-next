@@ -343,6 +343,16 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
                 MessageType::Image(image) => TimelineItemContentView::Image {
                     body: image.body.clone(),
                     source: serde_json::to_string(&image.source).unwrap_or_default(),
+                    width: image
+                        .info
+                        .as_ref()
+                        .and_then(|info| info.width)
+                        .map(|width| i64::from(width) as u64),
+                    height: image
+                        .info
+                        .as_ref()
+                        .and_then(|info| info.height)
+                        .map(|height| i64::from(height) as u64),
                 },
                 _ => TimelineItemContentView::Message {
                     body: message.body().to_owned(),

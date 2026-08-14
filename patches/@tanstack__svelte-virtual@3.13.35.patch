@@ -1,0 +1,50 @@
+diff --git a/dist/index.js b/dist/index.js
+index 4cc816a90149c4c4aa458623c02849c995874c6d..57005bed07b84b289ca70a70854bef201ec86e21 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,4 +1,5 @@
+ import { Virtualizer, elementScroll, observeElementOffset, observeElementRect, observeWindowOffset, observeWindowRect, windowScroll, } from '@tanstack/virtual-core';
++import { tick } from 'svelte';
+ import { derived, writable } from 'svelte/store';
+ export * from '@tanstack/virtual-core';
+ function createVirtualizerBase(initialOptions) {
+@@ -18,12 +19,12 @@ function createVirtualizerBase(initialOptions) {
+                 resolvedOptions.onChange?.(instance, sync);
+             },
+         });
+-        virtualizer._willUpdate();
+         // Force store update in case the range didn't change (e.g. count increased
+         // but scroll position stayed the same). Without this, the store only
+         // updates when onChange fires (on range change), so changes like a new
+         // count that don't shift the visible range would not trigger a re-render.
+         virtualizerWritable.set(virtualizer);
++        void tick().then(() => virtualizer._willUpdate());
+     };
+     virtualizerWritable = writable(virtualizer, () => {
+         setOptions(initialOptions);
+diff --git a/src/index.ts b/src/index.ts
+index 1607d8c2c2aecbca78077f93212d72b620829f0f..6a03cccb3261ad31e14866940f308947062bc8c9 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -7,6 +7,7 @@ import {
+   observeWindowRect,
+   windowScroll,
+ } from '@tanstack/virtual-core'
++import { tick } from 'svelte'
+ import { derived, writable } from 'svelte/store'
+ import type { PartialKeys, VirtualizerOptions } from '@tanstack/virtual-core'
+ import type { Readable, Writable } from 'svelte/store'
+@@ -52,12 +53,12 @@ function createVirtualizerBase<
+         resolvedOptions.onChange?.(instance, sync)
+       },
+     })
+-    virtualizer._willUpdate()
+     // Force store update in case the range didn't change (e.g. count increased
+     // but scroll position stayed the same). Without this, the store only
+     // updates when onChange fires (on range change), so changes like a new
+     // count that don't shift the visible range would not trigger a re-render.
+     virtualizerWritable.set(virtualizer)
++    void tick().then(() => virtualizer._willUpdate())
+   }
+ 
+   virtualizerWritable = writable(virtualizer, () => {

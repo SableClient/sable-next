@@ -5,12 +5,15 @@ type WorkerMode =
   | 'loading'
   | 'error'
   | 'delayed_history'
+  | 'delayed_media'
+  | 'delayed_pagination'
   | 'delayed_snapshot'
   | 'delayed_layout_diff';
 
 declare global {
   interface Window {
     __e2eCommands: string[];
+    __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
     __e2eEmitTimelineEvent: (event: unknown) => void;
@@ -99,6 +102,21 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }
 
       postMessage(request: { id: number; command?: { type: string } }): void {
+        if ('media' in request) {
+          const png = new Uint8Array([
+            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8,
+            6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 8, 215, 99, 248, 207, 192,
+            240, 31, 0, 5, 0, 1, 255, 137, 153, 61, 29, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96,
+            130,
+          ]);
+          window.setTimeout(
+            () => {
+              this.onmessage?.({ data: { id: request.id, bytes: png } } as MessageEvent);
+            },
+            workerMode === 'delayed_media' ? 1_000 : 100
+          );
+          return;
+        }
         const command = request.command?.type;
         if (command) commandLog.push(command);
         if (command === 'subscribe_timeline') {
@@ -136,6 +154,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                               const room = rooms.get(state.roomId);
                               if (!room) throw new Error('unknown timeline room');
                               const items = timelineItems(room.name);
+                              const timelineStart = {
+                                ...items[0],
+                                id: `${room.name.toLowerCase()}-date-divider`,
+                                event_id: null,
+                                sender: null,
+                                sender_name: null,
+                                timestamp: 1_700_000_000_000,
+                                content: {
+                                  kind: 'date_divider' as const,
+                                  timestamp: 1_700_000_000_000,
+                                },
+                              };
                               return {
                                 type: 'subscribe_timeline',
                                 subscription,
@@ -150,7 +180,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                             body: `Delayed history ${String(index)}`,
                                           },
                                         }))
-                                      : items,
+                                      : workerMode === 'delayed_pagination'
+                                        ? [timelineStart, ...items]
+                                        : items,
                               };
                             })()
                           : command === 'room_members'
@@ -233,22 +265,39 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                       },
                                                     },
                                                   }))
-                                                : [
-                                                    {
-                                                      op: 'push_front',
+                                                : workerMode === 'delayed_pagination'
+                                                  ? Array.from({ length: 20 }, (_, index) => ({
+                                                      op: 'insert' as const,
+                                                      index: index + 1,
                                                       value: {
                                                         ...items[0],
-                                                        id: `${room.name.toLowerCase()}-history-${String(state.page)}`,
-                                                        event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                        id: `${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
+                                                        event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
+                                                        timestamp: 1_699_999_000_000 + index,
                                                         content: {
-                                                          kind: 'message',
-                                                          body: `${room.name} history ${String(state.page)}`,
+                                                          kind: 'message' as const,
+                                                          body: `${room.name} history ${String(state.page)} ${String(index)}`,
                                                           formatted: null,
                                                           edited: false,
                                                         },
                                                       },
-                                                    },
-                                                  ],
+                                                    }))
+                                                  : [
+                                                      {
+                                                        op: 'push_front',
+                                                        value: {
+                                                          ...items[0],
+                                                          id: `${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                          event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                          content: {
+                                                            kind: 'message',
+                                                            body: `${room.name} history ${String(state.page)}`,
+                                                            formatted: null,
+                                                            edited: false,
+                                                          },
+                                                        },
+                                                      },
+                                                    ],
                                           });
                                           this.emit({
                                             type: 'timeline_pagination',
@@ -257,7 +306,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                             reached_start: reachedEnd,
                                           });
                                         },
-                                        workerMode === 'delayed_history' ? 750 : 0
+                                        workerMode === 'delayed_history'
+                                          ? 750
+                                          : workerMode === 'delayed_pagination'
+                                            ? 1_500
+                                            : 0
                                       );
                                       return {
                                         type: 'paginate',

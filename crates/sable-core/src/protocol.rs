@@ -927,6 +927,10 @@ pub enum TimelineItemContentView {
     Image {
         body: String,
         source: String,
+        #[ts(type = "number | null")]
+        width: Option<u64>,
+        #[ts(type = "number | null")]
+        height: Option<u64>,
     },
     Redacted,
     UnableToDecrypt {

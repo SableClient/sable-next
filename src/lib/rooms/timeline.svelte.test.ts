@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
@@ -47,7 +47,13 @@ class FakeCore {
     return Promise.resolve({ subscription: 1, items: [item('initial')] });
   }
 
-  paginate(subscription: number, direction: 'backward' | 'forward') {
+  paginate(
+    subscription: number,
+    direction: 'backward' | 'forward'
+  ): Promise<{
+    direction: 'backward' | 'forward';
+    reached_end: boolean;
+  }> {
     this.paginateCalls += 1;
     this.paginateSubscriptions.push(subscription);
     this.emit({
@@ -196,7 +202,7 @@ class EventSettledPaginationCore extends FakeCore {
   }
 }
 
-test('keeps live pagination pending until the SDK event stream settles', async () => {
+test('settles live pagination when the oldest event changes after the response', async () => {
   const core = new EventSettledPaginationCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   await timeline.start('!room:example.org');
@@ -220,6 +226,49 @@ test('keeps live pagination pending until the SDK event stream settles', async (
   expect(timeline.items.map((entry) => entry.id)).toEqual(['history', 'initial']);
 });
 
+class UnchangedPaginationCore extends EventSettledPaginationCore {
+  override paginate(subscription: number, direction: 'backward' | 'forward') {
+    this.paginateCalls += 1;
+    this.paginateSubscriptions.push(subscription);
+    return Promise.resolve({ direction, reached_end: false });
+  }
+}
+
+test('settles an unchanged live page after the diff fallback timeout', async () => {
+  vi.useFakeTimers();
+  try {
+    const core = new UnchangedPaginationCore();
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+    await timeline.start('!room:example.org');
+
+    await timeline.paginateBackward(25);
+    expect(timeline.backwardPagination).toBe('loading');
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(timeline.backwardPagination).toBe('idle');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+class ReachedEndPaginationCore extends EventSettledPaginationCore {
+  override paginate(subscription: number, direction: 'backward' | 'forward') {
+    this.paginateCalls += 1;
+    this.paginateSubscriptions.push(subscription);
+    return Promise.resolve({ direction, reached_end: true });
+  }
+}
+
+test('settles a reached-end live page without waiting for a diff', async () => {
+  const core = new ReachedEndPaginationCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+
+  await expect(timeline.paginateBackward(25)).resolves.toBe(true);
+
+  expect(timeline.backwardPagination).toBe('end');
+});
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
@@ -237,6 +286,26 @@ class PendingPaginationCore extends FakeCore {
     return this.pendingPagination.promise.then((response) => ({ direction, ...response }));
   }
 }
+
+test('settles live pagination when the oldest event changes before the response', async () => {
+  const core = new PendingPaginationCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+
+  const pagination = timeline.paginateBackward(25);
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_front', value: item('history') }],
+  });
+  expect(timeline.backwardPagination).toBe('loading');
+
+  core.pendingPagination.resolve({ reached_end: false });
+  await pagination;
+
+  expect(timeline.backwardPagination).toBe('idle');
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['history', 'initial']);
+});
 
 test('coalesces pagination and ignores completion after stop', async () => {
   const core = new PendingPaginationCore();
