@@ -1,6 +1,6 @@
 <script lang="ts">
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
-  import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
+  import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
 
   import { i18n } from '$lib/i18n';
   import Alert from '$lib/ui/primitives/Alert.svelte';
@@ -10,12 +10,12 @@
   interface Props {
     roomId: string;
     onSend: (roomId: string, body: string) => Promise<void>;
-    onSendImage: (roomId: string, image: File) => Promise<void>;
+    onSendAttachment: (roomId: string, file: File) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
     typingLabel?: string | null;
   }
 
-  let { roomId, onSend, onSendImage, onTyping, typingLabel = null }: Props = $props();
+  let { roomId, onSend, onSendAttachment, onTyping, typingLabel = null }: Props = $props();
   let draft = $state('');
   let sending = $state(false);
   let error = $state<string | null>(null);
@@ -61,17 +61,17 @@
     }
   }
 
-  async function sendImage(event: Event): Promise<void> {
+  async function sendAttachment(event: Event): Promise<void> {
     const input = event.currentTarget;
     if (!(input instanceof HTMLInputElement)) return;
-    const image = input.files?.[0];
+    const file = input.files?.[0];
     input.value = '';
-    if (!image || sending) return;
+    if (!file || sending) return;
 
     sending = true;
     error = null;
     try {
-      await onSendImage(roomId, image);
+      await onSendAttachment(roomId, file);
     } catch {
       error = $i18n.t('timeline.sendFailed');
     } finally {
@@ -102,9 +102,9 @@
           void send();
         }}
       >
-        <label class="composer-image" aria-label={$i18n.t('timeline.sendImage')}>
-          <ImageIcon />
-          <input type="file" accept="image/*" onchange={sendImage} disabled={sending} />
+        <label class="composer-image" aria-label={$i18n.t('timeline.sendAttachment')}>
+          <PaperclipIcon />
+          <input type="file" onchange={sendAttachment} disabled={sending} />
         </label>
         <TextArea
           class="composer-input"

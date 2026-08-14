@@ -930,6 +930,35 @@ pub enum TimelineItemContentView {
     Image {
         body: String,
         source: String,
+        mime: Option<String>,
+        #[ts(type = "number | null")]
+        width: Option<u64>,
+        #[ts(type = "number | null")]
+        height: Option<u64>,
+    },
+    Video {
+        body: String,
+        source: String,
+        mime: Option<String>,
+        #[ts(type = "number | null")]
+        width: Option<u64>,
+        #[ts(type = "number | null")]
+        height: Option<u64>,
+    },
+    Audio {
+        body: String,
+        source: String,
+        mime: Option<String>,
+    },
+    File {
+        body: String,
+        source: String,
+        mime: Option<String>,
+    },
+    Sticker {
+        body: String,
+        source: String,
+        mime: Option<String>,
         #[ts(type = "number | null")]
         width: Option<u64>,
         #[ts(type = "number | null")]

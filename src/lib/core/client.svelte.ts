@@ -18,6 +18,7 @@ import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
+const maxAttachmentBytes = 100 * 1024 * 1024;
 let resolvedHomeservers: Record<string, string> = {};
 
 async function resolveHomeserverInPage(homeserver: string): Promise<string> {
@@ -352,12 +353,13 @@ export class CoreClient {
     });
   }
 
-  async sendImage(roomId: string, image: File): Promise<void> {
-    const bytes = new Uint8Array(await image.arrayBuffer());
+  async sendAttachment(roomId: string, file: File): Promise<void> {
+    if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+    const bytes = new Uint8Array(await file.arrayBuffer());
     await this.ensureTransport().sendAttachment({
       roomId,
-      filename: image.name,
-      mime: image.type || 'image/*',
+      filename: file.name,
+      mime: file.type || 'application/octet-stream',
       bytes,
     });
   }

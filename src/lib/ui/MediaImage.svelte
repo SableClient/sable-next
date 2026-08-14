@@ -15,6 +15,7 @@
     height: number;
     intrinsicWidth?: number | null;
     intrinsicHeight?: number | null;
+    mime?: string | null;
     class?: string;
   }
 
@@ -25,6 +26,7 @@
     height,
     intrinsicWidth = null,
     intrinsicHeight = null,
+    mime = null,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -44,7 +46,10 @@
 
   $effect(() => {
     let active = true;
-    const key = `${source}:${String(width)}:${String(height)}`;
+    const original = mime === 'image/svg+xml';
+    const requestWidth = original ? 0 : width;
+    const requestHeight = original ? 0 : height;
+    const key = `${source}:${String(requestWidth)}:${String(requestHeight)}`;
     const cached = mediaUrls.get(key);
     if (cached) {
       url = cached;
@@ -53,8 +58,8 @@
 
     const pending =
       pendingMedia.get(key) ??
-      core.fetchMedia(source, width, height).then((bytes) => {
-        const objectUrl = URL.createObjectURL(new Blob([bytes]));
+      core.fetchMedia(source, requestWidth, requestHeight).then((bytes) => {
+        const objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime ?? '' }));
         mediaUrls.set(key, objectUrl);
         pendingMedia.delete(key);
         return objectUrl;

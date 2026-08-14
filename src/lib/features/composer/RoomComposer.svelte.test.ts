@@ -23,7 +23,7 @@ test('typing cleanup and drafts stay scoped to their room', async () => {
     props: {
       roomId: '!first:example.org',
       onSend: send,
-      onSendImage: send,
+      onSendAttachment: send,
       onTyping: typing,
     },
   });
@@ -41,10 +41,34 @@ test('typing cleanup and drafts stay scoped to their room', async () => {
     props: {
       roomId: '!second:example.org',
       onSend: send,
-      onSendImage: send,
+      onSendAttachment: send,
       onTyping: typing,
     },
   });
   expect(textarea().value).toBe('');
   await unmount(second);
+});
+
+test('queues any selected attachment, not only images', async () => {
+  const attachment = vi.fn(async () => {});
+  const instance = mount(RoomComposer, {
+    target: document.body,
+    props: {
+      roomId: '!room:example.org',
+      onSend: async () => {},
+      onSendAttachment: attachment,
+      onTyping: async () => {},
+    },
+  });
+  const input = document.querySelector('input[type="file"]');
+  if (!(input instanceof HTMLInputElement)) throw new Error('attachment input not found');
+  const file = new File(['report'], 'report.pdf', { type: 'application/pdf' });
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await tick();
+
+  expect(input.accept).toBe('');
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file);
+  await unmount(instance);
 });

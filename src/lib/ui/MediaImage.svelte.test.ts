@@ -67,6 +67,25 @@ test('shares a pending media request across component instances', async () => {
   await unmount(second);
 });
 
+test('loads SVG images from the original rather than a thumbnail', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/vector',
+      alt: 'Vector image',
+      width: 800,
+      height: 600,
+      mime: 'image/svg+xml',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/vector', 0, 0);
+  await unmount(instance);
+});
+
 test.each([
   { intrinsicWidth: 1600, intrinsicHeight: 900, expected: '1600 / 900' },
   { intrinsicWidth: 1600, intrinsicHeight: null, expected: '800 / 600' },

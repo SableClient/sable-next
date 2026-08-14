@@ -75,6 +75,9 @@ use matrix_sdk_ui::{
 use mime::Mime;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use url::Url;
+
+const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
+
 include!("dispatch_commands.rs");
 
 use protocol::{
@@ -1831,20 +1834,34 @@ impl Core {
             return Err(CommandErr::InvalidMedia);
         }
 
+        let format = if width == 0 || height == 0 {
+            MediaFormat::File
+        } else {
+            MediaFormat::Thumbnail(MediaThumbnailSettings::new(width.into(), height.into()))
+        };
+        let client = self.client().await?;
         let request = MediaRequestParameters {
-            source,
-            format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(
-                width.into(),
-                height.into(),
-            )),
+            source: source.clone(),
+            format,
         };
 
-        self.client()
-            .await?
-            .media()
-            .get_media_content(&request, true)
-            .await
-            .map_err(|error| self.failed("media_thumbnail", error))
+        match client.media().get_media_content(&request, true).await {
+            Ok(bytes) => Ok(bytes),
+            // Some servers cannot thumbnail SVGs or older media. The original is
+            // still useful, and is the only safe fallback for an unknown thumbnail.
+            Err(_) if width != 0 && height != 0 => client
+                .media()
+                .get_media_content(
+                    &MediaRequestParameters {
+                        source,
+                        format: MediaFormat::File,
+                    },
+                    true,
+                )
+                .await
+                .map_err(|error| self.failed("media_thumbnail", error)),
+            Err(error) => Err(self.failed("media_thumbnail", error)),
+        }
     }
 
     /// For the avatar commands. Not for attachments: `send_attachment` keeps the
@@ -1884,6 +1901,9 @@ impl Core {
         caption: Option<String>,
         in_reply_to: Option<String>,
     ) -> Result<(), CommandErr> {
+        if bytes.len() > MAX_ATTACHMENT_BYTES {
+            return Err(CommandErr::InvalidMedia);
+        }
         let room_id = OwnedRoomId::try_from(room_id).map_err(|_| CommandErr::UnknownRoom)?;
         let mime: Mime = mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
 

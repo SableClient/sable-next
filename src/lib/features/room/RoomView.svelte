@@ -125,8 +125,8 @@
     await core.sendMessage(targetRoomId, body);
   }
 
-  async function sendImage(targetRoomId: string, image: File): Promise<void> {
-    await core.sendImage(targetRoomId, image);
+  async function sendAttachment(targetRoomId: string, file: File): Promise<void> {
+    await core.sendAttachment(targetRoomId, file);
   }
 
   async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
@@ -163,7 +163,7 @@
         <RoomComposer
           roomId={resolvedRoomId}
           onSend={sendMessage}
-          onSendImage={sendImage}
+          onSendAttachment={sendAttachment}
           onTyping={setTyping}
           {typingLabel}
         />

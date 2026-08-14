@@ -5,7 +5,9 @@
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import MediaImage from '$lib/ui/MediaImage.svelte';
+  import MediaContent from '$lib/ui/MediaContent.svelte';
 
+  import FormattedBody from './FormattedBody.svelte';
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
   interface Props {
@@ -16,7 +18,7 @@
   let { item, collapsed }: Props = $props();
 </script>
 
-{#if item.content.kind === 'message' || item.content.kind === 'image'}
+{#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
   <article
     class={[
       'message',
@@ -60,8 +62,8 @@
         </p>
       {/if}
       {#if item.content.kind === 'message'}
-        <p class="body">{item.content.body}</p>
-      {:else}
+        <FormattedBody body={item.content.body} formatted={item.content.formatted} />
+      {:else if item.content.kind === 'image' || item.content.kind === 'sticker'}
         <MediaImage
           class="image"
           source={item.content.source}
@@ -70,8 +72,17 @@
           height={600}
           intrinsicWidth={item.content.width}
           intrinsicHeight={item.content.height}
+          mime={item.content.mime}
         />
         {#if item.content.body}<p class="body">{item.content.body}</p>{/if}
+      {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
+        <MediaContent
+          class="media"
+          source={item.content.source}
+          mime={item.content.mime}
+          body={item.content.body}
+          kind={item.content.kind}
+        />
       {/if}
       {#if item.reactions.length > 0}
         <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
@@ -207,6 +218,10 @@
     margin-top: 0.25rem;
     max-height: 32rem;
     object-fit: contain;
+    width: min(100%, 32rem);
+  }
+
+  :global(.media) {
     width: min(100%, 32rem);
   }
 

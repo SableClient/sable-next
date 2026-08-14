@@ -343,6 +343,7 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
                 MessageType::Image(image) => TimelineItemContentView::Image {
                     body: image.body.clone(),
                     source: serde_json::to_string(&image.source).unwrap_or_default(),
+                    mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
                     width: image
                         .info
                         .as_ref()
@@ -354,6 +355,31 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
                         .and_then(|info| info.height)
                         .map(|height| i64::from(height) as u64),
                 },
+                MessageType::Video(video) => TimelineItemContentView::Video {
+                    body: video.body.clone(),
+                    source: serde_json::to_string(&video.source).unwrap_or_default(),
+                    mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
+                    width: video
+                        .info
+                        .as_ref()
+                        .and_then(|info| info.width)
+                        .map(|width| i64::from(width) as u64),
+                    height: video
+                        .info
+                        .as_ref()
+                        .and_then(|info| info.height)
+                        .map(|height| i64::from(height) as u64),
+                },
+                MessageType::Audio(audio) => TimelineItemContentView::Audio {
+                    body: audio.body.clone(),
+                    source: serde_json::to_string(&audio.source).unwrap_or_default(),
+                    mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+                },
+                MessageType::File(file) => TimelineItemContentView::File {
+                    body: file.body.clone(),
+                    source: serde_json::to_string(&file.source).unwrap_or_default(),
+                    mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+                },
                 _ => TimelineItemContentView::Message {
                     body: message.body().to_owned(),
                     formatted: formatted_body(message.msgtype()),
@@ -364,7 +390,16 @@ fn content(content: &TimelineItemContent) -> TimelineItemContentView {
             MsgLikeKind::UnableToDecrypt(_) => TimelineItemContentView::UnableToDecrypt {
                 reason: "undecryptable".to_owned(),
             },
-            MsgLikeKind::Sticker(_) => unsupported("sticker"),
+            MsgLikeKind::Sticker(sticker) => {
+                let sticker = sticker.content();
+                TimelineItemContentView::Sticker {
+                    body: sticker.body.clone(),
+                    source: serde_json::to_string(&sticker.source).unwrap_or_default(),
+                    mime: sticker.info.mimetype.clone(),
+                    width: sticker.info.width.map(|width| i64::from(width) as u64),
+                    height: sticker.info.height.map(|height| i64::from(height) as u64),
+                }
+            }
             MsgLikeKind::Poll(_) => unsupported("poll"),
             MsgLikeKind::LiveLocation(_) => unsupported("live location"),
             MsgLikeKind::Other(_) => unsupported("message-like event"),
