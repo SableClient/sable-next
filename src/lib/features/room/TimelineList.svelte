@@ -67,6 +67,9 @@
   const DATE_DIVIDER_REM = 3.5;
   const READ_MARKER_REM = 2;
   const SEPARATOR_REM = 2.5;
+  const STATE_ROW_REM = 1.5;
+  const DEBUG_ROW_REM = 2.25;
+  const UNDECRYPTABLE_REM = 2.5;
   // The UA audio control does not scale with the font size.
   const AUDIO_HEIGHT_PX = 58;
   // Track MediaImage's 800x600 default and MediaContent's 16/9 video box.
@@ -128,6 +131,15 @@
         return DATE_DIVIDER_REM * rem;
       case 'read_marker':
         return READ_MARKER_REM * rem;
+      case 'membership':
+      case 'profile_change':
+      case 'redacted':
+      case 'unsupported':
+        return STATE_ROW_REM * rem;
+      case 'state_event':
+        return DEBUG_ROW_REM * rem;
+      case 'unable_to_decrypt':
+        return UNDECRYPTABLE_REM * rem;
       default:
         return SEPARATOR_REM * rem;
     }
@@ -166,6 +178,10 @@
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
+    onReply?: (eventId: string) => void;
+    onEdit?: (eventId: string, body: string) => void;
+    onDelete?: (eventId: string) => void;
+    roomId?: string;
     scrollLocked?: boolean;
     nearLatest?: boolean;
   }
@@ -182,6 +198,10 @@
     onCancelSend,
     currentUserId,
     onToggleReaction,
+    onReply,
+    onEdit,
+    onDelete,
+    roomId,
     scrollLocked = false,
     nearLatest = $bindable(true),
   }: Props = $props();
@@ -937,6 +957,10 @@
                 {onCancelSend}
                 {currentUserId}
                 {onToggleReaction}
+                {onReply}
+                {onEdit}
+                {onDelete}
+                {roomId}
               />
             </div>
           {/if}

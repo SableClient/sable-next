@@ -21,6 +21,16 @@
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
     typingLabel?: string | null;
     statusTrailing?: Snippet;
+    /** What the next send relates to: a message being replied to, or edited. */
+    context?: ComposerContext | null;
+    onCancelContext?: () => void;
+  }
+
+  interface ComposerContext {
+    kind: 'reply' | 'edit';
+    eventId: string;
+    sender?: string | null;
+    body: string;
   }
 
   interface StagedFile {
@@ -35,7 +45,10 @@
     onTyping,
     typingLabel = null,
     statusTrailing,
+    context = null,
+    onCancelContext,
   }: Props = $props();
+  let prefilledFor: string | null = null;
   let draft = $state('');
   let staged = $state<StagedFile[]>([]);
   let sending = $state(false);
@@ -51,6 +64,17 @@
       if (typingTimeout) clearTimeout(typingTimeout);
       void onTyping(roomId, false);
     };
+  });
+
+  // An edit starts from the existing text; `prefilledFor` keeps later keystrokes
+  // from being overwritten while the same edit is still open.
+  $effect(() => {
+    if (context?.kind === 'edit' && prefilledFor !== context.eventId) {
+      prefilledFor = context.eventId;
+      draft = context.body;
+    } else if (context === null) {
+      prefilledFor = null;
+    }
   });
 
   function updateTyping(): void {
@@ -104,7 +128,6 @@
     return Array.from(dataTransfer.files).filter((file): file is File => file instanceof File);
   }
 
-  /** The door's two items share one input, so the picker opens on the type the user asked for. */
   function pick(accept: string): void {
     if (!fileInput) return;
     fileInput.accept = accept;
@@ -169,6 +192,24 @@
       ondrop={handleDrop}
       ondragover={handleDragover}
     >
+      {#if context}
+        <div class="context">
+          <span class="context-kind">
+            {context.kind === 'edit'
+              ? $i18n.t('composer.editing')
+              : $i18n.t('composer.replyingTo', { name: context.sender ?? '' })}
+          </span>
+          <span class="context-body">{context.body}</span>
+          <IconButton
+            size="small"
+            variant="ghost"
+            label={$i18n.t('composer.cancelContext')}
+            onclick={onCancelContext}
+          >
+            <XIcon />
+          </IconButton>
+        </div>
+      {/if}
       {#if staged.length > 0}
         <ul class="staged" aria-label={$i18n.t('composer.stagedFiles')}>
           {#each staged as item (item.id)}
@@ -277,9 +318,17 @@
 
 <style>
   .composer-stack {
+    --composer-gutter: var(--page-gutter);
+
     margin: 0 auto calc(0.5rem + env(safe-area-inset-bottom));
     position: relative;
-    width: calc(100% - var(--page-gutter) - var(--page-gutter));
+    width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
+  }
+
+  @media (width < 32rem) {
+    .composer-stack {
+      --composer-gutter: var(--space-2);
+    }
   }
 
   .status-row {
@@ -327,6 +376,32 @@
     align-items: end;
     display: flex;
     position: relative;
+  }
+
+  .context {
+    align-items: center;
+    border-bottom: 1px solid var(--sable-surface-container-line);
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-1);
+    margin-inline: 0.375rem;
+    min-width: 0;
+    padding: 0.375rem 0 0.3125rem;
+  }
+
+  .context-kind {
+    color: var(--sable-primary-main);
+    flex: 0 0 auto;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .context-body {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .composer {
@@ -481,6 +556,21 @@
   :global(.composer-door svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  @media (pointer: coarse) {
+    :global(.composer-door),
+    :global(.composer-send) {
+      position: relative;
+    }
+
+    :global(.composer-door::after),
+    :global(.composer-send::after) {
+      border-radius: inherit;
+      content: '';
+      inset: calc((var(--control-height-small) - 3rem) / 2);
+      position: absolute;
+    }
   }
 
   :global(.composer-menu) {

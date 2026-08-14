@@ -7,29 +7,38 @@
   import MediaContent from '$lib/ui/MediaContent.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
+  import MessageActions from './MessageActions.svelte';
   import type { MatrixLink } from './matrix-link';
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
   interface Props {
     item: TimelineItemView;
     collapsed: boolean;
+    roomId?: string;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
+    onReply?: (eventId: string) => void;
+    onEdit?: (eventId: string, body: string) => void;
+    onDelete?: (eventId: string) => void;
   }
 
   let {
     item,
     collapsed,
+    roomId = '',
     onMatrixLink,
     onSenderProfile,
     onRetrySend,
     onCancelSend,
     currentUserId = null,
     onToggleReaction,
+    onReply,
+    onEdit,
+    onDelete,
   }: Props = $props();
   let senderName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
@@ -44,6 +53,55 @@
   let upload = $derived(
     item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
   );
+
+  // A local echo has no event id, so server-event actions have nothing to act on.
+  let actionable = $derived(item.event_id !== null && stalled === null && !pending);
+  let ownMessage = $derived(item.is_own && item.content.kind === 'message');
+
+  let actions = $derived.by(() => {
+    const eventId = item.event_id ?? '';
+    const body = item.content.kind === 'message' ? item.content.body : null;
+    return {
+      onReply: onReply
+        ? () => {
+            onReply(eventId);
+          }
+        : undefined,
+      onEdit:
+        ownMessage && onEdit && body !== null
+          ? () => {
+              onEdit(eventId, body);
+            }
+          : undefined,
+      onDelete:
+        ownMessage && onDelete
+          ? () => {
+              onDelete(eventId);
+            }
+          : undefined,
+      onCopyText:
+        body === null
+          ? undefined
+          : () => {
+              void copyText();
+            },
+      onCopyLink: roomId
+        ? () => {
+            void copyLink();
+          }
+        : undefined,
+    };
+  });
+
+  async function copyText(): Promise<void> {
+    if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
+  }
+
+  async function copyLink(): Promise<void> {
+    if (item.event_id) {
+      await navigator.clipboard.writeText(`https://matrix.to/#/${roomId}/${item.event_id}`);
+    }
+  }
 
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
@@ -64,7 +122,10 @@
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
-  <article class={['message', { collapsed, stalled: stalled !== null, pending }]}>
+  <article class={['message', { collapsed, pending }]}>
+    {#if actionable}
+      <MessageActions {...actions} />
+    {/if}
     {#if !collapsed}
       {#if item.sender && onSenderProfile}
         <button
@@ -206,21 +267,29 @@
     </div>
   </article>
 {:else if item.content.kind === 'membership'}
-  <p class="separator">
+  <p class="state">
+    <span class="state-rail" aria-hidden="true"></span>
     {$i18n.t(`timeline.membership.${item.content.change}`, {
       user: item.content.display_name ?? item.content.user_id,
     })}
   </p>
 {:else if item.content.kind === 'profile_change'}
-  <p class="separator">{profileChangeText(item.content)}</p>
+  <p class="state">
+    <span class="state-rail" aria-hidden="true"></span>
+    {profileChangeText(item.content)}
+  </p>
 {:else if item.content.kind === 'state_event'}
-  <p class="separator">
+  <p class="debug-event">
+    <code>{item.content.event_type}</code>
     {$i18n.t('timeline.stateEvent', { type: item.content.event_type })}
   </p>
 {:else if item.content.kind === 'unable_to_decrypt'}
-  <p class="separator">{$i18n.t('timeline.unableToDecrypt', { reason: item.content.reason })}</p>
+  <p class="undecryptable">
+    {$i18n.t('timeline.unableToDecrypt', { reason: item.content.reason })}
+  </p>
 {:else if item.content.kind === 'unsupported'}
-  <p class="separator">
+  <p class="state">
+    <span class="state-rail" aria-hidden="true"></span>
     {$i18n.t('timeline.unsupported', { description: item.content.description })}
   </p>
 {:else if item.content.kind === 'date_divider'}
@@ -230,7 +299,10 @@
 {:else if item.content.kind === 'read_marker'}
   <p class="read-marker">{$i18n.t('timeline.readMarker')}</p>
 {:else}
-  <p class="separator">{$i18n.t('timeline.redacted')}</p>
+  <p class="state redacted">
+    <span class="state-rail" aria-hidden="true"></span>
+    {$i18n.t('timeline.redacted')}
+  </p>
 {/if}
 
 <style>
@@ -239,6 +311,13 @@
     gap: 0.625rem;
     overflow-wrap: anywhere;
     padding: 0.25rem 0;
+    position: relative;
+  }
+
+  /* Keyboard reach is not gated on pointer capability. */
+  .message:focus-within :global(.message-actions) {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .message.collapsed {
@@ -247,12 +326,6 @@
 
   .message.pending {
     opacity: 0.65;
-  }
-
-  /* Filling the row would make one failure the loudest thing on screen, and
-     would grow with the message. */
-  .message.stalled {
-    box-shadow: inset 2px 0 0 var(--sable-crit-main);
   }
 
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
@@ -267,6 +340,11 @@
 
     .message:hover {
       background-color: var(--sable-surface-container-hover);
+    }
+
+    .message:hover :global(.message-actions) {
+      opacity: 1;
+      pointer-events: auto;
     }
   }
 
@@ -355,7 +433,10 @@
   .reply-preview,
   .separator,
   .read-marker,
-  .date-divider {
+  .date-divider,
+  .state,
+  .debug-event,
+  .undecryptable {
     margin: 0;
   }
 
@@ -484,6 +565,59 @@
     font-size: var(--font-size-small);
     padding: 0.5rem;
     text-align: center;
+  }
+
+  /* Left-aligned against the message column, so a run of these does not pull
+     the eye to the centre and back. */
+
+  /* The row wrapper already supplies the vertical rhythm, so these stay one
+     line tall. */
+  .state {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.5rem;
+    line-height: 1.3;
+    padding: 0;
+  }
+
+  .state-rail {
+    border-top: 1px dashed var(--sable-surface-var-container-line);
+    flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
+    margin-inline-start: 0.75rem;
+  }
+
+  .redacted {
+    font-style: italic;
+  }
+
+  .debug-event {
+    align-items: baseline;
+    background: var(--sable-surface-var-container);
+    border-block: 1px dashed var(--sable-surface-var-container-line);
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.5rem;
+    padding: 0.375rem 0;
+  }
+
+  .debug-event code {
+    flex: 0 0 auto;
+    font-family: monospace;
+    margin-inline-start: calc(var(--avatar-size-small) + 0.625rem);
+  }
+
+  .undecryptable {
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius);
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin-inline-start: calc(var(--avatar-size-small) + 0.625rem);
+    padding: 0.375rem 0.5rem;
+    width: fit-content;
   }
 
   .date-divider {

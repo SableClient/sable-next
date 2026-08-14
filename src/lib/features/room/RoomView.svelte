@@ -42,6 +42,12 @@
   let profileAnchor = $state<HTMLElement | null>(null);
   let profile = $state<ProfileView | null>(null);
   let profileFailed = $state(false);
+  let composerContext = $state<{
+    kind: 'reply' | 'edit';
+    eventId: string;
+    sender?: string | null;
+    body: string;
+  } | null>(null);
   let profileRequestId = 0;
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
@@ -201,7 +207,13 @@
   }
 
   async function sendMessage(targetRoomId: string, body: string): Promise<void> {
-    await core.sendMessage(targetRoomId, body);
+    const pending = composerContext;
+    composerContext = null;
+    if (pending?.kind === 'edit') {
+      await core.editMessage(targetRoomId, pending.eventId, body);
+      return;
+    }
+    await core.sendMessage(targetRoomId, body, pending?.eventId ?? null);
   }
 
   async function sendAttachment(targetRoomId: string, file: File): Promise<void> {
@@ -235,6 +247,29 @@
   function onToggleReaction(eventId: string, key: string): void {
     void core.toggleReaction(resolvedRoomId, eventId, key);
   }
+
+  function onDelete(eventId: string): void {
+    void core.redact(resolvedRoomId, eventId);
+  }
+
+  function onReply(eventId: string): void {
+    const item = timeline.items.find((entry) => entry.event_id === eventId);
+    if (!item || item.content.kind !== 'message') return;
+    composerContext = {
+      kind: 'reply',
+      eventId,
+      sender: item.sender_name ?? item.sender,
+      body: item.content.body,
+    };
+  }
+
+  function onEdit(eventId: string, body: string): void {
+    composerContext = { kind: 'edit', eventId, body };
+  }
+
+  function clearComposerContext(): void {
+    composerContext = null;
+  }
 </script>
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
@@ -252,6 +287,10 @@
         {onRetrySend}
         {onCancelSend}
         {onToggleReaction}
+        {onDelete}
+        {onReply}
+        {onEdit}
+        roomId={resolvedRoomId}
         currentUserId={core.session?.user_id ?? null}
         scrollLocked={profileOpen}
         bind:nearLatest={timelineAtBottom}
@@ -265,6 +304,8 @@
           onSendAttachment={sendAttachment}
           onTyping={setTyping}
           {typingLabel}
+          context={composerContext}
+          onCancelContext={clearComposerContext}
         >
           {#snippet statusTrailing()}
             <RoomReadReceipts
