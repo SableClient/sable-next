@@ -51,7 +51,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       state: 'joined',
       encrypted: true,
       is_space: false,
-      space_parents: [],
       space_children: [],
       unread: 2,
       highlight: 1,

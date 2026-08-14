@@ -709,9 +709,6 @@ pub struct RoomSummary {
     /// `null` until the state event loads, which is not the same as `false`.
     pub encrypted: Option<bool>,
     pub is_space: bool,
-    /// Spaces are a DAG, so there can be several.
-    #[ts(type = "string[]")]
-    pub space_parents: Vec<OwnedRoomId>,
     /// Already sorted by `order`, then the child event's age.
     #[ts(type = "Array<{ room_id: string, order: string | null, origin_server_ts: number }>")]
     pub space_children: Vec<SpaceChildEdge>,

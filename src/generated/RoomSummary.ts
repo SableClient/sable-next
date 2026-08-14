@@ -12,10 +12,6 @@ state: RoomStateView,
  */
 encrypted: boolean | null, is_space: boolean, 
 /**
- * Spaces are a DAG, so there can be several.
- */
-space_parents: string[], 
-/**
  * Already sorted by `order`, then the child event's age.
  */
 space_children: Array<{ room_id: string, order: string | null, origin_server_ts: number }>, unread: number, highlight: number, latest_event: LatestEventView | null, };

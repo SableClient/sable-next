@@ -66,13 +66,15 @@
     const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
     if (!space?.is_space) return [];
 
-    const roomsById = new Map(roomList.rooms.map((room) => [room.room_id, room]));
+    const roomsById = new Map(
+      roomList.rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
+    );
     return spaceItems(space, roomsById, [space.room_id], space.room_id);
   });
   let rooms = $derived.by<RoomNavRow[]>(() => {
     if (page.url.pathname.startsWith('/direct')) {
       return roomList.rooms
-        .filter((room) => room.is_direct)
+        .filter((room) => room.state === 'joined' && room.is_direct)
         .map((room) => ({ room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id }));
     }
 
@@ -80,8 +82,20 @@
       return spaceRootItems.filter(isRoom);
     }
 
+    const claimedByJoinedSpace = new Set(
+      roomList.rooms
+        .filter((space) => space.is_space && space.state === 'joined')
+        .flatMap((space) => space.space_children.map((child) => child.room_id))
+    );
+
     return roomList.rooms
-      .filter((room) => !room.is_space && !room.is_direct && room.space_parents.length === 0)
+      .filter(
+        (room) =>
+          room.state === 'joined' &&
+          !room.is_space &&
+          !room.is_direct &&
+          !claimedByJoinedSpace.has(room.room_id)
+      )
       .map((room) => ({ room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id }));
   });
   let subspaces = $derived.by(() => spaceRootItems.filter((item) => item.kind === 'category'));

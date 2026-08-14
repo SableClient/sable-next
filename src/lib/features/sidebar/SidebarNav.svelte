@@ -25,11 +25,12 @@
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
   let widthReady = $state(false);
   let spaces = $derived.by(() => {
-    const childSpaceIds = roomList.rooms
-      .filter((room) => room.is_space)
-      .flatMap((space) => space.space_children.map((child) => child.room_id));
+    const joinedSpaces = roomList.rooms.filter((room) => room.is_space && room.state === 'joined');
+    const childSpaceIds = joinedSpaces.flatMap((space) =>
+      space.space_children.map((child) => child.room_id)
+    );
 
-    return roomList.rooms.filter((room) => room.is_space && !childSpaceIds.includes(room.room_id));
+    return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
 
   onMount(() => {

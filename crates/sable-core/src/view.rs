@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 use std::sync::Arc;
 
-use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
-use matrix_sdk::room::{ParentSpace, Room, RoomMember};
+use matrix_sdk::room::{Room, RoomMember};
 use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::room::message::MessageType;
@@ -38,7 +37,6 @@ use crate::protocol::{
 pub struct RoomInfo {
     pub is_space: bool,
     pub canonical_alias: Option<String>,
-    pub parents: Vec<OwnedRoomId>,
     pub children: Vec<SpaceChildEdge>,
 }
 
@@ -73,7 +71,6 @@ pub fn room_summary<S: BuildHasher>(
             RoomState::Banned => RoomStateView::Banned,
         },
         is_space: info.is_some_and(|i| i.is_space),
-        space_parents: info.map(|i| i.parents.clone()).unwrap_or_default(),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
         unread: u32::try_from(item.num_unread_messages()).unwrap_or(u32::MAX),
         highlight: u32::try_from(item.num_unread_mentions()).unwrap_or(u32::MAX),
@@ -145,8 +142,8 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
     }
 }
 
-/// `Room::parent_spaces` hits the state store, so this runs once per room per
-/// subscription.
+/// `Room::get_state_events_static` hits the state store, so this runs once per
+/// room per subscription.
 pub async fn enrich_room_fields<S: BuildHasher>(
     client: &Client,
     diff: &eyeball_im::VectorDiff<RoomListItem>,
@@ -176,23 +173,6 @@ pub async fn enrich_room_fields<S: BuildHasher>(
                 let is_space = room.is_space();
                 let canonical_alias = room.canonical_alias().map(|alias| alias.to_string());
 
-                let parents = match room.parent_spaces().await {
-                    Ok(stream) => {
-                        pin_mut!(stream);
-                        stream
-                            .filter_map(|result| async { result.ok() })
-                            .map(|parent| match parent {
-                                ParentSpace::Reciprocal(parent)
-                                | ParentSpace::WithPowerlevel(parent)
-                                | ParentSpace::Illegitimate(parent) => parent.room_id().to_owned(),
-                                ParentSpace::Unverifiable(room_id) => room_id,
-                            })
-                            .collect()
-                            .await
-                    }
-                    Err(_) => Vec::new(),
-                };
-
                 let children = if is_space {
                     space_children(&room).await
                 } else {
@@ -202,14 +182,12 @@ pub async fn enrich_room_fields<S: BuildHasher>(
                 RoomInfo {
                     is_space,
                     canonical_alias,
-                    parents,
                     children,
                 }
             }
             None => RoomInfo {
                 is_space: false,
                 canonical_alias: None,
-                parents: Vec::new(),
                 children: Vec::new(),
             },
         };
