@@ -448,13 +448,32 @@ export class CoreClient {
     return response.room_id;
   }
 
-  async sendMessage(roomId: string, body: string): Promise<void> {
+  async sendMessage(roomId: string, body: string, inReplyTo: string | null = null): Promise<void> {
     await this.ensureTransport().send({
       type: 'send_message',
       room_id: roomId,
       body,
       formatted: null,
-      in_reply_to: null,
+      in_reply_to: inReplyTo,
+    });
+  }
+
+  async editMessage(roomId: string, eventId: string, body: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'edit_message',
+      room_id: roomId,
+      event_id: eventId,
+      body,
+      formatted: null,
+    });
+  }
+
+  async redact(roomId: string, eventId: string, reason: string | null = null): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'redact',
+      room_id: roomId,
+      event_id: eventId,
+      reason,
     });
   }
 
