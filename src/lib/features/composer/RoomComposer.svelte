@@ -1,6 +1,13 @@
 <script lang="ts">
-  import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+  import { DropdownMenu } from 'bits-ui';
+  import FileIcon from 'phosphor-svelte/lib/FileIcon';
+  import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
+  import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import VideoIcon from 'phosphor-svelte/lib/VideoIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
+  import type { Snippet } from 'svelte';
 
   import { i18n } from '$lib/i18n';
   import Alert from '$lib/ui/primitives/Alert.svelte';
@@ -13,13 +20,31 @@
     onSendAttachment: (roomId: string, file: File) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
     typingLabel?: string | null;
+    statusTrailing?: Snippet;
   }
 
-  let { roomId, onSend, onSendAttachment, onTyping, typingLabel = null }: Props = $props();
+  interface StagedFile {
+    id: number;
+    file: File;
+  }
+
+  let {
+    roomId,
+    onSend,
+    onSendAttachment,
+    onTyping,
+    typingLabel = null,
+    statusTrailing,
+  }: Props = $props();
   let draft = $state('');
+  let staged = $state<StagedFile[]>([]);
   let sending = $state(false);
   let error = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
+  let fileInput = $state<HTMLInputElement | null>(null);
+  let nextStagedId = 0;
+
+  let hasContent = $derived(draft.trim().length > 0 || staged.length > 0);
 
   $effect(() => {
     return () => {
@@ -43,36 +68,35 @@
 
   async function send(): Promise<void> {
     const body = draft.trim();
-    if (!body || sending) return;
+    const attachments = staged;
+    if (!hasContent || sending) return;
 
     sending = true;
     error = null;
     draft = '';
+    staged = [];
     if (typingTimeout) clearTimeout(typingTimeout);
     void onTyping(roomId, false);
 
     try {
-      await onSend(roomId, body);
+      for (const { file } of attachments) await onSendAttachment(roomId, file);
+      if (body) await onSend(roomId, body);
     } catch {
       draft = body;
+      staged = attachments;
       error = $i18n.t('timeline.sendFailed');
     } finally {
       sending = false;
     }
   }
 
-  async function sendAttachments(files: File[]): Promise<void> {
-    if (files.length === 0 || sending) return;
+  function stage(files: File[]): void {
+    if (files.length === 0) return;
+    staged = [...staged, ...files.map((file) => ({ id: nextStagedId++, file }))];
+  }
 
-    sending = true;
-    error = null;
-    try {
-      for (const file of files) await onSendAttachment(roomId, file);
-    } catch {
-      error = $i18n.t('timeline.sendFailed');
-    } finally {
-      sending = false;
-    }
+  function unstage(id: number): void {
+    staged = staged.filter((item) => item.id !== id);
   }
 
   function filesFrom(dataTransfer: DataTransfer | null): File[] {
@@ -80,26 +104,32 @@
     return Array.from(dataTransfer.files).filter((file): file is File => file instanceof File);
   }
 
-  function sendAttachment(event: Event): void {
+  /** The door's two items share one input, so the picker opens on the type the user asked for. */
+  function pick(accept: string): void {
+    if (!fileInput) return;
+    fileInput.accept = accept;
+    fileInput.click();
+  }
+
+  function stageFromInput(event: Event): void {
     const input = event.currentTarget;
     if (!(input instanceof HTMLInputElement)) return;
-    const files = input.files ? Array.from(input.files) : [];
+    stage(input.files ? Array.from(input.files) : []);
     input.value = '';
-    void sendAttachments(files);
   }
 
   function handlePaste(event: ClipboardEvent): void {
     const files = filesFrom(event.clipboardData);
     if (files.length === 0) return;
     event.preventDefault();
-    void sendAttachments(files);
+    stage(files);
   }
 
   function handleDrop(event: DragEvent): void {
     const files = filesFrom(event.dataTransfer);
     if (files.length === 0) return;
     event.preventDefault();
-    void sendAttachments(files);
+    stage(files);
   }
 
   function handleDragover(event: DragEvent): void {
@@ -111,13 +141,24 @@
     event.preventDefault();
     void send();
   }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes.toFixed(0)} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
 </script>
 
 <div class="composer-stack">
-  <div class="typing" aria-hidden={typingLabel === null} aria-live="polite" role="status">
-    {#if typingLabel}
-      <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span>{typingLabel}</span>
+  <div class="status-row">
+    <div class="typing" aria-hidden={typingLabel === null} aria-live="polite" role="status">
+      {#if typingLabel}
+        <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>{typingLabel}</span>
+      {/if}
+    </div>
+    {#if statusTrailing}
+      {@render statusTrailing()}
     {/if}
   </div>
   <div class="composer-shell">
@@ -128,6 +169,39 @@
       ondrop={handleDrop}
       ondragover={handleDragover}
     >
+      {#if staged.length > 0}
+        <ul class="staged" aria-label={$i18n.t('composer.stagedFiles')}>
+          {#each staged as item (item.id)}
+            <li class="staged-item">
+              <span class="staged-icon" aria-hidden="true">
+                {#if item.file.type.startsWith('image/')}
+                  <ImageIcon />
+                {:else if item.file.type.startsWith('video/')}
+                  <VideoIcon />
+                {:else}
+                  <FileIcon />
+                {/if}
+              </span>
+              <span class="staged-text">
+                <span class="staged-name">{item.file.name}</span>
+                <span class="staged-size">{formatSize(item.file.size)}</span>
+              </span>
+              <IconButton
+                variant="ghost"
+                size="small"
+                class="staged-remove"
+                disabled={sending}
+                label={$i18n.t('composer.removeAttachment', { name: item.file.name })}
+                onclick={() => {
+                  unstage(item.id);
+                }}
+              >
+                <XIcon />
+              </IconButton>
+            </li>
+          {/each}
+        </ul>
+      {/if}
       <form
         class="composer-row"
         onsubmit={(event) => {
@@ -135,16 +209,50 @@
           void send();
         }}
       >
-        <label class="composer-image" aria-label={$i18n.t('timeline.sendAttachment')}>
-          <PaperclipIcon />
-          <input type="file" onchange={sendAttachment} disabled={sending} />
-        </label>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            class="composer-door"
+            disabled={sending}
+            aria-label={$i18n.t('composer.insert')}
+          >
+            <PlusIcon />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="composer-menu" side="top" align="start" sideOffset={8}>
+            <DropdownMenu.Item
+              onclick={() => {
+                pick('image/*,video/*');
+              }}
+            >
+              <ImageIcon />
+              {$i18n.t('composer.photoOrVideo')}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onclick={() => {
+                pick('*');
+              }}
+            >
+              <PaperclipIcon />
+              {$i18n.t('composer.attachFile')}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+        <input
+          bind:this={fileInput}
+          class="composer-file"
+          type="file"
+          multiple
+          tabindex="-1"
+          aria-hidden="true"
+          onchange={stageFromInput}
+        />
         <TextArea
           class="composer-input"
           bind:value={draft}
           rows={1}
           maxlength={4000}
-          placeholder={$i18n.t('timeline.messagePlaceholder')}
+          placeholder={staged.length > 0
+            ? $i18n.t('composer.addMessageOrSend')
+            : $i18n.t('timeline.messagePlaceholder')}
           aria-label={$i18n.t('timeline.messagePlaceholder')}
           oninput={updateTyping}
           onkeydown={handleKeydown}
@@ -156,7 +264,7 @@
           size="small"
           class="composer-send"
           loading={sending}
-          disabled={!draft.trim()}
+          disabled={!hasContent}
           label={$i18n.t('timeline.sendMessage')}
         >
           <PaperPlaneIcon weight="fill" />
@@ -174,6 +282,14 @@
     width: calc(100% - var(--page-gutter) - var(--page-gutter));
   }
 
+  .status-row {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    min-height: 1.75rem;
+  }
+
   .typing {
     align-items: center;
     color: var(--sable-surface-var-on-container);
@@ -181,7 +297,6 @@
     font-size: var(--font-size-small);
     gap: 0.375rem;
     line-height: 1.25rem;
-    min-height: 1.25rem;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
@@ -227,9 +342,77 @@
     width: 100%;
   }
 
+  .composer:has(.staged) {
+    border-radius: var(--radius);
+  }
+
   .composer:focus-within {
     border-color: var(--sable-primary-main);
     box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+  }
+
+  .staged {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    list-style: none;
+    margin: 0;
+    max-height: 7.5rem;
+    overflow-y: auto;
+    padding: 0.5rem 0 0.375rem;
+  }
+
+  .staged-item {
+    align-items: center;
+    background: var(--sable-surface-container);
+    border: 1px solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
+    display: flex;
+    gap: 0.375rem;
+    max-width: 14rem;
+    min-width: 0;
+    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+  }
+
+  .staged-icon {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .staged-icon :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  /* min-width:0 on both the flex item and the name is what lets the ellipsis
+     win over the intrinsic width of a long filename. */
+  .staged-text {
+    display: grid;
+    line-height: 1.15;
+    min-width: 0;
+  }
+
+  .staged-name {
+    font-size: var(--font-size-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .staged-size {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+  }
+
+  :global(.staged-remove) {
+    flex: 0 0 auto;
+  }
+
+  :global(.staged-remove svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .composer-row {
@@ -260,44 +443,84 @@
     outline: 0;
   }
 
-  :global(.composer-send) {
-    color: var(--sable-primary-main);
+  .composer-file {
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    width: 1px;
   }
 
-  .composer-image {
+  :global(.composer-door) {
     align-items: center;
+    background: transparent;
+    border: 0;
     border-radius: var(--radius);
     color: var(--sable-primary-main);
     cursor: pointer;
     display: flex;
+    flex: 0 0 auto;
     height: var(--control-height-small);
     justify-content: center;
     width: var(--control-height-small);
   }
 
-  .composer-image:hover {
+  :global(.composer-door:hover) {
     background: var(--sable-surface-container-hover);
   }
 
-  .composer-image:active {
+  :global(.composer-door[data-state='open']) {
     background: var(--sable-surface-container-active);
   }
 
-  .composer-image:has(input:disabled) {
+  :global(.composer-door:disabled) {
     color: var(--sable-sec-main);
     cursor: default;
   }
 
-  .composer-image input {
-    height: 1px;
-    opacity: 0;
-    position: absolute;
-    width: 1px;
-  }
-
-  .composer-image :global(svg) {
+  :global(.composer-door svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  :global(.composer-menu) {
+    background: var(--sable-bg-container);
+    border: 1px solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-float);
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.375rem;
+    width: min(15rem, calc(100vw - 2rem));
+    z-index: var(--layer-popover);
+  }
+
+  :global(.composer-menu [role='menuitem']) {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: calc(var(--radius) - 0.125rem);
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    gap: var(--space-1);
+    padding: 0.5rem 0.625rem;
+    text-align: left;
+  }
+
+  :global(.composer-menu [role='menuitem']:hover),
+  :global(.composer-menu [role='menuitem'][data-highlighted]) {
+    background: var(--sable-bg-container-hover);
+  }
+
+  :global(.composer-menu [role='menuitem'] svg) {
+    color: var(--sable-surface-var-on-container);
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  :global(.composer-send) {
+    color: var(--sable-primary-main);
   }
 
   :global(.composer-send:disabled) {
@@ -326,7 +549,7 @@
       transition: block-size var(--motion-normal) var(--motion-easing-emphasized);
     }
 
-    .composer-image:active {
+    :global(.composer-door) {
       transition: background-color var(--motion-normal) var(--motion-easing-standard);
     }
 

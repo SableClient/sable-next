@@ -113,6 +113,7 @@
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
     scrollLocked?: boolean;
+    nearLatest?: boolean;
   }
 
   let {
@@ -128,10 +129,10 @@
     currentUserId,
     onToggleReaction,
     scrollLocked = false,
+    nearLatest = $bindable(true),
   }: Props = $props();
   let visibleItems = $derived(visibleTimelineItems(timeline.items, timelinePreferences));
   let viewport = $state<HTMLDivElement | null>(null);
-  let nearLatest = $state(true);
   let userScrollPending = false;
   let upwardScrollPending = false;
   let lastTouchY: number | null = null;

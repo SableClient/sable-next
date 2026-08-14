@@ -21,10 +21,11 @@
     readers: readonly string[];
     members: readonly MemberView[];
     loading: boolean;
+    visible?: boolean;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { readers, members, loading, onMemberProfile }: Props = $props();
+  let { readers, members, loading, visible = true, onMemberProfile }: Props = $props();
   let open = $state(false);
   let anchor = $state<HTMLButtonElement | null>(null);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
@@ -41,6 +42,10 @@
   );
   let names = $derived(seen.map((reader) => reader.name).join(', '));
 
+  $effect(() => {
+    if (!visible) open = false;
+  });
+
   function localPart(userId: string): string {
     const match = /^@?([^:]+)(?::.*)?$/.exec(userId);
     return match?.[1] ?? userId;
@@ -48,7 +53,7 @@
 </script>
 
 <div class="room-read-receipts">
-  {#if readers.length > 0}
+  {#if visible && readers.length > 0}
     <button
       type="button"
       aria-label={$i18n.t('timeline.seenByNames', { names })}
@@ -124,9 +129,7 @@
     align-items: center;
     display: flex;
     justify-content: flex-end;
-    min-height: 1.75rem;
     min-width: 0;
-    padding: 0 1rem;
 
     --stack-ring: var(--sable-bg-container);
   }

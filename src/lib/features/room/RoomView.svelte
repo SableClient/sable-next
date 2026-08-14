@@ -44,6 +44,7 @@
   let profileFailed = $state(false);
   let profileRequestId = 0;
   let typingUserIds = $state.raw<string[]>([]);
+  let timelineAtBottom = $state(true);
   let latestReadBy = $derived.by(() => {
     const userId = core.session?.user_id;
     for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
@@ -103,6 +104,11 @@
 
   $effect(() => {
     if (latestReadBy.length > 0) void loadMembers();
+  });
+
+  $effect(() => {
+    void roomId;
+    timelineAtBottom = eventId === null;
   });
 
   $effect(() => {
@@ -248,23 +254,28 @@
         {onToggleReaction}
         currentUserId={core.session?.user_id ?? null}
         scrollLocked={profileOpen}
+        bind:nearLatest={timelineAtBottom}
       />
     {/key}
     <div class="composer-dock">
       {#key resolvedRoomId}
-        <RoomReadReceipts
-          readers={latestReadBy}
-          members={receiptMembers}
-          loading={memberLoader.loading}
-          onMemberProfile={openProfile}
-        />
         <RoomComposer
           roomId={resolvedRoomId}
           onSend={sendMessage}
           onSendAttachment={sendAttachment}
           onTyping={setTyping}
           {typingLabel}
-        />
+        >
+          {#snippet statusTrailing()}
+            <RoomReadReceipts
+              readers={latestReadBy}
+              members={receiptMembers}
+              loading={memberLoader.loading}
+              visible={timelineAtBottom}
+              onMemberProfile={openProfile}
+            />
+          {/snippet}
+        </RoomComposer>
       {/key}
     </div>
   </div>

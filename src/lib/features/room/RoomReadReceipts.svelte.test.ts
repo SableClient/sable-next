@@ -70,3 +70,22 @@ test('caps the stack at three faces and keeps the row reserved when empty', asyn
 
   await unmount(empty);
 });
+
+test('hides the trigger when not visible but keeps the row reserved', async () => {
+  const instance = mount(RoomReadReceipts, {
+    target: document.body,
+    props: {
+      readers: ['@bob:example.org'],
+      members,
+      loading: false,
+      visible: false,
+      onMemberProfile: () => {},
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.room-read-receipts')).not.toBeNull();
+  expect(document.querySelector('.room-read-receipts')?.children).toHaveLength(0);
+
+  await unmount(instance);
+});
