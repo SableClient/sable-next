@@ -2,7 +2,7 @@
 
 import { expect, test } from 'vitest';
 
-import { sanitizeMatrixHtml } from './sanitize-matrix-html';
+import { linkifyMatrixText, sanitizeMatrixHtml } from './sanitize-matrix-html';
 
 test('keeps Matrix formatting while removing executable markup and unsafe links', () => {
   const html = sanitizeMatrixHtml(
@@ -15,4 +15,16 @@ test('keeps Matrix formatting while removing executable markup and unsafe links'
   expect(html).not.toContain('href="/settings"');
   expect(html).toContain('href="matrix:u/alice:example.org"');
   expect(html).toContain('rel="noreferrer noopener"');
+});
+
+test('linkifies plain external and Matrix URIs', () => {
+  const html = linkifyMatrixText('See https://example.org and matrix:u/alice:example.org');
+
+  expect(html).toContain('href="https://example.org"');
+  expect(html).toContain('href="matrix:u/alice:example.org"');
+  expect(html).toContain('target="_blank"');
+});
+
+test('preserves literal markup in plain message text', () => {
+  expect(linkifyMatrixText('Use <b>text</b>')).toBe('Use &lt;b&gt;text&lt;/b&gt;');
 });

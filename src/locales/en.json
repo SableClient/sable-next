@@ -80,7 +80,9 @@
     "jumpToLatest": "Jump to latest",
     "powerLevelAdmin": "Admin",
     "powerLevelModerator": "Moderator",
-    "reactions": "Reactions"
+    "reactions": "Reactions",
+    "userProfile": "Profile",
+    "closeProfile": "Close profile"
   },
   "auth": {
     "welcome": "Welcome to Sable",

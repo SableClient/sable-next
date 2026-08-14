@@ -11,6 +11,7 @@
   import Button from '$lib/ui/primitives/Button.svelte';
 
   import TimelineItem from './TimelineItem.svelte';
+  import type { MatrixLink } from './matrix-link';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import { isCollapsed } from './timeline-format';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
@@ -104,6 +105,7 @@
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
 
   let {
@@ -112,6 +114,7 @@
     onRequestHistory,
     onRequestFuture,
     onRead,
+    onMatrixLink,
   }: Props = $props();
   let viewport = $state<HTMLDivElement | null>(null);
   let nearLatest = $state(true);
@@ -834,7 +837,11 @@
               style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
               {@attach measure}
             >
-              <TimelineItem {item} collapsed={isCollapsed(timeline.items, virtualItem.index)} />
+              <TimelineItem
+                {item}
+                collapsed={isCollapsed(timeline.items, virtualItem.index)}
+                {onMatrixLink}
+              />
             </div>
           {/if}
         {/each}

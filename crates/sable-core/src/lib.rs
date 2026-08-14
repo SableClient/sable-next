@@ -78,6 +78,41 @@ use url::Url;
 
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
 
+fn profile_bio(
+    response: &matrix_sdk::ruma::api::client::profile::get_profile::v3::Response,
+) -> Option<String> {
+    response
+        .iter()
+        .find_map(|(field, value)| match field.as_str() {
+            "gay.fomx.biography" => value
+                .get("m.text")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|texts| texts.first())
+                .and_then(|text| text.get("body"))
+                .and_then(serde_json::Value::as_str)
+                .map(ToOwned::to_owned),
+            "moe.sable.app.bio" | "chat.commet.profile_bio" => {
+                value.as_str().map(ToOwned::to_owned)
+            }
+            _ => None,
+        })
+}
+
+fn profile_hero_color(
+    response: &matrix_sdk::ruma::api::client::profile::get_profile::v3::Response,
+) -> Option<String> {
+    response
+        .iter()
+        .find(|(field, _)| field.as_str() == "chat.commet.profile_color_scheme")
+        .and_then(|(_, value)| value.get("color"))
+        .and_then(serde_json::Value::as_str)
+        .filter(|color| {
+            let digits = color.strip_prefix('#').unwrap_or_default();
+            matches!(digits.len(), 3 | 6) && digits.bytes().all(|digit| digit.is_ascii_hexdigit())
+        })
+        .map(ToOwned::to_owned)
+}
+
 include!("dispatch_commands.rs");
 
 use protocol::{

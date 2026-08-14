@@ -8,14 +8,16 @@
   import MediaContent from '$lib/ui/MediaContent.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
+  import type { MatrixLink } from './matrix-link';
   import { formatDate, formatTime, initials, senderColor } from './timeline-format';
 
   interface Props {
     item: TimelineItemView;
     collapsed: boolean;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
 
-  let { item, collapsed }: Props = $props();
+  let { item, collapsed, onMatrixLink }: Props = $props();
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
@@ -62,7 +64,7 @@
         </p>
       {/if}
       {#if item.content.kind === 'message'}
-        <FormattedBody body={item.content.body} formatted={item.content.formatted} />
+        <FormattedBody body={item.content.body} formatted={item.content.formatted} {onMatrixLink} />
       {:else if item.content.kind === 'image' || item.content.kind === 'sticker'}
         <MediaImage
           class="image"
