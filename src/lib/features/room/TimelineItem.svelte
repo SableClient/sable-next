@@ -24,6 +24,7 @@
     $props();
   let senderName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
+  // A recoverable failure resumes by itself, so only a parked one gets a prompt.
   let stalled = $derived(
     item.send_state?.status === 'failed' && !item.send_state.recoverable ? item.send_state : null
   );
@@ -54,16 +55,7 @@
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
-  <article
-    class={[
-      'message',
-      {
-        collapsed,
-        failed: item.send_state?.status === 'failed',
-        sending: item.send_state?.status === 'sending',
-      },
-    ]}
-  >
+  <article class={['message', { collapsed, stalled: stalled !== null, pending }]}>
     {#if !collapsed}
       {#if item.sender && onSenderProfile}
         <button
@@ -163,10 +155,28 @@
           {/each}
         </div>
       {/if}
-      {#if item.send_state?.status === 'sending'}
-        <span class="send-state">{$i18n.t('timeline.sending')}</span>
-      {:else if item.send_state?.status === 'failed'}
-        <span class="send-state">{$i18n.t('timeline.sendFailed')}: {item.send_state.error}</span>
+      {#if upload}
+        <progress
+          class="upload"
+          max={upload.total}
+          value={upload.current}
+          aria-label={$i18n.t('timeline.uploading')}
+        ></progress>
+      {/if}
+      {#if stalled}
+        <p class="send-failure">
+          <!-- The raw SDK error is diagnostic detail. -->
+          <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
+          {#if item.transaction_id}
+            {@const transactionId = item.transaction_id}
+            <button type="button" onclick={() => onRetrySend?.(transactionId)}>
+              {$i18n.t('timeline.retrySend')}
+            </button>
+            <button type="button" onclick={() => onCancelSend?.(transactionId)}>
+              {$i18n.t('timeline.cancelSend')}
+            </button>
+          {/if}
+        </p>
       {/if}
     </div>
   </article>
@@ -210,24 +220,19 @@
     padding-left: calc(var(--avatar-size-small) + 0.625rem);
   }
 
-  .message.sending {
+  .message.pending {
     opacity: 0.65;
   }
 
-  .message.failed {
-    background: var(--sable-crit-container);
-    border-radius: var(--radius);
-    color: var(--sable-crit-on-container);
-    padding: 0.5rem;
+  /* Filling the row would make one failure the loudest thing on screen, and
+     would grow with the message. */
+  .message.stalled {
+    box-shadow: inset 2px 0 0 var(--sable-crit-main);
   }
 
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
     .message {
       margin-inline: calc(-1 * var(--page-gutter));
-      padding-inline: var(--page-gutter);
-    }
-
-    .message.failed {
       padding-inline: var(--page-gutter);
     }
 
@@ -237,10 +242,6 @@
 
     .message:hover {
       background-color: var(--sable-surface-container-hover);
-    }
-
-    .message.failed:hover {
-      background-color: var(--sable-crit-container-hover);
     }
   }
 
@@ -286,15 +287,43 @@
   }
 
   time,
-  .edited,
-  .send-state {
+  .edited {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
-  .failed .send-state {
-    color: var(--sable-crit-on-container);
+  .send-failure {
+    align-items: baseline;
+    color: var(--sable-crit-main);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+  }
+
+  .send-failure button {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .send-failure button:focus-visible {
+    border-radius: 0.125rem;
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: 0.15rem;
+  }
+
+  .upload {
+    accent-color: var(--sable-primary-main);
     display: block;
+    height: 0.25rem;
+    margin-top: 0.25rem;
+    width: min(100%, 16rem);
   }
 
   .body,

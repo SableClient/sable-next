@@ -13,7 +13,8 @@
   import TimelineItem from './TimelineItem.svelte';
   import type { MatrixLink } from './matrix-link';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
-  import { isCollapsed } from './timeline-format';
+  import { isCollapsed, visibleTimelineItems } from './timeline-format';
+  import { timelinePreferences } from '$lib/settings/timeline-preferences.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
   const HISTORY_PREFETCH_ITEMS = 10;
@@ -124,6 +125,7 @@
     onCancelSend,
     scrollLocked = false,
   }: Props = $props();
+  let visibleItems = $derived(visibleTimelineItems(timeline.items, timelinePreferences));
   let viewport = $state<HTMLDivElement | null>(null);
   let nearLatest = $state(true);
   let userScrollPending = false;
@@ -356,7 +358,7 @@
   }
 
   $effect.pre(() => {
-    const items = timeline.items;
+    const items = visibleItems;
     const instance = get(virtualizer);
     const previousItems = historyDebugItems;
     historyDebugItems = items;
@@ -412,7 +414,7 @@
   });
 
   $effect(() => {
-    if (timeline.loading || timeline.items.length === 0 || !viewport) return;
+    if (timeline.loading || visibleItems.length === 0 || !viewport) return;
 
     const controller = new AbortController();
     void (async () => {
@@ -421,7 +423,7 @@
       if (controller.signal.aborted) return;
       const focusedEventId = scrollMode.kind === 'focused' ? scrollMode.eventId : null;
       const focusIndex = focusedEventId
-        ? timeline.items.findIndex((item) => item.event_id === focusedEventId)
+        ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
         : -1;
       if (focusIndex >= 0 && !focusAnchored) {
         get(virtualizer).scrollToIndex(focusIndex, { align: 'center' });
@@ -513,7 +515,7 @@
       scrollMode.kind === 'focused' &&
       timeline.forwardPagination === 'idle' &&
       newestVisibleIndex !== undefined &&
-      newestVisibleIndex >= timeline.items.length - HISTORY_PREFETCH_ITEMS
+      newestVisibleIndex >= visibleItems.length - HISTORY_PREFETCH_ITEMS
     ) {
       void onRequestFuture();
     }
@@ -854,7 +856,7 @@
     >
       <div class="items" style:height={String($virtualizer.getTotalSize()) + 'px'}>
         {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
-          {@const item = timeline.items[virtualItem.index]}
+          {@const item = visibleItems[virtualItem.index]}
           {#if item}
             <div
               class="item"
@@ -881,7 +883,7 @@
 
   {#if scrollMode.kind === 'initialLive'}<TimelineSkeleton />{/if}
 
-  {#if timeline.mode.kind === 'live' && scrollMode.kind === 'readingHistory' && timeline.items.length > 0}
+  {#if timeline.mode.kind === 'live' && scrollMode.kind === 'readingHistory' && visibleItems.length > 0}
     <Button
       type="button"
       class="jump-to-latest"

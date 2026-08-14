@@ -14,7 +14,7 @@
   import Button from '$lib/ui/primitives/Button.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+  import GeneralSettings from './GeneralSettings.svelte';
 
   import DevicesSettings from './DevicesSettings.svelte';
 
@@ -117,7 +117,7 @@
         {#if activeSection === 'devices'}
           <DevicesSettings />
         {:else}
-          <RoutePlaceholder titleKey="settings.general" />
+          <GeneralSettings />
         {/if}
       {:else}
         {@render children?.()}

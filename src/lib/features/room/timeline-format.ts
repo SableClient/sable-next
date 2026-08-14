@@ -1,4 +1,47 @@
 import type { TimelineItemView } from '@/generated/TimelineItemView';
+import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
+
+/** Dividers and markers annotate a run of events; they cannot justify one. */
+function isAnnotation(item: TimelineItemView): boolean {
+  const kind = item.content.kind;
+  return kind === 'date_divider' || kind === 'read_marker' || kind === 'timeline_start';
+}
+
+function isVisibleEvent(item: TimelineItemView, preferences: TimelinePreferences): boolean {
+  switch (item.content.kind) {
+    case 'membership':
+      // `other` is the SDK reporting a member event it could not classify.
+      return !preferences.hideMembershipEvents && item.content.change !== 'other';
+    case 'profile_change':
+      return !preferences.hideProfileChanges;
+    case 'state_event':
+      return preferences.showHiddenEvents;
+    default:
+      return true;
+  }
+}
+
+/** A divider left with nothing under it would render as a stray date. */
+export function visibleTimelineItems(
+  items: readonly TimelineItemView[],
+  preferences: TimelinePreferences
+): TimelineItemView[] {
+  const kept = items.filter((item) => isVisibleEvent(item, preferences));
+
+  const visible: TimelineItemView[] = [];
+  let hasEventBelow = false;
+  for (let index = kept.length - 1; index >= 0; index -= 1) {
+    const item = kept[index];
+    if (item.content.kind === 'date_divider') {
+      if (!hasEventBelow) continue;
+      hasEventBelow = false;
+    } else if (!isAnnotation(item)) {
+      hasEventBelow = true;
+    }
+    visible.push(item);
+  }
+  return visible.reverse();
+}
 
 const senderColors = [
   'var(--sable-primary-main)',

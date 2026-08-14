@@ -231,8 +231,9 @@
         onRead={markRead}
         onMatrixLink={handleMatrixLink}
         onSenderProfile={openProfile}
-        onRetrySend={(transactionId) => void core.retrySend(resolvedRoomId, transactionId)}
-        onCancelSend={(transactionId) => void core.cancelSend(resolvedRoomId, transactionId)}
+        onRetrySend={(transactionId: string) => void core.retrySend(resolvedRoomId, transactionId)}
+        onCancelSend={(transactionId: string) =>
+          void core.cancelSend(resolvedRoomId, transactionId)}
         scrollLocked={profileOpen}
       />
     {/key}

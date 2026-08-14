@@ -458,6 +458,22 @@ export class CoreClient {
     });
   }
 
+  async retrySend(roomId: string, transactionId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'retry_send',
+      room_id: roomId,
+      transaction_id: transactionId,
+    });
+  }
+
+  async cancelSend(roomId: string, transactionId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'cancel_send',
+      room_id: roomId,
+      transaction_id: transactionId,
+    });
+  }
+
   async sendAttachment(roomId: string, file: File): Promise<void> {
     if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
     const bytes = new Uint8Array(await file.arrayBuffer());
