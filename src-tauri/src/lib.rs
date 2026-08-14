@@ -14,11 +14,33 @@ use tauri::{
     AppHandle, Manager, State,
 };
 use tauri_plugin_opener::OpenerExt;
-use tokio::sync::mpsc::UnboundedReceiver;
 
 struct AppState {
     core: Arc<Core>,
-    events: Mutex<Option<UnboundedReceiver<CoreEvent>>>,
+    event_sink: Arc<EventSink>,
+}
+
+#[derive(Default)]
+struct EventSink(Mutex<Option<Channel<CoreEvent>>>);
+
+impl EventSink {
+    fn replace(&self, channel: Channel<CoreEvent>) {
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(channel);
+    }
+
+    fn send(&self, event: CoreEvent) {
+        let channel = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(channel) = channel {
+            let _ = channel.send(event);
+        }
+    }
 }
 
 #[tauri::command]
@@ -95,27 +117,13 @@ async fn upload_media(
         .await
 }
 
-/// Called once at startup.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
 fn subscribe_events(
     state: State<'_, AppState>,
     channel: Channel<CoreEvent>,
 ) -> Result<(), CommandErr> {
-    let mut events = state
-        .events
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let mut rx = events.take().ok_or(CommandErr::Unavailable)?;
-
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            if channel.send(event).is_err() {
-                break;
-            }
-        }
-    });
-
+    state.event_sink.replace(channel);
     Ok(())
 }
 
@@ -166,13 +174,19 @@ pub fn run() {
             }
 
             let data_dir = app.path().app_data_dir()?;
-            let (core, events) = Core::new(
+            let (core, mut events) = Core::new(
                 data_dir.to_string_lossy().into_owned(),
                 Box::new(sable_core::store::FileSessionStore::new(&data_dir)),
             );
+            let event_sink = Arc::new(EventSink::default());
             app.manage(AppState {
                 core,
-                events: Mutex::new(Some(events)),
+                event_sink: event_sink.clone(),
+            });
+            tauri::async_runtime::spawn(async move {
+                while let Some(event) = events.recv().await {
+                    event_sink.send(event);
+                }
             });
 
             Ok(())
@@ -188,5 +202,55 @@ pub fn run() {
         .run(tauri::generate_context!())
     {
         log::error!("error while running Tauri application: {error}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::EventSink;
+    use sable_core::protocol::CoreEvent;
+    use tauri::ipc::Channel;
+
+    #[test]
+    fn replaces_the_event_channel_after_a_frontend_reload() {
+        let first_messages = Arc::new(Mutex::new(0));
+        let first_count = first_messages.clone();
+        let first = Channel::new(move |_| {
+            *first_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
+            Ok(())
+        });
+
+        let second_messages = Arc::new(Mutex::new(0));
+        let second_count = second_messages.clone();
+        let second = Channel::new(move |_| {
+            *second_count
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) += 1;
+            Ok(())
+        });
+
+        let sink = EventSink::default();
+        sink.replace(first);
+        sink.replace(second);
+        sink.send(CoreEvent::SessionEnded {
+            reason: "test".to_owned(),
+        });
+
+        assert_eq!(
+            *first_messages
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            0
+        );
+        assert_eq!(
+            *second_messages
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            1
+        );
     }
 }
