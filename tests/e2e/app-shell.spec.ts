@@ -710,11 +710,14 @@ test('anchors each history page requested by separate upward gestures', async ({
   await page.getByRole('link', { name: 'General' }).click();
 
   const viewport = page.locator('.timeline-viewport .viewport');
-  const firstId = await page
-    .locator('.timeline-viewport .item')
-    .first()
-    .getAttribute('data-item-id');
-  if (!firstId) throw new Error('missing first timeline item id');
+  const first = page.locator('.timeline-viewport .item').first();
+  const [firstId, firstIndexValue] = await Promise.all([
+    first.getAttribute('data-item-id'),
+    first.getAttribute('data-index'),
+  ]);
+  if (!firstId || firstIndexValue === null) throw new Error('missing first timeline item');
+  const firstIndex = Number(firstIndexValue);
+  if (!Number.isInteger(firstIndex)) throw new Error('invalid first timeline item index');
   await viewport.evaluate((element) => {
     element.scrollTop = 0;
   });
@@ -728,7 +731,7 @@ test('anchors each history page requested by separate upward gestures', async ({
     .toBe(1);
   await expect
     .poll(async () => page.locator(`[data-item-id="${firstId}"]`).getAttribute('data-index'))
-    .toBe('1');
+    .toBe(String(firstIndex + 1));
   await page.waitForTimeout(300);
   expect(
     await page.evaluate(() => window.__e2eCommands.filter((item) => item === 'paginate').length)
@@ -750,7 +753,7 @@ test('anchors each history page requested by separate upward gestures', async ({
     .toBe(2);
   await expect
     .poll(async () => page.locator(`[data-item-id="${firstId}"]`).getAttribute('data-index'))
-    .toBe('2');
+    .toBe(String(firstIndex + 2));
   await expect
     .poll(async () => (await page.locator(`[data-item-id="${firstId}"]`).boundingBox())?.y)
     .toBeCloseTo(beforeSecondPage.y, 0);
