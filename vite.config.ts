@@ -1,3 +1,4 @@
+import { sentrySvelteKit } from '@sentry/sveltekit';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
@@ -23,6 +24,22 @@ export default defineConfig({
     },
   },
   plugins: [
+    sentrySvelteKit({
+      // The plugin detects the adapter from `svelte.config.js`, which this
+      // project does not have, and does not know `adapter-static` either.
+      adapter: 'other',
+      autoUploadSourceMaps: Boolean(process.env.SENTRY_AUTH_TOKEN),
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      release: { name: process.env.VITE_APP_VERSION },
+      sourcemaps: {
+        // `adapter: 'other'` would look in `.svelte-kit/output`, not the copy
+        // `adapter-static` writes and the browser loads.
+        assets: ['./dist/**/*.js', './dist/**/*.js.map'],
+        // Otherwise the maps ship to Cloudflare with the bundle.
+        filesToDeleteAfterUpload: ['./dist/**/*.js.map'],
+      },
+    }),
     sveltekit({
       preprocess: vitePreprocess({ script: true }),
       alias: {

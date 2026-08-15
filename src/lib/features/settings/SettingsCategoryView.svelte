@@ -2,7 +2,9 @@
   import { page } from '$app/state';
 
   import { i18n } from '$lib/i18n';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
   import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
   import Select from '$lib/ui/primitives/Select.svelte';
   import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
@@ -32,6 +34,8 @@
   let focusId = $derived(page.url.searchParams.get('focus'));
   let highlighted = $state<string | null>(null);
   let copied = $state<string | null>(null);
+  /** Sentry reads its consent once, at boot. */
+  let reloadPending = $state(false);
 
   async function copyLink(anchor: string): Promise<void> {
     await navigator.clipboard.writeText(buildSettingsLink(location.origin, category.id, anchor));
@@ -65,6 +69,21 @@
   class="settings-category"
 >
   <div class="settings-stack">
+    {#if reloadPending}
+      <Alert variant="info">
+        <p>{$i18n.t('settings.telemetryReloadNotice')}</p>
+        <Button
+          variant="secondary"
+          size="small"
+          onclick={() => {
+            location.reload();
+          }}
+        >
+          {$i18n.t('settings.telemetryReloadAction')}
+        </Button>
+      </Alert>
+    {/if}
+
     <section class="settings-card" aria-labelledby={`settings-${category.id}`}>
       <h2 id={`settings-${category.id}`} class="screen-reader-only">{$i18n.t(category.name)}</h2>
       <ul class="settings">
@@ -128,6 +147,10 @@
                   checked={preferences[key]}
                   onCheckedChange={(checked: boolean) => {
                     setPreference(key, checked);
+                    if (key === 'errorReporting' || key === 'sessionReplay') {
+                      setPreference('telemetryAsked', true);
+                      reloadPending = true;
+                    }
                   }}
                 />
               {/if}

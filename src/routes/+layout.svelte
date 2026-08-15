@@ -6,6 +6,7 @@
   import { createCoreClient } from '$lib/core/client.svelte';
   import { provideCoreClient } from '$lib/core/context';
   import CoreHealthBanner from '$lib/ui/CoreHealthBanner.svelte';
+  import TelemetryConsentBanner from '$lib/ui/TelemetryConsentBanner.svelte';
   import favicon from '$lib/assets/favicon.png';
 
   interface Props {
@@ -30,6 +31,7 @@
 </svelte:head>
 
 <CoreHealthBanner />
+<TelemetryConsentBanner />
 
 <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
   {@render children()}

@@ -66,6 +66,15 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      # Absent on forks, which builds an app with error reporting switched off.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      # Ties the events the client sends to the source maps uploaded below.
+      VITE_APP_VERSION: ${{ github.sha }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -208,6 +217,11 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+    env:
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      VITE_APP_VERSION: ${{ github.sha }}
     strategy:
       fail-fast: false
       matrix:
@@ -303,6 +317,10 @@ jobs:
     env:
       MISE_ENV: tauri
       RUST_TARGETS: aarch64-linux-android armv7-linux-androideabi
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      VITE_APP_VERSION: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -365,6 +383,10 @@ jobs:
       contents: write
     env:
       RUST_TARGETS: aarch64-apple-ios
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      VITE_APP_VERSION: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

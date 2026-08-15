@@ -34,6 +34,11 @@ export interface Preferences {
   notificationSounds: boolean;
   notificationContent: boolean;
 
+  errorReporting: boolean;
+  sessionReplay: boolean;
+  /** Distinguishes a declined prompt from one that was never shown. */
+  telemetryAsked: boolean;
+
   showHiddenEvents: boolean;
   showNonStandardEvents: boolean;
 }
@@ -90,6 +95,10 @@ const DEFAULTS: Preferences = {
   desktopNotifications: false,
   notificationSounds: true,
   notificationContent: false,
+
+  errorReporting: false,
+  sessionReplay: false,
+  telemetryAsked: false,
 
   showHiddenEvents: false,
   showNonStandardEvents: false,

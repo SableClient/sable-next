@@ -21,6 +21,16 @@ const core = init().then(() => {
 });
 
 const boundary = createCoreWorkerBoundary(core);
+
+// A SharedWorker's runtime failures never reach the pages that opened it, so
+// they ride the same channel as a Rust panic. A failed `init()` lands here too.
+self.addEventListener('error', (event) => {
+  boundary.handlePanic(`worker error: ${event.message}`);
+});
+self.addEventListener('unhandledrejection', (event) => {
+  boundary.handlePanic(`unhandled rejection in worker: ${String(event.reason)}`);
+});
+
 void core.then((instance) => {
   setPanicHandler((message: string) => {
     boundary.handlePanic(message);

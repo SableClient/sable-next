@@ -27,6 +27,15 @@ tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
 sable-core = { path = "../crates/sable-core", version = "0.1.0" }
 tokio = { workspace = true }
+# default-features drags in reqwest and native-tls; ureq is a sync rustls
+# transport with no async runtime of its own.
+sentry = { version = "0.49", default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "panic",
+  "debug-images",
+  "ureq",
+] }
 
 # Desktop only: a second launch carrying the OIDC redirect must hand the URL to
 # the running instance instead of starting a rival process.

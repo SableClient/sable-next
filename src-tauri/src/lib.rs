@@ -3,6 +3,8 @@
 //! The native carrier. A feature adds a `Command` variant, not a tauri command,
 //! except for the three below that move bytes.
 
+mod sentry;
+
 use std::sync::{Arc, Mutex};
 
 use sable_core::{
@@ -138,6 +140,9 @@ fn open_auth_url(app: AppHandle, url: String) -> Result<(), CommandErr> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before the threads Tauri spawns, so they inherit the panic handler.
+    let _sentry_guard = sentry::init();
+
     let builder = tauri::Builder::default();
 
     // Before every other plugin, as its docs require: it has to win the race
@@ -193,7 +198,8 @@ pub fn run() {
             fetch_media,
             send_attachment,
             upload_media,
-            open_auth_url
+            open_auth_url,
+            sentry::set_native_sentry_enabled
         ])
         .run(tauri::generate_context!())
     {

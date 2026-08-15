@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/sveltekit';
+
 import type { Command } from '@/generated/Command';
 import type { CommandOk } from '@/generated/CommandOk';
 import type { CoreEvent } from '@/generated/CoreEvent';
@@ -32,6 +34,12 @@ export function createWebTransport(): Transport {
   }
 
   function handleCrash(message: string): void {
+    // The failure crosses as a string, so every one of them carries this file's
+    // stack. The fingerprint groups on the Rust `panicked at <path>:<line>`.
+    Sentry.captureException(new Error(message), {
+      fingerprint: ['wasm-core-crash', message],
+      tags: { source: 'wasm-core' },
+    });
     worker = null;
     const waiting = [...pending.values()];
     pending.clear();
@@ -54,8 +62,13 @@ export function createWebTransport(): Transport {
       name: 'sable-core',
     });
 
+    // Only the worker failing to load reaches here. Runtime failures inside it
+    // are reported to its own global scope, so the worker forwards those itself.
     nextWorker.addEventListener('error', (event) => {
       console.error('[sable transport] shared worker error', event.message);
+      Sentry.captureException(new Error(`shared worker failed to start: ${event.message}`), {
+        tags: { source: 'wasm-core' },
+      });
     });
 
     nextWorker.port.onmessageerror = (event) => {

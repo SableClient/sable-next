@@ -98,6 +98,27 @@ export function findSettingByFocusId(
   return undefined;
 }
 
+/** A build without a DSN has no error reporting to offer, so the rows are absent. */
+const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
+  ? [
+      {
+        key: 'errorReporting',
+        icon: BugIcon,
+        name: 'settings.errorReporting',
+        description: 'settings.errorReportingHint',
+        type: 'boolean',
+      },
+      {
+        key: 'sessionReplay',
+        icon: FilmStripIcon,
+        name: 'settings.sessionReplay',
+        description: 'settings.sessionReplayHint',
+        type: 'boolean',
+        gatedBy: 'errorReporting',
+      },
+    ]
+  : [];
+
 export const settingsCategories: SettingsCategory[] = [
   {
     id: 'appearance',
@@ -280,6 +301,7 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
         unavailable: true,
       },
+      ...telemetrySettings,
     ],
   },
   {
