@@ -1,64 +1,67 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { page } from '$app/state';
   import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
-  import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
+  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
+  import { SETTINGS_DEVICES_SECTION, settingsCategories } from '$lib/settings/registry';
+  import { BREAKPOINTS } from '$lib/ui/breakpoints';
+  import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import GeneralSettings from './GeneralSettings.svelte';
-
-  import DevicesSettings from './DevicesSettings.svelte';
-
-  type SettingsSection = 'general' | 'devices';
-  type SettingsMode = 'route' | 'overlay';
+  import SettingsSectionContent from './SettingsSectionContent.svelte';
+  import { defaultSettingsSection, selectSettingsSection } from './settings-navigation';
 
   interface Props {
+    /** Active section id; null on phones means the section list. */
+    section: string | null;
+    /** Rendered over the page it was opened from, instead of as its own route. */
+    shallow?: boolean;
     children?: Snippet;
-    mode?: SettingsMode;
-    open?: boolean;
-    onClose?: () => void;
   }
 
-  let { children, mode = 'route', open = $bindable(true), onClose }: Props = $props();
+  let { section: activeSection, shallow = false, children }: Props = $props();
   const core = useCoreClient();
 
   const sections = [
-    { id: 'general' as const, label: 'settings.general', icon: GearIcon },
-    { id: 'devices' as const, label: 'settings.security', icon: LockIcon },
-  ] as const;
-  let overlaySection = $state<SettingsSection>('devices');
-  let activeSection = $derived(
-    mode === 'overlay'
-      ? overlaySection
-      : ((page.params.section as SettingsSection | undefined) ?? 'devices')
+    ...settingsCategories.map((category) => ({
+      id: category.id,
+      label: category.name,
+      icon: category.icon,
+    })),
+    { id: SETTINGS_DEVICES_SECTION, label: 'settings.security', icon: LockIcon },
+  ];
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  let desktop = $derived(appLayout.matches);
+
+  /** Desktop always has a section open; the list alone is a phone state. */
+  let openSection = $derived(activeSection ?? (desktop ? defaultSettingsSection() : null));
+  let showList = $derived(desktop || activeSection === null);
+  let showContent = $derived(desktop || activeSection !== null);
+  let activeLabel = $derived(
+    sections.find((entry) => entry.id === openSection)?.label ?? 'settings.title'
   );
 
   function close(): void {
-    if (mode === 'overlay') {
-      open = false;
-      onClose?.();
+    // Shallow settings sit on one history entry above the page they cover.
+    if (shallow) {
+      history.back();
       return;
     }
 
     void goto(resolve('/home'));
   }
 
-  function selectSection(section: SettingsSection): void {
-    if (mode === 'overlay') {
-      overlaySection = section;
-      return;
-    }
-
-    void goto(resolve(section === 'devices' ? '/settings' : `/settings/${section}`));
+  function back(): void {
+    void goto(resolve('/settings'));
   }
 
   function logout(): void {
@@ -67,62 +70,80 @@
 </script>
 
 <DialogFrame
-  {open}
+  open
   variant="settings"
   onOpenChange={(next) => {
     if (!next) close();
   }}
 >
-  <div class="settings-shell">
-    <aside class="settings-nav" aria-label={$i18n.t('settings.title')}>
-      <div class="settings-title">
-        <Dialog.Title class="settings-heading">{$i18n.t('settings.title')}</Dialog.Title>
-        <Dialog.Description class="screen-reader-only">
-          {$i18n.t('settings.dialogDescription')}
-        </Dialog.Description>
-        <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={close}
-          ><XIcon /></IconButton
-        >
-      </div>
-      <nav aria-label={$i18n.t('settings.sections')}>
-        {#each sections as section (section.id)}
-          {@const active = activeSection === section.id}
-          <a
-            class="sable-selection-layer"
-            href={resolve(section.id === 'devices' ? '/settings' : `/settings/${section.id}`)}
-            class:active
-            aria-current={active ? 'page' : undefined}
-            onclick={(event) => {
-              if (mode !== 'overlay') return;
-              event.preventDefault();
-              selectSection(section.id);
-            }}
+  <div class="settings-shell" class:paged={!desktop}>
+    <Dialog.Description class="screen-reader-only">
+      {$i18n.t('settings.dialogDescription')}
+    </Dialog.Description>
+
+    {#if showList}
+      <aside class="settings-nav" aria-label={$i18n.t('settings.title')}>
+        <div class="settings-title">
+          <Dialog.Title class="settings-heading">{$i18n.t('settings.title')}</Dialog.Title>
+          <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={close}
+            ><XIcon /></IconButton
           >
-            <span class="icon" aria-hidden="true"><section.icon /></span>
-            <span>{$i18n.t(section.label)}</span>
-          </a>
-        {/each}
-      </nav>
-      <Button
-        block
-        class="settings-logout"
-        variant="danger"
-        aria-label={$i18n.t('settings.logout')}
-        onclick={logout}
-        ><SignOutIcon /><span class="logout-label">{$i18n.t('settings.logout')}</span></Button
-      >
-    </aside>
-    <div class="settings-content">
-      {#if mode === 'overlay'}
-        {#if activeSection === 'devices'}
-          <DevicesSettings />
-        {:else}
-          <GeneralSettings />
+        </div>
+        <nav aria-label={$i18n.t('settings.sections')}>
+          {#each sections as entry (entry.id)}
+            {@const active = openSection === entry.id}
+            {@const href = resolve(`/settings/${entry.id}`)}
+            <a
+              class="sable-selection-layer"
+              {href}
+              class:active
+              aria-current={active ? 'page' : undefined}
+              onclick={(event) => {
+                if (shallow) selectSettingsSection(event, entry.id);
+              }}
+            >
+              <span class="icon" aria-hidden="true"><entry.icon /></span>
+              <span class="label">{$i18n.t(entry.label)}</span>
+              <span class="chevron" aria-hidden="true"><CaretRightIcon /></span>
+            </a>
+          {/each}
+        </nav>
+        <Button
+          block
+          class="settings-logout"
+          variant="danger"
+          aria-label={$i18n.t('settings.logout')}
+          onclick={logout}
+          ><SignOutIcon /><span class="logout-label">{$i18n.t('settings.logout')}</span></Button
+        >
+      </aside>
+    {/if}
+
+    {#if showContent}
+      <div class="settings-content">
+        {#if !desktop}
+          <div class="settings-title section-bar">
+            <IconButton variant="ghost" size="small" label={$i18n.t('settings.back')} onclick={back}
+              ><ArrowLeftIcon /></IconButton
+            >
+            <Dialog.Title class="settings-heading">{$i18n.t(activeLabel)}</Dialog.Title>
+            <IconButton
+              variant="ghost"
+              size="small"
+              label={$i18n.t('settings.close')}
+              onclick={close}><XIcon /></IconButton
+            >
+          </div>
         {/if}
-      {:else}
-        {@render children?.()}
-      {/if}
-    </div>
+        <div class="settings-scroll">
+          {#if shallow}
+            <SettingsSectionContent section={openSection} />
+          {:else}
+            {@render children?.()}
+          {/if}
+        </div>
+      </div>
+    {/if}
   </div>
 </DialogFrame>
 
@@ -160,6 +181,8 @@
   nav {
     display: grid;
     gap: 0;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   a {
@@ -201,71 +224,77 @@
     width: auto;
   }
 
+  .chevron {
+    display: none;
+  }
+
   .settings-content {
+    display: flex;
+    flex-direction: column;
     height: 100%;
     min-width: 0;
-    overflow: auto;
     width: 100%;
   }
 
-  @media (width < 48rem) {
-    .settings-shell {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-    }
+  .settings-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
 
-    .settings-nav {
-      border-bottom: 1px solid var(--sable-surface-container-line);
-      border-right: 0;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      padding: 0;
-    }
+  .section-bar {
+    background: var(--sable-surface-container);
+    border-bottom: 1px solid var(--sable-surface-container-line);
+    flex: 0 0 auto;
+    gap: var(--space-1);
+    justify-content: flex-start;
+  }
 
-    .settings-title {
-      grid-column: 1 / -1;
-      min-height: var(--control-height-medium);
-      padding: var(--space-1) var(--space-3);
-    }
+  .section-bar :global(.settings-heading) {
+    flex: 1;
+    font-size: var(--font-size-large);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-    :global(.settings-heading) {
-      font-size: var(--font-size-large);
-      margin: 0;
-      padding: 0;
-    }
+  .paged .settings-nav {
+    border-right: 0;
+    flex: 1;
+  }
 
-    nav {
-      display: flex;
-      overflow-x: auto;
-    }
+  .paged .settings-title {
+    min-height: var(--control-height-large);
+  }
 
-    a {
-      border-bottom: 0.1875rem solid transparent;
-      border-left: 0;
-      flex: 0 0 auto;
-      min-height: var(--control-height-medium);
-      padding: 0 var(--space-3);
-    }
+  .paged nav {
+    flex: 1;
+  }
 
-    a.active {
-      border-bottom-color: var(--sable-primary-main);
-    }
+  .paged a {
+    border-left: 0;
+    min-height: var(--control-height-large);
+  }
 
-    :global(.settings-logout) {
-      align-self: center;
-      margin: 0 var(--space-2) 0 0;
-      width: auto;
-    }
+  .paged .label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .paged .chevron {
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .paged a.active {
+    background: var(--sable-surface-container-hover);
   }
 
   @media (width < 28rem) {
     :global(.settings-logout) {
       min-height: var(--control-height-medium);
-      padding-inline: var(--space-2);
-    }
-
-    .logout-label {
-      display: none;
     }
   }
 </style>

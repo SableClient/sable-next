@@ -205,3 +205,21 @@ test('an unhighlightable language leaves the escaped source intact', async () =>
   expect(code?.querySelector('script')).toBeNull();
   await unmount(instance);
 });
+
+test('renders a settings link as a labelled chip', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: {
+      html: `<a href="${location.origin}/settings/timeline?focus=hide-read-receipts">${location.origin}/settings/timeline?focus=hide-read-receipts</a>`,
+    },
+  });
+  await tick();
+
+  const anchor = document.querySelector<HTMLAnchorElement>('a');
+  expect(anchor?.dataset.settingsLink).toBe('timeline');
+  expect(anchor?.dataset.settingsLinkFocus).toBe('hide-read-receipts');
+  expect(anchor?.textContent).toBe('Timeline / Hide read receipts');
+  // The app-level delegate follows it, so the anchor is not sent to a new tab.
+  expect(anchor?.target).toBe('');
+  await unmount(instance);
+});

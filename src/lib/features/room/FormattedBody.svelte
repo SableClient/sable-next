@@ -5,6 +5,8 @@
 
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';
+  import { settingsLinkLabel } from './settings-link-label';
+  import { parseSettingsLink } from './settings-link';
 
   interface Props {
     html: string;
@@ -85,11 +87,21 @@
       void html;
       for (const anchor of node.querySelectorAll('a')) {
         const link = parseMatrixLink(anchor.href);
-        if (link) anchor.dataset.matrixLink = link.kind;
-        else {
-          anchor.target = '_blank';
-          anchor.rel = 'noopener noreferrer';
+        if (link) {
+          anchor.dataset.matrixLink = link.kind;
+          continue;
         }
+
+        const settings = parseSettingsLink(anchor.href, location.origin);
+        if (settings) {
+          anchor.dataset.settingsLink = settings.section;
+          if (settings.focus !== undefined) anchor.dataset.settingsLinkFocus = settings.focus;
+          anchor.textContent = settingsLinkLabel(settings);
+          continue;
+        }
+
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
         element.style.color = element.dataset.mxColor ?? '';
@@ -290,10 +302,15 @@
 
   .formatted-body :global(a) {
     color: var(--sable-primary-main);
+    text-decoration: var(--link-decoration);
+  }
+
+  .formatted-body :global(a:hover) {
     text-decoration: underline;
   }
 
-  .formatted-body :global(a[data-matrix-link]) {
+  .formatted-body :global(a[data-matrix-link]),
+  .formatted-body :global(a[data-settings-link]) {
     background: var(--sable-sec-container);
     border: 1px solid var(--sable-sec-container-line);
     border-radius: var(--radius);

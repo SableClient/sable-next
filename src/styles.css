@@ -233,6 +233,7 @@ html {
   --navigation-rail-width: 4.125rem;
   --timeline-row-gap: var(--space-relaxed-tight);
   --timeline-row-padding: var(--space-compact);
+  --link-decoration: underline;
 
   /* Code blocks: the estimator reads this, so it has to be a fixed length. */
   --code-line-height: 1.25rem;
@@ -298,6 +299,10 @@ body {
 *:focus-within::-webkit-scrollbar-thumb {
   background: var(--sable-surface-container-line);
   background-clip: padding-box;
+}
+
+:root[data-underline-links='off'] {
+  --link-decoration: none;
 }
 
 body {

@@ -2,9 +2,10 @@ import { baseKeymap } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
-import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 
+import { preferences } from '$lib/settings/preferences.svelte';
 import type { AutocompleteQuery } from '../autocomplete';
 import {
   activeMarks,
@@ -18,6 +19,12 @@ import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
 import { queryKey, queryPlugin } from './query-plugin';
 import { composerSchema } from './schema';
+
+const newline: Command = (state, dispatch, view) => {
+  if (splitListEntry(state, dispatch, view)) return true;
+  dispatch?.(state.tr.split(state.selection.from));
+  return true;
+};
 
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape';
 
@@ -45,6 +52,11 @@ export class ComposerEditor {
 
   constructor(private options: ComposerEditorOptions) {}
 
+  private submit(): boolean {
+    this.options.onSubmit();
+    return true;
+  }
+
   mount(node: HTMLElement): () => void {
     const state = EditorState.create({
       schema: composerSchema,
@@ -61,16 +73,12 @@ export class ComposerEditor {
           ArrowDown: () => this.options.onNavigate('ArrowDown'),
           Tab: () => this.options.onNavigate('Tab'),
           Escape: () => this.options.onNavigate('Escape'),
-          Enter: () => {
+          Enter: (state, dispatch, view) => {
             if (this.options.onNavigate('Enter')) return true;
-            this.options.onSubmit();
-            return true;
+            return preferences.enterForNewline ? newline(state, dispatch, view) : this.submit();
           },
-          'Shift-Enter': (state, dispatch, view) => {
-            if (splitListEntry(state, dispatch, view)) return true;
-            dispatch?.(state.tr.split(state.selection.from));
-            return true;
-          },
+          'Shift-Enter': (state, dispatch, view) =>
+            preferences.enterForNewline ? this.submit() : newline(state, dispatch, view),
         }),
         keymap(baseKeymap),
       ],

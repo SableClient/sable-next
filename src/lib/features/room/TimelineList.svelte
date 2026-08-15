@@ -40,7 +40,7 @@
     unreadCountAfter,
     visibleTimelineItems,
   } from './timeline-format';
-  import { timelinePreferences } from '$lib/settings/timeline-preferences.svelte';
+  import { preferences } from '$lib/settings/preferences.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
   interface Props {
@@ -91,7 +91,7 @@
     nearLatest = $bindable(true),
   }: Props = $props();
   let folded = $derived(
-    foldEventRuns(visibleTimelineItems(timeline.items, timelinePreferences, { readOnly }))
+    foldEventRuns(visibleTimelineItems(timeline.items, preferences, { readOnly }))
   );
   let visibleItems = $derived(folded.items);
   let personas = $derived(personasByEventId(timeline.items));
@@ -344,7 +344,7 @@
     }
     // `getComputedStyle` flushes style and the estimator runs per row.
     const rem = rootFontSize();
-    const layout = timelinePreferences.layout;
+    const layout = preferences.layout;
     instance.setOptions({
       count: items.length,
       getScrollElement: () => viewport,
@@ -510,7 +510,10 @@
   >
 {/if}
 
-<div class="timeline-content" style={TIMELINE_LAYOUT_STYLE}>
+<div
+  class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
+  style={TIMELINE_LAYOUT_STYLE}
+>
   {#if timelineDebugEnabledForView && timelineDebugSample}
     <aside class="timeline-debug">
       <strong>Timeline debug</strong>
@@ -550,7 +553,7 @@
       role="log"
     >
       <div
-        class={['items', `layout-${timelinePreferences.layout}`]}
+        class={['items', `layout-${preferences.layout}`]}
         style:height={String($virtualizer.getTotalSize()) + 'px'}
       >
         {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
@@ -589,7 +592,7 @@
                   {onDelete}
                   {canRedactOthers}
                   {members}
-                  layout={timelinePreferences.layout}
+                  layout={preferences.layout}
                   {onJumpToEvent}
                   onPersonaOpenChange={setPersonaOpen}
                   {roomId}
@@ -630,6 +633,16 @@
     flex-direction: column;
     min-height: 0;
     position: relative;
+  }
+
+  .timeline-content.spacing-compact {
+    --timeline-row-gap: var(--space-compact);
+    --timeline-row-padding: 0.125rem;
+  }
+
+  .timeline-content.spacing-roomy {
+    --timeline-row-gap: var(--space-2);
+    --timeline-row-padding: var(--space-1);
   }
 
   .timeline-viewport {

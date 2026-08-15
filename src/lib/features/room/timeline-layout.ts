@@ -1,6 +1,6 @@
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 
-import type { TimelineLayout } from '$lib/settings/timeline-preferences.svelte';
+import type { TimelineLayout } from '$lib/settings/preferences.svelte';
 
 import { isCollapsed } from './timeline-format';
 

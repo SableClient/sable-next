@@ -18,6 +18,7 @@
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
 
+  import { preferences } from '$lib/settings/preferences.svelte';
   import MembersDrawer from './MembersDrawer.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -77,7 +78,7 @@
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
   let typingLabel = $derived.by(() => {
-    if (typingUserIds.length === 0) return null;
+    if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
     const names = typingUserIds.slice(0, 3).map(typingMemberName);
     if (names.some((name) => name === null)) return $i18n.t('timeline.unknownTyping');
     if (names.length === 1) return $i18n.t('timeline.oneTyping', { name: names[0] });
@@ -293,6 +294,7 @@
   }
 
   async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
+    if (!preferences.sendTypingNotifications) return;
     await core.setTyping(targetRoomId, typing);
   }
 
@@ -305,6 +307,7 @@
   }
 
   async function markRead(eventId: string): Promise<void> {
+    if (!preferences.sendReadReceipts) return;
     await core.markRead(resolvedRoomId, eventId);
   }
 
@@ -407,13 +410,15 @@
           onEditLast={editLastOwnMessage}
         >
           {#snippet statusTrailing()}
-            <RoomReadReceipts
-              readers={latestReadBy}
-              members={receiptMembers}
-              loading={memberLoader.loading}
-              visible={timelineAtBottom}
-              onMemberProfile={openProfile}
-            />
+            {#if !preferences.hideReadReceipts}
+              <RoomReadReceipts
+                readers={latestReadBy}
+                members={receiptMembers}
+                loading={memberLoader.loading}
+                visible={timelineAtBottom}
+                onMemberProfile={openProfile}
+              />
+            {/if}
           {/snippet}
         </RoomComposer>
       {/key}

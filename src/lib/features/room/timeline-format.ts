@@ -1,6 +1,7 @@
 import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
-import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
+import { preferences } from '$lib/settings/preferences.svelte';
+import type { TimelinePreferences } from '$lib/settings/preferences.svelte';
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
@@ -211,7 +212,12 @@ export function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
+    ...(preferences.hour24Clock ? { hour12: false } : {}),
   });
+}
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
 }
 
 export function formatDate(timestamp: number): string {
@@ -220,5 +226,18 @@ export function formatDate(timestamp: number): string {
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
   if (date.toDateString() === today.toDateString()) return 'Today';
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = String(date.getFullYear());
+  switch (preferences.dateFormat) {
+    case 'dmy':
+      return `${day}/${month}/${year}`;
+    case 'mdy':
+      return `${month}/${day}/${year}`;
+    case 'ymd':
+      return `${year}-${month}-${day}`;
+    default:
+      return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  }
 }

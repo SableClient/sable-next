@@ -7,15 +7,25 @@
     description?: string;
     headingId: string;
     class?: ClassValue;
+    icon?: Snippet;
     actions?: Snippet;
     children?: Snippet;
   };
 
-  let { title, description, headingId, class: className = '', actions, children }: Props = $props();
+  let {
+    title,
+    description,
+    headingId,
+    class: className = '',
+    icon,
+    actions,
+    children,
+  }: Props = $props();
 </script>
 
 <section class={['settings-section', className]} aria-labelledby={headingId}>
   <header class="settings-section-header">
+    {#if icon}<span class="settings-section-icon" aria-hidden="true">{@render icon()}</span>{/if}
     <div class="settings-section-heading">
       <h2 id={headingId}>{title}</h2>
       {#if description}<p>{description}</p>{/if}
@@ -42,7 +52,25 @@
   }
 
   .settings-section-heading {
+    flex: 1;
     min-width: 0;
+  }
+
+  .settings-section-icon {
+    align-items: center;
+    background: var(--sable-surface-container);
+    border-radius: var(--radius);
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    flex: 0 0 auto;
+    height: var(--control-height-medium);
+    justify-content: center;
+    width: var(--control-height-medium);
+  }
+
+  .settings-section-icon :global(svg) {
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
   }
 
   h2 {

@@ -3,11 +3,6 @@
   import MobileNavDrawer from '$lib/ui/MobileNavDrawer.svelte';
   import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
   import DeviceVerificationDialog from '$lib/features/settings/DeviceVerificationDialog.svelte';
-  import SettingsPanel from '$lib/features/settings/SettingsPanel.svelte';
-  import {
-    closeSettingsOverlay,
-    settingsOverlay,
-  } from '$lib/features/settings/settings-overlay.svelte';
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
 
@@ -30,10 +25,6 @@
 </div>
 
 <DeviceVerificationDialog />
-
-{#if appLayout.matches && settingsOverlay.open}
-  <SettingsPanel mode="overlay" open={settingsOverlay.open} onClose={closeSettingsOverlay} />
-{/if}
 
 <style>
   .app-shell {

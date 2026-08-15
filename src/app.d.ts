@@ -5,7 +5,10 @@ declare global {
     // interface Error {}
     // interface Locals {}
     // interface PageData {}
-    // interface PageState {}
+    interface PageState {
+      /** Settings opened as a shallow route over the page it was opened from. */
+      settings?: { section: string };
+    }
     // interface Platform {}
   }
 }

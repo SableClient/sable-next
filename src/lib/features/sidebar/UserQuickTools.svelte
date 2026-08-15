@@ -3,9 +3,9 @@
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
   import {
-    openSettingsOverlay,
-    settingsOverlay,
-  } from '$lib/features/settings/settings-overlay.svelte';
+    defaultSettingsSection,
+    openSettingsOver,
+  } from '$lib/features/settings/settings-navigation';
   import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
@@ -38,16 +38,15 @@
 
   function activateTool(event: MouseEvent, href: string): void {
     if (href === '/settings' && !mobile) {
-      event.preventDefault();
-      openSettingsOverlay();
-      return;
+      openSettingsOver(event, defaultSettingsSection());
+      if (event.defaultPrevented) return;
     }
 
     onNavigate?.(href);
   }
 
   function isToolActive(href: string): boolean {
-    return page.url.pathname.startsWith(href) || (href === '/settings' && settingsOverlay.open);
+    return page.url.pathname.startsWith(href);
   }
 
   let mobileSelectedIndex = $derived(mobileTools.findIndex((item) => isToolActive(item.href)));

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import type { Snippet } from 'svelte';
   import SettingsPanel from '$lib/features/settings/SettingsPanel.svelte';
 
@@ -9,4 +10,4 @@
   let { children }: Props = $props();
 </script>
 
-<SettingsPanel>{@render children()}</SettingsPanel>
+<SettingsPanel section={page.params.section ?? null}>{@render children()}</SettingsPanel>
