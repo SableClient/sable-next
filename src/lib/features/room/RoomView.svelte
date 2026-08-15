@@ -12,6 +12,7 @@
   import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
   import { activeRoomTimeline } from '$lib/rooms/timeline.svelte';
   import RoomComposer from '$lib/features/composer/RoomComposer.svelte';
+  import type { ComposerContext } from '$lib/features/composer/composer-context';
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
@@ -43,12 +44,7 @@
   let profileAnchor = $state<HTMLElement | null>(null);
   let profile = $state<ProfileView | null>(null);
   let profileFailed = $state(false);
-  let composerContext = $state<{
-    kind: 'reply' | 'edit';
-    eventId: string;
-    sender?: string | null;
-    body: string;
-  } | null>(null);
+  let composerContext = $state<ComposerContext | null>(null);
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
   let typingUserIds = $state.raw<string[]>([]);
