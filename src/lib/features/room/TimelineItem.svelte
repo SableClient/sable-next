@@ -517,17 +517,17 @@
 {:else if item.content.kind === 'timeline_start'}
   <p class="separator">{$i18n.t('timeline.start')}</p>
 {:else if item.content.kind === 'read_marker'}
-  <p class="unread">
-    <span>
-      {unreadCount > 0
-        ? $i18n.t('timeline.unreadCount', { count: unreadCount })
-        : $i18n.t('timeline.readMarker')}
-    </span>
-  </p>
+  {#if unreadCount > 0}
+    <p class="unread">
+      <span>{$i18n.t('timeline.unreadCount', { count: unreadCount })}</span>
+    </p>
+  {:else}
+    <p class="read-marker"><span>{$i18n.t('timeline.readMarker')}</span></p>
+  {/if}
 {:else}
   <p class="state redacted">
     <span class="state-rail" aria-hidden="true"></span>
-    {$i18n.t('timeline.redacted')}
+    <span>{$i18n.t('timeline.redacted')}</span>
   </p>
 {/if}
 
@@ -1059,8 +1059,13 @@
     margin-inline-start: 0.75rem;
   }
 
-  .redacted {
-    font-style: italic;
+  .redacted span {
+    align-items: center;
+    border: 1px dashed var(--sable-surface-var-container-line);
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.125rem var(--space-1);
   }
 
   .debug-event {
@@ -1111,11 +1116,12 @@
 
   .undecryptable {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: 1px dashed var(--sable-surface-var-container-line);
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin-inline-start: calc(var(--avatar-size-small) + 0.625rem);
+    max-width: 32rem;
     padding: 0.375rem 0.5rem;
     width: fit-content;
   }
@@ -1132,23 +1138,43 @@
 
   .date-divider::before,
   .date-divider::after {
-    background: var(--sable-surface-var-container);
+    border-top: 1px solid var(--sable-bg-container-line);
     content: '';
     flex: 1;
-    height: 1px;
   }
 
   .date-divider span {
     background: var(--sable-surface-var-container);
-    border-radius: 999px;
-    padding: 0.125rem 0.625rem;
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius-pill);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    padding: 0.125rem var(--space-2);
+    text-transform: uppercase;
   }
 
-  .unread {
+  .unread,
+  .read-marker {
     align-items: center;
     display: flex;
     gap: 0.5rem;
+    margin: 0;
     padding: 0.25rem 0;
+  }
+
+  /* A different job from the unread separator, so a different family. */
+  .read-marker::before {
+    border-top: 1px solid var(--sable-success-main);
+    content: '';
+    flex: 1;
+  }
+
+  .read-marker span {
+    color: var(--sable-success-main);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .unread::before {
