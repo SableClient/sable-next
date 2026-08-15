@@ -75,6 +75,7 @@ test('a per-message profile takes the sender position and names the account behi
       pronouns: [{ summary: 'they/them', language: null }],
       color_on_light: '#4f7a3a',
       color_on_dark: '#9fd07c',
+      has_fallback: false,
     },
   };
   const instance = mount(TimelineItem, {

@@ -1,0 +1,10 @@
+.avatar-button {
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  display: block;
+  flex: 0 0 auto;
+  height: var(--avatar-size-small);
+  padding: 0;
+}

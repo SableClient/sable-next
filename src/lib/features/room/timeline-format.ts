@@ -1,3 +1,4 @@
+import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
 
@@ -73,6 +74,18 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
     if (!item.is_own && MESSAGE_KINDS.has(item.content.kind)) count += 1;
   }
   return count;
+}
+
+export function personasByEventId(
+  items: readonly TimelineItemView[]
+): Map<string, PerMessageProfileView> {
+  const personas = new Map<string, PerMessageProfileView>();
+  for (const item of items) {
+    if (item.event_id && item.per_message_profile) {
+      personas.set(item.event_id, item.per_message_profile);
+    }
+  }
+  return personas;
 }
 
 const FOLDABLE_KINDS = new Set(['membership', 'profile_change', 'state_event']);

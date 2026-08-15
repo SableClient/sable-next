@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
   import type { TimelineItemView } from '@/generated/TimelineItemView';
 
   import { i18n } from '$lib/i18n';
@@ -9,9 +10,11 @@
   import FormattedBody from './FormattedBody.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
+  import PersonaProfile from './PersonaProfile.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import type { MatrixLink } from './matrix-link';
   import { stateEventText } from './state-event-text';
+  import './avatar-button.css';
   import {
     formatDate,
     formatTime,
@@ -24,6 +27,7 @@
     item: TimelineItemView;
     collapsed: boolean;
     unreadCount?: number;
+    replyPersona?: PerMessageProfileView | null;
     roomId?: string;
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -35,12 +39,14 @@
     onReply?: (eventId: string) => void;
     onEdit?: (eventId: string, body: string) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
+    onPersonaOpenChange?: (open: boolean) => void;
   }
 
   let {
     item,
     collapsed,
     unreadCount = 0,
+    replyPersona = null,
     roomId = '',
     highlighted = false,
     onMatrixLink,
@@ -52,14 +58,33 @@
     onReply,
     onEdit,
     onDelete,
+    onPersonaOpenChange,
   }: Props = $props();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
   let persona = $derived(item.per_message_profile);
   let senderName = $derived(persona?.display_name ?? accountName);
   let senderAvatar = $derived(persona?.avatar_url ?? item.sender_avatar);
-  let personaTint = $derived(
-    persona && (persona.color_on_light ?? persona.color_on_dark) !== null ? persona : null
+  let personaTint = $derived(tinted(persona));
+  let replyName = $derived(
+    replyPersona?.display_name ??
+      item.in_reply_to?.sender_name ??
+      item.in_reply_to?.sender ??
+      $i18n.t('timeline.unknownSender')
   );
+  let replyBody = $derived(stripFallback(item.in_reply_to?.body ?? '', replyPersona));
+
+  function tinted(profile: PerMessageProfileView | null): PerMessageProfileView | null {
+    return profile && (profile.color_on_light ?? profile.color_on_dark) !== null ? profile : null;
+  }
+
+  function stripFallback(body: string, profile: PerMessageProfileView | null): string {
+    if (!profile) return body;
+    const name = profile.display_name?.trim();
+    if (name && body.startsWith(`${name}: `)) return body.slice(name.length + 2);
+    if (!profile.has_fallback) return body;
+    const separator = body.indexOf(': ');
+    return separator === -1 ? body : body.slice(separator + 2);
+  }
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let jumbo = $derived(
     item.content.kind === 'message' && !item.content.emote
@@ -123,6 +148,7 @@
   const LONG_PRESS_SLOP_PX = 10;
   let sheetOpen = $state(false);
   let deleteOpen = $state(false);
+  let messageRow = $state<HTMLElement | null>(null);
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
 
@@ -166,10 +192,15 @@
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
   }
+
+  function openAccountFromPersona(): void {
+    if (item.sender && messageRow) onSenderProfile?.(item.sender, messageRow);
+  }
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
   <article
+    bind:this={messageRow}
     class={['message', { collapsed, pending, highlighted, persona: personaTint }]}
     style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
     style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
@@ -192,7 +223,24 @@
       />
     {/if}
     {#if !collapsed}
-      {#if item.sender && onSenderProfile}
+      {#if persona && item.sender}
+        <PersonaProfile
+          profile={persona}
+          accountId={item.sender}
+          {accountName}
+          label={$i18n.t('timeline.personaProfile', { name: senderName })}
+          onOpenAccount={openAccountFromPersona}
+          onOpenChange={onPersonaOpenChange}
+        >
+          <Avatar
+            class="message-avatar"
+            src={senderAvatar}
+            size="small"
+            color={avatarColor}
+            initials={initials(senderName)}
+          />
+        </PersonaProfile>
+      {:else if item.sender && onSenderProfile}
         <button
           class="avatar-button"
           type="button"
@@ -247,13 +295,14 @@
         </header>
       {/if}
       {#if item.in_reply_to}
-        <p class="reply-preview">
-          <strong
-            >{item.in_reply_to.sender_name ??
-              item.in_reply_to.sender ??
-              $i18n.t('timeline.unknownSender')}</strong
-          >
-          {item.in_reply_to.body ?? ''}
+        {@const tint = tinted(replyPersona)}
+        <p
+          class={['reply-preview', { persona: tint }]}
+          style:--pmp-on-light={tint?.color_on_light ?? undefined}
+          style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+        >
+          <strong>{replyName}</strong>
+          {replyBody}
         </p>
       {/if}
       {#if item.content.kind === 'message' && item.content.emote}
@@ -482,17 +531,6 @@
     color: var(--sable-primary-on-main);
   }
 
-  .avatar-button {
-    background: none;
-    border: 0;
-    border-radius: var(--radius-pill);
-    cursor: pointer;
-    display: block;
-    flex: 0 0 auto;
-    height: var(--avatar-size-small);
-    padding: 0;
-  }
-
   .message-content {
     flex: 1;
     min-width: 0;
@@ -509,24 +547,36 @@
     font-weight: var(--font-weight-bold);
   }
 
-  .message.persona {
-    --pmp-name-floor: 38%;
-    --pmp-name: var(--pmp-on-light, var(--sable-sec-on-container));
-    --pmp-ink: color-mix(
-      in oklab,
-      var(--pmp-name) calc(100% - var(--pmp-name-floor)),
-      var(--sable-bg-on-container)
-    );
+  .persona {
+    --pmp-ink: var(--pmp-on-light, var(--sable-sec-on-container));
   }
 
   @media (prefers-color-scheme: dark) {
-    :global(:root:not(.light)) .message.persona {
-      --pmp-name: var(--pmp-on-dark, var(--sable-sec-on-container));
+    .persona {
+      --pmp-ink: var(--pmp-on-dark, var(--sable-sec-on-container));
+    }
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    .persona {
+      --pmp-ink: oklch(
+        from var(--pmp-on-light, var(--sable-sec-on-container)) clamp(0.25, l, 0.52)
+          clamp(0, c, 0.19) h
+      );
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .persona {
+        --pmp-ink: oklch(
+          from var(--pmp-on-dark, var(--sable-sec-on-container)) clamp(0.72, l, 0.92)
+            clamp(0, c, 0.16) h
+        );
+      }
     }
   }
 
   .message.persona :global(.message-avatar) {
-    background: color-mix(in oklab, var(--pmp-name) 18%, var(--sable-surface-var-container));
+    background: color-mix(in oklab, var(--pmp-ink) 18%, var(--sable-surface-var-container));
     color: var(--pmp-ink);
   }
 
@@ -684,6 +734,10 @@
   .reply-preview strong {
     color: var(--sable-sec-on-container);
     margin-right: 0.25rem;
+  }
+
+  .reply-preview.persona strong {
+    color: var(--pmp-ink);
   }
 
   .reaction {

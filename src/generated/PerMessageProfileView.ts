@@ -11,4 +11,9 @@ export type PerMessageProfileView = { id: string | null, display_name: string | 
  * Author-chosen, so it is arbitrary and not theme-aware. The UI has to
  * hold it to a legibility floor against whatever surface is active.
  */
-color_on_light: string | null, color_on_dark: string | null, };
+color_on_light: string | null, color_on_dark: string | null, 
+/**
+ * The sender prefixed the body with the profile name for clients that
+ * cannot read the profile.
+ */
+has_fallback: boolean, };

@@ -25,7 +25,10 @@ use matrix_sdk::ruma::events::{
     AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
 
-use crate::matrix_html::{display_html, strip_profile_fallback_body, strip_profile_fallback_html};
+use crate::matrix_html::{
+    display_html, has_profile_fallback_html, strip_profile_fallback_body,
+    strip_profile_fallback_html,
+};
 use crate::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView,
@@ -350,6 +353,10 @@ fn per_message_profile(event: &EventTimelineItem) -> Option<PerMessageProfileVie
         pronouns: pronoun_sets(profile.get("io.fsky.nyx.pronouns")),
         color_on_light: color("on_light"),
         color_on_dark: color("on_dark"),
+        has_fallback: profile
+            .get("has_fallback")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
     })
 }
 
@@ -377,12 +384,18 @@ fn text_message(
     message: &matrix_sdk_ui::timeline::Message,
     profile: Option<&PerMessageProfileView>,
 ) -> TimelineItemContentView {
+    let formatted = formatted_body(message.msgtype());
+    let known = formatted.as_deref().is_some_and(has_profile_fallback_html)
+        || profile.is_some_and(|profile| profile.has_fallback);
     let body = strip_profile_fallback_body(
         message.body(),
         profile.and_then(|profile| profile.display_name.as_deref()),
+        known,
     );
-    let formatted = formatted_body(message.msgtype()).map(|formatted| match profile {
-        Some(_) => strip_profile_fallback_html(&formatted),
+    let formatted = formatted.map(|formatted| match profile {
+        Some(profile) => {
+            strip_profile_fallback_html(&formatted, profile.display_name.as_deref(), known)
+        }
         None => formatted,
     });
 

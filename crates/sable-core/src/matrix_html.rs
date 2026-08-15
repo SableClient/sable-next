@@ -238,35 +238,65 @@ fn linkify_plain_text(text: &str) -> String {
 /// the prefix in would print the name twice.
 ///
 /// Must run before sanitising, which drops the marker attribute.
-#[must_use]
-pub fn strip_profile_fallback_html(formatted: &str) -> String {
+/// The leading `<strong>` element and the text it wraps, when there is one.
+fn leading_strong(formatted: &str) -> Option<(&str, &str, usize)> {
     let trimmed = formatted.trim_start();
-    let Some(tag_end) = trimmed.find('>') else {
+    let tag_end = trimmed.find('>')?;
+    let open_tag = &trimmed[..=tag_end];
+    if !open_tag.starts_with("<strong") {
+        return None;
+    }
+    let close = trimmed[tag_end..].find("</strong>")?;
+    let text = &trimmed[tag_end + 1..tag_end + close];
+    let rest = tag_end + close + "</strong>".len();
+    Some((open_tag, text, rest))
+}
+
+#[must_use]
+pub fn has_profile_fallback_html(formatted: &str) -> bool {
+    leading_strong(formatted)
+        .is_some_and(|(open_tag, _, _)| open_tag.contains("data-mx-profile-fallback"))
+}
+
+/// Not every sender marks the element; some emit a bare `<strong>Name: </strong>`.
+/// Matching the profile name, or `has_fallback` plus a trailing colon, catches
+/// those without eating the sender's own emphasis.
+#[must_use]
+pub fn strip_profile_fallback_html(
+    formatted: &str,
+    display_name: Option<&str>,
+    known: bool,
+) -> String {
+    let Some((open_tag, text, rest)) = leading_strong(formatted) else {
         return formatted.to_owned();
     };
-    let open_tag = &trimmed[..=tag_end];
-    if !open_tag.starts_with("<strong") || !open_tag.contains("data-mx-profile-fallback") {
-        return formatted.to_owned();
+    let label = text.trim().trim_end_matches(':').trim();
+    let named = display_name
+        .map(str::trim)
+        .is_some_and(|name| !name.is_empty() && label == name);
+    let marked = open_tag.contains("data-mx-profile-fallback");
+    let fallback = marked || named || (known && text.trim_end().ends_with(':'));
+    if fallback {
+        formatted.trim_start()[rest..].trim_start().to_owned()
+    } else {
+        formatted.to_owned()
     }
-    trimmed[tag_end..].find("</strong>").map_or_else(
-        || formatted.to_owned(),
-        |close| {
-            trimmed[tag_end + close + "</strong>".len()..]
-                .trim_start()
-                .to_owned()
-        },
-    )
 }
 
 /// The plain-text half of the same fallback, which arrives as `Name: `.
+/// `known` comes from `has_fallback` or the HTML marker; without it only an
+/// exact name match is removed, so a plain `Yes: it shipped` survives.
 #[must_use]
-pub fn strip_profile_fallback_body(body: &str, display_name: Option<&str>) -> String {
-    let Some(name) = display_name.map(str::trim).filter(|name| !name.is_empty()) else {
+pub fn strip_profile_fallback_body(body: &str, display_name: Option<&str>, known: bool) -> String {
+    let name = display_name.map(str::trim).filter(|name| !name.is_empty());
+    if let Some(stripped) = name.and_then(|name| body.strip_prefix(&format!("{name}: "))) {
+        return stripped.to_owned();
+    }
+    if !known {
         return body.to_owned();
-    };
-    let prefix = format!("{name}: ");
-    body.strip_prefix(&prefix)
-        .map_or_else(|| body.to_owned(), ToOwned::to_owned)
+    }
+    body.split_once(": ")
+        .map_or_else(|| body.to_owned(), |(_, rest)| rest.to_owned())
 }
 
 /// The HTML the UI renders for a message: the sender's `formatted_body` once
@@ -291,38 +321,61 @@ mod tests {
     fn strips_the_per_message_profile_fallback() {
         assert_eq!(
             strip_profile_fallback_html(
-                "<strong data-mx-profile-fallback>Kris: </strong>hello there"
+                "<strong data-mx-profile-fallback>Kris: </strong>hello there",
+                None,
+                false
             ),
             "hello there"
         );
         assert_eq!(
-            strip_profile_fallback_body("Kris: hello there", Some("Kris")),
+            strip_profile_fallback_body("Kris: hello there", Some("Kris"), false),
+            "hello there"
+        );
+        assert_eq!(
+            strip_profile_fallback_body("Kris: hello there", Some("Robin"), true),
+            "hello there"
+        );
+        assert_eq!(
+            strip_profile_fallback_body("Kris: hello there", None, true),
             "hello there"
         );
     }
 
     #[test]
     fn leaves_markup_without_the_fallback_marker_alone() {
-        // A plain bold opener is the sender's own emphasis, not a fallback.
         assert_eq!(
-            strip_profile_fallback_html("<strong>Kris: </strong>hello"),
+            strip_profile_fallback_html("<strong>Kris: </strong>hello", Some("Robin"), false),
             "<strong>Kris: </strong>hello"
         );
-        // Only the exact `Name: ` prefix is a fallback; a mention is not.
         assert_eq!(
-            strip_profile_fallback_body("Kris: hello", Some("Robin")),
+            strip_profile_fallback_body("Kris: hello", Some("Robin"), false),
             "Kris: hello"
         );
         assert_eq!(
-            strip_profile_fallback_body("Kris: hello", None),
+            strip_profile_fallback_body("Kris: hello", None, false),
             "Kris: hello"
+        );
+    }
+
+    #[test]
+    fn strips_an_unmarked_bold_prefix_that_names_the_profile() {
+        assert_eq!(
+            strip_profile_fallback_html("<strong>Alice: </strong>hello", Some("Alice"), false),
+            "hello"
+        );
+        assert_eq!(
+            strip_profile_fallback_html("<strong>Alice: </strong>hello", None, true),
+            "hello"
         );
     }
 
     #[test]
     fn keeps_the_body_when_the_fallback_tag_is_unclosed() {
         let malformed = "<strong data-mx-profile-fallback>Kris: hello";
-        assert_eq!(strip_profile_fallback_html(malformed), malformed);
+        assert_eq!(
+            strip_profile_fallback_html(malformed, Some("Kris"), true),
+            malformed
+        );
     }
 
     #[test]

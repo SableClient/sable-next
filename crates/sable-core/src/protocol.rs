@@ -79,6 +79,10 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
+    ImagePacks {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
     UserProfile {
         #[ts(type = "string")]
         user_id: OwnedUserId,
@@ -96,6 +100,13 @@ pub enum Command {
         /// thread from the replied-to event.
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
+    },
+    SendSticker {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        /// `mxc://` only; the core rejects anything else.
+        url: String,
+        body: String,
     },
     /// `edited` on the view flips once the server has the replacement.
     EditMessage {
@@ -428,6 +439,9 @@ pub enum CommandOk {
     RoomMembers {
         members: Vec<MemberView>,
     },
+    ImagePacks {
+        packs: Vec<ImagePackView>,
+    },
     /// Boxed: the extended fields make this the widest variant by far.
     UserProfile {
         profile: Box<ProfileView>,
@@ -438,6 +452,7 @@ pub enum CommandOk {
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
+    SendSticker,
     EditMessage,
     FetchEventDetails,
     Redact,
@@ -891,6 +906,9 @@ pub struct PerMessageProfileView {
     /// hold it to a legibility floor against whatever surface is active.
     pub color_on_light: Option<String>,
     pub color_on_dark: Option<String>,
+    /// The sender prefixed the body with the profile name for clients that
+    /// cannot read the profile.
+    pub has_fallback: bool,
 }
 
 /// The SDK loads the body lazily, so it is absent for an event we have never
@@ -1093,6 +1111,49 @@ pub struct MemberView {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub power_level: i32,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ImagePackView {
+    /// The state key for a room pack, empty for the account's own pack. Unique
+    /// only together with `room_id`.
+    pub id: String,
+    pub origin: ImagePackOriginView,
+    pub room_id: Option<String>,
+    pub name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub attribution: Option<String>,
+    pub images: Vec<PackImageView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum ImagePackOriginView {
+    Account,
+    /// The room being viewed.
+    Room,
+    /// Another room, subscribed to account-wide.
+    Global,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct PackImageView {
+    pub shortcode: String,
+    /// Always `mxc://`; anything else is dropped when the pack is read.
+    pub url: String,
+    pub body: Option<String>,
+    pub usage: Vec<ImageUsageView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageUsageView {
+    Emoticon,
+    Sticker,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

@@ -17,6 +17,7 @@
   import {
     foldEventRuns,
     isCollapsed,
+    personasByEventId,
     unreadCountAfter,
     visibleTimelineItems,
   } from './timeline-format';
@@ -208,6 +209,8 @@
   }: Props = $props();
   let folded = $derived(foldEventRuns(visibleTimelineItems(timeline.items, timelinePreferences)));
   let visibleItems = $derived(folded.items);
+  let personas = $derived(personasByEventId(timeline.items));
+  let personaOpen = $state(false);
   let viewport = $state<HTMLDivElement | null>(null);
   let userScrollPending = false;
   let upwardScrollPending = false;
@@ -859,6 +862,10 @@
     };
   }
 
+  function setPersonaOpen(open: boolean): void {
+    personaOpen = open;
+  }
+
   function scrollLock(locked: boolean) {
     return (node: HTMLElement) => {
       if (!locked) return;
@@ -928,7 +935,7 @@
       aria-label={$i18n.t('timeline.label')}
       onscroll={onScroll}
       {@attach userScrollMarker}
-      {@attach scrollLock(scrollLocked)}
+      {@attach scrollLock(scrollLocked || personaOpen)}
       role="log"
     >
       <div class="items" style:height={String($virtualizer.getTotalSize()) + 'px'}>
@@ -953,6 +960,9 @@
                   unreadCount={item.content.kind === 'read_marker'
                     ? unreadCountAfter(visibleItems, virtualItem.index)
                     : 0}
+                  replyPersona={item.in_reply_to
+                    ? (personas.get(item.in_reply_to.event_id) ?? null)
+                    : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
                   {onSenderProfile}
@@ -963,6 +973,7 @@
                   {onReply}
                   {onEdit}
                   {onDelete}
+                  onPersonaOpenChange={setPersonaOpen}
                   {roomId}
                 />
               {/if}
