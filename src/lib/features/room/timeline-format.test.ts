@@ -4,7 +4,12 @@ import type { TimelineItemView } from '@/generated/TimelineItemView';
 
 import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
 
-import { jumboEmojiLevel, readReceiptEventId, visibleTimelineItems } from './timeline-format';
+import {
+  foldEventRuns,
+  jumboEmojiLevel,
+  readReceiptEventId,
+  visibleTimelineItems,
+} from './timeline-format';
 
 const items = [{ event_id: '$latest' }] as TimelineItemView[];
 const visibleAtLatest = {
@@ -31,7 +36,7 @@ const defaults: TimelinePreferences = {
   showHiddenEvents: false,
 };
 
-function item(content: TimelineItemView['content'], id = content.kind): TimelineItemView {
+function item(content: TimelineItemView['content'], id: string = content.kind): TimelineItemView {
   return { id, content } as TimelineItemView;
 }
 
@@ -58,6 +63,23 @@ test('honours each toggle independently', () => {
     showHiddenEvents: true,
   });
   expect(shown.map((entry) => entry.content.kind)).toEqual(['profile_change', 'state_event']);
+});
+
+test('folds a contiguous run of three or more events behind its head', () => {
+  const left = item(
+    { kind: 'membership', user_id: '@c:b', change: 'left', display_name: null },
+    'c'
+  );
+  const run = [joined, renamed, left];
+  const folded = foldEventRuns([message, ...run, message]);
+
+  expect(folded.items).toEqual([message, joined, message]);
+  expect(folded.runs.get(joined.id)).toEqual(run);
+});
+
+test('leaves short runs and message-separated events unfolded', () => {
+  expect(foldEventRuns([joined, renamed]).runs.size).toBe(0);
+  expect(foldEventRuns([joined, message, renamed, message, topic]).runs.size).toBe(0);
 });
 
 test('drops a divider whose whole run was filtered out', () => {

@@ -11,6 +11,7 @@
   import MessageActionSheet from './MessageActionSheet.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import type { MatrixLink } from './matrix-link';
+  import { stateEventText } from './state-event-text';
   import {
     formatDate,
     formatTime,
@@ -152,18 +153,6 @@
 
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
-  }
-
-  function profileChangeText(
-    change: Extract<TimelineItemView['content'], { kind: 'profile_change' }>
-  ): string {
-    const user = change.display_name?.old ?? change.user_id;
-    if (change.display_name?.new) {
-      const key = change.display_name.old ? 'profileNameChanged' : 'profileNameSet';
-      return $i18n.t(`timeline.${key}`, { user, name: change.display_name.new });
-    }
-    if (change.display_name) return $i18n.t('timeline.profileNameRemoved', { user });
-    return $i18n.t('timeline.profileAvatarChanged', { user });
   }
 </script>
 
@@ -328,17 +317,10 @@
       {/if}
     </div>
   </article>
-{:else if item.content.kind === 'membership'}
+{:else if item.content.kind === 'membership' || item.content.kind === 'profile_change'}
   <p class="state">
     <span class="state-rail" aria-hidden="true"></span>
-    {$i18n.t(`timeline.membership.${item.content.change}`, {
-      user: item.content.display_name ?? item.content.user_id,
-    })}
-  </p>
-{:else if item.content.kind === 'profile_change'}
-  <p class="state">
-    <span class="state-rail" aria-hidden="true"></span>
-    {profileChangeText(item.content)}
+    {stateEventText(item, $i18n.t)}
   </p>
 {:else if item.content.kind === 'state_event'}
   <p class="debug-event">

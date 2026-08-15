@@ -13,7 +13,8 @@
   import TimelineItem from './TimelineItem.svelte';
   import type { MatrixLink } from './matrix-link';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
-  import { isCollapsed, visibleTimelineItems } from './timeline-format';
+  import FoldedEventRun from './FoldedEventRun.svelte';
+  import { foldEventRuns, isCollapsed, visibleTimelineItems } from './timeline-format';
   import { timelinePreferences } from '$lib/settings/timeline-preferences.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
@@ -200,7 +201,8 @@
     scrollLocked = false,
     nearLatest = $bindable(true),
   }: Props = $props();
-  let visibleItems = $derived(visibleTimelineItems(timeline.items, timelinePreferences));
+  let folded = $derived(foldEventRuns(visibleTimelineItems(timeline.items, timelinePreferences)));
+  let visibleItems = $derived(folded.items);
   let viewport = $state<HTMLDivElement | null>(null);
   let userScrollPending = false;
   let upwardScrollPending = false;
@@ -928,6 +930,7 @@
         {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
           {@const item = visibleItems[virtualItem.index]}
           {#if item}
+            {@const run = folded.runs.get(item.id)}
             <div
               class="item"
               data-event-id={item.event_id ?? undefined}
@@ -936,21 +939,25 @@
               style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
               {@attach measure}
             >
-              <TimelineItem
-                {item}
-                collapsed={isCollapsed(visibleItems, virtualItem.index)}
-                highlighted={focusEventId !== null && item.event_id === focusEventId}
-                {onMatrixLink}
-                {onSenderProfile}
-                {onRetrySend}
-                {onCancelSend}
-                {currentUserId}
-                {onToggleReaction}
-                {onReply}
-                {onEdit}
-                {onDelete}
-                {roomId}
-              />
+              {#if run}
+                <FoldedEventRun {run} />
+              {:else}
+                <TimelineItem
+                  {item}
+                  collapsed={isCollapsed(visibleItems, virtualItem.index)}
+                  highlighted={focusEventId !== null && item.event_id === focusEventId}
+                  {onMatrixLink}
+                  {onSenderProfile}
+                  {onRetrySend}
+                  {onCancelSend}
+                  {currentUserId}
+                  {onToggleReaction}
+                  {onReply}
+                  {onEdit}
+                  {onDelete}
+                  {roomId}
+                />
+              {/if}
             </div>
           {/if}
         {/each}
