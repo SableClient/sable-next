@@ -1,15 +1,26 @@
+export type TimelineLayout = 'modern' | 'compact' | 'bubble';
+
 export interface TimelinePreferences {
+  layout: TimelineLayout;
   hideMembershipEvents: boolean;
   hideProfileChanges: boolean;
+  hideMemberInReadOnly: boolean;
+  showTombstoneEvents: boolean;
   showHiddenEvents: boolean;
+  showNonStandardEvents: boolean;
 }
 
 const STORAGE_KEY = 'sable-timeline-preferences';
+const LAYOUTS: TimelineLayout[] = ['modern', 'compact', 'bubble'];
 
 const DEFAULTS: TimelinePreferences = {
+  layout: 'modern',
   hideMembershipEvents: false,
   hideProfileChanges: true,
+  hideMemberInReadOnly: true,
+  showTombstoneEvents: false,
   showHiddenEvents: false,
+  showNonStandardEvents: false,
 };
 
 function load(): TimelinePreferences {
@@ -26,7 +37,12 @@ function load(): TimelinePreferences {
   const record = stored as Record<string, unknown>;
   const preferences = { ...DEFAULTS };
   for (const key of Object.keys(DEFAULTS) as (keyof TimelinePreferences)[]) {
-    if (typeof record[key] === 'boolean') preferences[key] = record[key];
+    const value = record[key];
+    if (key === 'layout') {
+      if (LAYOUTS.includes(value as TimelineLayout)) preferences.layout = value as TimelineLayout;
+    } else if (typeof value === 'boolean') {
+      preferences[key] = value;
+    }
   }
   return preferences;
 }

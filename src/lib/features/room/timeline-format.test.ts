@@ -6,6 +6,7 @@ import type { TimelinePreferences } from '$lib/settings/timeline-preferences.sve
 
 import {
   foldEventRuns,
+  isCollapsed,
   jumboEmojiLevel,
   readReceiptEventId,
   visibleTimelineItems,
@@ -31,9 +32,13 @@ test('does not mark permalink context events as read', () => {
 });
 
 const defaults: TimelinePreferences = {
+  layout: 'modern',
   hideMembershipEvents: false,
   hideProfileChanges: true,
+  hideMemberInReadOnly: true,
+  showTombstoneEvents: false,
   showHiddenEvents: false,
+  showNonStandardEvents: false,
 };
 
 function item(content: TimelineItemView['content'], id: string = content.kind): TimelineItemView {
@@ -58,11 +63,54 @@ test('hides profile changes and raw state events by default, keeping joins', () 
 
 test('honours each toggle independently', () => {
   const shown = visibleTimelineItems([joined, renamed, topic], {
+    ...defaults,
     hideMembershipEvents: true,
     hideProfileChanges: false,
     showHiddenEvents: true,
+    showNonStandardEvents: true,
   });
   expect(shown.map((entry) => entry.content.kind)).toEqual(['profile_change', 'state_event']);
+});
+
+const removed = item({ kind: 'redacted' });
+
+test('keeps tombstones out unless the preference asks for them', () => {
+  expect(visibleTimelineItems([removed, message], defaults)).toEqual([message]);
+  expect(
+    visibleTimelineItems([removed, message], { ...defaults, showTombstoneEvents: true })
+  ).toEqual([removed, message]);
+});
+
+test('drops member events in a read-only room', () => {
+  expect(visibleTimelineItems([joined, message], defaults, { readOnly: true })).toEqual([message]);
+  expect(
+    visibleTimelineItems(
+      [joined, message],
+      { ...defaults, hideMemberInReadOnly: false },
+      {
+        readOnly: true,
+      }
+    )
+  ).toEqual([joined, message]);
+});
+
+test('gates raw state events behind both developer switches', () => {
+  const master = { ...defaults, showHiddenEvents: true };
+  expect(visibleTimelineItems([topic], master)).toEqual([]);
+  expect(visibleTimelineItems([topic], { ...master, showNonStandardEvents: true })).toEqual([
+    topic,
+  ]);
+});
+
+test("keeps a persona message out of the account's collapsed run", () => {
+  const account = item({ kind: 'message', body: 'a', html: 'a', emote: false, edited: false }, 'a');
+  const persona = item({ kind: 'message', body: 'b', html: 'b', emote: false, edited: false }, 'b');
+  const items = [
+    { ...account, sender: '@a:b', timestamp: 0 },
+    { ...persona, sender: '@a:b', timestamp: 1000, per_message_profile: { id: 'kris' } },
+  ] as TimelineItemView[];
+
+  expect(isCollapsed(items, 1)).toBe(false);
 });
 
 test('folds a contiguous run of three or more events behind its head', () => {

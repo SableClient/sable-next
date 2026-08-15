@@ -23,14 +23,27 @@ function isAnnotation(item: TimelineItemView): boolean {
   return kind === 'date_divider' || kind === 'read_marker' || kind === 'timeline_start';
 }
 
-function isVisibleEvent(item: TimelineItemView, preferences: TimelinePreferences): boolean {
+export interface TimelineFilterContext {
+  readOnly?: boolean;
+}
+
+function isVisibleEvent(
+  item: TimelineItemView,
+  preferences: TimelinePreferences,
+  context: TimelineFilterContext
+): boolean {
+  const memberEventsHidden = Boolean(context.readOnly) && preferences.hideMemberInReadOnly;
   switch (item.content.kind) {
     case 'membership':
-      return !preferences.hideMembershipEvents && item.content.change !== 'other';
+      return (
+        !preferences.hideMembershipEvents && !memberEventsHidden && item.content.change !== 'other'
+      );
     case 'profile_change':
-      return !preferences.hideProfileChanges;
+      return !preferences.hideProfileChanges && !memberEventsHidden;
+    case 'redacted':
+      return preferences.showTombstoneEvents;
     case 'state_event':
-      return preferences.showHiddenEvents;
+      return preferences.showHiddenEvents && preferences.showNonStandardEvents;
     default:
       return true;
   }
@@ -38,9 +51,10 @@ function isVisibleEvent(item: TimelineItemView, preferences: TimelinePreferences
 
 export function visibleTimelineItems(
   items: readonly TimelineItemView[],
-  preferences: TimelinePreferences
+  preferences: TimelinePreferences,
+  context: TimelineFilterContext = {}
 ): TimelineItemView[] {
-  const kept = items.filter((item) => isVisibleEvent(item, preferences));
+  const kept = items.filter((item) => isVisibleEvent(item, preferences, context));
 
   const visible: TimelineItemView[] = [];
   let hasEventBelow = false;
@@ -141,6 +155,13 @@ export function senderColor(sender: string | null): string {
   return senderColors[Math.abs(hash) % senderColors.length];
 }
 
+function personaKey(item: TimelineItemView): string {
+  const profile = item.per_message_profile;
+  if (!profile) return '';
+  return profile.id ?? profile.display_name ?? '';
+}
+
+// Collapsing on sender alone would hide a persona behind the account's header.
 export function isCollapsed(items: readonly TimelineItemView[], index: number): boolean {
   if (index === 0) return false;
   const current = items[index];
@@ -150,6 +171,7 @@ export function isCollapsed(items: readonly TimelineItemView[], index: number): 
     previous.content.kind === 'message' &&
     current.sender !== null &&
     current.sender === previous.sender &&
+    personaKey(current) === personaKey(previous) &&
     current.timestamp - previous.timestamp < 120_000
   );
 }

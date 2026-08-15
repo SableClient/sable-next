@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import type { ProfileView } from '@/generated/ProfileView';
+  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -49,6 +50,7 @@
     body: string;
   } | null>(null);
   let profileRequestId = 0;
+  let permissions = $state<RoomPermissionsView | null>(null);
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
   let latestReadBy = $derived.by(() => {
@@ -102,6 +104,23 @@
       typingUserIds = event.user_ids.filter((userId) => userId !== core.session?.user_id);
       if (typingUserIds.length > 0) void loadMembers();
     });
+  });
+
+  $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    permissions = null;
+    let current = true;
+    void core
+      .roomPermissions(activeRoomId)
+      .then((next) => {
+        if (current) permissions = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] permissions unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
   });
 
   $effect(() => {
@@ -206,18 +225,26 @@
     void goto(resolve('/home'));
   }
 
-  async function sendMessage(targetRoomId: string, body: string): Promise<void> {
+  async function sendMessage(
+    targetRoomId: string,
+    body: string,
+    formatted: string | null = null
+  ): Promise<void> {
     const pending = composerContext;
     composerContext = null;
     if (pending?.kind === 'edit') {
       await core.editMessage(targetRoomId, pending.eventId, body);
       return;
     }
-    await core.sendMessage(targetRoomId, body, pending?.eventId ?? null);
+    await core.sendMessage(targetRoomId, body, pending?.eventId ?? null, formatted);
   }
 
   async function sendAttachment(targetRoomId: string, file: File): Promise<void> {
     await core.sendAttachment(targetRoomId, file);
+  }
+
+  async function sendSticker(targetRoomId: string, url: string, body: string): Promise<void> {
+    await core.sendSticker(targetRoomId, url, body);
   }
 
   async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
@@ -248,8 +275,8 @@
     void core.toggleReaction(resolvedRoomId, eventId, key);
   }
 
-  function onDelete(eventId: string): void {
-    void core.redact(resolvedRoomId, eventId);
+  function onDelete(eventId: string, reason: string | null): void {
+    void core.redact(resolvedRoomId, eventId, reason);
   }
 
   function onReply(eventId: string): void {
@@ -291,6 +318,8 @@
         {onReply}
         {onEdit}
         roomId={resolvedRoomId}
+        readOnly={permissions ? !permissions.can_post : false}
+        canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}
         scrollLocked={profileOpen}
         bind:nearLatest={timelineAtBottom}
@@ -302,6 +331,7 @@
           roomId={resolvedRoomId}
           onSend={sendMessage}
           onSendAttachment={sendAttachment}
+          onSendSticker={sendSticker}
           onTyping={setTyping}
           {typingLabel}
           context={composerContext}

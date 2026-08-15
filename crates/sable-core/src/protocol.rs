@@ -79,6 +79,10 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
+    RoomPermissions {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
     ImagePacks {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -439,6 +443,7 @@ pub enum CommandOk {
     RoomMembers {
         members: Vec<MemberView>,
     },
+    RoomPermissions(RoomPermissionsView),
     ImagePacks {
         packs: Vec<ImagePackView>,
     },
@@ -890,6 +895,16 @@ pub struct TimelineItemView {
     /// MSC4144. When set, this is the identity to show as the sender; `sender`
     /// stays the account that actually sent it and must remain reachable.
     pub per_message_profile: Option<PerMessageProfileView>,
+}
+
+/// What this account may do in one room, resolved from `m.room.power_levels`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct RoomPermissionsView {
+    pub own_power_level: i32,
+    pub can_post: bool,
+    /// Redacting someone else's event. Your own needs no extra level.
+    pub can_redact_others: bool,
 }
 
 /// MSC4144 per-message profile, letting one account send under several

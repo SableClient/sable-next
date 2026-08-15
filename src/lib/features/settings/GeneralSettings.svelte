@@ -1,11 +1,18 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
   import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
+  import Switch from '$lib/ui/primitives/Switch.svelte';
   import { settingsCategories } from '$lib/settings/registry';
+  import type { SettingDefinition } from '$lib/settings/registry';
   import {
     setTimelinePreference,
     timelinePreferences,
   } from '$lib/settings/timeline-preferences.svelte';
+  import type { TimelineLayout } from '$lib/settings/timeline-preferences.svelte';
+
+  function gated(setting: SettingDefinition): boolean {
+    return setting.gatedBy !== undefined && !timelinePreferences[setting.gatedBy];
+  }
 </script>
 
 {#each settingsCategories as category (category.id)}
@@ -16,20 +23,40 @@
   >
     <ul class="settings">
       {#each category.items as setting (setting.key)}
-        <li>
-          <label>
-            <input
-              type="checkbox"
-              checked={timelinePreferences[setting.key]}
-              onchange={(event) => {
-                setTimelinePreference(setting.key, event.currentTarget.checked);
-              }}
-            />
-            <span>{$i18n.t(setting.name)}</span>
-          </label>
-          {#if setting.description}
-            <p>{$i18n.t(setting.description)}</p>
-          {/if}
+        {@const disabled = gated(setting)}
+        <li class={{ gated: setting.gatedBy !== undefined, disabled }}>
+          <div class="row">
+            <span class="copy">
+              <span class="name">{$i18n.t(setting.name)}</span>
+              {#if setting.description}
+                <span class="hint">{$i18n.t(setting.description)}</span>
+              {/if}
+            </span>
+            {#if setting.type === 'select'}
+              <select
+                {disabled}
+                aria-label={$i18n.t(setting.name)}
+                value={timelinePreferences[setting.key]}
+                onchange={(event) => {
+                  setTimelinePreference('layout', event.currentTarget.value as TimelineLayout);
+                }}
+              >
+                {#each setting.options as option (option.value)}
+                  <option value={option.value}>{$i18n.t(option.label)}</option>
+                {/each}
+              </select>
+            {:else}
+              {@const key = setting.key}
+              <Switch
+                {disabled}
+                label={$i18n.t(setting.name)}
+                checked={timelinePreferences[key]}
+                onCheckedChange={(checked: boolean) => {
+                  setTimelinePreference(key, checked);
+                }}
+              />
+            {/if}
+          </div>
         </li>
       {/each}
     </ul>
@@ -45,23 +72,43 @@
     padding: 0;
   }
 
-  label {
+  .gated {
+    border-inline-start: 1px solid var(--sable-surface-var-container-line);
+    padding-inline-start: var(--space-3);
+  }
+
+  .disabled {
+    opacity: 0.55;
+  }
+
+  .row {
     align-items: center;
-    cursor: pointer;
     display: flex;
+    gap: var(--space-3);
+    justify-content: space-between;
+  }
+
+  .copy {
+    display: grid;
+    min-width: 0;
+  }
+
+  .name {
     font-weight: var(--font-weight-medium);
-    gap: var(--space-1);
   }
 
-  input {
-    accent-color: var(--sable-primary-main);
-    height: 1rem;
-    width: 1rem;
-  }
-
-  p {
+  .hint {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: 0.125rem 0 0 calc(1rem + var(--space-1));
+  }
+
+  select {
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius);
+    color: inherit;
+    font: inherit;
+    font-size: var(--font-size-small);
+    padding: 0.25rem var(--space-1);
   }
 </style>

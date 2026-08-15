@@ -4,7 +4,9 @@ import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
 import type { AuthIntent } from '@/generated/AuthIntent';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
+import type { ImagePackView } from '@/generated/ImagePackView';
 import type { MemberView } from '@/generated/MemberView';
+import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
 import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
@@ -361,6 +363,19 @@ export class CoreClient {
     return response.members;
   }
 
+  async roomPermissions(roomId: string): Promise<RoomPermissionsView> {
+    const response = await this.ensureTransport().send({
+      type: 'room_permissions',
+      room_id: roomId,
+    });
+    return response;
+  }
+
+  async imagePacks(roomId: string): Promise<ImagePackView[]> {
+    const response = await this.ensureTransport().send({ type: 'image_packs', room_id: roomId });
+    return response.packs;
+  }
+
   async userProfile(userId: string): Promise<ProfileView> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.profileCache.get(userId);
@@ -448,14 +463,23 @@ export class CoreClient {
     return response.room_id;
   }
 
-  async sendMessage(roomId: string, body: string, inReplyTo: string | null = null): Promise<void> {
+  async sendMessage(
+    roomId: string,
+    body: string,
+    inReplyTo: string | null = null,
+    formatted: string | null = null
+  ): Promise<void> {
     await this.ensureTransport().send({
       type: 'send_message',
       room_id: roomId,
       body,
-      formatted: null,
+      formatted,
       in_reply_to: inReplyTo,
     });
+  }
+
+  async sendSticker(roomId: string, url: string, body: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'send_sticker', room_id: roomId, url, body });
   }
 
   async editMessage(roomId: string, eventId: string, body: string): Promise<void> {

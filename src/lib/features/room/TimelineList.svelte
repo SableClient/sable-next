@@ -184,6 +184,8 @@
     onEdit?: (eventId: string, body: string) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     roomId?: string;
+    readOnly?: boolean;
+    canRedactOthers?: boolean;
     scrollLocked?: boolean;
     nearLatest?: boolean;
   }
@@ -204,10 +206,14 @@
     onEdit,
     onDelete,
     roomId,
+    readOnly = false,
+    canRedactOthers = false,
     scrollLocked = false,
     nearLatest = $bindable(true),
   }: Props = $props();
-  let folded = $derived(foldEventRuns(visibleTimelineItems(timeline.items, timelinePreferences)));
+  let folded = $derived(
+    foldEventRuns(visibleTimelineItems(timeline.items, timelinePreferences, { readOnly }))
+  );
   let visibleItems = $derived(folded.items);
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
@@ -973,6 +979,7 @@
                   {onReply}
                   {onEdit}
                   {onDelete}
+                  {canRedactOthers}
                   onPersonaOpenChange={setPersonaOpen}
                   {roomId}
                 />

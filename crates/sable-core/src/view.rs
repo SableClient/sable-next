@@ -5,11 +5,12 @@ use std::sync::Arc;
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{Room, RoomMember};
-use matrix_sdk::ruma::OwnedRoomId;
+use matrix_sdk::ruma::events::MessageLikeEventType;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::room::message::MessageType;
-use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
+use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
+use matrix_sdk::ruma::{OwnedRoomId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_ui::{
     eyeball_im,
@@ -32,9 +33,9 @@ use crate::matrix_html::{
 use crate::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView,
-    PerMessageProfileView, ReactionGroup, ReplyView, RoomStateView, RoomSummary, SendStateView,
-    SpaceChildEdge, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
-    UploadProgressView, VectorDiff,
+    PerMessageProfileView, ReactionGroup, ReplyView, RoomPermissionsView, RoomStateView,
+    RoomSummary, SendStateView, SpaceChildEdge, ThreadSummaryView, TimelineItemContentView,
+    TimelineItemView, UploadProgressView, VectorDiff,
 };
 
 pub struct RoomInfo {
@@ -581,16 +582,29 @@ pub fn member_view(member: &RoomMember) -> MemberView {
         user_id: member.user_id().to_owned(),
         display_name: member.display_name().map(str::to_owned),
         avatar_url: member.avatar_url().map(ToString::to_string),
-        power_level: match member.power_level() {
-            UserPowerLevel::Int(level) => i32::try_from(level).unwrap_or_else(|_| {
-                if level.is_negative() {
-                    i32::MIN
-                } else {
-                    i32::MAX
-                }
-            }),
-            _ => i32::MAX,
-        },
+        power_level: clamp_power_level(member.power_level()),
+    }
+}
+
+#[must_use]
+pub fn room_permissions(power_levels: &RoomPowerLevels, user_id: &UserId) -> RoomPermissionsView {
+    RoomPermissionsView {
+        own_power_level: clamp_power_level(power_levels.for_user(user_id)),
+        can_post: power_levels.user_can_send_message(user_id, MessageLikeEventType::RoomMessage),
+        can_redact_others: power_levels.user_can_redact_event_of_other(user_id),
+    }
+}
+
+fn clamp_power_level(level: UserPowerLevel) -> i32 {
+    match level {
+        UserPowerLevel::Int(level) => i32::try_from(level).unwrap_or_else(|_| {
+            if level.is_negative() {
+                i32::MIN
+            } else {
+                i32::MAX
+            }
+        }),
+        _ => i32::MAX,
     }
 }
 

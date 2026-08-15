@@ -180,6 +180,21 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::SendMessage)
             }
 
+            Command::SendSticker { room_id, url, body } => {
+                let url = OwnedMxcUri::from(url);
+                if url.parts().is_err() {
+                    return Err(CommandErr::InvalidMedia);
+                }
+
+                let timeline = $self.timeline(&room_id).await?;
+                timeline
+                    .send(StickerEventContent::new(body, ImageInfo::new(), url).into())
+                    .await
+                    .map_err(|error| $self.failed("send_sticker", error))?;
+
+                Ok(CommandOk::SendSticker)
+            }
+
             Command::EditMessage {
                 room_id,
                 event_id,
@@ -221,6 +236,26 @@ macro_rules! dispatch_commands {
                     members: members.iter().map(view::member_view).collect(),
                 })
             }
+
+            Command::RoomPermissions { room_id } => {
+                let room = $self.room(&room_id).await?;
+                let user_id = room
+                    .client()
+                    .user_id()
+                    .ok_or_else(|| $self.failed("room_permissions", "no session"))?
+                    .to_owned();
+                let power_levels = room
+                    .power_levels()
+                    .await
+                    .map_err(|error| $self.failed("room_permissions", error))?;
+
+                Ok(CommandOk::RoomPermissions(view::room_permissions(
+                    &power_levels,
+                    &user_id,
+                )))
+            }
+
+            Command::ImagePacks { room_id } => $self.image_packs(room_id).await,
 
             Command::UserProfile { user_id } => {
                 let response = $self

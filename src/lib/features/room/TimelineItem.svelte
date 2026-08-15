@@ -39,6 +39,7 @@
     onReply?: (eventId: string) => void;
     onEdit?: (eventId: string, body: string) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
+    canRedactOthers?: boolean;
     onPersonaOpenChange?: (open: boolean) => void;
   }
 
@@ -58,6 +59,7 @@
     onReply,
     onEdit,
     onDelete,
+    canRedactOthers = false,
     onPersonaOpenChange,
   }: Props = $props();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
@@ -125,7 +127,7 @@
             }
           : undefined,
       onDelete:
-        ownMessage && onDelete
+        (ownMessage || canRedactOthers) && onDelete
           ? () => {
               deleteOpen = true;
             }
