@@ -7,6 +7,16 @@ import type { WorkerMessage, WorkerRequest } from '@/worker/protocol';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 
+type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
+
+function requestLabel(request: WorkerRequest): RequestLabel | undefined {
+  if ('command' in request) return request.command.type;
+  if ('media' in request) return 'media';
+  if ('attachment' in request) return 'attachment';
+  if ('upload' in request) return 'upload';
+  return undefined;
+}
+
 export function createWebTransport(): Transport {
   const listeners = new Set<(event: CoreEvent) => void>();
   // Which reply belongs to which id is a runtime fact, so it cannot be typed.
@@ -15,7 +25,7 @@ export function createWebTransport(): Transport {
     number,
     { resolve: (value: Reply) => void; reject: (error: unknown) => void }
   >();
-  const pendingCommands = new Map<number, Command['type']>();
+  const pendingCommands = new Map<number, RequestLabel>();
   const crashListeners = new Set<(message: string) => void>();
   const stallListeners = new Set<(stalled: boolean) => void>();
   const overdue = new Set<number>();
@@ -120,14 +130,14 @@ export function createWebTransport(): Transport {
 
       return new Promise<T>((resolve, reject) => {
         const request = body(id);
-        const command = 'command' in request ? request.command.type : undefined;
+        const label = requestLabel(request);
         const timeout =
-          command === 'login_flows'
+          label === 'login_flows'
             ? setTimeout(() => {
                 if (!pending.delete(id)) return;
                 pendingCommands.delete(id);
                 console.error('[sable transport] command timed out waiting for worker', {
-                  command,
+                  command: label,
                 });
                 reject(new Error('Timed out waiting for homeserver discovery'));
               }, 20_000)
@@ -153,9 +163,7 @@ export function createWebTransport(): Transport {
             reject(error instanceof Error ? error : new Error(String(error)));
           },
         });
-        if ('command' in request) {
-          pendingCommands.set(id, request.command.type);
-        }
+        if (label !== undefined) pendingCommands.set(id, label);
         activeWorker.port.postMessage(request, transfers);
       });
     })();
