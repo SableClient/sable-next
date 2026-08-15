@@ -426,3 +426,40 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
     assert_eq!(sent["url"], "mxc://example.org/blob");
     assert_eq!(sent["body"], "blobwave");
 }
+
+#[tokio::test]
+async fn a_room_read_elsewhere_reports_the_server_unread_count() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!read-elsewhere:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_bulk([
+                    factory
+                        .text_msg("one")
+                        .event_id(event_id!("$one"))
+                        .into_raw(),
+                    factory
+                        .text_msg("two")
+                        .event_id(event_id!("$two"))
+                        .into_raw(),
+                ])
+                .set_unread_notifications_count(json!({
+                    "notification_count": 0,
+                    "highlight_count": 0,
+                })),
+        )
+        .await;
+
+    let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
+    let summary = super::view::room_summary(&item, &std::collections::HashMap::new());
+
+    assert_eq!(item.num_unread_messages(), 2);
+    assert_eq!(summary.unread, 0);
+    assert_eq!(summary.highlight, 0);
+}

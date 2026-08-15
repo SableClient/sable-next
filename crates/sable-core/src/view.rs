@@ -54,6 +54,7 @@ pub fn room_summary<S: BuildHasher>(
     room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
 ) -> RoomSummary {
     let info = room_cache.get(item.room_id());
+    let (unread, highlight) = unread_counts(item);
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
@@ -83,10 +84,25 @@ pub fn room_summary<S: BuildHasher>(
         },
         is_space: info.is_some_and(|i| i.is_space),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
-        unread: u32::try_from(item.num_unread_messages()).unwrap_or(u32::MAX),
-        highlight: u32::try_from(item.num_unread_mentions()).unwrap_or(u32::MAX),
+        unread,
+        highlight,
         latest_event: latest_event(item),
     }
+}
+
+fn unread_counts(item: &RoomListItem) -> (u32, u32) {
+    let count = |value: u64| u32::try_from(value).unwrap_or(u32::MAX);
+    if item.read_receipts().latest_active.is_none() {
+        let server = item.unread_notification_counts();
+        return (
+            count(server.notification_count),
+            count(server.highlight_count),
+        );
+    }
+    (
+        count(item.num_unread_messages()),
+        count(item.num_unread_mentions()),
+    )
 }
 
 const fn join_rule_view(rule: Option<&JoinRule>) -> RoomJoinRuleView {
