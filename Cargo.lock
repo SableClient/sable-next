@@ -3235,8 +3235,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7083d580527511ac5d9369e03b9f2b20902e76949f1b3964051f978e4d3756ae"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "anymap2",
  "aquamarine",
@@ -3299,8 +3298,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e09a917eb1f7643d9d9a06b2f131e2ceb39df6910a7b830dac18bfd6db37a1f5"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "assert_matches",
@@ -3330,8 +3328,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b9d1e0fee0f090180ef9457034adc547e80de9e6e3eb2e63aaac68a8476f836"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "eyeball-im",
  "futures-core",
@@ -3354,8 +3351,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54afd2a326f51c13a6ad44ec86315a688fffeb3f1e287fb343e0e1836a3bdaf"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "aes",
  "aquamarine",
@@ -3396,8 +3392,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-indexeddb"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fef37395fffb7c916f7109ab0d16d8ca599403dd8164d08c0d966176b66ede47"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3429,8 +3424,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-sqlite"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a49133429271005745f8d5a05362d2ba6567274777250236799927ca30dc0670"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "async-trait",
@@ -3457,8 +3451,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-store-encryption"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f48f304e553fb6200b1d7d1f77a88fd182076d4b25624e9dbfa42d6a37de35e"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -3479,8 +3472,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-test"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8023d4315fff35598c2d4a955920c1273c6aaab4dcd9ed405238a882581649bf"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "ctor 0.2.9",
@@ -3503,8 +3495,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-test-macros"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d97d6a0e5b1401c530b3c5d18cb98257d255d396bacf3903beda6718a2f4c4c5"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -3513,8 +3504,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-test-utils"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4053bd5b9ea5731d5ec9aec026ead55402126ff37d96b6aa525ad5c1a628e87f"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "ctor 0.2.9",
  "tracing-subscriber",
@@ -3523,8 +3513,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-ui"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d1f2b8a8cf57164d7cee4eb61c0b9f074b2e11d766a9391b7db0b9f2cbd83d8"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "async-rx",
