@@ -32,12 +32,12 @@ use matrix_sdk::encryption::{
 };
 use matrix_sdk::event_cache::PaginationStatus;
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
+use matrix_sdk::room::Receipts;
 use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::ruma::api::client::account::IdentityServerInfo;
 use matrix_sdk::ruma::api::client::account::register::v3::Request as RegistrationRequest;
 use matrix_sdk::ruma::api::client::account::request_registration_token_via_email::v3::Request as RegistrationEmailRequest;
 use matrix_sdk::ruma::api::client::profile::{AvatarUrl, DisplayName};
-use matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType;
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::session::get_login_types::v3::LoginType;

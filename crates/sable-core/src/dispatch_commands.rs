@@ -954,11 +954,17 @@ macro_rules! dispatch_commands {
             }
 
             Command::MarkRead { room_id, event_id } => {
-                // The server drops it unless newer, so the UI may send freely.
+                // The read marker line tracks `m.fully_read`, so a receipt alone
+                // would leave it where it was. The server drops either unless
+                // newer, so the UI may send freely.
                 $self
                     .timeline(&room_id)
                     .await?
-                    .send_single_receipt(ReceiptType::Read, event_id)
+                    .send_multiple_receipts(
+                        Receipts::new()
+                            .public_read_receipt(event_id.clone())
+                            .fully_read_marker(event_id),
+                    )
                     .await
                     .map_err(|error| $self.failed("mark_read", error))?;
 

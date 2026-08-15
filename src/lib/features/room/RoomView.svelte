@@ -136,6 +136,16 @@
     timelineAtBottom = eventId === null;
   });
 
+  // The event param is a navigation instruction, not room state. Holding it
+  // once the live end is back in view would keep read receipts switched off.
+  $effect(() => {
+    if (eventId === null || !timelineAtBottom) return;
+    const target = resolve('/(app)/home/[roomId]', {
+      roomId: roomPathParamFromId(resolvedRoomId),
+    });
+    void goto(target, { replaceState: true, noScroll: true, keepFocus: true });
+  });
+
   $effect(() => {
     const activeRoomId = roomId.startsWith('!') ? roomId : resolvedRoom?.room_id;
     if (!activeRoomId) return;
