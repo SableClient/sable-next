@@ -50,6 +50,14 @@ strip = true
 inherits = "release"
 strip = "debuginfo"
 
+# An unoptimised `dev` build is ~100 MB, which the browser recompiles on every
+# reload and which OOMs wasm-bindgen-test-runner. This trades that for ~42 MB
+# and keeps incremental rebuilds around a second.
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+debug = false
+
 # 0.18.0 plus a fix for an event cache panic that aborts the wasm core. Patching
 # one crate alone splits the family into two incompatible copies.
 [patch.crates-io]

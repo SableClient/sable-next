@@ -2,6 +2,7 @@ import { readFileSync, renameSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const release = process.argv.includes('--release');
+const profile = release ? 'wasm-release' : 'wasm-dev';
 const cargoArgs = [
   'build',
   '--locked',
@@ -9,9 +10,9 @@ const cargoArgs = [
   'sable-wasm',
   '--target',
   'wasm32-unknown-unknown',
+  '--profile',
+  profile,
 ];
-
-if (release) cargoArgs.push('--profile', 'wasm-release');
 
 function run(command, args) {
   const result = spawnSync(command, args, { stdio: 'inherit' });
@@ -29,7 +30,6 @@ if (!version || cli.status !== 0 || cli.stdout.trim() !== `wasm-bindgen ${versio
 
 run('cargo', cargoArgs);
 
-const profile = release ? 'wasm-release' : 'debug';
 const wasm = `target/wasm32-unknown-unknown/${profile}/sable_wasm.wasm`;
 const output = 'src/generated/wasm';
 const bindgenArgs = ['--target', 'web', '--out-dir', output, '--out-name', 'sable_wasm'];
