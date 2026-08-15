@@ -139,7 +139,11 @@
   $effect(() => {
     const activeRoomId = roomId.startsWith('!') ? roomId : resolvedRoom?.room_id;
     if (!activeRoomId) return;
-    void untrack(() => activeTimeline.start(timelineOwner, activeRoomId, eventId));
+    // An event already in the loaded range is reached by scrolling, so only a
+    // target we do not hold restarts the timeline in permalink mode.
+    const loaded = untrack(() => timeline.items.some((item) => item.event_id === eventId));
+    const anchor = loaded ? null : eventId;
+    void untrack(() => activeTimeline.start(timelineOwner, activeRoomId, anchor));
   });
 
   async function loadMembers(): Promise<void> {
@@ -194,12 +198,8 @@
 
     const roomId = roomPathParamFromId(link.roomId);
     if (link.kind === 'event') {
-      void goto(
-        resolve('/(app)/home/[roomId]/[eventId]', {
-          roomId,
-          eventId: roomPathParamFromId(link.eventId),
-        })
-      );
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- path is resolved; only the query is appended
+      void goto(resolve('/(app)/home/[roomId]', { roomId }) + eventQuery(link.eventId));
       return;
     }
     void goto(resolve('/(app)/home/[roomId]', { roomId }));
@@ -207,6 +207,20 @@
 
   function typingMemberName(userId: string): string | null {
     return memberLoader.members.find((member) => member.user_id === userId)?.display_name ?? null;
+  }
+
+  /** The event rides as a query param so a permalink or notification can carry
+      it without a second route. */
+  function eventQuery(eventId: string): string {
+    return `?event=${encodeURIComponent(eventId)}`;
+  }
+
+  function jumpToEvent(eventId: string): void {
+    const target =
+      resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(resolvedRoomId) }) +
+      eventQuery(eventId);
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- path is resolved; only the query is appended
+    void goto(target, { replaceState: true, noScroll: true, keepFocus: true });
   }
 
   function goBack(): void {
@@ -315,7 +329,7 @@
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
     <RoomHeader {roomName} {roomAvatar} onBack={goBack} onMembers={toggleMembers} {initials} />
-    {#key `${roomId}:${eventId ?? ''}`}
+    {#key resolvedRoomId}
       <TimelineList
         {timeline}
         focusEventId={eventId}
@@ -332,6 +346,7 @@
         {onEdit}
         roomId={resolvedRoomId}
         members={memberLoader.members}
+        onJumpToEvent={jumpToEvent}
         readOnly={permissions ? !permissions.can_post : false}
         canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}

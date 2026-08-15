@@ -3,14 +3,7 @@
 
   import RoomView from './RoomView.svelte';
 
-  interface Props {
-    focusEvent?: boolean;
-  }
-
-  let { focusEvent = false }: Props = $props();
+  let eventId = $derived(page.url.searchParams.get('event'));
 </script>
 
-<RoomView
-  roomId={page.params.roomId ?? ''}
-  eventId={focusEvent ? (page.params.eventId ?? null) : null}
-/>
+<RoomView roomId={page.params.roomId ?? ''} {eventId} />

@@ -195,6 +195,7 @@
     onDelete?: (eventId: string, reason: string | null) => void;
     roomId?: string;
     members?: readonly MemberView[];
+    onJumpToEvent?: (eventId: string) => void;
     readOnly?: boolean;
     canRedactOthers?: boolean;
     scrollLocked?: boolean;
@@ -218,6 +219,7 @@
     onDelete,
     roomId,
     members = [],
+    onJumpToEvent,
     readOnly = false,
     canRedactOthers = false,
     scrollLocked = false,
@@ -229,6 +231,19 @@
   let visibleItems = $derived(folded.items);
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
+
+  // A permalink to an event already in the list is a scroll, not a reload.
+  let smoothTarget: string | null = null;
+  $effect(() => {
+    const target = focusEventId;
+    if (target === null || target === smoothTarget) return;
+    const index = visibleItems.findIndex((item) => item.event_id === target);
+    if (index < 0) return;
+    smoothTarget = target;
+    if (!focusAnchored) return;
+    scrollMode = { kind: 'focused', eventId: target };
+    get(virtualizer).scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+  });
   // Virtual rows are absolutely positioned, so the separator cannot be sticky
   // in flow; it is mirrored here once its own row has scrolled above the top.
   let stuckUnreadCount = $derived.by(() => {
@@ -1015,6 +1030,7 @@
                   {canRedactOthers}
                   {members}
                   layout={timelinePreferences.layout}
+                  {onJumpToEvent}
                   onPersonaOpenChange={setPersonaOpen}
                   {roomId}
                 />

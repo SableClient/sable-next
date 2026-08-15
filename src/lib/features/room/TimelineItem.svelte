@@ -11,6 +11,7 @@
   import MediaImage from '$lib/ui/MediaImage.svelte';
   import MediaContent from '$lib/ui/MediaContent.svelte';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 
   import FormattedBody from './FormattedBody.svelte';
   import MessageActions from './MessageActions.svelte';
@@ -51,6 +52,7 @@
     selected?: boolean;
     layout?: TimelineLayout;
     members?: readonly MemberView[];
+    onJumpToEvent?: (eventId: string) => void;
     onPersonaOpenChange?: (open: boolean) => void;
   }
 
@@ -74,6 +76,7 @@
     selected = false,
     layout = 'modern',
     members = [],
+    onJumpToEvent,
     onPersonaOpenChange,
   }: Props = $props();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
@@ -347,14 +350,19 @@
       {/if}
       {#if item.in_reply_to}
         {@const tint = tinted(replyPersona)}
-        <p
+        {@const target = item.in_reply_to.event_id}
+        <button
           class={['reply-preview', { persona: tint }]}
+          type="button"
           style:--pmp-on-light={tint?.color_on_light ?? undefined}
           style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+          onclick={() => {
+            onJumpToEvent?.(target);
+          }}
         >
-          <strong>{replyName}</strong>
-          {replyBody}
-        </p>
+          <ReplyIcon class="reply-icon" />
+          <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
+        </button>
       {/if}
       {#if item.content.kind === 'message' && item.content.emote}
         <div class="emote">
@@ -547,12 +555,12 @@
   /* The leading border carries the signal, so the fill stays quiet enough to
      read a long message on. */
   .message.mention-silent {
-    background: color-mix(in oklab, var(--sable-sec-container) 20%, transparent);
+    background: color-mix(in oklab, var(--sable-sec-container) 10%, transparent);
     border-inline-start-color: var(--sable-sec-main);
   }
 
   .message.mention-loud {
-    background: color-mix(in oklab, var(--sable-warn-container) 35%, transparent);
+    background: color-mix(in oklab, var(--sable-warn-container) 16%, transparent);
     border-inline-start-color: var(--sable-warn-main);
   }
 
@@ -894,23 +902,42 @@
   }
 
   .reply-preview {
+    align-items: center;
     background: var(--sable-surface-var-container);
     border: 1px solid var(--sable-surface-var-container-line);
-    border-inline-start: 3px solid var(--sable-primary-main-line);
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    display: grid;
+    font: inherit;
     font-size: var(--font-size-small);
+    gap: var(--space-1);
+    grid-template-columns: auto minmax(0, 1fr);
     line-height: 1.4;
     margin-bottom: 0.25rem;
+    padding: 0.25rem var(--space-1);
+    text-align: start;
+    width: 100%;
+  }
+
+  .reply-preview:hover {
+    background: var(--sable-surface-var-container-hover);
+  }
+
+  .reply-preview :global(.reply-icon) {
+    color: var(--sable-primary-main);
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .reply-line {
     overflow: hidden;
-    padding: 0.25rem 0.5rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .reply-preview strong {
     color: var(--sable-sec-on-container);
-    margin-right: 0.25rem;
   }
 
   .reply-preview.persona strong {
