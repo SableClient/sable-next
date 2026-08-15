@@ -164,7 +164,20 @@
 
       block.replaceWith(figure);
       figure.append(header, block);
+      if (language) void paintHighlight(block, language);
     }
+  }
+
+  async function paintHighlight(block: HTMLPreElement, language: string): Promise<void> {
+    const code = block.querySelector('code');
+    const source = code?.textContent;
+    if (!code || !source) return;
+
+    const { highlightCode } = await import('./code-highlight');
+    const html = await highlightCode(source, language);
+    // The row may have scrolled out of the virtualiser while the grammar loaded.
+    if (html === null || !code.isConnected) return;
+    code.innerHTML = html;
   }
 
   function handleCodeAction(target: Element): boolean {

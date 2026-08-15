@@ -189,3 +189,19 @@ test('a long block starts collapsed and expands on demand', async () => {
   expect(toggle?.textContent).toBe('Collapse');
   await unmount(instance);
 });
+
+test('an unhighlightable language leaves the escaped source intact', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: {
+      html: '<pre><code class="language-notalanguage">&lt;script&gt;alert(1)&lt;/script&gt;</code></pre>',
+    },
+  });
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  const code = document.querySelector('pre code');
+  expect(code?.textContent).toBe('<script>alert(1)</script>');
+  expect(code?.querySelector('script')).toBeNull();
+  await unmount(instance);
+});
