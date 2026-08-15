@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 
 import {
+  codeBlockHeight,
   estimateTimelineItemSize,
   rootFontSize,
   TIMELINE_LAYOUT,
@@ -74,4 +75,26 @@ test('uses an explicit fallback for videos without dimensions', () => {
       TIMELINE_LAYOUT.videoRatio +
       TIMELINE_LAYOUT.messageChromeRem * rem
   );
+});
+
+test('a message with no code block costs nothing extra', () => {
+  expect(codeBlockHeight('<p>plain</p>', 16)).toBe(0);
+});
+
+test('a code block is measured by its lines and capped at the collapse limit', () => {
+  const rem = 16;
+  const short = codeBlockHeight(`<pre><code>${'a\n'.repeat(3)}</code></pre>`, rem);
+  const long = codeBlockHeight(`<pre><code>${'a\n'.repeat(400)}</code></pre>`, rem);
+
+  expect(short).toBeGreaterThan(0);
+  expect(long).toBeGreaterThan(short);
+  expect(long).toBe(
+    TIMELINE_LAYOUT.codeLineLimit * TIMELINE_LAYOUT.codeLineRem * rem +
+      TIMELINE_LAYOUT.codeChromeRem * rem
+  );
+});
+
+test('every block in a message counts', () => {
+  const one = codeBlockHeight('<pre><code>a</code></pre>', 16);
+  expect(codeBlockHeight('<pre><code>a</code></pre><pre><code>b</code></pre>', 16)).toBe(one * 2);
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
+  import { i18n } from '$lib/i18n';
   import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
 
   import type { MatrixLink } from './matrix-link';
@@ -103,6 +104,7 @@
       }
 
       resolveImages(node);
+      decorateCodeBlocks(node);
       const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
       if (maths.length > 0) void renderMaths(maths);
 
@@ -115,6 +117,88 @@
     };
   }
 
+  /** Past this many lines a block collapses behind a toggle. */
+  const CODE_LINE_LIMIT = 14;
+
+  function codeLanguage(block: HTMLElement): string | null {
+    const code = block.querySelector('code');
+    const named = [...(code?.classList ?? [])].find((name) => name.startsWith('language-'));
+    return named?.slice('language-'.length) || null;
+  }
+
+  function decorateCodeBlocks(node: HTMLElement): void {
+    for (const block of node.querySelectorAll<HTMLPreElement>('pre')) {
+      if (block.dataset.codeHandled !== undefined) continue;
+      block.dataset.codeHandled = '';
+
+      const language = codeLanguage(block);
+      const long = block.textContent.split('\n').length > CODE_LINE_LIMIT;
+
+      const figure = document.createElement('div');
+      figure.className = 'code-block';
+      if (long) figure.dataset.collapsed = '';
+
+      const header = document.createElement('div');
+      header.className = 'code-head';
+
+      const label = document.createElement('span');
+      label.className = 'code-language';
+      label.textContent = language ?? $i18n.t('timeline.codeLabel');
+      header.append(label);
+
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'code-action';
+      copy.dataset.codeCopy = '';
+      copy.textContent = $i18n.t('timeline.copyCode');
+      header.append(copy);
+
+      if (long) {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'code-action';
+        toggle.dataset.codeToggle = '';
+        toggle.textContent = $i18n.t('timeline.expandCode');
+        header.append(toggle);
+      }
+
+      block.replaceWith(figure);
+      figure.append(header, block);
+    }
+  }
+
+  function handleCodeAction(target: Element): boolean {
+    const button = target.closest<HTMLButtonElement>('.code-action');
+    const figure = button?.closest<HTMLElement>('.code-block');
+    const block = figure?.querySelector('pre');
+    if (!button || !figure || !block) return false;
+
+    if (button.dataset.codeToggle !== undefined) {
+      const collapsed = figure.dataset.collapsed !== undefined;
+      if (collapsed) delete figure.dataset.collapsed;
+      else figure.dataset.collapsed = '';
+      button.textContent = collapsed
+        ? $i18n.t('timeline.collapseCode')
+        : $i18n.t('timeline.expandCode');
+      return true;
+    }
+
+    if (button.dataset.codeCopy === undefined) return false;
+    const label = button;
+    void navigator.clipboard
+      .writeText(block.textContent)
+      .then(() => {
+        label.textContent = $i18n.t('timeline.copiedCode');
+        setTimeout(() => {
+          if (label.isConnected) label.textContent = $i18n.t('timeline.copyCode');
+        }, 1500);
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable code] clipboard unavailable', error);
+      });
+    return true;
+  }
+
   function reveal(target: Element): boolean {
     const spoiler = target.closest<HTMLElement>('[data-mx-spoiler]');
     if (!spoiler || spoiler.ariaPressed === 'false') return false;
@@ -125,6 +209,10 @@
   function handleClick(event: MouseEvent): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    if (handleCodeAction(target)) {
+      event.preventDefault();
+      return;
+    }
     if (reveal(target)) {
       event.preventDefault();
       return;
@@ -220,8 +308,87 @@
     padding-left: var(--space-1);
   }
 
+  /* Inline code had no rule at all, so it read as prose. */
+  .formatted-body :global(:not(pre) > code) {
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: 0.25rem;
+    font-family: var(--font-family-mono);
+    font-size: 0.9em;
+    padding: 0 0.25rem;
+  }
+
+  .formatted-body :global(.code-block) {
+    background: var(--sable-surface-container);
+    border: 1px solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
+    margin: var(--space-compact) 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .formatted-body :global(.code-head) {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border-bottom: 1px solid var(--sable-surface-container-line);
+    display: flex;
+    gap: var(--space-1);
+    min-height: var(--control-height-small);
+    padding: 0 var(--space-1);
+  }
+
+  .formatted-body :global(.code-language) {
+    color: var(--sable-surface-var-on-container);
+    flex: 1;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .formatted-body :global(.code-action) {
+    background: none;
+    border: 0;
+    border-radius: var(--radius-pill);
+    color: var(--sable-primary-main);
+    cursor: pointer;
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: var(--font-size-small);
+    padding: 0 var(--space-1);
+  }
+
+  .formatted-body :global(.code-action:hover) {
+    background: var(--sable-surface-container-hover);
+  }
+
   .formatted-body :global(pre) {
-    overflow-x: auto;
+    margin: 0;
+    overflow: auto;
+    padding: var(--space-1);
+  }
+
+  .formatted-body :global(pre code) {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-small);
+  }
+
+  /* Bounded so a long paste cannot own the viewport, and so the virtualiser's
+     estimate for the row stays close. */
+  .formatted-body :global(.code-block[data-collapsed] pre) {
+    max-height: 18.75rem;
+  }
+
+  .formatted-body :global(.code-block[data-collapsed])::after {
+    background: linear-gradient(transparent, var(--sable-surface-container));
+    bottom: 0;
+    content: '';
+    height: 2rem;
+    inset-inline: 0;
+    pointer-events: none;
+    position: absolute;
   }
 
   .formatted-body :global(img[data-media-pending]) {

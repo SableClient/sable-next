@@ -28,6 +28,10 @@ export const TIMELINE_LAYOUT = {
   debugRowRem: 2.25,
   undecryptableRem: 2.5,
   audioHeightPx: 58,
+  /** Matches the collapse threshold and header in FormattedBody. */
+  codeLineLimit: 14,
+  codeLineRem: 1.2,
+  codeChromeRem: 2.75,
   pictureRatio: 0.75,
   videoRatio: 9 / 16,
 } as const;
@@ -71,6 +75,24 @@ export const LAYOUT_METRICS: Record<
   bubble: { message: 5, collapsed: 3.5, chrome: 3.25 },
 };
 
+/**
+ * A code block is many rows tall inside a message the estimator would otherwise
+ * size as one line, so the row settles visibly after measurement. Counting the
+ * newlines is cheap and bounded by the same cap the collapsed block uses.
+ */
+export function codeBlockHeight(html: string, rem: number): number {
+  if (!html.includes('<pre')) return 0;
+
+  let total = 0;
+  for (const block of html.split('<pre').slice(1)) {
+    const end = block.indexOf('</pre>');
+    const body = end === -1 ? block : block.slice(0, end);
+    const lines = Math.min(body.split('\n').length, TIMELINE_LAYOUT.codeLineLimit);
+    total += lines * TIMELINE_LAYOUT.codeLineRem * rem + TIMELINE_LAYOUT.codeChromeRem * rem;
+  }
+  return total;
+}
+
 export function estimateTimelineItemSize(
   items: readonly TimelineItemView[],
   index: number,
@@ -93,8 +115,10 @@ export function estimateTimelineItemSize(
     (item.reactions.length > 0 ? TIMELINE_LAYOUT.reactionsRem * rem : 0);
 
   switch (item.content.kind) {
-    case 'message':
-      return (isCollapsed(items, index) ? metrics.collapsed : metrics.message) * rem + trimmings;
+    case 'message': {
+      const base = (isCollapsed(items, index) ? metrics.collapsed : metrics.message) * rem;
+      return base + codeBlockHeight(item.content.html, rem) + trimmings;
+    }
     case 'image': {
       const ratio = inverseAspectRatio(
         item.content.width,

@@ -1088,7 +1088,7 @@
 
   .debug-event code {
     flex: 0 0 auto;
-    font-family: monospace;
+    font-family: var(--font-family-mono);
     margin-inline-start: calc(var(--avatar-size-small) + 0.625rem);
   }
 

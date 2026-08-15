@@ -142,3 +142,50 @@ test('leaves a remote image for the browser and drops a source with no scheme be
   expect(document.body.textContent).toContain(':party:');
   await unmount(instance);
 });
+
+test('a code block gains a language label and a copy control', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<pre><code class="language-rust">fn main() {}</code></pre>' },
+  });
+  await tick();
+
+  expect(document.querySelector('.code-language')?.textContent).toBe('rust');
+  expect(document.querySelector('[data-code-copy]')).not.toBeNull();
+  // Short blocks are not collapsible.
+  expect(document.querySelector('[data-code-toggle]')).toBeNull();
+  expect(document.querySelector('.code-block')?.hasAttribute('data-collapsed')).toBe(false);
+  await unmount(instance);
+});
+
+test('an unlabelled block falls back to a generic label', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<pre><code>plain</code></pre>' },
+  });
+  await tick();
+
+  expect(document.querySelector('.code-language')?.textContent).toBe('Code');
+  await unmount(instance);
+});
+
+test('a long block starts collapsed and expands on demand', async () => {
+  const lines = Array.from({ length: 40 }, (_, index) => `line ${String(index)}`).join('\n');
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: `<pre><code>${lines}</code></pre>` },
+  });
+  await tick();
+
+  const block = document.querySelector('.code-block');
+  const toggle = document.querySelector<HTMLButtonElement>('[data-code-toggle]');
+  expect(block?.hasAttribute('data-collapsed')).toBe(true);
+  expect(toggle?.textContent).toBe('Expand');
+
+  toggle?.click();
+  await tick();
+
+  expect(block?.hasAttribute('data-collapsed')).toBe(false);
+  expect(toggle?.textContent).toBe('Collapse');
+  await unmount(instance);
+});
