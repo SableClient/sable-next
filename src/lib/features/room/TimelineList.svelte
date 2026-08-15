@@ -14,7 +14,12 @@
   import type { MatrixLink } from './matrix-link';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import FoldedEventRun from './FoldedEventRun.svelte';
-  import { foldEventRuns, isCollapsed, visibleTimelineItems } from './timeline-format';
+  import {
+    foldEventRuns,
+    isCollapsed,
+    unreadCountAfter,
+    visibleTimelineItems,
+  } from './timeline-format';
   import { timelinePreferences } from '$lib/settings/timeline-preferences.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
@@ -945,6 +950,9 @@
                 <TimelineItem
                   {item}
                   collapsed={isCollapsed(visibleItems, virtualItem.index)}
+                  unreadCount={item.content.kind === 'read_marker'
+                    ? unreadCountAfter(visibleItems, virtualItem.index)
+                    : 0}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
                   {onSenderProfile}

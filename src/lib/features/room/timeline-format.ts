@@ -56,6 +56,25 @@ export function visibleTimelineItems(
   return visible.reverse();
 }
 
+const MESSAGE_KINDS = new Set([
+  'message',
+  'image',
+  'video',
+  'audio',
+  'file',
+  'sticker',
+  'unable_to_decrypt',
+]);
+
+export function unreadCountAfter(items: readonly TimelineItemView[], index: number): number {
+  let count = 0;
+  for (let next = index + 1; next < items.length; next += 1) {
+    const item = items[next];
+    if (!item.is_own && MESSAGE_KINDS.has(item.content.kind)) count += 1;
+  }
+  return count;
+}
+
 const FOLDABLE_KINDS = new Set(['membership', 'profile_change', 'state_event']);
 const FOLD_MIN_RUN = 3;
 export const FOLD_SUMMARY_COUNT = 2;

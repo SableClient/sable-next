@@ -23,6 +23,7 @@
   interface Props {
     item: TimelineItemView;
     collapsed: boolean;
+    unreadCount?: number;
     roomId?: string;
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -39,6 +40,7 @@
   let {
     item,
     collapsed,
+    unreadCount = 0,
     roomId = '',
     highlighted = false,
     onMatrixLink,
@@ -71,6 +73,10 @@
 
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
   let ownMessage = $derived(item.is_own && item.content.kind === 'message');
+  let avatarColor = $derived(item.is_own ? undefined : senderColor(item.sender));
+  let nameColor = $derived(
+    item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
+  );
 
   let actions = $derived.by(() => {
     const eventId = item.event_id ?? '';
@@ -189,7 +195,7 @@
             class="message-avatar"
             src={item.sender_avatar}
             size="small"
-            color={senderColor(item.sender)}
+            color={avatarColor}
             initials={initials(senderName)}
           />
         </button>
@@ -198,7 +204,7 @@
           class="message-avatar"
           src={item.sender_avatar}
           size="small"
-          color={senderColor(item.sender)}
+          color={avatarColor}
           initials={initials(senderName)}
         />
       {/if}
@@ -207,7 +213,7 @@
       {#if !collapsed}
         <header>
           {#if !emote}
-            <span class="sender" style:color={senderColor(item.sender)}>{senderName}</span>
+            <span class="sender" style:color={nameColor}>{senderName}</span>
           {/if}
           <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time
           >
@@ -228,7 +234,7 @@
       {/if}
       {#if item.content.kind === 'message' && item.content.emote}
         <div class="emote">
-          <span class="sender" style:color={senderColor(item.sender)}>* {senderName}</span>
+          <span class="sender" style:color={nameColor}>* {senderName}</span>
           <FormattedBody html={item.content.html} {onMatrixLink} />
         </div>
       {:else if item.content.kind === 'message'}
@@ -341,7 +347,13 @@
 {:else if item.content.kind === 'timeline_start'}
   <p class="separator">{$i18n.t('timeline.start')}</p>
 {:else if item.content.kind === 'read_marker'}
-  <p class="read-marker">{$i18n.t('timeline.readMarker')}</p>
+  <p class="unread">
+    <span>
+      {unreadCount > 0
+        ? $i18n.t('timeline.unreadCount', { count: unreadCount })
+        : $i18n.t('timeline.readMarker')}
+    </span>
+  </p>
 {:else}
   <p class="state redacted">
     <span class="state-rail" aria-hidden="true"></span>
@@ -530,7 +542,7 @@
   .body,
   .reply-preview,
   .separator,
-  .read-marker,
+  .unread,
   .date-divider,
   .state,
   .debug-event,
@@ -731,11 +743,27 @@
     padding: 0.125rem 0.625rem;
   }
 
-  .read-marker {
-    border-bottom: 1px solid var(--sable-success-main);
-    color: var(--sable-success-main);
-    font-size: var(--font-size-small);
+  .unread {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
     padding: 0.25rem 0;
-    text-align: center;
+  }
+
+  .unread::before {
+    border-top: 2px solid var(--sable-primary-main-line);
+    content: '';
+    flex: 1;
+  }
+
+  .unread span {
+    background: var(--sable-primary-container);
+    border: 1px solid var(--sable-primary-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--sable-primary-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.04em;
+    padding: 0.125rem 0.5rem;
   }
 </style>
