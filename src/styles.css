@@ -199,6 +199,8 @@ html {
   --control-height-small: 2.25rem;
   --control-height-medium: 2.75rem;
   --control-height-large: 3rem;
+  --target: 2.5rem;
+  --target-hit: 2.5rem;
   --control-padding-block: 0.625rem;
   --control-padding-inline: 0.875rem;
   --icon-size-small: 1.25rem;
@@ -390,5 +392,11 @@ a:not([class]):hover {
 @media (width >= 42rem) {
   :root {
     --page-gutter: 2rem;
+  }
+}
+
+@media (pointer: coarse) {
+  :root {
+    --target-hit: 3rem;
   }
 }

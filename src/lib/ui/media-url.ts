@@ -47,13 +47,17 @@ export function loadMediaUrl(
   const key = cacheKey(source, width, height);
   const request =
     pending.get(key) ??
-    core.fetchMedia(source, width, height).then((bytes) => {
-      const type = mime ?? imageMime(bytes) ?? '';
-      const objectUrl = URL.createObjectURL(new Blob([bytes], { type }));
-      objectUrls.set(key, objectUrl);
-      pending.delete(key);
-      return objectUrl;
-    });
+    core
+      .fetchMedia(source, width, height)
+      .then((bytes) => {
+        const type = mime ?? imageMime(bytes) ?? '';
+        const objectUrl = URL.createObjectURL(new Blob([bytes], { type }));
+        objectUrls.set(key, objectUrl);
+        return objectUrl;
+      })
+      .finally(() => {
+        pending.delete(key);
+      });
   pending.set(key, request);
   return request;
 }

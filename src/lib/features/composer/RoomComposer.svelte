@@ -10,8 +10,15 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
   import VideoIcon from 'phosphor-svelte/lib/VideoIcon';
+  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
+  import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
+  import QuotesIcon from 'phosphor-svelte/lib/QuotesIcon';
+  import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
+  import TextBIcon from 'phosphor-svelte/lib/TextBIcon';
+  import TextItalicIcon from 'phosphor-svelte/lib/TextItalicIcon';
+  import TextStrikethroughIcon from 'phosphor-svelte/lib/TextStrikethroughIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
-  import type { Snippet } from 'svelte';
+  import type { Component, Snippet } from 'svelte';
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
@@ -30,11 +37,21 @@
   import { suggestionsFor } from './suggestions';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
+  import type { FormatAction } from './editor/formatting';
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import { serializeComposer } from './editor/serialize';
 
   const emoteSize = 24;
+
+  const formatButtons: { action: FormatAction; label: string; icon: Component }[] = [
+    { action: 'strong', label: 'composer.bold', icon: TextBIcon },
+    { action: 'em', label: 'composer.italic', icon: TextItalicIcon },
+    { action: 'strike', label: 'composer.strike', icon: TextStrikethroughIcon },
+    { action: 'code', label: 'composer.code', icon: CodeIcon },
+    { action: 'bullet_list', label: 'composer.bulletList', icon: ListBulletsIcon },
+    { action: 'blockquote', label: 'composer.quote', icon: QuotesIcon },
+  ];
 
   interface Props {
     roomId: string;
@@ -83,6 +100,9 @@
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
+  let activeFormats = $state.raw<FormatAction[]>([]);
+  let formattingOpen = $state(false);
+  let dragging = $state(false);
   let doorOpen = $state(false);
   let boardOpen = $state(false);
   /** The board reopens on the tab last used, which is what a sticker-first user wants. */
@@ -104,19 +124,29 @@
     load: (url) => loadMediaUrl(core, url, emoteSize, emoteSize),
   };
 
+  const uid = $props.id();
+  const hintId = `composer-hint-${uid}`;
+  const listboxId = `composer-suggestions-${uid}`;
+  const optionId = (index: number): string => `${listboxId}-${String(index)}`;
+
   const editor = new ComposerEditor({
     media,
     label: $i18n.t('timeline.messagePlaceholder'),
+    describedBy: hintId,
+    listboxId,
+    activeOptionId: () => (panelOpen && suggestions.length > 0 ? optionId(active) : null),
     editable: () => !sending,
     onSubmit: () => {
       void send();
     },
-    onChange: (next) => {
+    onChange: (next, marks) => {
       empty = next;
+      activeFormats = marks;
       activeIndex = 0;
       updateTyping();
     },
     onQuery: (next) => {
+      if (!next) dismissedAt = null;
       query = next;
     },
     onNavigate: navigate,
@@ -135,7 +165,9 @@
         (loaded) => {
           members = loaded;
         },
-        () => {}
+        () => {
+          loadedMembersFor = null;
+        }
       );
     }
 
@@ -147,7 +179,9 @@
             .flatMap((pack) => pack.images)
             .filter((image) => image.usage.includes('emoticon'));
         },
-        () => {}
+        () => {
+          loadedEmotesFor = null;
+        }
       );
     }
   });
@@ -155,9 +189,16 @@
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
 
   $effect(() => {
+    void panelOpen;
+    void active;
+    void suggestions.length;
+    editor.syncActiveOption();
+  });
+
+  $effect(() => {
     return () => {
       if (typingTimeout) clearTimeout(typingTimeout);
-      void onTyping(roomId, false);
+      stopTyping();
     };
   });
 
@@ -170,41 +211,52 @@
     }
   });
 
+  function stopTyping(): void {
+    onTyping(roomId, false).catch(() => {});
+  }
+
   function updateTyping(): void {
     if (typingTimeout) clearTimeout(typingTimeout);
     if (empty) {
-      void onTyping(roomId, false);
+      stopTyping();
       return;
     }
 
-    void onTyping(roomId, true);
+    onTyping(roomId, true).catch(() => {});
     typingTimeout = setTimeout(() => {
-      void onTyping(roomId, false);
+      stopTyping();
     }, 4000);
   }
 
   async function send(): Promise<void> {
-    const doc = editor.doc();
-    const message = doc ? serializeComposer(doc) : { body: '', formatted: null };
-    const attachments = staged;
     if (!hasContent || sending) return;
+
+    const doc = editor.doc();
+    let attachments = staged;
 
     sending = true;
     error = null;
     editor.clear();
     staged = [];
     if (typingTimeout) clearTimeout(typingTimeout);
-    void onTyping(roomId, false);
+    stopTyping();
 
     try {
-      for (const { file } of attachments) await onSendAttachment(roomId, file);
-      if (message.body) await onSend(roomId, message.body, message.formatted);
-    } catch {
+      const message = doc ? serializeComposer(doc) : { body: '', formatted: null };
+      while (attachments.length > 0) {
+        const [next, ...rest] = attachments;
+        await onSendAttachment(roomId, next.file);
+        attachments = rest;
+      }
+      await onSend(roomId, message.body, message.formatted);
+    } catch (cause) {
+      console.debug('[sable composer] send failed', cause);
       if (doc) editor.setDoc(doc);
       staged = attachments;
       error = $i18n.t('timeline.sendFailed');
     } finally {
       sending = false;
+      editor.refresh();
     }
   }
 
@@ -220,7 +272,9 @@
       if (!onSendSticker) return;
       try {
         await onSendSticker(roomId, image.url, image.body ?? image.shortcode);
-      } catch {
+        error = null;
+      } catch (cause) {
+        console.debug('[sable composer] sticker failed', cause);
         error = $i18n.t('timeline.sendFailed');
       }
       return;
@@ -261,13 +315,23 @@
 
   function handleDrop(event: DragEvent): void {
     const files = filesFrom(event.dataTransfer);
+    dragging = false;
     if (files.length === 0) return;
     event.preventDefault();
     stage(files);
   }
 
   function handleDragover(event: DragEvent): void {
-    if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    dragging = true;
+  }
+
+  function handleDragleave(event: DragEvent): void {
+    if (event.currentTarget instanceof Node && event.relatedTarget instanceof Node) {
+      if (event.currentTarget.contains(event.relatedTarget)) return;
+    }
+    dragging = false;
   }
 
   function nodeFor(sigil: string, suggestion: Suggestion): ProseMirrorNode {
@@ -343,11 +407,12 @@
   </div>
   <div class="composer-shell">
     <div
-      class="composer"
+      class={['composer', { dragging }]}
       role="group"
       aria-label={$i18n.t('timeline.messagePlaceholder')}
       ondrop={handleDrop}
       ondragover={handleDragover}
+      ondragleave={handleDragleave}
     >
       {#if context}
         <div class="context">
@@ -399,6 +464,24 @@
             </li>
           {/each}
         </ul>
+      {/if}
+      {#if formattingOpen}
+        <div class="formatting" role="group" aria-label={$i18n.t('composer.formatting')}>
+          {#each formatButtons as button (button.action)}
+            <IconButton
+              variant="ghost"
+              size="small"
+              class="format-button"
+              label={$i18n.t(button.label)}
+              aria-pressed={activeFormats.includes(button.action)}
+              onclick={() => {
+                editor.format(button.action);
+              }}
+            >
+              <button.icon />
+            </IconButton>
+          {/each}
+        </div>
       {/if}
       <form
         class="composer-row"
@@ -481,6 +564,8 @@
         <input
           bind:this={fileInput}
           class="composer-file"
+          id="composer-file-{uid}"
+          name="attachment"
           type="file"
           multiple
           tabindex="-1"
@@ -499,6 +584,8 @@
           />
           {#if panelOpen && query}
             <ComposerAutocomplete
+              id={listboxId}
+              {optionId}
               sigil={query.sigil}
               heading={query.sigil === '@'
                 ? $i18n.t('composer.membersHeading', { query: query.query })
@@ -558,6 +645,19 @@
           {/if}
         </div>
         <IconButton
+          variant="ghost"
+          size="small"
+          class="composer-format"
+          disabled={sending}
+          aria-pressed={formattingOpen}
+          label={$i18n.t('composer.formatting')}
+          onclick={() => {
+            formattingOpen = !formattingOpen;
+          }}
+        >
+          <TextAaIcon />
+        </IconButton>
+        <IconButton
           type="submit"
           variant="ghost"
           size="small"
@@ -569,9 +669,7 @@
           <PaperPlaneIcon weight="fill" />
         </IconButton>
       </form>
-      <p class="composer-hint">
-        {panelOpen ? $i18n.t('composer.hintAutocomplete') : $i18n.t('composer.hintSend')}
-      </p>
+      <p class="composer-hint" id={hintId}>{$i18n.t('composer.hintSend')}</p>
     </div>
   </div>
   {#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
@@ -625,14 +723,6 @@
     width: 0.25rem;
   }
 
-  .typing-dots i:nth-child(2) {
-    animation-delay: 0.15s;
-  }
-
-  .typing-dots i:nth-child(3) {
-    animation-delay: 0.3s;
-  }
-
   .composer-shell {
     align-items: end;
     display: flex;
@@ -663,6 +753,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .composer.dragging {
+    background: var(--sable-primary-container);
+    border-color: var(--sable-primary-main);
   }
 
   .composer {
@@ -777,14 +872,58 @@
     width: var(--icon-size-medium);
   }
 
-  .composer-hint {
+  .formatting {
+    border-bottom: 1px solid var(--sable-surface-container-line);
+    display: flex;
+    gap: 0.125rem;
+    padding: 0.375rem 0.5rem;
+  }
+
+  :global(.format-button) {
+    border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
+    height: var(--target);
+    min-height: var(--target);
+    width: var(--target);
+  }
+
+  :global(.format-button[aria-pressed='true']) {
+    background: var(--sable-primary-container);
+    color: var(--sable-primary-on-container);
+  }
+
+  :global(.format-button svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  :global(.composer-format) {
+    border-radius: var(--radius);
+    color: var(--sable-surface-var-on-container);
+    flex: 0 0 auto;
+    height: var(--target);
+    min-height: var(--target);
+    width: var(--target);
+  }
+
+  :global(.composer-format[aria-pressed='true']) {
+    background: var(--sable-primary-container);
+    color: var(--sable-primary-on-container);
+  }
+
+  :global(.composer-format svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .composer-hint {
+    clip-path: inset(50%);
+    height: 1px;
     margin: 0;
     overflow: hidden;
-    padding: 0 0.75rem 0.5rem;
-    text-overflow: ellipsis;
+    position: absolute;
     white-space: nowrap;
+    width: 1px;
   }
 
   /* The board writes into the draft, so it belongs to the field; the door and
@@ -835,28 +974,6 @@
     box-shadow: var(--shadow-float);
     overflow: hidden;
     z-index: var(--layer-popover);
-  }
-
-  .composer :global(textarea.composer-input) {
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    color: inherit;
-    field-sizing: content;
-    flex: 1;
-    interpolate-size: allow-keywords;
-    max-height: 10rem;
-    min-height: var(--control-height-small);
-    overflow-y: auto;
-    padding-block: 0.375rem;
-    padding-inline: 0 var(--control-height-small);
-    resize: none;
-  }
-
-  .composer :global(textarea.composer-input:focus-visible) {
-    border-color: transparent;
-    box-shadow: none;
-    outline: 0;
   }
 
   .composer-file {
@@ -977,10 +1094,6 @@
         border-color var(--motion-fast) var(--motion-easing-standard),
         box-shadow var(--motion-fast) var(--motion-easing-standard),
         padding var(--motion-slow) var(--motion-easing-emphasized);
-    }
-
-    .composer :global(textarea.composer-input) {
-      transition: block-size var(--motion-normal) var(--motion-easing-emphasized);
     }
 
     :global(.composer-door) {

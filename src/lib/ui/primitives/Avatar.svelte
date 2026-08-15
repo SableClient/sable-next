@@ -85,12 +85,12 @@
   :global(.sable-avatar img) {
     height: 100%;
     object-fit: cover;
+    object-position: center;
     width: 100%;
   }
 
   :global(.sable-avatar .avatar-image) {
     height: 100%;
-    object-fit: cover;
     width: 100%;
   }
 </style>

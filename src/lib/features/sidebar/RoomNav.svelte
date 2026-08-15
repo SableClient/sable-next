@@ -503,8 +503,12 @@
 
   :global(.room-image) {
     height: 100%;
-    object-fit: cover;
     width: 100%;
+  }
+
+  :global(.room-image .media-image-content) {
+    object-fit: cover;
+    object-position: center;
   }
 
   .room-category {

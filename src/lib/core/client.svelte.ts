@@ -482,13 +482,18 @@ export class CoreClient {
     await this.ensureTransport().send({ type: 'send_sticker', room_id: roomId, url, body });
   }
 
-  async editMessage(roomId: string, eventId: string, body: string): Promise<void> {
+  async editMessage(
+    roomId: string,
+    eventId: string,
+    body: string,
+    formatted: string | null = null
+  ): Promise<void> {
     await this.ensureTransport().send({
       type: 'edit_message',
       room_id: roomId,
       event_id: eventId,
       body,
-      formatted: null,
+      formatted,
     });
   }
 
