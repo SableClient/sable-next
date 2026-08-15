@@ -1,0 +1,539 @@
+<script lang="ts">
+  import type { ImagePackView } from '@/generated/ImagePackView';
+  import type { ImageUsageView } from '@/generated/ImageUsageView';
+  import type { PackImageView } from '@/generated/PackImageView';
+  import { useCoreClient } from '$lib/core/context';
+  import { i18n } from '$lib/i18n';
+  import MediaImage from '$lib/ui/MediaImage.svelte';
+  import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+
+  import { emojiGroups, searchReactionEmoji, shortcodeFor } from '$lib/emoji/emoji';
+  import { readRecentReactions, rememberReaction } from '$lib/emoji/recents';
+  import { readRecent, writeRecent } from '$lib/emoji/recent-packs';
+
+  interface Props {
+    roomId: string;
+    tab?: ImageUsageView;
+    variant?: 'popover' | 'sheet';
+    /** Reactions can be plain unicode, so the board offers both on one surface. */
+    unicode?: boolean;
+    /** A reaction cannot be a sticker, so that tab goes. */
+    stickers?: boolean;
+    onPick: (image: PackImageView, usage: ImageUsageView) => void;
+    onPickUnicode?: (emoji: string) => void;
+  }
+
+  let {
+    roomId,
+    tab = $bindable('emoticon'),
+    variant = 'popover',
+    unicode = false,
+    stickers = true,
+    onPick,
+    onPickUnicode,
+  }: Props = $props();
+  const core = useCoreClient();
+
+  let packs = $state.raw<ImagePackView[]>([]);
+  let loading = $state(true);
+  let failed = $state(false);
+  let recent = $state.raw<string[]>(readRecent());
+  let query = $state('');
+  let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
+
+  $effect(() => {
+    let cancelled = false;
+    loading = true;
+    failed = false;
+    void core.imagePacks(roomId).then(
+      (loaded) => {
+        if (cancelled) return;
+        packs = loaded;
+        loading = false;
+      },
+      () => {
+        if (cancelled) return;
+        failed = true;
+        loading = false;
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  let sections = $derived.by(() => {
+    const needle = query.trim().toLowerCase();
+    return packs
+      .map((pack) => ({
+        pack,
+        images: pack.images.filter(
+          (image) =>
+            image.usage.includes(tab) &&
+            (needle === '' || image.shortcode.toLowerCase().includes(needle))
+        ),
+      }))
+      .filter((section) => section.images.length > 0);
+  });
+
+  let recentImages = $derived.by(() => {
+    if (query.trim() !== '') return [];
+    const all = sections.flatMap((section) => section.images);
+    return recent
+      .map((shortcode) => all.find((image) => image.shortcode === shortcode))
+      .filter((image): image is PackImageView => image !== undefined)
+      .slice(0, 16);
+  });
+
+  let unicodeSections = $derived.by(() => {
+    if (!unicode || tab !== 'emoticon') return [];
+    const needle = query.trim();
+    if (needle !== '') {
+      const matches = searchReactionEmoji(needle, 96).map((entry) => entry.emoji);
+      return matches.length === 0
+        ? []
+        : [{ id: 'search', glyph: '🔎', label: $i18n.t('timeline.emojiResults'), emojis: matches }];
+    }
+    return [
+      {
+        id: 'recent',
+        glyph: '🕘',
+        label: $i18n.t('timeline.frequentlyUsed'),
+        emojis: readRecentReactions(),
+      },
+      ...emojiGroups
+        .filter((group) => group.emojis.length > 0)
+        .map((group) => ({
+          id: group.id,
+          glyph: group.emojis[0].emoji,
+          label: $i18n.t(`emoji.${group.id}`),
+          emojis: group.emojis.map((entry) => entry.emoji),
+        })),
+    ];
+  });
+
+  let originLabels: Record<ImagePackView['origin'], string> = $derived({
+    account: $i18n.t('composer.packMine'),
+    room: $i18n.t('composer.packRoom'),
+    global: $i18n.t('composer.packGlobal'),
+  });
+
+  function packName(pack: ImagePackView): string {
+    return pack.name ?? (pack.id || originLabels[pack.origin]);
+  }
+
+  function jumpTo(pack: ImagePackView): void {
+    const target = document.getElementById(sectionId(pack));
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function sectionId(pack: ImagePackView): string {
+    return `pack-${pack.origin}-${pack.room_id ?? 'account'}-${pack.id}`;
+  }
+
+  function pick(image: PackImageView): void {
+    recent = [image.shortcode, ...recent.filter((code) => code !== image.shortcode)].slice(0, 32);
+    writeRecent(recent);
+    onPick(image, tab);
+  }
+</script>
+
+<div class={['board', { sheet: variant === 'sheet' }]}>
+  <div class="board-head">
+    {#if stickers}
+      <div class="tabs" role="tablist" aria-label={$i18n.t('composer.emotesAndStickers')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'emoticon'}
+          onclick={() => {
+            tab = 'emoticon';
+          }}
+        >
+          {$i18n.t('composer.emoticons')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'sticker'}
+          onclick={() => {
+            tab = 'sticker';
+          }}
+        >
+          {$i18n.t('composer.stickers')}
+        </button>
+      </div>
+    {/if}
+    <TextInput
+      class="board-search"
+      type="search"
+      bind:value={query}
+      placeholder={$i18n.t('composer.searchPacks')}
+      aria-label={$i18n.t('composer.searchPacks')}
+    />
+  </div>
+
+  {#if loading}
+    <div class="board-note"><Spinner /></div>
+  {:else if failed}
+    <div class="board-note">{$i18n.t('composer.packsFailed')}</div>
+  {:else if sections.length === 0 && !unicode}
+    <div class="board-note">
+      {query.trim() ? $i18n.t('composer.noMatches') : $i18n.t('composer.noPacks')}
+    </div>
+  {:else}
+    <div class="board-body">
+      <nav class="rail" aria-label={$i18n.t('composer.packs')}>
+        {#each ['account', 'room', 'global'] as const as origin (origin)}
+          {@const group = sections.filter((section) => section.pack.origin === origin)}
+          {#if group.length > 0}
+            <span class="rail-label">{originLabels[origin]}</span>
+            {#each group as section (sectionId(section.pack))}
+              <button
+                type="button"
+                class="rail-pack"
+                title={packName(section.pack)}
+                aria-label={packName(section.pack)}
+                onclick={() => {
+                  jumpTo(section.pack);
+                }}
+              >
+                {#if section.pack.avatar_url}
+                  <Avatar
+                    size="small"
+                    src={section.pack.avatar_url}
+                    initials={packName(section.pack).slice(0, 2)}
+                    shape={origin === 'account' ? 'person' : 'room'}
+                  />
+                {:else}
+                  <MediaImage
+                    class="rail-emote"
+                    source={section.images[0].url}
+                    alt={packName(section.pack)}
+                    width={32}
+                    height={32}
+                  />
+                {/if}
+              </button>
+            {/each}
+          {/if}
+        {/each}
+        {#if unicodeSections.length > 0}
+          <span class="rail-label">{$i18n.t('emoji.unicode')}</span>
+          {#each unicodeSections as section (section.id)}
+            <button
+              type="button"
+              class="rail-pack rail-glyph"
+              title={section.label}
+              aria-label={section.label}
+              onclick={() => {
+                document
+                  .getElementById(`emoji-${section.id}`)
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}>{section.glyph}</button
+            >
+          {/each}
+        {/if}
+      </nav>
+
+      <div class="grids">
+        {#if recentImages.length > 0}
+          <section>
+            <h3>{$i18n.t('composer.recent')}</h3>
+            <ul>
+              {#each recentImages as image (image.shortcode)}
+                <li>
+                  <button
+                    type="button"
+                    title=":{image.shortcode}:"
+                    aria-label=":{image.shortcode}:"
+                    onclick={() => {
+                      pick(image);
+                    }}
+                  >
+                    <MediaImage
+                      source={image.url}
+                      alt={image.body ?? image.shortcode}
+                      width={32}
+                      height={32}
+                    />
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+        {#each sections as section (sectionId(section.pack))}
+          <section id={sectionId(section.pack)}>
+            <h3>
+              {packName(section.pack)}
+              <span class="section-origin">{originLabels[section.pack.origin]}</span>
+              {#if section.pack.attribution}
+                <span class="section-attribution">{section.pack.attribution}</span>
+              {/if}
+            </h3>
+            <ul>
+              {#each section.images as image (image.shortcode)}
+                <li>
+                  <button
+                    type="button"
+                    title=":{image.shortcode}:"
+                    aria-label=":{image.shortcode}:"
+                    onclick={() => {
+                      pick(image);
+                    }}
+                    onpointerenter={() => {
+                      preview = { image, pack: section.pack };
+                    }}
+                    onfocus={() => {
+                      preview = { image, pack: section.pack };
+                    }}
+                  >
+                    <MediaImage
+                      source={image.url}
+                      alt={image.body ?? image.shortcode}
+                      width={32}
+                      height={32}
+                    />
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+        {#each unicodeSections as section (section.id)}
+          <section class="unicode" id={`emoji-${section.id}`}>
+            <h3>{section.label}</h3>
+            <ul>
+              {#each section.emojis as emoji (emoji)}
+                <li>
+                  <button
+                    type="button"
+                    title={shortcodeFor(emoji) ?? emoji}
+                    aria-label={shortcodeFor(emoji) ?? emoji}
+                    onclick={() => {
+                      rememberReaction(emoji);
+                      onPickUnicode?.(emoji);
+                    }}>{emoji}</button
+                  >
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      </div>
+    </div>
+
+    <div class="preview" aria-live="polite">
+      {#if preview}
+        <MediaImage
+          source={preview.image.url}
+          alt=""
+          width={28}
+          height={28}
+          class="preview-image"
+        />
+        <code>:{preview.image.shortcode}:</code>
+        <span class="preview-pack">{packName(preview.pack)}</span>
+      {:else}
+        <span class="preview-hint">{$i18n.t('composer.previewHint')}</span>
+      {/if}
+    </div>
+  {/if}
+</div>
+
+<style>
+  .board {
+    display: flex;
+    flex-direction: column;
+    height: min(22rem, 60vh);
+    width: min(24rem, calc(100vw - 2rem));
+  }
+
+  .board.sheet {
+    height: min(24rem, 60vh);
+    width: 100%;
+  }
+
+  .board-head {
+    align-items: center;
+    border-bottom: 1px solid var(--sable-surface-container-line);
+    display: flex;
+    gap: var(--space-1);
+    padding: var(--space-1);
+  }
+
+  .tabs {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.125rem;
+  }
+
+  .tabs button {
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    font-size: var(--font-size-small);
+    padding: 0.375rem 0.5rem;
+  }
+
+  .tabs button[aria-selected='true'] {
+    background: var(--sable-primary-container);
+    color: var(--sable-primary-on-container);
+  }
+
+  .board :global(.board-search) {
+    font-size: var(--font-size-small);
+    min-width: 0;
+  }
+
+  .board-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Fixed, or a long pack name widens the rail and squeezes the grid. */
+  .rail {
+    align-items: center;
+    border-right: 1px solid var(--sable-surface-container-line);
+    display: flex;
+    flex: 0 0 3.25rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-1) 0.375rem;
+    scrollbar-width: none;
+  }
+
+  .rail-label {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: lowercase;
+    white-space: nowrap;
+  }
+
+  .rail-pack {
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    padding: 0.125rem;
+  }
+
+  .rail-pack:hover {
+    background: var(--sable-surface-container-hover);
+  }
+
+  .grids {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: var(--space-1);
+  }
+
+  .grids h3 {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--font-size-small);
+    gap: 0.375rem;
+    margin: 0.25rem 0;
+  }
+
+  .section-origin,
+  .section-attribution {
+    color: var(--sable-surface-var-on-container);
+    font-weight: 400;
+  }
+
+  .grids ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0 0 var(--space-2);
+    padding: 0;
+  }
+
+  .grids li button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: flex;
+    height: 2.5rem;
+    justify-content: center;
+    padding: 0.25rem;
+    width: 2.5rem;
+  }
+
+  .grids li button:hover {
+    background: var(--sable-surface-container-hover);
+  }
+
+  /* Sized to the 32px custom emote beside it, not to the surrounding type. */
+  .grids .unicode li button {
+    font-size: 1.75rem;
+    line-height: 1;
+  }
+
+  /* Matches the pack avatars beside it, so the rail reads as one column. */
+  .rail-glyph {
+    align-items: center;
+    font-size: var(--font-size-large);
+    height: var(--avatar-size-small);
+    justify-content: center;
+    line-height: 1;
+    width: var(--avatar-size-small);
+  }
+
+  .rail :global(.rail-emote) {
+    height: var(--avatar-size-small);
+    object-fit: contain;
+    width: var(--avatar-size-small);
+  }
+
+  .preview {
+    align-items: center;
+    border-top: 1px solid var(--sable-surface-container-line);
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    padding: 0 var(--space-1);
+  }
+
+  .preview code {
+    color: var(--sable-bg-on-container);
+  }
+
+  .preview-pack,
+  .preview-hint {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .board-note {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    flex: 1;
+    font-size: var(--font-size-small);
+    justify-content: center;
+    padding: var(--space-3);
+    text-align: center;
+  }
+</style>

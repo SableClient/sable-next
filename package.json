@@ -34,10 +34,18 @@
     "@tanstack/svelte-virtual": "^3.13.35",
     "@tauri-apps/api": "2.11.1",
     "bits-ui": "^2.18.1",
+    "emojibase": "^17.0.0",
+    "emojibase-data": "^17.0.0",
     "i18next": "^26.3.6",
     "i18next-browser-languagedetector": "^8.2.1",
     "katex": "0.18.4",
     "phosphor-svelte": "^3.1.0",
+    "prosemirror-commands": "^1.7.2",
+    "prosemirror-history": "^1.5.0",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.11",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-view": "^1.42.2",
     "svelte-i18next": "^2.2.2"
   },
   "devDependencies": {

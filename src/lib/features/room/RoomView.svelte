@@ -294,6 +294,19 @@
     composerContext = { kind: 'edit', eventId, body };
   }
 
+  function editLastOwnMessage(): void {
+    const userId = core.session?.user_id;
+    if (!userId) return;
+
+    for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
+      const item = timeline.items[index];
+      if (!item.event_id || item.sender !== userId) continue;
+      if (item.content.kind !== 'message') continue;
+      onEdit(item.event_id, item.content.body);
+      return;
+    }
+  }
+
   function clearComposerContext(): void {
     composerContext = null;
   }
@@ -318,6 +331,7 @@
         {onReply}
         {onEdit}
         roomId={resolvedRoomId}
+        members={memberLoader.members}
         readOnly={permissions ? !permissions.can_post : false}
         canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}
@@ -334,8 +348,10 @@
           onSendSticker={sendSticker}
           onTyping={setTyping}
           {typingLabel}
+          {roomName}
           context={composerContext}
           onCancelContext={clearComposerContext}
+          onEditLast={editLastOwnMessage}
         >
           {#snippet statusTrailing()}
             <RoomReadReceipts

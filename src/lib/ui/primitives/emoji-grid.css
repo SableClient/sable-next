@@ -1,0 +1,91 @@
+.emoji-grid {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* Fields recede inside a card, so the input takes the page ground. */
+.emoji-search {
+  background: var(--sable-bg-container);
+  border: 1px solid var(--sable-primary-main-line);
+  border-radius: var(--radius);
+  color: var(--sable-bg-on-container);
+  font: inherit;
+  min-height: var(--control-height-medium);
+  padding: 0 var(--space-1);
+  width: 100%;
+}
+
+.emoji-label {
+  color: var(--sable-surface-var-on-container);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  margin: 0;
+  padding-inline: var(--space-1);
+  text-transform: uppercase;
+}
+
+.emoji-cells {
+  display: grid;
+  gap: 2px;
+  grid-template-columns: repeat(auto-fit, minmax(2.25rem, 1fr));
+}
+
+.emoji-cell {
+  aspect-ratio: 1;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: grid;
+  font-size: var(--font-size-large);
+  line-height: 1;
+  min-height: var(--control-height-small);
+  place-items: center center;
+  width: 100%;
+}
+
+.emoji-cell:hover {
+  background: var(--sable-surface-var-container);
+}
+
+.emoji-cell[aria-selected='true'] {
+  background: var(--sable-primary-container);
+  box-shadow: inset 0 0 0 1px var(--sable-primary-container-line);
+}
+
+.emoji-empty,
+.emoji-foot {
+  align-items: center;
+  color: var(--sable-surface-var-on-container);
+  display: flex;
+  font-size: var(--font-size-small);
+  gap: var(--space-1);
+  margin: 0;
+  padding-inline: var(--space-1);
+}
+
+.emoji-foot {
+  border-top: 1px solid var(--sable-surface-container-line);
+  padding-top: 0.25rem;
+}
+
+.emoji-foot em {
+  font-size: var(--font-size-medium);
+  font-style: normal;
+  line-height: 1;
+}
+
+.emoji-foot kbd {
+  background: var(--sable-surface-var-container);
+  border: 1px solid var(--sable-surface-var-container-line);
+  border-radius: 0.25rem;
+  font-family: inherit;
+  padding: 0 0.25rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .emoji-cell {
+    transition: background-color var(--motion-normal) var(--motion-easing-standard);
+  }
+}

@@ -4,10 +4,18 @@
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
   import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import MoreIcon from 'phosphor-svelte/lib/DotsThreeIcon';
+  import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 
   import { i18n } from '$lib/i18n';
 
+  import ReactionPicker from './ReactionPicker.svelte';
+
   interface Props {
+    roomId?: string;
+    onReact?: (emoji: string) => void;
+    onViewReactions?: () => void;
+    onReadReceipts?: () => void;
+    onPickerOpenChange?: (open: boolean) => void;
     onReply?: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
@@ -15,16 +23,39 @@
     onCopyLink?: () => void;
   }
 
-  let { onReply, onEdit, onDelete, onCopyText, onCopyLink }: Props = $props();
+  let {
+    roomId = '',
+    onReact,
+    onViewReactions,
+    onReadReceipts,
+    onPickerOpenChange,
+    onReply,
+    onEdit,
+    onDelete,
+    onCopyText,
+    onCopyLink,
+  }: Props = $props();
   let hasOverflow = $derived(
     onReply !== undefined ||
       onCopyText !== undefined ||
       onCopyLink !== undefined ||
+      onViewReactions !== undefined ||
+      onReadReceipts !== undefined ||
       onDelete !== undefined
   );
 </script>
 
 <div class="message-actions">
+  {#if onReact}
+    <ReactionPicker
+      label={$i18n.t('timeline.addReaction')}
+      {roomId}
+      onPick={onReact}
+      onOpenChange={onPickerOpenChange}
+    >
+      <EmojiIcon />
+    </ReactionPicker>
+  {/if}
   {#if onReply}
     <button type="button" aria-label={$i18n.t('timeline.reply')} onclick={onReply}>
       <ReplyIcon />
@@ -61,6 +92,16 @@
           {#if onCopyLink}
             <DropdownMenu.Item onclick={onCopyLink}
               >{$i18n.t('timeline.copyLink')}</DropdownMenu.Item
+            >
+          {/if}
+          {#if onViewReactions}
+            <DropdownMenu.Item onclick={onViewReactions}
+              >{$i18n.t('timeline.viewReactions')}</DropdownMenu.Item
+            >
+          {/if}
+          {#if onReadReceipts}
+            <DropdownMenu.Item onclick={onReadReceipts}
+              >{$i18n.t('timeline.readReceipts')}</DropdownMenu.Item
             >
           {/if}
           {#if onDelete}

@@ -1,16 +1,22 @@
 <script lang="ts">
+  import type { MemberView } from '@/generated/MemberView';
   import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
   import type { TimelineItemView } from '@/generated/TimelineItemView';
 
   import { i18n } from '$lib/i18n';
+  import type { TimelineLayout } from '$lib/settings/timeline-preferences.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import MediaImage from '$lib/ui/MediaImage.svelte';
   import MediaContent from '$lib/ui/MediaContent.svelte';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
   import FormattedBody from './FormattedBody.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
   import PersonaProfile from './PersonaProfile.svelte';
+  import ReactionPicker from './ReactionPicker.svelte';
+  import ReactionsDialog from './ReactionsDialog.svelte';
+  import ReceiptsDialog from './ReceiptsDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import type { MatrixLink } from './matrix-link';
   import { stateEventText } from './state-event-text';
@@ -41,6 +47,8 @@
     onDelete?: (eventId: string, reason: string | null) => void;
     canRedactOthers?: boolean;
     selected?: boolean;
+    layout?: TimelineLayout;
+    members?: readonly MemberView[];
     onPersonaOpenChange?: (open: boolean) => void;
   }
 
@@ -62,6 +70,8 @@
     onDelete,
     canRedactOthers = false,
     selected = false,
+    layout = 'modern',
+    members = [],
     onPersonaOpenChange,
   }: Props = $props();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
@@ -117,6 +127,20 @@
     const eventId = item.event_id ?? '';
     const body = item.content.kind === 'message' ? item.content.body : null;
     return {
+      onReact: onToggleReaction
+        ? (emoji: string) => {
+            onToggleReaction(eventId, emoji);
+          }
+        : undefined,
+      onViewReactions:
+        item.reactions.length > 0
+          ? () => {
+              reactionsOpen = true;
+            }
+          : undefined,
+      onReadReceipts: () => {
+        receiptsOpen = true;
+      },
       onReply: onReply
         ? () => {
             onReply(eventId);
@@ -152,6 +176,8 @@
   const LONG_PRESS_SLOP_PX = 10;
   let sheetOpen = $state(false);
   let deleteOpen = $state(false);
+  let reactionsOpen = $state(false);
+  let receiptsOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
@@ -207,6 +233,7 @@
     bind:this={messageRow}
     class={[
       'message',
+      `layout-${layout}`,
       {
         collapsed,
         pending,
@@ -225,7 +252,7 @@
     onpointercancel={endPress}
   >
     {#if actionable}
-      <MessageActions {...actions} />
+      <MessageActions {roomId} {...actions} />
       <MessageActionSheet
         bind:open={sheetOpen}
         preview={item.content.kind === 'message' ? item.content.body : null}
@@ -236,8 +263,17 @@
         preview={item.content.kind === 'message' ? item.content.body : null}
         onConfirm={confirmDelete}
       />
+      <ReactionsDialog bind:open={reactionsOpen} reactions={item.reactions} {members} />
+      <ReceiptsDialog bind:open={receiptsOpen} readers={item.read_by} {members} />
     {/if}
-    {#if !collapsed}
+    {#if layout === 'compact'}
+      <div class="compact-gutter">
+        <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time>
+        <span class="compact-name" style:color={personaTint ? undefined : nameColor}>
+          {collapsed ? '' : senderName}
+        </span>
+      </div>
+    {:else if !collapsed}
       {#if persona && item.sender}
         <PersonaProfile
           profile={persona}
@@ -281,7 +317,7 @@
       {/if}
     {/if}
     <div class="message-content">
-      {#if !collapsed}
+      {#if !collapsed && layout !== 'compact'}
         <header>
           {#if !emote}
             <span class="sender" style:color={personaTint ? undefined : nameColor}>
@@ -381,10 +417,31 @@
                 if (eventId) onToggleReaction?.(eventId, reaction.key);
               }}
             >
-              <em>{reaction.key}</em>
+              {#if reaction.key.startsWith('mxc://')}
+                <MediaImage
+                  class="reaction-image"
+                  source={reaction.key}
+                  alt={reaction.key}
+                  width={64}
+                  height={64}
+                />
+              {:else}
+                <em>{reaction.key}</em>
+              {/if}
               {reaction.senders.length}
             </button>
           {/each}
+          {#if actionable && actions.onReact}
+            {@const react = actions.onReact}
+            <ReactionPicker
+              label={$i18n.t('timeline.addReaction')}
+              triggerClass="add-reaction"
+              {roomId}
+              onPick={react}
+            >
+              <PlusIcon />
+            </ReactionPicker>
+          {/if}
         </div>
       {/if}
       {#if upload}
@@ -480,7 +537,10 @@
     border-inline-start-color: var(--sable-warn-main);
   }
 
-  .message.selected {
+  /* The spec pairs multi-select with keyboard focus; focus is the half that
+     exists today, and unlike hover it survives on touch. */
+  .message.selected,
+  .message:has(:focus-visible) {
     background: var(--sable-primary-container);
     border-radius: var(--radius);
     box-shadow: inset 0 0 0 1px var(--sable-primary-container-line);
@@ -817,6 +877,20 @@
     color: var(--pmp-ink);
   }
 
+  /* bits-ui renders the trigger, so the row's scoped `.reaction` cannot reach it. */
+  .reactions :global(.add-reaction) {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    display: inline-flex;
+    justify-content: center;
+    min-height: 1.5rem;
+    padding: 2px 0.5rem;
+  }
+
   .reaction {
     align-items: center;
     background: var(--sable-surface-var-container);
@@ -840,6 +914,13 @@
     content: '';
     inset: -0.375rem -2px;
     position: absolute;
+  }
+
+  .reaction :global(.reaction-image) {
+    display: block;
+    height: 1.125rem;
+    object-fit: contain;
+    width: auto;
   }
 
   .reaction em {

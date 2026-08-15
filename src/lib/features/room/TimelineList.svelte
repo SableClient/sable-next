@@ -4,6 +4,7 @@
   import { get } from 'svelte/store';
   import { createVirtualizer } from '@tanstack/svelte-virtual';
 
+  import type { MemberView } from '@/generated/MemberView';
   import type { TimelineItemView } from '@/generated/TimelineItemView';
   import { i18n } from '$lib/i18n';
   import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
@@ -22,6 +23,7 @@
     visibleTimelineItems,
   } from './timeline-format';
   import { timelinePreferences } from '$lib/settings/timeline-preferences.svelte';
+  import type { TimelineLayout } from '$lib/settings/timeline-preferences.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
   const HISTORY_PREFETCH_ITEMS = 10;
@@ -63,12 +65,18 @@
   const STICKER_WIDTH_REM = 9.5;
   const MESSAGE_INSET_REM = 4;
   const FILE_HEIGHT_REM = 1.75;
-  const MESSAGE_CHROME_REM = 2.75;
   const CAPTION_HEIGHT_REM = 1.5;
   const REPLY_PREVIEW_REM = 1.875;
   const REACTIONS_REM = 1.875;
-  const COLLAPSED_MESSAGE_REM = 3;
-  const MESSAGE_REM = 4.5;
+  // Every mode obeys the same measurement contract; only these three numbers move.
+  const LAYOUT_METRICS: Record<
+    TimelineLayout,
+    { message: number; collapsed: number; chrome: number }
+  > = {
+    modern: { message: 4.5, collapsed: 3, chrome: 2.75 },
+    compact: { message: 2.25, collapsed: 1.75, chrome: 1.5 },
+    bubble: { message: 5, collapsed: 3.5, chrome: 3.25 },
+  };
   const DATE_DIVIDER_REM = 3.5;
   const READ_MARKER_REM = 2;
   const SEPARATOR_REM = 2.5;
@@ -98,20 +106,22 @@
     items: readonly TimelineItemView[],
     index: number,
     viewportWidth: number,
-    rem: number
+    rem: number,
+    layout: TimelineLayout
   ): number {
     const item = items[index];
+    const metrics = LAYOUT_METRICS[layout];
     const contentWidth = Math.min(
       MEDIA_MAX_REM * rem,
       Math.max(MEDIA_MIN_REM * rem, viewportWidth - MESSAGE_INSET_REM * rem)
     );
-    const chrome = MESSAGE_CHROME_REM * rem;
+    const chrome = metrics.chrome * rem;
     const trimmings =
       (item.in_reply_to ? REPLY_PREVIEW_REM * rem : 0) +
       (item.reactions.length > 0 ? REACTIONS_REM * rem : 0);
     switch (item.content.kind) {
       case 'message':
-        return (isCollapsed(items, index) ? COLLAPSED_MESSAGE_REM : MESSAGE_REM) * rem + trimmings;
+        return (isCollapsed(items, index) ? metrics.collapsed : metrics.message) * rem + trimmings;
       case 'image': {
         const ratio = inverseAspectRatio(item.content.width, item.content.height, PICTURE_RATIO);
         const caption = item.content.body ? CAPTION_HEIGHT_REM * rem : 0;
@@ -184,6 +194,7 @@
     onEdit?: (eventId: string, body: string) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     roomId?: string;
+    members?: readonly MemberView[];
     readOnly?: boolean;
     canRedactOthers?: boolean;
     scrollLocked?: boolean;
@@ -206,6 +217,7 @@
     onEdit,
     onDelete,
     roomId,
+    members = [],
     readOnly = false,
     canRedactOthers = false,
     scrollLocked = false,
@@ -217,6 +229,17 @@
   let visibleItems = $derived(folded.items);
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
+  // Virtual rows are absolutely positioned, so the separator cannot be sticky
+  // in flow; it is mirrored here once its own row has scrolled above the top.
+  let stuckUnreadCount = $derived.by(() => {
+    const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
+    if (index === -1) return 0;
+    const marker = $virtualizer
+      .getVirtualItems()
+      .find((virtualItem) => virtualItem.index === index);
+    if (marker && marker.start >= ($virtualizer.scrollOffset ?? 0)) return 0;
+    return unreadCountAfter(visibleItems, index);
+  });
   let viewport = $state<HTMLDivElement | null>(null);
   let userScrollPending = false;
   let upwardScrollPending = false;
@@ -257,7 +280,7 @@
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: 0,
     getScrollElement: () => viewport,
-    estimateSize: (index) => estimateTimelineItemSize(initialItems, index, 512, 16),
+    estimateSize: (index) => estimateTimelineItemSize(initialItems, index, 512, 16, 'modern'),
     getItemKey: (index) => timelineItemKey(initialItems, index),
     anchorTo: 'end',
     followOnAppend: true,
@@ -474,11 +497,18 @@
       });
     }
     const rem = rootFontSize();
+    const layout = timelinePreferences.layout;
     instance.setOptions({
       count: items.length,
       getScrollElement: () => viewport,
       estimateSize: (index) =>
-        estimateTimelineItemSize(items, index, viewport?.clientWidth ?? MEDIA_MAX_REM * rem, rem),
+        estimateTimelineItemSize(
+          items,
+          index,
+          viewport?.clientWidth ?? MEDIA_MAX_REM * rem,
+          rem,
+          layout
+        ),
       getItemKey: (index) => timelineItemKey(items, index),
       anchorTo: 'end',
       followOnAppend: true,
@@ -944,7 +974,10 @@
       {@attach scrollLock(scrollLocked || personaOpen)}
       role="log"
     >
-      <div class="items" style:height={String($virtualizer.getTotalSize()) + 'px'}>
+      <div
+        class={['items', `layout-${timelinePreferences.layout}`]}
+        style:height={String($virtualizer.getTotalSize()) + 'px'}
+      >
         {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
           {@const item = visibleItems[virtualItem.index]}
           {#if item}
@@ -980,6 +1013,8 @@
                   {onEdit}
                   {onDelete}
                   {canRedactOthers}
+                  {members}
+                  layout={timelinePreferences.layout}
                   onPersonaOpenChange={setPersonaOpen}
                   {roomId}
                 />
@@ -990,6 +1025,12 @@
       </div>
     </div>
   </div>
+
+  {#if stuckUnreadCount > 0}
+    <p class="unread-pinned">
+      <span>{$i18n.t('timeline.unreadCount', { count: stuckUnreadCount })}</span>
+    </p>
+  {/if}
 
   {#if scrollMode.kind === 'initialLive'}<TimelineSkeleton />{/if}
 
@@ -1105,6 +1146,36 @@
     right: 0;
     top: 0;
     width: 100%;
+  }
+
+  .unread-pinned {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    inset-inline: 0;
+    margin: 0;
+    padding: 0 var(--space-3);
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    z-index: 1;
+  }
+
+  .unread-pinned::before {
+    border-top: 2px solid var(--sable-primary-main-line);
+    content: '';
+    flex: 1;
+  }
+
+  .unread-pinned span {
+    background: var(--sable-primary-container);
+    border: 1px solid var(--sable-primary-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--sable-primary-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.04em;
+    padding: 0.125rem 0.5rem;
   }
 
   :global(.jump-to-latest) {
