@@ -28,6 +28,13 @@ jobs:
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
+      # Supplies wasm-bindgen-test-runner at the version mise pins.
+      - name: Set up mise
+        uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          cache: true
+          env: false
+
       - name: Install Linux Tauri dependencies
         run: |
           sudo apt-get update
@@ -60,6 +67,11 @@ jobs:
 
       - name: Run Rust tests
         run: cargo test --locked --workspace --all-features
+
+      - name: Run WASM-target tests
+        run: |
+          export CHROMEDRIVER="${CHROMEWEBDRIVER:?chromedriver comes from the runner image}/chromedriver"
+          cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
       - name: Check Rust documentation
         env:

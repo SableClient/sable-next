@@ -7,3 +7,6 @@ TS_RS_EXPORT_DIR = { value = "src/generated", relative = true }
 # the feature below is necessary but not sufficient without this flag.
 [target.wasm32-unknown-unknown]
 rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
+# Ships with the mise-pinned wasm-bindgen-cli, so it matches the `wasm-bindgen`
+# the tests were compiled against.
+runner = "wasm-bindgen-test-runner"

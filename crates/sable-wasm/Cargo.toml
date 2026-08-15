@@ -24,5 +24,8 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
   "env-filter",
 ] }
 
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 [lints]
 workspace = true

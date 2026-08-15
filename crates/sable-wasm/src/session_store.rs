@@ -56,3 +56,48 @@ impl SessionStore for JsSessionStore {
         })
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use js_sys::Function;
+    use sable_core::store::SessionStore;
+    use wasm_bindgen_test::wasm_bindgen_test;
+
+    use super::JsSessionStore;
+
+    fn store() -> JsSessionStore {
+        JsSessionStore::new(
+            Function::new_no_args("return Promise.resolve(globalThis.__sableTestSession ?? null);"),
+            Function::new_with_args(
+                "bytes",
+                "globalThis.__sableTestSession = bytes; return Promise.resolve();",
+            ),
+            Function::new_no_args("globalThis.__sableTestSession = null; return Promise.resolve();"),
+        )
+    }
+
+    #[wasm_bindgen_test]
+    async fn a_saved_session_loads_back_unchanged() {
+        let store = store();
+
+        store.save(vec![1, 2, 3]).await.expect("save");
+        assert_eq!(store.load().await, Some(vec![1, 2, 3]));
+
+        store.clear().await.expect("clear");
+        assert_eq!(store.load().await, None);
+    }
+
+    #[wasm_bindgen_test]
+    async fn a_callback_that_forgets_its_promise_fails_rather_than_hangs() {
+        let store = JsSessionStore::new(
+            Function::new_no_args("return 42;"),
+            Function::new_with_args("bytes", "return 42;"),
+            Function::new_no_args("return 42;"),
+        );
+
+        assert!(store.load().await.is_none());
+        assert!(store.save(vec![1]).await.is_err());
+        assert!(store.clear().await.is_err());
+    }
+}

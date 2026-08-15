@@ -65,7 +65,12 @@ run = [
 [tasks.test]
 description = "Run all frontend and Rust tests"
 alias = "t"
-run = ["pnpm test", "cargo test --locked --workspace --all-features"]
+run = [
+  "pnpm test",
+  "cargo test --locked --workspace --all-features",
+  # Needs chromedriver on PATH.
+  "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev",
+]
 raw = true
 
 [tasks.doc]

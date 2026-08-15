@@ -207,6 +207,63 @@ impl SableCore {
     }
 }
 
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use js_sys::Function;
+    use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
+
+    use super::{SableCore, err_json};
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    /// `CommandErr` is serialize-only, so the page's decoding is mirrored here
+    /// rather than reused.
+    fn command_err(json: &str) -> serde_json::Value {
+        let error: serde_json::Value = serde_json::from_str(json).expect("JSON");
+        assert!(error["code"].is_string(), "{json}");
+        error
+    }
+
+    fn core() -> SableCore {
+        SableCore::new(
+            "sable-wasm-tests".to_owned(),
+            Function::new_no_args("return Promise.resolve(null);"),
+            Function::new_with_args("bytes", "return Promise.resolve();"),
+            Function::new_no_args("return Promise.resolve();"),
+            None,
+        )
+    }
+
+    #[wasm_bindgen_test]
+    fn a_failure_is_reported_as_command_err_json() {
+        let error = command_err(&err_json("boom"));
+
+        assert_eq!(error["code"], "failed");
+        assert_eq!(error["log_id"], "boom");
+    }
+
+    #[wasm_bindgen_test]
+    async fn an_unparseable_command_rejects_with_a_protocol_error() {
+        let rejection = core()
+            .submit_command("not json".to_owned())
+            .await
+            .expect_err("an unparseable command must reject");
+
+        command_err(&rejection);
+    }
+
+    #[wasm_bindgen_test]
+    fn events_can_only_be_subscribed_once() {
+        let core = core();
+        let noop = Function::new_with_args("json", "");
+
+        core.subscribe_events(noop.clone()).expect("first subscribe");
+
+        assert!(core.subscribe_events(noop).is_err());
+    }
+}
+
 mod tokio_stream_compat {
     use std::{
         pin::Pin,
