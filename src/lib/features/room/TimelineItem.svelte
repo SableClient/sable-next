@@ -40,6 +40,7 @@
     onEdit?: (eventId: string, body: string) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     canRedactOthers?: boolean;
+    selected?: boolean;
     onPersonaOpenChange?: (open: boolean) => void;
   }
 
@@ -60,6 +61,7 @@
     onEdit,
     onDelete,
     canRedactOthers = false,
+    selected = false,
     onPersonaOpenChange,
   }: Props = $props();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
@@ -203,7 +205,18 @@
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
   <article
     bind:this={messageRow}
-    class={['message', { collapsed, pending, highlighted, persona: personaTint }]}
+    class={[
+      'message',
+      {
+        collapsed,
+        pending,
+        highlighted,
+        selected,
+        persona: personaTint,
+        'mention-silent': item.mention === 'silent',
+        'mention-loud': item.mention === 'loud',
+      },
+    ]}
     style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
     style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
     onpointerdown={startPress}
@@ -450,6 +463,29 @@
     pointer-events: auto;
   }
 
+  .message.mention-silent,
+  .message.mention-loud {
+    border-inline-start: 4px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding-inline: 0.5rem;
+  }
+
+  .message.mention-silent {
+    background: color-mix(in oklab, var(--sable-sec-container) 25%, transparent);
+    border-inline-start-color: var(--sable-sec-main);
+  }
+
+  .message.mention-loud {
+    background: var(--sable-warn-container);
+    border-inline-start-color: var(--sable-warn-main);
+  }
+
+  .message.selected {
+    background: var(--sable-primary-container);
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 0 1px var(--sable-primary-container-line);
+  }
+
   .message.collapsed {
     padding-left: calc(var(--avatar-size-small) + 0.625rem);
   }
@@ -513,6 +549,45 @@
     .message {
       margin-inline: calc(-1 * var(--page-gutter));
       padding-inline: var(--page-gutter);
+    }
+
+    .message.mention-silent,
+    .message.mention-loud {
+      border-inline-start: 4px solid;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding-inline: 0.5rem;
+    }
+
+    .message.mention-silent {
+      background: color-mix(in oklab, var(--sable-sec-container) 25%, transparent);
+      border-inline-start-color: var(--sable-sec-main);
+    }
+
+    .message.mention-loud {
+      background: var(--sable-warn-container);
+      border-inline-start-color: var(--sable-warn-main);
+    }
+
+    .message.mention-loud .body,
+    .message.mention-loud time {
+      color: var(--sable-warn-on-container);
+    }
+
+    .message.mention-loud :global(a[data-matrix-link]) {
+      background: var(--sable-warn-container-active);
+      border-color: var(--sable-warn-container-line);
+      color: var(--sable-warn-on-container);
+    }
+
+    .message.selected {
+      background: var(--sable-primary-container);
+      border-radius: var(--radius);
+      box-shadow: inset 0 0 0 1px var(--sable-primary-container-line);
+    }
+
+    .message.selected .body,
+    .message.selected time {
+      color: var(--sable-primary-on-container);
     }
 
     .message.collapsed {
@@ -914,5 +989,21 @@
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
     padding: 0.125rem 0.5rem;
+  }
+
+  .message.mention-loud .body,
+  .message.mention-loud time {
+    color: var(--sable-warn-on-container);
+  }
+
+  .message.mention-loud :global(a[data-matrix-link]) {
+    background: var(--sable-warn-container-active);
+    border-color: var(--sable-warn-container-line);
+    color: var(--sable-warn-on-container);
+  }
+
+  .message.selected .body,
+  .message.selected time {
+    color: var(--sable-primary-on-container);
   }
 </style>

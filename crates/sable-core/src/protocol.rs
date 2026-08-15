@@ -895,6 +895,18 @@ pub struct TimelineItemView {
     /// MSC4144. When set, this is the identity to show as the sender; `sender`
     /// stays the account that actually sent it and must remain reachable.
     pub per_message_profile: Option<PerMessageProfileView>,
+    pub mention: MentionView,
+}
+
+/// Whether this event mentions us, and how loudly. `Loud` covers `@room` and
+/// anything the push rules chose to highlight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum MentionView {
+    None,
+    Silent,
+    Loud,
 }
 
 /// What this account may do in one room, resolved from `m.room.power_levels`.

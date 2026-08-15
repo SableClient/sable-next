@@ -32,7 +32,7 @@ use crate::matrix_html::{
 };
 use crate::pronoun_sets;
 use crate::protocol::{
-    DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView,
+    DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView, MentionView,
     PerMessageProfileView, ReactionGroup, ReplyView, RoomPermissionsView, RoomStateView,
     RoomSummary, SendStateView, SpaceChildEdge, ThreadSummaryView, TimelineItemContentView,
     TimelineItemView, UploadProgressView, VectorDiff,
@@ -234,7 +234,7 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
 }
 
 #[must_use]
-pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
+pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> TimelineItemView {
     let id = item.unique_id().0.clone();
 
     match item.kind() {
@@ -264,6 +264,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,
+                mention: mention(event, own_user_id),
             }
         }
 
@@ -296,6 +297,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>) -> TimelineItemView {
                 is_own: false,
                 read_by: Vec::new(),
                 per_message_profile: None,
+                mention: MentionView::None,
             }
         }
     }
@@ -322,6 +324,33 @@ fn send_state(state: &EventSendState) -> SendStateView {
 
 /// MSC4144 is still unstable, so the Beeper key is what servers actually emit
 /// today; the `m.` key is read too so nothing breaks when it stabilises.
+/// `m.mentions` names us directly; the SDK's highlight flag folds in `@room`
+/// and any push rule the server matched.
+fn mention(event: &EventTimelineItem, own_user_id: Option<&UserId>) -> MentionView {
+    if event.is_own() {
+        return MentionView::None;
+    }
+    if event.is_highlighted() {
+        return MentionView::Loud;
+    }
+
+    let mentioned = msg_like(event.content())
+        .and_then(|msg| match &msg.kind {
+            MsgLikeKind::Message(message) => Some(message),
+            _ => None,
+        })
+        .and_then(|message| message.mentions())
+        .is_some_and(|mentions| {
+            own_user_id.is_some_and(|user_id| mentions.user_ids.contains(user_id))
+        });
+
+    if mentioned {
+        MentionView::Silent
+    } else {
+        MentionView::None
+    }
+}
+
 const PMP_KEYS: [&str; 2] = ["com.beeper.per_message_profile", "m.per_message_profile"];
 
 fn per_message_profile(event: &EventTimelineItem) -> Option<PerMessageProfileView> {

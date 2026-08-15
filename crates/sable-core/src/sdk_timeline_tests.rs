@@ -360,3 +360,69 @@ async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
         .expect("open timeline stream");
     assert_eq!(event_ids(timeline.items().await), ["$live"]);
 }
+
+#[tokio::test]
+async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!packs:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .mock_room_send()
+        .ok(event_id!("$sticker"))
+        .mount()
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    core.dispatch(Command::SubscribeTimeline {
+        room_id: room_id.to_owned(),
+        event_id: None,
+    })
+    .await
+    .unwrap();
+
+    let result = core
+        .dispatch(Command::SendSticker {
+            room_id: room_id.to_owned(),
+            url: "mxc://example.org/blob".to_owned(),
+            body: "blobwave".to_owned(),
+        })
+        .await;
+
+    assert!(matches!(result, Ok(CommandOk::SendSticker)), "{result:?}");
+
+    let sent = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let requests = server
+                .server()
+                .received_requests()
+                .await
+                .unwrap_or_default();
+            if let Some(request) = requests
+                .iter()
+                .find(|request| request.url.path().contains("/send/m.sticker/"))
+            {
+                break request
+                    .body_json::<serde_json::Value>()
+                    .expect("sticker body");
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the send queue flushed the sticker");
+
+    assert_eq!(sent["url"], "mxc://example.org/blob");
+    assert_eq!(sent["body"], "blobwave");
+}

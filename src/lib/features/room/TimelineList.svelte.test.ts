@@ -52,6 +52,7 @@ function item(id: string): TimelineItemView {
     is_own: false,
     read_by: [],
     per_message_profile: null,
+    mention: 'none',
   };
 }
 

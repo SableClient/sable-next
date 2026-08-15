@@ -160,11 +160,13 @@
   }
 
   .formatted-body :global(a[data-matrix-link]) {
-    background: var(--sable-primary-container);
-    border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
+    background: var(--sable-sec-container);
+    border: 1px solid var(--sable-sec-container-line);
+    border-radius: var(--radius);
+    color: var(--sable-sec-on-container);
     display: inline-block;
-    padding: 0 0.375rem;
+    font-weight: var(--font-weight-medium);
+    padding: 0 0.25rem;
     text-decoration: none;
   }
 
