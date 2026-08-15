@@ -8,4 +8,8 @@ order: string | null,
 /**
  * Used to consistently order sibling child edges with equal `order` values.
  */
-origin_server_ts: number, };
+origin_server_ts: number, 
+/**
+ * The parent marked this child as worth surfacing first.
+ */
+suggested: boolean, };

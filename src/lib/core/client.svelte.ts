@@ -5,10 +5,13 @@ import type { AuthIntent } from '@/generated/AuthIntent';
 import type { LoginFlowsView } from '@/generated/LoginFlowsView';
 import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
 import type { ImagePackView } from '@/generated/ImagePackView';
+import type { JoinRuleView } from '@/generated/JoinRuleView';
 import type { MemberView } from '@/generated/MemberView';
+import type { RoomTag } from '@/generated/RoomTag';
 import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
 import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
+import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
 import type { PaginationDirection } from '@/generated/PaginationDirection';
 import type { MutualRoomView } from '@/generated/MutualRoomView';
@@ -60,6 +63,18 @@ export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
 export type ActiveVerification = { flowId: string; state: VerificationView };
+export type CreateRoomOptions = {
+  name?: string | null;
+  topic?: string | null;
+  isSpace?: boolean;
+  /** Published in the directory, joinable by link. */
+  public?: boolean;
+  /** Ignored for a space or a public room. */
+  encrypted?: boolean;
+  invite?: string[];
+  /** Adds an `m.space.child` edge from this space. */
+  parentSpace?: string | null;
+};
 
 export class CoreClient {
   status = $state<CoreStatus>('idle');
@@ -457,10 +472,76 @@ export class CoreClient {
     });
   }
 
+  async unbanUser(roomId: string, userId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'unban_user',
+      room_id: roomId,
+      user_id: userId,
+      reason: null,
+    });
+  }
+
+  async createRoom(options: CreateRoomOptions): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'create_room',
+      name: options.name ?? null,
+      topic: options.topic ?? null,
+      is_space: options.isSpace ?? false,
+      public: options.public ?? false,
+      encrypted: options.encrypted ?? true,
+      invite: options.invite ?? [],
+      parent_space: options.parentSpace ?? null,
+    });
+    return response.room_id;
+  }
+
   /** Reuses the existing DM with this user when there is one. */
   async createDm(userId: string): Promise<string> {
     const response = await this.ensureTransport().send({ type: 'create_dm', user_id: userId });
     return response.room_id;
+  }
+
+  /** `address` is a room id or an alias. Returns the resolved id. */
+  async joinRoom(address: string, via: string[] = []): Promise<string> {
+    const response = await this.ensureTransport().send({ type: 'join_room', address, via });
+    return response.room_id;
+  }
+
+  /** Also how an invitation is declined. */
+  async leaveRoom(roomId: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'leave_room', room_id: roomId });
+  }
+
+  async addToSpace(spaceId: string, roomId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'add_to_space',
+      space_id: spaceId,
+      room_id: roomId,
+    });
+  }
+
+  /**
+   * The server's own view, so it includes rooms this account has not joined. The
+   * root space is in `rooms`; walk its `children` to rebuild the tree.
+   */
+  async spaceHierarchy(
+    spaceId: string,
+    from: string | null = null
+  ): Promise<{ rooms: SpaceHierarchyRoomView[]; nextBatch: string | null }> {
+    const response = await this.ensureTransport().send({
+      type: 'space_hierarchy',
+      space_id: spaceId,
+      from,
+    });
+    return { rooms: response.rooms, nextBatch: response.next_batch };
+  }
+
+  async removeFromSpace(spaceId: string, roomId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'remove_from_space',
+      space_id: spaceId,
+      room_id: roomId,
+    });
   }
 
   async sendMessage(
@@ -494,6 +575,15 @@ export class CoreClient {
       event_id: eventId,
       body,
       formatted,
+    });
+  }
+
+  /** The filled-in details arrive on the timeline diff stream, not here. */
+  async fetchEventDetails(roomId: string, eventId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'fetch_event_details',
+      room_id: roomId,
+      event_id: eventId,
     });
   }
 
@@ -667,6 +757,67 @@ export class CoreClient {
 
   async setAvatarUrl(url: string | null): Promise<void> {
     await this.ensureTransport().send({ type: 'set_avatar_url', url });
+  }
+
+  /** `m.direct` is client-owned; nothing else will correct it. */
+  async setDirect(roomId: string, direct: boolean): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_direct', room_id: roomId, direct });
+  }
+
+  async setRoomTag(roomId: string, tag: RoomTag, set: boolean): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_room_tag', room_id: roomId, tag, set });
+  }
+
+  async setRoomName(roomId: string, name: string | null): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_room_name', room_id: roomId, name });
+  }
+
+  async setRoomTopic(roomId: string, topic: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_room_topic', room_id: roomId, topic });
+  }
+
+  async setRoomAvatar(roomId: string, url: string | null): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_room_avatar', room_id: roomId, url });
+  }
+
+  async uploadRoomAvatar(
+    roomId: string,
+    mime: string,
+    bytes: Uint8Array<ArrayBuffer>
+  ): Promise<string> {
+    const uri = await this.ensureTransport().uploadMedia(mime, bytes);
+    await this.setRoomAvatar(roomId, uri);
+    return uri;
+  }
+
+  async setRoomJoinRule(roomId: string, rule: JoinRuleView): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_room_join_rule', room_id: roomId, rule });
+  }
+
+  /** Escape hatch for unmodelled state; prefer a typed method where one exists. */
+  async sendStateEvent(
+    roomId: string,
+    eventType: string,
+    stateKey: string,
+    content: unknown
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'send_state_event',
+      room_id: roomId,
+      event_type: eventType,
+      state_key: stateKey,
+      content,
+    });
+  }
+
+  /** Lowering your own cannot be undone: the level to raise it back is gone. */
+  async setUserPowerLevel(roomId: string, userId: string, powerLevel: number): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_user_power_level',
+      room_id: roomId,
+      user_id: userId,
+      power_level: powerLevel,
+    });
   }
 
   async uploadAvatar(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {

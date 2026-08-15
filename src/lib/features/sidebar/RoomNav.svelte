@@ -1,6 +1,8 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
+  import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
   import {
     findRoomByPathId,
@@ -15,7 +17,13 @@
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import MediaImage from '$lib/ui/MediaImage.svelte';
+  import LeaveRoomDialog from '$lib/features/room/LeaveRoomDialog.svelte';
+  import RoomSettingsDialog from '$lib/features/room/RoomSettingsDialog.svelte';
+
+  import RoomInvites from './RoomInvites.svelte';
+  import RoomOptionsMenu from './RoomOptionsMenu.svelte';
 
   interface Props {
     onNavigate?: (href: string) => void;
@@ -25,6 +33,47 @@
 
   let { onNavigate, width, collapsed = false }: Props = $props();
   const roomList = useRoomList();
+  const core = useCoreClient();
+  let settingsRoomId = $state<string | null>(null);
+  let leaveRoomId = $state<string | null>(null);
+  let spacePermissions = $state<RoomPermissionsView | null>(null);
+
+  let activeSpace = $derived(
+    page.url.pathname.startsWith('/space')
+      ? (findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null)
+      : null
+  );
+  // Outside a space anyone may create a room; inside one it also has to land as
+  // a child, which the space's own power levels govern.
+  let canCreateHere = $derived(
+    activeSpace === null || (spacePermissions?.can_manage_children ?? false)
+  );
+  // Nested under the space so its rail, room list and header survive the
+  // navigation; the flat routes would drop back to Home.
+  let createRoomHref = $derived(
+    activeSpace === null
+      ? resolve('/create-room')
+      : resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(activeSpace) })
+  );
+  // A space browses its own children through the lobby; the public directory is
+  // a home-level destination.
+  let browseHref = $derived(
+    activeSpace === null
+      ? resolve('/explore')
+      : resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(activeSpace) })
+  );
+  let browseLabel = $derived(
+    activeSpace === null ? $i18n.t('nav.exploreSpaces') : $i18n.t('nav.lobby')
+  );
+  let createRoomLabel = $derived(
+    activeSpace === null ? $i18n.t('nav.createRoom') : $i18n.t('nav.createRoomInSpace')
+  );
+
+  // Held by id so the dialogs follow the live summary.
+  let settingsRoom = $derived(
+    roomList.rooms.find((room) => room.room_id === settingsRoomId) ?? null
+  );
+  let leaveRoom = $derived(roomList.rooms.find((room) => room.room_id === leaveRoomId) ?? null);
 
   type RoomNavRow = {
     room?: RoomSummary;
@@ -192,6 +241,38 @@
   function isRoom(item: RoomNavItem): item is RoomNavRow {
     return item.kind === 'room';
   }
+
+  // Adding a room to a space writes `m.space.child` there, so the space's own
+  // power levels decide whether creating from inside it is offered at all.
+  $effect(() => {
+    const space = activeSpace;
+    if (!space) {
+      spacePermissions = null;
+      return;
+    }
+
+    let current = true;
+    spacePermissions = null;
+    void core
+      .roomPermissions(space.room_id)
+      .then((next) => {
+        if (current) spacePermissions = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable nav] space permissions unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  function openSettings(room: RoomSummary): void {
+    settingsRoomId = room.room_id;
+  }
+
+  function openLeave(room: RoomSummary): void {
+    leaveRoomId = room.room_id;
+  }
 </script>
 
 <section
@@ -210,24 +291,30 @@
   </header>
 
   <div class="room-nav-content">
+    <RoomInvites {collapsed} />
+
     <div class="room-nav-actions" class:collapsed>
+      {#if canCreateHere}
+        <a
+          class="sable-selection-layer"
+          href={createRoomHref}
+          onclick={() => onNavigate?.(createRoomHref)}
+          aria-label={collapsed ? createRoomLabel : undefined}
+        >
+          <span class="action-icon" aria-hidden="true"><PlusIcon /></span>
+          {#if !collapsed}<span>{createRoomLabel}</span>{/if}
+        </a>
+      {/if}
       <a
         class="sable-selection-layer"
-        href={resolve('/create-room')}
-        onclick={() => onNavigate?.('/create-room')}
-        aria-label={collapsed ? $i18n.t('nav.createRoom') : undefined}
+        href={browseHref}
+        onclick={() => onNavigate?.(browseHref)}
+        aria-label={collapsed ? browseLabel : undefined}
       >
-        <span class="action-icon" aria-hidden="true"><PlusIcon /></span>
-        {#if !collapsed}<span>{$i18n.t('nav.createRoom')}</span>{/if}
-      </a>
-      <a
-        class="sable-selection-layer"
-        href={resolve('/explore')}
-        onclick={() => onNavigate?.('/explore')}
-        aria-label={collapsed ? $i18n.t('nav.exploreSpaces') : undefined}
-      >
-        <span class="action-icon" aria-hidden="true"><CompassIcon /></span>
-        {#if !collapsed}<span>{$i18n.t('nav.exploreSpaces')}</span>{/if}
+        <span class="action-icon" aria-hidden="true">
+          {#if activeSpace === null}<CompassIcon />{:else}<FlagIcon />{/if}
+        </span>
+        {#if !collapsed}<span>{browseLabel}</span>{/if}
       </a>
     </div>
 
@@ -259,66 +346,97 @@
           {#if item.kind === 'category'}
             {@const name = roomName(item.room)}
             {@const isClosed = closedCategories.has(item.key)}
-            <button
-              type="button"
-              class="room-category sable-selection-layer"
-              class:collapsed
-              style:--room-depth={collapsed ? 0 : item.depth}
-              aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
-              aria-expanded={!isClosed}
-              onclick={() => {
-                toggleCategory(item.key);
-              }}
-            >
-              <span class:closed={isClosed} class="category-caret" aria-hidden="true"
-                ><CaretDownIcon /></span
+            <div class="room-row-wrap">
+              <button
+                type="button"
+                class="room-category sable-selection-layer"
+                class:collapsed
+                style:--room-depth={collapsed ? 0 : item.depth}
+                aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
+                aria-expanded={!isClosed}
+                onclick={() => {
+                  toggleCategory(item.key);
+                }}
               >
-              {#if !collapsed}<span class="category-name">{name}</span>{/if}
-            </button>
+                <span class:closed={isClosed} class="category-caret" aria-hidden="true"
+                  ><CaretDownIcon /></span
+                >
+                {#if !collapsed}<span class="category-name">{name}</span>{/if}
+              </button>
+              {#if !collapsed}
+                <RoomOptionsMenu room={item.room} onSettings={openSettings} onLeave={openLeave} />
+              {/if}
+            </div>
           {:else if isRoom(item)}
             {@const room = item.room}
             {@const name = room ? roomName(room) : item.roomId}
             {@const href = roomHref(item)}
             {@const unread = room?.highlight || room?.unread || 0}
-            <a
-              class="room-row sable-selection-layer"
-              class:active={page.url.pathname === href}
-              {href}
-              style:--room-depth={collapsed ? 0 : item.depth}
-              onclick={() => onNavigate?.(href)}
-              aria-label={collapsed ? name : undefined}
-              aria-current={page.url.pathname === href ? 'page' : undefined}
-            >
-              <span class="room-icon" aria-hidden="true">
-                {#if room?.avatar_url}
-                  <MediaImage
-                    source={room.avatar_url}
-                    alt=""
-                    width={56}
-                    height={56}
-                    class="room-image"
-                  />
-                {:else}
-                  {initial(name)}
+            <div class="room-row-wrap">
+              <a
+                class="room-row sable-selection-layer"
+                class:active={page.url.pathname === href}
+                {href}
+                style:--room-depth={collapsed ? 0 : item.depth}
+                onclick={() => onNavigate?.(href)}
+                aria-label={collapsed ? name : undefined}
+                aria-current={page.url.pathname === href ? 'page' : undefined}
+              >
+                <span class="room-icon" aria-hidden="true">
+                  {#if room?.avatar_url}
+                    <MediaImage
+                      source={room.avatar_url}
+                      alt=""
+                      width={56}
+                      height={56}
+                      class="room-image"
+                    />
+                  {:else}
+                    {initial(name)}
+                  {/if}
+                </span>
+                {#if !collapsed}
+                  <span class="room-name">{name}</span>
+                  {#if unread > 0}
+                    <span
+                      class:highlight={(room?.highlight ?? 0) > 0}
+                      class="room-badge"
+                      aria-label={$i18n.t('nav.unreadMessages', { count: unread })}>{unread}</span
+                    >
+                  {/if}
                 {/if}
-              </span>
-              {#if !collapsed}
-                <span class="room-name">{name}</span>
-                {#if unread > 0}
-                  <span
-                    class:highlight={(room?.highlight ?? 0) > 0}
-                    class="room-badge"
-                    aria-label={$i18n.t('nav.unreadMessages', { count: unread })}>{unread}</span
-                  >
-                {/if}
+              </a>
+              {#if !collapsed && room}
+                <RoomOptionsMenu
+                  {room}
+                  parentSpaceId={item.parentSpaceId ?? null}
+                  onSettings={openSettings}
+                  onLeave={openLeave}
+                />
               {/if}
-            </a>
+            </div>
           {/if}
         {/each}
       </div>
     {/if}
   </div>
 </section>
+
+<RoomSettingsDialog
+  open={settingsRoom !== null}
+  room={settingsRoom}
+  onOpenChange={(open) => {
+    if (!open) settingsRoomId = null;
+  }}
+/>
+
+<LeaveRoomDialog
+  open={leaveRoom !== null}
+  room={leaveRoom}
+  onOpenChange={(open) => {
+    if (!open) leaveRoomId = null;
+  }}
+/>
 
 <style>
   .room-nav {
@@ -466,21 +584,36 @@
     padding: 0 0.5rem 0.5rem;
   }
 
+  .room-row-wrap {
+    align-items: center;
+    border-radius: var(--radius);
+    display: flex;
+    min-width: 0;
+    padding-right: 0.25rem;
+  }
+
+  .room-row-wrap:hover,
+  .room-row-wrap:focus-within {
+    background: var(--sable-bg-container-hover);
+  }
+
+  /* A subspace heading opens a group, so it needs air above it to read as a
+     break rather than as one more row. */
+  .room-row-wrap:has(.room-category):not(:first-child) {
+    margin-top: var(--space-2);
+  }
+
   .room-row {
     align-items: center;
     border-radius: var(--radius);
     color: inherit;
     display: flex;
+    flex: 1;
     gap: var(--space-2);
     min-height: var(--control-height-medium);
     min-width: 0;
     padding: 0 0.5rem 0 calc(0.5rem + var(--room-depth) * 1rem);
     text-decoration: none;
-  }
-
-  .room-row:hover,
-  .room-row:focus-visible {
-    background: var(--sable-bg-container-hover);
   }
 
   .room-row.active {
@@ -519,6 +652,7 @@
     color: inherit;
     cursor: pointer;
     display: flex;
+    flex: 1;
     font: inherit;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
@@ -528,11 +662,6 @@
     text-align: left;
     text-transform: uppercase;
     width: 100%;
-  }
-
-  .room-category:hover,
-  .room-category:focus-visible {
-    background: var(--sable-bg-container-hover);
   }
 
   .category-caret.closed {
@@ -586,13 +715,20 @@
     padding: 0 0 0.5rem;
   }
 
+  .room-list.collapsed .room-row-wrap {
+    justify-content: center;
+    padding-right: 0;
+  }
+
   .room-list.collapsed .room-row {
+    flex: none;
     justify-content: center;
     padding: 0;
     width: var(--avatar-size-small);
   }
 
   .room-list.collapsed .room-category {
+    flex: none;
     justify-content: center;
     margin: 0 auto;
     padding: 0;

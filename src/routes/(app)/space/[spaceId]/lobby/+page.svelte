@@ -1,5 +1,27 @@
 <script lang="ts">
-  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+  import { page } from '$app/state';
+
+  import SpaceLobby from '$lib/features/room/SpaceLobby.svelte';
+  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
+
+  const roomList = useRoomList();
+  let space = $derived(findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null);
 </script>
 
-<RoutePlaceholder titleKey="nav.lobby" />
+<svelte:head>
+  <title>{space?.name ?? 'Lobby'} - Sable</title>
+</svelte:head>
+
+<main class="lobby-page">
+  <SpaceLobby {space} />
+</main>
+
+<style>
+  .lobby-page {
+    margin: 0 auto;
+    max-width: 52rem;
+    overflow: auto;
+    padding: var(--page-gutter);
+    width: 100%;
+  }
+</style>

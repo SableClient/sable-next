@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import type { ProfileView } from '@/generated/ProfileView';
   import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
   import { goto } from '$app/navigation';
@@ -21,6 +22,7 @@
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
   import RoomReadReceipts from './RoomReadReceipts.svelte';
+  import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
   import type { MatrixLink } from './matrix-link';
   import { initials } from './timeline-format';
@@ -47,6 +49,8 @@
   let composerContext = $state<ComposerContext | null>(null);
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
+  let settingsOpen = $state(false);
+  const requestedDetails = new SvelteSet<string>();
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
   let latestReadBy = $derived.by(() => {
@@ -93,6 +97,7 @@
     const activeRoomId = resolvedRoomId;
     memberLoader.reset();
     typingUserIds = [];
+    requestedDetails.clear();
     closeProfile();
 
     return core.subscribeEvents((event) => {
@@ -121,6 +126,22 @@
 
   $effect(() => {
     if (desktop && desktopMembersOpen) void loadMembers();
+  });
+
+  // The SDK loads a replied-to event lazily, so a reply preview stays blank
+  // until it is asked for.
+  $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    for (const item of timeline.items) {
+      const reply = item.in_reply_to;
+      if (!reply || reply.body !== null) continue;
+      if (requestedDetails.has(reply.event_id)) continue;
+
+      requestedDetails.add(reply.event_id);
+      void core.fetchEventDetails(activeRoomId, reply.event_id).catch((error: unknown) => {
+        console.debug('[sable room] reply details unavailable', error);
+      });
+    }
   });
 
   $effect(() => {
@@ -338,7 +359,14 @@
 
 <section class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
-    <RoomHeader {roomName} {roomAvatar} onBack={goBack} onMembers={toggleMembers} {initials} />
+    <RoomHeader
+      {roomName}
+      {roomAvatar}
+      onBack={goBack}
+      onMembers={toggleMembers}
+      onSettings={() => (settingsOpen = true)}
+      {initials}
+    />
     {#key resolvedRoomId}
       <TimelineList
         {timeline}
@@ -413,6 +441,14 @@
     </DialogFrame>
   {/if}
 
+  <RoomSettingsDialog
+    open={settingsOpen}
+    room={resolvedRoom ?? null}
+    onOpenChange={(open: boolean) => {
+      settingsOpen = open;
+    }}
+  />
+
   <MentionProfile
     open={profileOpen}
     onOpenChange={(open: boolean) => {
@@ -425,6 +461,7 @@
     {roomId}
     ownPowerLevel={memberLoader.members.find((member) => member.user_id === core.session?.user_id)
       ?.power_level ?? 0}
+    {permissions}
     {profile}
     failed={profileFailed}
   />

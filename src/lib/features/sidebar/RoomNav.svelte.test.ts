@@ -12,7 +12,13 @@ const pageState = vi.hoisted(() => ({
 
 const roomsFixture = vi.hoisted(() => ({ rooms: [] as RoomSummary[] }));
 
+const coreStub = vi.hoisted(() => ({
+  roomPermissions: vi.fn(() => new Promise<never>(() => {})),
+  session: null,
+}));
+
 vi.mock('$app/state', () => ({ page: pageState }));
+vi.mock('$lib/core/context', () => ({ useCoreClient: () => coreStub }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('$lib/i18n', () => ({
   i18n: {
@@ -37,8 +43,11 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     room_id: '!room:example.org',
     canonical_alias: null,
     name: null,
+    topic: null,
     avatar_url: null,
     is_direct: false,
+    join_rule: 'invite',
+    tags: [],
     state: 'joined',
     encrypted: null,
     is_space: false,

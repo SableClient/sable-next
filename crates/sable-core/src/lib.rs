@@ -41,6 +41,7 @@ use matrix_sdk::ruma::api::client::profile::{AvatarUrl, DisplayName};
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::session::get_login_types::v3::LoginType;
+use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::api::client::uiaa::{
     AuthData, AuthFlow, AuthType, EmailIdentity, MatrixUserIdentifier, Password,
@@ -744,6 +745,38 @@ impl Core {
             .map_err(|error| self.failed("add_to_space", error))?;
 
         Ok(())
+    }
+
+    async fn space_hierarchy(
+        &self,
+        space_id: &OwnedRoomId,
+        from: Option<String>,
+    ) -> Result<CommandOk, CommandErr> {
+        let client = self.client().await?;
+
+        let mut request = get_hierarchy::v1::Request::new(space_id.clone());
+        request.from = from;
+
+        let response = client
+            .send(request)
+            .await
+            .map_err(|error| self.failed("space_hierarchy", error))?;
+
+        // Ordering lives on each parent's `m.space.child` edges, so the chunks
+        // are passed through unsorted.
+        let rooms = response
+            .rooms
+            .into_iter()
+            .map(|chunk| {
+                let children = view::hierarchy_child_edges(&chunk.children_state);
+                view::space_hierarchy_room(&chunk.summary, children)
+            })
+            .collect();
+
+        Ok(CommandOk::SpaceHierarchy {
+            rooms,
+            next_batch: response.next_batch,
+        })
     }
 
     /// The handle lives on the timeline item, so the id has to be looked up.

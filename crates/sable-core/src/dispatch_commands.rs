@@ -893,6 +893,10 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::AddToSpace)
             }
 
+            Command::SpaceHierarchy { space_id, from } => {
+                $self.space_hierarchy(&space_id, from).await
+            }
+
             Command::RemoveFromSpace { space_id, room_id } => {
                 // The spec delists by omitting `via`. The typed content has it
                 // non-optional and would send `{"via": []}`, a valid array.

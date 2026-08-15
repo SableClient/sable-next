@@ -10,6 +10,8 @@
   } from '$lib/settings/timeline-preferences.svelte';
   import type { TimelineLayout } from '$lib/settings/timeline-preferences.svelte';
 
+  import StateEventTool from './StateEventTool.svelte';
+
   function gated(setting: SettingDefinition): boolean {
     return setting.gatedBy !== undefined && !timelinePreferences[setting.gatedBy];
   }
@@ -63,6 +65,16 @@
   </SettingsSection>
 {/each}
 
+{#if timelinePreferences.showHiddenEvents}
+  <SettingsSection
+    title={$i18n.t('settings.stateEventTitle')}
+    headingId="settings-state-event"
+    class="state-event-section"
+  >
+    <StateEventTool />
+  </SettingsSection>
+{/if}
+
 <style>
   .settings {
     display: grid;
@@ -100,6 +112,10 @@
   .hint {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  :global(.state-event-section .settings-section-content) {
+    padding: var(--space-3);
   }
 
   select {

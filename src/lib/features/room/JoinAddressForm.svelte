@@ -1,0 +1,110 @@
+<script lang="ts">
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import { useCoreClient } from '$lib/core/context';
+  import { i18n } from '$lib/i18n';
+  import { roomPathParamFromId } from '$lib/rooms/room-list.svelte';
+  import Alert from '$lib/ui/primitives/Alert.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
+  import Label from '$lib/ui/primitives/Label.svelte';
+  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+
+  import { parseJoinAddress } from './join-address';
+
+  const core = useCoreClient();
+  let address = $state('');
+  let joining = $state(false);
+  let invalid = $state(false);
+  let failed = $state(false);
+
+  async function submit(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (joining) return;
+
+    const parsed = parseJoinAddress(address);
+    invalid = parsed === null;
+    failed = false;
+    if (!parsed) return;
+
+    joining = true;
+    try {
+      const roomId = await core.joinRoom(parsed.address, parsed.via);
+      await goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(roomId) }));
+    } catch (error) {
+      console.warn('[sable room] join failed', error);
+      failed = true;
+    } finally {
+      joining = false;
+    }
+  }
+</script>
+
+<form class="join-address" onsubmit={submit}>
+  <div class="examples">
+    <p>{$i18n.t('room.joinExamplesLabel')}</p>
+    <ul>
+      <li><code>#room:server</code></li>
+      <li><code>https://matrix.to/#/#room:server</code></li>
+      <li><code>https://matrix.to/#/!abc:server?via=server</code></li>
+    </ul>
+  </div>
+
+  <div class="field">
+    <Label for="join-address-input">{$i18n.t('room.joinAddressLabel')}</Label>
+    <TextInput
+      id="join-address-input"
+      bind:value={address}
+      autocomplete="off"
+      autocapitalize="none"
+      spellcheck={false}
+      aria-invalid={invalid}
+      placeholder={$i18n.t('room.joinAddressPlaceholder')}
+    />
+    {#if invalid}
+      <p class="error">{$i18n.t('room.joinInvalid')}</p>
+    {/if}
+  </div>
+
+  {#if failed}
+    <Alert variant="critical" role="alert">{$i18n.t('room.joinFailed')}</Alert>
+  {/if}
+
+  <Button type="submit" variant="primary" loading={joining} disabled={address.trim() === ''}>
+    {$i18n.t('room.joinSubmit')}
+  </Button>
+</form>
+
+<style>
+  .join-address {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .field {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .examples {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-body);
+  }
+
+  .examples p {
+    margin: 0 0 var(--space-1);
+  }
+
+  .examples ul {
+    display: grid;
+    gap: 0.125rem;
+    margin: 0;
+    padding-left: var(--space-4);
+  }
+
+  .error {
+    color: var(--sable-crit-main);
+    font-size: var(--font-size-small);
+    margin: 0;
+  }
+</style>

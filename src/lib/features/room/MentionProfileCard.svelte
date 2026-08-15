@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MemberView } from '@/generated/MemberView';
   import type { ProfileView } from '@/generated/ProfileView';
+  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
   import { DropdownMenu } from 'bits-ui';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -8,6 +9,7 @@
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
+  import LockOpenIcon from 'phosphor-svelte/lib/LockOpenIcon';
   import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import GavelIcon from 'phosphor-svelte/lib/GavelIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
@@ -38,6 +40,7 @@
     member: MemberView | null;
     roomId: string;
     ownPowerLevel?: number;
+    permissions?: RoomPermissionsView | null;
     profile: ProfileView | null;
     failed?: boolean;
     variant?: 'popover' | 'sheet';
@@ -48,6 +51,7 @@
     member,
     roomId,
     ownPowerLevel = 0,
+    permissions = null,
     profile,
     failed = false,
     variant = 'popover',
@@ -114,10 +118,25 @@
     return $i18n.t('timeline.powerLevelMember');
   });
   let elevated = $derived(member !== null && member.power_level >= 50);
-  let canModerate = $derived(
-    !isSelf && ownPowerLevel >= 50 && ownPowerLevel > (member?.power_level ?? 0)
+  let outranks = $derived(!isSelf && ownPowerLevel > (member?.power_level ?? 0));
+  let canKick = $derived(outranks && (permissions?.can_kick ?? false));
+  let canBan = $derived(outranks && (permissions?.can_ban ?? false));
+  let canInvite = $derived(!isSelf && member === null && (permissions?.can_invite ?? false));
+  let canUnban = $derived(!isSelf && member === null && (permissions?.can_ban ?? false));
+  let canSetPower = $derived(
+    !isSelf &&
+      (permissions?.can_change_power_levels ?? false) &&
+      ownPowerLevel > (member?.power_level ?? 0)
   );
-  let canInvite = $derived(!isSelf && member === null && ownPowerLevel >= 50);
+  // The spec caps what you may grant at your own level.
+  let powerRoles = $derived(
+    [
+      { level: 100, label: $i18n.t('timeline.powerLevelAdmin') },
+      { level: 50, label: $i18n.t('timeline.powerLevelModerator') },
+      { level: 0, label: $i18n.t('timeline.powerLevelMember') },
+      { level: -1, label: $i18n.t('timeline.powerLevelMuted') },
+    ].filter((role) => role.level <= ownPowerLevel && role.level !== (member?.power_level ?? 0))
+  );
   let profileLink = $derived(`https://matrix.to/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
   let mutualRooms = $state<MutualRoomView[]>([]);
@@ -201,6 +220,12 @@
         console.warn('[sable profile] moderation action failed', error);
       });
     };
+  }
+
+  function setPowerLevel(level: number): void {
+    void core.setUserPowerLevel(roomId, userId, level).catch((error: unknown) => {
+      console.warn('[sable profile] power level change failed', error);
+    });
   }
 
   function showShared(kind: 'rooms' | 'spaces' | null): void {
@@ -326,7 +351,34 @@
           {$i18n.t('timeline.profileInvite')}
         </DropdownMenu.Item>
       {/if}
-      {#if canModerate}
+      {#if canUnban}
+        <DropdownMenu.Item class="profile-menu-item" onSelect={moderate(core.unbanUser.bind(core))}>
+          <LockOpenIcon size={16} />
+          {$i18n.t('timeline.profileUnban')}
+        </DropdownMenu.Item>
+      {/if}
+      {#if canSetPower}
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger class="profile-menu-item">
+            <ShieldIcon size={16} />
+            {$i18n.t('timeline.profileChangePower')}
+          </DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent class="profile-menu" sideOffset={4}>
+            {#each powerRoles as role (role.level)}
+              <DropdownMenu.Item
+                class="profile-menu-item"
+                onSelect={() => {
+                  setPowerLevel(role.level);
+                }}
+              >
+                <span class="profile-power-name">{role.label}</span>
+                <span class="profile-power-level">{role.level}</span>
+              </DropdownMenu.Item>
+            {/each}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+      {/if}
+      {#if canKick}
         <DropdownMenu.Item
           class="profile-menu-item profile-menu-destructive"
           onSelect={moderate(core.kickUser.bind(core))}
@@ -334,8 +386,10 @@
           <SignOutIcon size={16} />
           {$i18n.t('timeline.profileKick')}
         </DropdownMenu.Item>
+      {/if}
+      {#if canBan}
         <DropdownMenu.Item
-          class="profile-menu-item profile-menu-destructive profile-menu-grouped"
+          class={['profile-menu-item profile-menu-destructive', canKick && 'profile-menu-grouped']}
           onSelect={moderate(core.banUser.bind(core))}
         >
           <GavelIcon size={16} />
@@ -346,7 +400,7 @@
         <DropdownMenu.Item
           class={[
             'profile-menu-item profile-menu-destructive',
-            canModerate && 'profile-menu-grouped',
+            (canKick || canBan) && 'profile-menu-grouped',
           ]}
           onSelect={toggleIgnored}
         >
@@ -662,6 +716,16 @@
 
   :global(.profile-menu-item[data-highlighted]) {
     background: var(--sable-bg-container-hover);
+  }
+
+  :global(.profile-power-name) {
+    flex: 1;
+  }
+
+  :global(.profile-power-level) {
+    color: var(--sable-sec-main);
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
   }
 
   :global(.profile-menu-destructive) {

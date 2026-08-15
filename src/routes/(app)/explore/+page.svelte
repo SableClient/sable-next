@@ -1,5 +1,9 @@
 <script lang="ts">
-  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+  import JoinAddressForm from '$lib/features/room/JoinAddressForm.svelte';
+  import { i18n } from '$lib/i18n';
+  import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
 </script>
 
-<RoutePlaceholder titleKey="nav.explore" />
+<AppPageShell title={$i18n.t('room.joinTitle')} description={$i18n.t('room.joinDescription')}>
+  <JoinAddressForm />
+</AppPageShell>

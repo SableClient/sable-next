@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MemberView } from '@/generated/MemberView';
   import type { ProfileView } from '@/generated/ProfileView';
+  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
   import { Popover } from 'bits-ui';
 
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
@@ -16,6 +17,7 @@
     member: MemberView | null;
     roomId: string;
     ownPowerLevel?: number;
+    permissions?: RoomPermissionsView | null;
     profile?: ProfileView | null;
     failed?: boolean;
     anchor: HTMLElement | null;
@@ -28,6 +30,7 @@
     member,
     roomId,
     ownPowerLevel = 0,
+    permissions = null,
     profile = null,
     failed = false,
     anchor,
@@ -68,7 +71,15 @@
         onCloseAutoFocus={handleCloseAutoFocus}
       >
         {#if userId}
-          <MentionProfileCard {userId} {member} {roomId} {ownPowerLevel} {profile} {failed} />
+          <MentionProfileCard
+            {userId}
+            {member}
+            {roomId}
+            {ownPowerLevel}
+            {permissions}
+            {profile}
+            {failed}
+          />
         {/if}
       </Popover.Content>
     </Popover.Portal>
@@ -86,6 +97,7 @@
         {member}
         {roomId}
         {ownPowerLevel}
+        {permissions}
         {profile}
         {failed}
         variant="sheet"

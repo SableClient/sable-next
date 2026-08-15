@@ -26,7 +26,7 @@ encrypted: boolean, invite: string[],
 /**
  * Adds an `m.space.child` edge from this space.
  */
-parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "join_room", 
+parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "space_hierarchy", space_id: string, from: string | null, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "join_room", 
 /**
  * A room id or an alias. A pasted address could be either.
  */

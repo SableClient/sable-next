@@ -5,11 +5,14 @@ use std::sync::Arc;
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{Room, RoomMember};
-use matrix_sdk::ruma::events::MessageLikeEventType;
 use matrix_sdk::ruma::events::SyncStateEvent;
+use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::message::MessageType;
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
-use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
+use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
+use matrix_sdk::ruma::events::tag::TagName;
+use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventType};
+use matrix_sdk::ruma::room::{JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType};
 use matrix_sdk::ruma::{OwnedRoomId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_ui::{
@@ -33,15 +36,16 @@ use crate::matrix_html::{
 use crate::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView, MentionView,
-    PerMessageProfileView, ReactionGroup, ReplyView, RoomPermissionsView, RoomStateView,
-    RoomSummary, SendStateView, SpaceChildEdge, ThreadSummaryView, TimelineItemContentView,
-    TimelineItemView, UploadProgressView, VectorDiff,
+    PerMessageProfileView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
+    RoomStateView, RoomSummary, RoomTag, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView,
+    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
 };
 
 pub struct RoomInfo {
     pub is_space: bool,
     pub canonical_alias: Option<String>,
     pub children: Vec<SpaceChildEdge>,
+    pub tags: Vec<RoomTag>,
 }
 
 #[must_use]
@@ -59,8 +63,11 @@ pub fn room_summary<S: BuildHasher>(
             .cached_display_name()
             .map(|name| name.to_string())
             .or_else(|| item.name()),
+        topic: item.topic(),
         avatar_url: item.avatar_url().map(|url| url.to_string()),
         is_direct: !item.direct_targets().is_empty(),
+        join_rule: join_rule_view(item.join_rule().as_ref()),
+        tags: info.map(|i| i.tags.clone()).unwrap_or_default(),
         encrypted: match item.encryption_state() {
             EncryptionState::Encrypted => Some(true),
             EncryptionState::NotEncrypted => Some(false),
@@ -79,6 +86,18 @@ pub fn room_summary<S: BuildHasher>(
         unread: u32::try_from(item.num_unread_messages()).unwrap_or(u32::MAX),
         highlight: u32::try_from(item.num_unread_mentions()).unwrap_or(u32::MAX),
         latest_event: latest_event(item),
+    }
+}
+
+const fn join_rule_view(rule: Option<&JoinRule>) -> RoomJoinRuleView {
+    match rule {
+        Some(JoinRule::Public) => RoomJoinRuleView::Public,
+        Some(JoinRule::Invite) => RoomJoinRuleView::Invite,
+        Some(JoinRule::Knock) => RoomJoinRuleView::Knock,
+        Some(JoinRule::Restricted(_)) => RoomJoinRuleView::Restricted,
+        Some(JoinRule::KnockRestricted(_)) => RoomJoinRuleView::KnockRestricted,
+        Some(JoinRule::Private) => RoomJoinRuleView::Private,
+        _ => RoomJoinRuleView::Unknown,
     }
 }
 
@@ -187,16 +206,83 @@ pub async fn enrich_room_fields<S: BuildHasher>(
                     is_space,
                     canonical_alias,
                     children,
+                    tags: room_tags(&room).await,
                 }
             }
             None => RoomInfo {
                 is_space: false,
                 canonical_alias: None,
                 children: Vec::new(),
+                tags: Vec::new(),
             },
         };
         room_cache.insert(room_id.to_owned(), info);
     }
+}
+
+#[must_use]
+pub fn space_hierarchy_room(
+    summary: &RumaRoomSummary,
+    children: Vec<SpaceChildEdge>,
+) -> SpaceHierarchyRoomView {
+    SpaceHierarchyRoomView {
+        room_id: summary.room_id.clone(),
+        canonical_alias: summary.canonical_alias.as_ref().map(ToString::to_string),
+        name: summary.name.clone(),
+        topic: summary.topic.clone(),
+        avatar_url: summary.avatar_url.as_ref().map(ToString::to_string),
+        is_space: summary.room_type == Some(RoomType::Space),
+        num_joined_members: u32::try_from(summary.num_joined_members).unwrap_or(u32::MAX),
+        join_rule: join_rule_summary_view(&summary.join_rule),
+        guest_can_join: summary.guest_can_join,
+        children,
+    }
+}
+
+/// Sorted lexically on `order`, then oldest first; unordered entries sort last.
+#[must_use]
+pub fn hierarchy_child_edges(
+    events: &[matrix_sdk::ruma::serde::Raw<HierarchySpaceChildEvent>],
+) -> Vec<SpaceChildEdge> {
+    let mut children: Vec<SpaceChildEdge> = events
+        .iter()
+        .filter_map(|raw| raw.deserialize().ok())
+        .map(|event| SpaceChildEdge {
+            room_id: event.state_key,
+            order: event.content.order.map(|order| order.to_string()),
+            origin_server_ts: u64::from(event.origin_server_ts.get()),
+            suggested: event.content.suggested,
+        })
+        .collect();
+
+    sort_child_edges(&mut children);
+    children
+}
+
+const fn join_rule_summary_view(rule: &JoinRuleSummary) -> RoomJoinRuleView {
+    match rule {
+        JoinRuleSummary::Public => RoomJoinRuleView::Public,
+        JoinRuleSummary::Invite => RoomJoinRuleView::Invite,
+        JoinRuleSummary::Knock => RoomJoinRuleView::Knock,
+        JoinRuleSummary::Restricted(_) => RoomJoinRuleView::Restricted,
+        JoinRuleSummary::KnockRestricted(_) => RoomJoinRuleView::KnockRestricted,
+        JoinRuleSummary::Private => RoomJoinRuleView::Private,
+        _ => RoomJoinRuleView::Unknown,
+    }
+}
+
+async fn room_tags(room: &Room) -> Vec<RoomTag> {
+    let Ok(Some(tags)) = room.tags().await else {
+        return Vec::new();
+    };
+
+    tags.keys()
+        .filter_map(|name| match name {
+            TagName::Favorite => Some(RoomTag::Favourite),
+            TagName::LowPriority => Some(RoomTag::LowPriority),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Sorted lexically on `order`, then oldest first; unordered entries sort last.
@@ -218,9 +304,15 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
             room_id: original.state_key.clone(),
             order: original.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(original.origin_server_ts.get()),
+            suggested: original.content.suggested,
         });
     }
 
+    sort_child_edges(&mut children);
+    children
+}
+
+fn sort_child_edges(children: &mut [SpaceChildEdge]) {
     children.sort_by(|a, b| {
         match (&a.order, &b.order) {
             (Some(left), Some(right)) => left.cmp(right),
@@ -230,7 +322,6 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
         }
         .then_with(|| a.origin_server_ts.cmp(&b.origin_server_ts))
     });
-    children
 }
 
 #[must_use]
@@ -637,6 +728,15 @@ pub fn room_permissions(power_levels: &RoomPowerLevels, user_id: &UserId) -> Roo
         own_power_level: clamp_power_level(power_levels.for_user(user_id)),
         can_post: power_levels.user_can_send_message(user_id, MessageLikeEventType::RoomMessage),
         can_redact_others: power_levels.user_can_redact_event_of_other(user_id),
+        can_invite: power_levels.user_can_invite(user_id),
+        can_kick: power_levels.user_can_kick(user_id),
+        can_ban: power_levels.user_can_ban(user_id),
+        can_change_settings: power_levels.user_can_send_state(user_id, StateEventType::RoomName),
+        can_change_join_rule: power_levels
+            .user_can_send_state(user_id, StateEventType::RoomJoinRules),
+        can_change_power_levels: power_levels
+            .user_can_send_state(user_id, StateEventType::RoomPowerLevels),
+        can_manage_children: power_levels.user_can_send_state(user_id, StateEventType::SpaceChild),
     }
 }
 

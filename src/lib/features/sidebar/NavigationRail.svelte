@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import type { RoomSummary } from '@/generated/RoomSummary';
-  import type { Pathname } from '$app/types';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { i18n } from '$lib/i18n';
@@ -13,11 +12,11 @@
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
+  /** `href` is resolved where the item is built, so templates use it as-is. */
   type RailItem = {
     href: string;
     activePrefix: string;
     label: string;
-    route?: Pathname;
     icon?: Component;
     initial?: string;
     avatar?: string | null;
@@ -40,21 +39,18 @@
       activePrefix: '/home',
       icon: HouseIcon,
       label: 'nav.home',
-      route: '/home',
     },
     {
       href: resolve('/navigate'),
       activePrefix: '/navigate',
       icon: MagnifyingGlassIcon,
       label: 'nav.navigate',
-      route: '/navigate',
     },
     {
       href: resolve('/direct'),
       activePrefix: '/direct',
       icon: ChatsIcon,
       label: 'nav.direct',
-      route: '/direct',
     },
   ];
 
@@ -80,7 +76,6 @@
     activePrefix: '/create-room',
     icon: PlusIcon,
     label: 'nav.createRoom',
-    route: '/create-room',
   };
 
   function spaceName(name: string | null, roomId: string): string {
@@ -107,6 +102,8 @@
   }
 </script>
 
+<!-- eslint-disable svelte/no-navigation-without-resolve -- every rail href is
+     built with resolve() above; resolving again here would double the base path -->
 {#if mobile}
   <div class="rail">
     <div class="rail-scroll">
@@ -118,7 +115,7 @@
               class="rail-item sable-selection-layer"
               class:space-item={Boolean(item.initial)}
               class:active
-              href={resolve((item.route ?? item.href) as Pathname)}
+              href={item.href}
               onclick={() => {
                 navigate(item);
               }}
@@ -158,7 +155,7 @@
         <a
           class="rail-item sable-selection-layer"
           class:active={isActive(createItem)}
-          href={resolve((createItem.route ?? createItem.href) as Pathname)}
+          href={createItem.href}
           onclick={() => {
             navigate(createItem);
           }}
@@ -186,7 +183,7 @@
                 class="rail-item sable-selection-layer"
                 class:space-item={Boolean(item.initial)}
                 class:active
-                href={resolve((item.route ?? item.href) as Pathname)}
+                href={item.href}
                 aria-label={label}
                 aria-current={active ? 'page' : undefined}
               >
@@ -228,7 +225,7 @@
             {...props}
             class="rail-item sable-selection-layer"
             class:active={isActive(createItem)}
-            href={resolve((createItem.route ?? createItem.href) as Pathname)}
+            href={createItem.href}
             aria-label={label}
             aria-current={isActive(createItem) ? 'page' : undefined}
           >

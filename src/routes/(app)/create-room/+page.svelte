@@ -1,5 +1,9 @@
 <script lang="ts">
-  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+  import CreateRoomForm from '$lib/features/room/CreateRoomForm.svelte';
+  import { i18n } from '$lib/i18n';
+  import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
 </script>
 
-<RoutePlaceholder titleKey="nav.createRoom" />
+<AppPageShell title={$i18n.t('room.createTitle')} description={$i18n.t('room.createDescription')}>
+  <CreateRoomForm />
+</AppPageShell>

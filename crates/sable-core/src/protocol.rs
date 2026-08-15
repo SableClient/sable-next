@@ -186,6 +186,13 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
+    /// The server's view of a space's children, so the lobby can list rooms this
+    /// account has never joined. One page; `next_batch` continues it.
+    SpaceHierarchy {
+        #[ts(type = "string")]
+        space_id: OwnedRoomId,
+        from: Option<String>,
+    },
     RemoveFromSpace {
         #[ts(type = "string")]
         space_id: OwnedRoomId,
@@ -478,6 +485,11 @@ pub enum CommandOk {
         room_id: OwnedRoomId,
     },
     AddToSpace,
+    SpaceHierarchy {
+        rooms: Vec<SpaceHierarchyRoomView>,
+        /// Pass back as `from` for the next page; `null` at the end.
+        next_batch: Option<String>,
+    },
     RemoveFromSpace,
 
     /// Resolved, since the caller may have joined by alias.
@@ -722,8 +734,12 @@ pub struct RoomSummary {
     pub room_id: OwnedRoomId,
     pub canonical_alias: Option<String>,
     pub name: Option<String>,
+    pub topic: Option<String>,
     pub avatar_url: Option<String>,
     pub is_direct: bool,
+    pub join_rule: RoomJoinRuleView,
+    /// Only the tags this client models; others are dropped.
+    pub tags: Vec<RoomTag>,
     /// An `invited` room is an invitation to accept, not a room to open.
     pub state: RoomStateView,
     /// `null` until the state event loads, which is not the same as `false`.
@@ -831,6 +847,23 @@ pub enum JoinRuleView {
     Knock,
 }
 
+/// Wider than the settable `JoinRuleView`: a UI that cannot name the current
+/// rule would offer to replace it, silently widening or narrowing who may join.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum RoomJoinRuleView {
+    Public,
+    Invite,
+    Knock,
+    /// Members of an allowed space may join.
+    Restricted,
+    KnockRestricted,
+    Private,
+    /// Not loaded, or a rule this client has no name for.
+    Unknown,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
@@ -850,6 +883,26 @@ pub enum RoomStateView {
     Banned,
 }
 
+/// One room in a space's hierarchy. The root space is included, so a caller can
+/// walk the tree from it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct SpaceHierarchyRoomView {
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    pub canonical_alias: Option<String>,
+    pub name: Option<String>,
+    pub topic: Option<String>,
+    pub avatar_url: Option<String>,
+    pub is_space: bool,
+    pub num_joined_members: u32,
+    pub join_rule: RoomJoinRuleView,
+    pub guest_can_join: bool,
+    /// This room's own `m.space.child` edges, already sorted. Empty unless it is
+    /// a space.
+    pub children: Vec<SpaceChildEdge>,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct SpaceChildEdge {
@@ -860,6 +913,8 @@ pub struct SpaceChildEdge {
     /// Used to consistently order sibling child edges with equal `order` values.
     #[ts(type = "number")]
     pub origin_server_ts: u64,
+    /// The parent marked this child as worth surfacing first.
+    pub suggested: bool,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -912,11 +967,23 @@ pub enum MentionView {
 /// What this account may do in one room, resolved from `m.room.power_levels`.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
+// Each field is an independent capability, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 pub struct RoomPermissionsView {
     pub own_power_level: i32,
     pub can_post: bool,
     /// Redacting someone else's event. Your own needs no extra level.
     pub can_redact_others: bool,
+    pub can_invite: bool,
+    pub can_kick: bool,
+    pub can_ban: bool,
+    /// `m.room.name`, `m.room.topic` and `m.room.avatar` share one level in
+    /// practice, so they are reported together.
+    pub can_change_settings: bool,
+    pub can_change_join_rule: bool,
+    pub can_change_power_levels: bool,
+    /// `m.space.child`. Meaningless outside a space.
+    pub can_manage_children: bool,
 }
 
 /// MSC4144 per-message profile, letting one account send under several

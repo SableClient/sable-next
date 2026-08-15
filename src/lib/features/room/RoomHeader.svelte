@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
@@ -12,10 +13,11 @@
     roomAvatar: string | null;
     onBack: () => void;
     onMembers: () => void;
+    onSettings: () => void;
     initials: (name: string) => string;
   }
 
-  let { roomName, roomAvatar, onBack, onMembers, initials }: Props = $props();
+  let { roomName, roomAvatar, onBack, onMembers, onSettings, initials }: Props = $props();
 </script>
 
 <header class="room-header">
@@ -40,6 +42,15 @@
     <UsersIcon />
     <span>{$i18n.t('timeline.members')}</span>
   </Button>
+  <IconButton
+    class="settings-button"
+    variant="ghost"
+    size="small"
+    label={$i18n.t('room.settingsOpen')}
+    onclick={onSettings}
+  >
+    <GearIcon />
+  </IconButton>
 </header>
 
 <style>
@@ -82,7 +93,8 @@
   }
 
   :global(.back-button svg),
-  :global(.members-button svg) {
+  :global(.members-button svg),
+  :global(.settings-button svg) {
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
   }
