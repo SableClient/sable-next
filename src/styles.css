@@ -234,6 +234,9 @@ html {
   --timeline-row-gap: var(--space-relaxed-tight);
   --timeline-row-padding: var(--space-compact);
 
+  /* Code blocks: the estimator reads this, so it has to be a fixed length. */
+  --code-line-height: 1.25rem;
+
   /* Font families */
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 

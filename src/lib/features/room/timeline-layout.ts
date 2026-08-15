@@ -28,10 +28,11 @@ export const TIMELINE_LAYOUT = {
   debugRowRem: 2.25,
   undecryptableRem: 2.5,
   audioHeightPx: 58,
-  /** Matches the collapse threshold and header in FormattedBody. */
+  /** Matches the collapse threshold in FormattedBody. */
   codeLineLimit: 14,
-  codeLineRem: 1.2,
-  codeChromeRem: 2.75,
+  /** Measured: the mono font's metrics push the line box past --code-line-height. */
+  codeLineRem: 1.3125,
+  codeChromeRem: 3.875,
   pictureRatio: 0.75,
   videoRatio: 9 / 16,
 } as const;

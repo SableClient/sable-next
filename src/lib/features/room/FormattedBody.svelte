@@ -377,9 +377,13 @@
     background: var(--sable-surface-container-hover);
   }
 
+  /* Only long lines scroll. A vertical scroller here would swallow the wheel
+     whenever the pointer crossed a code block, stalling the timeline. */
   .formatted-body :global(pre) {
+    line-height: var(--code-line-height);
     margin: 0;
-    overflow: auto;
+    overflow: auto hidden;
+    overscroll-behavior-x: contain;
     padding: var(--space-1);
   }
 
