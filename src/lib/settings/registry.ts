@@ -2,7 +2,6 @@ import type { TimelinePreferences } from './timeline-preferences.svelte';
 
 export type SettingType = 'boolean';
 
-/** `name` and `description` are i18n keys. */
 export interface SettingDefinition {
   key: keyof TimelinePreferences;
   name: string;

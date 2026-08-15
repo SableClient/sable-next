@@ -6,7 +6,6 @@ export interface TimelinePreferences {
 
 const STORAGE_KEY = 'sable-timeline-preferences';
 
-/** Hiding profile changes by default follows Sable v1's `hideNickAvatarEvents`. */
 const DEFAULTS: TimelinePreferences = {
   hideMembershipEvents: false,
   hideProfileChanges: true,
@@ -24,7 +23,6 @@ function load(): TimelinePreferences {
   }
   if (typeof stored !== 'object' || stored === null) return { ...DEFAULTS };
 
-  // Anything the user hand-edited or an older build wrote falls back per key.
   const record = stored as Record<string, unknown>;
   const preferences = { ...DEFAULTS };
   for (const key of Object.keys(DEFAULTS) as (keyof TimelinePreferences)[]) {
@@ -43,7 +41,7 @@ export function setTimelinePreference<K extends keyof TimelinePreferences>(
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(timelinePreferences));
-  } catch {
-    // Private browsing can refuse writes; the in-memory value still applies.
+  } catch (error) {
+    console.debug('[sable settings] timeline preferences not persisted', error);
   }
 }

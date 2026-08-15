@@ -1,13 +1,10 @@
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { TimelinePreferences } from '$lib/settings/timeline-preferences.svelte';
 
-// Digits and a few ASCII marks are Emoji_Component, so a pictographic
-// character has to be present for a body to count as emoji-only.
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const JUMBO_MAX = 8;
 
-/** Emoji-only bodies render larger, stepping down as the count grows. */
 export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
   const trimmed = body.trim();
   if (!trimmed || !PICTOGRAPHIC.test(trimmed) || !EMOJI_ONLY.test(trimmed)) return null;
@@ -20,7 +17,6 @@ export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
   return count <= 4 ? 3 : 4;
 }
 
-/** Dividers and markers annotate a run of events; they cannot justify one. */
 function isAnnotation(item: TimelineItemView): boolean {
   const kind = item.content.kind;
   return kind === 'date_divider' || kind === 'read_marker' || kind === 'timeline_start';
@@ -29,7 +25,6 @@ function isAnnotation(item: TimelineItemView): boolean {
 function isVisibleEvent(item: TimelineItemView, preferences: TimelinePreferences): boolean {
   switch (item.content.kind) {
     case 'membership':
-      // `other` is the SDK reporting a member event it could not classify.
       return !preferences.hideMembershipEvents && item.content.change !== 'other';
     case 'profile_change':
       return !preferences.hideProfileChanges;
@@ -40,7 +35,6 @@ function isVisibleEvent(item: TimelineItemView, preferences: TimelinePreferences
   }
 }
 
-/** A divider left with nothing under it would render as a stray date. */
 export function visibleTimelineItems(
   items: readonly TimelineItemView[],
   preferences: TimelinePreferences

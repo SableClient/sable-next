@@ -81,8 +81,6 @@
     border: 1px solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     inset-inline-end: var(--space-2);
-
-    /* Rides the row's top edge so it never covers the message text. */
     bottom: calc(100% - var(--space-1));
     box-shadow: var(--shadow-float);
     display: flex;
@@ -109,7 +107,6 @@
     width: var(--control-height-small);
   }
 
-  /* Keeps the control 24px tall while the target reaches 36px. */
   .message-actions :global(button::after) {
     content: '';
     inset: -0.375rem -1px;

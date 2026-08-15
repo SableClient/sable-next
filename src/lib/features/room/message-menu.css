@@ -1,5 +1,3 @@
-/* bits-ui portals menu content out of the component, so these rules cannot be
-   scoped styles. */
 .message-menu {
   background: var(--sable-bg-container);
   border: 1px solid var(--sable-bg-container-line);

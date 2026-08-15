@@ -69,8 +69,6 @@
 
   :global(.sable-avatar-small) {
     --avatar-size: var(--avatar-size-small);
-
-    /* Keeps the corner-to-size ratio of the larger sizes. */
     --avatar-radius: 0.3125rem;
   }
 
@@ -80,7 +78,6 @@
     font-size: var(--font-size-xlarge);
   }
 
-  /* Last, so it also rounds the small and large sizes. */
   :global(.sable-avatar-room) {
     --avatar-radius: var(--radius-pill);
   }

@@ -59,7 +59,6 @@
     width: 1rem;
   }
 
-  /* Indents the hint past the checkbox, to the label text. */
   p {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);

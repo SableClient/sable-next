@@ -56,7 +56,6 @@
       ? jumboEmojiLevel(item.content.body)
       : null
   );
-  // A recoverable failure resumes by itself, so only a parked one gets a prompt.
   let stalled = $derived(
     item.send_state?.status === 'failed' && !item.send_state.recoverable ? item.send_state : null
   );
@@ -68,7 +67,6 @@
     item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
   );
 
-  // A local echo has no event id, so server-event actions have nothing to act on.
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
   let ownMessage = $derived(item.is_own && item.content.kind === 'message');
 
@@ -150,7 +148,6 @@
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
   }
 
-  /** A single event can rename, unset a name, or change the avatar. */
   function profileChangeText(
     change: Extract<TimelineItemView['content'], { kind: 'profile_change' }>
   ): string {
@@ -209,7 +206,6 @@
     <div class="message-content">
       {#if !collapsed}
         <header>
-          <!-- An emote carries the name in its own text, so the header omits it. -->
           {#if !emote}
             <span class="sender" style:color={senderColor(item.sender)}>{senderName}</span>
           {/if}
@@ -307,7 +303,6 @@
       {/if}
       {#if stalled}
         <p class="send-failure">
-          <!-- The raw SDK error is diagnostic detail. -->
           <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
           {#if item.transaction_id}
             {@const transactionId = item.transaction_id}
@@ -370,7 +365,6 @@
     position: relative;
   }
 
-  /* Keyboard reach is not gated on pointer capability. */
   .message:focus-within :global(.message-actions) {
     opacity: 1;
     pointer-events: auto;
@@ -486,7 +480,6 @@
     font-weight: var(--font-weight-bold);
   }
 
-  /* An emote reads as one sentence, so the name sits in the text flow. */
   .emote {
     color: var(--sable-success-main);
     font-style: italic;
@@ -557,8 +550,6 @@
     white-space: pre-wrap;
   }
 
-  /* The third term is the width a 32rem-tall image would take: it caps height
-     without letterboxing a portrait picture. */
   :global(.image) {
     border-radius: var(--radius);
     display: block;
@@ -566,7 +557,6 @@
     width: min(100%, 32rem, calc(32rem * var(--media-ratio)));
   }
 
-  /* A sticker is glyph-sized, so it ignores the picture box width. */
   :global(.sticker) {
     border-radius: var(--radius);
     display: block;
@@ -612,13 +602,10 @@
     font-weight: var(--font-weight-medium);
     gap: 0.25rem;
     min-height: 1.5rem;
-
-    /* Sits the glyph nearer the leading edge than the count. */
     padding: 2px 0.5rem 2px 0.375rem;
     position: relative;
   }
 
-  /* Keeps the pill visually 24px while meeting the 36px touch target. */
   .reaction::after {
     border-radius: inherit;
     content: '';
@@ -679,11 +666,6 @@
     text-align: center;
   }
 
-  /* Left-aligned against the message column, so a run of these does not pull
-     the eye to the centre and back. */
-
-  /* The row wrapper already supplies the vertical rhythm, so these stay one
-     line tall. */
   .state {
     align-items: center;
     color: var(--sable-surface-var-on-container);
