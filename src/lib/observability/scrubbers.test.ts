@@ -190,6 +190,23 @@ describe('omitIdentifierFields', () => {
       omitIdentifierFields({ roomId: '!room:example.org', eventId: '$abc', kind: 'reaction' })
     ).toEqual({ kind: 'reaction' });
   });
+
+  it('removes the snake_case keys the core emits', () => {
+    expect(
+      omitIdentifierFields({
+        room_id: '!room:example.org',
+        event_id: '$abc',
+        sender_id: '@alice:example.org',
+        kind: 'reaction',
+      })
+    ).toEqual({ kind: 'reaction' });
+  });
+
+  it('removes opaque ids that no value pattern would catch', () => {
+    expect(
+      omitIdentifierFields({ device_id: 'QBUAZIFURK', transaction_id: 'm1234567890' })
+    ).toEqual({});
+  });
 });
 
 describe('sanitizePayload', () => {
@@ -197,5 +214,11 @@ describe('sanitizePayload', () => {
     expect(
       sanitizePayload({ roomId: '!room:example.org', message: 'from @alice:example.org' })
     ).toEqual({ message: 'from @[USER_ID]' });
+  });
+
+  it('drops a core payload down to its non-identifying fields', () => {
+    expect(
+      sanitizePayload({ room_id: '!room:example.org', device_id: 'QBUAZIFURK', code: 'failed' })
+    ).toEqual({ code: 'failed' });
   });
 });

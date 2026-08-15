@@ -46,24 +46,30 @@ export function scrubDataObject(data: unknown): unknown {
   return data;
 }
 
-const IDENTIFIER_KEYS = new Set([
-  'roomId',
-  'eventId',
-  'userId',
-  'senderId',
-  'targetEventId',
-  'deviceId',
-  'spaceId',
-  'threadRootId',
-  'transactionId',
-]);
+function identifierKey(key: string): string {
+  return key.toLowerCase().replace(/_/g, '');
+}
+
+const IDENTIFIER_KEYS = new Set(
+  [
+    'roomId',
+    'eventId',
+    'userId',
+    'senderId',
+    'targetEventId',
+    'deviceId',
+    'spaceId',
+    'threadRootId',
+    'transactionId',
+  ].map(identifierKey)
+);
 
 export function omitIdentifierFields(data: unknown): unknown {
   if (Array.isArray(data)) return data.map(omitIdentifierFields);
   if (data !== null && typeof data === 'object') {
     return Object.fromEntries(
       Object.entries(data as Record<string, unknown>)
-        .filter(([key]) => !IDENTIFIER_KEYS.has(key))
+        .filter(([key]) => !IDENTIFIER_KEYS.has(identifierKey(key)))
         .map(([key, value]) => [key, omitIdentifierFields(value)])
     );
   }
