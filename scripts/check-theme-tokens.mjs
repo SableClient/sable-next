@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sourceRoot = join(root, 'src');
 const sourceExtensions = new Set(['.css', '.svelte', '.ts', '.js', '.mjs']);
+const styleExtensions = new Set(['.css', '.svelte']);
 const declarationPattern = /(--[a-z0-9_-]+)\s*:/gi;
 const runtimeDeclarationPattern = /style:\s*(--[a-z0-9_-]+)\s*=/gi;
 const setPropertyPattern = /setProperty\(\s*['"](--[a-z0-9_-]+)['"]/gi;
@@ -68,7 +69,12 @@ for (const file of files) {
     addLocation(referenced, property, file, source, match.index);
   }
 
-  if (relative(root, file) !== 'src\\styles.css' && relative(root, file) !== 'src/styles.css') {
+  const isStyleFile = styleExtensions.has(file.slice(file.lastIndexOf('.')));
+  if (
+    isStyleFile &&
+    relative(root, file) !== 'src\\styles.css' &&
+    relative(root, file) !== 'src/styles.css'
+  ) {
     for (const match of source.matchAll(literalColorPattern)) {
       literalColors.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
     }
