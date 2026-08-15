@@ -2,6 +2,7 @@
   import { i18n } from '$lib/i18n';
   import { onMount } from 'svelte';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
+  import { unreadSpaceIds } from '$lib/rooms/spaces';
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
@@ -32,6 +33,7 @@
 
     return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
+  let unreadSpaces = $derived(unreadSpaceIds(spaces, roomList.rooms));
 
   onMount(() => {
     const storedWidth = Number.parseInt(localStorage.getItem(ROOM_NAV_STORAGE_KEY) ?? '', 10);
@@ -94,7 +96,7 @@
   {#if mobile}
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="navigation-main">
-        <NavigationRail {spaces} mobile {onNavigate} />
+        <NavigationRail {spaces} unreadSpaceIds={unreadSpaces} mobile {onNavigate} />
         <RoomNav {onNavigate} />
       </div>
       <UserQuickTools mobile {onNavigate} />
@@ -102,7 +104,7 @@
   {:else}
     <nav class="desktop-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="desktop-navigation-main">
-        <NavigationRail {spaces} />
+        <NavigationRail {spaces} unreadSpaceIds={unreadSpaces} />
         <RoomNav width={roomNavWidth} {collapsed} />
         <button
           type="button"

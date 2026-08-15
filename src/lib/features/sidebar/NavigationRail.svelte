@@ -22,15 +22,17 @@
     initial?: string;
     avatar?: string | null;
     navigateHref?: string;
+    unread?: boolean;
   };
 
   interface Props {
     spaces: readonly RoomSummary[];
+    unreadSpaceIds?: ReadonlySet<string>;
     mobile?: boolean;
     onNavigate?: (href: string) => void;
   }
 
-  let { spaces, mobile = false, onNavigate }: Props = $props();
+  let { spaces, unreadSpaceIds = new Set(), mobile = false, onNavigate }: Props = $props();
 
   const items: readonly RailItem[] = [
     {
@@ -68,6 +70,7 @@
         initial: initial(name),
         avatar: space.avatar_url,
         label: name,
+        unread: unreadSpaceIds.has(space.room_id),
       };
     })
   );
@@ -141,6 +144,9 @@
                   {/if}
                 </span>
               {/if}
+              {#if item.unread}
+                <span class="unread-dot" aria-hidden="true"></span>
+              {/if}
             </a>
           </li>
         {/each}
@@ -202,6 +208,9 @@
                       {item.initial}
                     {/if}
                   </span>
+                {/if}
+                {#if item.unread}
+                  <span class="unread-dot" aria-hidden="true"></span>
                 {/if}
               </a>
             {/snippet}
@@ -328,6 +337,18 @@
     justify-content: center;
     overflow: hidden;
     width: var(--avatar-size-small);
+  }
+
+  .unread-dot {
+    background: var(--sable-primary-main);
+    border: 2px solid var(--sable-bg-container);
+    border-radius: 50%;
+    box-sizing: border-box;
+    height: 0.625rem;
+    position: absolute;
+    right: 0.125rem;
+    top: 0.125rem;
+    width: 0.625rem;
   }
 
   :global(.space-image) {
