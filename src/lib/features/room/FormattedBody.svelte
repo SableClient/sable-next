@@ -154,6 +154,36 @@
     white-space: pre-wrap;
   }
 
+  .formatted-body :global(h1),
+  .formatted-body :global(h2),
+  .formatted-body :global(h3),
+  .formatted-body :global(h4),
+  .formatted-body :global(h5),
+  .formatted-body :global(h6) {
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-body);
+    margin: 0.25rem 0 0;
+  }
+
+  .formatted-body :global(h1) {
+    font-size: var(--font-size-large);
+  }
+
+  .formatted-body :global(h2) {
+    font-size: var(--font-size-medium);
+  }
+
+  .formatted-body :global(h3),
+  .formatted-body :global(h4),
+  .formatted-body :global(h5),
+  .formatted-body :global(h6) {
+    font-size: inherit;
+  }
+
+  .formatted-body :global(:first-child) {
+    margin-top: 0;
+  }
+
   .formatted-body :global(a) {
     color: var(--sable-primary-main);
     text-decoration: underline;

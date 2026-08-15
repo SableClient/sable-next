@@ -54,7 +54,12 @@ const renamed = item({
   display_name: { old: 'a', new: 'b' },
   avatar_changed: false,
 });
-const topic = item({ kind: 'state_event', event_type: 'm.room.topic', state_key: '' });
+const topic = item({
+  kind: 'state_event',
+  event_type: 'm.room.topic',
+  state_key: '',
+  content: null,
+});
 
 test('hides profile changes and raw state events by default, keeping joins', () => {
   const visible = visibleTimelineItems([joined, renamed, topic, message], defaults);

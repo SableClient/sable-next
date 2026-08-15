@@ -1064,6 +1064,10 @@ pub enum TimelineItemContentView {
         /// e.g. `m.room.topic`.
         event_type: String,
         state_key: String,
+        /// Raw content, for the developer-only peek. Absent if the event's
+        /// JSON is no longer around.
+        #[ts(type = "unknown")]
+        content: Option<serde_json::Value>,
     },
     DateDivider {
         #[ts(type = "number")]

@@ -233,7 +233,7 @@
     const pending = composerContext;
     composerContext = null;
     if (pending?.kind === 'edit') {
-      await core.editMessage(targetRoomId, pending.eventId, body);
+      await core.editMessage(targetRoomId, pending.eventId, body, formatted);
       return;
     }
     await core.sendMessage(targetRoomId, body, pending?.eventId ?? null, formatted);

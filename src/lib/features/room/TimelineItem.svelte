@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Collapsible } from 'bits-ui';
+
   import type { MemberView } from '@/generated/MemberView';
   import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
   import type { TimelineItemView } from '@/generated/TimelineItemView';
@@ -178,6 +180,7 @@
   let deleteOpen = $state(false);
   let reactionsOpen = $state(false);
   let receiptsOpen = $state(false);
+  let peekOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
@@ -340,9 +343,6 @@
           {/if}
           <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time
           >
-          {#if item.content.kind === 'message' && item.content.edited}
-            <span class="edited">{$i18n.t('timeline.edited')}</span>
-          {/if}
         </header>
       {/if}
       {#if item.in_reply_to}
@@ -364,6 +364,10 @@
       {:else if item.content.kind === 'message'}
         <div class={jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`}>
           <FormattedBody html={item.content.html} {onMatrixLink} />
+          <!-- Trails the body, where the edit happened, not the header. -->
+          {#if item.content.edited}
+            <span class="edited">{$i18n.t('timeline.edited')}</span>
+          {/if}
         </div>
       {:else if item.content.kind === 'sticker'}
         <MediaImage
@@ -474,10 +478,23 @@
     {stateEventText(item, $i18n.t)}
   </p>
 {:else if item.content.kind === 'state_event'}
-  <p class="debug-event">
+  {@const raw = item.content.content}
+  <div class="debug-event">
     <code>{item.content.event_type}</code>
-    {$i18n.t('timeline.stateEvent', { type: item.content.event_type })}
-  </p>
+    <div class="debug-body">
+      <span>{$i18n.t('timeline.stateEvent', { type: item.content.event_type })}</span>
+      {#if raw !== null}
+        <Collapsible.Root bind:open={peekOpen}>
+          <Collapsible.Trigger class="debug-peek-trigger">
+            {peekOpen ? $i18n.t('timeline.hidePeek') : $i18n.t('timeline.showPeek')}
+          </Collapsible.Trigger>
+          <Collapsible.Content>
+            <pre class="debug-peek">{JSON.stringify(raw, null, 2)}</pre>
+          </Collapsible.Content>
+        </Collapsible.Root>
+      {/if}
+    </div>
+  </div>
 {:else if item.content.kind === 'unable_to_decrypt'}
   <p class="undecryptable">
     {$i18n.t('timeline.unableToDecrypt', { reason: item.content.reason })}
@@ -527,13 +544,15 @@
     padding-inline: 0.5rem;
   }
 
+  /* The leading border carries the signal, so the fill stays quiet enough to
+     read a long message on. */
   .message.mention-silent {
-    background: color-mix(in oklab, var(--sable-sec-container) 25%, transparent);
+    background: color-mix(in oklab, var(--sable-sec-container) 20%, transparent);
     border-inline-start-color: var(--sable-sec-main);
   }
 
   .message.mention-loud {
-    background: var(--sable-warn-container);
+    background: color-mix(in oklab, var(--sable-warn-container) 35%, transparent);
     border-inline-start-color: var(--sable-warn-main);
   }
 
@@ -548,6 +567,17 @@
 
   .message.collapsed {
     padding-left: calc(var(--avatar-size-small) + 0.625rem);
+  }
+
+  /* Identity has to persist when the header is gone. */
+  .message.persona.collapsed::before {
+    background: color-mix(in oklab, var(--pmp-ink) 55%, var(--sable-bg-container-line));
+    border-radius: var(--radius-pill);
+    content: '';
+    inset-block: 2px;
+    inset-inline-start: calc(var(--avatar-size-small) / 2 - 1px);
+    position: absolute;
+    width: 2px;
   }
 
   .message.pending {
@@ -680,8 +710,14 @@
     gap: 0.5rem;
   }
 
+  /* The name gives way before the pronouns, the via chip or the time. */
   .sender {
     font-weight: var(--font-weight-bold);
+    letter-spacing: -0.005em;
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .persona {
@@ -783,6 +819,10 @@
   .edited {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  .edited {
+    margin-inline-start: 0.25rem;
   }
 
   .send-failure {
@@ -1007,6 +1047,35 @@
     padding: 0.375rem 0;
   }
 
+  .debug-body {
+    display: grid;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .debug-body :global(.debug-peek-trigger) {
+    background: none;
+    border: 0;
+    color: var(--sable-primary-main);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-small);
+    justify-self: start;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .debug-peek {
+    background: var(--sable-bg-container);
+    border-radius: var(--radius);
+    font-size: var(--font-size-small);
+    margin: 0.25rem 0 0;
+    max-height: 14rem;
+    overflow: auto;
+    padding: var(--space-1);
+  }
+
   .debug-event code {
     flex: 0 0 auto;
     font-family: monospace;
@@ -1070,11 +1139,6 @@
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
     padding: 0.125rem 0.5rem;
-  }
-
-  .message.mention-loud .body,
-  .message.mention-loud time {
-    color: var(--sable-warn-on-container);
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {

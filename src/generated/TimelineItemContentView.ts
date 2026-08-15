@@ -23,4 +23,9 @@ display_name: string | null, } | { "kind": "profile_change", user_id: string, di
 /**
  * e.g. `m.room.topic`.
  */
-event_type: string, state_key: string, } | { "kind": "date_divider", timestamp: number, } | { "kind": "read_marker" } | { "kind": "timeline_start" } | { "kind": "unsupported", description: string, };
+event_type: string, state_key: string, 
+/**
+ * Raw content, for the developer-only peek. Absent if the event's
+ * JSON is no longer around.
+ */
+content: unknown, } | { "kind": "date_divider", timestamp: number, } | { "kind": "read_marker" } | { "kind": "timeline_start" } | { "kind": "unsupported", description: string, };

@@ -243,7 +243,8 @@ pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> 
                 TimelineDetails::Ready(profile) => Some(profile),
                 _ => None,
             };
-            let message_profile = per_message_profile(event);
+            let raw = raw_content(event);
+            let message_profile = per_message_profile(raw.as_ref());
 
             TimelineItemView {
                 id,
@@ -256,7 +257,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> 
                     .and_then(|p: &Profile| p.avatar_url.as_ref())
                     .map(ToString::to_string),
                 timestamp: event.timestamp().0.into(),
-                content: content(event.content(), message_profile.as_ref()),
+                content: content(event.content(), message_profile.as_ref(), raw.as_ref()),
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
@@ -353,12 +354,16 @@ fn mention(event: &EventTimelineItem, own_user_id: Option<&UserId>) -> MentionVi
 
 const PMP_KEYS: [&str; 2] = ["com.beeper.per_message_profile", "m.per_message_profile"];
 
-fn per_message_profile(event: &EventTimelineItem) -> Option<PerMessageProfileView> {
-    // An edit replaces the content, carrying its own profile, so the latest
-    // event wins over the original.
+/// An edit replaces the content, carrying its own profile, so the latest event
+/// wins over the original.
+fn raw_content(event: &EventTimelineItem) -> Option<serde_json::Value> {
     let raw = event.latest_json().or_else(|| event.original_json())?;
     let json: serde_json::Value = raw.deserialize_as_unchecked().ok()?;
-    let content = json.get("content")?;
+    json.get("content").cloned()
+}
+
+fn per_message_profile(content: Option<&serde_json::Value>) -> Option<PerMessageProfileView> {
+    let content = content?;
     let profile = PMP_KEYS.iter().find_map(|key| content.get(*key))?;
 
     let text = |key: &str| {
@@ -440,6 +445,7 @@ fn text_message(
 fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
+    raw: Option<&serde_json::Value>,
 ) -> TimelineItemContentView {
     let unsupported = |what: &str| TimelineItemContentView::Unsupported {
         description: what.to_owned(),
@@ -529,6 +535,7 @@ fn content(
         TimelineItemContent::OtherState(state) => TimelineItemContentView::StateEvent {
             event_type: state.content().event_type().to_string(),
             state_key: state.state_key().to_owned(),
+            content: raw.cloned(),
         },
         TimelineItemContent::CallInvite => unsupported("call invite"),
         _ => unsupported("event"),

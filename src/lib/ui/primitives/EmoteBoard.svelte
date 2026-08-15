@@ -78,6 +78,10 @@
       .filter((section) => section.images.length > 0);
   });
 
+  let searching = $derived(query.trim() !== '');
+  /** Searching is by emote, not by pack, so matches arrive as one flat list. */
+  let matchedImages = $derived(searching ? sections.flatMap((section) => section.images) : []);
+
   let recentImages = $derived.by(() => {
     if (query.trim() !== '') return [];
     const all = sections.flatMap((section) => section.images);
@@ -133,6 +137,17 @@
     return `pack-${pack.origin}-${pack.room_id ?? 'account'}-${pack.id}`;
   }
 
+  /** A reaction key is any string, so an unmatched query is still a valid one. */
+  function submitQuery(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || !onPickUnicode) return;
+    const text = query.trim();
+    if (text === '') return;
+    event.preventDefault();
+    const best = unicodeSections.at(0)?.emojis.at(0);
+    if (best !== undefined) rememberReaction(best);
+    onPickUnicode(best ?? text);
+  }
+
   function pick(image: PackImageView): void {
     recent = [image.shortcode, ...recent.filter((code) => code !== image.shortcode)].slice(0, 32);
     writeRecent(recent);
@@ -172,6 +187,7 @@
       bind:value={query}
       placeholder={$i18n.t('composer.searchPacks')}
       aria-label={$i18n.t('composer.searchPacks')}
+      onkeydown={submitQuery}
     />
   </div>
 
@@ -185,7 +201,7 @@
     </div>
   {:else}
     <div class="board-body">
-      <nav class="rail" aria-label={$i18n.t('composer.packs')}>
+      <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
         {#each ['account', 'room', 'global'] as const as origin (origin)}
           {@const group = sections.filter((section) => section.pack.origin === origin)}
           {#if group.length > 0}
@@ -239,6 +255,18 @@
       </nav>
 
       <div class="grids">
+        {#if onPickUnicode && query.trim() !== ''}
+          {@const text = query.trim()}
+          <button
+            type="button"
+            class="free-text"
+            onclick={() => {
+              onPickUnicode(text);
+            }}
+          >
+            {$i18n.t('composer.reactWithText', { text })}
+          </button>
+        {/if}
         {#if recentImages.length > 0}
           <section>
             <h3>{$i18n.t('composer.recent')}</h3>
@@ -265,7 +293,33 @@
             </ul>
           </section>
         {/if}
-        {#each sections as section (sectionId(section.pack))}
+        {#if searching && matchedImages.length > 0}
+          <section>
+            <h3>{$i18n.t('composer.emoticons')}</h3>
+            <ul>
+              {#each matchedImages as image (image.url)}
+                <li>
+                  <button
+                    type="button"
+                    title=":{image.shortcode}:"
+                    aria-label=":{image.shortcode}:"
+                    onclick={() => {
+                      pick(image);
+                    }}
+                  >
+                    <MediaImage
+                      source={image.url}
+                      alt={image.body ?? image.shortcode}
+                      width={32}
+                      height={32}
+                    />
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+        {#each searching ? [] : sections as section (sectionId(section.pack))}
           <section id={sectionId(section.pack)}>
             <h3>
               {packName(section.pack)}
@@ -479,6 +533,31 @@
   }
 
   .grids li button:hover {
+    background: var(--sable-surface-container-hover);
+  }
+
+  .rail.hidden {
+    display: none;
+  }
+
+  .free-text {
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius);
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-small);
+    margin-bottom: var(--space-2);
+    overflow: hidden;
+    padding: 0.375rem var(--space-1);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .free-text:hover {
     background: var(--sable-surface-container-hover);
   }
 
