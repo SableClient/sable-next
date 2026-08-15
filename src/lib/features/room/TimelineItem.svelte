@@ -364,20 +364,19 @@
 <style>
   .message {
     display: flex;
-    gap: 0.625rem;
+    gap: var(--timeline-row-gap);
     overflow-wrap: anywhere;
-    padding: 0.25rem 0;
+    padding: var(--timeline-row-padding) 0;
     position: relative;
   }
 
-  /* Keyboard reach is not gated on pointer capability. */
   .message:focus-within :global(.message-actions) {
     opacity: 1;
     pointer-events: auto;
   }
 
   .message.collapsed {
-    padding-left: calc(var(--avatar-size-small) + 0.625rem);
+    padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap));
   }
 
   .message.pending {
@@ -442,7 +441,7 @@
     }
 
     .message.collapsed {
-      padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + 0.625rem);
+      padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap));
     }
 
     .message:hover {
@@ -563,7 +562,11 @@
     border-radius: var(--radius);
     display: block;
     margin-top: 0.25rem;
-    width: min(100%, 32rem, calc(32rem * var(--media-ratio)));
+    width: min(
+      100%,
+      var(--timeline-media-max),
+      calc(var(--timeline-media-max) * var(--media-ratio))
+    );
   }
 
   /* A sticker is glyph-sized, so it ignores the picture box width. */
@@ -571,11 +574,11 @@
     border-radius: var(--radius);
     display: block;
     margin-top: 0.25rem;
-    width: 9.5rem;
+    width: var(--timeline-sticker-width);
   }
 
   :global(.media) {
-    width: min(100%, 32rem);
+    width: min(100%, var(--timeline-media-max));
   }
 
   .reply-preview {

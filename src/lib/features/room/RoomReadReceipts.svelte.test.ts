@@ -24,11 +24,15 @@ test('shows a face stack and opens the seen-by list', async () => {
 
   const trigger = document.querySelector('button') as HTMLButtonElement;
   expect(trigger.getAttribute('aria-label')).toBe('Seen by Bob, Carol. Open the list.');
+  expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(trigger.getAttribute('title')).toBe('Bob, Carol');
   expect(trigger.querySelectorAll('.sable-avatar')).toHaveLength(2);
   expect(trigger.querySelector('.count')?.textContent).toBe('2');
 
   trigger.click();
   await tick();
+  expect(document.querySelector('button')?.getAttribute('aria-expanded')).toBe('true');
   expect(document.querySelector('.members-drawer')?.textContent).toContain('Bob');
   expect(document.querySelector('.members-drawer')?.textContent).toContain('Carol');
   (document.querySelector('[aria-label="Close members"]') as HTMLButtonElement).click();

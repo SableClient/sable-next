@@ -110,6 +110,7 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
   });
 
   const element = viewport();
+  expect(element.getAttribute('tabindex')).toBe('0');
   Object.defineProperties(element, {
     scrollHeight: { configurable: true, value: 1_000 },
     scrollTop: { configurable: true, writable: true, value: 900 },

@@ -28,7 +28,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
     line-height: 1.25;
-    padding: 0.2rem 0.55rem;
+    padding: 0.2rem var(--space-tight);
   }
 
   :global(.status-badge-neutral) {

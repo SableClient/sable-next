@@ -57,9 +57,10 @@
     <button
       type="button"
       aria-label={$i18n.t('timeline.seenByNames', { names })}
+      aria-haspopup="dialog"
+      aria-expanded={open}
       title={names}
       bind:this={anchor}
-      aria-expanded={open}
       onclick={() => {
         open = true;
       }}
@@ -147,10 +148,10 @@
     cursor: pointer;
     display: inline-flex;
     font: inherit;
-    gap: 0.375rem;
+    gap: var(--space-tight);
     height: 1.75rem;
     max-width: 100%;
-    padding: 0 var(--space-1) 0 0.375rem;
+    padding: 0 var(--space-1) 0 var(--space-tight);
     transition:
       background-color var(--motion-fast) var(--motion-easing-standard),
       border-color var(--motion-fast) var(--motion-easing-standard),

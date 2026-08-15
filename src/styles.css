@@ -196,6 +196,9 @@ html {
   --space-2: 0.75rem;
   --space-3: 1rem;
   --space-4: 1.25rem;
+  --space-compact: 0.25rem;
+  --space-tight: 0.375rem;
+  --space-relaxed-tight: 0.625rem;
   --control-height-small: 2.25rem;
   --control-height-medium: 2.75rem;
   --control-height-large: 3rem;
@@ -226,6 +229,8 @@ html {
   --layer-tooltip: 500;
   --page-gutter: var(--space-3);
   --navigation-rail-width: 4.125rem;
+  --timeline-row-gap: var(--space-relaxed-tight);
+  --timeline-row-padding: var(--space-compact);
 
   /* Font sizes */
   --font-size-small: 0.8125rem;
