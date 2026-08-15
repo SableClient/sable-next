@@ -132,12 +132,15 @@ export function createWebTransport(): Transport {
                 reject(new Error('Timed out waiting for homeserver discovery'));
               }, 20_000)
             : undefined;
-        const stall = setTimeout(() => {
-          setOverdue(id, true);
-        }, stallAfterMs);
+        const stall =
+          'command' in request
+            ? setTimeout(() => {
+                setOverdue(id, true);
+              }, stallAfterMs)
+            : undefined;
         const settle = () => {
           if (timeout !== undefined) clearTimeout(timeout);
-          clearTimeout(stall);
+          if (stall !== undefined) clearTimeout(stall);
           setOverdue(id, false);
         };
         pending.set(id, {
