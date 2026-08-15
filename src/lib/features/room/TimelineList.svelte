@@ -51,8 +51,6 @@
     return `item:${item.id}`;
   }
 
-  // Mirrors TimelineItem's stylesheet, which is written in `rem`: pixel
-  // constants here would drift on any root font size but 16px.
   const MEDIA_MAX_REM = 32;
   const MEDIA_MIN_REM = 15;
   const STICKER_WIDTH_REM = 9.5;
@@ -70,9 +68,7 @@
   const STATE_ROW_REM = 1.5;
   const DEBUG_ROW_REM = 2.25;
   const UNDECRYPTABLE_REM = 2.5;
-  // The UA audio control does not scale with the font size.
   const AUDIO_HEIGHT_PX = 58;
-  // Track MediaImage's 800x600 default and MediaContent's 16/9 video box.
   const PICTURE_RATIO = 0.75;
   const VIDEO_RATIO = 9 / 16;
 
@@ -98,7 +94,6 @@
     rem: number
   ): number {
     const item = items[index];
-    // The avatar column and the page gutters sit outside the message box.
     const contentWidth = Math.min(
       MEDIA_MAX_REM * rem,
       Math.max(MEDIA_MIN_REM * rem, viewportWidth - MESSAGE_INSET_REM * rem)
@@ -462,15 +457,12 @@
         viewport: historyDebugSnapshot(),
       });
     }
-    // `getComputedStyle` flushes style and the estimator runs per row.
     const rem = rootFontSize();
     instance.setOptions({
       count: items.length,
       getScrollElement: () => viewport,
       estimateSize: (index) =>
         estimateTimelineItemSize(items, index, viewport?.clientWidth ?? MEDIA_MAX_REM * rem, rem),
-      // TanStack compares the previous and next key functions during prepends.
-      // Each function must retain the item ordering it was created for.
       getItemKey: (index) => timelineItemKey(items, index),
       anchorTo: 'end',
       followOnAppend: true,
@@ -678,7 +670,6 @@
   function isNearOldestHistory(): boolean {
     if (!viewport) return false;
     const oldestVisibleIndex = get(virtualizer).getVirtualItemForOffset(viewport.scrollTop)?.index;
-    // The virtualizer has no measurements in non-layout environments.
     if (oldestVisibleIndex === undefined) return viewport.scrollTop === 0;
     return oldestVisibleIndex < HISTORY_PREFETCH_ITEMS;
   }
@@ -861,9 +852,6 @@
     };
   }
 
-  // `overflow: hidden` would drop the scrollbar and reflow the messages, so the
-  // gestures are cancelled instead. Svelte makes `ontouchmove` passive, hence
-  // the explicit listeners.
   function scrollLock(locked: boolean) {
     return (node: HTMLElement) => {
       if (!locked) return;

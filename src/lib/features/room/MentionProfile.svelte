@@ -36,8 +36,6 @@
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
 
-  // The virtualiser recycles the anchor node into another message once it leaves
-  // the viewport, and the timeline still scrolls itself when a message arrives.
   $effect(() => {
     if (!open || !desktop || !anchor) return;
     const observer = new IntersectionObserver((entries) => {
@@ -53,7 +51,6 @@
     onOpenChange?.(next);
   }
 
-  /** Restoring focus with a scroll would drag the timeline back to the anchor. */
   function handleCloseAutoFocus(event: Event): void {
     event.preventDefault();
     anchor?.focus({ preventScroll: true });

@@ -237,8 +237,6 @@
     z-index: var(--layer-popover);
   }
 
-  /* Bounding the drawer is what lets its own list scroll under a fixed header,
-     rather than the whole popover sliding its title out of view. */
   :global(.read-receipts-popover .members-drawer) {
     max-height: 100%;
     min-height: 0;

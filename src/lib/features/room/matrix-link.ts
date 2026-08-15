@@ -57,7 +57,6 @@ function parseMatrixTo(href: string): MatrixLink | null {
   }
 }
 
-/** Parses the Matrix URI and matrix.to permalink forms handled by V1. */
 export function parseMatrixLink(href: string): MatrixLink | null {
   if (href.toLowerCase().startsWith('matrix:')) {
     try {

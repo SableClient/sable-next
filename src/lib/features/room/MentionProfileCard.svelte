@@ -74,7 +74,6 @@
       }).format(new Date());
       return { time, timezone };
     } catch {
-      // An unknown zone name is another client's data.
       return null;
     }
   });
@@ -157,8 +156,8 @@
   async function copy(text: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(text);
-    } catch {
-      // No clipboard in this document.
+    } catch (error) {
+      console.debug('[sable profile] clipboard unavailable', error);
     }
   }
 
@@ -177,8 +176,8 @@
   async function shareProfileLink(): Promise<void> {
     try {
       await navigator.share({ url: profileLink, title: displayName });
-    } catch {
-      // A dismissed share sheet rejects.
+    } catch (error) {
+      console.debug('[sable profile] share dismissed', error);
     }
   }
 
@@ -191,8 +190,8 @@
     try {
       await core.setUserIgnored(userId, next);
       ignored = next;
-    } catch {
-      // `ignored` stays as the server last reported it.
+    } catch (error) {
+      console.warn('[sable profile] could not change ignore state', error);
     }
   }
 
@@ -225,7 +224,6 @@
       await core.sendMessage(roomId, body);
       draft = '';
     } catch {
-      // The draft stays put: a failed send must not eat what was typed.
       sendFailed = true;
     } finally {
       sending = false;
@@ -360,8 +358,6 @@
   </DropdownMenu.Root>
 {/snippet}
 
-<!-- Holds the panel's height while the profile is in flight, so the card does not
-     jump when the bio lands. -->
 {#snippet bioPlaceholder()}
   <div class="profile-bio-placeholder">
     <Skeleton style="height: 0.8125rem; width: 90%" />
@@ -467,8 +463,6 @@
   </details>
 {/snippet}
 
-<!-- Panels are passed only when filled; an empty snippet still draws its padding,
-     background and separator. -->
 <ProfileCard
   {displayName}
   {userId}
@@ -515,8 +509,6 @@
     color: var(--sable-sec-main);
   }
 
-  /* Weight and full contrast mark an elevated role. A bordered chip here would
-     put a third shape between the plain facts and the action pills. */
   .profile-meta-elevated {
     color: var(--sable-bg-on-container);
     font-weight: var(--font-weight-medium);
@@ -544,7 +536,6 @@
     white-space: nowrap;
   }
 
-  /* Only the sheet needs a full touch target; at 22rem it makes the row loom. */
   :global(.sable-profile-card-sheet .profile-action) {
     min-height: 2.75rem;
   }
@@ -733,8 +724,6 @@
     line-height: var(--line-height-body);
   }
 
-  /* Inline padding matches the bio block above, so both rows share a text origin,
-     and the row is its own touch target. */
   .profile-extra summary {
     align-items: center;
     cursor: pointer;

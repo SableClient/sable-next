@@ -6,7 +6,6 @@
   import { parseMatrixLink } from './matrix-link';
 
   interface Props {
-    /** Display HTML from the core, already sanitised. */
     html: string;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
@@ -35,7 +34,6 @@
         continue;
       }
 
-      // Emoji are small enough to take whole; anything else is scaled down.
       const [width, height] = emoticon ? [0, 0] : [640, 480];
       image.dataset.mediaPending = '';
       image.removeAttribute('src');
@@ -60,7 +58,6 @@
     delete image.dataset.mediaPending;
   }
 
-  /** An unresolvable emoji reads better as its shortcode than as nothing. */
   function fallbackLabel(image: HTMLImageElement, emoticon: boolean): string {
     const label = image.alt || image.title;
     if (!label) return '';
@@ -75,7 +72,6 @@
     for (const element of elements) {
       const maths = element.dataset.mxMaths;
       if (maths === undefined || !element.isConnected) continue;
-      // Replaces the sender's fallback text, which is what the element holds.
       element.innerHTML = katex.renderToString(maths, {
         displayMode: element.tagName === 'DIV',
         throwOnError: false,
@@ -83,7 +79,6 @@
     }
   }
 
-  /** Reading `html` is what makes a new body re-run the pass over its nodes. */
   function decorate(html: string) {
     return (node: HTMLElement) => {
       void html;
@@ -92,8 +87,6 @@
         if (link) anchor.dataset.matrixLink = link.kind;
         else anchor.target = '_blank';
       }
-      // The core keeps colours as data attributes so its allow-list never has
-      // to admit `style`.
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
         element.style.color = element.dataset.mxColor ?? '';
       }
@@ -175,7 +168,6 @@
     text-decoration: none;
   }
 
-  /* Hidden from the first paint: the attachment only adds the toggle state. */
   .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false'])) {
     background: var(--sable-surface-var-on-container);
     border-radius: var(--radius);
@@ -183,7 +175,6 @@
     cursor: pointer;
   }
 
-  /* A nested link keeps its own colour, so the subtree has to be hidden too. */
   .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) *) {
     visibility: hidden;
   }
@@ -198,12 +189,10 @@
     overflow-x: auto;
   }
 
-  /* Still an `mxc:` URI, so the browser has nothing to load yet. */
   .formatted-body :global(img[data-media-pending]) {
     display: none;
   }
 
-  /* No `height` here, so the sender's attribute still sets the size under the cap. */
   .formatted-body :global(img) {
     max-height: 4rem;
     max-width: 100%;
