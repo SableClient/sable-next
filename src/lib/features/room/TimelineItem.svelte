@@ -9,6 +9,7 @@
   import FormattedBody from './FormattedBody.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
+  import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import type { MatrixLink } from './matrix-link';
   import {
     formatDate,
@@ -31,7 +32,7 @@
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
     onEdit?: (eventId: string, body: string) => void;
-    onDelete?: (eventId: string) => void;
+    onDelete?: (eventId: string, reason: string | null) => void;
   }
 
   let {
@@ -88,7 +89,7 @@
       onDelete:
         ownMessage && onDelete
           ? () => {
-              onDelete(eventId);
+              deleteOpen = true;
             }
           : undefined,
       onCopyText:
@@ -108,6 +109,7 @@
   const LONG_PRESS_MS = 450;
   const LONG_PRESS_SLOP_PX = 10;
   let sheetOpen = $state(false);
+  let deleteOpen = $state(false);
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
 
@@ -144,6 +146,10 @@
     }
   }
 
+  function confirmDelete(reason: string | null): void {
+    if (item.event_id) onDelete?.(item.event_id, reason);
+  }
+
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
   }
@@ -175,6 +181,11 @@
         bind:open={sheetOpen}
         preview={item.content.kind === 'message' ? item.content.body : null}
         {...actions}
+      />
+      <DeleteMessageDialog
+        bind:open={deleteOpen}
+        preview={item.content.kind === 'message' ? item.content.body : null}
+        onConfirm={confirmDelete}
       />
     {/if}
     {#if !collapsed}

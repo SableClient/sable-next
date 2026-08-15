@@ -175,7 +175,7 @@
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
     onEdit?: (eventId: string, body: string) => void;
-    onDelete?: (eventId: string) => void;
+    onDelete?: (eventId: string, reason: string | null) => void;
     roomId?: string;
     scrollLocked?: boolean;
     nearLatest?: boolean;
