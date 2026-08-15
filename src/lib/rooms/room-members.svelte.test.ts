@@ -21,6 +21,39 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test('a failed load settles without rejecting and is not retried', async () => {
+  const loader = new RoomMemberLoader();
+  let calls = 0;
+  const fetchMembers = () => {
+    calls += 1;
+    return Promise.reject(new Error('failed'));
+  };
+
+  await expect(loader.load('!room:example.org', fetchMembers)).resolves.toBeUndefined();
+  await loader.load('!room:example.org', fetchMembers);
+  await loader.load('!room:example.org', fetchMembers);
+
+  expect(calls).toBe(1);
+  expect(loader.loading).toBe(false);
+  expect(loader.members).toEqual([]);
+});
+
+test('resetting clears the failure so the room can be loaded again', async () => {
+  const loader = new RoomMemberLoader();
+  let calls = 0;
+  const fetchMembers = () => {
+    calls += 1;
+    return calls === 1 ? Promise.reject(new Error('failed')) : Promise.resolve([member('@a:b')]);
+  };
+
+  await loader.load('!room:example.org', fetchMembers);
+  loader.reset();
+  await loader.load('!room:example.org', fetchMembers);
+
+  expect(calls).toBe(2);
+  expect(loader.members.map((entry) => entry.user_id)).toEqual(['@a:b']);
+});
+
 test('a pending member load cannot block or replace the next room', async () => {
   const loader = new RoomMemberLoader();
   const first = deferred<MemberView[]>();
