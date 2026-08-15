@@ -317,7 +317,8 @@ pub fn display_html(body: &str, formatted: Option<&str>) -> String {
     // Markup rejected in full would otherwise leave the message blank.
     match sanitized {
         Some(html) if !html.trim().is_empty() => html,
-        _ => linkify_plain_text(body),
+        _ if body.is_empty() => String::new(),
+        _ => format!("<span data-plain-body>{}</span>", linkify_plain_text(body)),
     }
 }
 
@@ -502,7 +503,17 @@ mod tests {
     fn falls_back_to_the_body_when_nothing_survives_sanitising() {
         let html = display_html("plain words", Some("<script>alert(1)</script>"));
 
-        assert_eq!(html, "plain words");
+        assert_eq!(html, "<span data-plain-body>plain words</span>");
+    }
+
+    #[test]
+    fn marks_the_plain_branch_only() {
+        assert_eq!(
+            display_html("first\nsecond", None),
+            "<span data-plain-body>first\nsecond</span>"
+        );
+        assert!(!display_html("first\nsecond", Some("<b>rich</b>")).contains("data-plain-body"));
+        assert_eq!(display_html("", None), "");
     }
 
     #[test]

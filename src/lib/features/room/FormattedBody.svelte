@@ -267,6 +267,9 @@
   .formatted-body :global(p) {
     line-height: var(--line-height-body);
     margin: 0;
+  }
+
+  .formatted-body :global([data-plain-body]) {
     white-space: pre-wrap;
   }
 
@@ -298,6 +301,21 @@
 
   .formatted-body :global(:first-child) {
     margin-top: 0;
+  }
+
+  .formatted-body :global(:last-child) {
+    margin-bottom: 0;
+  }
+
+  .formatted-body :global(ul),
+  .formatted-body :global(ol) {
+    margin: var(--space-1) 0;
+    padding-inline-start: 1.5rem;
+  }
+
+  .formatted-body :global(ol) {
+    list-style-position: inside;
+    padding-inline-start: var(--space-1);
   }
 
   .formatted-body :global(a) {
