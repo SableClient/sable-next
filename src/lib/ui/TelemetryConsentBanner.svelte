@@ -54,7 +54,7 @@
     border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius-card);
     bottom: var(--space-3);
-    box-shadow: var(--shadow-overlay);
+    box-shadow: var(--shadow-dialog);
     display: flex;
     gap: var(--space-3);
     inset-inline: var(--space-3);
