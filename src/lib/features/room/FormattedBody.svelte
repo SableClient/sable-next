@@ -85,7 +85,10 @@
       for (const anchor of node.querySelectorAll('a')) {
         const link = parseMatrixLink(anchor.href);
         if (link) anchor.dataset.matrixLink = link.kind;
-        else anchor.target = '_blank';
+        else {
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+        }
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
         element.style.color = element.dataset.mxColor ?? '';
@@ -196,7 +199,7 @@
     color: var(--sable-sec-on-container);
     display: inline-block;
     font-weight: var(--font-weight-medium);
-    padding: 0 0.25rem;
+    padding: 0 var(--space-tight);
     text-decoration: none;
   }
 
@@ -213,8 +216,8 @@
 
   .formatted-body :global(blockquote) {
     border-left: 2px solid var(--sable-primary-main);
-    margin: 0.25rem 0;
-    padding-left: 0.5rem;
+    margin: var(--space-compact) 0;
+    padding-left: var(--space-1);
   }
 
   .formatted-body :global(pre) {
@@ -238,13 +241,13 @@
 
   .formatted-body :global(table) {
     border-collapse: collapse;
-    margin: 0.25rem 0;
+    margin: var(--space-compact) 0;
   }
 
   .formatted-body :global(th),
   .formatted-body :global(td) {
     border: 1px solid var(--sable-surface-container-line);
-    padding: 0.125rem 0.375rem;
+    padding: calc(var(--space-compact) / 2) var(--space-tight);
     text-align: left;
   }
 

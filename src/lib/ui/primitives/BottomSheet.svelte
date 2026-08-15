@@ -86,9 +86,12 @@
   .handle {
     background: transparent;
     border: 0;
+    border-radius: var(--radius-pill);
+    cursor: grab;
     display: grid;
-    height: 2rem;
+    height: var(--control-height-medium);
     left: 50%;
+    padding: 0;
     place-items: center;
     position: absolute;
     top: 0;
@@ -96,6 +99,10 @@
     transform: translateX(-50%);
     width: 4rem;
     z-index: 2;
+  }
+
+  .handle:active {
+    cursor: grabbing;
   }
 
   .handle::after {
@@ -108,7 +115,7 @@
   }
 
   .handle:focus-visible {
-    outline: 2px solid var(--sable-primary-main);
-    outline-offset: -0.25rem;
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 </style>

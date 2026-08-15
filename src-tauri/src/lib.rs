@@ -119,12 +119,8 @@ async fn upload_media(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
-fn subscribe_events(
-    state: State<'_, AppState>,
-    channel: Channel<CoreEvent>,
-) -> Result<(), CommandErr> {
+fn subscribe_events(state: State<'_, AppState>, channel: Channel<CoreEvent>) {
     state.event_sink.replace(channel);
-    Ok(())
 }
 
 #[tauri::command]

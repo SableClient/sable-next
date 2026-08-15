@@ -465,12 +465,12 @@ fn content(
                         .info
                         .as_ref()
                         .and_then(|info| info.width)
-                        .map(|width| i64::from(width) as u64),
+                        .map(|width| i64::from(width).cast_unsigned()),
                     height: image
                         .info
                         .as_ref()
                         .and_then(|info| info.height)
-                        .map(|height| i64::from(height) as u64),
+                        .map(|height| i64::from(height).cast_unsigned()),
                 },
                 MessageType::Video(video) => TimelineItemContentView::Video {
                     body: video.body.clone(),
@@ -480,12 +480,12 @@ fn content(
                         .info
                         .as_ref()
                         .and_then(|info| info.width)
-                        .map(|width| i64::from(width) as u64),
+                        .map(|width| i64::from(width).cast_unsigned()),
                     height: video
                         .info
                         .as_ref()
                         .and_then(|info| info.height)
-                        .map(|height| i64::from(height) as u64),
+                        .map(|height| i64::from(height).cast_unsigned()),
                 },
                 MessageType::Audio(audio) => TimelineItemContentView::Audio {
                     body: audio.body.clone(),
@@ -509,8 +509,14 @@ fn content(
                     body: sticker.body.clone(),
                     source: serde_json::to_string(&sticker.source).unwrap_or_default(),
                     mime: sticker.info.mimetype.clone(),
-                    width: sticker.info.width.map(|width| i64::from(width) as u64),
-                    height: sticker.info.height.map(|height| i64::from(height) as u64),
+                    width: sticker
+                        .info
+                        .width
+                        .map(|width| i64::from(width).cast_unsigned()),
+                    height: sticker
+                        .info
+                        .height
+                        .map(|height| i64::from(height).cast_unsigned()),
                 }
             }
             MsgLikeKind::Poll(_) => unsupported("poll"),

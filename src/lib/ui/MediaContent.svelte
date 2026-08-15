@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
   import { useCoreClient } from '$lib/core/context';
+  import { i18n } from '$lib/i18n';
+  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
 
   interface Props {
     source: string;
@@ -26,8 +27,26 @@
   let failed = $state(false);
   /* An unsized video lays out at the UA's 150px, then jumps to its intrinsic
      size once metadata arrives, shoving the rows below it down. */
+  let mediaLabel = $derived(
+    body ||
+      (kind === 'video'
+        ? $i18n.t('timeline.videoAttachment')
+        : kind === 'audio'
+          ? $i18n.t('timeline.audioAttachment')
+          : $i18n.t('timeline.fileAttachment'))
+  );
   let aspectRatio = $derived(
-    width !== null && height !== null && width > 0 && height > 0 ? width / height : null
+    kind === 'video' &&
+      typeof width === 'number' &&
+      typeof height === 'number' &&
+      Number.isFinite(width) &&
+      Number.isFinite(height) &&
+      width > 0 &&
+      height > 0
+      ? `${String(width)} / ${String(height)}`
+      : kind === 'video'
+        ? '16 / 9'
+        : undefined
   );
 
   $effect(() => {
@@ -53,33 +72,62 @@
   });
 </script>
 
-{#if failed}
-  <span class={[className, 'media-error']}>{body}</span>
-{:else if kind === 'video'}
-  <!-- svelte-ignore a11y_media_has_caption -->
-  <video
-    class={[className, 'media-content', 'media-video']}
-    style:aspect-ratio={aspectRatio}
-    controls
-    src={url}
-  >
-    {body}
-  </video>
-{:else if kind === 'audio'}
-  <audio class={[className, 'media-content']} controls src={url}> {body} </audio>
-{:else if url}
-  <!-- Blob URLs are generated locally from authenticated media bytes. -->
-  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-  <a class={[className, 'media-file']} href={url} download={body}>{body}</a>
-{:else}
-  <span class={[className, 'media-file']}>{body}</span>
-{/if}
+<div
+  class={['media-frame', `media-frame-${kind}`, className]}
+  style:aspect-ratio={aspectRatio}
+  aria-busy={!url && !failed ? 'true' : undefined}
+>
+  {#if failed}
+    <span class="media-error">{mediaLabel}</span>
+  {:else if url}
+    {#if kind === 'video'}
+      <svelte:element
+        this={"video"}
+        class="media-content media-video"
+        controls
+        src={url}
+        width={width ?? undefined}
+        height={height ?? undefined}
+        style:aspect-ratio={aspectRatio}
+        aria-label={mediaLabel}
+      >
+        {body}
+      </svelte:element>
+    {:else if kind === 'audio'}
+      <audio class="media-content" controls src={url} aria-label={mediaLabel}>
+        {body}
+      </audio>
+    {:else}
+      <svelte:element this={"a"} class="media-file" href={url} download={mediaLabel}
+        >{mediaLabel}</svelte:element
+      >
+    {/if}
+  {:else if kind === 'file'}
+    <span class="media-file">{mediaLabel}</span>
+  {/if}
+</div>
 
 <style>
+  .media-frame {
+    display: block;
+    max-width: 100%;
+  }
+
+  .media-frame-video {
+    background: var(--sable-surface-container);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .media-frame-audio {
+    min-height: var(--control-height-medium);
+  }
+
   .media-content {
     display: block;
     margin-top: 0.25rem;
     max-width: 100%;
+    width: 100%;
   }
 
   /* Fallback for a dimensionless event; the timeline estimator assumes it. */

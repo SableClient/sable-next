@@ -56,12 +56,12 @@
 
   .timeline-skeleton-row {
     display: flex;
-    gap: 0.625rem;
-    padding: 0.25rem 0;
+    gap: var(--timeline-row-gap);
+    padding: var(--timeline-row-padding) 0;
   }
 
   .timeline-skeleton-row.collapsed {
-    padding-left: calc(var(--avatar-size-small) + 0.625rem);
+    padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap));
   }
 
   .timeline-skeleton-copy {

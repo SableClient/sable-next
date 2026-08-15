@@ -48,6 +48,7 @@ test('sends external links to a new tab instead of the handler', async () => {
 
   const anchor = document.querySelector<HTMLAnchorElement>('a');
   expect(anchor?.target).toBe('_blank');
+  expect(anchor?.rel).toBe('noopener noreferrer');
   expect(anchor?.dataset.matrixLink).toBeUndefined();
   anchor?.click();
   expect(onMatrixLink).not.toHaveBeenCalled();
