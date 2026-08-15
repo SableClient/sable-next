@@ -28,4 +28,5 @@ export type WorkerMessage =
   | { id: number; bytes: Uint8Array<ArrayBuffer> }
   /** An `mxc:` URI from `uploadMedia`, or nothing from `sendAttachment`. */
   | { id: number; uri: string | null }
-  | { event: CoreEvent };
+  | { event: CoreEvent }
+  | { panic: { message: string } };

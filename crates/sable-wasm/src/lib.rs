@@ -3,7 +3,13 @@
 
 mod session_store;
 
-use std::sync::Arc;
+use std::{
+    cell::RefCell,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use futures_util::StreamExt;
 use js_sys::Function;
@@ -41,12 +47,39 @@ fn init_tracing(filter: &str) {
         .try_init();
 }
 
+thread_local! {
+    static PANIC_NOTIFIER: RefCell<Option<Function>> = const { RefCell::new(None) };
+}
+
+static PANIC_HOOK_CHAINED: AtomicBool = AtomicBool::new(false);
+
+#[wasm_bindgen(js_name = setPanicHandler)]
+#[allow(clippy::needless_pass_by_value)] // wasm-bindgen maps the JS function boundary to an owned value
+pub fn set_panic_handler(notify: Function) {
+    PANIC_NOTIFIER.with_borrow_mut(|slot| *slot = Some(notify));
+
+    if PANIC_HOOK_CHAINED.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    console_error_panic_hook::set_once();
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        previous(info);
+        let message = info.to_string();
+        PANIC_NOTIFIER.with_borrow(|slot| {
+            if let Some(notify) = slot.as_ref() {
+                let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&message));
+            }
+        });
+    }));
+}
+
 /// The web carrier, mirroring `src-tauri/src/lib.rs`. JSON both ways, so the
 /// frontend cannot tell the two apart.
 #[wasm_bindgen]
 pub struct SableCore {
     core: Arc<Core>,
-    events: Option<UnboundedReceiverStream>,
+    events: RefCell<Option<UnboundedReceiverStream>>,
 }
 
 #[wasm_bindgen]
@@ -74,7 +107,7 @@ impl SableCore {
 
         SableCore {
             core,
-            events: Some(UnboundedReceiverStream::new(events)),
+            events: RefCell::new(Some(UnboundedReceiverStream::new(events))),
         }
     }
 
@@ -150,9 +183,10 @@ impl SableCore {
     ///
     /// Returns an error when events have already been subscribed.
     #[wasm_bindgen(js_name = subscribeEvents)]
-    pub fn subscribe_events(&mut self, on_event: Function) -> Result<(), JsValue> {
+    pub fn subscribe_events(&self, on_event: Function) -> Result<(), JsValue> {
         let mut events = self
             .events
+            .borrow_mut()
             .take()
             .ok_or_else(|| JsValue::from_str("events are already subscribed"))?;
 

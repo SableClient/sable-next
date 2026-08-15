@@ -13,6 +13,7 @@ import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
 import type { SubscriptionId } from '@/generated/SubscriptionId';
+import type { SyncStatus } from '@/generated/SyncStatus';
 import type { PaginationDirection } from '@/generated/PaginationDirection';
 import type { MutualRoomView } from '@/generated/MutualRoomView';
 import type { ProfileView } from '@/generated/ProfileView';
@@ -81,6 +82,9 @@ export class CoreClient {
   session = $state<CoreSession | null>(null);
   accounts = $state<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
+  crashed = $state<string | null>(null);
+  sync = $state<SyncStatus | null>(null);
+  unresponsive = $state(false);
 
   private transport: Transport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
@@ -880,7 +884,18 @@ export class CoreClient {
 
     const transport = createTransport();
     this.transport = transport;
-    this.unsubscribeTransport = transport.subscribe(this.handleEvent);
+    const unsubscribeEvents = transport.subscribe(this.handleEvent);
+    const unsubscribeCrash = transport.subscribeCrash((message) => {
+      this.crashed = message;
+    });
+    const unsubscribeStall = transport.subscribeStall((stalled) => {
+      this.unresponsive = stalled;
+    });
+    this.unsubscribeTransport = () => {
+      unsubscribeEvents();
+      unsubscribeCrash();
+      unsubscribeStall();
+    };
     return transport;
   }
 
@@ -905,6 +920,10 @@ export class CoreClient {
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {
+    if (event.type === 'sync_status') {
+      this.sync = event;
+      return;
+    }
     if (event.type !== 'session_ended') return;
 
     this.session = null;

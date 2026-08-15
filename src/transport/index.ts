@@ -37,6 +37,10 @@ export interface Transport {
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 
   subscribe(onEvent: (event: CoreEvent) => void): () => void;
+
+  subscribeCrash(onCrash: (message: string) => void): () => void;
+
+  subscribeStall(onStall: (stalled: boolean) => void): () => void;
   close(): void;
 }
 

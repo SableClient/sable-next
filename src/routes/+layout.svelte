@@ -5,6 +5,7 @@
   import '../styles.css';
   import { createCoreClient } from '$lib/core/client.svelte';
   import { provideCoreClient } from '$lib/core/context';
+  import CoreHealthBanner from '$lib/ui/CoreHealthBanner.svelte';
   import favicon from '$lib/assets/favicon.png';
 
   interface Props {
@@ -27,6 +28,8 @@
   <title>Sable</title>
   <link rel="icon" href={favicon} />
 </svelte:head>
+
+<CoreHealthBanner />
 
 <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
   {@render children()}

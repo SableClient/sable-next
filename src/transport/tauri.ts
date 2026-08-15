@@ -74,6 +74,14 @@ export function createTauriTransport(): Transport {
       return () => listeners.delete(onEvent);
     },
 
+    subscribeCrash() {
+      return () => {};
+    },
+
+    subscribeStall() {
+      return () => {};
+    },
+
     close() {
       listeners.clear();
     },

@@ -29,6 +29,7 @@ export type WorkerPort = {
 export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
   const ports = new Set<WorkerPort>();
   const timelineEvents = new TimelineEventRouter<WorkerPort>();
+  let panic: string | null = null;
 
   function closePort(port: WorkerPort): void {
     ports.delete(port);
@@ -54,6 +55,11 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
         closePort(port);
       }
     }
+  }
+
+  function handlePanic(message: string): void {
+    panic ??= message;
+    broadcast({ panic: { message } });
   }
 
   function handleEvent(json: string): void {
@@ -82,6 +88,11 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
         return;
       }
       const { id } = request;
+
+      if (panic !== null) {
+        port.postMessage({ id, err: { code: 'failed', log_id: `core panicked: ${panic}` } });
+        return;
+      }
 
       try {
         const instance = await core;
@@ -156,5 +167,5 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
     port.start();
   }
 
-  return { connect, handleEvent };
+  return { connect, handleEvent, handlePanic };
 }

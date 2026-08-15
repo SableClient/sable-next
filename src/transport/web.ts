@@ -14,8 +14,33 @@ export function createWebTransport(): Transport {
     { resolve: (value: Reply) => void; reject: (error: unknown) => void }
   >();
   const pendingCommands = new Map<number, Command['type']>();
+  const crashListeners = new Set<(message: string) => void>();
+  const stallListeners = new Set<(stalled: boolean) => void>();
+  const overdue = new Set<number>();
   let nextId = 1;
   let worker: SharedWorker | null = null;
+
+  const stallAfterMs = 20_000;
+
+  function setOverdue(id: number, stalled: boolean): void {
+    const before = overdue.size > 0;
+    if (stalled) overdue.add(id);
+    else overdue.delete(id);
+    const after = overdue.size > 0;
+    if (before === after) return;
+    for (const listener of stallListeners) listener(after);
+  }
+
+  function handleCrash(message: string): void {
+    worker = null;
+    const waiting = [...pending.values()];
+    pending.clear();
+    pendingCommands.clear();
+    for (const { reject } of waiting) {
+      reject(new CoreError({ code: 'failed', log_id: `core panicked: ${message}` }));
+    }
+    for (const listener of crashListeners) listener(message);
+  }
 
   function connect(): SharedWorker {
     if (worker) return worker;
@@ -42,6 +67,12 @@ export function createWebTransport(): Transport {
 
       if ('event' in data) {
         for (const listener of listeners) listener(data.event);
+        return;
+      }
+
+      if ('panic' in data) {
+        console.error('[sable transport] core panicked', data.panic.message);
+        handleCrash(data.panic.message);
         return;
       }
 
@@ -88,13 +119,21 @@ export function createWebTransport(): Transport {
                 reject(new Error('Timed out waiting for homeserver discovery'));
               }, 20_000)
             : undefined;
+        const stall = setTimeout(() => {
+          setOverdue(id, true);
+        }, stallAfterMs);
+        const settle = () => {
+          if (timeout !== undefined) clearTimeout(timeout);
+          clearTimeout(stall);
+          setOverdue(id, false);
+        };
         pending.set(id, {
           resolve: (value) => {
-            if (timeout !== undefined) clearTimeout(timeout);
+            settle();
             resolve(value as T);
           },
           reject: (error) => {
-            if (timeout !== undefined) clearTimeout(timeout);
+            settle();
             reject(error instanceof Error ? error : new Error(String(error)));
           },
         });
@@ -148,6 +187,16 @@ export function createWebTransport(): Transport {
     subscribe(onEvent) {
       listeners.add(onEvent);
       return () => listeners.delete(onEvent);
+    },
+
+    subscribeCrash(onCrash) {
+      crashListeners.add(onCrash);
+      return () => crashListeners.delete(onCrash);
+    },
+
+    subscribeStall(onStall) {
+      stallListeners.add(onStall);
+      return () => stallListeners.delete(onStall);
     },
 
     close() {

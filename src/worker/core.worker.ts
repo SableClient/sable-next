@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, { SableCore } from '@/generated/wasm/sable_wasm.js';
+import init, { SableCore, setPanicHandler } from '@/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '@/platform/sessionStorage';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 
@@ -22,6 +22,12 @@ const core = init().then(() => {
 
 const boundary = createCoreWorkerBoundary(core);
 void core.then((instance) => {
+  setPanicHandler((message: string) => {
+    boundary.handlePanic(message);
+    setTimeout(() => {
+      self.close();
+    }, 0);
+  });
   instance.subscribeEvents(boundary.handleEvent);
 });
 

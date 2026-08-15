@@ -156,3 +156,20 @@ test('cleans up active and pending subscriptions when their ports close', async 
   expect(active.messages).toHaveLength(1);
   expect(pending.messages).toEqual([]);
 });
+
+test('a panic reaches every port and later commands fail instead of hanging', async () => {
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => new Promise(() => {}))));
+  const first = new FakePort();
+  const second = new FakePort();
+  boundary.connect(first);
+  boundary.connect(second);
+
+  boundary.handlePanic('index out of bounds');
+  await first.send({ id: 1, command: { type: 'restore' } });
+
+  expect(second.messages).toEqual([{ panic: { message: 'index out of bounds' } }]);
+  expect(first.messages).toEqual([
+    { panic: { message: 'index out of bounds' } },
+    { id: 1, err: { code: 'failed', log_id: 'core panicked: index out of bounds' } },
+  ]);
+});
