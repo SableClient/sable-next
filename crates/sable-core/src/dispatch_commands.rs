@@ -244,10 +244,9 @@ macro_rules! dispatch_commands {
                     .user_id()
                     .ok_or_else(|| $self.failed("room_permissions", "no session"))?
                     .to_owned();
-                let power_levels = room
-                    .power_levels()
-                    .await
-                    .map_err(|error| $self.failed("room_permissions", error))?;
+                // An invited room carries only stripped state, so the levels are
+                // often absent. Spec defaults beat failing the whole command.
+                let power_levels = room.power_levels_or_default().await;
 
                 Ok(CommandOk::RoomPermissions(view::room_permissions(
                     &power_levels,

@@ -96,6 +96,10 @@
     return profile && (profile.color_on_light ?? profile.color_on_dark) !== null ? profile : null;
   }
 
+  function isCaption(body: string): boolean {
+    return !/^\S+\.[a-z0-9]{2,4}$/i.test(body);
+  }
+
   function stripFallback(body: string, profile: PerMessageProfileView | null): string {
     if (!profile) return body;
     const name = profile.display_name?.trim();
@@ -246,6 +250,7 @@
         highlighted,
         selected,
         persona: personaTint,
+        own: item.is_own,
         'mention-silent': item.mention === 'silent',
         'mention-loud': item.mention === 'loud',
       },
@@ -258,7 +263,7 @@
     onpointercancel={endPress}
   >
     {#if actionable}
-      <MessageActions {roomId} {...actions} />
+      <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
       <MessageActionSheet
         bind:open={sheetOpen}
         preview={item.content.kind === 'message' ? item.content.body : null}
@@ -399,7 +404,7 @@
           intrinsicHeight={item.content.height}
           mime={item.content.mime}
         />
-        {#if item.content.body}<p class="body">{item.content.body}</p>{/if}
+        {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
       {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
         <MediaContent
           class="media"
@@ -527,7 +532,7 @@
 {:else}
   <p class="state redacted">
     <span class="state-rail" aria-hidden="true"></span>
-    <span>{$i18n.t('timeline.redacted')}</span>
+    <span class="redacted-label">{$i18n.t('timeline.redacted')}</span>
   </p>
 {/if}
 
@@ -564,8 +569,8 @@
     border-inline-start-color: var(--sable-warn-main);
   }
 
-  /* The spec pairs multi-select with keyboard focus; focus is the half that
-     exists today, and unlike hover it survives on touch. */
+  /* The sheet pairs multi-select with keyboard focus; focus is the half that
+     exists today, and it survives on touch where hover does not. */
   .message.selected,
   .message:has(:focus-visible) {
     background: var(--sable-primary-container);
@@ -649,47 +654,15 @@
       padding-inline: var(--page-gutter);
     }
 
-    .message.mention-silent,
-    .message.mention-loud {
-      border-inline-start: 4px solid;
-      border-radius: 0 var(--radius) var(--radius) 0;
-      padding-inline: 0.5rem;
-    }
-
-    .message.mention-silent {
-      background: color-mix(in oklab, var(--sable-sec-container) 25%, transparent);
-      border-inline-start-color: var(--sable-sec-main);
-    }
-
-    .message.mention-loud {
-      background: var(--sable-warn-container);
-      border-inline-start-color: var(--sable-warn-main);
-    }
-
-    .message.mention-loud .body,
-    .message.mention-loud time {
-      color: var(--sable-warn-on-container);
-    }
-
-    .message.mention-loud :global(a[data-matrix-link]) {
-      background: var(--sable-warn-container-active);
-      border-color: var(--sable-warn-container-line);
-      color: var(--sable-warn-on-container);
-    }
-
-    .message.selected {
-      background: var(--sable-primary-container);
-      border-radius: var(--radius);
-      box-shadow: inset 0 0 0 1px var(--sable-primary-container-line);
-    }
-
-    .message.selected .body,
-    .message.selected time {
-      color: var(--sable-primary-on-container);
-    }
-
     .message.collapsed {
       padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + 0.625rem);
+    }
+
+    /* Matches the base mention rule's specificity, so the gutter the row's
+       negative margin assumes survives. */
+    .message.mention-silent,
+    .message.mention-loud {
+      padding-inline: calc(var(--page-gutter) - 4px) var(--page-gutter);
     }
 
     .message:hover {
@@ -702,7 +675,9 @@
     }
   }
 
-  :global(.sable-avatar.message-avatar) {
+  /* Only the hashed sender colours are `-main` fills; an own or persona avatar
+     keeps Avatar's own container pair, whose ink this would wash out. */
+  .message:not(.own, .persona) :global(.sable-avatar.message-avatar) {
     color: var(--sable-primary-on-main);
   }
 
@@ -718,7 +693,6 @@
     gap: 0.5rem;
   }
 
-  /* The name gives way before the pronouns, the via chip or the time. */
   .sender {
     font-weight: var(--font-weight-bold);
     letter-spacing: -0.005em;
@@ -1059,7 +1033,7 @@
     margin-inline-start: 0.75rem;
   }
 
-  .redacted span {
+  .redacted-label {
     align-items: center;
     border: 1px dashed var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
@@ -1162,7 +1136,6 @@
     padding: 0.25rem 0;
   }
 
-  /* A different job from the unread separator, so a different family. */
   .read-marker::before {
     border-top: 1px solid var(--sable-success-main);
     content: '';
@@ -1203,5 +1176,82 @@
   .message.selected .body,
   .message.selected time {
     color: var(--sable-primary-on-container);
+  }
+
+  /* Layout modes stay in one block at the end: each overrides a base rule
+     above, and a second copy elsewhere would drift out of sync. */
+  .message.layout-compact {
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .message.layout-compact.collapsed {
+    padding-left: 0;
+  }
+
+  .compact-gutter {
+    align-items: baseline;
+    display: flex;
+    flex: 0 0 clamp(6rem, 20%, 10.625rem);
+    gap: var(--space-1);
+    justify-content: flex-end;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .message.layout-compact .compact-gutter time {
+    color: var(--sable-surface-var-on-container);
+    flex: none;
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .compact-name {
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.005em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .message.layout-bubble .message-content {
+    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* `.body` only ever matches a media caption, which stays flat. */
+  .message.layout-bubble :global(.formatted-body) {
+    background: var(--sable-surface-container);
+    border: 1px solid var(--sable-surface-container-line);
+    border-radius: var(--radius-card);
+    color: var(--sable-surface-on-container);
+    max-width: 50rem;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .message.layout-bubble.own :global(.formatted-body) {
+    background: var(--sable-primary-container);
+    border-color: var(--sable-primary-container-line);
+    color: var(--sable-primary-on-container);
+  }
+
+  /* The one mode where your own side changes. */
+  .message.layout-bubble.own {
+    flex-direction: row-reverse;
+  }
+
+  .message.layout-bubble.own .message-content {
+    align-items: flex-end;
+  }
+
+  .message.layout-bubble.own header {
+    flex-direction: row-reverse;
+  }
+
+  .message.layout-bubble.own.collapsed {
+    padding-left: 0;
+    padding-right: calc(var(--avatar-size-small) + 0.625rem);
   }
 </style>

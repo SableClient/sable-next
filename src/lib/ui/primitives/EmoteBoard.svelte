@@ -19,7 +19,7 @@
     variant?: 'popover' | 'sheet';
     /** Reactions can be plain unicode, so the board offers both on one surface. */
     unicode?: boolean;
-    /** A reaction cannot be a sticker, so that tab goes. */
+    /** A reaction key cannot be a sticker. */
     stickers?: boolean;
     onPick: (image: PackImageView, usage: ImageUsageView) => void;
     onPickUnicode?: (emoji: string) => void;
@@ -79,7 +79,7 @@
   });
 
   let searching = $derived(query.trim() !== '');
-  /** Searching is by emote, not by pack, so matches arrive as one flat list. */
+  /** Search is by emote, so matches arrive as one flat list across packs. */
   let matchedImages = $derived(searching ? sections.flatMap((section) => section.images) : []);
 
   let recentImages = $derived.by(() => {
@@ -297,7 +297,7 @@
           <section>
             <h3>{$i18n.t('composer.emoticons')}</h3>
             <ul>
-              {#each matchedImages as image (image.url)}
+              {#each matchedImages as image, index (`${String(index)}-${image.url}`)}
                 <li>
                   <button
                     type="button"

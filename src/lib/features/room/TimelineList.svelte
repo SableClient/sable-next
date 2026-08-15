@@ -232,16 +232,21 @@
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
 
-  // A permalink to an event already in the list is a scroll, not a reload.
-  let smoothTarget: string | null = null;
+  // The mount-time target belongs to the anchoring effect below, so it starts
+  // here as already handled.
+  let smoothTarget: string | null = untrack(() => focusEventId);
   $effect(() => {
     const target = focusEventId;
-    if (target === null || target === smoothTarget) return;
+    if (target === null) {
+      smoothTarget = null;
+      return;
+    }
+    if (target === smoothTarget) return;
     const index = visibleItems.findIndex((item) => item.event_id === target);
     if (index < 0) return;
     smoothTarget = target;
-    if (!focusAnchored) return;
     scrollMode = { kind: 'focused', eventId: target };
+    focusAnchored = true;
     get(virtualizer).scrollToIndex(index, { align: 'center', behavior: 'smooth' });
   });
   // Virtual rows are absolutely positioned, so the separator cannot be sticky
@@ -249,10 +254,10 @@
   let stuckUnreadCount = $derived.by(() => {
     const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
     if (index === -1) return 0;
-    const marker = $virtualizer
-      .getVirtualItems()
-      .find((virtualItem) => virtualItem.index === index);
-    if (marker && marker.start >= ($virtualizer.scrollOffset ?? 0)) return 0;
+    // A missing virtual item means the row is outside the overscan window in
+    // either direction, so compare indices rather than treating it as "above".
+    const top = $virtualizer.getVirtualItemForOffset($virtualizer.scrollOffset ?? 0);
+    if (top === undefined || index >= top.index) return 0;
     return unreadCountAfter(visibleItems, index);
   });
   let viewport = $state<HTMLDivElement | null>(null);

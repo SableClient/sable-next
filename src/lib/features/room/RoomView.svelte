@@ -136,14 +136,13 @@
     timelineAtBottom = eventId === null;
   });
 
-  // The event param is a navigation instruction, not room state. Holding it
-  // once the live end is back in view would keep read receipts switched off.
+  // Holding the param would keep read receipts switched off. Waiting for live
+  // mode matters: in permalink mode `timelineAtBottom` only means the bottom of
+  // the loaded context, and dropping the anchor there restarts at the present.
   $effect(() => {
-    if (eventId === null || !timelineAtBottom) return;
-    const target = resolve('/(app)/home/[roomId]', {
-      roomId: roomPathParamFromId(resolvedRoomId),
-    });
-    void goto(target, { replaceState: true, noScroll: true, keepFocus: true });
+    if (eventId === null || !timelineAtBottom || timeline.mode.kind !== 'live') return;
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+    void goto(roomUrl(null), { replaceState: true, noScroll: true, keepFocus: true });
   });
 
   $effect(() => {
@@ -208,8 +207,9 @@
 
     const roomId = roomPathParamFromId(link.roomId);
     if (link.kind === 'event') {
+      const path = resolve('/(app)/home/[roomId]', { roomId });
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- path is resolved; only the query is appended
-      void goto(resolve('/(app)/home/[roomId]', { roomId }) + eventQuery(link.eventId));
+      void goto(`${path}?event=${encodeURIComponent(link.eventId)}`);
       return;
     }
     void goto(resolve('/(app)/home/[roomId]', { roomId }));
@@ -219,18 +219,18 @@
     return memberLoader.members.find((member) => member.user_id === userId)?.display_name ?? null;
   }
 
-  /** The event rides as a query param so a permalink or notification can carry
-      it without a second route. */
-  function eventQuery(eventId: string): string {
-    return `?event=${encodeURIComponent(eventId)}`;
+  /** RoomPage is mounted by the home, direct and space routes alike, so the
+      current path has to survive the rewrite. */
+  function roomUrl(eventId: string | null): string {
+    const url = new URL(page.url);
+    if (eventId === null) url.searchParams.delete('event');
+    else url.searchParams.set('event', eventId);
+    return `${url.pathname}${url.search}`;
   }
 
   function jumpToEvent(eventId: string): void {
-    const target =
-      resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(resolvedRoomId) }) +
-      eventQuery(eventId);
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- path is resolved; only the query is appended
-    void goto(target, { replaceState: true, noScroll: true, keepFocus: true });
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+    void goto(roomUrl(eventId), { replaceState: true, noScroll: true, keepFocus: true });
   }
 
   function goBack(): void {
@@ -255,12 +255,16 @@
     formatted: string | null = null
   ): Promise<void> {
     const pending = composerContext;
-    composerContext = null;
-    if (pending?.kind === 'edit') {
-      await core.editMessage(targetRoomId, pending.eventId, body, formatted);
+    if (body === '') {
+      composerContext = null;
       return;
     }
-    await core.sendMessage(targetRoomId, body, pending?.eventId ?? null, formatted);
+    if (pending?.kind === 'edit') {
+      await core.editMessage(targetRoomId, pending.eventId, body, formatted);
+    } else {
+      await core.sendMessage(targetRoomId, body, pending?.eventId ?? null, formatted);
+    }
+    composerContext = null;
   }
 
   async function sendAttachment(targetRoomId: string, file: File): Promise<void> {

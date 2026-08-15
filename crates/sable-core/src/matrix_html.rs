@@ -10,7 +10,7 @@ use ammonia::{Builder, UrlRelative};
 use linkify::{LinkFinder, LinkKind};
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
 
-const ALLOWED_TAGS: [&str; 35] = [
+const ALLOWED_TAGS: [&str; 37] = [
     "a",
     "b",
     "blockquote",
@@ -46,6 +46,8 @@ const ALLOWED_TAGS: [&str; 35] = [
     "th",
     "thead",
     "tr",
+    "u",
+    "ul",
 ];
 
 /// `mx-reply` holds the quoted fallback, which the UI already renders from
@@ -270,12 +272,16 @@ pub fn strip_profile_fallback_html(
     let Some((open_tag, text, rest)) = leading_strong(formatted) else {
         return formatted.to_owned();
     };
+    // The fallback always carries the colon; without it this is the sender's
+    // own emphasis that happens to read like the profile name.
+    let labelled = text.trim_end().ends_with(':');
     let label = text.trim().trim_end_matches(':').trim();
-    let named = display_name
-        .map(str::trim)
-        .is_some_and(|name| !name.is_empty() && label == name);
+    let named = labelled
+        && display_name
+            .map(str::trim)
+            .is_some_and(|name| !name.is_empty() && label == name);
     let marked = open_tag.contains("data-mx-profile-fallback");
-    let fallback = marked || named || (known && text.trim_end().ends_with(':'));
+    let fallback = marked || named || (known && labelled);
     if fallback {
         formatted.trim_start()[rest..].trim_start().to_owned()
     } else {
@@ -284,13 +290,17 @@ pub fn strip_profile_fallback_html(
 }
 
 /// The plain-text half of the same fallback, which arrives as `Name: `.
-/// `known` comes from `has_fallback` or the HTML marker; without it only an
-/// exact name match is removed, so a plain `Yes: it shipped` survives.
+///
+/// A known name that does not prefix the body means there is no fallback, so
+/// nothing is cut: splitting on the first `": "` would eat the opening clause
+/// of `we shipped it: finally`. Only a nameless profile falls back to that.
 #[must_use]
 pub fn strip_profile_fallback_body(body: &str, display_name: Option<&str>, known: bool) -> String {
     let name = display_name.map(str::trim).filter(|name| !name.is_empty());
-    if let Some(stripped) = name.and_then(|name| body.strip_prefix(&format!("{name}: "))) {
-        return stripped.to_owned();
+    if let Some(name) = name {
+        return body
+            .strip_prefix(&format!("{name}: "))
+            .map_or_else(|| body.to_owned(), ToOwned::to_owned);
     }
     if !known {
         return body.to_owned();
@@ -332,12 +342,44 @@ mod tests {
             "hello there"
         );
         assert_eq!(
-            strip_profile_fallback_body("Kris: hello there", Some("Robin"), true),
-            "hello there"
-        );
-        assert_eq!(
             strip_profile_fallback_body("Kris: hello there", None, true),
             "hello there"
+        );
+    }
+
+    #[test]
+    fn keeps_a_body_whose_colon_is_not_a_fallback() {
+        assert_eq!(
+            strip_profile_fallback_body("we shipped it: finally", Some("Robin"), true),
+            "we shipped it: finally"
+        );
+        assert_eq!(
+            strip_profile_fallback_body("Note: to self", Some("Kris"), true),
+            "Note: to self"
+        );
+    }
+
+    #[test]
+    fn keeps_bold_that_merely_repeats_the_profile_name() {
+        assert_eq!(
+            strip_profile_fallback_html("<strong>Kris</strong> is great", Some("Kris"), false),
+            "<strong>Kris</strong> is great"
+        );
+        assert_eq!(
+            strip_profile_fallback_html("<strong>Kris</strong> is great", Some("Kris"), true),
+            "<strong>Kris</strong> is great"
+        );
+    }
+
+    #[test]
+    fn strips_the_html_fallback_without_a_parsed_profile() {
+        assert_eq!(
+            strip_profile_fallback_html(
+                "<strong data-mx-profile-fallback>Kris: </strong>hi",
+                None,
+                true
+            ),
+            "hi"
         );
     }
 

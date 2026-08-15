@@ -25,7 +25,7 @@ export interface EmojiGroup {
 
 export const QUICK_REACTIONS = ['🎉', '👀', '✅', '🙏', '🔥', '💜'];
 
-// Group 2 (component) has no bucket, so a miss here is expected, not a bug.
+// Group 2 (component) has no bucket, so a miss here is expected.
 const groupOf: Partial<Record<number, EmojiGroupId>> = {
   0: 'people',
   1: 'people',

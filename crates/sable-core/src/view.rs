@@ -427,11 +427,14 @@ fn text_message(
         profile.and_then(|profile| profile.display_name.as_deref()),
         known,
     );
-    let formatted = formatted.map(|formatted| match profile {
-        Some(profile) => {
-            strip_profile_fallback_html(&formatted, profile.display_name.as_deref(), known)
-        }
-        None => formatted,
+    // Runs without a parsed profile too: the marker alone is enough, and
+    // skipping it leaves the html naming a sender the body no longer does.
+    let formatted = formatted.map(|formatted| {
+        strip_profile_fallback_html(
+            &formatted,
+            profile.and_then(|profile| profile.display_name.as_deref()),
+            known,
+        )
     });
 
     TimelineItemContentView::Message {
