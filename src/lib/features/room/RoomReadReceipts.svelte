@@ -22,11 +22,18 @@
     members: readonly MemberView[];
     loading: boolean;
     visible?: boolean;
+    open?: boolean;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { readers, members, loading, visible = true, onMemberProfile }: Props = $props();
-  let open = $state(false);
+  let {
+    readers,
+    members,
+    loading,
+    visible = true,
+    open = $bindable(false),
+    onMemberProfile,
+  }: Props = $props();
   let anchor = $state<HTMLButtonElement | null>(null);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);

@@ -43,6 +43,7 @@
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
   let profileOpen = $state(false);
+  let receiptsOpen = $state(false);
   let profileUserId = $state<string | null>(null);
   let profileAnchor = $state<HTMLElement | null>(null);
   let profile = $state<ProfileView | null>(null);
@@ -99,6 +100,7 @@
     memberLoader.reset();
     typingUserIds = [];
     requestedDetails.clear();
+    receiptsOpen = false;
     closeProfile();
 
     return core.subscribeEvents((event) => {
@@ -391,7 +393,7 @@
         readOnly={permissions ? !permissions.can_post : false}
         canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}
-        scrollLocked={profileOpen}
+        scrollLocked={profileOpen || receiptsOpen}
         bind:nearLatest={timelineAtBottom}
       />
     {/key}
@@ -412,6 +414,7 @@
           {#snippet statusTrailing()}
             {#if !preferences.hideReadReceipts}
               <RoomReadReceipts
+                bind:open={receiptsOpen}
                 readers={latestReadBy}
                 members={receiptMembers}
                 loading={memberLoader.loading}
