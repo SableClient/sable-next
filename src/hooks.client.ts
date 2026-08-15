@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/sveltekit';
-import { invoke, isTauri } from '@tauri-apps/api/core';
 
+import { syncNativeTelemetryConsent } from '$lib/observability/native-consent';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '$lib/observability/scrubbers';
 import { preferences } from '$lib/settings/preferences.svelte';
 import { CoreError } from '@/transport';
@@ -90,12 +90,6 @@ if (dsn && preferences.errorReporting) {
 }
 
 // The native process has its own DSN baked in and drops everything until told.
-if (isTauri()) {
-  void invoke('set_native_sentry_enabled', { enabled: preferences.errorReporting }).catch(
-    (error: unknown) => {
-      console.warn('[sable] native crash reporting consent not applied', error);
-    }
-  );
-}
+syncNativeTelemetryConsent(preferences.errorReporting);
 
 export const handleError = Sentry.handleErrorWithSentry();

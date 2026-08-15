@@ -14,6 +14,7 @@
 
   import { buildSettingsLink } from '$lib/features/room/settings-link';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import { syncNativeTelemetryConsent } from '$lib/observability/native-consent';
   import { settingFocusId } from '$lib/settings/registry';
   import type { SettingDefinition, SettingsCategory } from '$lib/settings/registry';
   import { preferences, setPreference } from '$lib/settings/preferences.svelte';
@@ -151,6 +152,7 @@
                       setPreference('telemetryAsked', true);
                       reloadPending = true;
                     }
+                    if (key === 'errorReporting') syncNativeTelemetryConsent(checked);
                   }}
                 />
               {/if}
