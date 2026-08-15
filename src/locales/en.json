@@ -97,6 +97,8 @@
     "foldMore_one": "and {{count}} more event",
     "foldMore_other": "and {{count}} more events",
     "foldShowLess": "Show less",
+    "via": "via",
+    "viaAccount": "Open the account behind this profile, {{user}}",
     "unreadCount_one": "{{count}} new message",
     "unreadCount_other": "{{count}} new messages",
     "start": "Beginning of timeline",

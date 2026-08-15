@@ -53,7 +53,13 @@
     onEdit,
     onDelete,
   }: Props = $props();
-  let senderName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
+  let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
+  let persona = $derived(item.per_message_profile);
+  let senderName = $derived(persona?.display_name ?? accountName);
+  let senderAvatar = $derived(persona?.avatar_url ?? item.sender_avatar);
+  let personaTint = $derived(
+    persona && (persona.color_on_light ?? persona.color_on_dark) !== null ? persona : null
+  );
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let jumbo = $derived(
     item.content.kind === 'message' && !item.content.emote
@@ -73,7 +79,7 @@
 
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
   let ownMessage = $derived(item.is_own && item.content.kind === 'message');
-  let avatarColor = $derived(item.is_own ? undefined : senderColor(item.sender));
+  let avatarColor = $derived(personaTint || item.is_own ? undefined : senderColor(item.sender));
   let nameColor = $derived(
     item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
   );
@@ -164,7 +170,9 @@
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
   <article
-    class={['message', { collapsed, pending, highlighted }]}
+    class={['message', { collapsed, pending, highlighted, persona: personaTint }]}
+    style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
+    style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
     onpointerdown={startPress}
     onpointermove={movePress}
     onpointerup={endPress}
@@ -193,7 +201,7 @@
         >
           <Avatar
             class="message-avatar"
-            src={item.sender_avatar}
+            src={senderAvatar}
             size="small"
             color={avatarColor}
             initials={initials(senderName)}
@@ -202,7 +210,7 @@
       {:else}
         <Avatar
           class="message-avatar"
-          src={item.sender_avatar}
+          src={senderAvatar}
           size="small"
           color={avatarColor}
           initials={initials(senderName)}
@@ -213,7 +221,23 @@
       {#if !collapsed}
         <header>
           {#if !emote}
-            <span class="sender" style:color={nameColor}>{senderName}</span>
+            <span class="sender" style:color={personaTint ? undefined : nameColor}>
+              {senderName}
+            </span>
+          {/if}
+          {#each persona?.pronouns ?? [] as pronoun (pronoun.summary)}
+            <span class="pronouns" lang={pronoun.language ?? undefined}>{pronoun.summary}</span>
+          {/each}
+          {#if persona && item.sender}
+            {@const account = item.sender}
+            <button
+              class="via"
+              type="button"
+              aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
+              onclick={openSenderProfile}
+            >
+              {$i18n.t('timeline.via')}<strong>{account}</strong>
+            </button>
           {/if}
           <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time
           >
@@ -485,6 +509,71 @@
     font-weight: var(--font-weight-bold);
   }
 
+  .message.persona {
+    --pmp-name-floor: 38%;
+    --pmp-name: var(--pmp-on-light, var(--sable-sec-on-container));
+    --pmp-ink: color-mix(
+      in oklab,
+      var(--pmp-name) calc(100% - var(--pmp-name-floor)),
+      var(--sable-bg-on-container)
+    );
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not(.light)) .message.persona {
+      --pmp-name: var(--pmp-on-dark, var(--sable-sec-on-container));
+    }
+  }
+
+  .message.persona :global(.message-avatar) {
+    background: color-mix(in oklab, var(--pmp-name) 18%, var(--sable-surface-var-container));
+    color: var(--pmp-ink);
+  }
+
+  .pronouns {
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.015em;
+    line-height: 1.35;
+    padding: 0 var(--space-1);
+    text-transform: lowercase;
+  }
+
+  .via {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border: 1px solid var(--sable-surface-var-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-normal);
+    gap: 0.25rem;
+    letter-spacing: 0.01em;
+    padding: 0 var(--space-1);
+    position: relative;
+    transition: background-color 120ms ease-out;
+  }
+
+  .via:hover {
+    background: var(--sable-surface-var-container-hover);
+  }
+
+  .via::after {
+    content: '';
+    inset: -0.5rem -2px;
+    position: absolute;
+  }
+
+  .via strong {
+    font-weight: var(--font-weight-medium);
+  }
+
   .emote {
     color: var(--sable-success-main);
     font-style: italic;
@@ -493,6 +582,10 @@
 
   .emote .sender {
     font-style: normal;
+  }
+
+  .message.persona .sender {
+    color: var(--pmp-ink);
   }
 
   .emote :global(.formatted-body) {

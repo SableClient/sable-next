@@ -64,3 +64,27 @@ test('keeps the sender header for an ordinary message', async () => {
   expect(document.querySelector('.emote')).toBeNull();
   await unmount(instance);
 });
+
+test('a per-message profile takes the sender position and names the account behind it', async () => {
+  const persona = {
+    ...item(false),
+    per_message_profile: {
+      id: 'kris',
+      display_name: 'Kris',
+      avatar_url: null,
+      pronouns: [{ summary: 'they/them', language: null }],
+      color_on_light: '#4f7a3a',
+      color_on_dark: '#9fd07c',
+    },
+  };
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: persona, collapsed: false },
+  });
+  await tick();
+
+  expect(document.querySelector('header .sender')?.textContent.trim()).toBe('Kris');
+  expect(document.querySelector('header .pronouns')?.textContent).toBe('they/them');
+  expect(document.querySelector('header .via')?.textContent).toContain('@alice:example.org');
+  await unmount(instance);
+});
