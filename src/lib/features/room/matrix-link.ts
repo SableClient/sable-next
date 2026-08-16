@@ -41,7 +41,10 @@ function parseMatrixTo(href: string): MatrixLink | null {
     const url = new URL(href);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
     if (url.hostname !== matrixToHost) return null;
-    const path = url.hash.replace(/^#\/?/, '');
+    /* matrix.to keeps `?via=` inside the fragment, so `URL` reports it as part
+       of the hash and it would otherwise land in the trailing id. No Matrix id
+       contains `?`, so the first one always starts the query. */
+    const path = url.hash.replace(/^#\/?/, '').split('?')[0];
     if (!path) return null;
 
     const segments = path.split('/');
