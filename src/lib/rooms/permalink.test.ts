@@ -4,7 +4,7 @@ import type { RoomSummary } from '@/generated/RoomSummary';
 
 import { parseMatrixLink } from '$lib/features/room/matrix-link';
 
-import { matrixToUrl, permalinkPath, roomSectionPath } from './permalink';
+import { matrixToUrl, permalinkTarget, roomSectionPath, viaFor } from './permalink';
 
 function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary {
   return {
@@ -91,15 +91,19 @@ test('a space drops a focused event, having no timeline to focus it in', () => {
 
 test('a permalink fragment resolves through the same sectioning', () => {
   const rooms = [room('!dm:example.org', { is_direct: true })];
-  expect(permalinkPath(rooms, encodeURIComponent('!dm:example.org'))).toBe(
-    '/direct/!dm%3Aexample.org'
-  );
+  expect(permalinkTarget(rooms, encodeURIComponent('!dm:example.org'))).toEqual({
+    kind: 'room',
+    path: '/direct/!dm%3Aexample.org',
+  });
 });
 
 test('a permalink fragment carries its event id', () => {
   const rooms = [room('!general:example.org')];
   const fragment = `${encodeURIComponent('!general:example.org')}/${encodeURIComponent('$abc')}`;
-  expect(permalinkPath(rooms, fragment)).toBe('/home/!general%3Aexample.org?event=%24abc');
+  expect(permalinkTarget(rooms, fragment)).toEqual({
+    kind: 'room',
+    path: '/home/!general%3Aexample.org?event=%24abc',
+  });
 });
 
 test('via servers ride along for a room the client has never seen', () => {
@@ -123,16 +127,18 @@ test('a focused event and via servers share one query', () => {
 
 test('a permalink fragment carries its via servers, which sit inside the fragment', () => {
   const fragment = `${encodeURIComponent('!missing:example.org')}?via=a.example&via=b.example`;
-  expect(permalinkPath([], fragment)).toBe(
-    '/home/!missing%3Aexample.org?via=a.example&via=b.example'
-  );
+  expect(permalinkTarget([], fragment)).toEqual({
+    kind: 'room',
+    path: '/home/!missing%3Aexample.org?via=a.example&via=b.example',
+  });
 });
 
 test('via inside the fragment does not leak into the room id', () => {
   const fragment = `${encodeURIComponent('!missing:example.org')}/${encodeURIComponent('$abc')}?via=a.example`;
-  expect(permalinkPath([], fragment)).toBe(
-    '/home/!missing%3Aexample.org?event=%24abc&via=a.example'
-  );
+  expect(permalinkTarget([], fragment)).toEqual({
+    kind: 'room',
+    path: '/home/!missing%3Aexample.org?event=%24abc&via=a.example',
+  });
 });
 
 /* A room id is not routable on its own, so a link to one must advertise
@@ -164,10 +170,18 @@ test('a link the app generates parses back to what it named', () => {
   });
 });
 
-test('a user permalink has no room to open', () => {
-  expect(permalinkPath([], encodeURIComponent('@alice:example.org'))).toBeNull();
+test('a user permalink resolves to the user, having no route of its own', () => {
+  expect(permalinkTarget([], encodeURIComponent('@alice:example.org'))).toEqual({
+    kind: 'user',
+    userId: '@alice:example.org',
+  });
 });
 
 test('a fragment that names nothing resolvable is rejected', () => {
-  expect(permalinkPath([], 'not-an-id')).toBeNull();
+  expect(permalinkTarget([], 'not-an-id')).toBeNull();
+});
+
+test('only a room id is given routing help; an alias resolves itself', () => {
+  expect(viaFor('!somewhere:example.org', ['a.example'])).toEqual(['a.example']);
+  expect(viaFor('#lobby:example.org', ['a.example'])).toEqual([]);
 });

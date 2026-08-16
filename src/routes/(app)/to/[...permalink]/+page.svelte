@@ -3,13 +3,15 @@
   import { page } from '$app/state';
 
   import { i18n } from '$lib/i18n';
-  import { permalinkPath } from '$lib/rooms/permalink';
+  import UserLinkCard from '$lib/features/profile/UserLinkCard.svelte';
+  import { permalinkTarget, type PermalinkTarget } from '$lib/rooms/permalink';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
 
   const roomList = useRoomList();
 
   let unresolved = $state(false);
+  let user = $state<string | null>(null);
 
   $effect(() => {
     // The still-encoded tail, rather than the rest param: the matrix.to parser
@@ -21,28 +23,38 @@
       // which the room's section cannot be decided.
       await roomList.start();
 
-      const target = permalinkPath(roomList.rooms, fragment);
+      const target: PermalinkTarget | null = permalinkTarget(roomList.rooms, fragment);
       if (target === null) {
         unresolved = true;
         return;
       }
 
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- permalinkPath resolves the route
-      await goto(target, { replaceState: true });
+      // A user has no route of its own, so the link opens a card here instead.
+      if (target.kind === 'user') {
+        user = target.userId;
+        return;
+      }
+
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- permalinkTarget resolves the route
+      await goto(target.path, { replaceState: true });
     })();
   });
 </script>
 
-<main class="permalink" aria-busy={!unresolved}>
-  {#if unresolved}
-    <p role="alert">{$i18n.t('permalink.unresolved')}</p>
-  {:else}
-    <div role="status">
-      <Spinner />
-      <p>{$i18n.t('permalink.opening')}</p>
-    </div>
-  {/if}
-</main>
+{#if user !== null}
+  <UserLinkCard userId={user} />
+{:else}
+  <main class="permalink" aria-busy={!unresolved}>
+    {#if unresolved}
+      <p role="alert">{$i18n.t('permalink.unresolved')}</p>
+    {:else}
+      <div role="status">
+        <Spinner />
+        <p>{$i18n.t('permalink.opening')}</p>
+      </div>
+    {/if}
+  </main>
+{/if}
 
 <style>
   .permalink {

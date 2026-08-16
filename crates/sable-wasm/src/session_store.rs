@@ -52,7 +52,6 @@ impl SessionStore for JsSessionStore {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use js_sys::Function;
     use sable_core::store::SessionStore;

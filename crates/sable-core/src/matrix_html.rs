@@ -202,19 +202,35 @@ fn matrix_uri_spans(text: &str) -> Vec<(usize, usize)> {
     let lowercase = text.to_ascii_lowercase();
     let mut spans = Vec::new();
     let mut search = 0;
-    while let Some(offset) = lowercase[search..].find("matrix:") {
+    while let Some(offset) = lowercase
+        .get(search..)
+        .and_then(|rest| rest.find("matrix:"))
+    {
         let start = search + offset;
-        let mut end = text[start..]
-            .find(char::is_whitespace)
+        let mut end = text
+            .get(start..)
+            .and_then(|rest| rest.find(char::is_whitespace))
             .map_or(text.len(), |length| start + length);
-        while end > start && text[start..end].ends_with(TRAILING) {
+        while end > start
+            && text
+                .get(start..end)
+                .is_some_and(|span| span.ends_with(TRAILING))
+        {
             end -= 1;
         }
         // A non-separator before the scheme means this is the tail of a longer token.
-        let follows_text = text[..start].chars().next_back().is_some_and(|character| {
-            !character.is_whitespace() && !matches!(character, '(' | '[' | '{' | '<' | '"' | '\'')
-        });
-        if !follows_text && MatrixUri::parse(&text[start..end]).is_ok() {
+        let follows_text = text
+            .get(..start)
+            .and_then(|before| before.chars().next_back())
+            .is_some_and(|character| {
+                !character.is_whitespace()
+                    && !matches!(character, '(' | '[' | '{' | '<' | '"' | '\'')
+            });
+        if !follows_text
+            && text
+                .get(start..end)
+                .is_some_and(|uri| MatrixUri::parse(uri).is_ok())
+        {
             spans.push((start, end));
         }
         search = end.max(start + "matrix:".len());
@@ -257,8 +273,10 @@ fn linkify_plain_text(text: &str) -> String {
         if start < offset {
             continue;
         }
-        html.push_str(&escape_html(&text[offset..start]));
-        let link = &text[start..end];
+        let (Some(before), Some(link)) = (text.get(offset..start), text.get(start..end)) else {
+            continue;
+        };
+        html.push_str(&escape_html(before));
         if is_email {
             html.push_str(&anchor(&format!("mailto:{link}"), link));
         } else {
@@ -266,7 +284,7 @@ fn linkify_plain_text(text: &str) -> String {
         }
         offset = end;
     }
-    html.push_str(&escape_html(&text[offset..]));
+    html.push_str(&escape_html(text.get(offset..).unwrap_or_default()));
     html
 }
 
@@ -279,12 +297,12 @@ fn linkify_plain_text(text: &str) -> String {
 fn leading_strong(formatted: &str) -> Option<(&str, &str, usize)> {
     let trimmed = formatted.trim_start();
     let tag_end = trimmed.find('>')?;
-    let open_tag = &trimmed[..=tag_end];
+    let open_tag = trimmed.get(..=tag_end)?;
     if !open_tag.starts_with("<strong") {
         return None;
     }
-    let close = trimmed[tag_end..].find("</strong>")?;
-    let text = &trimmed[tag_end + 1..tag_end + close];
+    let close = trimmed.get(tag_end..)?.find("</strong>")?;
+    let text = trimmed.get(tag_end + 1..tag_end + close)?;
     let rest = tag_end + close + "</strong>".len();
     Some((open_tag, text, rest))
 }
@@ -317,11 +335,10 @@ pub fn strip_profile_fallback_html(
             .is_some_and(|name| !name.is_empty() && label == name);
     let marked = open_tag.contains("data-mx-profile-fallback");
     let fallback = marked || named || (known && labelled);
-    if fallback {
-        formatted.trim_start()[rest..].trim_start().to_owned()
-    } else {
-        formatted.to_owned()
-    }
+    fallback
+        .then(|| formatted.trim_start().get(rest..))
+        .flatten()
+        .map_or_else(|| formatted.to_owned(), |body| body.trim_start().to_owned())
 }
 
 /// The plain-text half of the same fallback, which arrives as `Name: `.
@@ -351,7 +368,10 @@ fn nests_too_deeply(formatted: &str) -> bool {
     let mut depth = 0usize;
     let mut rest = formatted;
     while let Some(offset) = rest.find('<') {
-        rest = &rest[offset + 1..];
+        let Some(after) = rest.get(offset + 1..) else {
+            break;
+        };
+        rest = after;
         let Some(name) = rest.split(['>', ' ', '/', '\t', '\n']).next() else {
             continue;
         };

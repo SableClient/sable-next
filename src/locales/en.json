@@ -149,9 +149,14 @@
     "members_one": "{{count}} member",
     "members_other": "{{count}} members"
   },
+  "userLink": {
+    "action": "Send a message",
+    "opening": "Opening…",
+    "failed": "The chat could not be opened."
+  },
   "permalink": {
     "opening": "Opening link…",
-    "unresolved": "That link does not point to a room Sable can open."
+    "unresolved": "Sable cannot tell what that link points to."
   },
   "app": {
     "starting": "Starting Sable…",

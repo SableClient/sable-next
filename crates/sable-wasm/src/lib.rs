@@ -208,7 +208,6 @@ impl SableCore {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use js_sys::Function;
     use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};

@@ -2664,19 +2664,11 @@ mod tests {
 }
 
 #[cfg(all(test, not(target_family = "wasm")))]
-// These timeline tests use panic-based assertions to keep async test failures readable.
-#[allow(
-    clippy::expect_used,
-    clippy::large_futures,
-    clippy::panic,
-    clippy::unwrap_used
-)]
+#[allow(clippy::large_futures)]
 mod sdk_timeline_tests;
 
 #[cfg(test)]
-// These ignored network tests intentionally panic with context on an unexpected
-// server response; production command paths remain panic-free.
-#[allow(clippy::expect_used, clippy::large_futures, clippy::panic)]
+#[allow(clippy::large_futures)]
 mod live_tests {
     use super::*;
 

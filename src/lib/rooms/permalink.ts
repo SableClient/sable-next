@@ -62,10 +62,14 @@ export function roomSectionPath(
   return search === '' ? base : `${base}?${search}`;
 }
 
+/** An alias resolves through its own domain; only a room id needs routing help. */
+export function viaFor(address: string, via: readonly string[]): string[] {
+  return address.startsWith('#') ? [] : [...via];
+}
+
 /**
- * A matrix.to link others can follow. A canonical alias carries its own server,
- * so it needs no `via`; a room id is not routable without one, which is why
- * `via` is not optional for that form.
+ * A matrix.to link others can follow. A room id is not routable without `via`,
+ * which is why it is not optional for that form.
  */
 export function matrixToUrl(
   address: string,
@@ -77,24 +81,33 @@ export function matrixToUrl(
     : encodeURIComponent(address);
 
   // The query belongs inside the fragment, so it cannot be built with `URL`.
-  const servers = address.startsWith('#') ? [] : via;
-  const query = new URLSearchParams(servers.map((server) => ['via', server])).toString();
+  const query = new URLSearchParams(
+    viaFor(address, via).map((server) => ['via', server])
+  ).toString();
   return `https://matrix.to/#/${path}${query === '' ? '' : `?${query}`}`;
 }
+
+/** A room link resolves to a route; a user link has no route of its own. */
+export type PermalinkTarget = { kind: 'room'; path: string } | { kind: 'user'; userId: string };
 
 /**
  * Resolves the tail of a `/to/...` URL, which mirrors a matrix.to fragment.
  * Takes it still percent-encoded so the matrix.to parser decodes each segment
  * itself, as it does for a pasted link.
  */
-export function permalinkPath(
+export function permalinkTarget(
   rooms: readonly RoomSummary[],
   encodedFragment: string
-): string | null {
+): PermalinkTarget | null {
   // `?via=` sits inside the fragment, where it would otherwise be parsed as
   // part of the last id.
   const { href, via } = splitVia(`https://matrix.to/#/${encodedFragment}`);
   const link = parseMatrixLink(href);
-  if (link === null || link.kind === 'user') return null;
-  return roomSectionPath(rooms, link.roomId, link.kind === 'event' ? link.eventId : null, via);
+  if (link === null) return null;
+  if (link.kind === 'user') return { kind: 'user', userId: link.userId };
+
+  return {
+    kind: 'room',
+    path: roomSectionPath(rooms, link.roomId, link.kind === 'event' ? link.eventId : null, via),
+  };
 }

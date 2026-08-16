@@ -5,7 +5,7 @@
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { roomSectionPath } from '$lib/rooms/permalink';
+  import { roomSectionPath, viaFor } from '$lib/rooms/permalink';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
@@ -43,7 +43,7 @@
     failed = false;
 
     core
-      .roomPreview(address, via)
+      .roomPreview(address, viaFor(address, via))
       .then((result) => {
         if (active) preview = result;
       })
@@ -66,13 +66,14 @@
 
   // The alias resolves on servers that have never seen the room id.
   let address = $derived(preview?.canonical_alias ?? roomId);
+  let routing = $derived(viaFor(address, via));
 
   async function join(): Promise<void> {
     if (busy) return;
     busy = true;
     failedAction = null;
     try {
-      const joined = await core.joinRoom(address, via);
+      const joined = await core.joinRoom(address, routing);
       const target = roomSectionPath(roomList.rooms, joined, eventId);
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
       await goto(target, { replaceState: true });
@@ -89,7 +90,7 @@
     busy = true;
     failedAction = null;
     try {
-      await core.knockRoom(address, via);
+      await core.knockRoom(address, routing);
       sentKnock = true;
     } catch (error) {
       console.warn('[sable room] knock failed', error);
