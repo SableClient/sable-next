@@ -50,6 +50,7 @@
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+    onCopyLink?: (eventId: string) => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
@@ -74,6 +75,7 @@
     onRequestFuture,
     onRead,
     onMatrixLink,
+    onCopyLink,
     onSenderProfile,
     onRetrySend,
     onCancelSend,
@@ -582,6 +584,7 @@
                     : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
+                  {onCopyLink}
                   {onSenderProfile}
                   {onRetrySend}
                   {onCancelSend}

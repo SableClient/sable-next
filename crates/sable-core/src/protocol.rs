@@ -215,6 +215,20 @@ pub enum Command {
         /// Servers to try when the id is not resolvable on ours, or empty.
         via: Vec<String>,
     },
+    /// Asks to be let into a `knock` room. A separate endpoint from joining, and
+    /// the only one that works when the join rule is `knock`.
+    KnockRoom {
+        address: String,
+        via: Vec<String>,
+        reason: Option<String>,
+    },
+    /// The servers to advertise in a permalink to this room, per the routing
+    /// rules in the spec appendices. Empty when the room has a canonical alias,
+    /// which is routable on its own.
+    RoomViaServers {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
     LeaveRoom {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -507,6 +521,13 @@ pub enum CommandOk {
     JoinRoom {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
+    },
+    KnockRoom {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    RoomViaServers {
+        servers: Vec<String>,
     },
     LeaveRoom,
     InviteUser,

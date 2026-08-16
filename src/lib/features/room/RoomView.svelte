@@ -9,7 +9,7 @@
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { roomSectionPath } from '$lib/rooms/permalink';
+  import { matrixToUrl, roomSectionPath } from '$lib/rooms/permalink';
   import { findRoomByPathId, roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
   import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
   import { activeRoomTimeline } from '$lib/rooms/timeline.svelte';
@@ -239,6 +239,20 @@
     void goto(target);
   }
 
+  function copyEventLink(eventId: string): void {
+    void writeEventLink(eventId);
+  }
+
+  async function writeEventLink(eventId: string): Promise<void> {
+    try {
+      const alias = resolvedRoom?.canonical_alias ?? null;
+      const via = alias ? [] : await core.roomViaServers(resolvedRoomId);
+      await navigator.clipboard.writeText(matrixToUrl(alias ?? resolvedRoomId, via, eventId));
+    } catch (error) {
+      console.debug('[sable room] copy link failed', error);
+    }
+  }
+
   function typingMemberName(userId: string): string | null {
     return memberLoader.members.find((member) => member.user_id === userId)?.display_name ?? null;
   }
@@ -384,6 +398,7 @@
         onRequestFuture={requestFuture}
         onRead={markRead}
         onMatrixLink={handleMatrixLink}
+        onCopyLink={copyEventLink}
         onSenderProfile={openProfile}
         {onRetrySend}
         {onCancelSend}

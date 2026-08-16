@@ -108,13 +108,26 @@ macro_rules! dispatch_commands {
                 let Some(removed) = $self.subscriptions.lock().await.remove(&subscription) else {
                     return Err(CommandErr::UnknownSubscription);
                 };
-                let was_live_timeline = matches!(removed.kind, SubscriptionKind::LiveTimeline(_));
-                for task in removed.tasks {
-                    task.abort();
-                }
+                let live_room = match &removed.kind {
+                    SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
+                    SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+                };
+                drop(removed);
 
-                if was_live_timeline {
+                if let Some(room_id) = live_room {
                     $self.sync_timeline_rooms_locked(None).await?;
+
+                    let subscriptions = $self.subscriptions.lock().await;
+                    let watched = subscriptions.values().any(|subscription| {
+                        matches!(
+                            &subscription.kind,
+                            SubscriptionKind::LiveTimeline(id) if *id == room_id
+                        )
+                    });
+                    drop(subscriptions);
+                    if !watched {
+                        $self.timelines.lock().await.remove(&room_id);
+                    }
                 }
 
                 Ok(CommandOk::Unsubscribe)
@@ -574,11 +587,11 @@ macro_rules! dispatch_commands {
                 if set {
                     room.set_tag(name, TagInfo::new())
                         .await
-                        .map_err(|error| $self.failed("set_room_tag", error))?;
+                        .map_err(|error| $self.room_error("set_room_tag", error))?;
                 } else {
                     room.remove_tag(name)
                         .await
-                        .map_err(|error| $self.failed("remove_room_tag", error))?;
+                        .map_err(|error| $self.room_error("remove_room_tag", error))?;
                 }
 
                 Ok(CommandOk::SetRoomTag)
@@ -627,7 +640,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .send_state_event(RoomJoinRulesEventContent::new(rule))
                     .await
-                    .map_err(|error| $self.failed("set_room_join_rule", error))?;
+                    .map_err(|error| $self.room_error("set_room_join_rule", error))?;
 
                 Ok(CommandOk::SetRoomJoinRule)
             }
@@ -643,7 +656,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .send_state_event_raw(&event_type, &state_key, &content)
                     .await
-                    .map_err(|error| $self.failed("send_state_event", error))?;
+                    .map_err(|error| $self.room_error("send_state_event", error))?;
 
                 Ok(CommandOk::SendStateEvent)
             }
@@ -655,7 +668,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .set_name(name.unwrap_or_default())
                     .await
-                    .map_err(|error| $self.failed("set_room_name", error))?;
+                    .map_err(|error| $self.room_error("set_room_name", error))?;
 
                 Ok(CommandOk::SetRoomName)
             }
@@ -666,7 +679,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .set_room_topic(&topic)
                     .await
-                    .map_err(|error| $self.failed("set_room_topic", error))?;
+                    .map_err(|error| $self.room_error("set_room_topic", error))?;
 
                 Ok(CommandOk::SetRoomTopic)
             }
@@ -678,13 +691,13 @@ macro_rules! dispatch_commands {
                     Some(url) => {
                         room.set_avatar_url(&mxc_uri(&url)?, None)
                             .await
-                            .map_err(|error| $self.failed("set_room_avatar", error))?;
+                            .map_err(|error| $self.room_error("set_room_avatar", error))?;
                     }
                     // State cannot be deleted, so empty content is the removal.
                     None => {
                         room.send_state_event(RoomAvatarEventContent::new())
                             .await
-                            .map_err(|error| $self.failed("clear_room_avatar", error))?;
+                            .map_err(|error| $self.room_error("clear_room_avatar", error))?;
                     }
                 }
 
@@ -701,7 +714,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .update_power_levels(vec![(&user_id, power_level.into())])
                     .await
-                    .map_err(|error| $self.failed("set_user_power_level", error))?;
+                    .map_err(|error| $self.room_error("set_user_power_level", error))?;
 
                 Ok(CommandOk::SetUserPowerLevel)
             }
@@ -716,7 +729,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .kick_user(&user_id, reason.as_deref())
                     .await
-                    .map_err(|error| $self.failed("kick_user", error))?;
+                    .map_err(|error| $self.room_error("kick_user", error))?;
 
                 Ok(CommandOk::KickUser)
             }
@@ -731,7 +744,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .ban_user(&user_id, reason.as_deref())
                     .await
-                    .map_err(|error| $self.failed("ban_user", error))?;
+                    .map_err(|error| $self.room_error("ban_user", error))?;
 
                 Ok(CommandOk::BanUser)
             }
@@ -746,7 +759,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .unban_user(&user_id, reason.as_deref())
                     .await
-                    .map_err(|error| $self.failed("unban_user", error))?;
+                    .map_err(|error| $self.room_error("unban_user", error))?;
 
                 Ok(CommandOk::UnbanUser)
             }
@@ -905,7 +918,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .send_state_event_raw("m.space.child", room_id.as_str(), &serde_json::json!({}))
                     .await
-                    .map_err(|error| $self.failed("remove_from_space", error))?;
+                    .map_err(|error| $self.room_error("remove_from_space", error))?;
 
                 Ok(CommandOk::RemoveFromSpace)
             }
@@ -928,10 +941,44 @@ macro_rules! dispatch_commands {
                     .await?
                     .join_room_by_id_or_alias(&address, &via)
                     .await
-                    .map_err(|error| $self.failed("join_room", error))?;
+                    .map_err(|error| $self.room_error("join_room", error))?;
 
                 Ok(CommandOk::JoinRoom {
                     room_id: room.room_id().to_owned(),
+                })
+            }
+
+            Command::KnockRoom {
+                address,
+                via,
+                reason,
+            } => $self.knock_room(&address, &via, reason).await,
+
+            Command::RoomViaServers { room_id } => {
+                let room = $self.room(&room_id).await?;
+                if room.canonical_alias().is_some() {
+                    return Ok(CommandOk::RoomViaServers {
+                        servers: Vec::new(),
+                    });
+                }
+
+                let members = room
+                    .members(RoomMemberships::JOIN)
+                    .await
+                    .map_err(|error| $self.failed("room_via_servers", error))?;
+
+                let ranked: Vec<(String, i32)> = members
+                    .iter()
+                    .map(|member| {
+                        (
+                            member.user_id().to_string(),
+                            view::clamp_power_level(member.power_level()),
+                        )
+                    })
+                    .collect();
+
+                Ok(CommandOk::RoomViaServers {
+                    servers: view::via_servers(&ranked),
                 })
             }
 
@@ -941,7 +988,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .leave()
                     .await
-                    .map_err(|error| $self.failed("leave_room", error))?;
+                    .map_err(|error| $self.room_error("leave_room", error))?;
 
                 // Keeping it would hand a stale timeline back on rejoin.
                 $self.timelines.lock().await.remove(&room_id);
@@ -955,7 +1002,7 @@ macro_rules! dispatch_commands {
                     .await?
                     .invite_user_by_id(&user_id)
                     .await
-                    .map_err(|error| $self.failed("invite_user", error))?;
+                    .map_err(|error| $self.room_error("invite_user", error))?;
 
                 Ok(CommandOk::InviteUser)
             }

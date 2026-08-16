@@ -13,6 +13,7 @@
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
+  import { matrixToUrl } from '$lib/rooms/permalink';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
@@ -105,9 +106,9 @@
   }
 
   async function copyLink(): Promise<void> {
-    const address = room.canonical_alias ?? room.room_id;
     try {
-      await navigator.clipboard.writeText(`https://matrix.to/#/${address}`);
+      const via = room.canonical_alias ? [] : await core.roomViaServers(room.room_id);
+      await navigator.clipboard.writeText(matrixToUrl(room.canonical_alias ?? room.room_id, via));
     } catch (error) {
       console.debug('[sable room] clipboard unavailable', error);
     }

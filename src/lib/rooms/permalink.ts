@@ -63,6 +63,26 @@ export function roomSectionPath(
 }
 
 /**
+ * A matrix.to link others can follow. A canonical alias carries its own server,
+ * so it needs no `via`; a room id is not routable without one, which is why
+ * `via` is not optional for that form.
+ */
+export function matrixToUrl(
+  address: string,
+  via: readonly string[],
+  eventId?: string | null
+): string {
+  const path = eventId
+    ? `${encodeURIComponent(address)}/${encodeURIComponent(eventId)}`
+    : encodeURIComponent(address);
+
+  // The query belongs inside the fragment, so it cannot be built with `URL`.
+  const servers = address.startsWith('#') ? [] : via;
+  const query = new URLSearchParams(servers.map((server) => ['via', server])).toString();
+  return `https://matrix.to/#/${path}${query === '' ? '' : `?${query}`}`;
+}
+
+/**
  * Resolves the tail of a `/to/...` URL, which mirrors a matrix.to fragment.
  * Takes it still percent-encoded so the matrix.to parser decodes each segment
  * itself, as it does for a pasted link.

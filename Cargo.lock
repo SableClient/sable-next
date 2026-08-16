@@ -145,6 +145,8 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2526,6 +2528,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "html-escape"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
+
+[[package]]
 name = "html5ever"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3405,7 +3413,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "anymap2",
  "aquamarine",
@@ -3468,7 +3476,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "assert_matches",
@@ -3498,7 +3506,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-common"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "eyeball-im",
  "futures-core",
@@ -3521,7 +3529,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "aes",
  "aquamarine",
@@ -3562,7 +3570,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-indexeddb"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3594,7 +3602,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-sqlite"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "async-trait",
@@ -3621,7 +3629,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-store-encryption"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -3642,7 +3650,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-test"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "ctor 0.2.9",
@@ -3665,7 +3673,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-test-macros"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -3674,7 +3682,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-test-utils"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "ctor 0.2.9",
  "tracing-subscriber",
@@ -3683,7 +3691,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-ui"
 version = "0.18.0"
-source = "git+https://github.com/eleboucher/matrix-rust-sdk?branch=sable%2F0.18.0-no-remove-panic#723b1f80885216489df89640ce74b88f2a230373"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=723b1f80885216489df89640ce74b88f2a230373#723b1f80885216489df89640ce74b88f2a230373"
 dependencies = [
  "as_variant",
  "async-rx",
@@ -5368,9 +5376,11 @@ name = "sable-core"
 version = "0.1.0"
 dependencies = [
  "ammonia",
+ "async-trait",
  "futures-util",
  "getrandom 0.3.4",
  "getrandom 0.4.3",
+ "html-escape",
  "linkify",
  "matrix-sdk",
  "matrix-sdk-test",
@@ -5392,12 +5402,14 @@ dependencies = [
 name = "sable-wasm"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "console_error_panic_hook",
  "futures-util",
  "js-sys",
  "sable-core",
  "serde_json",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
  "tracing-web",

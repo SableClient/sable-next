@@ -4,7 +4,6 @@ pub mod image_packs;
 pub mod matrix_html;
 pub mod protocol;
 mod registration;
-pub mod rt;
 pub mod session;
 pub mod store;
 pub mod view;
@@ -31,6 +30,7 @@ use matrix_sdk::encryption::{
     secret_storage::SecretStorageError,
 };
 use matrix_sdk::event_cache::PaginationStatus;
+use matrix_sdk::executor::{AbortOnDrop, JoinHandleExt, spawn};
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
 use matrix_sdk::room::Receipts;
 use matrix_sdk::room::edit::EditedContent;
@@ -342,7 +342,8 @@ use protocol::{
     RecoveryStateView, RegistrationResultView, RoomTag, SessionInfo, StatusView, SubscriptionId,
     SyncStatus, VerificationStateView, VerificationView,
 };
-use rt::Task;
+type Task = AbortOnDrop<()>;
+
 use session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession, Session};
 use store::SessionStore;
 
@@ -472,12 +473,11 @@ const fn verification_phase(state: &VerificationView) -> &'static str {
 
 fn sync_status(state: SyncState) -> SyncStatus {
     match state {
-        SyncState::Idle | SyncState::Terminated => SyncStatus::Offline,
+        SyncState::Idle | SyncState::Terminated | SyncState::Offline => SyncStatus::Offline,
         SyncState::Running => SyncStatus::Live,
         SyncState::Error(error) => SyncStatus::Error {
             message: error.to_string(),
         },
-        SyncState::Offline => SyncStatus::Syncing,
     }
 }
 
@@ -510,6 +510,7 @@ pub struct Core {
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
     session_store_lock: Mutex<()>,
+    session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
     accounts: Mutex<Option<AccountRegistry>>,
     session: RwLock<Option<Session>>,
@@ -554,6 +555,7 @@ impl Core {
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
             session_store_lock: Mutex::new(()),
+            session_swap_lock: Mutex::new(()),
             restore_lock: Mutex::new(()),
             accounts: Mutex::new(None),
             session: RwLock::new(None),
@@ -659,6 +661,31 @@ impl Core {
         self.failed("recover_identity", error)
     }
 
+    fn room_error(&self, context: &str, error: matrix_sdk::Error) -> CommandErr {
+        match error.client_api_error_kind() {
+            Some(ErrorKind::Forbidden) => {
+                tracing::warn!(context, category = "denied", "room operation refused");
+                return CommandErr::Denied;
+            }
+            Some(ErrorKind::LimitExceeded(limit)) => {
+                let retry_after_ms = limit.retry_after.as_ref().and_then(|retry_after| {
+                    let RetryAfter::Delay(delay) = retry_after else {
+                        return None;
+                    };
+                    delay.as_millis().try_into().ok()
+                });
+                tracing::warn!(context, category = "rate_limited", "room operation refused");
+                return CommandErr::RateLimited { retry_after_ms };
+            }
+            _ => {}
+        }
+
+        match error {
+            matrix_sdk::Error::Http(error) => self.homeserver_http_error(context, *error),
+            _ => self.failed(context, error),
+        }
+    }
+
     fn homeserver_http_error(&self, context: &str, error: matrix_sdk::HttpError) -> CommandErr {
         match error.client_api_error_kind() {
             Some(ErrorKind::LimitExceeded(limit)) => {
@@ -745,6 +772,30 @@ impl Core {
             .map_err(|error| self.failed("add_to_space", error))?;
 
         Ok(())
+    }
+
+    async fn knock_room(
+        &self,
+        address: &str,
+        via: &[String],
+        reason: Option<String>,
+    ) -> Result<CommandOk, CommandErr> {
+        let address = RoomOrAliasId::parse(address).map_err(|_| CommandErr::UnknownRoom)?;
+        let via = via
+            .iter()
+            .filter_map(|server| ServerName::parse(server).ok())
+            .collect::<Vec<_>>();
+
+        let room = self
+            .client()
+            .await?
+            .knock(address, reason, via)
+            .await
+            .map_err(|error| self.failed("knock_room", error))?;
+
+        Ok(CommandOk::KnockRoom {
+            room_id: room.room_id().to_owned(),
+        })
     }
 
     async fn room_preview(&self, address: &str, via: &[String]) -> Result<CommandOk, CommandErr> {
@@ -1452,7 +1503,9 @@ impl Core {
         registry
             .accounts
             .retain(|account| account.account_id != account_id);
-        registry.active_account_id = None;
+        if registry.active_account_id.as_deref() == Some(account_id) {
+            registry.active_account_id = None;
+        }
         let bytes = serde_json::to_vec(registry)
             .map_err(|error| self.failed("logout: serialize accounts", error))?;
         self.sessions
@@ -1490,9 +1543,17 @@ impl Core {
         self.watch_ephemeral(&client, generation);
         self.watch_incoming_verifications(&client);
 
+        self.install_session_callbacks(&client, &homeserver, &account_id, generation);
+
         let sync_service = session::start_sync(client.clone())
             .await
             .map_err(|error| self.failed("start_sync", error))?;
+
+        let _swap = self.session_swap_lock.lock().await;
+        if self.session_generation.load(Ordering::SeqCst) != generation {
+            sync_service.stop().await;
+            return Err(CommandErr::Unavailable);
+        }
 
         // Do not disrupt the active session unless its replacement started
         // successfully. `take_session` also aborts its owned watcher tasks.
@@ -1503,11 +1564,6 @@ impl Core {
         let verification_client = client.clone();
         let verification_user_id = client.user_id().map(ToOwned::to_owned);
         let mut session = self.session.write().await;
-        if self.session_generation.load(Ordering::SeqCst) != generation {
-            drop(session);
-            sync_service.stop().await;
-            return Ok(());
-        }
         *session = Some(Session {
             account_id: account_id.clone(),
             client: client.clone(),
@@ -1515,22 +1571,48 @@ impl Core {
             homeserver: homeserver.clone(),
             oauth,
         });
+        drop(session);
 
-        self.watch_session(&client, &homeserver, &account_id, generation);
+        self.watch_session_changes(&client, generation);
         self.watch_encryption(&client, generation);
+
+        client
+            .send_queue()
+            .respawn_tasks_for_rooms_with_unsent_requests()
+            .await;
 
         let core = self.clone();
         let mut states = sync_service.state();
+        let restarted = sync_service.clone();
         // `Subscriber::next` yields only on *change*, so emit the first by hand.
         core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
-        self.track_session_task(rt::spawn(async move {
-            while let Some(state) = states.next().await {
-                core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
-            }
-        }));
+        self.track_session_task(
+            spawn(async move {
+                let mut failures = 0u32;
+                while let Some(state) = states.next().await {
+                    let stalled = matches!(
+                        state,
+                        SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
+                    );
+                    core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
+
+                    if stalled {
+                        failures = failures.saturating_add(1);
+                        matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
+                            2u64.saturating_pow(failures.min(5)),
+                        ))
+                        .await;
+                        restarted.start().await;
+                    } else {
+                        failures = 0;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
 
         if let Some(user_id) = verification_user_id {
-            rt::spawn_detached(async move {
+            drop(spawn(async move {
                 if let Err(error) = verification_client
                     .encryption()
                     .request_user_identity(&user_id)
@@ -1541,7 +1623,7 @@ impl Core {
                         "could not refresh own device list: {error}"
                     );
                 }
-            });
+            }));
         }
 
         Ok(())
@@ -1554,30 +1636,36 @@ impl Core {
 
         let core = self.clone();
         let watched = client.clone();
-        self.track_session_task(rt::spawn(async move {
-            while verification.next().await.is_some() {
-                core.emit_if_current(
-                    generation,
-                    CoreEvent::EncryptionStatus {
-                        status: encryption_status(&watched).await,
-                    },
-                );
-            }
-        }));
+        self.track_session_task(
+            spawn(async move {
+                while verification.next().await.is_some() {
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::EncryptionStatus {
+                            status: encryption_status(&watched).await,
+                        },
+                    );
+                }
+            })
+            .abort_on_drop(),
+        );
 
         let core = self.clone();
         let watched = client.clone();
-        self.track_session_task(rt::spawn(async move {
-            pin_mut!(recovery);
-            while recovery.next().await.is_some() {
-                core.emit_if_current(
-                    generation,
-                    CoreEvent::EncryptionStatus {
-                        status: encryption_status(&watched).await,
-                    },
-                );
-            }
-        }));
+        self.track_session_task(
+            spawn(async move {
+                pin_mut!(recovery);
+                while recovery.next().await.is_some() {
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::EncryptionStatus {
+                            status: encryption_status(&watched).await,
+                        },
+                    );
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     /// Self-verification travels to-device, verifying someone else as a DM
@@ -1636,7 +1724,7 @@ impl Core {
     /// Both funnel into one event stream keyed by the flow id.
     fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
         let core = self.clone();
-        let task = rt::spawn(async move {
+        let task = spawn(async move {
             let user_id = request.other_user_id().to_owned();
             let flow_id = request.flow_id().to_owned();
 
@@ -1686,13 +1774,14 @@ impl Core {
                     }
                 }
             }
-        });
+        })
+        .abort_on_drop();
         self.track_session_task(task);
     }
 
     fn watch_sas(self: &Arc<Self>, user_id: OwnedUserId, flow_id: String, sas: SasVerification) {
         let core = self.clone();
-        let task = rt::spawn(async move {
+        let task = spawn(async move {
             let mut changes = sas.changes();
             core.emit_verification(&user_id, &flow_id, sas_view(&sas, &sas.state()));
 
@@ -1714,7 +1803,8 @@ impl Core {
                     break;
                 }
             }
-        });
+        })
+        .abort_on_drop();
         self.track_session_task(task);
     }
 
@@ -1816,7 +1906,7 @@ impl Core {
 
     /// The SDK rotates the OAuth refresh token when it refreshes. Without
     /// re-persisting, the next cold start authenticates with a spent one.
-    fn watch_session(
+    fn install_session_callbacks(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,
         homeserver: &str,
@@ -1837,7 +1927,7 @@ impl Core {
             // The callback is synchronous and the store is not. A failure only
             // costs the next restore, so it is logged.
             let core = saver.clone();
-            rt::spawn_detached(async move {
+            drop(spawn(async move {
                 let store_id: Option<String> = {
                     let accounts = core.accounts.lock().await;
                     accounts
@@ -1859,7 +1949,7 @@ impl Core {
                 {
                     tracing::error!("could not persist refreshed session: {error:?}");
                 }
-            });
+            }));
 
             Ok(())
         };
@@ -1873,21 +1963,26 @@ impl Core {
         if let Err(error) = client.set_session_callbacks(Box::new(reload), Box::new(save)) {
             tracing::error!("could not install session callbacks: {error}");
         }
-
-        let core = self.clone();
-        let mut changes = client.subscribe_to_session_changes();
-        self.track_session_task(rt::spawn(async move {
-            while let Ok(change) = changes.recv().await {
-                if core.handle_session_change(change, generation).await {
-                    return;
-                }
-            }
-        }));
     }
 
-    async fn handle_session_change(
+    fn watch_session_changes(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+        let core = self.clone();
+        let mut changes = client.subscribe_to_session_changes();
+        self.track_session_task(
+            spawn(async move {
+                while let Ok(change) = changes.recv().await {
+                    if core.handle_session_change(&change, generation) {
+                        return;
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    fn handle_session_change(
         self: &Arc<Self>,
-        change: matrix_sdk::SessionChange,
+        change: &matrix_sdk::SessionChange,
         generation: u64,
     ) -> bool {
         if !matches!(change, matrix_sdk::SessionChange::UnknownToken(_)) {
@@ -1907,17 +2002,20 @@ impl Core {
             return true;
         }
 
-        let session = self.take_session().await;
-        let account_id = session.as_ref().map(|session| session.account_id.clone());
-        if let Some(session) = session {
-            session.sync_service.stop().await;
-        }
-        if let Err(error) = self.remove_account(account_id.as_deref()).await {
-            tracing::error!("could not clear rejected session: {error:?}");
-        }
-        self.emit(CoreEvent::SessionEnded {
-            reason: "token_rejected".to_owned(),
-        });
+        let core = self.clone();
+        drop(spawn(async move {
+            let session = core.take_session().await;
+            let account_id = session.as_ref().map(|session| session.account_id.clone());
+            if let Some(session) = session {
+                session.sync_service.stop().await;
+            }
+            if let Err(error) = core.remove_account(account_id.as_deref()).await {
+                tracing::error!("could not clear rejected session: {error:?}");
+            }
+            core.emit(CoreEvent::SessionEnded {
+                reason: "token_rejected".to_owned(),
+            });
+        }));
         true
     }
 
@@ -1945,7 +2043,7 @@ impl Core {
                 .clone()
         };
 
-        let task = rt::spawn(async move {
+        let task = spawn(async move {
             let room_list = match sync_service.room_list_service().all_rooms().await {
                 Ok(room_list) => room_list,
                 Err(error) => {
@@ -1962,6 +2060,8 @@ impl Core {
 
             let mut stream = Box::pin(stream);
             while let Some(diffs) = stream.next().await {
+                controller.add_one_page();
+
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
                     view::enrich_room_fields(&client, diff, &mut room_cache).await;
@@ -1976,7 +2076,8 @@ impl Core {
                         .collect(),
                 });
             }
-        });
+        })
+        .abort_on_drop();
 
         self.subscriptions.lock().await.insert(
             subscription,
@@ -2034,7 +2135,7 @@ impl Core {
         let own_user_id = self.client().await?.user_id().map(ToOwned::to_owned);
         let core = self.clone();
         let stream_user_id = own_user_id.clone();
-        let task = rt::spawn(async move {
+        let task = spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
                 core.emit(CoreEvent::TimelineDiff {
@@ -2049,17 +2150,21 @@ impl Core {
                         .collect(),
                 });
             }
-        });
+        })
+        .abort_on_drop();
         let (initial_status, status_task) = pagination.map_or((None, None), |(status, stream)| {
             let core = self.clone();
             (
                 Some(status),
-                Some(rt::spawn(async move {
-                    let mut status = Box::pin(stream);
-                    while let Some(status) = status.next().await {
-                        core.emit(timeline_pagination_event(subscription, status));
-                    }
-                })),
+                Some(
+                    spawn(async move {
+                        let mut status = Box::pin(stream);
+                        while let Some(status) = status.next().await {
+                            core.emit(timeline_pagination_event(subscription, status));
+                        }
+                    })
+                    .abort_on_drop(),
+                ),
             )
         });
         let mut subscriptions = self.subscriptions.lock().await;
@@ -2477,27 +2582,18 @@ mod tests {
 
     struct FailingClearSessionStore;
 
+    #[async_trait::async_trait]
     impl SessionStore for FailingClearSessionStore {
-        fn load(
-            &self,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send + '_>>
-        {
-            Box::pin(async { None })
+        async fn load(&self) -> Option<Vec<u8>> {
+            None
         }
 
-        fn save(
-            &self,
-            _bytes: Vec<u8>,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
-        {
-            Box::pin(async { Ok(()) })
+        async fn save(&self, _bytes: Vec<u8>) -> Result<(), String> {
+            Ok(())
         }
 
-        fn clear(
-            &self,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
-        {
-            Box::pin(async { Err("storage unavailable".to_owned()) })
+        async fn clear(&self) -> Result<(), String> {
+            Err("storage unavailable".to_owned())
         }
     }
 
@@ -2505,33 +2601,20 @@ mod tests {
         bytes: Arc<Mutex<Option<Vec<u8>>>>,
     }
 
+    #[async_trait::async_trait]
     impl SessionStore for TestSessionStore {
-        fn load(
-            &self,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send + '_>>
-        {
-            Box::pin(async move { self.bytes.lock().await.clone() })
+        async fn load(&self) -> Option<Vec<u8>> {
+            self.bytes.lock().await.clone()
         }
 
-        fn save(
-            &self,
-            bytes: Vec<u8>,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
-        {
-            Box::pin(async move {
-                *self.bytes.lock().await = Some(bytes);
-                Ok(())
-            })
+        async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+            *self.bytes.lock().await = Some(bytes);
+            Ok(())
         }
 
-        fn clear(
-            &self,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>
-        {
-            Box::pin(async move {
-                *self.bytes.lock().await = None;
-                Ok(())
-            })
+        async fn clear(&self) -> Result<(), String> {
+            *self.bytes.lock().await = None;
+            Ok(())
         }
     }
 
@@ -2563,27 +2646,20 @@ mod tests {
             }),
         );
 
-        assert!(
-            !core
-                .handle_session_change(matrix_sdk::SessionChange::TokensRefreshed, 1)
-                .await
-        );
+        assert!(!core.handle_session_change(&matrix_sdk::SessionChange::TokensRefreshed, 1));
         assert_eq!(*bytes.lock().await, Some(b"session".to_vec()));
 
-        assert!(
-            core.handle_session_change(
-                matrix_sdk::SessionChange::UnknownToken(
-                    matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
-                ),
-                1,
-            )
-            .await
-        );
-        assert_eq!(*bytes.lock().await, None);
+        assert!(core.handle_session_change(
+            &matrix_sdk::SessionChange::UnknownToken(
+                matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
+            ),
+            1,
+        ));
         assert!(matches!(
             events.recv().await,
             Some(CoreEvent::SessionEnded { reason }) if reason == "token_rejected"
         ));
+        assert_eq!(*bytes.lock().await, None);
     }
 }
 

@@ -15,10 +15,10 @@ use futures_util::StreamExt;
 use js_sys::Function;
 use sable_core::{
     Core,
-    protocol::{Command, CommandErr},
+    protocol::{Command, CommandErr, CoreEvent},
 };
 use session_store::JsSessionStore;
-use tokio_stream_compat::UnboundedReceiverStream;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use wasm_bindgen::{JsValue, prelude::*};
 
 /// The rejection payload must stay valid `CommandErr` JSON, so never
@@ -79,7 +79,7 @@ pub fn set_panic_handler(notify: Function) {
 #[wasm_bindgen]
 pub struct SableCore {
     core: Arc<Core>,
-    events: RefCell<Option<UnboundedReceiverStream>>,
+    events: RefCell<Option<UnboundedReceiverStream<CoreEvent>>>,
 }
 
 #[wasm_bindgen]
@@ -262,33 +262,5 @@ mod tests {
             .expect("first subscribe");
 
         assert!(core.subscribe_events(noop).is_err());
-    }
-}
-
-mod tokio_stream_compat {
-    use std::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
-    use futures_util::Stream;
-    use sable_core::protocol::CoreEvent;
-    use tokio::sync::mpsc::UnboundedReceiver;
-
-    /// `tokio-stream` would pull in more than this needs.
-    pub struct UnboundedReceiverStream(UnboundedReceiver<CoreEvent>);
-
-    impl UnboundedReceiverStream {
-        pub const fn new(receiver: UnboundedReceiver<CoreEvent>) -> Self {
-            Self(receiver)
-        }
-    }
-
-    impl Stream for UnboundedReceiverStream {
-        type Item = CoreEvent;
-
-        fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<CoreEvent>> {
-            self.0.poll_recv(cx)
-        }
     }
 }

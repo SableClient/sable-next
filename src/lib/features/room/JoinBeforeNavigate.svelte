@@ -24,8 +24,9 @@
 
   let preview = $state<RoomPreviewView | null>(null);
   let failed = $state(false);
-  let joining = $state(false);
-  let joinFailed = $state(false);
+  let busy = $state(false);
+  let sentKnock = $state(false);
+  let failedAction = $state<'join' | 'knock' | null>(null);
 
   let title = $derived(preview?.name ?? roomId);
   let initials = $derived(
@@ -56,21 +57,45 @@
     };
   });
 
+  /* `knock` admits nobody through /join, so the button has to ask instead.
+     `knock_restricted` still lets a member of the allowed space straight in,
+     so it tries joining first and offers to knock only once that is refused. */
+  let mustKnock = $derived(preview?.join_rule === 'knock');
+  let canKnock = $derived(mustKnock || preview?.join_rule === 'knock_restricted');
+  let knocked = $derived(preview?.state === 'knocked' || sentKnock);
+
+  // The alias resolves on servers that have never seen the room id.
+  let address = $derived(preview?.canonical_alias ?? roomId);
+
   async function join(): Promise<void> {
-    if (joining) return;
-    joining = true;
-    joinFailed = false;
+    if (busy) return;
+    busy = true;
+    failedAction = null;
     try {
-      // The alias resolves on servers that have never seen the room id.
-      const joined = await core.joinRoom(preview?.canonical_alias ?? roomId, via);
+      const joined = await core.joinRoom(address, via);
       const target = roomSectionPath(roomList.rooms, joined, eventId);
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
       await goto(target, { replaceState: true });
     } catch (error) {
       console.warn('[sable room] join failed', error);
-      joinFailed = true;
+      failedAction = 'join';
     } finally {
-      joining = false;
+      busy = false;
+    }
+  }
+
+  async function knock(): Promise<void> {
+    if (busy) return;
+    busy = true;
+    failedAction = null;
+    try {
+      await core.knockRoom(address, via);
+      sentKnock = true;
+    } catch (error) {
+      console.warn('[sable room] knock failed', error);
+      failedAction = 'knock';
+    } finally {
+      busy = false;
     }
   }
 </script>
@@ -92,12 +117,28 @@
     {#if preview.topic}
       <p class="join-topic">{preview.topic}</p>
     {/if}
-    {#if joinFailed}
-      <p role="alert">{$i18n.t('join.failed')}</p>
+    {#if failedAction}
+      <p role="alert">
+        {failedAction === 'knock' ? $i18n.t('join.knockFailed') : $i18n.t('join.failed')}
+      </p>
     {/if}
-    <Button onclick={() => void join()} disabled={joining}>
-      {joining ? $i18n.t('join.joining') : $i18n.t('join.action')}
-    </Button>
+
+    {#if knocked}
+      <p role="status">{$i18n.t('join.knockSent')}</p>
+    {:else if mustKnock}
+      <Button onclick={() => void knock()} disabled={busy}>
+        {busy ? $i18n.t('join.knocking') : $i18n.t('join.knockAction')}
+      </Button>
+    {:else}
+      <Button onclick={() => void join()} disabled={busy}>
+        {busy ? $i18n.t('join.joining') : $i18n.t('join.action')}
+      </Button>
+      {#if canKnock && failedAction === 'join'}
+        <Button variant="ghost" onclick={() => void knock()} disabled={busy}>
+          {$i18n.t('join.knockAction')}
+        </Button>
+      {/if}
+    {/if}
   {/if}
 </section>
 

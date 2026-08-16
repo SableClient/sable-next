@@ -110,11 +110,14 @@ jobs:
       - name: Run WASM-target Clippy
         run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
-      - name: Check dependency policy
-        run: cargo deny check
-
       - name: Run Rust tests
         run: cargo test --locked --workspace --all-features
+
+      - name: Check generated bindings are current
+        run: git diff --exit-code src/generated
+
+      - name: Check dependency policy
+        run: cargo deny check
 
       - name: Run WASM-target tests
         run: |

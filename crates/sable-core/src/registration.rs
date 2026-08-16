@@ -140,6 +140,24 @@ fn email_params(info: &UiaaInfo) -> (Option<String>, Option<String>) {
         })
 }
 
+fn trusted_submit_url(pending: &PendingRegistration, submit_url: &str) -> Option<Url> {
+    let identity_host = pending
+        .email
+        .as_ref()
+        .and_then(|email| email.id_server.as_deref())
+        .and_then(|id_server| Url::parse(&format!("https://{id_server}")).ok())
+        .and_then(|url| url.host_str().map(ToOwned::to_owned));
+
+    let url = Url::parse(submit_url).ok()?;
+    let allowed = url.scheme() == "https"
+        && url.host_str().is_some_and(|host| {
+            pending.client.homeserver().host_str() == Some(host)
+                || identity_host.as_deref() == Some(host)
+        });
+
+    allowed.then_some(url)
+}
+
 fn can_complete_email_out_of_band(versions: &matrix_sdk::ruma::api::SupportedVersions) -> bool {
     versions
         .versions
@@ -735,12 +753,9 @@ impl Core {
             };
             (submit_url, sid, client_secret)
         };
-        let submit_url = match Url::parse(&submit_url) {
-            Ok(url) if matches!(url.scheme(), "http" | "https") => url,
-            Ok(_) | Err(_) => {
-                self.restore_pending_registration(pending).await;
-                return Err(CommandErr::EmailVerificationFailed);
-            }
+        let Some(submit_url) = trusted_submit_url(&pending, &submit_url) else {
+            self.restore_pending_registration(pending).await;
+            return Err(CommandErr::EmailVerificationFailed);
         };
         if token.is_empty() || token.chars().count() > 255 {
             self.restore_pending_registration(pending).await;
@@ -755,7 +770,16 @@ impl Core {
             self.restore_pending_registration(pending).await;
             return Err(CommandErr::EmailVerificationFailed);
         };
-        let Ok(response) = matrix_sdk::reqwest::Client::new()
+        let builder = matrix_sdk::reqwest::Client::builder();
+        #[cfg(not(target_family = "wasm"))]
+        let builder = builder
+            .redirect(matrix_sdk::reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(15));
+        let Ok(client) = builder.build() else {
+            self.restore_pending_registration(pending).await;
+            return Err(CommandErr::EmailVerificationFailed);
+        };
+        let Ok(response) = client
             .post(submit_url)
             .header("content-type", "application/json")
             .body(payload)

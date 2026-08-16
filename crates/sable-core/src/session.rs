@@ -184,6 +184,7 @@ pub async fn build_client(
         .handle_refresh_tokens()
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::OneShot,
+            auto_enable_cross_signing: true,
             ..EncryptionSettings::default()
         });
 

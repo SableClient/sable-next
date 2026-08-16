@@ -8,6 +8,9 @@ use std::sync::LazyLock;
 
 use ammonia::{Builder, UrlRelative};
 use linkify::{LinkFinder, LinkKind};
+use matrix_sdk::ruma::html::{
+    ElementAttributesSchemes, Html, ListBehavior, PropertiesNames, SanitizerConfig,
+};
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
 
 const ALLOWED_TAGS: [&str; 37] = [
@@ -143,8 +146,43 @@ fn is_mxc_uri(value: &str) -> bool {
 }
 
 fn has_scheme(value: &str, scheme: &str) -> bool {
-    value.len() >= scheme.len() && value[..scheme.len()].eq_ignore_ascii_case(scheme)
+    value
+        .get(..scheme.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(scheme))
 }
+
+static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
+    SanitizerConfig::compat()
+        .remove_reply_fallback()
+        .remove_elements(["script", "style", "textarea", "option", "noscript"])
+        .remove_attributes([PropertiesNames {
+            parent: "a",
+            properties: &["target"],
+        }])
+        .allow_attributes(
+            [
+                PropertiesNames {
+                    parent: "img",
+                    properties: &["data-mx-emoticon"],
+                },
+                PropertiesNames {
+                    parent: "pre",
+                    properties: &["class"],
+                },
+            ],
+            ListBehavior::Add,
+        )
+        .allow_schemes(
+            [ElementAttributesSchemes {
+                element: "img",
+                attr_schemes: &[PropertiesNames {
+                    parent: "src",
+                    properties: &["mxc", "http", "https"],
+                }],
+            }],
+            ListBehavior::Add,
+        )
+});
 
 static PLAIN_TEXT_LINKS: LazyLock<LinkFinder> = LazyLock::new(|| {
     let mut finder = LinkFinder::new();
@@ -153,18 +191,7 @@ static PLAIN_TEXT_LINKS: LazyLock<LinkFinder> = LazyLock::new(|| {
 });
 
 fn escape_html(value: &str) -> String {
-    let mut escaped = String::with_capacity(value.len());
-    for character in value.chars() {
-        match character {
-            '&' => escaped.push_str("&amp;"),
-            '<' => escaped.push_str("&lt;"),
-            '>' => escaped.push_str("&gt;"),
-            '"' => escaped.push_str("&quot;"),
-            '\'' => escaped.push_str("&#39;"),
-            _ => escaped.push(character),
-        }
-    }
-    escaped
+    html_escape::encode_text(value).into_owned()
 }
 
 /// linkify only recognises schemes with an authority, so `matrix:u/alice:hs`
@@ -196,9 +223,17 @@ fn matrix_uri_spans(text: &str) -> Vec<(usize, usize)> {
 }
 
 fn anchor(href: &str, text: &str) -> String {
+    let allowed = href.split_once(':').is_some_and(|(scheme, _)| {
+        URL_SCHEMES
+            .iter()
+            .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
+    });
+    if !allowed {
+        return escape_html(text);
+    }
     format!(
         "<a href=\"{}\" rel=\"noreferrer noopener\">{}</a>",
-        escape_html(href),
+        html_escape::encode_double_quoted_attribute(href),
         escape_html(text)
     )
 }
@@ -309,11 +344,45 @@ pub fn strip_profile_fallback_body(body: &str, display_name: Option<&str>, known
         .map_or_else(|| body.to_owned(), |(_, rest)| rest.to_owned())
 }
 
+fn nests_too_deeply(formatted: &str) -> bool {
+    const VOID_TAGS: [&str; 3] = ["br", "hr", "img"];
+    const LIMIT: usize = 512;
+
+    let mut depth = 0usize;
+    let mut rest = formatted;
+    while let Some(offset) = rest.find('<') {
+        rest = &rest[offset + 1..];
+        let Some(name) = rest.split(['>', ' ', '/', '\t', '\n']).next() else {
+            continue;
+        };
+        if rest.starts_with('/') {
+            depth = depth.saturating_sub(1);
+        } else if name.starts_with(|c: char| c.is_ascii_alphabetic())
+            && !VOID_TAGS.iter().any(|void| name.eq_ignore_ascii_case(void))
+        {
+            depth += 1;
+            if depth > LIMIT {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn sanitize(formatted: &str) -> String {
+    if nests_too_deeply(formatted) {
+        return String::new();
+    }
+    let html = Html::parse(formatted);
+    html.sanitize_with(&MATRIX_POLICY);
+    sanitizer().clean(&html.to_string()).to_string()
+}
+
 /// The HTML the UI renders for a message: the sender's `formatted_body` once
 /// sanitised, or the plain body linkified.
 #[must_use]
 pub fn display_html(body: &str, formatted: Option<&str>) -> String {
-    let sanitized = formatted.map(|formatted| sanitizer().clean(formatted).to_string());
+    let sanitized = formatted.map(sanitize);
     // Markup rejected in full would otherwise leave the message blank.
     match sanitized {
         Some(html) if !html.trim().is_empty() => html,
@@ -542,6 +611,57 @@ mod tests {
     fn leaves_trailing_punctuation_out_of_links() {
         assert!(linkify_plain_text("See https://example.org/a.").ends_with("</a>."));
         assert!(linkify_plain_text("(matrix:u/alice:example.org)").ends_with("</a>)"));
+    }
+
+    #[test]
+    fn multibyte_urls_do_not_panic() {
+        for markup in [
+            "<a href=\"mxc:\u{e9}\u{e9}\u{e9}\">x</a>",
+            "<a href=\"ftp:\u{e9}\u{e9}\u{e9}\">x</a>",
+            "<img src=\"mxc:\u{e9}\u{e9}\u{e9}\">",
+            "<img src=\"http:\u{e9}\u{e9}\u{e9}\">",
+        ] {
+            let _ = display_html("", Some(markup));
+        }
+    }
+
+    #[test]
+    fn plain_text_links_keep_the_scheme_whitelist() {
+        for body in [
+            "javascript://x/a%0aalert(1)",
+            "javascript://x?%0Aalert(1)",
+            "vbscript://x",
+            "data://text/html,x",
+        ] {
+            let html = display_html(body, None);
+            assert!(!html.contains("<a "), "{body} became a link: {html}");
+        }
+
+        assert!(display_html("see https://example.org/a", None).contains("<a href="));
+    }
+
+    #[test]
+    fn nesting_is_capped_and_absurd_nesting_falls_back_to_the_body() {
+        let moderate = format!("{}deep{}", "<div>".repeat(400), "</div>".repeat(400));
+        assert_eq!(
+            display_html("", Some(&moderate)).matches("<div>").count(),
+            100
+        );
+
+        let absurd = format!("{}deep{}", "<div>".repeat(50_000), "</div>".repeat(50_000));
+        assert_eq!(
+            display_html("plain", Some(&absurd)),
+            "<span data-plain-body>plain</span>"
+        );
+    }
+
+    #[test]
+    fn many_void_tags_are_not_mistaken_for_nesting() {
+        let markup = "<br>".repeat(2_000);
+        assert_eq!(
+            display_html("", Some(&markup)).matches("<br>").count(),
+            2_000
+        );
     }
 
     #[test]

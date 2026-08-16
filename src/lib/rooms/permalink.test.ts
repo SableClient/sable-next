@@ -2,7 +2,9 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '@/generated/RoomSummary';
 
-import { permalinkPath, roomSectionPath } from './permalink';
+import { parseMatrixLink } from '$lib/features/room/matrix-link';
+
+import { matrixToUrl, permalinkPath, roomSectionPath } from './permalink';
 
 function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary {
   return {
@@ -131,6 +133,35 @@ test('via inside the fragment does not leak into the room id', () => {
   expect(permalinkPath([], fragment)).toBe(
     '/home/!missing%3Aexample.org?event=%24abc&via=a.example'
   );
+});
+
+/* A room id is not routable on its own, so a link to one must advertise
+   servers; a canonical alias carries its own and must not. */
+test('a room id link advertises its via servers', () => {
+  expect(matrixToUrl('!somewhere:example.org', ['elsewhere.ca'])).toBe(
+    'https://matrix.to/#/!somewhere%3Aexample.org?via=elsewhere.ca'
+  );
+});
+
+test('an alias link carries no via, being routable already', () => {
+  expect(matrixToUrl('#lobby:example.org', ['elsewhere.ca'])).toBe(
+    'https://matrix.to/#/%23lobby%3Aexample.org'
+  );
+});
+
+test('an event link nests the event under the room', () => {
+  expect(matrixToUrl('!somewhere:example.org', ['a.example', 'b.example'], '$event')).toBe(
+    'https://matrix.to/#/!somewhere%3Aexample.org/%24event?via=a.example&via=b.example'
+  );
+});
+
+test('a link the app generates parses back to what it named', () => {
+  const url = matrixToUrl('!somewhere:example.org', ['elsewhere.ca'], '$event');
+  expect(parseMatrixLink(url)).toEqual({
+    kind: 'event',
+    roomId: '!somewhere:example.org',
+    eventId: '$event',
+  });
 });
 
 test('a user permalink has no room to open', () => {

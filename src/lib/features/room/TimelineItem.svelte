@@ -48,6 +48,7 @@
     onReply?: (eventId: string) => void;
     onEdit?: (eventId: string, body: string) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
+    onCopyLink?: (eventId: string) => void;
     canRedactOthers?: boolean;
     selected?: boolean;
     layout?: TimelineLayout;
@@ -72,6 +73,7 @@
     onReply,
     onEdit,
     onDelete,
+    onCopyLink,
     canRedactOthers = false,
     selected = false,
     layout = 'modern',
@@ -173,11 +175,12 @@
           : () => {
               void copyText();
             },
-      onCopyLink: roomId
-        ? () => {
-            void copyLink();
-          }
-        : undefined,
+      onCopyLink:
+        onCopyLink && item.event_id
+          ? () => {
+              if (item.event_id) onCopyLink(item.event_id);
+            }
+          : undefined,
     };
   });
 
@@ -217,12 +220,6 @@
 
   async function copyText(): Promise<void> {
     if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
-  }
-
-  async function copyLink(): Promise<void> {
-    if (item.event_id) {
-      await navigator.clipboard.writeText(`https://matrix.to/#/${roomId}/${item.event_id}`);
-    }
   }
 
   function confirmDelete(reason: string | null): void {

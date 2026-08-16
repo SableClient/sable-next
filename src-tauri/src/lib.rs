@@ -140,6 +140,12 @@ fn open_auth_url(app: AppHandle, url: String) -> Result<(), CommandErr> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG")
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    if let Err(error) = tracing_subscriber::fmt().with_env_filter(filter).try_init() {
+        eprintln!("could not install the log subscriber: {error}");
+    }
+
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let _sentry_guard = sentry::init();
 

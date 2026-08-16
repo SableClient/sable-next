@@ -518,6 +518,26 @@ export class CoreClient {
     return response.room_id;
   }
 
+  /** The only way into a `knock` room; `joinRoom` is refused on one. */
+  async knockRoom(address: string, via: string[] = [], reason?: string): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'knock_room',
+      address,
+      via,
+      reason: reason ?? null,
+    });
+    return response.room_id;
+  }
+
+  /** Empty for a room with a canonical alias, which routes on its own. */
+  async roomViaServers(roomId: string): Promise<string[]> {
+    const response = await this.ensureTransport().send({
+      type: 'room_via_servers',
+      room_id: roomId,
+    });
+    return response.servers;
+  }
+
   /** Also how an invitation is declined. */
   async leaveRoom(roomId: string): Promise<void> {
     await this.ensureTransport().send({ type: 'leave_room', room_id: roomId });

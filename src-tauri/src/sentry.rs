@@ -13,7 +13,13 @@ pub fn init() -> Option<sentry::ClientInitGuard> {
 
     // `ClientOptions` is `#[non_exhaustive]`, so mutate a default instance.
     let mut options = sentry::ClientOptions::default();
-    options.dsn = dsn.parse().ok();
+    match dsn.parse() {
+        Ok(dsn) => options.dsn = Some(dsn),
+        Err(error) => {
+            tracing::error!("SENTRY_DSN is malformed, crash reporting is off: {error}");
+            return None;
+        }
+    }
     options.environment = option_env!("SENTRY_ENVIRONMENT").map(Into::into);
     options.release = option_env!("SENTRY_APP_VERSION").map(Into::into);
     options.send_default_pii = false;

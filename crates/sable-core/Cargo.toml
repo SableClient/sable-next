@@ -15,6 +15,8 @@ tracing = { workspace = true }
 ts-rs = { workspace = true }
 url = { workspace = true }
 ammonia = "4"
+async-trait = "0.1"
+html-escape = "0.2"
 linkify = "0.11"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
