@@ -1,14 +1,17 @@
 const AUTH_ROUTES = new Set(['login', 'register']);
 
-export function homeserverFromAuthUrl(url: URL): string | null {
+export function homeserverFromAuthUrl(url: URL, routeId: string | null): string | null {
   const queryHomeserver = url.searchParams.get('server')?.trim();
   if (queryHomeserver) return queryHomeserver;
+  // `/login/verify`, `/register/recovery` and `/register/profile` sit in the
+  // same segment a homeserver would.
+  if (!routeId?.endsWith('/[homeserver]')) return null;
 
   const segments = url.pathname.split('/').filter(Boolean);
   const routeIndex = segments.findIndex((segment) => AUTH_ROUTES.has(segment));
   const candidate = routeIndex < 0 ? undefined : segments[routeIndex + 1];
 
-  if (!candidate || candidate === 'profile') return null;
+  if (!candidate) return null;
 
   try {
     const homeserver = decodeURIComponent(candidate).trim();

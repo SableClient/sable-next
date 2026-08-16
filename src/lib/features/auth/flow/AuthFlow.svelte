@@ -62,7 +62,7 @@
 
   const flow = new AuthFlowController(
     core,
-    homeserverFromAuthUrl(page.url) ?? DEFAULT_HOMESERVER,
+    homeserverFromAuthUrl(page.url, page.route.id) ?? DEFAULT_HOMESERVER,
     registrationTokenFromAuthUrl(page.url)
   );
   let hasCompletedInitialHomeserverCheck = $state(false);
@@ -202,7 +202,7 @@
     const urlKey = `${page.url.pathname}${page.url.search}`;
     if (urlKey === lastUrlPrefill) return;
     lastUrlPrefill = urlKey;
-    const urlHomeserver = homeserverFromAuthUrl(page.url);
+    const urlHomeserver = homeserverFromAuthUrl(page.url, page.route.id);
     const urlToken = registrationTokenFromAuthUrl(page.url);
     if (urlHomeserver) {
       const homeserverChanged = urlHomeserver !== flow.homeserver.trim();

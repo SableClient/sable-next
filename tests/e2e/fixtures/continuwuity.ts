@@ -4,6 +4,10 @@ import { GenericContainer, Wait } from 'testcontainers';
 
 const IMAGE = 'ghcr.io/continuwuity/continuwuity:latest';
 const CLIENT_SERVER_PORT = 8008;
+// The server mints its OAuth 2.0 metadata URLs at boot and the browser follows
+// them through a redirect login, so the host port has to be known beforehand.
+const HOST_PORT = 18008;
+const PUBLIC_URL = `http://127.0.0.1:${String(HOST_PORT)}`;
 const SERVER_NAME = 'test.local';
 const execFileAsync = promisify(execFile);
 
@@ -21,10 +25,13 @@ export const TIMELINE_ROOM_NAME = 'Timeline fixture';
 export const TIMELINE_MESSAGE_COUNT = 100;
 
 export async function startContinuwuity(): Promise<TestHomeserver> {
+  await removeStaleHomeservers();
+
   const container = await new GenericContainer(IMAGE)
-    .withExposedPorts(CLIENT_SERVER_PORT)
+    .withExposedPorts({ container: CLIENT_SERVER_PORT, host: HOST_PORT })
     .withEnvironment({
       CONTINUWUITY_SERVER_NAME: SERVER_NAME,
+      CONTINUWUITY_WELL_KNOWN__CLIENT: PUBLIC_URL,
       CONTINUWUITY_ADDRESS: '0.0.0.0',
       CONTINUWUITY_PORT: String(CLIENT_SERVER_PORT),
       CONTINUWUITY_DATABASE_PATH: '/database',
@@ -45,9 +52,22 @@ export async function startContinuwuity(): Promise<TestHomeserver> {
     .start();
 
   return {
-    baseUrl: `http://${container.getHost()}:${String(container.getMappedPort(CLIENT_SERVER_PORT))}`,
+    baseUrl: PUBLIC_URL,
     containerId: container.getId(),
   };
+}
+
+// An interrupted run leaves a container holding the port, with its accounts.
+async function removeStaleHomeservers(): Promise<void> {
+  const { stdout } = await execFileAsync('docker', [
+    'ps',
+    '-aq',
+    '--filter',
+    `publish=${String(HOST_PORT)}`,
+  ]);
+  for (const containerId of stdout.split('\n').filter(Boolean)) {
+    await removeContinuwuity(containerId);
+  }
 }
 
 export async function removeContinuwuity(containerId: string): Promise<void> {

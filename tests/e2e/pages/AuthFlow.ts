@@ -2,6 +2,8 @@ import type { Locator, Page } from '@playwright/test';
 
 export class AuthFlow {
   readonly heading: Locator;
+  readonly homeserver: Locator;
+  readonly redirectSignInButton: Locator;
   readonly username: Locator;
   readonly password: Locator;
   readonly moreMethodsButton: Locator;
@@ -12,6 +14,8 @@ export class AuthFlow {
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { level: 1 });
+    this.homeserver = page.getByLabel('Account provider');
+    this.redirectSignInButton = page.getByRole('button', { name: /^Sign in with http/ });
     this.username = page.getByLabel('Username');
     this.password = page.getByRole('textbox', { name: 'Password' });
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
@@ -26,8 +30,12 @@ export class AuthFlow {
     await this.page.goto(path);
   }
 
-  async revealPasswordLogin(): Promise<void> {
+  async revealMoreMethods(): Promise<void> {
     await this.moreMethodsButton.click();
+  }
+
+  async revealPasswordLogin(): Promise<void> {
+    await this.revealMoreMethods();
     await this.passwordSignInButton.click();
   }
 
