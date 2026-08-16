@@ -6,9 +6,7 @@
   "iconURL": "https://raw.githubusercontent.com/SableClient/sable-next/main/src-tauri/icons/icon.png",
   "website": "https://github.com/SableClient/sable-next",
   "tintColor": "#5CA399",
-  "featuredApps": [
-    "moe.sable.next"
-  ],
+  "featuredApps": ["moe.sable.next"],
   "apps": [
     {
       "name": "Sable Next",
@@ -20,16 +18,7 @@
       "tintColor": "#5CA399",
       "category": "social",
       "screenshots": [],
-      "versions": [
-        {
-          "version": "0.0.1786872614",
-          "buildVersion": "0.0.1786872614",
-          "date": "2026-08-16T09:41:50Z",
-          "size": 16267840,
-          "downloadURL": "https://github.com/SableClient/sable-next/releases/download/nightly/sable-next-0.0.2-nightly.260816093014-ios-arm64.ipa",
-          "localizedDescription": "Sable Next 0.0.2-nightly.260816093014"
-        }
-      ]
+      "versions": []
     }
   ],
   "news": []

@@ -33,9 +33,15 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       ref: ${{ steps.meta.outputs.ref }}
       nightly: ${{ steps.meta.outputs.nightly }}
+      started_at: ${{ steps.started.outputs.at }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      # Must precede every upload; finalize-nightly prunes against it.
+      - name: Record build start
+        id: started
+        run: echo "at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -333,6 +339,7 @@ jobs:
       ipa_name: ${{ steps.ipa.outputs.name }}
       ipa_size: ${{ steps.ipa.outputs.size }}
       ipa_version: ${{ steps.ipa.outputs.version }}
+      ipa_build: ${{ steps.ipa.outputs.build }}
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -391,12 +398,14 @@ jobs:
 
           unzip -p "$target" 'Payload/*.app/Info.plist' > Info.plist
           short_version="$(plutil -extract CFBundleShortVersionString raw -o - Info.plist)"
+          bundle_version="$(plutil -extract CFBundleVersion raw -o - Info.plist)"
 
           {
             echo "path=$target"
             echo "name=$(basename "$target")"
             echo "size=$(stat -f%z "$target")"
             echo "version=$short_version"
+            echo "build=$bundle_version"
           } >> "$GITHUB_OUTPUT"
 
       - name: Attest iOS bundle
@@ -449,61 +458,55 @@ jobs:
       IPA_NAME: ${{ needs.ios.outputs.ipa_name }}
       IPA_SIZE: ${{ needs.ios.outputs.ipa_size }}
       IPA_VERSION: ${{ needs.ios.outputs.ipa_version }}
+      IPA_BUILD: ${{ needs.ios.outputs.ipa_build }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      # The manifest lives on main so its raw.githubusercontent URL, which is
-      # what users add to AltStore, stays the same across releases.
-      - name: Check out main
+      - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
 
-      - name: Update AltStore source
+      # One asset name for both channels keeps the subscribed URL stable:
+      # releases/latest/download for stable, the rolling tag for nightly.
+      - name: Build AltStore source
         run: |
           if [ "$IS_NIGHTLY" = 'true' ]; then
-            source_file='altstore-source-nightly.json'
-            # Superseded nightly IPAs are replaced, so older entries would 404.
+            # Older entries would 404 once finalize-nightly prunes their IPAs.
             export ALTSTORE_MAX_VERSIONS=1
+            cp .github/templates/altstore-source-nightly.json altstore-source.json
           else
-            source_file='altstore-source.json'
+            previous="$(
+              gh release list --limit 100 --exclude-pre-releases --json tagName --jq '.[].tagName' \
+                | while read -r candidate; do
+                    if [ "$candidate" != "$TAG" ] &&
+                       gh release view "$candidate" --json assets --jq '.assets[].name' \
+                         | grep -qxF altstore-source.json; then
+                      echo "$candidate"
+                      break
+                    fi
+                  done
+            )"
+            if [ -n "$previous" ]; then
+              echo "Carrying versions forward from $previous."
+              gh release download "$previous" --pattern altstore-source.json --output altstore-source.json
+            else
+              cp .github/templates/altstore-source.json altstore-source.json
+            fi
           fi
-          echo "SOURCE_FILE=$source_file" >> "$GITHUB_ENV"
 
           node .github/scripts/update-altstore-source.mjs \
-            "$source_file" \
+            altstore-source.json \
             "$IPA_VERSION" \
+            "$IPA_BUILD" \
             "$IPA_SIZE" \
             "https://github.com/${REPOSITORY}/releases/download/${TAG}/${IPA_NAME}" \
             "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             "Sable Next $VERSION"
 
-      # Pushes made with GITHUB_TOKEN do not trigger workflows, so this cannot
-      # retrigger the build that produced it.
-      - name: Commit updated source to main
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "$SOURCE_FILE"
-
-          if git diff --cached --quiet; then
-            echo "$SOURCE_FILE is already up to date."
-            exit 0
-          fi
-
-          git commit -m "chore: update $SOURCE_FILE for $TAG"
-          for attempt in 1 2 3; do
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-            echo "Push failed (attempt $attempt); rebasing onto the latest main."
-            git pull --rebase origin main
-          done
-          echo "Could not push $SOURCE_FILE to main." >&2
-          exit 1
-
       - name: Attach AltStore source to release
-        run: gh release upload "$TAG" "$SOURCE_FILE" --clobber
+        run: gh release upload "$TAG" altstore-source.json --clobber
 
   finalize-nightly:
     name: Finalize nightly release
@@ -525,3 +528,19 @@ jobs:
             -f sha="$SHA" -F force=true
           gh release edit nightly --prerelease --target "$SHA" --title 'Nightly (main)' \
             --notes "Rolling nightly build $VERSION from main at $SHA"
+
+      # Stamped bundle names never clobber, so they accumulate and Obtainium
+      # starts offering a stale APK. The .json manifests keep fixed names.
+      - name: Remove superseded nightly assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STARTED_AT: ${{ needs.setup-release.outputs.started_at }}
+        run: |
+          gh release view nightly --json assets \
+            | jq -r --arg cutoff "$STARTED_AT" \
+                '.assets[] | select(.updatedAt <= $cutoff and (.name | endswith(".json") | not)) | .name' \
+            | while read -r name; do
+                [ -n "$name" ] || continue
+                echo "Removing superseded nightly asset: $name"
+                gh release delete-asset nightly "$name" --yes
+              done

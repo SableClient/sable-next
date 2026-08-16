@@ -3,10 +3,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 
-const [sourcePath, version, sizeStr, downloadURL, date, description] = process.argv.slice(2);
-if (!sourcePath || !version || !sizeStr || !downloadURL || !date || !description) {
+const [sourcePath, version, build, sizeStr, downloadURL, date, description] = process.argv.slice(2);
+if (!sourcePath || !version || !build || !sizeStr || !downloadURL || !date || !description) {
   console.error(
-    'Usage: update-altstore-source.mjs <source.json> <version> <ipa-size> <downloadURL> <date> <description>'
+    'Usage: update-altstore-source.mjs <source.json> <version> <build> <ipa-size> <downloadURL> <date> <description>'
   );
   process.exit(1);
 }
@@ -30,17 +30,19 @@ if (!app) {
   process.exit(1);
 }
 
-// CFBundleShortVersionString keeps only digits and dots, and AltStore matches
-// against that.
-const normalized = version
-  .replace(/-nightly\./g, '.')
-  .replace(/[^0-9.]/g, '.')
-  .replace(/\.+/g, '.')
-  .replace(/^\.|\.$/g, '');
+// https://faq.altstore.io/developers/make-a-source#app-versions
+const normalize = (value) =>
+  value
+    .replace(/-nightly\./g, '.')
+    .replace(/[^0-9.]/g, '.')
+    .replace(/\.+/g, '.')
+    .replace(/^\.|\.$/g, '');
+
+const normalized = normalize(version);
 
 const entry = {
   version: normalized,
-  buildVersion: normalized,
+  buildVersion: normalize(build),
   date,
   size,
   downloadURL,
