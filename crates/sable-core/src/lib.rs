@@ -747,6 +747,25 @@ impl Core {
         Ok(())
     }
 
+    async fn room_preview(&self, address: &str, via: &[String]) -> Result<CommandOk, CommandErr> {
+        let address = RoomOrAliasId::parse(address).map_err(|_| CommandErr::UnknownRoom)?;
+        let via = via
+            .iter()
+            .filter_map(|server| ServerName::parse(server).ok())
+            .collect::<Vec<_>>();
+
+        let preview = self
+            .client()
+            .await?
+            .get_room_preview(&address, via)
+            .await
+            .map_err(|error| self.failed("room_preview", error))?;
+
+        Ok(CommandOk::RoomPreview {
+            preview: view::room_preview_view(&preview),
+        })
+    }
+
     async fn space_hierarchy(
         &self,
         space_id: &OwnedRoomId,

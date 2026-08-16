@@ -9,6 +9,7 @@ import type { JoinRuleView } from '@/generated/JoinRuleView';
 import type { MemberView } from '@/generated/MemberView';
 import type { RoomTag } from '@/generated/RoomTag';
 import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
+import type { RoomPreviewView } from '@/generated/RoomPreviewView';
 import type { RoomSummary } from '@/generated/RoomSummary';
 import type { SessionInfo } from '@/generated/SessionInfo';
 import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
@@ -503,6 +504,12 @@ export class CoreClient {
   async createDm(userId: string): Promise<string> {
     const response = await this.ensureTransport().send({ type: 'create_dm', user_id: userId });
     return response.room_id;
+  }
+
+  /** Works for a room this account has not joined. */
+  async roomPreview(address: string, via: string[] = []): Promise<RoomPreviewView> {
+    const response = await this.ensureTransport().send({ type: 'room_preview', address, via });
+    return response.preview;
   }
 
   /** `address` is a room id or an alias. Returns the resolved id. */

@@ -137,6 +137,14 @@
     "lobbyMembers_one": "{{count}} member",
     "lobbyMembers_other": "{{count}} members"
   },
+  "join": {
+    "action": "Join",
+    "joining": "Joining…",
+    "failed": "The room could not be joined.",
+    "unavailable": "Nothing is known about {{room}}. It may be private, or the server may not have it.",
+    "members_one": "{{count}} member",
+    "members_other": "{{count}} members"
+  },
   "permalink": {
     "opening": "Opening link…",
     "unresolved": "That link does not point to a room Sable can open."

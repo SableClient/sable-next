@@ -910,6 +910,10 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::RemoveFromSpace)
             }
 
+            Command::RoomPreview { address, via } => {
+                $self.room_preview(&address, &via).await
+            }
+
             Command::JoinRoom { address, via } => {
                 let address =
                     RoomOrAliasId::parse(&address).map_err(|_| CommandErr::UnknownRoom)?;

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{Room, RoomMember};
+use matrix_sdk::room_preview::RoomPreview;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::message::MessageType;
@@ -37,8 +38,9 @@ use crate::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView, MentionView,
     PerMessageProfileView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
-    RoomStateView, RoomSummary, RoomTag, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView,
-    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
+    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SendStateView, SpaceChildEdge,
+    SpaceHierarchyRoomView, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
+    UploadProgressView, VectorDiff,
 };
 
 pub struct RoomInfo {
@@ -273,6 +275,30 @@ pub fn hierarchy_child_edges(
 
     sort_child_edges(&mut children);
     children
+}
+
+#[must_use]
+pub fn room_preview_view(preview: &RoomPreview) -> RoomPreviewView {
+    RoomPreviewView {
+        room_id: preview.room_id.clone(),
+        canonical_alias: preview.canonical_alias.as_ref().map(ToString::to_string),
+        name: preview.name.clone(),
+        topic: preview.topic.clone(),
+        avatar_url: preview.avatar_url.as_ref().map(ToString::to_string),
+        is_space: preview.room_type == Some(RoomType::Space),
+        num_joined_members: u32::try_from(preview.num_joined_members).unwrap_or(u32::MAX),
+        join_rule: preview
+            .join_rule
+            .as_ref()
+            .map_or(RoomJoinRuleView::Unknown, join_rule_summary_view),
+        state: preview.state.map(|state| match state {
+            RoomState::Joined => RoomStateView::Joined,
+            RoomState::Invited => RoomStateView::Invited,
+            RoomState::Knocked => RoomStateView::Knocked,
+            RoomState::Left => RoomStateView::Left,
+            RoomState::Banned => RoomStateView::Banned,
+        }),
+    }
 }
 
 const fn join_rule_summary_view(rule: &JoinRuleSummary) -> RoomJoinRuleView {

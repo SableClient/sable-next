@@ -201,6 +201,14 @@ pub enum Command {
     },
 
     // membership. Accepting an invite is `JoinRoom`, declining it `LeaveRoom`.
+    /// Describes a room this account has not joined, so a link to one can be
+    /// shown before committing to the join.
+    RoomPreview {
+        /// A room id or an alias, as `JoinRoom` takes.
+        address: String,
+        /// Servers to try when the id is not resolvable on ours, or empty.
+        via: Vec<String>,
+    },
     JoinRoom {
         /// A room id or an alias. A pasted address could be either.
         address: String,
@@ -492,6 +500,9 @@ pub enum CommandOk {
     },
     RemoveFromSpace,
 
+    RoomPreview {
+        preview: RoomPreviewView,
+    },
     /// Resolved, since the caller may have joined by alias.
     JoinRoom {
         #[ts(type = "string")]
@@ -881,6 +892,24 @@ pub enum RoomStateView {
     Knocked,
     Left,
     Banned,
+}
+
+/// A room as the server describes it to someone who may not be in it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct RoomPreviewView {
+    /// Resolved, since the preview may have been asked for by alias.
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    pub canonical_alias: Option<String>,
+    pub name: Option<String>,
+    pub topic: Option<String>,
+    pub avatar_url: Option<String>,
+    pub is_space: bool,
+    pub num_joined_members: u32,
+    pub join_rule: RoomJoinRuleView,
+    /// `null` when this account has no membership in the room.
+    pub state: Option<RoomStateView>,
 }
 
 /// One room in a space's hierarchy. The root space is included, so a caller can
