@@ -465,7 +465,7 @@
   .composer-stack {
     --composer-gutter: var(--page-gutter);
 
-    margin: 0 auto calc(0.5rem + env(safe-area-inset-bottom));
+    margin: 0 auto calc(0.95rem + env(safe-area-inset-bottom));
     position: relative;
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }
