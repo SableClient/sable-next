@@ -443,6 +443,7 @@
     background: var(--sable-bg-container);
     box-sizing: border-box;
     color: var(--sable-bg-on-container);
+    border-right: 1px solid var(--sable-surface-container-line);
     display: flex;
     flex: 1;
     flex-direction: column;
