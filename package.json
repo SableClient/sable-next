@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "prepare": "svelte-kit sync || echo ''; husky",
+    "prepare": "svelte-kit sync || echo ''; mise exec -- lefthook install",
     "check:theme": "node scripts/check-theme-tokens.mjs",
     "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --watch",
@@ -70,8 +70,6 @@
     "eslint-plugin-svelte": "^3.22.0",
     "globals": "^17.9.0",
     "happy-dom": "^20.11.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^17.3.0",
     "oxfmt": "^0.63.0",
     "postcss-html": "^2.0.0",
     "stylelint": "^17.14.1",
@@ -87,20 +85,6 @@
     "vite": "^8.0.16",
     "vitest": "^4.1.10",
     "wrangler": "^4.106.0"
-  },
-  "lint-staged": {
-    "*.{js,mjs,cjs,ts,mts,cts}": [
-      "eslint --fix --no-warn-ignored --max-warnings 0",
-      "oxfmt"
-    ],
-    "*.svelte": [
-      "eslint --fix --max-warnings 0",
-      "oxfmt",
-      "stylelint --fix --max-warnings 0"
-    ],
-    "*.css": [
-      "stylelint --fix --max-warnings 0"
-    ]
   },
   "devEngines": {
     "runtime": {

@@ -14,7 +14,7 @@ setup.
 
 ```bash
 mise install
-mise run setup    # pnpm install + git pre-commit hook
+mise run setup    # pnpm install + git hooks
 mise run dev      # SvelteKit on http://localhost:3000
 ```
 

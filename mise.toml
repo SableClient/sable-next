@@ -16,16 +16,13 @@ includes = ["scripts"]
 "cargo:wasm-bindgen-cli" = "0.2.127"
 "aqua:WebAssembly/binaryen" = "132"
 "aqua:watchexec/watchexec" = "2.5.1"
+"aqua:evilmartians/lefthook" = "2.1.10"
 
 [tasks.setup]
 description = "Install mise tools, pnpm dependencies, and git hooks"
-run = ["mise install", "pnpm install", { task = "hooks" }]
+run = ["mise install", "pnpm install"]
 sources = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'mise.toml']
 outputs = ['node_modules/.pnpm/lock.yaml']
-
-[tasks.hooks]
-description = "Install the git pre-commit hook (runs `mise run pre-commit`)"
-run = "mise generate git-pre-commit --write --task=pre-commit"
 
 [tasks.dev]
 description = "Build development WASM and start SvelteKit (port 3000 for Tauri)"
@@ -101,11 +98,6 @@ description = "Rebuild development WASM when Rust sources change"
 alias = "ww"
 run = "pnpm wasm:watch"
 raw = true
-
-[tasks.pre-commit]
-description = "Pre-commit checks (installed via `mise run hooks`)"
-hide = true
-run = { task = "check" }
 
 [tasks."tauri:icons"]
 description = "Generate native app icons from the canonical Sable SVG"

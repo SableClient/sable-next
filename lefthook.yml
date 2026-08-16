@@ -1,0 +1,54 @@
+pre-commit:
+  parallel: true
+  skip:
+    - merge
+    - rebase
+  jobs:
+    - name: scripts
+      glob: '*.{js,mjs,cjs,ts,mts,cts}'
+      group:
+        piped: true
+        jobs:
+          - run: pnpm exec eslint --fix --no-warn-ignored --max-warnings 0 {staged_files}
+            stage_fixed: true
+          - run: pnpm exec oxfmt {staged_files}
+            stage_fixed: true
+
+    - name: svelte
+      glob: '*.svelte'
+      group:
+        piped: true
+        jobs:
+          - run: pnpm exec eslint --fix --max-warnings 0 {staged_files}
+            stage_fixed: true
+          - run: pnpm exec oxfmt {staged_files}
+            stage_fixed: true
+          - run: pnpm exec stylelint --fix --max-warnings 0 {staged_files}
+            stage_fixed: true
+
+    - name: css
+      glob: '*.css'
+      run: pnpm exec stylelint --fix --max-warnings 0 {staged_files}
+      stage_fixed: true
+
+    - name: rust-fmt
+      glob: '*.rs'
+      run: cargo fmt --all
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  skip:
+    - merge
+    - rebase
+  jobs:
+    - name: rust-clippy
+      glob:
+        - '*.rs'
+        - '**/Cargo.toml'
+        - 'Cargo.lock'
+      group:
+        piped: true
+        jobs:
+          - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+          - run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
