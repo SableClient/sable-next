@@ -11,6 +11,7 @@ import { homeserverStatePath } from './runtime';
 
 export type TimelineHomeserver = TestHomeserver & {
   timelineRoomId: string;
+  timelineEventIds: string[];
   accessToken: string;
 };
 

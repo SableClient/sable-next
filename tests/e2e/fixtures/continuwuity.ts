@@ -114,7 +114,16 @@ export async function registerUser(
   };
 }
 
-export async function seedTimelineRoom(baseUrl: string, accessToken: string): Promise<string> {
+export type SeededTimeline = {
+  roomId: string;
+  /** Event id per message index, so a permalink can name a real event. */
+  eventIds: string[];
+};
+
+export async function seedTimelineRoom(
+  baseUrl: string,
+  accessToken: string
+): Promise<SeededTimeline> {
   const headers = {
     authorization: `Bearer ${accessToken}`,
     'content-type': 'application/json',
@@ -134,6 +143,7 @@ export async function seedTimelineRoom(baseUrl: string, accessToken: string): Pr
   const { room_id: roomId } = (await create.json()) as { room_id?: string };
   if (!roomId) throw new Error('create room response did not include a room id');
 
+  const eventIds: string[] = [];
   for (let index = 0; index < TIMELINE_MESSAGE_COUNT; index += 1) {
     const send = await fetch(
       `${baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/timeline-${String(index)}`,
@@ -149,9 +159,12 @@ export async function seedTimelineRoom(baseUrl: string, accessToken: string): Pr
     if (!send.ok) {
       throw new Error(`send message failed: ${String(send.status)} ${await send.text()}`);
     }
+    const { event_id: eventId } = (await send.json()) as { event_id?: string };
+    if (!eventId) throw new Error('send message response did not include an event id');
+    eventIds.push(eventId);
   }
 
-  return roomId;
+  return { roomId, eventIds };
 }
 
 export async function sendTimelineMessage(

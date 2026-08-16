@@ -216,16 +216,26 @@ test('preserves the visible history position when the mobile viewport resizes', 
   await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
 });
 
-// /home/[roomId]/[eventId] is not a route yet: the tree has (app)/home/[roomId]
-// and the only eventId route is (app)/to/[userId]/[roomId]/[[eventId]].
-test.fixme('opens a focused permalink at its target', async ({
+test('opens a focused permalink at its target', async ({ app, timeline, homeserver, signIn }) => {
+  await signIn();
+  await app.openPermalink(homeserver.timelineRoomId, homeserver.timelineEventIds[10]);
+
+  await expect(timeline.message('Timeline message 10')).toBeInViewport();
+});
+
+test('a matrix.to link redirects into the room it names', async ({
   app,
   timeline,
   homeserver,
   signIn,
+  page,
 }) => {
+  const eventId = homeserver.timelineEventIds[10];
   await signIn();
-  await app.openPermalink(homeserver.timelineRoomId, '$event:example.test');
+  await app.openMatrixToLink(homeserver.timelineRoomId, eventId);
 
+  await expect(page).toHaveURL(
+    `/home/${encodeURIComponent(homeserver.timelineRoomId)}?event=${encodeURIComponent(eventId)}`
+  );
   await expect(timeline.message('Timeline message 10')).toBeInViewport();
 });

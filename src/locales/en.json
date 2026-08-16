@@ -137,6 +137,10 @@
     "lobbyMembers_one": "{{count}} member",
     "lobbyMembers_other": "{{count}} members"
   },
+  "permalink": {
+    "opening": "Opening link…",
+    "unresolved": "That link does not point to a room Sable can open."
+  },
   "app": {
     "starting": "Starting Sable…",
     "unableToStart": "Sable could not start. Check your connection and try again.",

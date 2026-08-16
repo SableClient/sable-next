@@ -44,7 +44,17 @@ export class AppShell {
   }
 
   async openPermalink(roomId: string, eventId: string): Promise<void> {
-    await this.page.goto(`/home/${encodeURIComponent(roomId)}/${encodeURIComponent(eventId)}`);
+    await this.page.goto(
+      `/home/${encodeURIComponent(roomId)}?event=${encodeURIComponent(eventId)}`
+    );
+  }
+
+  /** The `/to/...` funnel external links and notifications go through. */
+  async openMatrixToLink(roomId: string, eventId?: string): Promise<void> {
+    const fragment = eventId
+      ? `${encodeURIComponent(roomId)}/${encodeURIComponent(eventId)}`
+      : encodeURIComponent(roomId);
+    await this.page.goto(`/to/${fragment}`);
   }
 
   homeLink(): Locator {
