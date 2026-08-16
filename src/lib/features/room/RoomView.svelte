@@ -9,6 +9,7 @@
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
+  import { roomSectionPath } from '$lib/rooms/permalink';
   import { findRoomByPathId, roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
   import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
   import { activeRoomTimeline } from '$lib/rooms/timeline.svelte';
@@ -25,6 +26,7 @@
   import RoomReadReceipts from './RoomReadReceipts.svelte';
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
+  import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
   import { initials } from './timeline-format';
 
@@ -225,14 +227,16 @@
       return;
     }
 
-    const roomId = roomPathParamFromId(link.roomId);
-    if (link.kind === 'event') {
-      const path = resolve('/(app)/home/[roomId]', { roomId });
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- path is resolved; only the query is appended
-      void goto(`${path}?event=${encodeURIComponent(link.eventId)}`);
-      return;
-    }
-    void goto(resolve('/(app)/home/[roomId]', { roomId }));
+    // The href carries `?via=` inside the fragment, which the parsed link drops.
+    const { via } = splitVia(anchor.href);
+    const target = roomSectionPath(
+      roomList.rooms,
+      link.roomId,
+      link.kind === 'event' ? link.eventId : null,
+      via
+    );
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
+    void goto(target);
   }
 
   function typingMemberName(userId: string): string | null {

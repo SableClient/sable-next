@@ -9,7 +9,7 @@ const idOrAlias = /^[!#][^:\s?]+:[^\s?]+$/;
  * nor `parseMatrixLink` will look at it. Splitting it off first also keeps the
  * query out of the room id the parser would otherwise return.
  */
-function splitVia(href: string): { href: string; via: string[] } {
+export function splitVia(href: string): { href: string; via: string[] } {
   const hash = href.indexOf('#');
   const query = href.indexOf('?', hash === -1 ? 0 : hash);
   if (query === -1) return { href, via: [] };

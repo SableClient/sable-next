@@ -2,6 +2,7 @@ import { resolve } from '$app/paths';
 
 import type { RoomSummary } from '@/generated/RoomSummary';
 
+import { splitVia } from '$lib/features/room/join-address';
 import { parseMatrixLink } from '$lib/features/room/matrix-link';
 
 import { findRoomByPathId, roomPathParam, roomPathParamFromId } from './room-list.svelte';
@@ -40,7 +41,8 @@ function sectionPath(
 export function roomSectionPath(
   rooms: readonly RoomSummary[],
   roomIdOrAlias: string,
-  eventId?: string | null
+  eventId?: string | null,
+  via: readonly string[] = []
 ): string {
   const room = findRoomByPathId(rooms, roomIdOrAlias);
   const base = sectionPath(
@@ -49,9 +51,15 @@ export function roomSectionPath(
     room ? roomPathParam(room) : roomPathParamFromId(roomIdOrAlias)
   );
 
+  const query = new URLSearchParams();
   // A space has no timeline to focus an event in.
-  if (!eventId || room?.is_space) return base;
-  return `${base}?event=${encodeURIComponent(eventId)}`;
+  if (eventId && !room?.is_space) query.set('event', eventId);
+  // `via` only helps a join, so it rides along solely for a room the client has
+  // never seen. Carrying it further would pin it in the URL of a room already open.
+  if (room === undefined) for (const server of via) query.append('via', server);
+
+  const search = query.toString();
+  return search === '' ? base : `${base}?${search}`;
 }
 
 /**
@@ -63,7 +71,10 @@ export function permalinkPath(
   rooms: readonly RoomSummary[],
   encodedFragment: string
 ): string | null {
-  const link = parseMatrixLink(`https://matrix.to/#/${encodedFragment}`);
+  // `?via=` sits inside the fragment, where it would otherwise be parsed as
+  // part of the last id.
+  const { href, via } = splitVia(`https://matrix.to/#/${encodedFragment}`);
+  const link = parseMatrixLink(href);
   if (link === null || link.kind === 'user') return null;
-  return roomSectionPath(rooms, link.roomId, link.kind === 'event' ? link.eventId : null);
+  return roomSectionPath(rooms, link.roomId, link.kind === 'event' ? link.eventId : null, via);
 }

@@ -100,6 +100,39 @@ test('a permalink fragment carries its event id', () => {
   expect(permalinkPath(rooms, fragment)).toBe('/home/!general%3Aexample.org?event=%24abc');
 });
 
+test('via servers ride along for a room the client has never seen', () => {
+  expect(roomSectionPath([], '!missing:example.org', null, ['a.example', 'b.example'])).toBe(
+    '/home/!missing%3Aexample.org?via=a.example&via=b.example'
+  );
+});
+
+test('via is dropped for a room already in the list, having nothing left to help', () => {
+  const rooms = [room('!general:example.org')];
+  expect(roomSectionPath(rooms, '!general:example.org', null, ['a.example'])).toBe(
+    '/home/!general%3Aexample.org'
+  );
+});
+
+test('a focused event and via servers share one query', () => {
+  expect(roomSectionPath([], '!missing:example.org', '$abc', ['a.example'])).toBe(
+    '/home/!missing%3Aexample.org?event=%24abc&via=a.example'
+  );
+});
+
+test('a permalink fragment carries its via servers, which sit inside the fragment', () => {
+  const fragment = `${encodeURIComponent('!missing:example.org')}?via=a.example&via=b.example`;
+  expect(permalinkPath([], fragment)).toBe(
+    '/home/!missing%3Aexample.org?via=a.example&via=b.example'
+  );
+});
+
+test('via inside the fragment does not leak into the room id', () => {
+  const fragment = `${encodeURIComponent('!missing:example.org')}/${encodeURIComponent('$abc')}?via=a.example`;
+  expect(permalinkPath([], fragment)).toBe(
+    '/home/!missing%3Aexample.org?event=%24abc&via=a.example'
+  );
+});
+
 test('a user permalink has no room to open', () => {
   expect(permalinkPath([], encodeURIComponent('@alice:example.org'))).toBeNull();
 });
