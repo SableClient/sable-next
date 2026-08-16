@@ -1,0 +1,25 @@
+{
+  "name": "Sable Next (nightly)",
+  "identifier": "moe.sable.next.source.nightly",
+  "subtitle": "Sable Next for iOS (nightly)",
+  "description": "Sable Next iOS nightly builds for AltStore and SideStore, rebuilt on every push to main.",
+  "iconURL": "https://raw.githubusercontent.com/SableClient/sable-next/main/src-tauri/icons/icon.png",
+  "website": "https://github.com/SableClient/sable-next",
+  "tintColor": "#5CA399",
+  "featuredApps": ["moe.sable.next"],
+  "apps": [
+    {
+      "name": "Sable Next",
+      "bundleIdentifier": "moe.sable.next",
+      "developerName": "SableClient",
+      "subtitle": "Sable Next for iOS (nightly)",
+      "localizedDescription": "Sable Next for iOS. Nightly builds from main; unsigned, resigned at install by AltStore/SideStore.",
+      "iconURL": "https://raw.githubusercontent.com/SableClient/sable-next/main/src-tauri/icons/icon.png",
+      "tintColor": "#5CA399",
+      "category": "social",
+      "screenshots": [],
+      "versions": []
+    }
+  ],
+  "news": []
+}

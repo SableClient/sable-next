@@ -1,0 +1,37 @@
+name: Resolve release meta
+description: Detects whether a build is a rolling nightly or a stable tag, and outputs its tag, version, ref, and build flavor.
+
+inputs:
+  input-tag:
+    description: Explicit tag supplied by a workflow_dispatch trigger.
+    required: false
+    default: ''
+
+outputs:
+  tag:
+    description: Release tag name (e.g. "nightly" or "v1.2.3").
+    value: ${{ steps.meta.outputs.tag }}
+  version:
+    description: SemVer version string stamped into the build.
+    value: ${{ steps.meta.outputs.version }}
+  ref:
+    description: Git ref to build (commit SHA for nightly, tag ref for stable).
+    value: ${{ steps.meta.outputs.ref }}
+  nightly:
+    description: '"true" when this is a rolling nightly build.'
+    value: ${{ steps.meta.outputs.nightly }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve release meta
+      id: meta
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        INPUT_TAG: ${{ inputs.input-tag }}
+        GIT_REF: ${{ github.ref }}
+        GIT_REF_NAME: ${{ github.ref_name }}
+        GIT_SHA: ${{ github.sha }}
+      run: node "${{ github.action_path }}/../../scripts/release-meta.mjs" "$GITHUB_OUTPUT"

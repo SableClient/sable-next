@@ -1,0 +1,25 @@
+{
+  "name": "Sable Next",
+  "identifier": "moe.sable.next.source",
+  "subtitle": "Sable Next for iOS",
+  "description": "Sable Next iOS releases for AltStore and SideStore.",
+  "iconURL": "https://raw.githubusercontent.com/SableClient/sable-next/main/src-tauri/icons/icon.png",
+  "website": "https://github.com/SableClient/sable-next",
+  "tintColor": "#5CA399",
+  "featuredApps": ["moe.sable.next"],
+  "apps": [
+    {
+      "name": "Sable Next",
+      "bundleIdentifier": "moe.sable.next",
+      "developerName": "SableClient",
+      "subtitle": "Sable Next for iOS",
+      "localizedDescription": "Sable Next for iOS. Unsigned builds, resigned at install by AltStore/SideStore.",
+      "iconURL": "https://raw.githubusercontent.com/SableClient/sable-next/main/src-tauri/icons/icon.png",
+      "tintColor": "#5CA399",
+      "category": "social",
+      "screenshots": [],
+      "versions": []
+    }
+  ],
+  "news": []
+}

@@ -1,28 +1,76 @@
-name: Rust CI
+name: Rust quality checks
 
 on:
-  push:
   pull_request:
+    paths:
+      - 'crates/**'
+      - 'src-tauri/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'deny.toml'
+      - '.github/workflows/rust-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'src-tauri/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'deny.toml'
+      - '.github/workflows/rust-quality.yml'
+  merge_group:
+
+permissions: {}
 
 concurrency:
-  group: rust-ci-${{ github.workflow }}-${{ github.ref }}
+  group: rust-quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
+
 jobs:
-  quality:
+  format:
+    name: Rust format
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: read
-
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.97.1
-          components: clippy, rustfmt
+          components: rustfmt
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+
+  checks:
+    name: Rust check, test, and Clippy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: 1.97.1
+          components: clippy
           targets: wasm32-unknown-unknown
 
       - name: Cache Rust artifacts
@@ -34,6 +82,9 @@ jobs:
         with:
           cache: true
           env: false
+
+      - name: Trust project mise configuration
+        run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
 
       - name: Install Linux Tauri dependencies
         run: |
@@ -52,9 +103,6 @@ jobs:
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --version 0.20.2 --locked
-
-      - name: Check Rust formatting
-        run: cargo fmt --all -- --check
 
       - name: Run workspace Clippy
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings

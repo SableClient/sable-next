@@ -1,0 +1,152 @@
+name: Cloudflare Worker Preview
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'static/**'
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'vite.config.ts'
+      - 'wrangler.jsonc'
+      - '.github/workflows/cloudflare-web-preview.yml'
+      - '.github/actions/setup/**'
+
+permissions: {}
+
+concurrency:
+  group: cloudflare-worker-preview-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy preview
+    # Forks cannot read the Cloudflare credentials wrangler needs.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up app and build
+        uses: ./.github/actions/setup
+        with:
+          build: 'true'
+        env:
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: preview
+          VITE_APP_VERSION: ${{ github.event.pull_request.head.sha }}
+
+      - name: Prepare preview metadata
+        id: metadata
+        run: |
+          preview_message="$(git log -1 --pretty=%s | head -c 100)"
+
+          {
+            echo 'preview_message<<EOF'
+            echo "$preview_message"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set deploy alias
+        id: alias
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "alias=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Worker preview
+        id: deploy
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        env:
+          PREVIEW_MESSAGE: ${{ steps.metadata.outputs.preview_message }}
+        with:
+          apiToken: ${{ secrets.TF_CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.TF_VAR_ACCOUNT_ID }}
+          command: >
+            versions upload
+            --config wrangler.jsonc
+            --preview-alias ${{ steps.alias.outputs.alias }}
+            --message "$PREVIEW_MESSAGE"
+
+      - name: Resolve preview URL
+        id: preview
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          COMMAND_OUTPUT: ${{ steps.deploy.outputs.command-output }}
+          ALIAS: ${{ steps.alias.outputs.alias }}
+        run: |
+          alias_url_pattern="^https?://${ALIAS}-[^[:space:]]+$"
+          preview_url=""
+
+          if printf '%s\n' "$DEPLOYMENT_URL" | grep -Eq "$alias_url_pattern"; then
+            preview_url="$DEPLOYMENT_URL"
+          else
+            preview_url="$(printf '%s\n' "$COMMAND_OUTPUT" | grep -Eo "https?://${ALIAS}-[^[:space:]]*" | head -n 1 || true)"
+          fi
+
+          if ! printf '%s\n' "$preview_url" | grep -Eq "$alias_url_pattern"; then
+            echo 'Failed to resolve aliased Worker preview URL.' >&2
+            exit 1
+          fi
+
+          echo "preview_url=${preview_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish summary and PR comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MARKER: '<!-- cloudflare-worker-preview -->'
+          PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
+          PREVIEW_ALIAS: ${{ steps.alias.outputs.alias }}
+          SHORT_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = process.env.MARKER;
+            const previewUrl = process.env.PREVIEW_URL;
+            const previewAlias = process.env.PREVIEW_ALIAS;
+            const shortSha = process.env.SHORT_SHA?.slice(0, 7);
+            const now = new Date().toUTCString().replace(':00 GMT', ' UTC');
+
+            if (!previewUrl) {
+              core.setFailed('Missing preview URL from Cloudflare deploy step.');
+              return;
+            }
+
+            const tableRow = '| Deployment successful! | <a href="' + previewUrl + '">' + previewUrl + '</a> | ' + shortSha + ' | `' + previewAlias + '` | ' + now + ' |';
+            const comment = [
+              marker,
+              '## Deploying with &nbsp;<a href="https://workers.dev"><img alt="Cloudflare" src="https://workers.cloudflare.com/logo.svg" width="16"></a> &nbsp;Cloudflare Workers',
+              '',
+              '| Status | Preview URL | Commit | Alias | Updated (UTC) |',
+              '| - | - | - | - | - |',
+              tableRow,
+            ].join('\n');
+
+            await core.summary.addRaw(comment.replace(marker + '\n', '')).write();
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            );
+            if (existing) {
+              await github.rest.issues.deleteComment({
+                owner, repo, comment_id: existing.id,
+              });
+            }
+
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: comment });

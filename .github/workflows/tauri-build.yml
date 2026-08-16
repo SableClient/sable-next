@@ -1,0 +1,527 @@
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and attach bundles to (e.g. v1.2.3). Empty builds a nightly from HEAD.'
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: tauri-build-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
+
+jobs:
+  setup-release:
+    name: Resolve release target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      ref: ${{ steps.meta.outputs.ref }}
+      nightly: ${{ steps.meta.outputs.nightly }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve release meta
+        id: meta
+        uses: ./.github/actions/resolve-release-meta
+        with:
+          input-tag: ${{ inputs.tag }}
+
+      - name: Wait for release to exist
+        if: ${{ steps.meta.outputs.nightly != 'true' }}
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          for i in $(seq 1 12); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release $TAG found."
+              exit 0
+            fi
+            echo "Waiting for release $TAG to be published ($i/12)…"
+            sleep 15
+          done
+          echo "Release $TAG was not found." >&2
+          exit 1
+
+      - name: Ensure nightly prerelease exists
+        if: ${{ steps.meta.outputs.nightly == 'true' }}
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          if gh release view nightly >/dev/null 2>&1; then
+            echo 'Reusing the existing nightly release while the new build is prepared.'
+          else
+            gh release create nightly --prerelease --target "$SHA" --title 'Nightly (main)' \
+              --notes "Rolling nightly build from main at $SHA"
+          fi
+
+  build-web:
+    name: Build web assets
+    needs: setup-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # Absent on forks, which builds an app with error reporting switched off.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Set up app and build
+        uses: ./.github/actions/setup
+        with:
+          build: 'true'
+
+      - name: Upload web assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: web-assets
+          path: |
+            .svelte-kit/output
+            dist
+            src/generated/wasm
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    name: ${{ matrix.name }}
+    needs: [setup-release, build-web]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal
+            runner: macos-latest
+            asset-platform: macos-universal
+            rust-targets: aarch64-apple-darwin x86_64-apple-darwin
+            tauri-args: --target universal-apple-darwin
+            bundle-path: target/universal-apple-darwin/release/bundle
+          - name: Windows x86_64
+            runner: windows-latest
+            asset-platform: windows-x86_64
+            rust-targets: ''
+            tauri-args: ''
+            bundle-path: target/release/bundle
+          - name: Linux x86_64
+            runner: ubuntu-24.04
+            asset-platform: linux-x86_64
+            rust-targets: ''
+            tauri-args: ''
+            bundle-path: target/release/bundle
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Download web assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: web-assets
+
+      - name: Install Linux Tauri dependencies
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            file \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            pkg-config
+
+      - name: Set up app
+        uses: ./.github/actions/setup
+        with:
+          build: 'false'
+          install-mise-tools: 'false'
+
+      - name: Add Rust targets
+        if: ${{ matrix.rust-targets != '' }}
+        shell: bash
+        run: rustup target add ${{ matrix.rust-targets }}
+
+      - name: Stamp release version into tauri.conf.json
+        shell: bash
+        run: node .github/scripts/set-tauri-version.mjs "$VERSION"
+
+      - name: Build desktop bundle
+        shell: bash
+        run: pnpm tauri build --config src-tauri/tauri.ci.conf.json ${{ matrix.tauri-args }}
+
+      - name: Normalize bundle names
+        shell: bash
+        env:
+          ASSET_PLATFORM: ${{ matrix.asset-platform }}
+          BUNDLE_PATH: ${{ matrix.bundle-path }}
+        run: |
+          test -d "$BUNDLE_PATH" || { echo "Bundle directory not found: $BUNDLE_PATH" >&2; exit 1; }
+          find "$BUNDLE_PATH" -type f -print0 \
+            | while IFS= read -r -d '' path; do
+                case "$path" in
+                  *-setup.exe) suffix='-setup.exe' ;;
+                  *.msi) suffix='.msi' ;;
+                  *.dmg) suffix='.dmg' ;;
+                  *.deb) suffix='.deb' ;;
+                  *.rpm) suffix='.rpm' ;;
+                  *.AppImage) suffix='.AppImage' ;;
+                  *) continue ;;
+                esac
+                target="$(dirname "$path")/sable-next-${VERSION}-${ASSET_PLATFORM}${suffix}"
+                [ "$path" = "$target" ] || mv "$path" "$target"
+              done
+          find "$BUNDLE_PATH" -type f -name 'sable-next-*' -print0 > bundles
+          test -s bundles || { echo "No desktop bundles found in $BUNDLE_PATH" >&2; exit 1; }
+
+      - name: Attest desktop bundles
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: ${{ matrix.bundle-path }}/*/sable-next-*
+
+      - name: Attach desktop bundles to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while IFS= read -r -d '' bundle; do
+            echo "Uploading $bundle"
+            gh release upload "$TAG" "$bundle" --clobber
+          done < bundles
+
+  android:
+    name: Build Android
+    needs: [setup-release, build-web]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      MISE_ENV: tauri
+      # Matches the ABIs passed to `tauri android build` below.
+      RUST_TARGETS: aarch64-linux-android armv7-linux-androideabi
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Download web assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: web-assets
+
+      - name: Set up app
+        uses: ./.github/actions/setup
+        with:
+          build: 'false'
+          install-mise-tools: 'false'
+
+      - name: Set up Android SDK and NDK
+        run: mise run tauri:setup:android
+
+      - name: Add Rust targets
+        run: |
+          # shellcheck disable=SC2086 # RUST_TARGETS is a space-separated list.
+          rustup target add $RUST_TARGETS
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Stamp release version into tauri.conf.json
+        run: node .github/scripts/set-tauri-version.mjs "$VERSION"
+
+      - name: Build Android bundles
+        run: |
+          pnpm tauri android build --config src-tauri/tauri.ci.conf.json --apk --aab --target aarch64 armv7
+          out='src-tauri/gen/android/app/build/outputs'
+          apk="$(find "$out/apk" -name '*.apk' -type f | head -n 1)"
+          aab="$(find "$out/bundle" -name '*.aab' -type f | head -n 1)"
+          [ -n "$apk" ] || { echo 'APK not found' >&2; exit 1; }
+          [ -n "$aab" ] || { echo 'AAB not found' >&2; exit 1; }
+          mv "$apk" "$(dirname "$apk")/sable-next-${VERSION}-android-universal.apk"
+          mv "$aab" "$(dirname "$aab")/sable-next-${VERSION}-android-universal.aab"
+
+      - name: Attest Android bundles
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            src-tauri/gen/android/app/build/outputs/apk/**/sable-next-*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/**/sable-next-*.aab
+
+      - name: Attach Android bundles to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find src-tauri/gen/android/app/build/outputs -type f -name 'sable-next-*' \
+            \( -name '*.apk' -o -name '*.aab' \) -print0 > bundles
+          test -s bundles || { echo 'No Android bundles found' >&2; exit 1; }
+          while IFS= read -r -d '' bundle; do
+            echo "Uploading $bundle"
+            gh release upload "$TAG" "$bundle" --clobber
+          done < bundles
+
+  ios:
+    name: Build iOS
+    needs: [setup-release, build-web]
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    outputs:
+      ipa_name: ${{ steps.ipa.outputs.name }}
+      ipa_size: ${{ steps.ipa.outputs.size }}
+      ipa_version: ${{ steps.ipa.outputs.version }}
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+      RUST_TARGETS: aarch64-apple-ios
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Download web assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: web-assets
+
+      - name: Set up app
+        uses: ./.github/actions/setup
+        with:
+          build: 'false'
+          install-mise-tools: 'false'
+
+      - name: Set up iOS project
+        run: |
+          brew install cocoapods
+          pnpm tauri ios init --ci
+
+      - name: Add Rust target
+        run: |
+          # shellcheck disable=SC2086 # RUST_TARGETS is a space-separated list.
+          rustup target add $RUST_TARGETS
+
+      # CFBundleShortVersionString rejects the -nightly suffix, so nightly
+      # builds fold their timestamp into the patch component instead.
+      - name: Stamp release version into tauri.conf.json
+        run: |
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            node .github/scripts/set-tauri-version.mjs "$VERSION" --apple-short-version
+          else
+            node .github/scripts/set-tauri-version.mjs "$VERSION"
+          fi
+
+      - name: Build unsigned iOS bundle
+        id: ipa
+        run: |
+          pnpm tauri ios build --config src-tauri/tauri.ci.conf.json --no-sign --ci
+          ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
+          [ -n "$ipa" ] || { echo 'No iOS IPA found' >&2; exit 1; }
+          target="$(dirname "$ipa")/sable-next-${VERSION}-ios-arm64.ipa"
+          [ "$ipa" = "$target" ] || mv "$ipa" "$target"
+
+          unzip -p "$target" 'Payload/*.app/Info.plist' > Info.plist
+          short_version="$(plutil -extract CFBundleShortVersionString raw -o - Info.plist)"
+
+          {
+            echo "path=$target"
+            echo "name=$(basename "$target")"
+            echo "size=$(stat -f%z "$target")"
+            echo "version=$short_version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest iOS bundle
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: ${{ steps.ipa.outputs.path }}
+
+      - name: Attach iOS bundle to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IPA_PATH: ${{ steps.ipa.outputs.path }}
+        run: gh release upload "$TAG" "$IPA_PATH" --clobber
+
+  obtainium:
+    name: Publish Obtainium config
+    needs: [setup-release, android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+
+      - name: Generate obtainium.json
+        run: node .github/scripts/obtainium-generate.mjs "$VERSION" "$TAG" obtainium.json
+
+      - name: Attach Obtainium config to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" obtainium.json --clobber
+
+  altstore:
+    name: Publish AltStore source
+    needs: [setup-release, ios]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+      IPA_NAME: ${{ needs.ios.outputs.ipa_name }}
+      IPA_SIZE: ${{ needs.ios.outputs.ipa_size }}
+      IPA_VERSION: ${{ needs.ios.outputs.ipa_version }}
+      REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # The manifest lives on main so its raw.githubusercontent URL, which is
+      # what users add to AltStore, stays the same across releases.
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Update AltStore source
+        run: |
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            source_file='altstore-source-nightly.json'
+            # Superseded nightly IPAs are replaced, so older entries would 404.
+            export ALTSTORE_MAX_VERSIONS=1
+          else
+            source_file='altstore-source.json'
+          fi
+          echo "SOURCE_FILE=$source_file" >> "$GITHUB_ENV"
+
+          node .github/scripts/update-altstore-source.mjs \
+            "$source_file" \
+            "$IPA_VERSION" \
+            "$IPA_SIZE" \
+            "https://github.com/${REPOSITORY}/releases/download/${TAG}/${IPA_NAME}" \
+            "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            "Sable Next $VERSION"
+
+      # Pushes made with GITHUB_TOKEN do not trigger workflows, so this cannot
+      # retrigger the build that produced it.
+      - name: Commit updated source to main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$SOURCE_FILE"
+
+          if git diff --cached --quiet; then
+            echo "$SOURCE_FILE is already up to date."
+            exit 0
+          fi
+
+          git commit -m "chore: update $SOURCE_FILE for $TAG"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt); rebasing onto the latest main."
+            git pull --rebase origin main
+          done
+          echo "Could not push $SOURCE_FILE to main." >&2
+          exit 1
+
+      - name: Attach AltStore source to release
+        run: gh release upload "$TAG" "$SOURCE_FILE" --clobber
+
+  finalize-nightly:
+    name: Finalize nightly release
+    needs: [setup-release, desktop, android, ios, obtainium, altstore]
+    if: ${{ needs.setup-release.outputs.nightly == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Update nightly tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          VERSION: ${{ needs.setup-release.outputs.version }}
+        run: |
+          gh api --method PATCH "repos/$REPOSITORY/git/refs/tags/nightly" \
+            -f sha="$SHA" -F force=true
+          gh release edit nightly --prerelease --target "$SHA" --title 'Nightly (main)' \
+            --notes "Rolling nightly build $VERSION from main at $SHA"

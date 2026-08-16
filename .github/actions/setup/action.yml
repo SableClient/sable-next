@@ -34,6 +34,14 @@ runs:
         env: false
         install: ${{ inputs.install-mise-tools }}
 
+    # Xcode drops CI and MISE_TRUSTED_CONFIG_PATHS from run-script build phases
+    # while keeping PATH, so mise stops auto-trusting the config there. Only
+    # trusting on disk survives that.
+    - name: Trust project mise configuration
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
+
     - name: Set up Rust for WASM generation
       uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
       with:
