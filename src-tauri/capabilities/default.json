@@ -3,5 +3,13 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": ["main"],
-  "permissions": ["core:default", "opener:allow-open-url", "deep-link:default"]
+  "permissions": [
+    "core:default",
+    "opener:allow-open-url",
+    "deep-link:default",
+    "os:allow-platform",
+    "os:allow-os-type",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text"
+  ]
 }

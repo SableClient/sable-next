@@ -154,9 +154,16 @@ pub fn run() {
         }
     }));
 
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
     if let Err(error) = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
