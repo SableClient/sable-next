@@ -73,7 +73,9 @@ mod tests {
                 "bytes",
                 "globalThis.__sableTestSession = bytes; return Promise.resolve();",
             ),
-            Function::new_no_args("globalThis.__sableTestSession = null; return Promise.resolve();"),
+            Function::new_no_args(
+                "globalThis.__sableTestSession = null; return Promise.resolve();",
+            ),
         )
     }
 

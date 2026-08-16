@@ -258,7 +258,8 @@ mod tests {
         let core = core();
         let noop = Function::new_with_args("json", "");
 
-        core.subscribe_events(noop.clone()).expect("first subscribe");
+        core.subscribe_events(noop.clone())
+            .expect("first subscribe");
 
         assert!(core.subscribe_events(noop).is_err());
     }
