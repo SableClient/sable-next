@@ -35,6 +35,9 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    },
+    "iOS": {
+      "template": "src-tauri/ios-project.yml"
     }
   },
   "plugins": {

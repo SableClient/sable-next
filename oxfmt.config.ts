@@ -13,6 +13,8 @@ export default {
     'target',
     'src/generated',
     'src-tauri/icons',
+    // Handlebars behind a .yml extension; oxfmt parses it as YAML and fails.
+    'src-tauri/ios-project.yml',
     'package.json',
     'pnpm-lock.yaml',
     'Cargo.lock',
