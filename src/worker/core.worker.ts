@@ -7,6 +7,10 @@ import { createCoreWorkerBoundary } from './core-worker-boundary';
 declare const self: SharedWorkerGlobalScope;
 
 const core = init().then(() => {
+  // Before the constructor, so a panic while opening the session store still
+  // carries its Rust message.
+  setPanicHandler(crash);
+
   const instance = new SableCore(
     'sable-next',
     () => loadSession(),
@@ -22,22 +26,27 @@ const core = init().then(() => {
 
 const boundary = createCoreWorkerBoundary(core);
 
+// A trap unwinds only the call that hit it, so the sync loop and the SDK's
+// timers keep re-entering a module whose allocator and borrows were left
+// mid-flight. Closing is what stops the derived failures that follow; the next
+// page connect builds a fresh worker.
+function crash(message: string): void {
+  boundary.handlePanic(message);
+  setTimeout(() => {
+    self.close();
+  }, 0);
+}
+
 // A SharedWorker's runtime failures never reach the pages that opened it, so
 // they ride the same channel as a Rust panic. A failed `init()` lands here too.
 self.addEventListener('error', (event) => {
-  boundary.handlePanic(`worker error: ${event.message}`);
+  crash(`worker error: ${event.message}`);
 });
 self.addEventListener('unhandledrejection', (event) => {
-  boundary.handlePanic(`unhandled rejection in worker: ${String(event.reason)}`);
+  crash(`unhandled rejection in worker: ${String(event.reason)}`);
 });
 
 void core.then((instance) => {
-  setPanicHandler((message: string) => {
-    boundary.handlePanic(message);
-    setTimeout(() => {
-      self.close();
-    }, 0);
-  });
   instance.subscribeEvents(boundary.handleEvent);
 });
 
