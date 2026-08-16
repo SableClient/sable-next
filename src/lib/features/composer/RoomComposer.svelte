@@ -9,6 +9,7 @@
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
+  import { pickFiles } from '$lib/platform/files';
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
@@ -261,9 +262,17 @@
   }
 
   function pick(accept: string): void {
-    if (!fileInput) return;
-    fileInput.accept = accept;
-    fileInput.click();
+    void (async () => {
+      const picked = await pickFiles(accept);
+      if (picked !== null) {
+        stage(picked);
+        return;
+      }
+
+      if (!fileInput) return;
+      fileInput.accept = accept;
+      fileInput.click();
+    })();
   }
 
   function stageFromInput(event: Event): void {

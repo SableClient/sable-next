@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
+  import { saveFile, savesNatively } from '$lib/platform/files';
   import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
 
   interface Props {
@@ -48,6 +49,12 @@
         ? '16 / 9'
         : undefined
   );
+
+  function download(event: MouseEvent): void {
+    if (url === null || !savesNatively()) return;
+    event.preventDefault();
+    void saveFile(url, mediaLabel);
+  }
 
   $effect(() => {
     let active = true;
@@ -98,9 +105,8 @@
         {body}
       </audio>
     {:else}
-      <svelte:element this={"a"} class="media-file" href={url} download={mediaLabel}
-        >{mediaLabel}</svelte:element
-      >
+      <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->
+      <a class="media-file" href={url} download={mediaLabel} onclick={download}>{mediaLabel}</a>
     {/if}
   {:else if kind === 'file'}
     <span class="media-file">{mediaLabel}</span>
