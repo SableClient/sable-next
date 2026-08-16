@@ -38,6 +38,46 @@ mise run tauri:setup:android  # Android: SDK packages + NDK
 mise run tauri:setup:ios      # iOS: Xcode project + CocoaPods (macOS)
 ```
 
+Every push to `main` publishes bundles for all five targets to the rolling
+[`nightly` release](https://github.com/SableClient/sable-next/releases/tag/nightly),
+with build attestations. Tagged releases are not set up yet.
+
+## Android (Obtainium)
+
+APKs ship with every build, and [Obtainium](https://obtainium.imranr.dev) updates them straight from GitHub. Each build also publishes an `obtainium.json` app config.
+
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22moe.sable.next%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSableClient%2Fsable-next%22%2C%22author%22%3A%22SableClient%22%2C%22name%22%3A%22Sable%20Next%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22about%5C%22%3A%5C%22The%20next%20Sable%20Matrix%20client%5C%22%2C%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Atrue%2C%5C%22versionDetection%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3A%22GitHub%22%7D"><img alt="Add to Obtainium" src="https://img.shields.io/badge/Add_to_Obtainium-6750A3?style=for-the-badge"></a>
+&nbsp;
+<a href="https://github.com/SableClient/sable-next/releases/download/nightly/obtainium.json"><img alt="App config" src="https://img.shields.io/badge/App_config-6B7280?style=for-the-badge"></a>
+&nbsp;
+<a href="https://github.com/SableClient/sable-next/releases/tag/nightly"><img alt="Download APK" src="https://img.shields.io/badge/Download_APK-3DDC84?style=for-the-badge&logo=android"></a>
+
+### Setup & install
+
+1. Install [Obtainium](https://github.com/ImranR98/Obtainium/releases/latest).
+2. Tap **Add to Obtainium** above. It opens an import prompt carrying the prerelease and version-tracking settings the rolling `nightly` tag needs.
+3. Or download `obtainium.json` and import it with **Import/Export → Import from file**.
+
+## iOS (AltStore / SideStore)
+
+iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io) and [SideStore](https://sidestore.io). Each build publishes the IPA alongside an `altstore-source.json` manifest, which lists one version because the IPA it replaces is deleted.
+
+<a href="https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://github.com/SableClient/sable-next/releases/download/nightly/altstore-source.json"><img alt="Add to AltStore" src="https://img.shields.io/badge/Add_to_AltStore-7C3AED?style=for-the-badge"></a>
+&nbsp;
+<a href="https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://github.com/SableClient/sable-next/releases/download/nightly/altstore-source.json"><img alt="Add to SideStore" src="https://img.shields.io/badge/Add_to_SideStore-2563EB?style=for-the-badge"></a>
+&nbsp;
+<a href="https://github.com/SableClient/sable-next/releases/download/nightly/altstore-source.json"><img alt="Direct URL" src="https://img.shields.io/badge/Direct_URL-6B7280?style=for-the-badge"></a>
+
+### Setup & install
+
+1. Set up [AltStore Classic](https://faq.altstore.io/altstore-classic/altserver) or [SideStore](https://docs.sidestore.io) on your device.
+2. Tap a button above, or add the source manually:
+   - AltStore: `altstore://source?url=https://github.com/SableClient/sable-next/releases/download/nightly/altstore-source.json`
+   - SideStore: `sidestore://source?url=https://github.com/SableClient/sable-next/releases/download/nightly/altstore-source.json`
+3. Install Sable Next from the source. AltStore/SideStore re-sign the unsigned IPA with your personal development certificate at install time, so apps refresh every 7 days on a free account.
+
+Both configs come from the `obtainium` and `altstore` jobs in [`tauri-build.yml`](.github/workflows/tauri-build.yml).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
