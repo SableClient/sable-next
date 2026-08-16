@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-type WorkerMode =
+export type RoomCoreMode =
   | 'ready'
   | 'loading'
   | 'error'
@@ -9,6 +9,8 @@ type WorkerMode =
   | 'delayed_pagination'
   | 'delayed_snapshot'
   | 'delayed_layout_diff';
+
+type WorkerMode = RoomCoreMode;
 
 declare global {
   interface Window {
@@ -70,7 +72,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         content: {
           kind: 'message',
           body: index === 0 ? `Welcome to ${roomName}` : `${roomName} message ${String(index)}`,
-          formatted: null,
+          html: index === 0 ? `Welcome to ${roomName}` : `${roomName} message ${String(index)}`,
+          emote: false,
           edited: false,
         },
         in_reply_to: null,
@@ -177,6 +180,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                           content: {
                                             ...item.content,
                                             body: `Delayed history ${String(index)}`,
+                                            html: `Delayed history ${String(index)}`,
                                           },
                                         }))
                                       : workerMode === 'delayed_pagination'
@@ -261,6 +265,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                       content: {
                                                         ...value.content,
                                                         body: `Delayed history ${String(index)}`,
+                                                        html: `Delayed history ${String(index)}`,
                                                       },
                                                     },
                                                   }))
@@ -276,7 +281,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                         content: {
                                                           kind: 'message' as const,
                                                           body: `${room.name} history ${String(state.page)} ${String(index)}`,
-                                                          formatted: null,
+                                                          html: `${room.name} history ${String(state.page)} ${String(index)}`,
+                                                          emote: false,
                                                           edited: false,
                                                         },
                                                       },
@@ -291,7 +297,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                           content: {
                                                             kind: 'message',
                                                             body: `${room.name} history ${String(state.page)}`,
-                                                            formatted: null,
+                                                            html: `${room.name} history ${String(state.page)}`,
+                                                            emote: false,
                                                             edited: false,
                                                           },
                                                         },
@@ -360,6 +367,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                         content: {
                           ...last.content,
                           body: `Delayed layout event ${'wraps '.repeat(80)}`,
+                          html: `Delayed layout event ${'wraps '.repeat(80)}`,
                         },
                       },
                     },

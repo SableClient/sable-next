@@ -1,6 +1,18 @@
-import { test as base, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { expect, test as base, type Page } from '@playwright/test';
 import { AuthFlow } from '../pages/AuthFlow';
 import { AppShell } from '../pages/AppShell';
+import { RoomTimeline } from '../pages/RoomTimeline';
+import { FakeCoreDriver } from '../pages/FakeCoreDriver';
+import { installFakeCore as installRoomCore, type RoomCoreMode } from '../fake-core';
+import type { TestHomeserver } from './continuwuity';
+import { LOGIN_PASSWORD, LOGIN_USERNAME } from './loginAccount';
+import { homeserverStatePath } from './runtime';
+
+export type TimelineHomeserver = TestHomeserver & {
+  timelineRoomId: string;
+  accessToken: string;
+};
 
 type WorkerMode = 'ready' | 'loading' | 'error';
 
@@ -13,7 +25,12 @@ type Session = {
 type Fixtures = {
   app: AppShell;
   auth: AuthFlow;
-  installFakeCore: (mode: WorkerMode) => Promise<void>;
+  timeline: RoomTimeline;
+  core: FakeCoreDriver;
+  installEmptyCore: (mode: WorkerMode) => Promise<void>;
+  installRoomCore: (mode: RoomCoreMode) => Promise<void>;
+  homeserver: TimelineHomeserver;
+  signIn: () => Promise<void>;
 };
 
 type WorkerFixtures = {
@@ -34,8 +51,11 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     },
     { scope: 'worker' },
   ],
-  installFakeCore: async ({ page, workerSession }, use) => {
-    await use((mode) => installFakeCore(page, mode, workerSession));
+  installEmptyCore: async ({ page, workerSession }, use) => {
+    await use((mode) => installEmptyCore(page, mode, workerSession));
+  },
+  installRoomCore: async ({ page }, use) => {
+    await use((mode) => installRoomCore(page, mode));
   },
   app: async ({ page }, use) => {
     await use(new AppShell(page));
@@ -43,11 +63,33 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   auth: async ({ page }, use) => {
     await use(new AuthFlow(page));
   },
+  timeline: async ({ page }, use) => {
+    await use(new RoomTimeline(page));
+  },
+  core: async ({ page }, use) => {
+    await use(new FakeCoreDriver(page));
+  },
+  // Playwright requires the destructuring pattern even with nothing to take.
+  // eslint-disable-next-line no-empty-pattern
+  homeserver: async ({}, use) => {
+    const state = JSON.parse(await readFile(homeserverStatePath(), 'utf8')) as TimelineHomeserver;
+    await use(state);
+  },
+  signIn: async ({ auth, page, homeserver }, use) => {
+    await use(async () => {
+      await auth.open(homeserver.baseUrl);
+      await auth.revealPasswordLogin();
+      await auth.signInWithPassword(LOGIN_USERNAME, LOGIN_PASSWORD);
+      await expect(page).toHaveURL(/\/login\/verify$/);
+      await auth.skipVerificationButton.click();
+      await expect(page).toHaveURL(/\/home$/);
+    });
+  },
 });
 
 export { expect } from '@playwright/test';
 
-async function installFakeCore(page: Page, mode: WorkerMode, session: Session): Promise<void> {
+async function installEmptyCore(page: Page, mode: WorkerMode, session: Session): Promise<void> {
   await page.addInitScript(
     ({ workerMode, workerSession }: { workerMode: WorkerMode; workerSession: Session }) => {
       class FakePort {
