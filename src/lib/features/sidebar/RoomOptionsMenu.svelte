@@ -11,7 +11,11 @@
   import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
+  import type { NotificationModeView } from '@/generated/NotificationModeView';
+  import BellIcon from 'phosphor-svelte/lib/BellIcon';
+
   import { useCoreClient } from '$lib/core/context';
+  import { settingsChanges } from '$lib/features/notifications/notifications.svelte';
   import { i18n } from '$lib/i18n';
   import { matrixToUrl } from '$lib/rooms/permalink';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
@@ -105,6 +109,42 @@
     void core.removeFromSpace(spaceId, room.room_id).catch(report);
   }
 
+  let notificationMode = $state<NotificationModeView | null | undefined>();
+  let notificationDefault = $state<NotificationModeView | undefined>();
+  const notificationModes: readonly { mode: NotificationModeView | null; label: string }[] = [
+    { mode: null, label: 'room.notifyDefault' },
+    { mode: 'all', label: 'room.notifyAll' },
+    { mode: 'mentions', label: 'room.notifyMentions' },
+    { mode: 'mute', label: 'room.notifyMute' },
+  ];
+  const modeLabels: Record<NotificationModeView, string> = {
+    all: 'room.notifyAll',
+    mentions: 'room.notifyMentions',
+    mute: 'room.notifyMute',
+  };
+
+  let defaultLabel = $derived(notificationDefault ? $i18n.t(modeLabels[notificationDefault]) : '');
+
+  $effect(() => {
+    void settingsChanges.version;
+    if (notificationMode !== undefined) void readNotificationMode();
+  });
+
+  async function readNotificationMode(): Promise<void> {
+    try {
+      const settings = await core.notificationSettings(room.room_id);
+      notificationMode = settings.room;
+      notificationDefault = settings.default;
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  function setNotificationMode(mode: NotificationModeView | null): void {
+    notificationMode = mode;
+    void core.setRoomNotificationMode(room.room_id, mode).catch(report);
+  }
+
   async function copyLink(): Promise<void> {
     try {
       const via = room.canonical_alias ? [] : await core.roomViaServers(room.room_id);
@@ -115,7 +155,11 @@
   }
 </script>
 
-<DropdownMenu.Root>
+<DropdownMenu.Root
+  onOpenChange={(open) => {
+    if (open) void readNotificationMode();
+  }}
+>
   <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>
     <DotsThreeIcon />
   </DropdownMenu.Trigger>
@@ -161,6 +205,30 @@
       <GearIcon size={16} />
       {$i18n.t('room.menuSettings')}
     </DropdownMenu.Item>
+
+    {#if !room.is_space}
+      <DropdownMenu.Sub>
+        <DropdownMenu.SubTrigger class="room-options-item">
+          <BellIcon size={16} />
+          {$i18n.t('room.menuNotifications')}
+        </DropdownMenu.SubTrigger>
+        <DropdownMenu.SubContent class="room-options-menu" sideOffset={4}>
+          {#each notificationModes as option (option.mode ?? 'default')}
+            {@const selected = notificationMode === option.mode}
+            <DropdownMenu.Item
+              class="room-options-item"
+              aria-checked={selected}
+              onSelect={() => {
+                setNotificationMode(option.mode);
+              }}
+            >
+              <span class="mode-check" aria-hidden="true">{selected ? '\u2713' : ''}</span>
+              {$i18n.t(option.label, { mode: defaultLabel })}
+            </DropdownMenu.Item>
+          {/each}
+        </DropdownMenu.SubContent>
+      </DropdownMenu.Sub>
+    {/if}
 
     {#if !room.is_space && offeredSpaces.length > 0}
       <DropdownMenu.Sub>
@@ -210,6 +278,12 @@
 </DropdownMenu.Root>
 
 <style>
+  .mode-check {
+    display: inline-block;
+    text-align: center;
+    width: 1rem;
+  }
+
   :global(.room-options-trigger) {
     align-items: center;
     background: transparent;

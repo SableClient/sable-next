@@ -3,6 +3,7 @@
 //! The native carrier. A feature adds a `Command` variant, not a tauri command,
 //! except for the three below that move bytes.
 
+mod notifications;
 mod sentry;
 
 use std::sync::{Arc, Mutex};
@@ -170,6 +171,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notifications::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -197,8 +199,12 @@ pub fn run() {
                 core,
                 event_sink: event_sink.clone(),
             });
+            let notifier = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 while let Some(event) = events.recv().await {
+                    if let CoreEvent::Notification { notification } = &event {
+                        notifications::show(&notifier, notification).await;
+                    }
                     event_sink.send(event);
                 }
             });

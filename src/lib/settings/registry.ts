@@ -348,7 +348,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.desktopNotifications',
         description: 'settings.desktopNotificationsHint',
         type: 'boolean',
-        unavailable: true,
       },
       {
         key: 'notificationSounds',
@@ -356,7 +355,7 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.notificationSounds',
         description: 'settings.notificationSoundsHint',
         type: 'boolean',
-        unavailable: true,
+        gatedBy: 'desktopNotifications',
       },
       {
         key: 'notificationContent',
@@ -364,7 +363,7 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.notificationContent',
         description: 'settings.notificationContentHint',
         type: 'boolean',
-        unavailable: true,
+        gatedBy: 'desktopNotifications',
       },
     ],
   },

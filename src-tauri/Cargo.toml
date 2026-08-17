@@ -31,6 +31,11 @@ tauri-plugin-fs = "2.5.1"
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-os = "2.3.2"
 tauri-plugin-clipboard-manager = "2.3.2"
+# Push stays off here: the feature pulls in Firebase and APNs, which belong to
+# the mobile builds, not the desktop one.
+tauri-plugin-notifications = { version = "0.4", default-features = false, features = [
+  "notify-rust",
+] }
 sable-core = { path = "../crates/sable-core", version = "0.1.0" }
 tokio = { workspace = true }
 # default-features drags in reqwest and native-tls; ureq is a sync rustls

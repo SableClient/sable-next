@@ -65,7 +65,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       },
     };
     const secondRoom = { ...room, room_id: '!second:example.test', name: 'Random' };
-    // An invitation the inbox and the sidebar both have to render.
     const invitedRoom = {
       ...room,
       room_id: '!invited:example.test',
@@ -348,11 +347,23 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                         reached_end: reachedEnd,
                                       };
                                     })()
-                                  : command === 'mark_read' || command === 'set_typing'
-                                    ? { type: command }
-                                    : command === 'unsubscribe'
-                                      ? { type: 'unsubscribe' }
-                                      : { type: command },
+                                  : command === 'notification_settings'
+                                    ? {
+                                        type: 'notification_settings',
+                                        room: null,
+                                        default: 'all',
+                                      }
+                                    : command === 'default_notification_modes'
+                                      ? {
+                                          type: 'default_notification_modes',
+                                          direct: 'all',
+                                          group: 'mentions',
+                                        }
+                                      : command === 'mark_read' || command === 'set_typing'
+                                        ? { type: command }
+                                        : command === 'unsubscribe'
+                                          ? { type: 'unsubscribe' }
+                                          : { type: command },
               };
 
         window.setTimeout(

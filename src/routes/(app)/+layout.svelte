@@ -15,6 +15,7 @@
   import Button from '$lib/ui/primitives/Button.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import { preferences } from '$lib/settings/preferences.svelte';
+  import { NotificationCenter } from '$lib/features/notifications/notifications.svelte';
 
   interface Props {
     children: Snippet;
@@ -24,6 +25,7 @@
   const core = useCoreClient();
   const roomList = new RoomList(core);
   provideRoomList(roomList);
+  const notifications = new NotificationCenter();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
   $effect(() => {
@@ -57,8 +59,10 @@
     if (core.status !== 'ready') return;
 
     void roomList.start();
+    notifications.start(core);
     return () => {
       roomList.stop();
+      notifications.stop();
     };
   });
 </script>

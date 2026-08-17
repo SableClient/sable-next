@@ -83,6 +83,17 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
+    NotificationSettings {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    DefaultNotificationModes,
+    Notification {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+    },
     ImagePacks {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -307,6 +318,30 @@ pub enum Command {
         /// False removes it.
         set: bool,
     },
+    SetPusher {
+        pushkey: String,
+        app_id: String,
+        /// The gateway's `_matrix/push/v1/notify`.
+        url: String,
+        device_display_name: String,
+        event_id_only: bool,
+        /// False replaces any pusher already holding this key.
+        append: bool,
+    },
+    RemovePusher {
+        pushkey: String,
+        app_id: String,
+    },
+    SetRoomNotificationMode {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        /// `null` drops the room's own rules so it follows the default again.
+        mode: Option<NotificationModeView>,
+    },
+    SetDefaultNotificationMode {
+        direct: bool,
+        mode: NotificationModeView,
+    },
 
     SetRoomName {
         #[ts(type = "string")]
@@ -473,6 +508,15 @@ pub enum CommandOk {
         members: Vec<MemberView>,
     },
     RoomPermissions(RoomPermissionsView),
+    NotificationSettings(NotificationSettingsView),
+    DefaultNotificationModes {
+        direct: NotificationModeView,
+        group: NotificationModeView,
+    },
+    /// `null` when the event notifies nobody, or is gone, or cannot be read.
+    Notification {
+        notification: Option<NotificationView>,
+    },
     ImagePacks {
         packs: Vec<ImagePackView>,
     },
@@ -558,6 +602,10 @@ pub enum CommandOk {
     UnignoreUser,
     SetTyping,
     SetRoomTag,
+    SetPusher,
+    RemovePusher,
+    SetRoomNotificationMode,
+    SetDefaultNotificationMode,
 
     SetDirect,
     SetRoomName,
@@ -705,6 +753,12 @@ pub enum CoreEvent {
     EncryptionStatus {
         status: EncryptionStatusView,
     },
+
+    Notification {
+        notification: NotificationView,
+    },
+
+    NotificationSettingsChanged,
 
     /// An incoming request arrives unsolicited. There is no other prompt.
     Verification {
@@ -1236,6 +1290,44 @@ pub struct ReactionGroup {
     pub key: String,
     #[ts(type = "string[]")]
     pub senders: Vec<OwnedUserId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationModeView {
+    All,
+    Mentions,
+    Mute,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+pub struct NotificationSettingsView {
+    /// The room's own rule. `null` means it follows `default`.
+    pub room: Option<NotificationModeView>,
+    pub default: NotificationModeView,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct NotificationView {
+    #[ts(type = "string")]
+    pub user_id: OwnedUserId,
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    #[ts(type = "string")]
+    pub event_id: OwnedEventId,
+    pub room_name: String,
+    pub room_avatar_url: Option<String>,
+    pub is_direct: bool,
+    #[ts(type = "string")]
+    pub sender: OwnedUserId,
+    pub sender_name: Option<String>,
+    pub sender_avatar_url: Option<String>,
+    pub body: String,
+    pub mention: bool,
+    pub noisy: Option<bool>,
 }
 
 /// Structured, so arranging and localising the preview stays with the UI.
