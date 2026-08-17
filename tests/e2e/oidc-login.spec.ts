@@ -20,14 +20,14 @@ test('signs in through the OIDC redirect flow', async ({ auth, page }) => {
   await provider.getByRole('button', { name: 'Continue' }).click();
 
   await expect(page).toHaveURL(/\/login\/verify$/);
-  await expect(page.getByRole('form', { name: 'Verify your device' })).toBeVisible();
+  await expect(auth.verificationCard).toBeVisible();
 
   // `/login/verify` once had its path segment read back as the homeserver.
   await auth.previousStageButton.click();
   await expect(auth.homeserver).toHaveValue(baseUrl);
 
   await auth.nextStageButton.click();
-  await auth.skipVerificationButton.click();
+  await auth.leaveVerification();
   await expect(page).toHaveURL(/\/home$/);
 
   await page.reload();

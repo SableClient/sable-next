@@ -25,6 +25,16 @@ describe('nextScrollMode', () => {
     expect(nextScrollMode(initial, signals({ nearLatest: true }))).toEqual(initial);
   });
 
+  test('a user scroll away from the end ends the initial landing', () => {
+    expect(nextScrollMode(initial, signals({ userDroveLastScroll: true }))).toEqual(reading);
+  });
+
+  test('a user scroll that stays at the end leaves the landing alone', () => {
+    expect(
+      nextScrollMode(initial, signals({ userDroveLastScroll: true, nearLatest: true }))
+    ).toEqual(initial);
+  });
+
   test('follows the end once the initial landing completes', () => {
     expect(nextScrollMode(initial, signals({ initialLandingComplete: true }))).toEqual(following);
   });

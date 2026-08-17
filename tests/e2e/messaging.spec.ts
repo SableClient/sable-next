@@ -63,9 +63,10 @@ test('does not send an empty message', async ({ app, timeline, scratchRoom, sign
   await signIn();
   await app.openRoom(scratchRoom.roomId);
   await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
-  await app.composer.fill(`Only message ${String(Date.now())}`);
+  const body = `Only message ${String(Date.now())}`;
+  await app.composer.fill(body);
   await app.composer.press('Enter');
-  await expect.poll(() => timeline.items.count()).toBe(1);
+  await timeline.expectMessageSettled(body);
   const newest = await timeline.items.last().innerText();
 
   await app.composer.press('Enter');

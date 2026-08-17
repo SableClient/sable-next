@@ -20,6 +20,9 @@ export function nextScrollMode(
   }
 
   if (current.kind === 'initialLive') {
+    // The landing scrolls to the end and reschedules itself until it settles, so
+    // without this a reader who scrolls up during it is dragged back every frame.
+    if (signals.userDroveLastScroll && !signals.nearLatest) return { kind: 'readingHistory' };
     return signals.initialLandingComplete ? { kind: 'followingLive' } : current;
   }
 
