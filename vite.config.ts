@@ -13,9 +13,11 @@ export default defineConfig({
     watch: {
       ignored: (path) => {
         const file = isAbsolute(path) ? relative(process.cwd(), path) : path;
-        return (
-          Boolean(file) && file !== 'src' && !file.startsWith('src/') && file !== 'vite.config.ts'
-        );
+        if (!file) return false;
+        // A build rewrites these, and the reload it triggers cannot help anyway:
+        // the SharedWorker holding the old wasm outlives it.
+        if (file === 'src/generated/wasm' || file.startsWith('src/generated/wasm/')) return true;
+        return file !== 'src' && !file.startsWith('src/') && file !== 'vite.config.ts';
       },
     },
   },
