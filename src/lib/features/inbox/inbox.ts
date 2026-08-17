@@ -6,8 +6,6 @@ export function parseFilter(value: string | null): NotificationFilter {
   return value === 'mentions' || value === 'direct' ? value : 'all';
 }
 
-/** A chat counts every message; a room only counts what named us. The sidebar
-    badge reads the same rule, so the two never disagree. */
 export function notificationCount(room: RoomSummary): number {
   return room.is_direct ? room.unread : room.highlight;
 }
@@ -53,8 +51,6 @@ export function inviter(room: RoomSummary): string | null {
   return room.latest_event?.sender ?? null;
 }
 
-/** No member list is loaded for a summary, so the localpart is the best name
-    the inbox can give a sender or an inviter. */
 export function senderName(userId: string): string {
   return userId.startsWith('@') ? (userId.slice(1).split(':')[0] ?? userId) : userId;
 }

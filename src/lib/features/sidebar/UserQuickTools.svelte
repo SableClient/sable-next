@@ -25,7 +25,6 @@
   let { mobile = false, compact = false, onNavigate }: Props = $props();
   const roomList = useRoomList();
 
-  // What the inbox itself would show, so the badge and the page agree.
   let inboxCount = $derived(countNotifications(roomList.rooms) + countInvites(roomList.rooms));
   let badgeText = $derived(inboxCount > 99 ? '99+' : String(inboxCount));
 

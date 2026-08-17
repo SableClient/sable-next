@@ -42,7 +42,6 @@
     return room.name ?? room.room_id;
   }
 
-  /** In a chat the sender is the room, so naming them again reads as noise. */
   function preview(room: RoomSummary): string | null {
     const latest = room.latest_event;
     if (!latest) return null;
@@ -55,7 +54,6 @@
     return sameDay ? formatTime(timestamp) : formatDate(timestamp);
   }
 
-  // The receipt clears the counts, and the room list pushes the row out.
   async function markRead(room: RoomSummary, eventId: string): Promise<void> {
     if (marking.has(room.room_id)) return;
     marking.add(room.room_id);

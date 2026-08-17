@@ -25,9 +25,7 @@ for (const { link, path } of RAIL_DESTINATIONS) {
   });
 }
 
-// The mobile drawer opens on the room list for the routes whose index it is,
-// and on the page itself everywhere else. aria-pressed on the panel toggle is
-// which panel is showing.
+// aria-pressed on the panel toggle is which panel is showing.
 const MOBILE_DESTINATIONS = [
   { path: '/explore', heading: 'Join with address' },
   { path: '/create-room', heading: 'Create a room' },
@@ -59,8 +57,7 @@ test('opens the chats list first, and reaches the new-chat form from there', asy
   const showConversation = page.getByRole('button', { name: 'Show conversation' });
   await expect(showConversation).toHaveAttribute('aria-pressed', 'true');
 
-  // The toggle is clipped out of the viewport for sighted users; a pointer
-  // cannot reach it, and swiping is what it stands in for.
+  // Clipped out of the viewport, so a pointer cannot reach it.
   await showConversation.focus();
   await page.keyboard.press('Enter');
 

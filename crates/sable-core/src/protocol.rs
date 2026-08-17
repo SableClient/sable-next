@@ -1341,8 +1341,6 @@ pub struct LatestEventView {
     #[ts(type = "number | null")]
     pub timestamp: Option<u64>,
     pub sending: bool,
-    /// What a read receipt would point at. `null` for an invitation and for an
-    /// echo the server has not accepted yet, neither of which can be read.
     #[ts(type = "string | null")]
     pub event_id: Option<OwnedEventId>,
 }

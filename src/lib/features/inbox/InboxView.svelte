@@ -9,7 +9,6 @@
 
   let filter = $derived(parseFilter(page.url.searchParams.get('filter')));
 
-  /** In the URL, so a filtered inbox is linkable and survives a reload. */
   function selectFilter(value: NotificationFilter): void {
     const url = new URL(page.url);
     if (value === 'all') url.searchParams.delete('filter');

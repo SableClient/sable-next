@@ -132,7 +132,6 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
             event_id: event.event_id(),
         }),
 
-        // The invite's own membership event is not something to read.
         LatestEventValue::RemoteInvite {
             timestamp, inviter, ..
         } => Some(LatestEventView {

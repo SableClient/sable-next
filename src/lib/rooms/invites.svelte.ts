@@ -7,8 +7,6 @@ import { resolve } from '$app/paths';
 import type { CoreClient } from '$lib/core/client.svelte';
 import { roomPathParamFromId } from '$lib/rooms/room-list.svelte';
 
-/** The sidebar and the inbox both answer invitations, and both need the same
-    in-flight guard, so the guard lives with the actions. */
 export class InviteActions {
   /** Rendered from, so the set has to be reactive. */
   private readonly answering = new SvelteSet<string>();
