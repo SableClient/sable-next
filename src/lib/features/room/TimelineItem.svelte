@@ -665,6 +665,15 @@
       padding-inline: calc(var(--page-gutter) - 4px) var(--page-gutter);
     }
 
+    /* The rule above resets the whole shorthand, and a collapsed row still
+       owes the avatar gutter. */
+    .message.collapsed.mention-silent,
+    .message.collapsed.mention-loud {
+      padding-left: calc(
+        var(--page-gutter) - 4px + var(--avatar-size-small) + var(--timeline-row-gap)
+      );
+    }
+
     .message:hover {
       background-color: var(--sable-surface-container-hover);
     }

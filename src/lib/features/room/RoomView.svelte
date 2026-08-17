@@ -141,10 +141,12 @@
     for (const item of timeline.items) {
       const reply = item.in_reply_to;
       if (!reply || reply.body !== null) continue;
-      if (requestedDetails.has(reply.event_id)) continue;
+      // Asked for by the id of the reply, not of the event it replies to.
+      const eventId = item.event_id;
+      if (eventId === null || requestedDetails.has(eventId)) continue;
 
-      requestedDetails.add(reply.event_id);
-      void core.fetchEventDetails(activeRoomId, reply.event_id).catch((error: unknown) => {
+      requestedDetails.add(eventId);
+      void core.fetchEventDetails(activeRoomId, eventId).catch((error: unknown) => {
         console.debug('[sable room] reply details unavailable', error);
       });
     }
