@@ -369,12 +369,14 @@ export class CoreClient {
 
   async subscribeTimeline(
     roomId: string,
-    eventId: string | null = null
+    eventId: string | null = null,
+    hiddenEvents = false
   ): Promise<{ subscription: SubscriptionId; items: TimelineItemView[] }> {
     const response = await this.ensureTransport().send({
       type: 'subscribe_timeline',
       room_id: roomId,
       event_id: eventId,
+      hidden_events: hiddenEvents,
     });
     return response;
   }

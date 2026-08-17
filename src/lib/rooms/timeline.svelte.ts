@@ -20,9 +20,14 @@ export class ActiveRoomTimeline {
     this.timeline = new RoomTimeline(core);
   }
 
-  async start(owner: symbol, roomId: string, eventId: string | null): Promise<void> {
+  async start(
+    owner: symbol,
+    roomId: string,
+    eventId: string | null,
+    hiddenEvents = false
+  ): Promise<void> {
     this.owner = owner;
-    await this.timeline.start(roomId, eventId);
+    await this.timeline.start(roomId, eventId, hiddenEvents);
   }
 
   stop(owner: symbol): Promise<void> {
@@ -50,7 +55,7 @@ export class RoomTimeline {
   mode = $state<TimelineMode>({ kind: 'live' });
 
   private subscription: SubscriptionId | null = null;
-  private target: { roomId: string; eventId: string | null } | null = null;
+  private target: { roomId: string; eventId: string | null; hiddenEvents: boolean } | null = null;
   private unsubscribeEvents: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private unsubscribePromise = Promise.resolve();
@@ -65,9 +70,13 @@ export class RoomTimeline {
   private backwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(private readonly core: CoreClient) {}
 
-  async start(roomId: string, eventId: string | null = null): Promise<void> {
-    const target = { roomId, eventId };
-    if (this.target?.roomId === roomId && this.target.eventId === eventId) {
+  async start(roomId: string, eventId: string | null = null, hiddenEvents = false): Promise<void> {
+    const target = { roomId, eventId, hiddenEvents };
+    if (
+      this.target?.roomId === roomId &&
+      this.target.eventId === eventId &&
+      this.target.hiddenEvents === hiddenEvents
+    ) {
       if (this.subscription !== null) return;
       if (this.startPromise) return this.startPromise;
     }
@@ -82,7 +91,7 @@ export class RoomTimeline {
     this.mode = eventId === null ? { kind: 'live' } : { kind: 'focused', eventId };
     this.loading = true;
     this.error = null;
-    const promise = this.startSubscription(roomId, eventId);
+    const promise = this.startSubscription(roomId, eventId, hiddenEvents);
     this.startPromise = promise;
 
     try {
@@ -207,7 +216,11 @@ export class RoomTimeline {
     return this.unsubscribePromise;
   }
 
-  private async startSubscription(roomId: string, eventId: string | null): Promise<void> {
+  private async startSubscription(
+    roomId: string,
+    eventId: string | null,
+    hiddenEvents: boolean
+  ): Promise<void> {
     const session = this.session;
     this.state = 'pending';
     const stopEvents = this.core.subscribeEvents((event) => {
@@ -240,7 +253,7 @@ export class RoomTimeline {
 
     let response;
     try {
-      response = await this.core.subscribeTimeline(roomId, eventId);
+      response = await this.core.subscribeTimeline(roomId, eventId, hiddenEvents);
     } catch (error) {
       stopEvents();
       this.state = 'stopped';

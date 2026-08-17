@@ -28,4 +28,13 @@ event_type: string, state_key: string,
  * Raw content, for the developer-only peek. Absent if the event's
  * JSON is no longer around.
  */
+content: unknown, } | { "kind": "hidden_event", 
+/**
+ * e.g. `m.key.verification.start`.
+ */
+event_type: string, 
+/**
+ * Raw content, for the developer-only peek. Absent if the event's
+ * JSON is no longer around.
+ */
 content: unknown, } | { "kind": "date_divider", timestamp: number, } | { "kind": "read_marker" } | { "kind": "timeline_start" } | { "kind": "unsupported", description: string, };

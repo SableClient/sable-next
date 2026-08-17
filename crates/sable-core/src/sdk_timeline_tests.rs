@@ -2,7 +2,14 @@ use std::{sync::Arc, time::Duration};
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::{
-    ruma::{event_id, events::room::message::RoomMessageEventContent, room_id},
+    ruma::{
+        event_id,
+        events::{
+            key::verification::done::KeyVerificationDoneEventContent, relation::Reference,
+            room::message::RoomMessageEventContent,
+        },
+        room_id,
+    },
     send_queue::RoomSendQueueUpdate,
     test_utils::mocks::{
         MatrixMockServer, RoomContextResponseTemplate, RoomMessagesResponseTemplate,
@@ -77,7 +84,7 @@ async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
                 .add_timeline_event(factory.text_msg("old").event_id(event_id!("$old"))),
         )
         .await;
-    let timeline = build_room_timeline(&room, None).await.unwrap();
+    let timeline = build_room_timeline(&room, None, false).await.unwrap();
     let (_, mut stream) = timeline.subscribe().await;
 
     server
@@ -115,7 +122,7 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
                 .add_timeline_event(factory.text_msg("latest").event_id(event_id!("$latest"))),
         )
         .await;
-    let timeline = build_room_timeline(&room, None).await.unwrap();
+    let timeline = build_room_timeline(&room, None, false).await.unwrap();
 
     server
         .mock_room_messages()
@@ -128,6 +135,42 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
 
     timeline.paginate_backwards(10).await.unwrap();
     assert_eq!(event_ids(timeline.items().await), ["$older", "$latest"]);
+}
+
+#[tokio::test]
+async fn hidden_events_admit_only_events_the_sdk_can_render() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!hidden:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let target = event_id!("$target");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("target").event_id(target))
+                .add_timeline_event(factory.reaction(target, "👍").event_id(event_id!("$react")))
+                .add_timeline_event(
+                    factory
+                        .text_msg("edited")
+                        .edit(target, RoomMessageEventContent::text_plain("edited").into())
+                        .event_id(event_id!("$edit")),
+                )
+                .add_timeline_event(
+                    factory
+                        .event(KeyVerificationDoneEventContent::new(Reference::new(
+                            target.to_owned(),
+                        )))
+                        .event_id(event_id!("$done")),
+                ),
+        )
+        .await;
+    let timeline = build_room_timeline(&room, None, true).await.unwrap();
+
+    assert_eq!(event_ids(timeline.items().await), ["$target", "$done"]);
 }
 
 #[tokio::test]
@@ -211,7 +254,7 @@ async fn permalink_timeline_loads_and_contains_its_target() {
         .mount()
         .await;
 
-    let timeline = build_room_timeline(&room, Some(target.to_owned()))
+    let timeline = build_room_timeline(&room, Some(target.to_owned()), false)
         .await
         .unwrap();
     assert_eq!(event_ids(timeline.items().await), [target.as_str()]);
@@ -245,6 +288,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
         .dispatch(Command::SubscribeTimeline {
             room_id: first_room_id.to_owned(),
             event_id: None,
+            hidden_events: false,
         })
         .await
         .unwrap()
@@ -258,6 +302,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
         .dispatch(Command::SubscribeTimeline {
             room_id: second_room_id.to_owned(),
             event_id: None,
+            hidden_events: false,
         })
         .await
         .unwrap()
@@ -307,6 +352,7 @@ async fn live_timeline_reports_its_back_pagination_status() {
         .dispatch(Command::SubscribeTimeline {
             room_id: room_id.to_owned(),
             event_id: None,
+            hidden_events: false,
         })
         .await
         .unwrap()
@@ -390,7 +436,7 @@ async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = client.get_room(room_id).expect("subscribed room");
-    let timeline = build_room_timeline(&room, None).await.unwrap();
+    let timeline = build_room_timeline(&room, None, false).await.unwrap();
     let (_, mut timeline_stream) = timeline.subscribe().await;
 
     let second_response = Mock::given(method("POST"))
@@ -450,6 +496,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
     core.dispatch(Command::SubscribeTimeline {
         room_id: room_id.to_owned(),
         event_id: None,
+        hidden_events: false,
     })
     .await
     .unwrap();

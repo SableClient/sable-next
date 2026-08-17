@@ -65,6 +65,10 @@ pub enum Command {
         room_id: OwnedRoomId,
         #[ts(type = "string | null")]
         event_id: Option<OwnedEventId>,
+        /// Relaxes the event filter so events the SDK would otherwise drop
+        /// arrive as `HiddenEvent`. Baked into the timeline, so flipping it
+        /// means re-subscribing.
+        hidden_events: bool,
     },
     Unsubscribe {
         subscription: SubscriptionId,
@@ -1233,6 +1237,17 @@ pub enum TimelineItemContentView {
         /// e.g. `m.room.topic`.
         event_type: String,
         state_key: String,
+        /// Raw content, for the developer-only peek. Absent if the event's
+        /// JSON is no longer around.
+        #[ts(type = "unknown")]
+        content: Option<serde_json::Value>,
+    },
+    /// A message-like event the SDK has no item for. Only ever reaches the UI
+    /// when the timeline was built with hidden events on; the default filter
+    /// drops these.
+    HiddenEvent {
+        /// e.g. `m.key.verification.start`.
+        event_type: String,
         /// Raw content, for the developer-only peek. Absent if the event's
         /// JSON is no longer around.
         #[ts(type = "unknown")]

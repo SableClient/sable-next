@@ -99,8 +99,14 @@ macro_rules! dispatch_commands {
 
             Command::SubscribeRoomList => $self.subscribe_room_list().await,
 
-            Command::SubscribeTimeline { room_id, event_id } => {
-                $self.subscribe_timeline(room_id, event_id).await
+            Command::SubscribeTimeline {
+                room_id,
+                event_id,
+                hidden_events,
+            } => {
+                $self
+                    .subscribe_timeline(room_id, event_id, hidden_events)
+                    .await
             }
 
             Command::Unsubscribe { subscription } => {

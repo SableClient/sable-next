@@ -44,6 +44,7 @@ function isVisibleEvent(
     case 'redacted':
       return preferences.showTombstoneEvents;
     case 'state_event':
+    case 'hidden_event':
       return preferences.showHiddenEvents && preferences.showNonStandardEvents;
     default:
       return true;
@@ -103,7 +104,7 @@ export function personasByEventId(
   return personas;
 }
 
-const FOLDABLE_KINDS = new Set(['membership', 'profile_change', 'state_event']);
+const FOLDABLE_KINDS = new Set(['membership', 'profile_change', 'state_event', 'hidden_event']);
 const FOLD_MIN_RUN = 3;
 export const FOLD_SUMMARY_COUNT = 2;
 

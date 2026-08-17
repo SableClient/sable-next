@@ -490,12 +490,12 @@
     <span class="state-rail" aria-hidden="true"></span>
     {stateEventText(item, $i18n.t)}
   </p>
-{:else if item.content.kind === 'state_event'}
+{:else if item.content.kind === 'state_event' || item.content.kind === 'hidden_event'}
   {@const raw = item.content.content}
   <div class="debug-event">
     <code>{item.content.event_type}</code>
     <div class="debug-body">
-      <span>{$i18n.t('timeline.stateEvent', { type: item.content.event_type })}</span>
+      <span>{stateEventText(item, $i18n.t)}</span>
       {#if raw !== null}
         <Collapsible.Root bind:open={peekOpen}>
           <Collapsible.Trigger class="debug-peek-trigger">

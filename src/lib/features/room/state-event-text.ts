@@ -20,6 +20,8 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
     }
     case 'state_event':
       return t('timeline.stateEvent', { type: content.event_type });
+    case 'hidden_event':
+      return t('timeline.hiddenEvent', { type: content.event_type });
     case 'unsupported':
       return t('timeline.unsupported', { description: content.description });
     default:

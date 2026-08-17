@@ -712,7 +712,10 @@ fn content(
             }
             MsgLikeKind::Poll(_) => unsupported("poll"),
             MsgLikeKind::LiveLocation(_) => unsupported("live location"),
-            MsgLikeKind::Other(_) => unsupported("message-like event"),
+            MsgLikeKind::Other(other) => TimelineItemContentView::HiddenEvent {
+                event_type: other.event_type().to_string(),
+                content: raw.cloned(),
+            },
         },
 
         TimelineItemContent::MembershipChange(change) => TimelineItemContentView::Membership {
