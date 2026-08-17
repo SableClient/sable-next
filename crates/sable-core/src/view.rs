@@ -129,8 +129,10 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
             body: remote_preview(&event)?,
             timestamp: event.timestamp().map(|at| at.0.into()),
             sending: false,
+            event_id: event.event_id(),
         }),
 
+        // The invite's own membership event is not something to read.
         LatestEventValue::RemoteInvite {
             timestamp, inviter, ..
         } => Some(LatestEventView {
@@ -138,6 +140,7 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
             body: "invited you".to_owned(),
             timestamp: Some(timestamp.0.into()),
             sending: false,
+            event_id: None,
         }),
 
         // `LocalHasBeenSent` is accepted already. These two are pending.
@@ -147,14 +150,16 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
                 body: local_preview(&local)?,
                 timestamp: Some(local.timestamp.0.into()),
                 sending: true,
+                event_id: None,
             })
         }
 
-        LatestEventValue::LocalHasBeenSent { value, .. } => Some(LatestEventView {
+        LatestEventValue::LocalHasBeenSent { value, event_id } => Some(LatestEventView {
             sender: None,
             body: local_preview(&value)?,
             timestamp: Some(value.timestamp.0.into()),
             sending: false,
+            event_id: Some(event_id),
         }),
     }
 }

@@ -52,4 +52,10 @@ test('the signed-in surfaces have no accessibility violations', async ({
 
   await expect(page.getByRole('main')).toHaveCount(1);
   expect(await violations(page)).toEqual([]);
+
+  await app.openInbox();
+  await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
+
+  await expect(page.getByRole('main')).toHaveCount(1);
+  expect(await violations(page)).toEqual([]);
 });

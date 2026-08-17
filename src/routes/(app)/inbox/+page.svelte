@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RoutePlaceholder from '$lib/ui/RoutePlaceholder.svelte';
+  import InboxView from '$lib/features/inbox/InboxView.svelte';
 </script>
 
-<RoutePlaceholder titleKey="nav.inbox" />
+<InboxView />

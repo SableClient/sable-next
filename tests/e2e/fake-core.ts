@@ -56,9 +56,32 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       space_children: [],
       unread: 2,
       highlight: 1,
-      latest_event: null,
+      latest_event: {
+        sender: '@alice:example.test',
+        body: 'General message 19',
+        timestamp: 1_700_000_000_019,
+        sending: false,
+        event_id: '$general-19:example.test' as string | null,
+      },
     };
     const secondRoom = { ...room, room_id: '!second:example.test', name: 'Random' };
+    // An invitation the inbox and the sidebar both have to render.
+    const invitedRoom = {
+      ...room,
+      room_id: '!invited:example.test',
+      name: 'Design crew',
+      topic: 'Where the redesign happens.',
+      state: 'invited',
+      unread: 0,
+      highlight: 0,
+      latest_event: {
+        sender: '@ada:example.test',
+        body: 'invited you',
+        timestamp: 1_700_000_000_000,
+        sending: false,
+        event_id: null,
+      },
+    };
     const timelineItems = (roomName: string) =>
       Array.from({ length: 20 }, (_, index) => ({
         id: `${roomName.toLowerCase()}-${String(index)}`,
@@ -86,6 +109,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     const rooms = new Map([
       [room.room_id, room],
       [secondRoom.room_id, secondRoom],
+      [invitedRoom.room_id, invitedRoom],
     ]);
     let nextSubscription = 2;
     const subscriptions = new Map<number, { roomId: string; page: number }>();
@@ -144,7 +168,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                         ? {
                             type: 'subscribe_room_list',
                             subscription: 1,
-                            rooms: [room, secondRoom],
+                            rooms: [room, secondRoom, invitedRoom],
                           }
                         : command === 'subscribe_timeline'
                           ? (() => {

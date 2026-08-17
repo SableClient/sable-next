@@ -6,6 +6,8 @@
     defaultSettingsSection,
     openSettingsOver,
   } from '$lib/features/settings/settings-navigation';
+  import { countInvites, countNotifications } from '$lib/features/inbox/inbox';
+  import { useRoomList } from '$lib/rooms/room-list.svelte';
   import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
@@ -21,6 +23,11 @@
   }
 
   let { mobile = false, compact = false, onNavigate }: Props = $props();
+  const roomList = useRoomList();
+
+  // What the inbox itself would show, so the badge and the page agree.
+  let inboxCount = $derived(countNotifications(roomList.rooms) + countInvites(roomList.rooms));
+  let badgeText = $derived(inboxCount > 99 ? '99+' : String(inboxCount));
 
   const mobileTools = [
     { href: '/home', icon: ChatsIcon, label: 'nav.messages' },
@@ -43,6 +50,12 @@
     }
 
     onNavigate?.(href);
+  }
+
+  /** The badge is decorative, so the count has to reach the accessible name. */
+  function toolLabel(item: { href: string; label: string }): string {
+    if (item.href !== '/inbox' || inboxCount === 0) return $i18n.t(item.label);
+    return $i18n.t('inbox.navLabel', { count: inboxCount });
   }
 
   function isToolActive(href: string): boolean {
@@ -74,12 +87,15 @@
           onclick={(event) => {
             activateTool(event, item.href);
           }}
-          aria-label={$i18n.t(item.label)}
+          aria-label={toolLabel(item)}
           aria-current={toolActive ? 'page' : undefined}
         >
           <span class="mobile-icon" aria-hidden="true"
             ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
           >
+          {#if item.href === '/inbox' && inboxCount > 0}
+            <span class="tool-badge" aria-hidden="true">{badgeText}</span>
+          {/if}
         </a>
       </div>
     {/each}
@@ -100,10 +116,13 @@
           onclick={(event) => {
             activateTool(event, item.href);
           }}
-          aria-label={$i18n.t(item.label)}
+          aria-label={toolLabel(item)}
           aria-current={toolActive ? 'page' : undefined}
         >
           <span aria-hidden="true"><item.icon weight={toolActive ? 'fill' : 'regular'} /></span>
+          {#if item.href === '/inbox' && inboxCount > 0}
+            <span class="tool-badge" aria-hidden="true">{badgeText}</span>
+          {/if}
         </a>
       {/snippet}
       <Tooltip label={$i18n.t(item.label)} side="right" {trigger} />
@@ -125,10 +144,13 @@
             onclick={(event) => {
               activateTool(event, item.href);
             }}
-            aria-label={$i18n.t(item.label)}
+            aria-label={toolLabel(item)}
             aria-current={toolActive ? 'page' : undefined}
           >
             <span aria-hidden="true"><item.icon weight={toolActive ? 'fill' : 'regular'} /></span>
+            {#if item.href === '/inbox' && inboxCount > 0}
+              <span class="tool-badge" aria-hidden="true">{badgeText}</span>
+            {/if}
           </a>
         {/snippet}
         <Tooltip label={$i18n.t(item.label)} {trigger} />
@@ -138,6 +160,25 @@
 {/if}
 
 <style>
+  .quick-tool {
+    position: relative;
+  }
+
+  .tool-badge {
+    background: var(--sable-primary-main);
+    border-radius: var(--radius-pill);
+    color: var(--sable-primary-on-main);
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1rem;
+    min-width: 1rem;
+    padding: 0 0.1875rem;
+    position: absolute;
+    right: 0.125rem;
+    text-align: center;
+    top: 0.125rem;
+  }
+
   .desktop-tools {
     align-items: center;
     background: var(--sable-surface-container);

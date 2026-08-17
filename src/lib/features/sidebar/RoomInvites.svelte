@@ -1,14 +1,11 @@
 <script lang="ts">
-  import type { RoomSummary } from '@/generated/RoomSummary';
-  import { SvelteSet } from 'svelte/reactivity';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
+  import { InviteActions } from '$lib/rooms/invites.svelte';
+  import { useRoomList } from '$lib/rooms/room-list.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
   import MediaImage from '$lib/ui/MediaImage.svelte';
 
@@ -17,43 +14,13 @@
   }
 
   let { collapsed = false }: Props = $props();
-  const core = useCoreClient();
   const roomList = useRoomList();
-  const answering = new SvelteSet<string>();
+  const answers = new InviteActions(useCoreClient());
 
   let invites = $derived(roomList.rooms.filter((room) => room.state === 'invited'));
 
   function initial(name: string): string {
     return name.slice(0, 1).toUpperCase();
-  }
-
-  async function accept(room: RoomSummary): Promise<void> {
-    if (answering.has(room.room_id)) return;
-    answering.add(room.room_id);
-    try {
-      const roomId = await core.joinRoom(room.room_id);
-      await goto(
-        room.is_space
-          ? resolve('/(app)/space/[spaceId]', { spaceId: roomPathParamFromId(roomId) })
-          : resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(roomId) })
-      );
-    } catch (error) {
-      console.warn('[sable room] accepting the invitation failed', error);
-    } finally {
-      answering.delete(room.room_id);
-    }
-  }
-
-  async function decline(room: RoomSummary): Promise<void> {
-    if (answering.has(room.room_id)) return;
-    answering.add(room.room_id);
-    try {
-      await core.leaveRoom(room.room_id);
-    } catch (error) {
-      console.warn('[sable room] declining the invitation failed', error);
-    } finally {
-      answering.delete(room.room_id);
-    }
   }
 </script>
 
@@ -63,7 +30,7 @@
     <ul>
       {#each invites as invite (invite.room_id)}
         {@const name = invite.name ?? invite.room_id}
-        {@const busy = answering.has(invite.room_id)}
+        {@const busy = answers.isAnswering(invite.room_id)}
         <li>
           <span class="invite-icon" aria-hidden="true">
             {#if invite.avatar_url}
@@ -85,7 +52,7 @@
             disabled={busy}
             label={$i18n.t('room.inviteAccept')}
             onclick={() => {
-              void accept(invite);
+              void answers.accept(invite);
             }}
           >
             <CheckIcon />
@@ -96,7 +63,7 @@
             disabled={busy}
             label={$i18n.t('room.inviteDecline')}
             onclick={() => {
-              void decline(invite);
+              void answers.decline(invite);
             }}
           >
             <XIcon />

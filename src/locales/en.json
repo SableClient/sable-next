@@ -35,6 +35,20 @@
     "roomOptions": "Room options",
     "createRoomInSpace": "Create room in space"
   },
+  "inbox": {
+    "notifications": "Notifications",
+    "invites": "Pending invites",
+    "navLabel": "Inbox, {{count}} waiting",
+    "filterLabel": "Filter notifications",
+    "filterAll": "All",
+    "filterMentions": "Mentions",
+    "filterDirect": "Chats",
+    "notificationsEmpty": "Nothing is waiting for you. Unread mentions and messages will show up here.",
+    "markRead": "Mark {{room}} as read",
+    "invitedBy": "Invited by {{name}}",
+    "inviteEncrypted": "Encrypted",
+    "inviteSpace": "Space"
+  },
   "room": {
     "createTitle": "Create a room",
     "createDescription": "Rooms hold a conversation. A space holds rooms.",

@@ -24,23 +24,23 @@
   let dragging = $state(false);
   let gesture: Gesture | undefined;
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  // A room route is enough to render its timeline; room-list hydration must not flash the sidebar.
-  let roomId = $derived(page.params.roomId);
-  let canShowConversation = $derived(Boolean(roomId));
-  let open = $derived(!roomId);
+  /** Routes whose own index is the room list. Anywhere else the list would
+      hide the page that was asked for behind an inert panel. Keyed on the path
+      so room-list hydration cannot flash the sidebar over a room. */
+  const LIST_INDEX_PATHS = new Set(['/home', '/direct']);
+  let pathname = $derived(page.url.pathname);
+  let open = $derived(LIST_INDEX_PATHS.has(pathname) || /^\/space\/[^/]+$/.test(pathname));
 
   // Navigating out from under a drag would otherwise leave the track pinned at
   // the gesture's last offset.
   $effect(() => {
-    void roomId;
+    void pathname;
     position = undefined;
     dragging = false;
     gesture = undefined;
   });
 
   function handleTouchStart(event: TouchEvent) {
-    if (!canShowConversation) return;
-
     const target = event.currentTarget;
     if (!(target instanceof HTMLDivElement)) return;
 
@@ -67,7 +67,7 @@
   function finishGesture(cancelled: boolean) {
     const activeGesture = gesture;
     gesture = undefined;
-    if (!activeGesture || activeGesture.mode !== 'horizontal' || !canShowConversation) {
+    if (!activeGesture || activeGesture.mode !== 'horizontal') {
       dragging = false;
       position = undefined;
       return;
@@ -91,7 +91,6 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'ArrowLeft') {
-      if (!canShowConversation) return;
       event.preventDefault();
       open = false;
     } else if (event.key === 'ArrowRight') {
@@ -119,10 +118,8 @@
     type="button"
     aria-label={open ? $i18n.t('nav.showConversation') : $i18n.t('nav.showRoomList')}
     aria-pressed={open}
-    disabled={!canShowConversation}
     aria-describedby="drawer-instructions"
     onclick={() => {
-      if (!canShowConversation) return;
       open = !open;
     }}
     onkeydown={handleKeydown}

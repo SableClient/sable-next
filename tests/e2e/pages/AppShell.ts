@@ -36,6 +36,10 @@ export class AppShell {
     await this.page.goto('/home');
   }
 
+  async openInbox(): Promise<void> {
+    await this.page.goto('/inbox');
+  }
+
   async openCreateRoom(): Promise<void> {
     await this.page.goto('/create-room');
   }
