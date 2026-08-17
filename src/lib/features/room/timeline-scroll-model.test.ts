@@ -72,8 +72,7 @@ describe('scroll mode policy', () => {
         for (const step of steps) {
           const next = nextScrollMode(mode, step);
           if (mode.kind === 'initialLive' && next.kind !== 'initialLive') {
-            // A permalink, a completed landing, or the reader scrolling away
-            // from the end, which the landing must not fight.
+            // Only a permalink, a completed landing, or the reader leaving the end.
             expect(
               step.initialLandingComplete ||
                 step.focusTarget !== null ||
