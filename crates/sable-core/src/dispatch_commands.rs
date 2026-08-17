@@ -577,6 +577,73 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::SetTyping)
             }
 
+            Command::NotificationSettings { room_id } => {
+                let room = $self.room(&room_id).await?;
+
+                Ok(CommandOk::NotificationSettings(
+                    notifications::settings(&room).await,
+                ))
+            }
+
+            Command::DefaultNotificationModes => {
+                let (direct, group) = notifications::default_modes(&$self.client().await?).await;
+
+                Ok(CommandOk::DefaultNotificationModes { direct, group })
+            }
+
+            Command::SetPusher { pusher } => {
+                notifications::set_pusher(&$self.client().await?, pusher)
+                    .await
+                    .map_err(|error| $self.failed("set_pusher", error))?;
+
+                Ok(CommandOk::SetPusher)
+            }
+
+            Command::RemovePusher { pushkey, app_id } => {
+                notifications::remove_pusher(&$self.client().await?, pushkey, app_id)
+                    .await
+                    .map_err(|error| $self.failed("remove_pusher", error))?;
+
+                Ok(CommandOk::RemovePusher)
+            }
+
+            Command::SetNotificationContent { visible } => {
+                $self
+                    .notification_content
+                    .store(visible, Ordering::Relaxed);
+
+                Ok(CommandOk::SetNotificationContent)
+            }
+
+            Command::SetRoomNotificationMode { room_id, mode } => {
+                let room = $self.room(&room_id).await?;
+                notifications::set_room_mode(&room, mode)
+                    .await
+                    .map_err(|error| $self.failed("set_room_notification_mode", error))?;
+
+                Ok(CommandOk::SetRoomNotificationMode)
+            }
+
+            Command::SetDefaultNotificationMode { direct, mode } => {
+                notifications::set_default_mode(&$self.client().await?, direct, mode)
+                    .await
+                    .map_err(|error| $self.failed("set_default_notification_mode", error))?;
+
+                Ok(CommandOk::SetDefaultNotificationMode)
+            }
+
+            Command::Notification { room_id, event_id } => {
+                let client = $self.client().await?;
+                let setup = NotificationProcessSetup::SingleProcess {
+                    sync_service: $self.sync_service().await?,
+                };
+
+                Ok(CommandOk::Notification {
+                    notification: notifications::notification(&client, setup, &room_id, &event_id)
+                        .await,
+                })
+            }
+
             Command::SetRoomTag { room_id, tag, set } => {
                 let room = $self.room(&room_id).await?;
                 let name = match tag {

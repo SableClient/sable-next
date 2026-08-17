@@ -15,7 +15,7 @@
     "test:e2e": "playwright test",
     "prepare": "svelte-kit sync || echo ''; mise exec -- lefthook install",
     "check:theme": "node scripts/check-theme-tokens.mjs",
-    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p tsconfig.service-worker.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --watch",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",

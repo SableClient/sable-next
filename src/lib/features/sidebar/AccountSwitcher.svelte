@@ -3,6 +3,7 @@
   import { resolve } from '$app/paths';
   import type { ProfileView } from '@/generated/ProfileView';
   import { useCoreClient } from '$lib/core/context';
+  import { dropPushSubscription } from '$lib/features/notifications/web-push';
   import { i18n } from '$lib/i18n';
   import { DropdownMenu } from 'bits-ui';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
@@ -63,8 +64,12 @@
     void goto(resolve('/profile'));
   }
 
+  // The pusher goes first: once the session ends there is no way to tell the
+  // homeserver to stop pushing to this browser.
   function logout(): void {
-    void core.logout();
+    void dropPushSubscription(core)
+      .catch(() => {})
+      .finally(() => void core.logout());
   }
 </script>
 

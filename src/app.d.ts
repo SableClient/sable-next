@@ -17,6 +17,10 @@ declare global {
     readonly VITE_SENTRY_DSN?: string;
     readonly VITE_SENTRY_ENVIRONMENT?: string;
     readonly VITE_APP_VERSION?: string;
+    /** All three absent leaves web push unregistered. */
+    readonly VITE_PUSH_GATEWAY_URL?: string;
+    readonly VITE_PUSH_WEB_APP_ID?: string;
+    readonly VITE_PUSH_VAPID_KEY?: string;
   }
 }
 

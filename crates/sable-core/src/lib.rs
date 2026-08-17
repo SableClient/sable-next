@@ -2,6 +2,7 @@
 
 pub mod image_packs;
 pub mod matrix_html;
+pub mod notifications;
 pub mod protocol;
 mod registration;
 pub mod session;
@@ -13,7 +14,7 @@ use std::{
     fmt::Display,
     sync::{
         Arc,
-        atomic::{AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
 };
 
@@ -335,6 +336,8 @@ fn profile_view(user_id: OwnedUserId, response: &ProfileResponse) -> ProfileView
 include!("dispatch_commands.rs");
 
 use image_packs::{EmoteRooms, PackContent, RoomPackEvent};
+use matrix_sdk::ruma::push::Action;
+use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 use protocol::{
     AnimalIdentityView, AuthIntent, BrightnessView, Command, CommandErr, CommandOk, CoreEvent,
     EmojiView, EncryptionStatusView, ImagePackOriginView, ImagePackView, JoinRuleView,
@@ -520,6 +523,7 @@ pub struct Core {
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscription_lock: Mutex<()>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
+    notification_content: AtomicBool,
 }
 
 enum PendingLogin {
@@ -550,6 +554,7 @@ impl Core {
             store_id: store_id.into(),
             sessions,
             events,
+            notification_content: AtomicBool::new(false),
             next_subscription: AtomicU32::new(1),
             next_log_id: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
@@ -567,6 +572,11 @@ impl Core {
             timelines: Mutex::new(HashMap::new()),
         });
         (core, rx)
+    }
+
+    #[must_use]
+    pub fn notification_content(&self) -> bool {
+        self.notification_content.load(Ordering::Relaxed)
     }
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.
@@ -1575,6 +1585,8 @@ impl Core {
 
         self.watch_session_changes(&client, generation);
         self.watch_encryption(&client, generation);
+        self.watch_notifications(&client, generation);
+        self.watch_notification_settings(&client, generation);
         self.watch_send_queue(&client);
 
         client
@@ -1654,6 +1666,52 @@ impl Core {
                     ))
                     .await;
                     queue.set_enabled(true).await;
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    fn watch_notifications(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+        client.add_event_handler({
+            let core = self.clone();
+            move |event: OriginalSyncRoomMessageEvent,
+                  room: matrix_sdk::Room,
+                  client: matrix_sdk::Client,
+                  actions: Vec<Action>| {
+                let core = core.clone();
+
+                async move {
+                    if Some(event.sender.as_ref()) == client.user_id() {
+                        return;
+                    }
+                    if !notifications::notifies(&actions) {
+                        return;
+                    }
+
+                    let Ok(sync_service) = core.sync_service().await else {
+                        return;
+                    };
+                    let setup = NotificationProcessSetup::SingleProcess { sync_service };
+                    if let Some(notification) =
+                        notifications::notification(&client, setup, room.room_id(), &event.event_id)
+                            .await
+                    {
+                        core.emit_if_current(generation, CoreEvent::Notification { notification });
+                    }
+                }
+            }
+        });
+    }
+
+    fn watch_notification_settings(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+        let core = self.clone();
+        let watched = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                let mut changes = watched.notification_settings().await.subscribe_to_changes();
+                while changes.recv().await.is_ok() {
+                    core.emit_if_current(generation, CoreEvent::NotificationSettingsChanged);
                 }
             })
             .abort_on_drop(),

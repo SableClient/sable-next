@@ -20,6 +20,7 @@
   import { preferences, setPreference } from '$lib/settings/preferences.svelte';
   import type { Preferences } from '$lib/settings/preferences.svelte';
 
+  import NotificationDefaults from '$lib/features/notifications/NotificationDefaults.svelte';
   import StateEventTool from './StateEventTool.svelte';
 
   interface Props {
@@ -161,6 +162,12 @@
         {/each}
       </ul>
     </section>
+
+    {#if category.id === 'notifications'}
+      <section class="settings-card">
+        <NotificationDefaults />
+      </section>
+    {/if}
 
     {#if category.id === 'developer' && preferences.showHiddenEvents}
       <SettingsSection

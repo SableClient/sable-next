@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const port = process.env.SABLE_PREVIEW_PORT ?? '4173';
+const origin = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
@@ -11,7 +14,7 @@ export default defineConfig({
   timeout: 60_000,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: origin,
     trace: 'on-first-retry',
     // A click must not land mid-transition.
     contextOptions: { reducedMotion: 'reduce' },
@@ -32,8 +35,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort',
-    url: 'http://127.0.0.1:4173',
+    command: `pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    url: origin,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
     gracefulShutdown: {

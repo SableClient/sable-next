@@ -7,6 +7,9 @@ import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
 import type { ImagePackView } from '@/generated/ImagePackView';
 import type { JoinRuleView } from '@/generated/JoinRuleView';
 import type { MemberView } from '@/generated/MemberView';
+import type { NotificationModeView } from '@/generated/NotificationModeView';
+import type { NotificationSettingsView } from '@/generated/NotificationSettingsView';
+import type { PusherView } from '@/generated/PusherView';
 import type { RoomTag } from '@/generated/RoomTag';
 import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
 import type { RoomPreviewView } from '@/generated/RoomPreviewView';
@@ -682,6 +685,51 @@ export class CoreClient {
 
   async markRead(roomId: string, eventId: string): Promise<void> {
     await this.ensureTransport().send({ type: 'mark_read', room_id: roomId, event_id: eventId });
+  }
+
+  async notificationSettings(roomId: string): Promise<NotificationSettingsView> {
+    const response = await this.ensureTransport().send({
+      type: 'notification_settings',
+      room_id: roomId,
+    });
+    return response;
+  }
+
+  /** `null` drops the room's own rule so it follows the account default. */
+  async setRoomNotificationMode(roomId: string, mode: NotificationModeView | null): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_room_notification_mode',
+      room_id: roomId,
+      mode,
+    });
+  }
+
+  async defaultNotificationModes(): Promise<{
+    direct: NotificationModeView;
+    group: NotificationModeView;
+  }> {
+    const response = await this.ensureTransport().send({ type: 'default_notification_modes' });
+    return { direct: response.direct, group: response.group };
+  }
+
+  async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_default_notification_mode',
+      direct,
+      mode,
+    });
+  }
+
+  async setPusher(pusher: PusherView): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_pusher', pusher });
+  }
+
+  async removePusher(pushkey: string, appId: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'remove_pusher', pushkey, app_id: appId });
+  }
+
+  async setNotificationContent(visible: boolean): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_notification_content', visible });
   }
 
   async encryptionStatus(): Promise<EncryptionStatusView> {

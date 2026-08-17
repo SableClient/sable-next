@@ -7,9 +7,4 @@ export type LatestEventView = { sender: string | null,
 /**
  * Plain text: a list row must not run untrusted HTML.
  */
-body: string, timestamp: number | null, sending: boolean, 
-/**
- * What a read receipt would point at. `null` for an invitation and for an
- * echo the server has not accepted yet, neither of which can be read.
- */
-event_id: string | null, };
+body: string, timestamp: number | null, sending: boolean, event_id: string | null, };
