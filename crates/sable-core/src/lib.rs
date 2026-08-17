@@ -1575,6 +1575,7 @@ impl Core {
 
         self.watch_session_changes(&client, generation);
         self.watch_encryption(&client, generation);
+        self.watch_send_queue(&client);
 
         client
             .send_queue()
@@ -1627,6 +1628,36 @@ impl Core {
         }
 
         Ok(())
+    }
+
+    fn watch_send_queue(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        let queue = client.send_queue();
+        let mut errors = queue.subscribe_errors();
+
+        self.track_session_task(
+            spawn(async move {
+                let mut failures = 0u32;
+                loop {
+                    let recoverable = match errors.recv().await {
+                        Ok(error) => error.is_recoverable,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => true,
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    };
+
+                    if !recoverable {
+                        continue;
+                    }
+
+                    failures = failures.saturating_add(1);
+                    matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
+                        2u64.saturating_pow(failures.min(5)),
+                    ))
+                    .await;
+                    queue.set_enabled(true).await;
+                }
+            })
+            .abort_on_drop(),
+        );
     }
 
     /// Two streams, one status, so either firing re-reads both.

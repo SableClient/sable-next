@@ -185,7 +185,7 @@ pub async fn build_client(
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::OneShot,
             auto_enable_cross_signing: true,
-            ..EncryptionSettings::default()
+            auto_enable_backups: true,
         });
 
     #[cfg(not(target_family = "wasm"))]

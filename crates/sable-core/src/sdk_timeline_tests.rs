@@ -2,7 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::{
-    ruma::{event_id, room_id},
+    ruma::{event_id, events::room::message::RoomMessageEventContent, room_id},
+    send_queue::RoomSendQueueUpdate,
     test_utils::mocks::{
         MatrixMockServer, RoomContextResponseTemplate, RoomMessagesResponseTemplate,
     },
@@ -127,6 +128,67 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
 
     timeline.paginate_backwards(10).await.unwrap();
     assert_eq!(event_ids(timeline.items().await), ["$older", "$latest"]);
+}
+
+#[tokio::test]
+async fn a_failed_send_wedges_the_room_queue_until_it_is_re_enabled() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!wedged:example.org");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server.sync_joined_room(&client, room_id).await;
+    let (_, mut updates) = room.send_queue().subscribe().await.unwrap();
+
+    let failing = server.mock_room_send().error500().mount_as_scoped().await;
+    room.send_queue()
+        .send(RoomMessageEventContent::text_plain("first").into())
+        .await
+        .unwrap();
+    let recoverable = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Ok(RoomSendQueueUpdate::SendError { is_recoverable, .. }) = updates.recv().await
+            {
+                break is_recoverable;
+            }
+        }
+    })
+    .await
+    .expect("a send failure");
+    assert!(recoverable, "a 500 leaves the request queued, not wedged");
+    drop(failing);
+
+    let unused = server
+        .mock_room_send()
+        .ok(event_id!("$never"))
+        .expect(0)
+        .mount_as_scoped()
+        .await;
+    room.send_queue()
+        .send(RoomMessageEventContent::text_plain("second").into())
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    drop(unused);
+
+    let sending = server
+        .mock_room_send()
+        .ok(event_id!("$sent"))
+        .expect(1..)
+        .mount_as_scoped()
+        .await;
+    client.send_queue().set_enabled(true).await;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Ok(RoomSendQueueUpdate::SentEvent { .. }) = updates.recv().await {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("re-enabling drains the queue");
+    drop(sending);
 }
 
 #[tokio::test]

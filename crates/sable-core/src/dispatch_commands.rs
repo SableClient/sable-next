@@ -1029,6 +1029,8 @@ macro_rules! dispatch_commands {
                 room_id,
                 transaction_id,
             } => {
+                $self.client().await?.send_queue().set_enabled(true).await;
+
                 $self
                     .local_echo(&room_id, &transaction_id)
                     .await?
