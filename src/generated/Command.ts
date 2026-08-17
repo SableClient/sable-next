@@ -3,6 +3,7 @@ import type { AuthIntent } from "./AuthIntent";
 import type { JoinRuleView } from "./JoinRuleView";
 import type { NotificationModeView } from "./NotificationModeView";
 import type { PaginationDirection } from "./PaginationDirection";
+import type { PusherView } from "./PusherView";
 import type { RoomTag } from "./RoomTag";
 import type { SubscriptionId } from "./SubscriptionId";
 
@@ -51,15 +52,7 @@ passphrase: string | null, } | { "type": "reset_recovery_key", passphrase: strin
 /**
  * False removes it.
  */
-set: boolean, } | { "type": "set_pusher", pushkey: string, app_id: string, 
-/**
- * The gateway's `_matrix/push/v1/notify`.
- */
-url: string, device_display_name: string, event_id_only: boolean, 
-/**
- * False replaces any pusher already holding this key.
- */
-append: boolean, } | { "type": "remove_pusher", pushkey: string, app_id: string, } | { "type": "set_room_notification_mode", room_id: string, 
+set: boolean, } | { "type": "set_pusher", pusher: PusherView, } | { "type": "remove_pusher", pushkey: string, app_id: string, } | { "type": "set_notification_content", visible: boolean, } | { "type": "set_room_notification_mode", room_id: string, 
 /**
  * `null` drops the room's own rules so it follows the default again.
  */

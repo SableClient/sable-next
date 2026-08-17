@@ -14,7 +14,7 @@ use std::{
     fmt::Display,
     sync::{
         Arc,
-        atomic::{AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
 };
 
@@ -523,6 +523,7 @@ pub struct Core {
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscription_lock: Mutex<()>,
     timelines: Mutex<HashMap<OwnedRoomId, Arc<Timeline>>>,
+    notification_content: AtomicBool,
 }
 
 enum PendingLogin {
@@ -553,6 +554,7 @@ impl Core {
             store_id: store_id.into(),
             sessions,
             events,
+            notification_content: AtomicBool::new(false),
             next_subscription: AtomicU32::new(1),
             next_log_id: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
@@ -570,6 +572,11 @@ impl Core {
             timelines: Mutex::new(HashMap::new()),
         });
         (core, rx)
+    }
+
+    #[must_use]
+    pub fn notification_content(&self) -> bool {
+        self.notification_content.load(Ordering::Relaxed)
     }
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.

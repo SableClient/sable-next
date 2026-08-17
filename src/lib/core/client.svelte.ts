@@ -719,6 +719,10 @@ export class CoreClient {
     });
   }
 
+  async setNotificationContent(visible: boolean): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_notification_content', visible });
+  }
+
   async encryptionStatus(): Promise<EncryptionStatusView> {
     const response = await this.ensureTransport().send({ type: 'encryption_status' });
     return response.status;

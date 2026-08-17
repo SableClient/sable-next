@@ -58,6 +58,12 @@
   $effect(() => {
     if (core.status !== 'ready') return;
 
+    void core.setNotificationContent(preferences.notificationContent).catch(() => {});
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+
     void roomList.start();
     notifications.start(core);
     return () => {

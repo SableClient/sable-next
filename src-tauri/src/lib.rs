@@ -9,7 +9,7 @@ mod sentry;
 use std::sync::{Arc, Mutex};
 
 use sable_core::{
-    protocol::{Command, CommandErr, CommandOk, CoreEvent},
+    protocol::{Command, CommandErr, CommandOk, CoreEvent, SyncStatus},
     Core,
 };
 use tauri::{
@@ -200,10 +200,20 @@ pub fn run() {
                 event_sink: event_sink.clone(),
             });
             let notifier = app.handle().clone();
+            let pushing = app.state::<AppState>().core.clone();
             tauri::async_runtime::spawn(async move {
+                let mut registered = false;
                 while let Some(event) = events.recv().await {
-                    if let CoreEvent::Notification { notification } = &event {
-                        notifications::show(&notifier, notification).await;
+                    match &event {
+                        CoreEvent::Notification { notification } => {
+                            notifications::show(&notifier, &pushing, notification).await;
+                        }
+                        CoreEvent::SyncStatus(SyncStatus::Live) if !registered => {
+                            registered = true;
+                            notifications::register_push(&notifier, &pushing).await;
+                        }
+                        CoreEvent::SessionEnded { .. } => registered = false,
+                        _ => {}
                     }
                     event_sink.send(event);
                 }

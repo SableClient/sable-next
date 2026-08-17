@@ -319,18 +319,15 @@ pub enum Command {
         set: bool,
     },
     SetPusher {
-        pushkey: String,
-        app_id: String,
-        /// The gateway's `_matrix/push/v1/notify`.
-        url: String,
-        device_display_name: String,
-        event_id_only: bool,
-        /// False replaces any pusher already holding this key.
-        append: bool,
+        pusher: PusherView,
     },
     RemovePusher {
         pushkey: String,
         app_id: String,
+    },
+    /// Mirrors the reader's choice so a native shell can apply it too.
+    SetNotificationContent {
+        visible: bool,
     },
     SetRoomNotificationMode {
         #[ts(type = "string")]
@@ -604,6 +601,7 @@ pub enum CommandOk {
     SetRoomTag,
     SetPusher,
     RemovePusher,
+    SetNotificationContent,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
 
@@ -1290,6 +1288,30 @@ pub struct ReactionGroup {
     pub key: String,
     #[ts(type = "string[]")]
     pub senders: Vec<OwnedUserId>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct PusherView {
+    pub pushkey: String,
+    pub app_id: String,
+    /// The gateway's `_matrix/push/v1/notify`.
+    pub url: String,
+    pub device_display_name: String,
+    /// Web push delivery, as `UnifiedPush` and a browser use: `pushkey` is then
+    /// the `p256dh` and the gateway encrypts to these.
+    pub web_push: Option<WebPushKeys>,
+    pub event_id_only: bool,
+    /// False replaces any pusher already holding this key.
+    pub append: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct WebPushKeys {
+    pub endpoint: String,
+    pub p256dh: String,
+    pub auth: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]

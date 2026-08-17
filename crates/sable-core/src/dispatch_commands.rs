@@ -591,25 +591,10 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::DefaultNotificationModes { direct, group })
             }
 
-            Command::SetPusher {
-                pushkey,
-                app_id,
-                url,
-                device_display_name,
-                event_id_only,
-                append,
-            } => {
-                notifications::set_pusher(
-                    &$self.client().await?,
-                    pushkey,
-                    app_id,
-                    url,
-                    device_display_name,
-                    event_id_only,
-                    append,
-                )
-                .await
-                .map_err(|error| $self.failed("set_pusher", error))?;
+            Command::SetPusher { pusher } => {
+                notifications::set_pusher(&$self.client().await?, pusher)
+                    .await
+                    .map_err(|error| $self.failed("set_pusher", error))?;
 
                 Ok(CommandOk::SetPusher)
             }
@@ -620,6 +605,14 @@ macro_rules! dispatch_commands {
                     .map_err(|error| $self.failed("remove_pusher", error))?;
 
                 Ok(CommandOk::RemovePusher)
+            }
+
+            Command::SetNotificationContent { visible } => {
+                $self
+                    .notification_content
+                    .store(visible, Ordering::Relaxed);
+
+                Ok(CommandOk::SetNotificationContent)
             }
 
             Command::SetRoomNotificationMode { room_id, mode } => {

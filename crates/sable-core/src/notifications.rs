@@ -11,7 +11,13 @@ use matrix_sdk_ui::notification_client::{
     NotificationStatus,
 };
 
-use crate::protocol::{NotificationModeView, NotificationSettingsView, NotificationView};
+use url::Url;
+
+use crate::protocol::{
+    NotificationModeView, NotificationSettingsView, NotificationView, PusherView,
+};
+
+const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
 
 impl From<NotificationModeView> for RoomNotificationMode {
     fn from(mode: NotificationModeView) -> Self {
@@ -133,23 +139,31 @@ pub async fn notification(
     }
 }
 
+/// A device token must not be handed to anything but a Matrix push gateway.
+///
+/// # Errors
+///
+/// When the address is not a gateway's.
+fn gateway(url: &str) -> Result<String, String> {
+    let parsed = Url::parse(url).map_err(|_| "the push gateway is not a URL".to_owned())?;
+    let plain = parsed.scheme() != "https";
+    let addressed = !parsed.username().is_empty() || parsed.password().is_some();
+    if plain || addressed || parsed.fragment().is_some() || parsed.path() != GATEWAY_PATH {
+        return Err(format!("{url} is not an https {GATEWAY_PATH} endpoint"));
+    }
+
+    Ok(parsed.to_string())
+}
+
 /// A cold platform notification is built from this payload, and it derives its
 /// identity from `user_id`, so leaving it out stops a running app replacing it.
 ///
 /// # Errors
 ///
-/// When the server rejects the registration.
-pub async fn set_pusher(
-    client: &Client,
-    pushkey: String,
-    app_id: String,
-    url: String,
-    device_display_name: String,
-    event_id_only: bool,
-    append: bool,
-) -> Result<(), String> {
-    let mut pusher_data = HttpPusherData::new(url);
-    if event_id_only {
+/// When the gateway is not a push gateway, or the server rejects the registration.
+pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), String> {
+    let mut pusher_data = HttpPusherData::new(gateway(&pusher.url)?);
+    if pusher.event_id_only {
         pusher_data.format = Some(PushFormat::EventIdOnly);
     }
     if let Some(user_id) = client.user_id() {
@@ -157,20 +171,29 @@ pub async fn set_pusher(
             .data
             .insert("user_id".to_owned(), user_id.as_str().into());
     }
+    if let Some(keys) = pusher.web_push {
+        pusher_data
+            .data
+            .insert("endpoint".to_owned(), keys.endpoint.into());
+        pusher_data
+            .data
+            .insert("p256dh".to_owned(), keys.p256dh.into());
+        pusher_data.data.insert("auth".to_owned(), keys.auth.into());
+    }
 
     client
         .pusher()
         .set(
             PusherInit {
-                ids: PusherIds::new(pushkey, app_id),
+                ids: PusherIds::new(pusher.pushkey, pusher.app_id),
                 kind: PusherKind::Http(pusher_data),
                 app_display_name: "Sable".to_owned(),
-                device_display_name,
+                device_display_name: pusher.device_display_name,
                 profile_tag: None,
                 lang: "en".to_owned(),
             }
             .into(),
-            append,
+            pusher.append,
         )
         .await
         .map_err(|error| error.to_string())
@@ -238,5 +261,31 @@ fn timeline_body(event: &AnySyncTimelineEvent) -> String {
         MessageType::Audio(_) => "sent an audio file".to_owned(),
         MessageType::File(_) => "sent a file".to_owned(),
         _ => content.body().to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::gateway;
+
+    #[test]
+    fn a_gateway_must_be_an_https_notify_endpoint() {
+        assert_eq!(
+            gateway("https://sygnal.example/_matrix/push/v1/notify"),
+            Ok("https://sygnal.example/_matrix/push/v1/notify".to_owned())
+        );
+
+        let accepted: Vec<&str> = [
+            "http://sygnal.example/_matrix/push/v1/notify",
+            "https://user:pass@sygnal.example/_matrix/push/v1/notify",
+            "https://sygnal.example/_matrix/push/v1/notify#fragment",
+            "https://sygnal.example/",
+            "not a url",
+        ]
+        .into_iter()
+        .filter(|address| gateway(address).is_ok())
+        .collect();
+
+        assert!(accepted.is_empty(), "these are not gateways: {accepted:?}");
     }
 }
