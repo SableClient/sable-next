@@ -4,6 +4,9 @@ import type { CoreClient } from '$lib/core/client.svelte';
    miss re-runs every waiting media element each time any other one resolves. */
 const objectUrls = new Map<string, string>();
 const pending = new Map<string, Promise<string>>();
+/* An object URL pins its blob until revoked. Far more than one viewport holds,
+   so the least recently read entry is never one on screen. */
+const MAX_OBJECT_URLS = 256;
 
 function cacheKey(source: string, width: number, height: number): string {
   return `${source}:${String(width)}:${String(height)}`;
@@ -29,7 +32,13 @@ function imageMime(bytes: Uint8Array): string | undefined {
 
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
 export function cachedMediaUrl(source: string, width: number, height: number): string | undefined {
-  return objectUrls.get(cacheKey(source, width, height));
+  const key = cacheKey(source, width, height);
+  const objectUrl = objectUrls.get(key);
+  if (objectUrl === undefined) return undefined;
+  // Re-inserted so the map's own order is the eviction order.
+  objectUrls.delete(key);
+  objectUrls.set(key, objectUrl);
+  return objectUrl;
 }
 
 /**
@@ -53,6 +62,11 @@ export function loadMediaUrl(
         const type = mime ?? imageMime(bytes) ?? '';
         const objectUrl = URL.createObjectURL(new Blob([bytes], { type }));
         objectUrls.set(key, objectUrl);
+        for (const [oldestKey, oldestUrl] of objectUrls) {
+          if (objectUrls.size <= MAX_OBJECT_URLS) break;
+          URL.revokeObjectURL(oldestUrl);
+          objectUrls.delete(oldestKey);
+        }
         return objectUrl;
       })
       .finally(() => {

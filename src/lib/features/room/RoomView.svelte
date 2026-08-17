@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
   import type { ProfileView } from '@/generated/ProfileView';
   import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
   import { goto } from '$app/navigation';
@@ -54,9 +53,11 @@
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
   let settingsOpen = $state(false);
-  const requestedDetails = new SvelteSet<string>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- only the prefetch effect touches it, and a reactive set would make that effect invalidate itself
+  const requestedDetails = new Set<string>();
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
+  let timelineFollowingLive = $state<boolean>(false);
   let latestReadBy = $derived.by(() => {
     const userId = core.session?.user_id;
     for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
@@ -158,11 +159,12 @@
     timelineAtBottom = eventId === null;
   });
 
-  // Holding the param would keep read receipts switched off. Waiting for live
-  // mode matters: in permalink mode `timelineAtBottom` only means the bottom of
-  // the loaded context, and dropping the anchor there restarts at the present.
+  // The URL describes what is on screen, so returning to live drops the anchor.
+  // Waiting for live mode matters: in permalink mode following the end only
+  // means the bottom of the loaded context, and dropping the anchor there
+  // restarts at the present.
   $effect(() => {
-    if (eventId === null || !timelineAtBottom || timeline.mode.kind !== 'live') return;
+    if (eventId === null || !timelineFollowingLive || timeline.mode.kind !== 'live') return;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
     void goto(roomUrl(null), { replaceState: true, noScroll: true, keepFocus: true });
   });
@@ -266,9 +268,10 @@
     return `${url.pathname}${url.search}`;
   }
 
+  // A history entry, so back is a way out of the anchor.
   function jumpToEvent(eventId: string): void {
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
-    void goto(roomUrl(eventId), { replaceState: true, noScroll: true, keepFocus: true });
+    void goto(roomUrl(eventId), { noScroll: true, keepFocus: true });
   }
 
   function goBack(): void {
@@ -380,7 +383,7 @@
   }
 </script>
 
-<section class="room-view" aria-label={$i18n.t('timeline.label')}>
+<main class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
     <RoomHeader
       {roomName}
@@ -414,6 +417,7 @@
         currentUserId={core.session?.user_id ?? null}
         scrollLocked={profileOpen || receiptsOpen}
         bind:nearLatest={timelineAtBottom}
+        bind:followingLive={timelineFollowingLive}
       />
     {/key}
     <div class="composer-dock">
@@ -492,7 +496,7 @@
     {profile}
     failed={profileFailed}
   />
-</section>
+</main>
 
 <style>
   .room-view {

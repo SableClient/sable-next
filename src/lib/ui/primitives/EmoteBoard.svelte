@@ -36,12 +36,16 @@
   }: Props = $props();
   const core = useCoreClient();
 
+  const emojiColumns = 8;
+
   let packs = $state.raw<ImagePackView[]>([]);
   let loading = $state(true);
   let failed = $state(false);
   let recent = $state.raw<string[]>(readRecent());
+  let recentReactions = $state.raw<string[]>(uniqueReactions());
   let query = $state('');
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
+  let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
 
   $effect(() => {
     let cancelled = false;
@@ -80,7 +84,16 @@
 
   let searching = $derived(query.trim() !== '');
   /** Search is by emote, so matches arrive as one flat list across packs. */
-  let matchedImages = $derived(searching ? sections.flatMap((section) => section.images) : []);
+  let matchedImages = $derived(
+    searching
+      ? sections.flatMap((section) =>
+          section.images.map((image) => ({
+            key: `${sectionId(section.pack)}-${image.shortcode}`,
+            image,
+          }))
+        )
+      : []
+  );
 
   let recentImages = $derived.by(() => {
     if (query.trim() !== '') return [];
@@ -105,7 +118,7 @@
         id: 'recent',
         glyph: '🕘',
         label: $i18n.t('timeline.frequentlyUsed'),
-        emojis: readRecentReactions(),
+        emojis: recentReactions,
       },
       ...emojiGroups
         .filter((group) => group.emojis.length > 0)
@@ -128,13 +141,64 @@
     return pack.name ?? (pack.id || originLabels[pack.origin]);
   }
 
-  function jumpTo(pack: ImagePackView): void {
-    const target = document.getElementById(sectionId(pack));
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  function jumpTo(id: string): void {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
   }
 
   function sectionId(pack: ImagePackView): string {
     return `pack-${pack.origin}-${pack.room_id ?? 'account'}-${pack.id}`;
+  }
+
+  function uniqueReactions(): string[] {
+    return [...new Set(readRecentReactions())];
+  }
+
+  function remember(emoji: string): void {
+    rememberReaction(emoji);
+    recentReactions = uniqueReactions();
+  }
+
+  function emojiRows(emojis: string[]): string[][] {
+    const rows: string[][] = [];
+    for (let start = 0; start < emojis.length; start += emojiColumns) {
+      rows.push(emojis.slice(start, start + emojiColumns));
+    }
+    return rows;
+  }
+
+  function targetCell(key: string, from: number, last: number): number | null {
+    if (key === 'ArrowLeft') return from - 1;
+    if (key === 'ArrowRight') return from + 1;
+    if (key === 'ArrowUp') return from - emojiColumns;
+    if (key === 'ArrowDown') return from + emojiColumns;
+    if (key === 'Home') return 0;
+    if (key === 'End') return last;
+    return null;
+  }
+
+  function moveCell(
+    event: KeyboardEvent & { currentTarget: HTMLElement },
+    id: string,
+    count: number
+  ): void {
+    const from = activeCell.section === id ? activeCell.index : 0;
+    const target = targetCell(event.key, from, count - 1);
+    if (target === null) return;
+
+    event.preventDefault();
+    const index = Math.min(Math.max(target, 0), count - 1);
+    activeCell = { section: id, index };
+    event.currentTarget.querySelector<HTMLElement>(`[data-cell="${String(index)}"]`)?.focus();
+  }
+
+  /** Clicking a cell moves focus too, so the roving tab stop follows it. */
+  function trackCell(event: FocusEvent, id: string): void {
+    if (!(event.target instanceof HTMLElement)) return;
+    const cell = event.target.dataset.cell;
+    if (cell !== undefined) activeCell = { section: id, index: Number(cell) };
   }
 
   /** A reaction key is any string, so an unmatched query is still a valid one. */
@@ -144,7 +208,7 @@
     if (text === '') return;
     event.preventDefault();
     const best = unicodeSections.at(0)?.emojis.at(0);
-    if (best !== undefined) rememberReaction(best);
+    if (best !== undefined) remember(best);
     onPickUnicode(best ?? text);
   }
 
@@ -158,11 +222,10 @@
 <div class={['board', { sheet: variant === 'sheet' }]}>
   <div class="board-head">
     {#if stickers}
-      <div class="tabs" role="tablist" aria-label={$i18n.t('composer.emotesAndStickers')}>
+      <div class="tabs" role="group" aria-label={$i18n.t('composer.emotesAndStickers')}>
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === 'emoticon'}
+          aria-pressed={tab === 'emoticon'}
           onclick={() => {
             tab = 'emoticon';
           }}
@@ -171,8 +234,7 @@
         </button>
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === 'sticker'}
+          aria-pressed={tab === 'sticker'}
           onclick={() => {
             tab = 'sticker';
           }}
@@ -213,7 +275,7 @@
                 title={packName(section.pack)}
                 aria-label={packName(section.pack)}
                 onclick={() => {
-                  jumpTo(section.pack);
+                  jumpTo(sectionId(section.pack));
                 }}
               >
                 {#if section.pack.avatar_url}
@@ -245,9 +307,7 @@
               title={section.label}
               aria-label={section.label}
               onclick={() => {
-                document
-                  .getElementById(`emoji-${section.id}`)
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                jumpTo(`emoji-${section.id}`);
               }}>{section.glyph}</button
             >
           {/each}
@@ -297,7 +357,7 @@
           <section>
             <h3>{$i18n.t('composer.emoticons')}</h3>
             <ul>
-              {#each matchedImages as image, index (`${String(index)}-${image.url}`)}
+              {#each matchedImages as { key, image } (key)}
                 <li>
                   <button
                     type="button"
@@ -358,29 +418,47 @@
           </section>
         {/each}
         {#each unicodeSections as section (section.id)}
+          {@const cursor = activeCell.section === section.id ? activeCell.index : 0}
           <section class="unicode" id={`emoji-${section.id}`}>
-            <h3>{section.label}</h3>
-            <ul>
-              {#each section.emojis as emoji (emoji)}
-                <li>
-                  <button
-                    type="button"
-                    title={shortcodeFor(emoji) ?? emoji}
-                    aria-label={shortcodeFor(emoji) ?? emoji}
-                    onclick={() => {
-                      rememberReaction(emoji);
-                      onPickUnicode?.(emoji);
-                    }}>{emoji}</button
-                  >
-                </li>
+            <h3 id={`emoji-head-${section.id}`}>{section.label}</h3>
+            <div
+              class="grid"
+              role="grid"
+              tabindex={-1}
+              aria-labelledby={`emoji-head-${section.id}`}
+              onkeydown={(event) => {
+                moveCell(event, section.id, section.emojis.length);
+              }}
+              onfocusin={(event) => {
+                trackCell(event, section.id);
+              }}
+            >
+              {#each emojiRows(section.emojis) as row, rowIndex (rowIndex)}
+                <div class="row" role="row">
+                  {#each row as emoji, columnIndex (columnIndex)}
+                    {@const index = rowIndex * emojiColumns + columnIndex}
+                    <button
+                      type="button"
+                      role="gridcell"
+                      data-cell={index}
+                      tabindex={index === cursor ? 0 : -1}
+                      title={shortcodeFor(emoji) ?? emoji}
+                      aria-label={shortcodeFor(emoji) ?? emoji}
+                      onclick={() => {
+                        remember(emoji);
+                        onPickUnicode?.(emoji);
+                      }}>{emoji}</button
+                    >
+                  {/each}
+                </div>
               {/each}
-            </ul>
+            </div>
           </section>
         {/each}
       </div>
     </div>
 
-    <div class="preview" aria-live="polite">
+    <div class="preview">
       {#if preview}
         <MediaImage
           source={preview.image.url}
@@ -435,7 +513,7 @@
     padding: 0.375rem 0.5rem;
   }
 
-  .tabs button[aria-selected='true'] {
+  .tabs button[aria-pressed='true'] {
     background: var(--sable-primary-container);
     color: var(--sable-primary-on-container);
   }
@@ -519,7 +597,8 @@
     padding: 0;
   }
 
-  .grids li button {
+  .grids li button,
+  .grids .unicode button {
     align-items: center;
     background: transparent;
     border: 0;
@@ -532,7 +611,15 @@
     width: 2.5rem;
   }
 
-  .grids li button:hover {
+  /* Sized to the 32px custom emote beside it, not to the surrounding type. */
+  .grids .unicode button {
+    font-size: 1.75rem;
+    line-height: 1;
+    width: 100%;
+  }
+
+  .grids li button:hover,
+  .grids .unicode button:hover {
     background: var(--sable-surface-container-hover);
   }
 
@@ -561,10 +648,18 @@
     background: var(--sable-surface-container-hover);
   }
 
-  /* Sized to the 32px custom emote beside it, not to the surrounding type. */
-  .grids .unicode li button {
-    font-size: 1.75rem;
-    line-height: 1;
+  /* Rows are real elements for the grid pattern, so the wrap is laid out here. */
+  .grids .unicode .grid {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: var(--space-2);
+  }
+
+  /* Column count must match emojiColumns, or the arrow keys walk another grid. */
+  .grids .unicode .row {
+    display: grid;
+    gap: 0.25rem;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
   /* Matches the pack avatars beside it, so the rail reads as one column. */

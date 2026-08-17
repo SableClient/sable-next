@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { on } from 'svelte/events';
   import { invoke, isTauri } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { callbackChannelName, redirectLoginType, scrubbedCallbackPath } from '$lib/auth/redirect';
@@ -12,6 +13,7 @@
 
   let { onCallback, onRegistrationComplete, onCallbackWindow }: Props = $props();
   let removeDeepLinkListener: (() => void) | undefined;
+  let disposed = false;
 
   onMount(() => {
     const onStorage = (event: StorageEvent) => {
@@ -19,7 +21,7 @@
       localStorage.removeItem(event.key);
       onRegistrationComplete();
     };
-    window.addEventListener('storage', onStorage);
+    const offStorage = on(window, 'storage', onStorage);
 
     const callbackUrl = window.location.href;
     if (!isTauri() && redirectLoginType(callbackUrl)) {
@@ -38,6 +40,10 @@
             const url = event.payload.find((candidate) => redirectLoginType(candidate));
             if (url) onCallback(url);
           });
+          if (disposed) {
+            unlisten();
+            return;
+          }
           removeDeepLinkListener = unlisten;
           const urls = await invoke<string[] | null>('plugin:deep-link|get_current');
           const url = urls?.find((candidate) => redirectLoginType(candidate));
@@ -49,8 +55,9 @@
     }
 
     return () => {
+      disposed = true;
       removeDeepLinkListener?.();
-      window.removeEventListener('storage', onStorage);
+      offStorage();
     };
   });
 </script>

@@ -50,28 +50,28 @@
   );
 
   // The space's own power levels govern the edge, so each candidate is asked.
+  // Rebuilt per run so a revoked space drops back out.
   const manageable = new SvelteSet<string>();
+  let manageableRun = 0;
 
   $effect(() => {
     const candidates = [...addableSpaces.map((space) => space.room_id), parentSpaceId].filter(
       (id): id is string => id !== null
     );
 
-    let current = true;
+    const run = ++manageableRun;
+    manageable.clear();
     for (const spaceId of candidates) {
       void core
         .roomPermissions(spaceId)
         .then((permissions) => {
-          if (!current || !permissions.can_manage_children) return;
+          if (run !== manageableRun || !permissions.can_manage_children) return;
           manageable.add(spaceId);
         })
         .catch((error: unknown) => {
           console.debug('[sable room] space permissions unavailable', error);
         });
     }
-    return () => {
-      current = false;
-    };
   });
 
   let offeredSpaces = $derived(addableSpaces.filter((space) => manageable.has(space.room_id)));

@@ -56,6 +56,7 @@ export class RoomList {
 
   stop(): void {
     this.generation += 1;
+    this.startPromise = null;
     this.rooms = [];
     this.unsubscribeEvents?.();
     this.unsubscribeEvents = null;

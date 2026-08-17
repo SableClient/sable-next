@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { on } from 'svelte/events';
+
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
   import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
@@ -120,11 +122,11 @@
       const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
       if (maths.length > 0) void renderMaths(maths);
 
-      node.addEventListener('click', handleClick);
-      node.addEventListener('keydown', handleKeydown);
+      const offClick = on(node, 'click', handleClick);
+      const offKeydown = on(node, 'keydown', handleKeydown);
       return () => {
-        node.removeEventListener('click', handleClick);
-        node.removeEventListener('keydown', handleKeydown);
+        offClick();
+        offKeydown();
       };
     };
   }

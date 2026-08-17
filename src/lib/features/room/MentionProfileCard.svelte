@@ -139,7 +139,7 @@
   );
   let profileLink = $derived(`https://matrix.to/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
-  let mutualRooms = $state<MutualRoomView[]>([]);
+  let mutualRooms = $state.raw<MutualRoomView[]>([]);
   let ignored = $state(false);
   let shared = $state<'rooms' | 'spaces' | null>(null);
   let miscOpen = $state(false);
@@ -153,6 +153,10 @@
 
   $effect(() => {
     const target = userId;
+    // The card instance is reused for the next user, so the previous answer
+    // must not survive until this one lands.
+    mutualRooms = [];
+    ignored = false;
     if (isSelf) return;
 
     let cancelled = false;

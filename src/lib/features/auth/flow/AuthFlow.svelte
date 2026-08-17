@@ -195,10 +195,6 @@
   });
 
   $effect(() => {
-    if (typeof window !== 'undefined') hasLoggedInBefore = readReturningUser(localStorage);
-  });
-
-  $effect(() => {
     const urlKey = `${page.url.pathname}${page.url.search}`;
     if (urlKey === lastUrlPrefill) return;
     lastUrlPrefill = urlKey;
@@ -221,19 +217,19 @@
   });
 
   $effect(() => {
-    if (pendingStage !== null && pendingStage === activeIndex) pendingStage = null;
-  });
-
-  $effect(() => {
     if (activeIndex > furthestReached) furthestReached = activeIndex;
   });
 
   $effect(() => {
     if ((!isAddingAccount && core.status !== 'signed-out') || initialized) return;
     initialized = true;
+    let cancelled = false;
     void flow.validateHomeserver(displayedStage).finally(() => {
-      hasCompletedInitialHomeserverCheck = true;
+      if (!cancelled) hasCompletedInitialHomeserverCheck = true;
     });
+    return () => {
+      cancelled = true;
+    };
   });
 
   $effect(() => {
@@ -328,6 +324,7 @@
   }
 
   onMount(() => {
+    hasLoggedInBefore = readReturningUser(localStorage);
     return () => {
       redirect.cleanup();
       profile.cleanup();
@@ -364,7 +361,9 @@
         keepFocus: true,
         noScroll: true,
       }
-    );
+    ).finally(() => {
+      pendingStage = null;
+    });
   }
 
   function stageRoute(index: number): string {

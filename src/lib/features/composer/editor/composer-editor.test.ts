@@ -20,7 +20,7 @@ function open(): ComposerEditor {
   document.body.append(host);
   const editor = new ComposerEditor({
     media: { cached: () => undefined, load: () => Promise.resolve('blob:x') },
-    label: 'Send a message',
+    label: () => 'Send a message',
     listboxId: 'suggestions',
     activeOptionId: () => null,
     editable: () => true,
@@ -95,7 +95,7 @@ test('the active option is written straight onto the editor node', () => {
   let activeId: string | null = null;
   const editor = new ComposerEditor({
     media: { cached: () => undefined, load: () => Promise.resolve('blob:x') },
-    label: 'Send a message',
+    label: () => 'Send a message',
     listboxId: 'suggestions',
     activeOptionId: () => activeId,
     editable: () => true,

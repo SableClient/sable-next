@@ -10,6 +10,7 @@
     value?: string;
     disabled?: boolean;
     invalid?: boolean;
+    describedBy?: string;
     autocomplete?: HTMLInputAttributes['autocomplete'];
     showPassword?: boolean;
     oninput?: HTMLInputAttributes['oninput'];
@@ -20,6 +21,7 @@
     value = $bindable(''),
     disabled = false,
     invalid = false,
+    describedBy,
     autocomplete = 'current-password',
     showPassword = $bindable(false),
     oninput,
@@ -35,6 +37,7 @@
     required
     {disabled}
     aria-invalid={invalid}
+    aria-describedby={describedBy}
     {oninput}
   />
 

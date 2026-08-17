@@ -11,11 +11,12 @@
     actions?: Snippet;
   };
 
+  const uid = $props.id();
   let {
     eyebrow,
     title,
     description,
-    titleId = 'empty-state-title',
+    titleId = uid,
     class: className = '',
     actions,
   }: Props = $props();

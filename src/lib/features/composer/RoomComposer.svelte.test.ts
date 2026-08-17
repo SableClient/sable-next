@@ -6,6 +6,7 @@ import type { CoreClient } from '$lib/core/client.svelte';
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import type { ComposerContext } from './composer-context';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
@@ -41,6 +42,7 @@ interface ComposerProps {
   onSend?: (roomId: string, body: string, formatted?: string | null) => Promise<void>;
   onSendAttachment?: (roomId: string, file: File) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
+  context?: ComposerContext;
 }
 
 function render(composer: ComposerProps): ReturnType<typeof mount> {
@@ -66,6 +68,10 @@ function fileInput(): HTMLInputElement {
 
 function submit(): void {
   document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true }));
+}
+
+function editorText(): string {
+  return document.querySelector('[role="combobox"]')?.textContent ?? '';
 }
 
 function stagedNames(): (string | null)[] {
@@ -168,6 +174,25 @@ test('the editor stays editable after a send', async () => {
   });
 
   expect(document.querySelector('[role="combobox"]')?.getAttribute('contenteditable')).toBe('true');
+  void unmount(instance);
+});
+
+test('a failed send puts the message back in the editor', async () => {
+  const instance = render({
+    roomId: '!room:example.org',
+    onSend: () => Promise.reject(new Error('offline')),
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'hold on' },
+  });
+  await tick();
+
+  expect(editorText()).toBe('hold on');
+
+  submit();
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
+  expect(editorText()).toBe('hold on');
   void unmount(instance);
 });
 

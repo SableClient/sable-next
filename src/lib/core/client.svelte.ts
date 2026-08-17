@@ -21,7 +21,6 @@ import type { ProfileView } from '@/generated/ProfileView';
 import type { TimelineItemView } from '@/generated/TimelineItemView';
 import type { RegistrationResultView } from '@/generated/RegistrationResultView';
 import type { VerificationView } from '@/generated/VerificationView';
-import { SvelteMap } from 'svelte/reactivity';
 
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
@@ -31,10 +30,12 @@ type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 const maxAttachmentBytes = 100 * 1024 * 1024;
 const profileCacheFreshMs = 10 * 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
-let resolvedHomeservers: Record<string, string> = {};
 
-async function resolveHomeserverInPage(homeserver: string): Promise<string> {
-  const cached = resolvedHomeservers[homeserver];
+async function resolveHomeserverInPage(
+  homeserver: string,
+  cache: Map<string, string>
+): Promise<string> {
+  const cached = cache.get(homeserver);
   if (cached) return cached;
 
   let origin: URL;
@@ -51,7 +52,7 @@ async function resolveHomeserverInPage(homeserver: string): Promise<string> {
     const baseUrl = body['m.homeserver']?.base_url;
     if (typeof baseUrl !== 'string') return homeserver;
     const resolved = new URL(baseUrl).toString();
-    resolvedHomeservers = { ...resolvedHomeservers, [homeserver]: resolved };
+    cache.set(homeserver, resolved);
     return resolved;
   } catch (error) {
     console.warn('[sable auth] page homeserver discovery failed; using entered server', {
@@ -91,18 +92,23 @@ export class CoreClient {
   private unsubscribeTransport: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
-  private readonly profileCache = new SvelteMap<
+  /* Nothing renders from these, and a reactive map would make every mounted
+     profile card re-run its effect on any other user's cache write. */
+  /* eslint-disable svelte/prefer-svelte-reactivity */
+  private readonly profileCache = new Map<
     string,
     { accountId: string | null; fetchedAt: number; profile: ProfileView }
   >();
-  private readonly profileRequests = new SvelteMap<
+  private readonly profileRequests = new Map<
     string,
     { accountId: string | null; request: Promise<ProfileView> }
   >();
-  private readonly relationsCache = new SvelteMap<
+  private readonly relationsCache = new Map<
     string,
     { accountId: string | null; fetchedAt: number; relations: UserRelations }
   >();
+  private readonly resolvedHomeservers = new Map<string, string>();
+  /* eslint-enable svelte/prefer-svelte-reactivity */
 
   async start(): Promise<void> {
     if (this.startPromise) return this.startPromise;
@@ -131,7 +137,10 @@ export class CoreClient {
     this.status = 'authenticating';
 
     try {
-      const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
+      const resolvedHomeserver = await resolveHomeserverInPage(
+        homeserver,
+        this.resolvedHomeservers
+      );
       const response = await transport.send({
         type: 'login',
         homeserver: resolvedHomeserver,
@@ -155,7 +164,7 @@ export class CoreClient {
 
   async loginFlows(homeserver: string): Promise<LoginFlowsView> {
     const transport = this.ensureTransport();
-    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     const response = await transport.send({
       type: 'login_flows',
       homeserver: resolvedHomeserver,
@@ -164,7 +173,7 @@ export class CoreClient {
   }
 
   async registrationFlows(homeserver: string): Promise<RegistrationFlowsView> {
-    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     const response = await this.ensureTransport().send({
       type: 'registration_flows',
       homeserver: resolvedHomeserver,
@@ -190,7 +199,10 @@ export class CoreClient {
     const previousSession = this.session;
     this.status = 'authenticating';
     try {
-      const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
+      const resolvedHomeserver = await resolveHomeserverInPage(
+        homeserver,
+        this.resolvedHomeservers
+      );
       const response = await transport.send({
         type: 'register',
         homeserver: resolvedHomeserver,
@@ -253,7 +265,7 @@ export class CoreClient {
     intent: AuthIntent = 'login'
   ): Promise<string> {
     const transport = this.ensureTransport();
-    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     const response = await transport.send({
       type: 'start_oidc_login',
       homeserver: resolvedHomeserver,
@@ -303,7 +315,7 @@ export class CoreClient {
     intent: AuthIntent = 'login'
   ): Promise<string> {
     const transport = this.ensureTransport();
-    const resolvedHomeserver = await resolveHomeserverInPage(homeserver);
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     const response = await transport.send({
       type: 'start_sso_login',
       homeserver: resolvedHomeserver,
@@ -721,6 +733,7 @@ export class CoreClient {
     this.session = null;
     this.accounts = [];
     this.verification = null;
+    this.resetCachedState();
     this.status = 'signed-out';
   }
 
@@ -876,7 +889,17 @@ export class CoreClient {
     this.cleanupTransport();
     this.session = null;
     this.verification = null;
+    this.resetCachedState();
     this.status = 'idle';
+  }
+
+  private resetCachedState(): void {
+    this.profileCache.clear();
+    this.profileRequests.clear();
+    this.relationsCache.clear();
+    this.sync = null;
+    this.crashed = null;
+    this.unresponsive = false;
   }
 
   private async startTransport(): Promise<void> {

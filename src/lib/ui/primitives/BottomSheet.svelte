@@ -17,6 +17,15 @@
   let dragProgress = $state(0);
   let suppressClick = false;
 
+  $effect(() => {
+    // Closing from the outside unmounts the handle mid-drag, so `endDrag` never
+    // runs and the next open would render pushed down.
+    if (!open) {
+      pointerId = null;
+      dragProgress = 0;
+    }
+  });
+
   function close(): void {
     // Left set, this transform reopens the sheet already pushed off screen.
     dragProgress = 0;

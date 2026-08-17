@@ -139,7 +139,9 @@ export class RoomTimeline {
   // so the message is briefly rendered twice.
   async expectMessageSettled(body: string, { timeout = 15_000 } = {}): Promise<void> {
     await expect(this.message(body)).toHaveCount(1, { timeout });
-    await expect(this.message(body).first()).toBeVisible();
+    // The viewport stays hidden until the initial anchor lands, which is the
+    // slow part under load, so this gets the same budget as the count.
+    await expect(this.message(body).first()).toBeVisible({ timeout });
   }
 
   async expectAnchorHeld(anchor: TimelineAnchor, { tolerance = 0.5 } = {}): Promise<void> {

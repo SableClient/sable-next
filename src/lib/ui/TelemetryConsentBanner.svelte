@@ -18,7 +18,7 @@
 </script>
 
 {#if configured && !answered}
-  <aside class="consent" aria-label={$i18n.t('settings.telemetryBannerTitle')}>
+  <aside class="consent" role="status" aria-label={$i18n.t('settings.telemetryBannerTitle')}>
     <span class="icon" aria-hidden="true"><ShieldCheckIcon /></span>
     <div class="copy">
       <p class="title">{$i18n.t('settings.telemetryBannerTitle')}</p>

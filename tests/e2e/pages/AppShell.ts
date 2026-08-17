@@ -18,7 +18,8 @@ export class AppShell {
   constructor(private readonly page: Page) {
     this.primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
     this.quickTools = page.getByRole('navigation', { name: 'Quick tools' });
-    this.startupStatus = page.getByRole('status');
+    // Scoped to the page: root-layout banners are live regions too.
+    this.startupStatus = page.getByRole('main').getByRole('status');
     this.startupHeading = page.getByRole('heading', { name: 'Starting Sable' });
     this.startupError = page.getByRole('alert');
     this.retryButton = page.getByRole('button', { name: 'Try again' });

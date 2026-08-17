@@ -34,7 +34,13 @@
   }: Props = $props();
 
   const core = useCoreClient();
+  const errorId = $props.id();
   let showPassword = $state(false);
+  let error = $derived(
+    fieldError || loginError || core.status === 'error'
+      ? (fieldError ?? loginError ?? $i18n.t('auth.unableToStart'))
+      : null
+  );
 </script>
 
 <div class="password-form">
@@ -46,6 +52,7 @@
       required
       disabled={isAuthenticating || isCheckingHomeserver}
       aria-invalid={invalidField === 'username'}
+      aria-describedby={error && invalidField === 'username' ? errorId : undefined}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onUsernameInput(event.currentTarget.value);
         onClearFieldError('username');
@@ -58,6 +65,7 @@
       bind:showPassword
       disabled={isAuthenticating || isCheckingHomeserver}
       invalid={invalidField === 'password'}
+      describedBy={error && invalidField === 'password' ? errorId : undefined}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onPasswordInput(event.currentTarget.value);
         onClearFieldError('password');
@@ -65,10 +73,8 @@
     />
   </AuthField>
   <div class="submit-area">
-    <div class="error-slot" aria-live="polite">
-      {#if fieldError || loginError || core.status === 'error'}<p class="error">
-          {fieldError ?? loginError ?? $i18n.t('auth.unableToStart')}
-        </p>{/if}
+    <div class="error-slot">
+      {#if error}<p class="error" id={errorId} role="alert">{error}</p>{/if}
     </div>
     <div class="actions">
       <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver} variant="primary">

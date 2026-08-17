@@ -3,16 +3,24 @@
 
   interface Props {
     expanded: boolean;
+    controls: string;
     showLabel: string;
     hideLabel: string;
     disabled?: boolean;
     onToggle: () => void;
   }
 
-  let { expanded, showLabel, hideLabel, disabled = false, onToggle }: Props = $props();
+  let { expanded, controls, showLabel, hideLabel, disabled = false, onToggle }: Props = $props();
 </script>
 
-<button class="method-toggle" type="button" aria-expanded={expanded} {disabled} onclick={onToggle}>
+<button
+  class="method-toggle"
+  type="button"
+  aria-expanded={expanded}
+  aria-controls={controls}
+  {disabled}
+  onclick={onToggle}
+>
   <span>{expanded ? hideLabel : showLabel}</span>
   <span class:expanded class="method-toggle-icon" aria-hidden="true"><CaretDownIcon /></span>
 </button>

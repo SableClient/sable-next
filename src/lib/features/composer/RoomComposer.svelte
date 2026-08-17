@@ -73,8 +73,8 @@
 
   let prefilledFor: string | null = null;
   let nextStagedId = 0;
-  let loadedMembersFor: string | null = null;
-  let loadedEmotesFor: string | null = null;
+  let loadedMembersFor = $state<string | null>(null);
+  let loadedEmotesFor = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
 
   let staged = $state<StagedFile[]>([]);
@@ -111,7 +111,7 @@
 
   const editor = new ComposerEditor({
     media,
-    label: $i18n.t('timeline.messagePlaceholder'),
+    label: () => $i18n.t('timeline.messagePlaceholder'),
     describedBy: hintId,
     listboxId,
     activeOptionId: () => (panelOpen && suggestions.length > 0 ? optionId(active) : null),
@@ -229,7 +229,6 @@
       error = $i18n.t('timeline.sendFailed');
     } finally {
       sending = false;
-      editor.refresh();
     }
   }
 

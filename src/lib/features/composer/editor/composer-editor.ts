@@ -4,6 +4,7 @@ import { keymap } from 'prosemirror-keymap';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { untrack } from 'svelte';
 
 import { preferences } from '$lib/settings/preferences.svelte';
 import type { AutocompleteQuery } from '../autocomplete';
@@ -30,7 +31,7 @@ export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'
 
 export interface ComposerEditorOptions {
   media: EmoteMedia;
-  label: string;
+  label: () => string;
   describedBy?: string;
   listboxId: string;
   activeOptionId: () => string | null;
@@ -84,27 +85,31 @@ export class ComposerEditor {
       ],
     });
 
-    const view = new EditorView(node, {
-      state,
-      editable: () => this.options.editable(),
-      nodeViews: composerNodeViews(this.options.media),
-      attributes: {
-        'aria-label': this.options.label,
-        role: 'combobox',
-        'aria-multiline': 'true',
-        'aria-controls': this.options.listboxId,
-        'aria-expanded': 'false',
-        ...(this.options.describedBy ? { 'aria-describedby': this.options.describedBy } : {}),
-      },
-      handlePaste: (_view, event) => this.handleFiles(filesFrom(event.clipboardData)),
-      handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
-      dispatchTransaction: (tr) => {
-        const next = view.state.apply(tr);
-        view.updateState(next);
-        this.options.onChange(this.isEmpty(), activeMarks(next));
-        this.options.onQuery(queryKey.getState(next) ?? null);
-      },
-    });
+    /* The constructor calls editable() and reads the attributes, so an unguarded
+       build makes every option a dependency of the attachment that mounts it. */
+    const view: EditorView = untrack(
+      () =>
+        new EditorView(node, {
+          state,
+          editable: () => this.options.editable(),
+          nodeViews: composerNodeViews(this.options.media),
+          attributes: {
+            'aria-label': this.options.label(),
+            role: 'combobox',
+            'aria-controls': this.options.listboxId,
+            'aria-expanded': 'false',
+            ...(this.options.describedBy ? { 'aria-describedby': this.options.describedBy } : {}),
+          },
+          handlePaste: (_view, event) => this.handleFiles(filesFrom(event.clipboardData)),
+          handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
+          dispatchTransaction: (tr) => {
+            const next = view.state.apply(tr);
+            view.updateState(next);
+            this.options.onChange(this.isEmpty(), activeMarks(next));
+            this.options.onQuery(queryKey.getState(next) ?? null);
+          },
+        })
+    );
 
     this.view = view;
 
@@ -114,8 +119,15 @@ export class ComposerEditor {
     };
   }
 
-  refresh(): void {
+  /** Read here rather than relying on the re-read `setProps` triggers, so the
+      caller's effect actually depends on it. */
+  syncEditable(): void {
+    void this.options.editable();
     this.view?.setProps({});
+  }
+
+  syncLabel(): void {
+    this.view?.dom.setAttribute('aria-label', this.options.label());
   }
 
   syncActiveOption(): void {

@@ -5,6 +5,8 @@
   import TextInput from './TextInput.svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';
 
+  /** Free text is a valid value, so the input always shows `value` itself.
+      `label` is the list's display and filter text and must not diverge from it. */
   type Item = {
     value: string;
     label: string;
@@ -86,7 +88,6 @@
       {required}
       {disabled}
       aria-invalid={ariaInvalid}
-      defaultValue={items.find((item) => item.value === value)?.label ?? value}
       oninput={handleInput}
       {onblur}
     >

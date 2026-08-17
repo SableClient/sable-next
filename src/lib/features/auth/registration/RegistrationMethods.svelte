@@ -64,6 +64,7 @@
     onConfirmPasswordInput,
   }: Props = $props();
 
+  const methodSlotId = $props.id();
   let showAllRegistrationMethods = $state(false);
   let observedHomeserver = $state('');
 
@@ -93,80 +94,85 @@
 </script>
 
 <div class="registration-methods">
-  {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
-    <LoginMethod reducedMotion={prefersReducedMotion.current}>
-      <Button
-        disabled={isRegistering || isCheckingHomeserver}
-        onclick={() => {
-          onLaunchRedirectLogin('oidc');
-        }}
-        variant="primary"
-      >
-        {#if isRegistering}<Spinner />{/if}
-        {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
-      </Button>
-    </LoginMethod>
-  {/if}
-
-  {#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
-    <LoginMethod reducedMotion={prefersReducedMotion.current}>
-      <div class="actions">
-        {#if loginFlows.sso_identity_providers.length > 0}
-          {#each loginFlows.sso_identity_providers as provider (provider.id)}
-            <Button
-              disabled={isRegistering}
-              onclick={() => {
-                onLaunchRedirectLogin('sso', provider.id);
-              }}
-              variant="primary"
-            >
-              {$i18n.t('auth.continueWithProvider', { name: provider.name })}
-            </Button>
-          {/each}
-        {:else}
+  {#if availableRegistrationMethodCount > 0}
+    <div class="method-slot" id={methodSlotId}>
+      {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
+        <LoginMethod reducedMotion={prefersReducedMotion.current}>
           <Button
-            disabled={isRegistering}
+            disabled={isRegistering || isCheckingHomeserver}
             onclick={() => {
-              onLaunchRedirectLogin('sso');
+              onLaunchRedirectLogin('oidc');
             }}
             variant="primary"
           >
+            {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
           </Button>
-        {/if}
-      </div>
-    </LoginMethod>
-  {/if}
+        </LoginMethod>
+      {/if}
 
-  {#if loginFlows && registrationFlows?.uiaa && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
-    <LoginMethod reducedMotion={prefersReducedMotion.current}>
-      <LegacyRegistrationForm
-        {serverLabel}
-        {registrationToken}
-        {isRegistering}
-        {isCheckingHomeserver}
-        {username}
-        {registrationEmail}
-        {password}
-        {confirmPassword}
-        {emailRequirement}
-        {tokenRequirement}
-        {invalidField}
-        {fieldError}
-        {onRegistrationTokenInput}
-        {onClearFieldError}
-        {onStartRegistration}
-        {onUsernameInput}
-        {onRegistrationEmailInput}
-        {onPasswordInput}
-        {onConfirmPasswordInput}
-      />
-    </LoginMethod>
+      {#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
+        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+          <div class="actions">
+            {#if loginFlows.sso_identity_providers.length > 0}
+              {#each loginFlows.sso_identity_providers as provider (provider.id)}
+                <Button
+                  disabled={isRegistering}
+                  onclick={() => {
+                    onLaunchRedirectLogin('sso', provider.id);
+                  }}
+                  variant="primary"
+                >
+                  {$i18n.t('auth.continueWithProvider', { name: provider.name })}
+                </Button>
+              {/each}
+            {:else}
+              <Button
+                disabled={isRegistering}
+                onclick={() => {
+                  onLaunchRedirectLogin('sso');
+                }}
+                variant="primary"
+              >
+                {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
+              </Button>
+            {/if}
+          </div>
+        </LoginMethod>
+      {/if}
+
+      {#if loginFlows && registrationFlows?.uiaa && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
+        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+          <LegacyRegistrationForm
+            {serverLabel}
+            {registrationToken}
+            {isRegistering}
+            {isCheckingHomeserver}
+            {username}
+            {registrationEmail}
+            {password}
+            {confirmPassword}
+            {emailRequirement}
+            {tokenRequirement}
+            {invalidField}
+            {fieldError}
+            {onRegistrationTokenInput}
+            {onClearFieldError}
+            {onStartRegistration}
+            {onUsernameInput}
+            {onRegistrationEmailInput}
+            {onPasswordInput}
+            {onConfirmPasswordInput}
+          />
+        </LoginMethod>
+      {/if}
+    </div>
   {/if}
 
   {#if availableRegistrationMethodCount > 1}
     <AuthMethodToggle
       expanded={showAllRegistrationMethods}
+      controls={methodSlotId}
       showLabel={$i18n.t('auth.moreWaysToCreateAccount')}
       hideLabel={$i18n.t('auth.hideOtherWaysToCreateAccount')}
       onToggle={() => {
@@ -182,6 +188,12 @@
 
 <style>
   .registration-methods {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .method-slot {
     display: grid;
     gap: 1rem;
     min-width: 0;

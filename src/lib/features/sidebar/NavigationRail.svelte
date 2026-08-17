@@ -54,7 +54,7 @@
     },
   ];
 
-  let spaceItems = $derived.by<RailItem[]>(() =>
+  let spaceItems = $derived<RailItem[]>(
     spaces.map((space) => {
       const name = spaceName(space.name, space.room_id);
       const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) });

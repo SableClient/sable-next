@@ -31,6 +31,7 @@ export function createWebTransport(): Transport {
   const overdue = new Set<number>();
   let nextId = 1;
   let worker: SharedWorker | null = null;
+  let closed = false;
 
   const stallAfterMs = 20_000;
 
@@ -43,6 +44,15 @@ export function createWebTransport(): Transport {
     for (const listener of stallListeners) listener(after);
   }
 
+  function rejectPending(logId: string): void {
+    const waiting = [...pending.values()];
+    pending.clear();
+    pendingCommands.clear();
+    for (const { reject } of waiting) {
+      reject(new CoreError({ code: 'failed', log_id: logId }));
+    }
+  }
+
   function handleCrash(message: string): void {
     // The failure crosses as a string, so every one of them carries this file's
     // stack. The fingerprint groups on the Rust `panicked at <path>:<line>`.
@@ -51,12 +61,7 @@ export function createWebTransport(): Transport {
       tags: { source: 'wasm-core' },
     });
     worker = null;
-    const waiting = [...pending.values()];
-    pending.clear();
-    pendingCommands.clear();
-    for (const { reject } of waiting) {
-      reject(new CoreError({ code: 'failed', log_id: `core panicked: ${message}` }));
-    }
+    rejectPending(`core panicked: ${message}`);
     for (const listener of crashListeners) listener(message);
   }
 
@@ -125,6 +130,7 @@ export function createWebTransport(): Transport {
     transfers: Transferable[] = []
   ): Promise<T> {
     return (async () => {
+      if (closed) throw new CoreError({ code: 'failed', log_id: 'transport closed' });
       const id = nextId++;
       const activeWorker = connect();
 
@@ -224,7 +230,12 @@ export function createWebTransport(): Transport {
     },
 
     close() {
+      closed = true;
       listeners.clear();
+      crashListeners.clear();
+      stallListeners.clear();
+      overdue.clear();
+      rejectPending('transport closed');
       // The worker outlives the tab: others may be using it, and it is what
       // keeps sync running.
       worker?.port.postMessage({ disconnect: true });

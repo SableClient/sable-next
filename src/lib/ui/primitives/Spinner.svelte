@@ -20,8 +20,8 @@
   }
 
   .spinner.small {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
+    height: 1rem;
+    width: 1rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
   import { i18n } from '$lib/i18n';
@@ -13,15 +14,21 @@
   let unresolved = $state(false);
   let user = $state<string | null>(null);
 
+  const routePrefix = resolve('/(app)/to/[...permalink]', { permalink: '' });
+
   $effect(() => {
     // The still-encoded tail, rather than the rest param: the matrix.to parser
     // does its own decoding.
-    const fragment = page.url.pathname.slice('/to/'.length);
+    const fragment = page.url.pathname.slice(routePrefix.length + 1);
+    let active = true;
+    unresolved = false;
+    user = null;
 
-    void (async () => {
+    const open = async (): Promise<void> => {
       // A permalink opened from a notification can beat the room list, without
       // which the room's section cannot be decided.
       await roomList.start();
+      if (!active) return;
 
       const target: PermalinkTarget | null = permalinkTarget(roomList.rooms, fragment);
       if (target === null) {
@@ -37,7 +44,13 @@
 
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- permalinkTarget resolves the route
       await goto(target.path, { replaceState: true });
-    })();
+    };
+
+    void open();
+
+    return () => {
+      active = false;
+    };
   });
 </script>
 

@@ -1,17 +1,18 @@
 <script lang="ts">
+  import { on } from 'svelte/events';
+
   import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
 
   import { readReceiptEventId } from './timeline-format';
 
   interface Props {
     timeline: RoomTimeline;
-    focusEventId: string | null;
-    initialAnchorComplete: boolean;
+    followingLive: boolean;
     nearLatest: boolean;
     onRead: (eventId: string) => Promise<void>;
   }
 
-  let { timeline, focusEventId, initialAnchorComplete, nearLatest, onRead }: Props = $props();
+  let { timeline, followingLive, nearLatest, onRead }: Props = $props();
   let documentVisible = $state(true);
   let lastReadEventId: string | null = null;
   let readingEventId: string | null = null;
@@ -21,17 +22,13 @@
       documentVisible = document.visibilityState === 'visible';
     };
     updateVisibility();
-    document.addEventListener('visibilitychange', updateVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', updateVisibility);
-    };
+    return on(document, 'visibilitychange', updateVisibility);
   });
 
   $effect(() => {
     if (timeline.mode.kind !== 'live') return;
     const eventId = readReceiptEventId(timeline.items, {
-      focusEventId,
-      initialAnchorComplete,
+      followingLive,
       nearLatest,
       documentVisible,
       lastReadEventId,

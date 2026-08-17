@@ -11,29 +11,32 @@
   }
 
   let { label, options, value, disabled = false, onSelect }: Props = $props();
+  // Native radios bring the group's arrow keys and single tab stop with them.
+  const name = $props.id();
 </script>
 
 <div class="option-cards" role="radiogroup" aria-label={label}>
   {#each options as option (option.value)}
     {@const Icon = option.icon}
     {@const selected = option.value === value}
-    <button
-      class="option-card"
-      class:selected
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      disabled={disabled || option.disabled}
-      onclick={() => {
-        onSelect(option.value);
-      }}
-    >
+    <label class="option-card" class:selected>
+      <input
+        class="screen-reader-only"
+        type="radio"
+        {name}
+        value={option.value}
+        checked={selected}
+        disabled={disabled || option.disabled}
+        onchange={() => {
+          onSelect(option.value);
+        }}
+      />
       {#if Icon}<span class="option-card-icon" aria-hidden="true"><Icon /></span>{/if}
       <span class="option-card-text">
         <span class="option-card-label">{option.label}</span>
         {#if option.hint}<span class="option-card-hint">{option.hint}</span>{/if}
       </span>
-    </button>
+    </label>
   {/each}
 </div>
 
@@ -51,24 +54,23 @@
     color: inherit;
     cursor: pointer;
     display: flex;
-    font: inherit;
     gap: var(--space-2);
     padding: var(--space-2);
-    text-align: left;
+    position: relative;
     width: 100%;
   }
 
-  .option-card:focus-visible {
+  .option-card:has(:focus-visible) {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
-  .option-card:disabled {
+  .option-card:has(:disabled) {
     cursor: not-allowed;
     opacity: 0.5;
   }
 
-  .option-card:hover:not(:disabled) {
+  .option-card:hover:not(:has(:disabled)) {
     background: var(--sable-bg-container-hover);
   }
 

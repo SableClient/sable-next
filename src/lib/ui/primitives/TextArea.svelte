@@ -12,8 +12,8 @@
 </script>
 
 <textarea
-  {...rest}
   bind:value
+  {...rest}
   class={['form-control', 'text-area', { 'form-control-error': error }, className]}></textarea>
 
 <style>

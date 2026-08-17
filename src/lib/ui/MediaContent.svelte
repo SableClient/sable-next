@@ -88,8 +88,9 @@
     <span class="media-error">{mediaLabel}</span>
   {:else if url}
     {#if kind === 'video'}
-      <svelte:element
-        this={"video"}
+      <!-- Matrix carries no caption track for an attachment. -->
+      <!-- svelte-ignore a11y_media_has_caption -->
+      <video
         class="media-content media-video"
         controls
         src={url}
@@ -99,7 +100,7 @@
         aria-label={mediaLabel}
       >
         {body}
-      </svelte:element>
+      </video>
     {:else if kind === 'audio'}
       <audio class="media-content" controls src={url} aria-label={mediaLabel}>
         {body}

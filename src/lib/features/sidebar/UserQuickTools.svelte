@@ -141,8 +141,8 @@
   .desktop-tools {
     align-items: center;
     background: var(--sable-surface-container);
-    border-top: 1px solid var(--sable-surface-container-line);
     border-right: 1px solid var(--sable-surface-container-line);
+    border-top: 1px solid var(--sable-surface-container-line);
     box-sizing: border-box;
     display: flex;
     flex: 0 0 4.625rem;

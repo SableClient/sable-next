@@ -52,6 +52,13 @@
     onPasswordInput,
     onConfirmPasswordInput,
   }: Props = $props();
+
+  const errorId = $props.id();
+  let error = $derived(fieldError && invalidField !== 'homeserver' ? fieldError : null);
+
+  function errorFor(field: Field): string | undefined {
+    return error && invalidField === field ? errorId : undefined;
+  }
 </script>
 
 <form
@@ -70,6 +77,7 @@
       required
       disabled={isRegistering}
       aria-invalid={invalidField === 'username'}
+      aria-describedby={errorFor('username')}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onUsernameInput(event.currentTarget.value);
         onClearFieldError('username');
@@ -83,6 +91,7 @@
       disabled={isRegistering}
       autocomplete="new-password"
       invalid={invalidField === 'password'}
+      describedBy={errorFor('password')}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onPasswordInput(event.currentTarget.value);
         onClearFieldError('password');
@@ -96,6 +105,7 @@
       disabled={isRegistering}
       autocomplete="new-password"
       invalid={invalidField === 'confirmPassword'}
+      describedBy={errorFor('confirmPassword')}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onConfirmPasswordInput(event.currentTarget.value);
         onClearFieldError('confirmPassword');
@@ -115,6 +125,7 @@
         required={emailRequirement === 'required'}
         disabled={isRegistering}
         aria-invalid={invalidField === 'email'}
+        aria-describedby={errorFor('email')}
         oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
           onRegistrationEmailInput(event.currentTarget.value);
           onClearFieldError('email');
@@ -147,6 +158,7 @@
         required={tokenRequirement === 'required'}
         disabled={isRegistering}
         aria-invalid={invalidField === 'registrationToken'}
+        aria-describedby={errorFor('registrationToken')}
         oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
           onRegistrationTokenInput(event.currentTarget.value);
           onClearFieldError('registrationToken');
@@ -155,8 +167,8 @@
     </AuthField>
   {/if}
   <div class="submit-area">
-    <div class="error-slot" aria-live="polite">
-      {#if fieldError && invalidField !== 'homeserver'}<p class="error">{fieldError}</p>{/if}
+    <div class="error-slot">
+      {#if error}<p class="error" id={errorId} role="alert">{error}</p>{/if}
     </div>
     <div class="actions">
       <Button type="submit" disabled={isRegistering || isCheckingHomeserver} variant="primary"

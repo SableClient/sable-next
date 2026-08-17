@@ -21,14 +21,9 @@
     onOpenChange,
     children,
   }: Props = $props();
-
-  function handleOpenChange(next: boolean): void {
-    open = next;
-    onOpenChange?.(next);
-  }
 </script>
 
-<Dialog.Root bind:open onOpenChange={handleOpenChange}>
+<Dialog.Root bind:open {onOpenChange}>
   <Dialog.Portal>
     <Dialog.Overlay class={['sable-dialog-backdrop', `sable-dialog-backdrop-${variant}`]} />
     <Dialog.Content

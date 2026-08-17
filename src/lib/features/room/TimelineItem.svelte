@@ -218,6 +218,9 @@
     pressOrigin = null;
   }
 
+  // A virtualised row can unmount mid-press, so the pending timer has to go.
+  $effect(() => endPress);
+
   async function copyText(): Promise<void> {
     if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
   }

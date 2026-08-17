@@ -58,10 +58,13 @@ test('does not send an empty message', async ({ app, timeline, homeserver, signI
   await signIn();
   await app.openRoom(homeserver.timelineRoomId);
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
-  const before = await timeline.items.count();
+  // Earlier tests post into this same room, so the newest message is whatever
+  // they left; only that it is unchanged says nothing was sent.
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  const newest = await timeline.items.last().innerText();
 
   await app.composer.press('Enter');
 
   await expect(app.sendMessage).toBeDisabled();
-  expect(await timeline.items.count()).toBe(before);
+  await expect(timeline.items.last()).toHaveText(newest);
 });

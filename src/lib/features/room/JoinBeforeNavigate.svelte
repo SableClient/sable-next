@@ -101,7 +101,7 @@
   }
 </script>
 
-<section class="join" aria-labelledby="join-title">
+<main class="join" aria-labelledby="join-title">
   {#if failed}
     <p role="alert">{$i18n.t('join.unavailable', { room: roomId })}</p>
   {:else if preview === null}
@@ -141,7 +141,7 @@
       {/if}
     {/if}
   {/if}
-</section>
+</main>
 
 <style>
   .join {

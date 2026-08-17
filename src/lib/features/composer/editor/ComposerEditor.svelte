@@ -10,7 +10,14 @@
   let { editor, placeholder, empty }: Props = $props();
 
   function mount(node: HTMLElement): () => void {
-    return editor.mount(node);
+    const detach = editor.mount(node);
+    $effect(() => {
+      editor.syncEditable();
+    });
+    $effect(() => {
+      editor.syncLabel();
+    });
+    return detach;
   }
 </script>
 

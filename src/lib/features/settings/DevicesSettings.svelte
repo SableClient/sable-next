@@ -35,6 +35,7 @@
   let deleting = $state<string | null>(null);
   let verificationOpen = $state(false);
   let currentDevice = $derived(devices.find((device) => device.is_own));
+  let cancelled = false;
 
   function deviceName(device: DeviceView | undefined): string {
     return device?.display_name?.trim() || t('settings.unnamedDevice');
@@ -69,13 +70,14 @@
         core.encryptionStatus(),
         core.devices(),
       ]);
+      if (cancelled) return;
       status = nextStatus;
       devices = nextDevices.devices;
       accountManagement = nextDevices.accountManagement;
     } catch (cause) {
-      error = messageFor(cause);
+      if (!cancelled) error = messageFor(cause);
     } finally {
-      loading = false;
+      if (!cancelled) loading = false;
     }
   }
 
@@ -156,9 +158,13 @@
 
   $effect(() => {
     void refresh();
-    return core.subscribeEvents((event) => {
+    const unsubscribe = core.subscribeEvents((event) => {
       if (event.type === 'encryption_status') status = event.status;
     });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   });
 </script>
 

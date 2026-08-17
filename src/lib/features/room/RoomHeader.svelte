@@ -38,7 +38,14 @@
     shape="room"
   />
   <h1>{roomName}</h1>
-  <Button class="members-button" variant="ghost" size="small" onclick={onMembers}>
+  <!-- Narrow viewports hide the label, leaving the icon as the only content. -->
+  <Button
+    class="members-button"
+    variant="ghost"
+    size="small"
+    aria-label={$i18n.t('timeline.members')}
+    onclick={onMembers}
+  >
     <UsersIcon />
     <span>{$i18n.t('timeline.members')}</span>
   </Button>

@@ -1,4 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { on } from 'svelte/events';
 import {
   callbackChannelName,
   createRedirectUri,
@@ -186,16 +187,13 @@ export class RedirectController {
     const listener = (event: MessageEvent<unknown>) => {
       if (event.origin !== expectedOrigin || event.source !== popup || event.data !== 'authDone')
         return;
-      window.removeEventListener('message', listener);
+      this.removeFallbackListener?.();
       this.removeFallbackListener = null;
       popup.close();
       this.popup = null;
       onComplete();
     };
-    window.addEventListener('message', listener);
-    this.removeFallbackListener = () => {
-      window.removeEventListener('message', listener);
-    };
+    this.removeFallbackListener = on(window, 'message', listener);
   }
 
   markCallbackWindow(): void {

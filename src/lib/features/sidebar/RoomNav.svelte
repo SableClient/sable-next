@@ -95,6 +95,7 @@
   type RoomNavItem = RoomNavCategory | RoomNavRow;
 
   const closedCategories = new SvelteSet<string>();
+  const roomListId = $props.id();
   let roomsClosed = $state(false);
 
   let title = $derived.by(() => {
@@ -147,12 +148,9 @@
       )
       .map((room) => ({ room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id }));
   });
-  let subspaces = $derived.by(() => spaceRootItems.filter((item) => item.kind === 'category'));
-  let visibleSubspaces = $derived.by<RoomNavItem[]>(() => visibleItems(subspaces));
-  let visibleRooms = $derived.by<RoomNavItem[]>(() => [
-    ...(roomsClosed ? [] : rooms),
-    ...visibleSubspaces,
-  ]);
+  let subspaces = $derived(spaceRootItems.filter((item) => item.kind === 'category'));
+  let visibleSubspaces = $derived<RoomNavItem[]>(visibleItems(subspaces));
+  let visibleRooms = $derived<RoomNavItem[]>([...(roomsClosed ? [] : rooms), ...visibleSubspaces]);
 
   function spaceItems(
     space: RoomSummary,
@@ -323,6 +321,7 @@
         type="button"
         class="rooms-heading sable-selection-layer"
         aria-expanded={!roomsClosed}
+        aria-controls={roomListId}
         onclick={() => {
           roomsClosed = !roomsClosed;
         }}
@@ -334,91 +333,93 @@
       </button>
     {/if}
 
-    {#if rooms.length === 0 && subspaces.length === 0}
-      {#if !collapsed && !roomsClosed}
-        <div class="empty-rooms">
-          <p>{$i18n.t('nav.roomsUnavailable')}</p>
+    <div id={roomListId}>
+      {#if rooms.length === 0 && subspaces.length === 0}
+        {#if !collapsed && !roomsClosed}
+          <div class="empty-rooms">
+            <p>{$i18n.t('nav.roomsUnavailable')}</p>
+          </div>
+        {/if}
+      {:else}
+        <div class="room-list" class:collapsed>
+          {#each visibleRooms as item (item.key)}
+            {#if item.kind === 'category'}
+              {@const name = roomName(item.room)}
+              {@const isClosed = closedCategories.has(item.key)}
+              <div class="room-row-wrap">
+                <button
+                  type="button"
+                  class="room-category sable-selection-layer"
+                  class:collapsed
+                  style:--room-depth={collapsed ? 0 : item.depth}
+                  aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
+                  aria-expanded={!isClosed}
+                  onclick={() => {
+                    toggleCategory(item.key);
+                  }}
+                >
+                  <span class:closed={isClosed} class="category-caret" aria-hidden="true"
+                    ><CaretDownIcon /></span
+                  >
+                  {#if !collapsed}<span class="category-name">{name}</span>{/if}
+                </button>
+                {#if !collapsed}
+                  <RoomOptionsMenu room={item.room} onSettings={openSettings} onLeave={openLeave} />
+                {/if}
+              </div>
+            {:else if isRoom(item)}
+              {@const room = item.room}
+              {@const name = room ? roomName(room) : item.roomId}
+              {@const href = roomHref(item)}
+              {@const unread = room?.highlight || room?.unread || 0}
+              <div class="room-row-wrap">
+                <a
+                  class="room-row sable-selection-layer"
+                  class:active={page.url.pathname === href}
+                  {href}
+                  style:--room-depth={collapsed ? 0 : item.depth}
+                  onclick={() => onNavigate?.(href)}
+                  aria-label={collapsed ? name : undefined}
+                  aria-current={page.url.pathname === href ? 'page' : undefined}
+                >
+                  <span class="room-icon" aria-hidden="true">
+                    {#if room?.avatar_url}
+                      <MediaImage
+                        source={room.avatar_url}
+                        alt=""
+                        width={56}
+                        height={56}
+                        class="room-image"
+                      />
+                    {:else}
+                      {initial(name)}
+                    {/if}
+                  </span>
+                  {#if !collapsed}
+                    <span class="room-name">{name}</span>
+                    {#if unread > 0}
+                      <span
+                        class:highlight={(room?.highlight ?? 0) > 0}
+                        class="room-badge"
+                        aria-label={$i18n.t('nav.unreadMessages', { count: unread })}>{unread}</span
+                      >
+                    {/if}
+                  {/if}
+                </a>
+                {#if !collapsed && room}
+                  <RoomOptionsMenu
+                    {room}
+                    parentSpaceId={item.parentSpaceId ?? null}
+                    onSettings={openSettings}
+                    onLeave={openLeave}
+                  />
+                {/if}
+              </div>
+            {/if}
+          {/each}
         </div>
       {/if}
-    {:else}
-      <div class="room-list" class:collapsed>
-        {#each visibleRooms as item (item.key)}
-          {#if item.kind === 'category'}
-            {@const name = roomName(item.room)}
-            {@const isClosed = closedCategories.has(item.key)}
-            <div class="room-row-wrap">
-              <button
-                type="button"
-                class="room-category sable-selection-layer"
-                class:collapsed
-                style:--room-depth={collapsed ? 0 : item.depth}
-                aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
-                aria-expanded={!isClosed}
-                onclick={() => {
-                  toggleCategory(item.key);
-                }}
-              >
-                <span class:closed={isClosed} class="category-caret" aria-hidden="true"
-                  ><CaretDownIcon /></span
-                >
-                {#if !collapsed}<span class="category-name">{name}</span>{/if}
-              </button>
-              {#if !collapsed}
-                <RoomOptionsMenu room={item.room} onSettings={openSettings} onLeave={openLeave} />
-              {/if}
-            </div>
-          {:else if isRoom(item)}
-            {@const room = item.room}
-            {@const name = room ? roomName(room) : item.roomId}
-            {@const href = roomHref(item)}
-            {@const unread = room?.highlight || room?.unread || 0}
-            <div class="room-row-wrap">
-              <a
-                class="room-row sable-selection-layer"
-                class:active={page.url.pathname === href}
-                {href}
-                style:--room-depth={collapsed ? 0 : item.depth}
-                onclick={() => onNavigate?.(href)}
-                aria-label={collapsed ? name : undefined}
-                aria-current={page.url.pathname === href ? 'page' : undefined}
-              >
-                <span class="room-icon" aria-hidden="true">
-                  {#if room?.avatar_url}
-                    <MediaImage
-                      source={room.avatar_url}
-                      alt=""
-                      width={56}
-                      height={56}
-                      class="room-image"
-                    />
-                  {:else}
-                    {initial(name)}
-                  {/if}
-                </span>
-                {#if !collapsed}
-                  <span class="room-name">{name}</span>
-                  {#if unread > 0}
-                    <span
-                      class:highlight={(room?.highlight ?? 0) > 0}
-                      class="room-badge"
-                      aria-label={$i18n.t('nav.unreadMessages', { count: unread })}>{unread}</span
-                    >
-                  {/if}
-                {/if}
-              </a>
-              {#if !collapsed && room}
-                <RoomOptionsMenu
-                  {room}
-                  parentSpaceId={item.parentSpaceId ?? null}
-                  onSettings={openSettings}
-                  onLeave={openLeave}
-                />
-              {/if}
-            </div>
-          {/if}
-        {/each}
-      </div>
-    {/if}
+    </div>
   </div>
 </section>
 
@@ -441,9 +442,9 @@
 <style>
   .room-nav {
     background: var(--sable-bg-container);
+    border-right: 1px solid var(--sable-surface-container-line);
     box-sizing: border-box;
     color: var(--sable-bg-on-container);
-    border-right: 1px solid var(--sable-surface-container-line);
     display: flex;
     flex: 1;
     flex-direction: column;

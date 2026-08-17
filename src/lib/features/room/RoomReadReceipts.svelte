@@ -50,7 +50,9 @@
   let names = $derived(seen.map((reader) => reader.name).join(', '));
 
   $effect(() => {
-    if (!visible) open = false;
+    // Losing the readers unmounts the anchor, which would drop a desktop
+    // popover through to the bottom sheet branch.
+    if (!visible || readers.length === 0) open = false;
   });
 
   function localPart(userId: string): string {

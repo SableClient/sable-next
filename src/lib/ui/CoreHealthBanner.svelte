@@ -1,17 +1,21 @@
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
+  import { i18n } from '$lib/i18n';
 
   const core = useCoreClient();
 
   const notice = $derived.by(() => {
     if (core.crashed !== null) {
-      return { kind: 'crash' as const, text: 'Sable hit an internal error and stopped syncing.' };
+      return { kind: 'crash' as const, text: $i18n.t('errors.coreCrashed') };
     }
     if (core.unresponsive) {
-      return { kind: 'warn' as const, text: 'Sable is not responding.' };
+      return { kind: 'warn' as const, text: $i18n.t('errors.coreUnresponsive') };
     }
     if (core.sync?.state === 'error') {
-      return { kind: 'warn' as const, text: `Sync failed: ${core.sync.message}` };
+      return {
+        kind: 'warn' as const,
+        text: $i18n.t('errors.syncFailed', { message: core.sync.message }),
+      };
     }
     return null;
   });
@@ -25,7 +29,7 @@
   <div class="banner" class:crash={notice.kind === 'crash'} role="alert">
     <p class="message">{notice.text}</p>
     {#if notice.kind === 'crash'}
-      <button type="button" onclick={reload}>Reload</button>
+      <button type="button" onclick={reload}>{$i18n.t('errors.reload')}</button>
     {/if}
   </div>
 {/if}

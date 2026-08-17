@@ -621,7 +621,10 @@
     "tooManyAttempts": "Too many sign-in attempts. Try again later.",
     "tooManyAttemptsSeconds": "Too many sign-in attempts. Try again in {{seconds}} seconds.",
     "connectionError": "Unable to sign in due to a connection error.",
-    "coreError": "Unable to sign in due to a core or homeserver error."
+    "coreError": "Unable to sign in due to a core or homeserver error.",
+    "coreCrashed": "Sable hit an internal error and stopped syncing.",
+    "coreUnresponsive": "Sable is not responding.",
+    "syncFailed": "Sync failed: {{message}}"
   },
   "composer": {
     "insert": "Insert",

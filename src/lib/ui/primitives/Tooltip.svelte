@@ -33,7 +33,7 @@
     {...props}
     class={['tooltip-trigger', `tooltip-trigger-${variant}`, className]}
     type="button"
-    aria-label={label}
+    aria-label={variant === 'icon' ? label : undefined}
   >
     {@render children?.()}
   </button>
@@ -121,13 +121,9 @@
   @media (prefers-reduced-motion: no-preference) {
     .tooltip-trigger {
       transition:
+        background-color var(--motion-normal) var(--motion-easing-standard),
         color var(--motion-normal) var(--motion-easing-standard),
         box-shadow var(--motion-normal) var(--motion-easing-standard);
-    }
-
-    .tooltip-trigger-icon:active,
-    .tooltip-trigger-icon[data-state='open'] {
-      transition: background-color var(--motion-normal) var(--motion-easing-standard);
     }
   }
 

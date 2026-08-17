@@ -20,7 +20,6 @@
 
   type Gesture = SwipeGesture & { width: number };
 
-  let open = $state(!page.params.roomId);
   let position = $state<number | undefined>();
   let dragging = $state(false);
   let gesture: Gesture | undefined;
@@ -28,9 +27,12 @@
   // A room route is enough to render its timeline; room-list hydration must not flash the sidebar.
   let roomId = $derived(page.params.roomId);
   let canShowConversation = $derived(Boolean(roomId));
+  let open = $derived(!roomId);
 
+  // Navigating out from under a drag would otherwise leave the track pinned at
+  // the gesture's last offset.
   $effect(() => {
-    open = !roomId;
+    void roomId;
     position = undefined;
     dragging = false;
     gesture = undefined;
@@ -140,9 +142,9 @@
       <SidebarNav mobile />
     </section>
     <section class="drawer-panel content-panel" inert={open && !appLayout.matches}>
-      <main class="content">
+      <div class="content">
         {@render children()}
-      </main>
+      </div>
     </section>
   </div>
 </div>

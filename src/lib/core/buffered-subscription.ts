@@ -18,8 +18,9 @@ export function bufferSubscription<Event, Diff, Item>(
     if (!selected) return;
 
     if (subscription === null) {
-      const diffs = buffered.get(selected.subscription) ?? [];
-      buffered.set(selected.subscription, [...diffs, ...selected.diffs]);
+      const diffs = buffered.get(selected.subscription);
+      if (diffs) diffs.push(...selected.diffs);
+      else buffered.set(selected.subscription, [...selected.diffs]);
     } else if (selected.subscription === subscription) {
       update(selected.diffs);
     }

@@ -55,6 +55,16 @@ export default defineConfig([
       'svelte/no-useless-mustaches': 'error',
       'svelte/prefer-const': 'error',
       'svelte/valid-compile': ['error', { ignoreWarnings: false }],
+
+      // `on()` hands back its own unsubscriber, so teardown cannot be forgotten.
+      'svelte/no-add-event-listener': 'error',
+      'svelte/button-has-type': 'error',
+      'svelte/no-ignored-unsubscribe': 'error',
+      'svelte/no-target-blank': 'error',
+      // Nothing here may read `window`/`document` at module scope: `ssr` is off,
+      // but the modules are still evaluated in node when prerendering the shell.
+      'svelte/no-top-level-browser-globals': 'error',
+      'svelte/prefer-derived-over-derived-by': 'error',
     },
   },
   {

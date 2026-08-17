@@ -13,11 +13,12 @@
     density?: 'default' | 'compact';
   };
 
+  const uid = $props.id();
   let {
     title,
     description,
     eyebrow,
-    titleId = 'app-page-title',
+    titleId = uid,
     class: className = '',
     actions,
     children,

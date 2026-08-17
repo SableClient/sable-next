@@ -35,13 +35,13 @@
   class={['sable-avatar', `sable-avatar-${size}`, `sable-avatar-${shape}`, className]}
   style:background={color}
   aria-hidden={decorative ? 'true' : undefined}
-  role={decorative || src ? undefined : 'img'}
-  aria-label={decorative || src ? undefined : accessibleLabel}
+  role={decorative ? undefined : 'img'}
+  aria-label={decorative ? undefined : accessibleLabel}
 >
   {#if src?.startsWith('mxc://')}
-    <MediaImage class="avatar-image" source={src} alt={alt ?? ''} width={96} height={96} />
+    <MediaImage class="avatar-image" source={src} alt="" width={96} height={96} />
   {:else if src}
-    <img {src} alt={alt ?? ''} />
+    <img {src} alt="" />
   {:else}
     <span>{initials}</span>
   {/if}

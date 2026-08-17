@@ -62,6 +62,7 @@
       return;
     }
 
+    url = null;
     void loadMediaUrl(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;

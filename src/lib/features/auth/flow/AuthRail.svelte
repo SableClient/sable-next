@@ -31,6 +31,7 @@
   let lastActiveIndex: number | null = null;
   let scrollTimer: number | undefined;
   let scrollAnimation: number | undefined;
+  let motionReadyFrame: number | undefined;
   let isDragging = $state(false);
   let swipeGesture: SwipeGesture | undefined;
   let swipeStartScroll = 0;
@@ -187,7 +188,7 @@
       animateToCard(rail, card);
     } else {
       rail.scrollLeft = cardTarget(rail, card);
-      window.requestAnimationFrame(() => {
+      motionReadyFrame = window.requestAnimationFrame(() => {
         motionReady = true;
       });
     }
@@ -198,6 +199,12 @@
       const focusTarget = heading ?? card.querySelector<HTMLElement>('input, button, [tabindex]');
       focusTarget?.focus({ preventScroll: true });
     }
+
+    return () => {
+      window.cancelAnimationFrame(scrollAnimation ?? 0);
+      window.cancelAnimationFrame(motionReadyFrame ?? 0);
+      window.clearTimeout(scrollTimer);
+    };
   });
 </script>
 

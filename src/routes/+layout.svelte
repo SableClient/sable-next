@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import type { Snippet } from 'svelte';
   import { Tooltip } from 'bits-ui';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
   import '../styles.css';
   import { createCoreClient } from '$lib/core/client.svelte';
   import { provideCoreClient } from '$lib/core/context';
@@ -30,9 +31,13 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<CoreHealthBanner />
-<TelemetryConsentBanner />
+<!-- Icons ride along with a labelled control, so `role="img"` would only add a
+     nameless node to the tree. -->
+<IconContext values={{ 'aria-hidden': true }}>
+  <CoreHealthBanner />
+  <TelemetryConsentBanner />
 
-<Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
-  {@render children()}
-</Tooltip.Provider>
+  <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
+    {@render children()}
+  </Tooltip.Provider>
+</IconContext>

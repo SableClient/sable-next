@@ -188,19 +188,13 @@ export function latestEventId(items: readonly TimelineItemView[]): string | null
 export function readReceiptEventId(
   items: readonly TimelineItemView[],
   options: {
-    focusEventId: string | null;
-    initialAnchorComplete: boolean;
+    followingLive: boolean;
     nearLatest: boolean;
     documentVisible: boolean;
     lastReadEventId: string | null;
   }
 ): string | null {
-  if (
-    options.focusEventId !== null ||
-    !options.initialAnchorComplete ||
-    !options.nearLatest ||
-    !options.documentVisible
-  ) {
+  if (!options.followingLive || !options.nearLatest || !options.documentVisible) {
     return null;
   }
 

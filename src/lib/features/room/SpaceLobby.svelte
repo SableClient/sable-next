@@ -40,7 +40,7 @@
   const removed = new SvelteSet<string>();
   const closed = new SvelteSet<string>();
 
-  let rooms = $state<SpaceHierarchyRoomView[]>([]);
+  let rooms = $state.raw<SpaceHierarchyRoomView[]>([]);
   let nextBatch = $state<string | null>(null);
   let loading = $state(false);
   let failed = $state(false);

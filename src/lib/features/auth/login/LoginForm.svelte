@@ -83,9 +83,15 @@
       : null
   );
 
+  const methodSlotId = $props.id();
+  // A combobox pick and the blur it causes both validate, so only the latest
+  // answer may release the controls.
+  let latestValidation = 0;
+
   async function validateHomeserver(): Promise<LoginFlowsView | null> {
+    const validation = ++latestValidation;
     const flows = await onValidateHomeserver();
-    if (flows) {
+    if (flows && validation === latestValidation) {
       displayedHomeserver = homeserver;
       showAllLoginMethods = false;
     }
@@ -127,14 +133,14 @@
         {$i18n.t('auth.checkingProvider')}
       </div>
     {:else if statusError}
-      <p class="status-message error" title={statusError}>{statusError}</p>
+      <p class="status-message error" role="alert" title={statusError}>{statusError}</p>
     {:else if loginFlows && availableLoginMethodCount === 0}
       <p class="status-message muted">{$i18n.t('errors.unsupportedSignIn')}</p>
     {/if}
   </div>
 
   <div class="login-methods">
-    <div class="method-slot" class:action-slot={hasLoginAction}>
+    <div class="method-slot" class:action-slot={hasLoginAction} id={methodSlotId}>
       {#if !loginFlows}
         <div class="actions">
           <Button
@@ -218,6 +224,7 @@
     {#if availableLoginMethodCount > 1}
       <AuthMethodToggle
         expanded={showAllLoginMethods}
+        controls={methodSlotId}
         showLabel={$i18n.t('auth.moreWaysToSignIn')}
         hideLabel={$i18n.t('auth.hideOtherWaysToSignIn')}
         disabled={isLoginControlsDisabled}

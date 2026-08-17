@@ -61,6 +61,7 @@
   let clampable = $derived(Boolean(bioMoreLabel && bioLessLabel));
   let expanded = $state(false);
   let truncated = $state(false);
+  const uid = $props.id();
 
   // The bio arrives with the profile fetch, so the overflow check has to outlive
   // the first render.
@@ -126,6 +127,7 @@
       {#if children}
         <div class="profile-card-bio-block">
           <div
+            id="{uid}-bio"
             class="profile-card-bio"
             class:clamped={clampable && !expanded}
             {@attach measureOverflow}
@@ -136,6 +138,8 @@
             <button
               class="profile-card-bio-toggle"
               type="button"
+              aria-expanded={expanded}
+              aria-controls="{uid}-bio"
               onclick={() => (expanded = !expanded)}
             >
               {expanded ? bioLessLabel : bioMoreLabel}
@@ -226,7 +230,7 @@
     position: relative;
   }
 
-  :global(.sable-avatar.profile-card-avatar) {
+  .profile-card-crest :global(.sable-avatar.profile-card-avatar) {
     --avatar-size: var(--profile-avatar-size);
 
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);

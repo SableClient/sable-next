@@ -24,7 +24,6 @@
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
-  let widthReady = $state(false);
   let spaces = $derived.by(() => {
     const joinedSpaces = roomList.rooms.filter((room) => room.is_space && room.state === 'joined');
     const childSpaceIds = joinedSpaces.flatMap((space) =>
@@ -38,12 +37,6 @@
   onMount(() => {
     const storedWidth = Number.parseInt(localStorage.getItem(ROOM_NAV_STORAGE_KEY) ?? '', 10);
     if (Number.isFinite(storedWidth)) roomNavWidth = clampRoomNavWidth(storedWidth);
-    widthReady = true;
-  });
-
-  $effect(() => {
-    if (!widthReady || mobile) return;
-    localStorage.setItem(ROOM_NAV_STORAGE_KEY, String(roomNavWidth));
   });
 
   function clampRoomNavWidth(width: number) {
@@ -80,6 +73,7 @@
 
     drag = undefined;
     dragging = false;
+    persistRoomNavWidth();
   }
 
   function handleResizeKeydown(event: KeyboardEvent) {
@@ -89,6 +83,11 @@
     roomNavWidth = clampRoomNavWidth(
       roomNavWidth + (event.key === 'ArrowLeft' ? -ROOM_NAV_WIDTH_STEP : ROOM_NAV_WIDTH_STEP)
     );
+    persistRoomNavWidth();
+  }
+
+  function persistRoomNavWidth() {
+    localStorage.setItem(ROOM_NAV_STORAGE_KEY, String(roomNavWidth));
   }
 </script>
 

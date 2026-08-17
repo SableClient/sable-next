@@ -57,6 +57,7 @@
     "svelte-i18next": "^2.2.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@sentry/sveltekit": "^10.70.0",

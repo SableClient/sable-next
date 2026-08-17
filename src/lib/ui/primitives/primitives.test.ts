@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { mount } from 'svelte';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import Alert from './Alert.svelte';
 import AppPageShell from './AppPageShell.svelte';
@@ -10,6 +10,7 @@ import Button from './Button.svelte';
 import EmptyState from './EmptyState.svelte';
 import IconButton from './IconButton.svelte';
 import LinkButton from './LinkButton.svelte';
+import OptionCards from './OptionCards.svelte';
 import Skeleton from './Skeleton.svelte';
 import StatusBadge from './StatusBadge.svelte';
 import TextArea from './TextArea.svelte';
@@ -85,6 +86,36 @@ test('decorative avatars stay out of the accessibility tree', () => {
 
   expect(document.querySelector('.sable-avatar')?.getAttribute('aria-hidden')).toBe('true');
   expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBeNull();
+});
+
+test('option cards are one native radio group', () => {
+  const onSelect = vi.fn();
+  mount(OptionCards, {
+    target: document.body,
+    props: {
+      label: 'Visibility',
+      value: 'private',
+      onSelect,
+      options: [
+        { value: 'private', label: 'Private', hint: 'Invite only' },
+        { value: 'public', label: 'Public' },
+        { value: 'space', label: 'Space', disabled: true },
+      ],
+    },
+  });
+
+  const radios = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+
+  expect(document.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe(
+    'Visibility'
+  );
+  expect(new Set(radios.map((radio) => radio.name)).size).toBe(1);
+  expect(radios[0].checked).toBe(true);
+  expect(radios[2].disabled).toBe(true);
+
+  radios[1].click();
+
+  expect(onSelect).toHaveBeenCalledWith('public');
 });
 
 test('skeletons are decorative and forward presentation attributes', () => {

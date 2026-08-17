@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { on } from 'svelte/events';
   import { page } from '$app/state';
   import AppShell from '$lib/ui/AppShell.svelte';
   import SettingsPanel from '$lib/features/settings/SettingsPanel.svelte';
@@ -27,7 +28,7 @@
 
   $effect(() => {
     if (core.status === 'signed-out') {
-      void goto(resolve('/login'));
+      void goto(resolve('/login'), { replaceState: true });
     }
   });
 
@@ -49,10 +50,7 @@
       followSettingsLink(event, section, anchor?.dataset.settingsLinkFocus, shallow);
     };
 
-    document.addEventListener('click', onClick);
-    return () => {
-      document.removeEventListener('click', onClick);
-    };
+    return on(document, 'click', onClick);
   });
 
   $effect(() => {

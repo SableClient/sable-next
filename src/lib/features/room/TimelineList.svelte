@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
+  import { on } from 'svelte/events';
   import { get } from 'svelte/store';
   import { createVirtualizer } from '@tanstack/svelte-virtual';
 
@@ -66,6 +67,7 @@
     canRedactOthers?: boolean;
     scrollLocked?: boolean;
     nearLatest?: boolean;
+    followingLive?: boolean;
   }
 
   let {
@@ -91,6 +93,7 @@
     canRedactOthers = false,
     scrollLocked = false,
     nearLatest = $bindable(true),
+    followingLive = $bindable(false),
   }: Props = $props();
   let folded = $derived(
     foldEventRuns(visibleTimelineItems(timeline.items, preferences, { readOnly }))
@@ -111,7 +114,8 @@
 
   // The mount-time target belongs to the anchoring effect below, so it starts
   // here as already handled.
-  let smoothTarget: string | null = untrack(() => focusEventId);
+  // svelte-ignore state_referenced_locally
+  let smoothTarget: string | null = focusEventId;
   $effect(() => {
     const target = focusEventId;
     if (target === null) {
@@ -122,7 +126,7 @@
     const index = visibleItems.findIndex((item) => item.event_id === target);
     if (index < 0) return;
     smoothTarget = target;
-    scrollMode = { kind: 'focused', eventId: target };
+    setScrollMode({ kind: 'focused', eventId: target });
     focusAnchored = true;
     get(virtualizer).scrollToIndex(index, { align: 'center', behavior: 'smooth' });
   });
@@ -132,16 +136,19 @@
   let virtualizerTotalSize = 0;
   let virtualizerViewportSize = 0;
   let focusAnchored = false;
-  let scrollMode = $state<TimelineScrollMode>(
-    untrack(() => initialTimelineScrollMode(focusEventId))
-  );
+  // Only the mount-time target picks the mode; later ones go through the effect.
+  // svelte-ignore state_referenced_locally
+  let scrollMode = $state<TimelineScrollMode>(initialTimelineScrollMode(focusEventId));
+  function setScrollMode(mode: TimelineScrollMode): void {
+    scrollMode = mode;
+    followingLive = mode.kind === 'followingLive';
+  }
   const initialItems: readonly TimelineItemView[] = [];
   let initialEndReconciliationPending = false;
   let followingEndReconciliationPending = false;
   let timelineDebugSample = $state<TimelineDebugSample | null>(null);
   const timelineDebugRecorder = new TimelineDebugRecorder();
   const identityTracker = new TimelineIdentityTracker();
-  const scrollRegionAttributes = { tabindex: 0 } as const;
   const timelineDebugEnabledForView = timelineDebugEnabled();
   let historyController: TimelineHistoryController;
   let historyDebugItems: readonly TimelineItemView[] = initialItems;
@@ -292,6 +299,10 @@
     });
   }
 
+  function isInitialLive(): boolean {
+    return scrollMode.kind === 'initialLive';
+  }
+
   function scheduleInitialEndReconciliation(): void {
     if (scrollMode.kind !== 'initialLive' || initialEndReconciliationPending) return;
 
@@ -303,7 +314,9 @@
       get(virtualizer).scrollToEnd({ behavior: 'auto' });
       await new Promise(requestAnimationFrame);
       const activeViewport = viewport;
-      if (untrack(() => scrollMode.kind) !== 'initialLive') return;
+      // A frame has passed, so the mode has to be read afresh. Through a call,
+      // which the narrowing from the check above does not reach into.
+      if (!isInitialLive()) return;
       const distance =
         activeViewport.scrollHeight - activeViewport.scrollTop - activeViewport.clientHeight;
       if (distance > 1 || get(virtualizer).isScrolling) {
@@ -312,7 +325,7 @@
       }
       if (!historyController.isRequestPending && timeline.backwardPagination !== 'loading') {
         nearLatest = true;
-        scrollMode = { kind: 'followingLive' };
+        setScrollMode({ kind: 'followingLive' });
         scheduleFollowingEndReconciliation();
       }
     });
@@ -442,14 +455,19 @@
     if (!viewport) return;
     nearLatest = isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold);
     if (timeline.mode.kind === 'live' && scrollMode.kind !== 'initialLive') {
-      if (nearLatest && scrollMode.kind !== 'followingLive') {
-        scrollMode = { kind: 'followingLive' };
+      if (
+        nearLatest &&
+        scrollMode.kind !== 'followingLive' &&
+        // The smooth scroll onto a focused event can itself end inside the threshold.
+        (scrollMode.kind !== 'focused' || historyController.hasUserScrollPending)
+      ) {
+        setScrollMode({ kind: 'followingLive' });
       } else if (
         !nearLatest &&
         scrollMode.kind !== 'readingHistory' &&
         historyController.hasUserScrollPending
       ) {
-        scrollMode = { kind: 'readingHistory' };
+        setScrollMode({ kind: 'readingHistory' });
       }
     }
     historyController.refreshQueuedRequest();
@@ -481,30 +499,24 @@
       const block = (event: Event): void => {
         event.preventDefault();
       };
-      node.addEventListener('wheel', block, { passive: false });
-      node.addEventListener('touchmove', block, { passive: false });
+      const offWheel = on(node, 'wheel', block, { passive: false });
+      const offTouchmove = on(node, 'touchmove', block, { passive: false });
       return () => {
-        node.removeEventListener('wheel', block);
-        node.removeEventListener('touchmove', block);
+        offWheel();
+        offTouchmove();
       };
     };
   }
 
   function jumpToLatest(): void {
     historyController.finishHistoryFill();
-    scrollMode = { kind: 'followingLive' };
+    setScrollMode({ kind: 'followingLive' });
     get(virtualizer).scrollToEnd({ behavior: 'smooth' });
     nearLatest = true;
   }
 </script>
 
-<TimelineReadReceipt
-  {timeline}
-  {focusEventId}
-  initialAnchorComplete={scrollMode.kind === 'followingLive'}
-  {nearLatest}
-  {onRead}
-/>
+<TimelineReadReceipt {timeline} {followingLive} {nearLatest} {onRead} />
 
 {#if timeline.error}
   <Alert class="timeline-error" variant="critical" role="alert"
@@ -544,11 +556,13 @@
   {/if}
 
   <div class={['timeline-viewport', { initial: scrollMode.kind === 'initialLive' }]}>
+    <!-- A scrollable region has to be keyboard-operable. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
       bind:this={viewport}
       class="viewport"
       aria-label={$i18n.t('timeline.label')}
-      {...scrollRegionAttributes}
+      tabindex="0"
       onscroll={onScroll}
       {@attach userScrollMarker}
       {@attach scrollLock(scrollLocked || personaOpen)}

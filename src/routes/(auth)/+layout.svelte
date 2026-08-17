@@ -9,19 +9,20 @@
   let { children }: { children: Snippet } = $props();
   const core = useCoreClient();
 
+  const loginPath = resolve('/login');
+  const registerPath = resolve('/register');
+  let authEntry = $derived(
+    page.url.pathname.startsWith(loginPath) || page.url.pathname.startsWith(registerPath)
+  );
+
   $effect(() => {
-    if (
-      core.status === 'ready' &&
-      !page.url.pathname.startsWith('/register') &&
-      !page.url.pathname.startsWith('/login') &&
-      !page.url.searchParams.has('addAccount')
-    ) {
-      void goto(resolve('/home'));
+    if (core.status === 'ready' && !authEntry && !page.url.searchParams.has('addAccount')) {
+      void goto(resolve('/home'), { replaceState: true });
     }
   });
 </script>
 
-{#if page.url.pathname.startsWith('/login') || page.url.pathname.startsWith('/register')}
+{#if authEntry}
   <AuthFlow />
 {/if}
 {@render children()}
