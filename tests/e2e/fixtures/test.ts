@@ -81,8 +81,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   scratchRoom: async ({ homeserver }, use, testInfo) => {
     const name = `Scratch ${String(testInfo.parallelIndex)} ${testInfo.testId}`;
     const roomId = await createRoom(homeserver.baseUrl, homeserver.accessToken, name);
-    // Sync orders rooms by activity, and an empty one can stay outside the
-    // window the client asks for.
+    // Sync orders rooms by activity, so an empty one can stay outside the window.
     await sendTimelineMessage(
       homeserver.baseUrl,
       homeserver.accessToken,
