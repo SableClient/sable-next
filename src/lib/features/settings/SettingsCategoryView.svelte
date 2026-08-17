@@ -21,6 +21,7 @@
   import type { Preferences } from '$lib/settings/preferences.svelte';
 
   import NotificationDefaults from '$lib/features/notifications/NotificationDefaults.svelte';
+  import PushGateway from '$lib/features/notifications/PushGateway.svelte';
   import StateEventTool from './StateEventTool.svelte';
 
   interface Props {
@@ -166,6 +167,9 @@
     {#if category.id === 'notifications'}
       <section class="settings-card">
         <NotificationDefaults />
+      </section>
+      <section class="settings-card">
+        <PushGateway />
       </section>
     {/if}
 

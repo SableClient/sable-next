@@ -1,6 +1,6 @@
-use sable_core::protocol::NotificationView;
 #[cfg(any(mobile, test))]
 use sable_core::protocol::WebPushKeys;
+use sable_core::protocol::{CommandErr, NotificationView};
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notifications::NotificationsExt;
 
@@ -58,6 +58,21 @@ pub async fn show<R: Runtime>(
     }
 }
 
+/// Resolved by the webview, so the binary bakes no gateway of its own.
+#[derive(serde::Deserialize)]
+#[cfg_attr(
+    not(mobile),
+    expect(dead_code, reason = "only a mobile build registers a pusher")
+)]
+pub struct PushConfig {
+    pub gateway_url: String,
+    pub vapid_key: String,
+    pub web_app_id: String,
+    /// Absent when the reader has retargeted the gateway: a token distributor
+    /// needs an app id that gateway serves, and only the deployment names one.
+    pub native_app_id: Option<String>,
+}
+
 #[cfg(any(mobile, test))]
 struct Registration {
     token: String,
@@ -85,43 +100,48 @@ fn pusher(
     }
 }
 
+/// # Errors
+///
+/// When the platform refuses a push registration, or the homeserver rejects the
+/// pusher the distributor asked for.
 #[cfg(mobile)]
-pub async fn register_push<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Core) {
+pub async fn register_push<R: Runtime>(
+    app: &AppHandle<R>,
+    core: &sable_core::Core,
+    config: PushConfig,
+) -> Result<(), CommandErr> {
     use sable_core::protocol::{Command, PusherView};
 
-    let Some(url) = option_env!("PUSH_GATEWAY_URL") else {
-        return;
-    };
-
-    let registered = match app
+    let registered = app
         .notifications()
-        .register_for_push_notifications(option_env!("PUSH_VAPID_KEY").map(str::to_owned), None)
+        .register_for_push_notifications(Some(config.vapid_key), None)
         .await
-    {
-        Ok(registered) => Registration {
-            token: registered.device_token,
-            p256dh: registered.p256dh,
-            auth: registered.auth,
-        },
-        Err(error) => {
+        .map_err(|error| {
             log::warn!("could not register for push: {error}");
-            return;
-        }
+            CommandErr::Unavailable
+        })?;
+
+    let registration = Registration {
+        token: registered.device_token,
+        p256dh: registered.p256dh,
+        auth: registered.auth,
     };
 
+    // No app id for what the platform handed back means that half is simply
+    // unconfigured in this build.
     let Some((app_id, pushkey, web_push)) = pusher(
-        registered,
-        option_env!("PUSH_APP_ID"),
-        option_env!("PUSH_WEB_APP_ID"),
+        registration,
+        config.native_app_id.as_deref(),
+        Some(&config.web_app_id),
     ) else {
-        return;
+        return Ok(());
     };
 
     let command = Command::SetPusher {
         pusher: PusherView {
             pushkey,
             app_id,
-            url: url.to_owned(),
+            url: config.gateway_url,
             device_display_name: format!("Sable on {}", std::env::consts::OS),
             web_push,
             event_id_only: !core.notification_content(),
@@ -129,14 +149,24 @@ pub async fn register_push<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Co
         },
     };
 
-    if let Err(error) = core.dispatch(command).await {
-        log::warn!("could not tell the homeserver where to push: {error:?}");
-    }
+    core.dispatch(command).await.map(|_| ())
 }
 
+/// A desktop build has no distributor to register with, and nothing runs to
+/// receive a push once it is closed.
+///
+/// # Errors
+///
+/// Never; the signature mirrors the mobile one.
 #[cfg(not(mobile))]
 #[expect(clippy::unused_async, reason = "mirrors the mobile signature")]
-pub async fn register_push<R: Runtime>(_app: &AppHandle<R>, _core: &sable_core::Core) {}
+pub async fn register_push<R: Runtime>(
+    _app: &AppHandle<R>,
+    _core: &sable_core::Core,
+    _config: PushConfig,
+) -> Result<(), CommandErr> {
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

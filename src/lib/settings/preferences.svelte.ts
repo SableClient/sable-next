@@ -34,6 +34,11 @@ export interface Preferences {
   notificationSounds: boolean;
   notificationContent: boolean;
 
+  /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
+  pushGatewayUrl: string;
+  pushVapidKey: string;
+  pushAppId: string;
+
   errorReporting: boolean;
   sessionReplay: boolean;
   /** Distinguishes a declined prompt from one that was never shown. */
@@ -65,6 +70,16 @@ const ENUMS = {
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
+/** Strings with no fixed set of values, which the loader would otherwise drop. */
+const FREE_TEXT = [
+  'pushGatewayUrl',
+  'pushVapidKey',
+  'pushAppId',
+] as const satisfies readonly (keyof Preferences)[];
+
+/** Excluded from `SelectPreference`, since these have no fixed set of choices. */
+export type FreeTextPreference = (typeof FREE_TEXT)[number];
+
 const DEFAULTS: Preferences = {
   layout: 'modern',
   messageSpacing: 'cozy',
@@ -95,6 +110,10 @@ const DEFAULTS: Preferences = {
   desktopNotifications: false,
   notificationSounds: true,
   notificationContent: false,
+
+  pushGatewayUrl: '',
+  pushVapidKey: '',
+  pushAppId: '',
 
   errorReporting: false,
   sessionReplay: false,
@@ -132,6 +151,8 @@ function load(): Preferences {
       if (typeof value === 'string' && allowed.includes(value)) {
         (preferences as Record<string, unknown>)[key] = value;
       }
+    } else if ((FREE_TEXT as readonly string[]).includes(key)) {
+      if (typeof value === 'string') (preferences as Record<string, unknown>)[key] = value;
     } else if (typeof value === 'boolean') {
       (preferences as Record<string, unknown>)[key] = value;
     }

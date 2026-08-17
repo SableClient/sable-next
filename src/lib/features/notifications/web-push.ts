@@ -1,29 +1,13 @@
 import type { CoreClient } from '$lib/core/client.svelte';
 import { preferences } from '$lib/settings/preferences.svelte';
 
+import { type PushConfig, pushConfig, type PushOverride } from './push-config';
+
 const REGISTERED_ENDPOINT = 'sable-push-endpoint';
-
-type PushConfig = {
-  gateway: string;
-  appId: string;
-  vapid: string;
-};
-
-function config(): PushConfig | null {
-  const gateway = import.meta.env.VITE_PUSH_GATEWAY_URL;
-  const appId = import.meta.env.VITE_PUSH_WEB_APP_ID;
-  const vapid = import.meta.env.VITE_PUSH_VAPID_KEY;
-  if (!gateway || !appId || !vapid) return null;
-
-  return { gateway, appId, vapid };
-}
 
 export function canReceivePush(): boolean {
   return (
-    config() !== null &&
-    typeof navigator !== 'undefined' &&
-    'serviceWorker' in navigator &&
-    'PushManager' in globalThis
+    typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in globalThis
   );
 }
 
@@ -36,15 +20,30 @@ export function vapidBytes(key: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-/** The browser can drop a subscription without telling the homeserver, so the
-    endpoint we last registered is compared against the live one. */
-export function needsRegistering(endpoint: string, registered: string | null): boolean {
-  return endpoint !== registered;
+/** Includes the gateway and app id because retargeting leaves the endpoint
+    unchanged, and the endpoint alone would then look already registered. */
+export function registrationMarker(endpoint: string, settings: PushConfig): string {
+  return [settings.gateway, settings.appId, endpoint].join('\n');
 }
 
-export async function syncPushSubscription(core: CoreClient): Promise<void> {
-  const settings = config();
-  if (!settings || !canReceivePush() || Notification.permission !== 'granted') return;
+export function needsRegistering(marker: string, registered: string | null): boolean {
+  return marker !== registered;
+}
+
+/** A pusher left under the previous app id keeps pushing from the old gateway,
+    doubling every notification. */
+function abandonedAppId(registered: string | null, appId: string): string | null {
+  const previous = registered?.split('\n')[1];
+  return previous !== undefined && previous !== appId ? previous : null;
+}
+
+export async function syncPushSubscription(
+  core: CoreClient,
+  override: PushOverride
+): Promise<void> {
+  if (!canReceivePush() || Notification.permission !== 'granted') return;
+  const { resolved: settings } = await pushConfig(override);
+  if (!settings) return;
 
   const registration = await navigator.serviceWorker.ready;
   const subscription =
@@ -56,7 +55,13 @@ export async function syncPushSubscription(core: CoreClient): Promise<void> {
 
   const { endpoint, keys } = subscription.toJSON();
   if (endpoint === undefined || !keys?.p256dh || !keys.auth) return;
-  if (!needsRegistering(endpoint, localStorage.getItem(REGISTERED_ENDPOINT))) return;
+
+  const registered = localStorage.getItem(REGISTERED_ENDPOINT);
+  const marker = registrationMarker(endpoint, settings);
+  if (!needsRegistering(marker, registered)) return;
+
+  const abandoned = abandonedAppId(registered, settings.appId);
+  if (abandoned) await core.removePusher(keys.p256dh, abandoned).catch(() => undefined);
 
   await core.setPusher({
     pushkey: keys.p256dh,
@@ -67,13 +72,17 @@ export async function syncPushSubscription(core: CoreClient): Promise<void> {
     event_id_only: !preferences.notificationContent,
     append: false,
   });
-  localStorage.setItem(REGISTERED_ENDPOINT, endpoint);
+  localStorage.setItem(REGISTERED_ENDPOINT, marker);
 }
 
 /** Leaving a pusher behind keeps a signed-out browser on the server's push list. */
-export async function dropPushSubscription(core: CoreClient): Promise<void> {
-  const settings = config();
-  if (!settings || !canReceivePush()) return;
+export async function dropPushSubscription(
+  core: CoreClient,
+  override: PushOverride
+): Promise<void> {
+  if (!canReceivePush()) return;
+  const { resolved: settings } = await pushConfig(override);
+  if (!settings) return;
 
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();

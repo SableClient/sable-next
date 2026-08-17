@@ -29,15 +29,18 @@ import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 
-import type { Preferences } from './preferences.svelte';
+import type { FreeTextPreference, Preferences } from './preferences.svelte';
 
 export type BooleanPreference = {
   [K in keyof Preferences]: Preferences[K] extends boolean ? K : never;
 }[keyof Preferences];
 
-export type SelectPreference = {
-  [K in keyof Preferences]: Preferences[K] extends string ? K : never;
-}[keyof Preferences];
+export type SelectPreference = Exclude<
+  {
+    [K in keyof Preferences]: Preferences[K] extends string ? K : never;
+  }[keyof Preferences],
+  FreeTextPreference
+>;
 
 export interface SettingOption {
   value: string;

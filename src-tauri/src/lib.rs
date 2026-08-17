@@ -1,7 +1,8 @@
 #![recursion_limit = "512"]
 
 //! The native carrier. A feature adds a `Command` variant, not a tauri command,
-//! except for the three below that move bytes.
+//! except to move bytes or to reach something only this process has: the push
+//! registration, the system browser, the crash reporter.
 
 mod notifications;
 mod sentry;
@@ -9,7 +10,7 @@ mod sentry;
 use std::sync::{Arc, Mutex};
 
 use sable_core::{
-    protocol::{Command, CommandErr, CommandOk, CoreEvent, SyncStatus},
+    protocol::{Command, CommandErr, CommandOk, CoreEvent},
     Core,
 };
 use tauri::{
@@ -127,6 +128,16 @@ fn subscribe_events(state: State<'_, AppState>, channel: Channel<CoreEvent>) {
 }
 
 #[tauri::command]
+async fn register_push(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    config: notifications::PushConfig,
+) -> Result<(), CommandErr> {
+    let core = state.core.clone();
+    notifications::register_push(&app, &core, config).await
+}
+
+#[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
 fn open_auth_url(app: AppHandle, url: String) -> Result<(), CommandErr> {
     let parsed = tauri::Url::parse(&url).map_err(|_| CommandErr::Denied)?;
@@ -202,18 +213,9 @@ pub fn run() {
             let notifier = app.handle().clone();
             let pushing = app.state::<AppState>().core.clone();
             tauri::async_runtime::spawn(async move {
-                let mut registered = false;
                 while let Some(event) = events.recv().await {
-                    match &event {
-                        CoreEvent::Notification { notification } => {
-                            notifications::show(&notifier, &pushing, notification).await;
-                        }
-                        CoreEvent::SyncStatus(SyncStatus::Live) if !registered => {
-                            registered = true;
-                            notifications::register_push(&notifier, &pushing).await;
-                        }
-                        CoreEvent::SessionEnded { .. } => registered = false,
-                        _ => {}
+                    if let CoreEvent::Notification { notification } = &event {
+                        notifications::show(&notifier, &pushing, notification).await;
                     }
                     event_sink.send(event);
                 }
@@ -228,6 +230,7 @@ pub fn run() {
             send_attachment,
             upload_media,
             open_auth_url,
+            register_push,
             sentry::set_native_sentry_enabled
         ])
         .run(tauri::generate_context!())
