@@ -72,8 +72,13 @@ describe('scroll mode policy', () => {
         for (const step of steps) {
           const next = nextScrollMode(mode, step);
           if (mode.kind === 'initialLive' && next.kind !== 'initialLive') {
-            // Only a permalink or a completed landing may take over.
-            expect(step.initialLandingComplete || step.focusTarget !== null).toBe(true);
+            // A permalink, a completed landing, or the reader scrolling away
+            // from the end, which the landing must not fight.
+            expect(
+              step.initialLandingComplete ||
+                step.focusTarget !== null ||
+                (step.userDroveLastScroll && !step.nearLatest)
+            ).toBe(true);
           }
           mode = next;
         }
