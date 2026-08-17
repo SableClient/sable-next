@@ -38,6 +38,7 @@
   let leaveRoomId = $state<string | null>(null);
   let spacePermissions = $state<RoomPermissionsView | null>(null);
 
+  let directSection = $derived(page.url.pathname.startsWith('/direct'));
   let activeSpace = $derived(
     page.url.pathname.startsWith('/space')
       ? (findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null)
@@ -98,10 +99,16 @@
   const roomListId = $props.id();
   let roomsClosed = $state(false);
 
+  const newChatHref = resolve('/direct');
+  let listLabel = $derived(directSection ? $i18n.t('nav.chats') : $i18n.t('nav.rooms'));
+  let listEmpty = $derived(
+    directSection ? $i18n.t('nav.chatsEmpty') : $i18n.t('nav.roomsUnavailable')
+  );
+
   let title = $derived.by(() => {
     const { pathname } = page.url;
 
-    if (pathname.startsWith('/direct')) return $i18n.t('nav.direct');
+    if (directSection) return $i18n.t('nav.direct');
     if (pathname.startsWith('/space')) {
       const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
       return space?.name ?? $i18n.t('nav.space');
@@ -109,7 +116,7 @@
 
     return $i18n.t('nav.home');
   });
-  let TitleIcon = $derived(page.url.pathname.startsWith('/direct') ? ChatsIcon : HouseIcon);
+  let TitleIcon = $derived(directSection ? ChatsIcon : HouseIcon);
   let spaceRootItems = $derived.by<RoomNavItem[]>(() => {
     if (!page.url.pathname.startsWith('/space')) return [];
 
@@ -122,7 +129,7 @@
     return spaceItems(space, roomsById, [space.room_id], space.room_id);
   });
   let rooms = $derived.by<RoomNavRow[]>(() => {
-    if (page.url.pathname.startsWith('/direct')) {
+    if (directSection) {
       return roomList.rooms
         .filter((room) => room.state === 'joined' && room.is_direct)
         .map((room) => ({ room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id }));
@@ -199,7 +206,7 @@
 
   function roomHref(row: RoomNavRow) {
     const routeId = row.room ? roomPathParam(row.room) : roomPathParamFromId(row.roomId);
-    if (page.url.pathname.startsWith('/direct')) {
+    if (directSection) {
       return resolve('/(app)/direct/[roomId]', { roomId: routeId });
     }
 
@@ -275,7 +282,7 @@
 
 <section
   class="room-nav"
-  aria-label={$i18n.t('nav.rooms')}
+  aria-label={listLabel}
   style:--room-nav-width={width === undefined ? undefined : String(width) + 'px'}
 >
   <header class="room-nav-header" class:collapsed>
@@ -292,28 +299,40 @@
     <RoomInvites {collapsed} />
 
     <div class="room-nav-actions" class:collapsed>
-      {#if canCreateHere}
+      {#if directSection}
         <a
           class="sable-selection-layer"
-          href={createRoomHref}
-          onclick={() => onNavigate?.(createRoomHref)}
-          aria-label={collapsed ? createRoomLabel : undefined}
+          href={newChatHref}
+          onclick={() => onNavigate?.(newChatHref)}
+          aria-label={collapsed ? $i18n.t('nav.newChat') : undefined}
         >
           <span class="action-icon" aria-hidden="true"><PlusIcon /></span>
-          {#if !collapsed}<span>{createRoomLabel}</span>{/if}
+          {#if !collapsed}<span>{$i18n.t('nav.newChat')}</span>{/if}
+        </a>
+      {:else}
+        {#if canCreateHere}
+          <a
+            class="sable-selection-layer"
+            href={createRoomHref}
+            onclick={() => onNavigate?.(createRoomHref)}
+            aria-label={collapsed ? createRoomLabel : undefined}
+          >
+            <span class="action-icon" aria-hidden="true"><PlusIcon /></span>
+            {#if !collapsed}<span>{createRoomLabel}</span>{/if}
+          </a>
+        {/if}
+        <a
+          class="sable-selection-layer"
+          href={browseHref}
+          onclick={() => onNavigate?.(browseHref)}
+          aria-label={collapsed ? browseLabel : undefined}
+        >
+          <span class="action-icon" aria-hidden="true">
+            {#if activeSpace === null}<CompassIcon />{:else}<FlagIcon />{/if}
+          </span>
+          {#if !collapsed}<span>{browseLabel}</span>{/if}
         </a>
       {/if}
-      <a
-        class="sable-selection-layer"
-        href={browseHref}
-        onclick={() => onNavigate?.(browseHref)}
-        aria-label={collapsed ? browseLabel : undefined}
-      >
-        <span class="action-icon" aria-hidden="true">
-          {#if activeSpace === null}<CompassIcon />{:else}<FlagIcon />{/if}
-        </span>
-        {#if !collapsed}<span>{browseLabel}</span>{/if}
-      </a>
     </div>
 
     {#if !collapsed}
@@ -329,7 +348,7 @@
         <span class:closed={roomsClosed} class="category-caret" aria-hidden="true"
           ><CaretDownIcon /></span
         >
-        <span class="rooms-heading-label">{$i18n.t('nav.rooms')}</span>
+        <span class="rooms-heading-label">{listLabel}</span>
       </button>
     {/if}
 
@@ -337,7 +356,7 @@
       {#if rooms.length === 0 && subspaces.length === 0}
         {#if !collapsed && !roomsClosed}
           <div class="empty-rooms">
-            <p>{$i18n.t('nav.roomsUnavailable')}</p>
+            <p>{listEmpty}</p>
           </div>
         {/if}
       {:else}

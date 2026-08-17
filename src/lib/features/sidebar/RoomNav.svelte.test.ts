@@ -162,3 +162,17 @@ test('direct page lists joined direct rooms only', async () => {
   expect(roomNames()).toEqual(['DM']);
   await unmount(instance);
 });
+
+test('direct page offers starting a chat instead of creating or browsing rooms', async () => {
+  pageState.url.pathname = '/direct';
+
+  const instance = await mountNav();
+  expect(
+    Array.from(document.querySelectorAll('.room-nav-actions a')).map((node) =>
+      node.getAttribute('href')
+    )
+  ).toEqual(['/direct']);
+  expect(document.querySelector('.rooms-heading-label')?.textContent).toBe('nav.chats');
+  expect(document.querySelector('.empty-rooms p')?.textContent).toBe('nav.chatsEmpty');
+  await unmount(instance);
+});

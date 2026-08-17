@@ -512,7 +512,7 @@ export class CoreClient {
     return response.room_id;
   }
 
-  /** Reuses the existing DM with this user when there is one. */
+  /** Always creates a room; it does not look for an existing DM with this user. */
   async createDm(userId: string): Promise<string> {
     const response = await this.ensureTransport().send({ type: 'create_dm', user_id: userId });
     return response.room_id;

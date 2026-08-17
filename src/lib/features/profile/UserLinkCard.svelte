@@ -57,7 +57,6 @@
     opening = true;
     failed = false;
     try {
-      // Reuses the existing chat, so a second click does not make a second room.
       const roomId = await core.createDm(userId);
       const target = roomSectionPath(roomList.rooms, roomId);
       // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
