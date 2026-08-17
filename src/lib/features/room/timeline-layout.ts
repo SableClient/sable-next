@@ -5,7 +5,10 @@ import type { TimelineLayout } from '$lib/settings/preferences.svelte';
 import { isCollapsed } from './timeline-format';
 
 export const TIMELINE_LAYOUT = {
-  historyPrefetchItems: 10,
+  /* Roughly a screenful of rows, so a page is requested while the reader still
+     has that much left to read. At 10 the request only started once they were
+     almost at the top, and a slow page left them waiting there. */
+  historyPrefetchItems: 25,
   historyFillMaxPages: 4,
   historyRequestMinInterval: 300,
   jumpToLatestThreshold: 80,
@@ -94,6 +97,13 @@ export function codeBlockHeight(html: string, rem: number): number {
   return total;
 }
 
+export function trimmingsHeight(item: TimelineItemView, rem: number): number {
+  return (
+    (item.in_reply_to ? TIMELINE_LAYOUT.replyPreviewRem * rem : 0) +
+    (item.reactions.length > 0 ? TIMELINE_LAYOUT.reactionsRem * rem : 0)
+  );
+}
+
 export function estimateTimelineItemSize(
   items: readonly TimelineItemView[],
   index: number,
@@ -111,13 +121,12 @@ export function estimateTimelineItemSize(
     )
   );
   const chrome = metrics.chrome * rem;
-  const trimmings =
-    (item.in_reply_to ? TIMELINE_LAYOUT.replyPreviewRem * rem : 0) +
-    (item.reactions.length > 0 ? TIMELINE_LAYOUT.reactionsRem * rem : 0);
+  const trimmings = trimmingsHeight(item, rem);
 
   switch (item.content.kind) {
     case 'message': {
-      const base = (isCollapsed(items, index) ? metrics.collapsed : metrics.message) * rem;
+      const collapsed = isCollapsed(items, index);
+      const base = (collapsed ? metrics.collapsed : metrics.message) * rem;
       return base + codeBlockHeight(item.content.html, rem) + trimmings;
     }
     case 'image': {

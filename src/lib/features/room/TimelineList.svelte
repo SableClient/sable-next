@@ -17,6 +17,13 @@
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
   import {
+    ANCHOR_EPSILON,
+    anchorKeyForItem,
+    domAnchorViewport,
+    TimelineAnchor,
+    type AnchorViewport,
+  } from './timeline-anchor';
+  import {
     estimateTimelineItemSize,
     rootFontSize,
     TIMELINE_LAYOUT,
@@ -33,6 +40,7 @@
     isNearLatest,
     type TimelineScrollMode,
   } from './timeline-scroll';
+  import { nextScrollMode } from './timeline-scroll-policy';
   import FoldedEventRun from './FoldedEventRun.svelte';
   import {
     foldEventRuns,
@@ -144,6 +152,8 @@
     followingLive = mode.kind === 'followingLive';
   }
   const initialItems: readonly TimelineItemView[] = [];
+  const INITIAL_END_RECONCILIATION_LIMIT = 60;
+  let initialEndReconciliationAttempts = 0;
   let initialEndReconciliationPending = false;
   let followingEndReconciliationPending = false;
   let timelineDebugSample = $state<TimelineDebugSample | null>(null);
@@ -151,33 +161,78 @@
   const identityTracker = new TimelineIdentityTracker();
   const timelineDebugEnabledForView = timelineDebugEnabled();
   let historyController: TimelineHistoryController;
-  let historyDebugItems: readonly TimelineItemView[] = initialItems;
+  let configuredItems: readonly TimelineItemView[] = initialItems;
   let historyDebugChange = 0;
+
+  let anchorHolding = false;
+  let anchorRolling = false;
+  let anchorCorrecting = false;
+  let anchorHoldSequence = 0;
+  let activeHoldId: number | null = null;
+  let measurementRevision = 0;
+  let anchorCorrection: { by: string; delta: number; key: string | null } | null = null;
+  let anchorAbandoned = false;
+  let anchorResidual: number | null = 0;
+  let expectedSelfOffset: number | null = null;
+  function recordSelfWrite(): void {
+    expectedSelfOffset = viewport?.scrollTop ?? null;
+  }
+  let anchorViewportCache: { node: HTMLDivElement; view: AnchorViewport } | null = null;
+  function anchorViewport(): AnchorViewport | null {
+    const node = viewport;
+    if (!node) return null;
+    if (anchorViewportCache?.node !== node) {
+      const base = domAnchorViewport(node);
+      anchorViewportCache = {
+        node,
+        view: {
+          ...base,
+          scrollBy: (delta) => {
+            anchorCorrection = {
+              by: anchorHolding ? 'hold' : 'rolling',
+              delta,
+              key: anchor.held?.key ?? null,
+            };
+            base.scrollBy(delta);
+            recordSelfWrite();
+          },
+        },
+      };
+    }
+    return anchorViewportCache.view;
+  }
+  const anchor = new TimelineAnchor(anchorViewport);
+
+  // The virtualiser's helpers arm `reconcileScroll`, which forces the offset back
+  // to its own target for five seconds.
+  function scrollToOffsetNow(offset: number): void {
+    if (!viewport) return;
+    viewport.scrollTop = offset;
+    recordSelfWrite();
+  }
+
+  function scrollToEndNow(): void {
+    if (!viewport) return;
+    scrollToOffsetNow(viewport.scrollHeight);
+  }
+
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: 0,
     getScrollElement: () => viewport,
     estimateSize: (index) =>
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
-    anchorTo: 'end',
-    followOnAppend: true,
     scrollEndThreshold: TIMELINE_LAYOUT.jumpToLatestThreshold,
     useScrollendEvent: true,
-    overscan: 8,
+    overscan: 24,
     onChange: handleVirtualizerChange,
   });
 
+  get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = () => false;
+
   historyController = new TimelineHistoryController({
     getBackwardPagination: () => timeline.backwardPagination,
-    isNearOldest: () => {
-      if (!viewport) return false;
-      const oldestVisibleIndex = get(virtualizer).getVirtualItemForOffset(
-        viewport.scrollTop
-      )?.index;
-      return oldestVisibleIndex === undefined
-        ? viewport.scrollTop === 0
-        : oldestVisibleIndex < TIMELINE_LAYOUT.historyPrefetchItems;
-    },
+    isNearOldest: () => viewport !== null && viewport.scrollTop < viewport.clientHeight * 2,
     isVirtualizerScrolling: () => get(virtualizer).isScrolling,
     requestHistory: () => onRequestHistory(),
     debugLog: historyDebugLog,
@@ -194,6 +249,7 @@
     let maxFrameDuration = 0;
     let maxFrameDelta = 0;
     let maxVisualDelta = 0;
+    let maxAnchorResidual = 0;
     let lastHudUpdate = 0;
     let frame = 0;
     const sample = (): void => {
@@ -215,7 +271,10 @@
         const contentDelta =
           previousScrollHeight === null ? 0 : scrollHeight - previousScrollHeight;
         const visualDelta =
-          anchorKey !== null && anchorKey === previousAnchorKey && previousAnchorTop !== null
+          frameDelta === 0 &&
+          anchorKey !== null &&
+          anchorKey === previousAnchorKey &&
+          previousAnchorTop !== null
             ? (anchorTop ?? previousAnchorTop) - previousAnchorTop
             : 0;
         previousTime = time;
@@ -226,6 +285,7 @@
         maxFrameDuration = Math.max(maxFrameDuration, frameDuration);
         maxFrameDelta = Math.max(maxFrameDelta, Math.abs(frameDelta));
         maxVisualDelta = Math.max(maxVisualDelta, Math.abs(visualDelta));
+        maxAnchorResidual = Math.max(maxAnchorResidual, Math.abs(anchorResidual ?? 0));
         const nextSample: TimelineDebugSample = {
           time,
           scrollTop,
@@ -240,6 +300,10 @@
           anchorTop,
           visualDelta,
           maxVisualDelta,
+          anchorResidual,
+          maxAnchorResidual,
+          anchorGuard: anchorHolding ? 'hold' : anchorRolling ? 'rolling' : 'none',
+          anchorCorrection,
           firstVirtualIndex: virtualItems[0]?.index ?? null,
           lastVirtualIndex: virtualItems.at(-1)?.index ?? null,
           isScrolling: instance.isScrolling,
@@ -272,6 +336,8 @@
     const viewportSizeChanged = viewportSize !== virtualizerViewportSize;
     virtualizerTotalSize = totalSize;
     virtualizerViewportSize = viewportSize;
+    if (contentSizeChanged) measurementRevision += 1;
+    if (contentSizeChanged) correctRollingAnchor();
     if (scrollMode.kind === 'followingLive' && (contentSizeChanged || viewportSizeChanged)) {
       scheduleFollowingEndReconciliation();
     }
@@ -280,6 +346,89 @@
     const scrollingEnded = virtualizerWasScrolling && !isScrolling;
     virtualizerWasScrolling = isScrolling;
     if (scrollingEnded) historyController.onVirtualizerScrollSettled();
+  }
+
+  function holdAnchorThroughUpdate(): void {
+    if (anchorHolding) return;
+    anchor.capture();
+    if (anchor.held === null) return;
+    const holdId = (anchorHoldSequence += 1);
+    activeHoldId = holdId;
+    anchorHolding = true;
+    anchorRolling = false;
+    anchorAbandoned = false;
+    historyController.suspendForAnchor();
+    void (async () => {
+      const owns = (): boolean => activeHoldId === holdId && !anchorAbandoned;
+      await tick();
+      if (!owns()) {
+        finishHold(holdId, 0);
+        return;
+      }
+      await bringAnchorIntoView();
+      if (!owns()) {
+        finishHold(holdId, 0);
+        return;
+      }
+      anchor.restore();
+      const correctedAt = measurementRevision;
+      await new Promise(requestAnimationFrame);
+      if (!owns()) {
+        finishHold(holdId, 0);
+        return;
+      }
+      finishHold(holdId, measurementRevision === correctedAt ? 0 : anchor.restore());
+    })();
+  }
+
+  async function bringAnchorIntoView(): Promise<void> {
+    const view = anchorViewport();
+    if (!view) return;
+    const target = anchor.locate((key) =>
+      visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
+    );
+    if (!target || view.topOf(target.snapshot.key) !== null) return;
+    const offset = get(virtualizer).getOffsetForIndex(target.index, 'start')?.[0];
+    if (offset === undefined) return;
+    scrollToOffsetNow(Math.max(0, offset - target.snapshot.top));
+    await new Promise(requestAnimationFrame);
+  }
+
+  function finishHold(holdId: number, residual: number | null): void {
+    if (activeHoldId !== holdId) return;
+    activeHoldId = null;
+    anchorResidual = residual;
+    anchor.release();
+    anchorHolding = false;
+    historyController.resumeAfterAnchor(residual);
+    refreshRollingAnchor();
+  }
+
+  function refreshRollingAnchor(): void {
+    if (anchorHolding || !viewport) return;
+    if (isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold)) {
+      anchorRolling = false;
+      anchor.release();
+      return;
+    }
+    anchorRolling = true;
+    anchor.capture();
+  }
+
+  function correctRollingAnchor(): void {
+    if (anchorHolding || anchorCorrecting || !anchorRolling) return;
+    anchorCorrecting = true;
+    try {
+      anchorResidual = anchor.restoreStationary();
+    } finally {
+      anchorCorrecting = false;
+    }
+  }
+
+  function releaseAnchor(): void {
+    if (!anchorHolding) return;
+    anchorAbandoned = true;
+    anchor.release();
   }
 
   function scheduleFollowingEndReconciliation(): void {
@@ -294,7 +443,7 @@
         !viewport
       )
         return;
-      get(virtualizer).scrollToEnd({ behavior: 'auto' });
+      scrollToEndNow();
       nearLatest = true;
     });
   }
@@ -305,13 +454,20 @@
 
   function scheduleInitialEndReconciliation(): void {
     if (scrollMode.kind !== 'initialLive' || initialEndReconciliationPending) return;
+    // It reschedules itself until the end settles, and runs while hidden, so an
+    // unbounded list would spin for as long as the room stayed open.
+    if (initialEndReconciliationAttempts >= INITIAL_END_RECONCILIATION_LIMIT) {
+      setScrollMode({ kind: 'followingLive' });
+      return;
+    }
+    initialEndReconciliationAttempts += 1;
 
     initialEndReconciliationPending = true;
     void tick().then(async () => {
       initialEndReconciliationPending = false;
       if (scrollMode.kind !== 'initialLive' || !viewport) return;
 
-      get(virtualizer).scrollToEnd({ behavior: 'auto' });
+      scrollToEndNow();
       await new Promise(requestAnimationFrame);
       const activeViewport = viewport;
       // A frame has passed, so the mode has to be read afresh. Through a call,
@@ -334,8 +490,8 @@
   $effect.pre(() => {
     const items = visibleItems;
     const instance = get(virtualizer);
-    const previousItems = historyDebugItems;
-    historyDebugItems = items;
+    const previousItems = configuredItems;
+    configuredItems = items;
     identityTracker.reconcile(items);
     const edgesChanged =
       previousItems.length !== items.length ||
@@ -357,6 +513,18 @@
         viewport: historyDebugSnapshot(),
       });
     }
+    // `scrollMode` goes stale: a programmatic scroll raises no gesture and a
+    // wheel at offset zero raises no scroll event.
+    const pinnedToEnd =
+      viewport !== null && isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold);
+    if (
+      edgesChanged &&
+      !pinnedToEnd &&
+      scrollMode.kind !== 'initialLive' &&
+      scrollMode.kind !== 'focused'
+    ) {
+      holdAnchorThroughUpdate();
+    }
     // `getComputedStyle` flushes style and the estimator runs per row.
     const rem = rootFontSize();
     const layout = preferences.layout;
@@ -374,8 +542,6 @@
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
       getItemKey: (index) => identityTracker.key(items, index),
-      anchorTo: 'end',
-      followOnAppend: true,
       scrollEndThreshold: TIMELINE_LAYOUT.jumpToLatestThreshold,
       useScrollendEvent: true,
       overscan: 8,
@@ -415,10 +581,10 @@
       } else if (scrollMode.kind === 'initialLive') {
         const initialAnchorCancelled = (): boolean =>
           controller.signal.aborted || scrollMode.kind !== 'initialLive';
-        get(virtualizer).scrollToEnd({ behavior: 'auto' });
+        scrollToEndNow();
         await new Promise(requestAnimationFrame);
         if (initialAnchorCancelled()) return;
-        const needsMoreHistory = viewport.scrollHeight <= viewport.clientHeight + 1;
+        const needsMoreHistory = viewport.scrollHeight <= viewport.clientHeight * 2;
         if (
           !initialHistoryRequested &&
           needsMoreHistory &&
@@ -453,23 +619,23 @@
 
   function onScroll(): void {
     if (!viewport) return;
+    const wasSelfScroll =
+      expectedSelfOffset !== null &&
+      Math.abs(viewport.scrollTop - expectedSelfOffset) <= ANCHOR_EPSILON;
+    expectedSelfOffset = null;
+    // Holding an anchor against the user is worse than losing it.
+    if (!wasSelfScroll && historyController.hasUserScrollPending) releaseAnchor();
     nearLatest = isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold);
-    if (timeline.mode.kind === 'live' && scrollMode.kind !== 'initialLive') {
-      if (
-        nearLatest &&
-        scrollMode.kind !== 'followingLive' &&
-        // The smooth scroll onto a focused event can itself end inside the threshold.
-        (scrollMode.kind !== 'focused' || historyController.hasUserScrollPending)
-      ) {
-        setScrollMode({ kind: 'followingLive' });
-      } else if (
-        !nearLatest &&
-        scrollMode.kind !== 'readingHistory' &&
-        historyController.hasUserScrollPending
-      ) {
-        setScrollMode({ kind: 'readingHistory' });
-      }
-    }
+    const next = nextScrollMode(scrollMode, {
+      timelineMode: timeline.mode.kind,
+      nearLatest,
+      userDroveLastScroll: historyController.hasUserScrollPending,
+      // The landing hands over on its own.
+      initialLandingComplete: false,
+      focusTarget: null,
+    });
+    if (next !== scrollMode) setScrollMode(next);
+    refreshRollingAnchor();
     historyController.refreshQueuedRequest();
     historyController.clearUserScrollPending();
     const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
@@ -486,11 +652,11 @@
     return historyController.attach(node);
   }
 
-  // `overflow: hidden` would drop the scrollbar and reflow the messages, so the
   function setPersonaOpen(open: boolean): void {
     personaOpen = open;
   }
 
+  // `overflow: hidden` would drop the scrollbar and reflow the messages, so the
   // gestures are cancelled instead. Svelte makes `ontouchmove` passive, hence
   // the explicit listeners.
   function scrollLock(locked: boolean) {
@@ -511,7 +677,7 @@
   function jumpToLatest(): void {
     historyController.finishHistoryFill();
     setScrollMode({ kind: 'followingLive' });
-    get(virtualizer).scrollToEnd({ behavior: 'smooth' });
+    viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
     nearLatest = true;
   }
 </script>
@@ -541,6 +707,8 @@
       <span>max delta {timelineDebugSample.maxFrameDelta.toFixed(1)}</span>
       <span>visual delta {timelineDebugSample.visualDelta.toFixed(1)}</span>
       <span>max visual delta {timelineDebugSample.maxVisualDelta.toFixed(1)}</span>
+      <span>anchor residual {timelineDebugSample.anchorResidual?.toFixed(1) ?? 'lost'}</span>
+      <span>max anchor residual {timelineDebugSample.maxAnchorResidual.toFixed(1)}</span>
       <span>
         range {timelineDebugSample.firstVirtualIndex ??
           '-'}..{timelineDebugSample.lastVirtualIndex ?? '-'}

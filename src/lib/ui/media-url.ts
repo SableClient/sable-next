@@ -4,6 +4,7 @@ import type { CoreClient } from '$lib/core/client.svelte';
    miss re-runs every waiting media element each time any other one resolves. */
 const objectUrls = new Map<string, string>();
 const pending = new Map<string, Promise<string>>();
+const aspectRatios = new Map<string, number>();
 /* An object URL pins its blob until revoked. Far more than one viewport holds,
    so the least recently read entry is never one on screen. */
 const MAX_OBJECT_URLS = 256;
@@ -28,6 +29,26 @@ function imageMime(bytes: Uint8Array): string | undefined {
     return 'image/svg+xml';
   }
   return undefined;
+}
+
+function measure(source: string, type: string, blob: Blob): Promise<void> | null {
+  // An empty type is a sniffer miss: encrypted attachments often carry no mime.
+  const worthDecoding = type === '' || type.startsWith('image/');
+  if (!worthDecoding || aspectRatios.has(source) || typeof createImageBitmap !== 'function') {
+    return null;
+  }
+  return createImageBitmap(blob)
+    .then((bitmap) => {
+      if (bitmap.width > 0 && bitmap.height > 0) {
+        aspectRatios.set(source, bitmap.width / bitmap.height);
+      }
+      bitmap.close();
+    })
+    .catch(() => {});
+}
+
+export function mediaAspectRatio(source: string): number | null {
+  return aspectRatios.get(source) ?? null;
 }
 
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
@@ -60,14 +81,19 @@ export function loadMediaUrl(
       .fetchMedia(source, width, height)
       .then((bytes) => {
         const type = mime ?? imageMime(bytes) ?? '';
-        const objectUrl = URL.createObjectURL(new Blob([bytes], { type }));
-        objectUrls.set(key, objectUrl);
-        for (const [oldestKey, oldestUrl] of objectUrls) {
-          if (objectUrls.size <= MAX_OBJECT_URLS) break;
-          URL.revokeObjectURL(oldestUrl);
-          objectUrls.delete(oldestKey);
-        }
-        return objectUrl;
+        const blob = new Blob([bytes], { type });
+        const publish = (): string => {
+          const objectUrl = URL.createObjectURL(blob);
+          objectUrls.set(key, objectUrl);
+          for (const [oldestKey, oldestUrl] of objectUrls) {
+            if (objectUrls.size <= MAX_OBJECT_URLS) break;
+            URL.revokeObjectURL(oldestUrl);
+            objectUrls.delete(oldestKey);
+          }
+          return objectUrl;
+        };
+        const measuring = measure(source, type, blob);
+        return measuring === null ? publish() : measuring.then(publish);
       })
       .finally(() => {
         pending.delete(key);

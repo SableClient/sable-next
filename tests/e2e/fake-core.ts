@@ -7,6 +7,7 @@ export type RoomCoreMode =
   | 'delayed_history'
   | 'delayed_media'
   | 'delayed_pagination'
+  | 'endless_history'
   | 'delayed_snapshot'
   | 'delayed_layout_diff';
 
@@ -114,6 +115,26 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     let nextSubscription = 2;
     const subscriptions = new Map<number, { roomId: string; page: number }>();
     let activePort: FakePort | null = null;
+    /* Encoded, not a hand-written byte literal: those are easy to get wrong and an
+       undecodable one measures nothing. A `wide-` source serves a file that
+       disagrees with the box the row was reserved at. */
+    const servedBytes = new Map<string, Promise<Uint8Array>>();
+    function servedPng(source: string): Promise<Uint8Array> {
+      const [width, height] = source.includes('wide-') ? [1000, 400] : [80, 60];
+      const key = `${String(width)}x${String(height)}`;
+      let bytes = servedBytes.get(key);
+      if (bytes === undefined) {
+        const canvas = new OffscreenCanvas(width, height);
+        // convertToBlob throws on a canvas that has never had a context.
+        canvas.getContext('2d')?.clearRect(0, 0, width, height);
+        bytes = canvas
+          .convertToBlob({ type: 'image/png' })
+          .then((blob) => blob.arrayBuffer())
+          .then((buffer) => new Uint8Array(buffer));
+        servedBytes.set(key, bytes);
+      }
+      return bytes;
+    }
 
     class FakePort {
       onmessage: ((event: MessageEvent) => void) | null = null;
@@ -127,17 +148,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         this.onmessage?.({ data: { event } } as MessageEvent);
       }
 
-      postMessage(request: { id: number; command?: { type: string } }): void {
-        if ('media' in request) {
-          const png = new Uint8Array([
-            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8,
-            6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 8, 215, 99, 248, 207, 192,
-            240, 31, 0, 5, 0, 1, 255, 137, 153, 61, 29, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96,
-            130,
-          ]);
+      postMessage(request: {
+        id: number;
+        command?: { type: string };
+        media?: { source: string };
+      }): void {
+        if (request.media) {
+          const { source } = request.media;
           window.setTimeout(
             () => {
-              this.onmessage?.({ data: { id: request.id, bytes: png } } as MessageEvent);
+              void servedPng(source).then((bytes) => {
+                this.onmessage?.({ data: { id: request.id, bytes } } as MessageEvent);
+              });
             },
             workerMode === 'delayed_media' ? 1_000 : 100
           );
@@ -266,7 +288,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                       const room = rooms.get(state.roomId);
                                       if (!room) throw new Error('unknown timeline room');
                                       state.page += 1;
-                                      const reachedEnd = state.page >= 2;
+                                      const reachedEnd =
+                                        workerMode === 'endless_history' ? false : state.page >= 2;
                                       this.emit({
                                         type: 'timeline_pagination',
                                         subscription,
@@ -280,54 +303,76 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                             type: 'timeline_diff',
                                             subscription,
                                             diffs:
-                                              workerMode === 'delayed_history'
-                                                ? items.slice(0, -1).map((value, index) => ({
+                                              workerMode === 'endless_history'
+                                                ? Array.from({ length: 20 }, (_, index) => ({
                                                     op: 'insert' as const,
-                                                    index,
+                                                    index: index + 1,
                                                     value: {
-                                                      ...value,
+                                                      ...items[0],
+                                                      id: `endless-${String(state.page)}-${String(index)}`,
+                                                      event_id: `$endless-${String(state.page)}-${String(index)}:example.test`,
+                                                      timestamp:
+                                                        1_600_000_000_000 +
+                                                        state.page * 100 +
+                                                        index,
                                                       content: {
-                                                        ...value.content,
-                                                        body: `Delayed history ${String(index)}`,
-                                                        html: `Delayed history ${String(index)}`,
+                                                        ...items[0].content,
+                                                        // Heights the estimator cannot predict: the
+                                                        // flat per-message guess is wrong in both
+                                                        // directions across this run.
+                                                        body: `Endless ${String(state.page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`,
+                                                        html: `Endless ${String(state.page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`,
                                                       },
                                                     },
                                                   }))
-                                                : workerMode === 'delayed_pagination'
-                                                  ? Array.from({ length: 20 }, (_, index) => ({
+                                                : workerMode === 'delayed_history'
+                                                  ? items.slice(0, -1).map((value, index) => ({
                                                       op: 'insert' as const,
-                                                      index: index + 1,
+                                                      index,
                                                       value: {
-                                                        ...items[0],
-                                                        id: `${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
-                                                        event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
-                                                        timestamp: 1_699_999_000_000 + index,
+                                                        ...value,
                                                         content: {
-                                                          kind: 'message' as const,
-                                                          body: `${room.name} history ${String(state.page)} ${String(index)}`,
-                                                          html: `${room.name} history ${String(state.page)} ${String(index)}`,
-                                                          emote: false,
-                                                          edited: false,
+                                                          ...value.content,
+                                                          body: `Delayed history ${String(index)}`,
+                                                          html: `Delayed history ${String(index)}`,
                                                         },
                                                       },
                                                     }))
-                                                  : [
-                                                      {
-                                                        op: 'push_front',
+                                                  : workerMode === 'delayed_pagination'
+                                                    ? Array.from({ length: 20 }, (_, index) => ({
+                                                        op: 'insert' as const,
+                                                        index: index + 1,
                                                         value: {
                                                           ...items[0],
-                                                          id: `${room.name.toLowerCase()}-history-${String(state.page)}`,
-                                                          event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                          id: `${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
+                                                          event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
+                                                          timestamp: 1_699_999_000_000 + index,
                                                           content: {
-                                                            kind: 'message',
-                                                            body: `${room.name} history ${String(state.page)}`,
-                                                            html: `${room.name} history ${String(state.page)}`,
+                                                            kind: 'message' as const,
+                                                            body: `${room.name} history ${String(state.page)} ${String(index)}`,
+                                                            html: `${room.name} history ${String(state.page)} ${String(index)}`,
                                                             emote: false,
                                                             edited: false,
                                                           },
                                                         },
-                                                      },
-                                                    ],
+                                                      }))
+                                                    : [
+                                                        {
+                                                          op: 'push_front',
+                                                          value: {
+                                                            ...items[0],
+                                                            id: `${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                            event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                            content: {
+                                                              kind: 'message',
+                                                              body: `${room.name} history ${String(state.page)}`,
+                                                              html: `${room.name} history ${String(state.page)}`,
+                                                              emote: false,
+                                                              edited: false,
+                                                            },
+                                                          },
+                                                        },
+                                                      ],
                                           });
                                           this.emit({
                                             type: 'timeline_pagination',
@@ -340,7 +385,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                           ? 750
                                           : workerMode === 'delayed_pagination'
                                             ? 1_500
-                                            : 0
+                                            : // Long enough for the gesture to settle first, so a
+                                              // test can tell the user's own scrolling apart from
+                                              // the shift a prepend causes.
+                                              workerMode === 'endless_history'
+                                              ? 400
+                                              : 0
                                       );
                                       return {
                                         type: 'paginate',

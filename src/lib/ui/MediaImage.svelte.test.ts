@@ -17,6 +17,7 @@ afterEach(() => {
   core.fetchMedia.mockReset();
   document.body.replaceChildren();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 test('does not retry a failed media request in a render loop', async () => {
@@ -87,32 +88,31 @@ test('loads SVG images from the original rather than a thumbnail', async () => {
 });
 
 async function mountAndLoad(
-  props: ComponentProps<typeof MediaImage>
+  props: ComponentProps<typeof MediaImage>,
+  served: { width: number; height: number } | null
 ): Promise<() => Promise<void>> {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:served');
+  if (served === null) {
+    vi.stubGlobal('createImageBitmap', undefined);
+  } else {
+    vi.stubGlobal('createImageBitmap', () => Promise.resolve({ ...served, close: () => {} }));
+  }
   const instance = mount(MediaImage, { target: document.body, props });
   await tick();
   await Promise.resolve();
-  await tick();
-
-  const image = document.querySelector('img');
-  if (!image) throw new Error('image never rendered');
-  Object.defineProperty(image, 'naturalWidth', { value: 1000 });
-  Object.defineProperty(image, 'naturalHeight', { value: 400 });
-  image.dispatchEvent(new Event('load'));
+  await Promise.resolve();
+  await Promise.resolve();
   await tick();
 
   return () => unmount(instance);
 }
 
 test('takes its shape from the served file when the event has no dimensions', async () => {
-  const dispose = await mountAndLoad({
-    source: 'mxc://example.org/no-dimensions',
-    alt: 'Image',
-    width: 800,
-    height: 600,
-  });
+  const dispose = await mountAndLoad(
+    { source: 'mxc://example.org/no-dimensions', alt: 'Image', width: 800, height: 600 },
+    { width: 1000, height: 400 }
+  );
 
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
     `--media-ratio: ${String(1000 / 400)}`
@@ -120,18 +120,35 @@ test('takes its shape from the served file when the event has no dimensions', as
   await dispose();
 });
 
-test('keeps the event dimensions when it has them, so the timeline does not shift', async () => {
-  const dispose = await mountAndLoad({
-    source: 'mxc://example.org/portrait-event',
-    alt: 'Image',
-    width: 800,
-    height: 600,
-    intrinsicWidth: 600,
-    intrinsicHeight: 900,
-  });
+test('keeps the event dimensions when the served file disagrees', async () => {
+  // The served file is a thumbnail and need not share the original's shape, so
+  // adopting it would resize the row on load and shift everything below.
+  const dispose = await mountAndLoad(
+    {
+      source: 'mxc://example.org/thumbnailed',
+      alt: 'Image',
+      width: 800,
+      height: 600,
+      intrinsicWidth: 600,
+      intrinsicHeight: 900,
+    },
+    { width: 1000, height: 400 }
+  );
 
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
     `--media-ratio: ${String(600 / 900)}`
+  );
+  await dispose();
+});
+
+test('keeps the requested box when the file cannot be decoded', async () => {
+  const dispose = await mountAndLoad(
+    { source: 'mxc://example.org/undecodable', alt: 'Image', width: 800, height: 600 },
+    null
+  );
+
+  expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
+    `--media-ratio: ${String(800 / 600)}`
   );
   await dispose();
 });

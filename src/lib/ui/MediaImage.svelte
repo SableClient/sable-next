@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
-  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
+  import { cachedMediaUrl, loadMediaUrl, mediaAspectRatio } from '$lib/ui/media-url';
 
   interface Props {
     source: string;
@@ -25,10 +25,7 @@
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
-  /* Tagged with the url, not the source prop that `load` can outlive: the
-     virtualiser recycles this node into another message, and a stale ratio
-     would size that one. */
-  let decoded = $state.raw<{ url: string; ratio: number } | null>(null);
+  let fileRatio = $state<number | null>(null);
   let eventRatio = $derived.by(() => {
     const hasIntrinsicSize =
       intrinsicWidth !== null &&
@@ -39,16 +36,10 @@
       intrinsicHeight > 0;
     return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
-  /* The event's own dimensions win even if the served file disagrees: the
-     timeline sizes its rows from them, so revising the box after load would
-     shift everything below it. Only a dimensionless event waits for the file. */
-  let aspectRatio = $derived(eventRatio ?? (decoded?.url === url ? decoded.ratio : width / height));
-
-  function onload(event: Event): void {
-    const image = event.currentTarget;
-    if (!(image instanceof HTMLImageElement) || image.naturalHeight === 0) return;
-    decoded = { url: image.src, ratio: image.naturalWidth / image.naturalHeight };
-  }
+  /* The event's dimensions reserve the row and are never revised: the served file
+     is a thumbnail whose shape need not match. The decoded shape covers an event
+     carrying none, and is known before the `<img>` mounts. */
+  let aspectRatio = $derived(eventRatio ?? fileRatio ?? width / height);
 
   $effect(() => {
     let active = true;
@@ -57,14 +48,17 @@
     const requestHeight = original ? 0 : height;
     const cached = cachedMediaUrl(source, requestWidth, requestHeight);
     if (cached !== undefined) {
+      fileRatio = mediaAspectRatio(source);
       url = cached;
       return;
     }
 
     url = null;
+    fileRatio = null;
     void loadMediaUrl(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
+        fileRatio = mediaAspectRatio(source);
         url = nextUrl;
       })
       .catch(() => {});
@@ -77,7 +71,7 @@
 
 <span class={[className, 'media-image']} style:--media-ratio={aspectRatio}>
   {#if url}
-    <img class="media-image-content" src={url} {alt} {onload} />
+    <img class="media-image-content" src={url} {alt} />
   {/if}
 </span>
 

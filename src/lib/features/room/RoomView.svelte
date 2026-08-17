@@ -165,8 +165,16 @@
   // Waiting for live mode matters: in permalink mode following the end only
   // means the bottom of the loaded context, and dropping the anchor there
   // restarts at the present.
+  /** The `?event=` the effect below has handed to the timeline. */
+  let appliedEventId: string | null = null;
+
   $effect(() => {
-    if (eventId === null || !timelineFollowingLive || timeline.mode.kind !== 'live') return;
+    // Waiting for the target to have been applied matters as much as waiting
+    // for live mode. Restarting the timeline is async, so at the moment of a
+    // jump the mode is still `live` and this would strip the anchor straight
+    // back off the URL, undoing the navigation before it takes effect.
+    if (eventId === null || eventId !== appliedEventId) return;
+    if (!timelineFollowingLive || timeline.mode.kind !== 'live') return;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
     void goto(roomUrl(null), { replaceState: true, noScroll: true, keepFocus: true });
   });
@@ -174,10 +182,15 @@
   $effect(() => {
     const activeRoomId = roomId.startsWith('!') ? roomId : resolvedRoom?.room_id;
     if (!activeRoomId) return;
-    // An event already in the loaded range is reached by scrolling, so only a
-    // target we do not hold restarts the timeline in permalink mode.
-    const loaded = untrack(() => timeline.items.some((item) => item.event_id === eventId));
-    const anchor = loaded ? null : eventId;
+    const anchor = untrack(() => {
+      // An event already in the loaded range is reached by scrolling, so only a
+      // target we do not hold restarts the timeline in permalink mode. That
+      // only holds while live: dropping the anchor from a focused timeline
+      // restarts it at the present instead of moving within the loaded window.
+      const loaded = timeline.items.some((item) => item.event_id === eventId);
+      return loaded && timeline.mode.kind === 'live' ? null : eventId;
+    });
+    appliedEventId = eventId;
     void untrack(() => activeTimeline.start(timelineOwner, activeRoomId, anchor));
   });
 

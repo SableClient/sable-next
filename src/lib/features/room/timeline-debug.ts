@@ -14,6 +14,13 @@ export interface TimelineDebugSample {
   anchorTop: number | null;
   visualDelta: number;
   maxVisualDelta: number;
+  /** Left over after the anchor last corrected; null when it had nothing to hold. */
+  anchorResidual: number | null;
+  maxAnchorResidual: number;
+  /** Which anchor owns the position, so an uncorrected shift can be attributed. */
+  anchorGuard: 'hold' | 'rolling' | 'none';
+  /** The last scroll the anchor wrote, so a jump in the trace names its author. */
+  anchorCorrection: { by: string; delta: number; key: string | null } | null;
   firstVirtualIndex: number | null;
   lastVirtualIndex: number | null;
   isScrolling: boolean;
@@ -63,6 +70,7 @@ export class TimelineDebugRecorder {
         Math.abs(sample.contentDelta) >= 100 ||
         sample.frameDuration >= 24 ||
         Math.abs(sample.visualDelta) >= 16 ||
+        Math.abs(sample.anchorResidual ?? 0) >= 2 ||
         sample.scrollMode !== previous.scrollMode ||
         sample.backwardPagination !== previous.backwardPagination ||
         sample.isScrolling !== previous.isScrolling

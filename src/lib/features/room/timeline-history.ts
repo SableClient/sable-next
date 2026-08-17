@@ -11,11 +11,18 @@ interface TimelineHistoryControllerOptions {
   debugSnapshot: () => object | null;
 }
 
+const ANCHOR_FAILURE_LIMIT = 2;
+
+const ANCHOR_RESIDUAL_TOLERANCE = 2;
+
 export class TimelineHistoryController {
   private destroyed = false;
   private historyRequestPending = false;
   private historyRequestQueued = false;
   private historyRequestEligible = false;
+  private anchorSuppressed = false;
+  private anchorDeferredRequest = false;
+  private anchorFailures = 0;
   private historyInputArmed = true;
   private historyFillActive = false;
   private historyFillPages = 0;
@@ -68,6 +75,31 @@ export class TimelineHistoryController {
     this.userScrollPending = false;
   }
 
+  get isAnchorFailing(): boolean {
+    return this.anchorFailures >= ANCHOR_FAILURE_LIMIT;
+  }
+
+  suspendForAnchor(): void {
+    if (this.destroyed) return;
+    this.anchorSuppressed = true;
+  }
+
+  resumeAfterAnchor(residual: number | null): void {
+    if (this.destroyed) return;
+    this.anchorSuppressed = false;
+    if (residual === null || Math.abs(residual) > ANCHOR_RESIDUAL_TOLERANCE) {
+      this.anchorFailures += 1;
+    } else {
+      this.anchorFailures = 0;
+    }
+    if (this.anchorDeferredRequest) {
+      this.anchorDeferredRequest = false;
+      this.historyRequestQueued = true;
+      this.historyRequestEligible = true;
+    }
+    this.flushHistoryRequest();
+  }
+
   resetForNewItems(firstKeyChanged: boolean): void {
     if (this.destroyed) return;
     if (!firstKeyChanged) return;
@@ -118,13 +150,14 @@ export class TimelineHistoryController {
 
   requestHistoryIfNeeded(): void {
     if (this.destroyed) return;
-    if (
-      !this.historyRequestQueued ||
-      !this.historyRequestEligible ||
-      this.historyRequestPending ||
-      this.options.getBackwardPagination() !== 'idle' ||
-      !this.options.isNearOldest()
-    ) {
+    if (!this.historyRequestQueued || !this.historyRequestEligible || this.historyRequestPending) {
+      return;
+    }
+    if (this.anchorSuppressed) {
+      this.anchorDeferredRequest = true;
+      return;
+    }
+    if (this.options.getBackwardPagination() !== 'idle' || !this.options.isNearOldest()) {
       return;
     }
     if (!this.historyFillActive) this.beginHistoryFill();
@@ -280,6 +313,9 @@ export class TimelineHistoryController {
     this.historyFillPages = 0;
     this.wheelGestureActive = false;
     this.userScrollPending = false;
+    this.anchorSuppressed = false;
+    this.anchorDeferredRequest = false;
+    this.anchorFailures = 0;
     this.lastTouchY = null;
   }
 
@@ -329,6 +365,7 @@ export class TimelineHistoryController {
     this.cancelHistoryFillTimer();
     if (
       !this.historyFillActive ||
+      this.isAnchorFailing ||
       this.historyFillPages >= TIMELINE_LAYOUT.historyFillMaxPages ||
       this.options.getBackwardPagination() === 'end' ||
       !this.options.isNearOldest()
@@ -351,11 +388,15 @@ export class TimelineHistoryController {
   private continueHistoryFill(): void {
     if (this.destroyed) return;
     this.historyFillTimer = null;
-    if (!this.historyFillActive || !this.options.isNearOldest()) {
+    if (!this.historyFillActive || this.isAnchorFailing || !this.options.isNearOldest()) {
       this.finishHistoryFill();
       return;
     }
-    if (this.historyRequestPending || this.options.getBackwardPagination() === 'loading') {
+    if (
+      this.anchorSuppressed ||
+      this.historyRequestPending ||
+      this.options.getBackwardPagination() === 'loading'
+    ) {
       this.historyFillTimer = setTimeout(() => {
         if (this.destroyed) return;
         this.continueHistoryFill();

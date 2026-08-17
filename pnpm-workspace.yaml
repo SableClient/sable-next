@@ -5,4 +5,3 @@ onlyBuiltDependencies:
   - esbuild
 patchedDependencies:
   '@tanstack/svelte-virtual@3.13.35': patches/@tanstack__svelte-virtual@3.13.35.patch
-  '@tanstack/virtual-core@3.17.7': patches/@tanstack__virtual-core@3.17.7.patch
