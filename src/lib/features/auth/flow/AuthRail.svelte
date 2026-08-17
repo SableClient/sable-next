@@ -425,6 +425,14 @@
     .rail.motion-ready :global(.auth-card.entering) {
       animation: none;
     }
+
+    .panel-nav {
+      transition: none;
+    }
+
+    .panel-nav:hover {
+      transform: translateY(-50%);
+    }
   }
 
   @media (width <= 48rem) {

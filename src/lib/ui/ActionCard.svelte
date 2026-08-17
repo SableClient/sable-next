@@ -99,7 +99,7 @@
 
   .action-card-disabled {
     cursor: default;
-    opacity: 0.7;
+    opacity: 0.65;
   }
 
   .action-card-icon {

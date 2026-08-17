@@ -716,7 +716,7 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    .persona {
+    :root:not(.light) .persona {
       --pmp-ink: var(--pmp-on-dark, var(--sable-sec-on-container));
     }
   }
@@ -730,7 +730,7 @@
     }
 
     @media (prefers-color-scheme: dark) {
-      .persona {
+      :root:not(.light) .persona {
         --pmp-ink: oklch(
           from var(--pmp-on-dark, var(--sable-sec-on-container)) clamp(0.72, l, 0.92)
             clamp(0, c, 0.16) h
@@ -771,7 +771,6 @@
     letter-spacing: 0.01em;
     padding: 0 var(--space-1);
     position: relative;
-    transition: background-color 120ms ease-out;
   }
 
   .via:hover {
@@ -832,8 +831,16 @@
     cursor: pointer;
     font: inherit;
     padding: 0;
+    position: relative;
     text-decoration: underline;
     text-underline-offset: 0.15em;
+  }
+
+  /* Small text buttons, so the tap area is grown without moving the baseline. */
+  .send-failure button::after {
+    content: '';
+    inset: -0.5rem -0.25rem;
+    position: absolute;
   }
 
   .send-failure button:focus-visible {
@@ -1003,6 +1010,10 @@
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
         border-color var(--motion-normal) var(--motion-easing-standard);
+    }
+
+    .via {
+      transition: background-color var(--motion-fast) var(--motion-easing-standard);
     }
   }
 

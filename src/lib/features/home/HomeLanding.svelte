@@ -67,7 +67,7 @@
         href={SABLE_DONATE_URL}
         target="_blank"
         rel="noreferrer noopener"
-        variant="danger"
+        variant="secondary"
       >
         <HeartIcon aria-hidden="true" />
         {$i18n.t('home.supportDevelopment')}

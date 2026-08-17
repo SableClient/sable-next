@@ -45,7 +45,7 @@
 
   .method-toggle:disabled {
     cursor: default;
-    opacity: 0.55;
+    opacity: 0.65;
   }
 
   .method-toggle-icon {

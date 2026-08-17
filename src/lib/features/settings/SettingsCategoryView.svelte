@@ -262,7 +262,7 @@
 
   .setting-row.disabled .row-icon,
   .setting-row.disabled .row-copy {
-    opacity: 0.55;
+    opacity: 0.65;
   }
 
   .setting-row.highlighted {

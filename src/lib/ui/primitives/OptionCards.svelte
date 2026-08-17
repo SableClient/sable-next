@@ -66,8 +66,8 @@
   }
 
   .option-card:has(:disabled) {
-    cursor: not-allowed;
-    opacity: 0.5;
+    cursor: default;
+    opacity: 0.65;
   }
 
   .option-card:hover:not(:has(:disabled)) {

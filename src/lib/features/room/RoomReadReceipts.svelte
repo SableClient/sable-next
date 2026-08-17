@@ -161,11 +161,19 @@
     height: 1.75rem;
     max-width: 100%;
     padding: 0 var(--space-1) 0 var(--space-tight);
+    position: relative;
     transition:
       background-color var(--motion-fast) var(--motion-easing-standard),
       border-color var(--motion-fast) var(--motion-easing-standard),
       color var(--motion-fast) var(--motion-easing-standard);
     white-space: nowrap;
+  }
+
+  /* The row reserves 1.75rem, so the tap area grows without changing layout. */
+  button::after {
+    content: '';
+    inset: -0.25rem 0;
+    position: absolute;
   }
 
   button:hover {

@@ -25,7 +25,16 @@
     flex: 0 0 auto;
     height: 1.375rem;
     padding: 2px;
+    position: relative;
     width: 2.375rem;
+  }
+
+  /* The control reads better at 22px than the 36px touch floor, so the tap
+     area is grown separately. */
+  :global(.sable-switch::after) {
+    content: '';
+    inset: -0.4375rem 0;
+    position: absolute;
   }
 
   :global(.sable-switch[data-state='checked']) {
@@ -34,8 +43,8 @@
   }
 
   :global(.sable-switch[data-disabled]) {
-    cursor: not-allowed;
-    opacity: 0.5;
+    cursor: default;
+    opacity: 0.65;
   }
 
   :global(.sable-switch-thumb) {

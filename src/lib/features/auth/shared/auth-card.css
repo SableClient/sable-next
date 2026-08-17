@@ -64,11 +64,24 @@
   font: inherit;
   font-size: var(--font-size-small);
   padding: 0.25rem;
+  position: relative;
   text-decoration: underline;
   text-underline-offset: 0.15em;
-  transition:
-    color var(--motion-normal) var(--motion-easing-standard),
-    opacity var(--motion-normal) var(--motion-easing-standard);
+}
+
+/* Small text button, so the tap area is grown without changing the text box. */
+.auth-page .auth-link-button::after {
+  content: '';
+  inset: -0.25rem 0;
+  position: absolute;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-page .auth-link-button {
+    transition:
+      color var(--motion-normal) var(--motion-easing-standard),
+      opacity var(--motion-normal) var(--motion-easing-standard);
+  }
 }
 
 .auth-page .auth-link-button:hover {
@@ -83,5 +96,5 @@
 
 .auth-page .auth-link-button:disabled {
   cursor: default;
-  opacity: 0.55;
+  opacity: 0.65;
 }

@@ -480,12 +480,12 @@
   .board {
     display: flex;
     flex-direction: column;
-    height: min(22rem, 60vh);
+    height: min(22rem, 60dvh);
     width: min(24rem, calc(100vw - 2rem));
   }
 
   .board.sheet {
-    height: min(24rem, 60vh);
+    height: min(24rem, 60dvh);
     width: 100%;
   }
 

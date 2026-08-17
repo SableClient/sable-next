@@ -96,13 +96,16 @@
     max-height: calc(100dvh - var(--space-2) * 2);
     overflow: auto;
     padding: var(--space-4);
+
+    /* Bottom-anchored, so the home indicator would otherwise sit on the content. */
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
     width: 100%;
     z-index: var(--layer-sheet);
   }
 
   :global(.sable-dialog-content-sheet) {
     overscroll-behavior: contain;
-    padding: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
   }
 
   @media (width >= 42rem) {

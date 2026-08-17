@@ -580,9 +580,14 @@
     width: 100%;
   }
 
-  .rooms-heading:hover,
   .rooms-heading:focus-visible {
     background: var(--sable-bg-container-hover);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .rooms-heading:hover {
+      background: var(--sable-bg-container-hover);
+    }
   }
 
   .rooms-heading-label {
@@ -613,9 +618,14 @@
     padding-right: 0.25rem;
   }
 
-  .room-row-wrap:hover,
   .room-row-wrap:focus-within {
     background: var(--sable-bg-container-hover);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .room-row-wrap:hover {
+      background: var(--sable-bg-container-hover);
+    }
   }
 
   /* A subspace heading opens a group, so it needs air above it to read as a
@@ -717,7 +727,7 @@
 
   .room-badge {
     background: var(--sable-surface-var-container);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     margin-left: auto;
@@ -727,7 +737,7 @@
   }
 
   .room-badge.highlight {
-    background: var(--sable-primary-main);
+    background: var(--sable-primary-container);
     color: var(--sable-primary-on-container);
   }
 

@@ -138,7 +138,7 @@
 <style>
   .members-drawer {
     background: var(--sable-bg-container);
-    box-shadow: -0.5rem 0 1rem var(--sable-shadow);
+    box-shadow: var(--shadow-dialog);
     display: flex;
     flex-direction: column;
     inset: 0 0 0 auto;

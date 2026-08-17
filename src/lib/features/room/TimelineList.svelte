@@ -849,7 +849,7 @@
     border: 1px solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     display: grid;
-    font-family: monospace;
+    font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
     gap: calc(var(--space-compact) / 2);
     left: var(--space-1);

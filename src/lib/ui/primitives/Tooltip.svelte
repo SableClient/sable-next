@@ -95,7 +95,7 @@
   }
 
   :global(.sable-tooltip) {
-    animation: tooltip-in calc(var(--motion-slow) * 1.5) var(--motion-easing-emphasized) both;
+    animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
     background: var(--sable-bg-container);
     border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius);

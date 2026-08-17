@@ -820,7 +820,12 @@
   .profile-extra summary :global(svg) {
     color: var(--sable-sec-main);
     flex: none;
-    transition: transform var(--motion-fast) var(--motion-easing-standard);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .profile-extra summary :global(svg) {
+      transition: transform var(--motion-fast) var(--motion-easing-standard);
+    }
   }
 
   .profile-extra[open] summary :global(svg) {

@@ -311,8 +311,10 @@
     display: none;
   }
 
-  .rail-item:hover {
-    background: var(--sable-bg-container-hover);
+  @media (hover: hover) and (pointer: fine) {
+    .rail-item:hover {
+      background: var(--sable-bg-container-hover);
+    }
   }
 
   .rail-item.active {

@@ -394,7 +394,7 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    .profile-card-name.tinted {
+    :root:not(.light) .profile-card-name.tinted {
       color: var(--profile-name-color-dark);
     }
   }
@@ -405,7 +405,7 @@
     }
 
     @media (prefers-color-scheme: dark) {
-      .profile-card-name.tinted {
+      :root:not(.light) .profile-card-name.tinted {
         color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
       }
     }
