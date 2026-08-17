@@ -70,14 +70,14 @@ const ENUMS = {
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
-/** Strings with no fixed set of values, which the loader would otherwise drop. */
+/** Strings with no fixed set of values, which `load` would otherwise drop and
+    `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
 ] as const satisfies readonly (keyof Preferences)[];
 
-/** Excluded from `SelectPreference`, since these have no fixed set of choices. */
 export type FreeTextPreference = (typeof FREE_TEXT)[number];
 
 const DEFAULTS: Preferences = {

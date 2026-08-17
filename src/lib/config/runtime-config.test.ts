@@ -32,7 +32,7 @@ test('a block missing any of the three a subscription needs registers nothing', 
   }
 });
 
-test('a file a deployment broke leaves push unregistered rather than throwing', () => {
+test('a file a deployment broke leaves push unregistered without throwing', () => {
   for (const raw of [null, undefined, 'not an object', 42, {}, { pushNotificationDetails: 'no' }]) {
     expect(parseRuntimeConfig(raw).push).toBeNull();
   }

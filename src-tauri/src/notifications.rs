@@ -127,8 +127,8 @@ pub async fn register_push<R: Runtime>(
         auth: registered.auth,
     };
 
-    // No app id for what the platform handed back means that half is simply
-    // unconfigured in this build.
+    // No app id for what the platform handed back means this build does not
+    // configure that half.
     let Some((app_id, pushkey, web_push)) = pusher(
         registration,
         config.native_app_id.as_deref(),

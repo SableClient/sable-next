@@ -48,7 +48,7 @@ test('the deployment default holds until all three fields are applied', async ({
   await expect(page.getByText(/Using https:\/\//)).toBeVisible();
 
   await url.fill(GATEWAY);
-  await expect(page.getByText(/All three fields are needed/)).toBeVisible();
+  await expect(page.getByText(/Fill in all three/)).toBeVisible();
   await expect(apply).toBeDisabled();
   expect(await storedOverride(page)).toEqual({
     pushGatewayUrl: '',
