@@ -87,6 +87,16 @@ export default defineConfig([
     },
   },
   {
+    // SvelteKit keeps the service worker out of the app's tsconfig, since it
+    // compiles against webworker libs rather than the DOM's.
+    files: ['src/service-worker.ts'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: false, project: false },
+      globals: { ...globals.serviceworker },
+    },
+  },
+  {
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },

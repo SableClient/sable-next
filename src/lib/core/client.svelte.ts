@@ -9,6 +9,7 @@ import type { JoinRuleView } from '@/generated/JoinRuleView';
 import type { MemberView } from '@/generated/MemberView';
 import type { NotificationModeView } from '@/generated/NotificationModeView';
 import type { NotificationSettingsView } from '@/generated/NotificationSettingsView';
+import type { PusherView } from '@/generated/PusherView';
 import type { RoomTag } from '@/generated/RoomTag';
 import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
 import type { RoomPreviewView } from '@/generated/RoomPreviewView';
@@ -717,6 +718,14 @@ export class CoreClient {
       direct,
       mode,
     });
+  }
+
+  async setPusher(pusher: PusherView): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_pusher', pusher });
+  }
+
+  async removePusher(pushkey: string, appId: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'remove_pusher', pushkey, app_id: appId });
   }
 
   async setNotificationContent(visible: boolean): Promise<void> {

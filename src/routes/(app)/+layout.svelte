@@ -8,7 +8,7 @@
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import { useCoreClient } from '$lib/core/context';
-  import { provideRoomList, RoomList } from '$lib/rooms/room-list.svelte';
+  import { provideRoomList, RoomList, roomPathParamFromId } from '$lib/rooms/room-list.svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { i18n } from '$lib/i18n';
@@ -16,6 +16,8 @@
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import { preferences } from '$lib/settings/preferences.svelte';
   import { NotificationCenter } from '$lib/features/notifications/notifications.svelte';
+  import { rememberRoomNames } from '$lib/features/notifications/room-names';
+  import { syncPushSubscription } from '$lib/features/notifications/web-push';
 
   interface Props {
     children: Snippet;
@@ -59,6 +61,40 @@
     if (core.status !== 'ready') return;
 
     void core.setNotificationContent(preferences.notificationContent).catch(() => {});
+  });
+
+  // The browser can rotate a subscription behind our back, so the worker asks
+  // for a fresh look rather than the app polling for one.
+  $effect(() => {
+    if (core.status !== 'ready' || !preferences.desktopNotifications) return;
+
+    const resync = (): void => {
+      void syncPushSubscription(core).catch((error: unknown) => {
+        console.debug('[sable notifications] push not registered', error);
+      });
+    };
+    resync();
+
+    return on(navigator.serviceWorker, 'message', (event) => {
+      const message = (event as MessageEvent).data as
+        | { type?: string; roomId?: string }
+        | undefined;
+      if (message?.type === 'sable:push-resubscribe') resync();
+      if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
+        void goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(message.roomId) }));
+      }
+    });
+  });
+
+  $effect(() => {
+    const names = new Map(
+      roomList.rooms
+        .filter((room) => room.name !== null)
+        .map((room) => [room.room_id, room.name ?? room.room_id])
+    );
+    if (names.size === 0) return;
+
+    void rememberRoomNames(names).catch(() => {});
   });
 
   $effect(() => {
