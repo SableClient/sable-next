@@ -54,6 +54,9 @@ src-tauri/gen/apple/*
 # Tauri-typegen cache
 .typecache
 
+# ESLint cache
+.eslintcache
+
 # Worktrees
 .worktrees
 

@@ -110,6 +110,15 @@ jobs:
           build: 'false'
           install-mise-tools: 'false'
 
+      # `--cache-strategy content`, because a fresh checkout remtimes every file.
+      - name: Restore ESLint cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eslintcache
+          key: eslint-${{ runner.os }}-${{ hashFiles('eslint.config.js', 'tsconfig.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('eslint.config.js', 'tsconfig.json', 'pnpm-lock.yaml') }}-
+
       - name: Run ESLint
         run: pnpm lint
 
