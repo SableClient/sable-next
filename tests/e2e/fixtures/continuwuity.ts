@@ -120,6 +120,29 @@ export type SeededTimeline = {
   eventIds: string[];
 };
 
+// A room of its own for any test that writes, so parallel workers cannot appear
+// in each other's timelines.
+export async function createRoom(
+  baseUrl: string,
+  accessToken: string,
+  name: string
+): Promise<string> {
+  const create = await fetch(`${baseUrl}/_matrix/client/v3/createRoom`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ name, preset: 'private_chat', visibility: 'private' }),
+  });
+  if (!create.ok) {
+    throw new Error(`create room failed: ${String(create.status)} ${await create.text()}`);
+  }
+  const { room_id: roomId } = (await create.json()) as { room_id?: string };
+  if (!roomId) throw new Error('create room response did not include a room id');
+  return roomId;
+}
+
 export async function seedTimelineRoom(
   baseUrl: string,
   accessToken: string

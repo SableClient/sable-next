@@ -5,7 +5,7 @@ import { AppShell } from '../pages/AppShell';
 import { RoomTimeline } from '../pages/RoomTimeline';
 import { FakeCoreDriver } from '../pages/FakeCoreDriver';
 import { installFakeCore as installRoomCore, type RoomCoreMode } from '../fake-core';
-import type { TestHomeserver } from './continuwuity';
+import { createRoom, registerUser, type TestHomeserver } from './continuwuity';
 import { LOGIN_PASSWORD, LOGIN_USERNAME } from './loginAccount';
 import { homeserverStatePath } from './runtime';
 
@@ -32,10 +32,16 @@ type Fixtures = {
   installRoomCore: (mode: RoomCoreMode) => Promise<void>;
   homeserver: TimelineHomeserver;
   signIn: () => Promise<void>;
+  scratchRoom: { roomId: string; name: string };
+  // An account per test, not per worker: every sign-in creates a device, and the
+  // verification step only offers to skip while the account has none.
+  homeserverAccount: { username: string; accessToken: string };
 };
 
 type WorkerFixtures = {
   workerSession: Session;
+  // One account per worker: parallel sign-ins as the same user race on device
+  // creation and leave the verification step without its skip button.
 };
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
@@ -52,6 +58,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     },
     { scope: 'worker' },
   ],
+
   installEmptyCore: async ({ page, workerSession }, use) => {
     await use((mode) => installEmptyCore(page, mode, workerSession));
   },
@@ -76,11 +83,21 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     const state = JSON.parse(await readFile(homeserverStatePath(), 'utf8')) as TimelineHomeserver;
     await use(state);
   },
-  signIn: async ({ auth, page, homeserver }, use) => {
+  homeserverAccount: async ({ homeserver }, use, testInfo) => {
+    const username = `${LOGIN_USERNAME}${testInfo.testId.toLowerCase()}`;
+    const session = await registerUser(homeserver.baseUrl, username, LOGIN_PASSWORD);
+    await use({ username, accessToken: session.accessToken });
+  },
+  scratchRoom: async ({ homeserver, homeserverAccount }, use, testInfo) => {
+    const name = `Scratch ${String(testInfo.parallelIndex)} ${testInfo.testId}`;
+    const roomId = await createRoom(homeserver.baseUrl, homeserverAccount.accessToken, name);
+    await use({ roomId, name });
+  },
+  signIn: async ({ auth, page, homeserver, homeserverAccount }, use) => {
     await use(async () => {
       await auth.open(homeserver.baseUrl);
       await auth.revealPasswordLogin();
-      await auth.signInWithPassword(LOGIN_USERNAME, LOGIN_PASSWORD);
+      await auth.signInWithPassword(homeserverAccount.username, LOGIN_PASSWORD);
       await expect(page).toHaveURL(/\/login\/verify$/);
       await auth.skipVerificationButton.click();
       await expect(page).toHaveURL(/\/home$/);
