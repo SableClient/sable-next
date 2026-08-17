@@ -15,6 +15,8 @@
   import Button from '$lib/ui/primitives/Button.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import { preferences } from '$lib/settings/preferences.svelte';
+  import { registerNativePush } from '$lib/features/notifications/native-push';
+  import { pushOverride } from '$lib/features/notifications/push-config';
   import { NotificationCenter } from '$lib/features/notifications/notifications.svelte';
   import { rememberRoomNames } from '$lib/features/notifications/room-names';
   import { syncPushSubscription } from '$lib/features/notifications/web-push';
@@ -63,13 +65,26 @@
     void core.setNotificationContent(preferences.notificationContent).catch(() => {});
   });
 
+  // Not gated on `desktopNotifications`: the native shell alerts without the
+  // webview, and that switch only governs the in-app ones.
+  $effect(() => {
+    if (core.status !== 'ready') return;
+
+    void registerNativePush(pushOverride()).catch((error: unknown) => {
+      console.debug('[sable notifications] native push not registered', error);
+    });
+  });
+
   // The browser can rotate a subscription behind our back, so the worker asks
   // for a fresh look rather than the app polling for one.
   $effect(() => {
     if (core.status !== 'ready' || !preferences.desktopNotifications) return;
 
+    // Read before the first await, or a retargeted gateway never re-registers.
+    const override = pushOverride();
+
     const resync = (): void => {
-      void syncPushSubscription(core).catch((error: unknown) => {
+      void syncPushSubscription(core, override).catch((error: unknown) => {
         console.debug('[sable notifications] push not registered', error);
       });
     };

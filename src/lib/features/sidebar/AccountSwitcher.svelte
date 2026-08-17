@@ -3,6 +3,7 @@
   import { resolve } from '$app/paths';
   import type { ProfileView } from '@/generated/ProfileView';
   import { useCoreClient } from '$lib/core/context';
+  import { pushOverride } from '$lib/features/notifications/push-config';
   import { dropPushSubscription } from '$lib/features/notifications/web-push';
   import { i18n } from '$lib/i18n';
   import { DropdownMenu } from 'bits-ui';
@@ -67,7 +68,7 @@
   // The pusher goes first: once the session ends there is no way to tell the
   // homeserver to stop pushing to this browser.
   function logout(): void {
-    void dropPushSubscription(core)
+    void dropPushSubscription(core, pushOverride())
       .catch(() => {})
       .finally(() => void core.logout());
   }
