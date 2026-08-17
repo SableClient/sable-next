@@ -14,11 +14,7 @@ export default defineConfig({
       ignored: (path) => {
         const file = isAbsolute(path) ? relative(process.cwd(), path) : path;
         return (
-          Boolean(file) &&
-          !['src', 'crates/sable-core', 'crates/sable-wasm'].some(
-            (directory) => file === directory || file.startsWith(`${directory}/`)
-          ) &&
-          !['vite.config.ts', 'svelte.config.js'].includes(file)
+          Boolean(file) && file !== 'src' && !file.startsWith('src/') && file !== 'vite.config.ts'
         );
       },
     },

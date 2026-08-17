@@ -67,18 +67,14 @@ iter_not_returning_iterator = "deny"
 expl_impl_clone_on_copy = "deny"
 infallible_try_from = "deny"
 
-# The wasm bundle is the web build's dominant cost, so the release profile
-# optimises for size rather than speed.
-[profile.release]
+# Sizing the wasm bundle down belongs here, not on `release`, which also builds
+# the `src-tauri` desktop binary. `strip` keeps the metadata wasm-bindgen reads
+# and wasm-opt then drops.
+[profile.wasm-release]
+inherits = "release"
 opt-level = "z"
 lto = true
 codegen-units = 1
-panic = "abort"
-strip = true
-
-# wasm-bindgen processes the linked module before wasm-opt strips its metadata.
-[profile.wasm-release]
-inherits = "release"
 strip = "debuginfo"
 
 # An unoptimised `dev` build is ~100 MB, which the browser recompiles on every
