@@ -5,7 +5,7 @@ import { AppShell } from '../pages/AppShell';
 import { RoomTimeline } from '../pages/RoomTimeline';
 import { FakeCoreDriver } from '../pages/FakeCoreDriver';
 import { installFakeCore as installRoomCore, type RoomCoreMode } from '../fake-core';
-import { createRoom, type TestHomeserver } from './continuwuity';
+import { createRoom, sendTimelineMessage, type TestHomeserver } from './continuwuity';
 import { LOGIN_PASSWORD, LOGIN_USERNAME } from './loginAccount';
 import { homeserverStatePath } from './runtime';
 
@@ -81,6 +81,15 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   scratchRoom: async ({ homeserver }, use, testInfo) => {
     const name = `Scratch ${String(testInfo.parallelIndex)} ${testInfo.testId}`;
     const roomId = await createRoom(homeserver.baseUrl, homeserver.accessToken, name);
+    // Sync orders rooms by activity, and an empty one can stay outside the
+    // window the client asks for.
+    await sendTimelineMessage(
+      homeserver.baseUrl,
+      homeserver.accessToken,
+      roomId,
+      `${testInfo.testId}-seed`,
+      'Scratch room opened'
+    );
     await use({ roomId, name });
   },
   signIn: async ({ auth, page, homeserver }, use) => {
@@ -89,7 +98,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       await auth.revealPasswordLogin();
       await auth.signInWithPassword(LOGIN_USERNAME, LOGIN_PASSWORD);
       await expect(page).toHaveURL(/\/login\/verify$/);
-      await auth.leaveVerification();
+      await auth.leaveVerificationButton.click();
       await expect(page).toHaveURL(/\/home$/);
     });
   },

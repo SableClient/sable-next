@@ -1,4 +1,15 @@
 import { expect, test } from './fixtures/test';
+import type { AppShell } from './pages/AppShell';
+
+// The room is created over the API moments before the test, so opening it waits
+// on the client's sync rather than on the UI.
+async function openScratchRoom(
+  app: AppShell,
+  room: { roomId: string; name: string }
+): Promise<void> {
+  await app.openRoom(room.roomId);
+  await expect(app.roomHeading(room.name)).toBeVisible({ timeout: 20_000 });
+}
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(60_000);
@@ -12,8 +23,7 @@ test('sends a message with Enter and keeps the timeline at latest', async ({
   signIn,
 }) => {
   await signIn();
-  await app.openRoom(scratchRoom.roomId);
-  await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
+  await openScratchRoom(app, scratchRoom);
 
   const body = `Composed with Enter ${String(Date.now())}`;
   await app.composer.fill(body);
@@ -26,8 +36,7 @@ test('sends a message with Enter and keeps the timeline at latest', async ({
 
 test('sends a message with the send button', async ({ app, timeline, scratchRoom, signIn }) => {
   await signIn();
-  await app.openRoom(scratchRoom.roomId);
-  await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
+  await openScratchRoom(app, scratchRoom);
 
   const body = `Composed with the button ${String(Date.now())}`;
   await expect(app.sendMessage).toBeDisabled();
@@ -46,8 +55,7 @@ test('keeps a sent message after a reload', async ({
   signIn,
 }) => {
   await signIn();
-  await app.openRoom(scratchRoom.roomId);
-  await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
+  await openScratchRoom(app, scratchRoom);
 
   const body = `Survives a reload ${String(Date.now())}`;
   await app.composer.fill(body);
@@ -61,8 +69,7 @@ test('keeps a sent message after a reload', async ({
 
 test('does not send an empty message', async ({ app, timeline, scratchRoom, signIn }) => {
   await signIn();
-  await app.openRoom(scratchRoom.roomId);
-  await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
+  await openScratchRoom(app, scratchRoom);
   const body = `Only message ${String(Date.now())}`;
   await app.composer.fill(body);
   await app.composer.press('Enter');

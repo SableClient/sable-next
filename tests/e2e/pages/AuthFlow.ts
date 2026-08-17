@@ -8,9 +8,8 @@ export class AuthFlow {
   readonly password: Locator;
   readonly moreMethodsButton: Locator;
   readonly passwordSignInButton: Locator;
-  readonly skipVerificationButton: Locator;
-  readonly continueVerificationButton: Locator;
   readonly verificationCard: Locator;
+  readonly leaveVerificationButton: Locator;
   readonly previousStageButton: Locator;
   readonly nextStageButton: Locator;
 
@@ -22,9 +21,12 @@ export class AuthFlow {
     this.password = page.getByRole('textbox', { name: 'Password' });
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
-    this.skipVerificationButton = page.getByRole('button', { name: 'Skip for now' });
-    this.continueVerificationButton = page.getByRole('button', { name: 'Continue' });
+    // A first device on a fresh account comes back cross-signed, so the card
+    // reads "Device verified" and offers Continue rather than the skip.
     this.verificationCard = page.getByRole('form', { name: /Verify your device|Device verified/ });
+    this.leaveVerificationButton = page
+      .getByRole('button', { name: /Skip for now|Continue/ })
+      .first();
     this.previousStageButton = page.getByRole('button', { name: 'Back' });
     this.nextStageButton = page.getByRole('button', { name: 'Next' });
   }
@@ -41,12 +43,6 @@ export class AuthFlow {
   async revealPasswordLogin(): Promise<void> {
     await this.revealMoreMethods();
     await this.passwordSignInButton.click();
-  }
-
-  // A first device on a fresh account comes back cross-signed, and the card then
-  // offers Continue instead of the skip. Both finish the step.
-  async leaveVerification(): Promise<void> {
-    await this.skipVerificationButton.or(this.continueVerificationButton).first().click();
   }
 
   async signInWithPassword(username: string, password: string): Promise<void> {
