@@ -221,6 +221,7 @@
   :global(.settings-logout) {
     justify-content: flex-start;
     margin: auto var(--space-3) 0;
+    min-height: var(--control-height-medium);
     width: auto;
   }
 
@@ -292,9 +293,9 @@
     background: var(--sable-surface-container-hover);
   }
 
-  @media (width < 28rem) {
+  @media (width >= 28rem) {
     :global(.settings-logout) {
-      min-height: var(--control-height-medium);
+      min-height: auto;
     }
   }
 </style>

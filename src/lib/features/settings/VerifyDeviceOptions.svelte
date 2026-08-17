@@ -151,12 +151,12 @@
   .recovery-controls {
     display: grid;
     gap: var(--space-1);
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 1fr;
   }
 
-  @media (width < 42rem) {
+  @media (width >= 42rem) {
     .recovery-controls {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr) auto;
     }
   }
 </style>

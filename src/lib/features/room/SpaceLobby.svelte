@@ -486,6 +486,7 @@
   .room {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-3);
     padding: var(--space-2) var(--space-3);
   }
@@ -559,6 +560,7 @@
     display: flex;
     flex: none;
     gap: var(--space-1);
+    margin-left: auto;
   }
 
   :global(.room-menu-trigger) {
@@ -597,13 +599,13 @@
     justify-content: center;
   }
 
-  @media (width < 42rem) {
+  @media (width >= 42rem) {
     .room {
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
 
     .room-actions {
-      margin-left: auto;
+      margin-left: 0;
     }
   }
 </style>

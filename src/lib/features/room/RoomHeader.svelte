@@ -92,6 +92,11 @@
   }
 
   :global(.back-button) {
+    display: inline-flex;
+  }
+
+  :global(.sable-avatar.room-avatar),
+  :global(.members-button span) {
     display: none;
   }
 
@@ -106,14 +111,17 @@
     width: var(--icon-size-medium);
   }
 
-  @media (width < 48rem) {
+  @media (width >= 48rem) {
     :global(.back-button) {
+      display: none;
+    }
+
+    :global(.sable-avatar.room-avatar) {
       display: inline-flex;
     }
 
-    :global(.sable-avatar.room-avatar),
     :global(.members-button span) {
-      display: none;
+      display: inline;
     }
   }
 </style>

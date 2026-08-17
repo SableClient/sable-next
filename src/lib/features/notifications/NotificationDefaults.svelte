@@ -138,17 +138,18 @@
   }
 
   label {
-    align-items: center;
+    align-items: stretch;
     display: flex;
-    gap: var(--space-3);
+    flex-direction: column;
+    gap: var(--space-1);
     justify-content: space-between;
   }
 
-  @media (width < 32rem) {
+  @media (width >= 32rem) {
     label {
-      align-items: stretch;
-      flex-direction: column;
-      gap: var(--space-1);
+      align-items: center;
+      flex-direction: row;
+      gap: var(--space-3);
     }
   }
 </style>

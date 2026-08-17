@@ -161,6 +161,11 @@
     min-height: 0;
   }
 
+  .sidebar {
+    height: 100%;
+    width: 100%;
+  }
+
   @media (width >= 48rem) {
     .sidebar {
       height: 100dvh;
@@ -199,13 +204,6 @@
     .resize-handle:focus-visible {
       outline: var(--focus-ring-width) solid var(--sable-focus-ring);
       outline-offset: -3px;
-    }
-  }
-
-  @media (width < 48rem) {
-    .sidebar {
-      height: 100%;
-      width: 100%;
     }
   }
 </style>

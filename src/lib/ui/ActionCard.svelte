@@ -70,7 +70,7 @@
     flex-direction: column;
     font: inherit;
     gap: var(--space-2);
-    min-height: 12rem;
+    min-height: 0;
     min-width: 0;
     padding: var(--space-3);
     position: relative;
@@ -152,9 +152,9 @@
     width: var(--icon-size-small);
   }
 
-  @media (width < 48rem) {
+  @media (width >= 48rem) {
     .action-card {
-      min-height: 0;
+      min-height: 12rem;
     }
   }
 

@@ -73,16 +73,16 @@
 
   :global(.sable-dialog-content-settings) {
     background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
-    border-radius: var(--radius-card);
+    border: 0;
+    border-radius: 0;
     box-shadow: var(--shadow-dialog);
-    height: min(52rem, calc(100dvh - 3rem));
+    height: 100dvh;
     left: 50%;
     max-width: 68rem;
     overflow: hidden;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: calc(100% - 3rem);
+    width: 100%;
     z-index: var(--layer-dialog);
   }
 
@@ -120,12 +120,12 @@
     }
   }
 
-  @media (width < 48rem) {
+  @media (width >= 48rem) {
     :global(.sable-dialog-content-settings) {
-      border: 0;
-      border-radius: 0;
-      height: 100dvh;
-      width: 100%;
+      border: 1px solid var(--sable-surface-container-line);
+      border-radius: var(--radius-card);
+      height: min(52rem, calc(100dvh - 3rem));
+      width: calc(100% - 3rem);
     }
   }
 
@@ -164,19 +164,16 @@
       animation: drawer-in var(--motion-slow) var(--motion-easing-emphasized);
     }
 
-    :global(.sable-dialog-content-settings) {
-      animation: dialog-in var(--motion-slow) var(--motion-easing-emphasized);
-    }
-
+    :global(.sable-dialog-content-settings),
     :global(.sable-dialog-content-verification),
     :global(.sable-dialog-content-sheet) {
       animation: sheet-in var(--motion-slow) var(--motion-easing-emphasized);
     }
   }
 
-  @media (prefers-reduced-motion: no-preference) and (width < 48rem) {
+  @media (prefers-reduced-motion: no-preference) and (width >= 48rem) {
     :global(.sable-dialog-content-settings) {
-      animation: sheet-in var(--motion-slow) var(--motion-easing-emphasized);
+      animation: dialog-in var(--motion-slow) var(--motion-easing-emphasized);
     }
   }
 </style>

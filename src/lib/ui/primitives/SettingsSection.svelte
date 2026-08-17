@@ -44,7 +44,7 @@
   }
 
   .settings-section-header {
-    align-items: center;
+    align-items: flex-start;
     display: flex;
     gap: var(--space-3);
     justify-content: space-between;
@@ -93,10 +93,9 @@
     border-top: 1px solid var(--sable-bg-container-line);
   }
 
-  @media (width < 42rem) {
+  @media (width >= 42rem) {
     .settings-section-header {
-      align-items: flex-start;
-      padding: var(--space-2) var(--space-3);
+      align-items: center;
     }
   }
 </style>

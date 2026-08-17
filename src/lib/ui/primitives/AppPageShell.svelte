@@ -52,6 +52,8 @@
   }
 
   .app-page-header {
+    align-items: stretch;
+    flex-direction: column;
     margin-bottom: var(--page-gutter);
   }
 
@@ -82,33 +84,33 @@
 
   .app-page-header,
   .app-page-actions {
-    align-items: center;
     display: flex;
     gap: var(--space-3);
     justify-content: space-between;
   }
 
+  .app-page-actions {
+    align-items: center;
+  }
+
   .app-page-shell-compact {
-    padding: var(--space-4);
+    padding: var(--space-3);
   }
 
   .app-page-shell-compact .app-page-header {
+    align-items: center;
+    flex-direction: row;
     margin-bottom: var(--space-3);
   }
 
-  @media (width < 42rem) {
+  @media (width >= 42rem) {
     .app-page-header {
-      align-items: stretch;
-      flex-direction: column;
+      align-items: center;
+      flex-direction: row;
     }
 
     .app-page-shell-compact {
-      padding: var(--space-3);
-    }
-
-    .app-page-shell-compact .app-page-header {
-      align-items: center;
-      flex-direction: row;
+      padding: var(--space-4);
     }
   }
 </style>

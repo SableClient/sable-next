@@ -56,6 +56,7 @@
     bottom: var(--space-3);
     box-shadow: var(--shadow-dialog);
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-3);
     inset-inline: var(--space-3);
     margin-inline: auto;
@@ -102,16 +103,18 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-2);
+    justify-content: flex-end;
+    width: 100%;
   }
 
-  @media (width < 42rem) {
+  @media (width >= 42rem) {
     .consent {
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
 
     .actions {
-      justify-content: flex-end;
-      width: 100%;
+      justify-content: normal;
+      width: auto;
     }
   }
 </style>

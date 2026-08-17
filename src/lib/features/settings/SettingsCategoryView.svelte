@@ -207,9 +207,10 @@
   .setting-row {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-3);
     min-height: calc(var(--control-height-medium) + var(--space-4));
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3);
   }
 
   .setting-row + .setting-row {
@@ -296,7 +297,9 @@
     align-items: center;
     display: flex;
     flex: 0 0 auto;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    padding-left: calc(var(--control-height-medium) + var(--space-3));
+    width: 100%;
   }
 
   @media (hover: hover) {
@@ -318,16 +321,16 @@
     padding: var(--space-3);
   }
 
-  @media (width < 42rem) {
+  @media (width >= 42rem) {
     .setting-row {
-      flex-wrap: wrap;
-      padding: var(--space-3);
+      flex-wrap: nowrap;
+      padding: var(--space-2) var(--space-3);
     }
 
     .row-control {
-      justify-content: flex-start;
-      padding-left: calc(var(--control-height-medium) + var(--space-3));
-      width: 100%;
+      justify-content: flex-end;
+      padding-left: 0;
+      width: auto;
     }
   }
 </style>
