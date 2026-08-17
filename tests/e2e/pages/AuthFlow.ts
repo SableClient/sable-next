@@ -21,8 +21,7 @@ export class AuthFlow {
     this.password = page.getByRole('textbox', { name: 'Password' });
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
-    // A first device on a fresh account comes back cross-signed, so the card
-    // reads "Device verified" and offers Continue rather than the skip.
+    // A first device comes back cross-signed, and that card offers Continue, not the skip.
     this.verificationCard = page.getByRole('form', { name: /Verify your device|Device verified/ });
     this.leaveVerificationButton = page
       .getByRole('button', { name: /Skip for now|Continue/ })
