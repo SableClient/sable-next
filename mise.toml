@@ -115,9 +115,10 @@ env = { MISE_ENV = "tauri" }
 description = "Install Android SDK packages + NDK (no Android Studio needed)"
 depends = ["tauri:setup"]
 env = { MISE_ENV = "tauri" }
+# Through `mise exec`, which is what puts the tauri env's sdkmanager on PATH.
 run = [
-  "yes | sdkmanager --licenses",
-  'sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;{{env.ANDROID_NDK_VERSION}}"',
+  "yes | mise exec -- sdkmanager --licenses",
+  'mise exec -- sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;{{env.ANDROID_NDK_VERSION}}"',
 ]
 
 [tasks."tauri:setup:macos"]
