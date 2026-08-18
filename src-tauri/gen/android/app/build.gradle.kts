@@ -55,7 +55,9 @@ android {
 }
 
 rust {
-    rootDirRel = "../../../"
+    // The repo root, not src-tauri: pnpm refuses to run in a directory with no
+    // package.json of its own.
+    rootDirRel = "../../../../"
 }
 
 dependencies {
