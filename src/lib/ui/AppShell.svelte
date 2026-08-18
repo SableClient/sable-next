@@ -29,6 +29,7 @@
 <style>
   .app-shell {
     height: 100dvh;
+    padding-top: var(--safe-top);
   }
 
   .desktop-navigation {

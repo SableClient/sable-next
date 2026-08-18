@@ -473,7 +473,7 @@
   .composer-stack {
     --composer-gutter: var(--space-2);
 
-    margin: 0 auto calc(0.95rem + env(safe-area-inset-bottom));
+    margin: 0 auto calc(0.95rem + var(--safe-bottom));
     position: relative;
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }

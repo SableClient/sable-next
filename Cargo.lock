@@ -121,6 +121,7 @@ dependencies = [
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
+ "tauri-plugin-edge-to-edge",
  "tauri-plugin-fs",
  "tauri-plugin-notifications",
  "tauri-plugin-opener",
@@ -6523,6 +6524,17 @@ dependencies = [
  "tauri-plugin-fs",
  "thiserror 2.0.20",
  "url",
+]
+
+[[package]]
+name = "tauri-plugin-edge-to-edge"
+version = "0.3.3"
+source = "git+https://github.com/SableClient/tauri-plugin-edge-to-edge.git?rev=33c6116c27be28c06df5a9d02231ecc5fdeb93c5#33c6116c27be28c06df5a9d02231ecc5fdeb93c5"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

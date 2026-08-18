@@ -217,9 +217,8 @@
     box-sizing: border-box;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    min-height: calc(4.25rem + env(safe-area-inset-bottom));
-    padding: 0.25rem env(safe-area-inset-right) calc(0.25rem + env(safe-area-inset-bottom))
-      env(safe-area-inset-left);
+    min-height: calc(4.25rem + var(--safe-bottom));
+    padding: 0.25rem var(--safe-right) calc(0.25rem + var(--safe-bottom)) var(--safe-left);
     position: relative;
     width: 100%;
   }
