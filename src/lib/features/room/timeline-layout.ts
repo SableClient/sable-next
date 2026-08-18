@@ -11,7 +11,8 @@ export const TIMELINE_LAYOUT = {
   historyPrefetchItems: 25,
   historyFillMaxPages: 4,
   historyRequestMinInterval: 300,
-  jumpToLatestThreshold: 80,
+  /** Stickiness is a question about a line or two of text, so it tracks type size. */
+  jumpToLatestRem: 5,
   wheelGestureEndDelay: 150,
   mediaMaxRem: 32,
   mediaMinRem: 15,

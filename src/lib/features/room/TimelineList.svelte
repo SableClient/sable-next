@@ -202,6 +202,9 @@
     return anchorViewportCache.view;
   }
   const anchor = new TimelineAnchor(anchorViewport);
+  // `rootFontSize` flushes style, so this is refreshed with the layout pass
+  // rather than read on every scroll event.
+  let nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * 16;
 
   // The virtualiser's helpers arm `reconcileScroll`, which forces the offset back
   // to its own target for five seconds.
@@ -222,7 +225,7 @@
     estimateSize: (index) =>
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
-    scrollEndThreshold: TIMELINE_LAYOUT.jumpToLatestThreshold,
+    scrollEndThreshold: nearLatestPx,
     useScrollendEvent: true,
     overscan: 24,
     onChange: handleVirtualizerChange,
@@ -235,6 +238,11 @@
     isNearOldest: () => viewport !== null && viewport.scrollTop < viewport.clientHeight * 2,
     isVirtualizerScrolling: () => get(virtualizer).isScrolling,
     requestHistory: () => onRequestHistory(),
+    onGestureSettled: () => {
+      if (!endFollowDeferred) return;
+      endFollowDeferred = false;
+      scheduleFollowingEndReconciliation(true);
+    },
     debugLog: historyDebugLog,
     debugSnapshot: () => timelineDebugSnapshot(viewport, get(virtualizer), scrollMode.kind),
   });
@@ -354,6 +362,9 @@
     if (anchorHolding) return;
     anchor.capture();
     if (anchor.held === null) return;
+    // The hold owns the position now, so a follow deferred earlier must not
+    // yank the reader to the end behind it.
+    endFollowDeferred = false;
     const holdId = (anchorHoldSequence += 1);
     activeHoldId = holdId;
     anchorHolding = true;
@@ -408,7 +419,7 @@
 
   function refreshRollingAnchor(): void {
     if (anchorHolding || !viewport) return;
-    if (isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold)) {
+    if (isNearLatest(viewport, nearLatestPx)) {
       anchorRolling = false;
       anchor.release();
       return;
@@ -433,21 +444,39 @@
     anchor.release();
   }
 
-  function scheduleFollowingEndReconciliation(): void {
+  // A gesture that could not scroll never settles through `onScroll`, so a follow
+  // dropped while it was pending has to be retried when it does.
+  let endFollowDeferred = false;
+
+  function scheduleFollowingEndReconciliation(afterGesture = false): void {
     if (followingEndReconciliationPending) return;
 
     followingEndReconciliationPending = true;
-    void tick().then(() => {
+    void tick().then(async () => {
       followingEndReconciliationPending = false;
-      if (
-        scrollMode.kind !== 'followingLive' ||
-        historyController.hasUserScrollPending ||
-        !viewport
-      )
+      if (scrollMode.kind !== 'followingLive' || !viewport) return;
+      if (!afterGesture && historyController.hasUserScrollPending) {
+        endFollowDeferred = true;
         return;
+      }
       scrollToEndNow();
       nearLatest = true;
+      // An appended row is measured a frame after it renders, so the first write
+      // lands short of the end by whatever that row turned out to be.
+      const settling = viewport;
+      await new Promise(requestAnimationFrame);
+      if (!canFollowEnd(afterGesture)) return;
+      if (settling.scrollHeight - settling.scrollTop - settling.clientHeight > 1) scrollToEndNow();
     });
+  }
+
+  // Read through a call: the narrowing above does not survive an await. After the
+  // gesture has settled a still-pending flag only means it never scrolled.
+  function canFollowEnd(afterGesture: boolean): boolean {
+    return (
+      scrollMode.kind === 'followingLive' &&
+      (afterGesture || !historyController.hasUserScrollPending)
+    );
   }
 
   function isInitialLive(): boolean {
@@ -516,8 +545,7 @@
     }
     // `scrollMode` goes stale: a programmatic scroll raises no gesture and a
     // wheel at offset zero raises no scroll event.
-    const pinnedToEnd =
-      viewport !== null && isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold);
+    const pinnedToEnd = viewport !== null && isNearLatest(viewport, nearLatestPx);
     // Prepended history has to be held even at the end: a wheel in a room that
     // fits the viewport raises no scroll event, so the gesture stays pending and
     // the end-follow declines, stranding the newest message out of view.
@@ -531,6 +559,7 @@
     }
     // `getComputedStyle` flushes style and the estimator runs per row.
     const rem = rootFontSize();
+    nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * rem;
     const layout = preferences.layout;
     instance.setOptions({
       count: items.length,
@@ -546,7 +575,7 @@
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
       getItemKey: (index) => identityTracker.key(items, index),
-      scrollEndThreshold: TIMELINE_LAYOUT.jumpToLatestThreshold,
+      scrollEndThreshold: nearLatestPx,
       useScrollendEvent: true,
       overscan: 8,
       onChange: handleVirtualizerChange,
@@ -629,7 +658,7 @@
     expectedSelfOffset = null;
     // Holding an anchor against the user is worse than losing it.
     if (!wasSelfScroll && historyController.hasUserScrollPending) releaseAnchor();
-    nearLatest = isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold);
+    nearLatest = isNearLatest(viewport, nearLatestPx);
     const next = nextScrollMode(scrollMode, {
       timelineMode: timeline.mode.kind,
       nearLatest,

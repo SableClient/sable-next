@@ -501,3 +501,30 @@ test('stays at the newest message when history lands in a room that fits', async
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
   await expect(timeline.jumpToLatest).toBeHidden();
 });
+
+// A wheel at the very bottom cannot move the offset, so it raises no scroll
+// event, the gesture never settles and the end-follow declines from then on.
+test('follows a sent message after a wheel that could not scroll', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await expect(timeline.initial).toHaveCount(0);
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+
+  await timeline.wheelUp(-200);
+
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    { op: 'push_back' as const, value: timelineItem('sent', 'A message I just sent') },
+  ]);
+
+  await expect(timeline.itemById('sent')).toBeInViewport();
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+});

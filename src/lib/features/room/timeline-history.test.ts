@@ -20,11 +20,13 @@ function setup(requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValu
     scrolling: false,
   };
   const debugLog = vi.fn<(event: string, details: object) => void>();
+  const gestureSettled = vi.fn<() => void>();
   const controller = new TimelineHistoryController({
     getBackwardPagination: () => state.pagination,
     isNearOldest: () => state.nearOldest,
     isVirtualizerScrolling: () => state.scrolling,
     requestHistory,
+    onGestureSettled: gestureSettled,
     debugLog,
     debugSnapshot: () => ({ scrollTop: 0 }),
   });

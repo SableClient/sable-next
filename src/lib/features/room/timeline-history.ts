@@ -7,6 +7,8 @@ interface TimelineHistoryControllerOptions {
   isNearOldest: () => boolean;
   isVirtualizerScrolling: () => boolean;
   requestHistory: () => Promise<boolean>;
+  /** A gesture that could not scroll leaves work the scroll handler never sees. */
+  onGestureSettled: () => void;
   debugLog: (event: string, details: object) => void;
   debugSnapshot: () => object | null;
 }
@@ -31,6 +33,7 @@ export class TimelineHistoryController {
   private wheelGestureTimer: ReturnType<typeof setTimeout> | null = null;
   private wheelGestureActive = false;
   private wheelUsesNativeScrollEnd = false;
+  private gestureSawScroll = false;
   private userScrollPending = false;
   private readonly wheelHandler = (event: WheelEvent): void => {
     this.markWheelScroll(event);
@@ -72,6 +75,7 @@ export class TimelineHistoryController {
 
   clearUserScrollPending(): void {
     if (this.destroyed) return;
+    this.gestureSawScroll = true;
     this.userScrollPending = false;
   }
 
@@ -176,10 +180,17 @@ export class TimelineHistoryController {
     this.wheelGestureTimer = setTimeout(() => {
       if (this.destroyed) return;
       this.wheelGestureTimer = null;
-      if (!this.wheelUsesNativeScrollEnd || !this.options.isVirtualizerScrolling()) {
+      // Without a scroll there is no `scrollend` to wait for, and the gesture
+      // would never settle.
+      if (
+        !this.wheelUsesNativeScrollEnd ||
+        !this.gestureSawScroll ||
+        !this.options.isVirtualizerScrolling()
+      ) {
         this.finishWheelGesture();
       }
     }, TIMELINE_LAYOUT.wheelGestureEndDelay);
+    if (!this.wheelGestureActive) this.gestureSawScroll = false;
     this.wheelGestureActive = true;
     this.userScrollPending = true;
     if (event.deltaY < 0 && this.historyInputArmed) {
@@ -195,6 +206,7 @@ export class TimelineHistoryController {
     if (this.destroyed) return;
     if (!this.wheelGestureActive) return;
     this.wheelGestureActive = false;
+    this.options.onGestureSettled();
     this.options.debugLog('gesture:settled', {
       queued: this.historyRequestQueued,
       eligible: this.historyRequestEligible,
@@ -239,6 +251,7 @@ export class TimelineHistoryController {
 
   markKeyEnd(event: KeyboardEvent): void {
     if (this.destroyed) return;
+    this.options.onGestureSettled();
     if (event.key !== 'ArrowUp' && event.key !== 'PageUp' && event.key !== 'Home') return;
     this.historyRequestQueued = false;
     this.historyRequestEligible = false;
@@ -265,6 +278,7 @@ export class TimelineHistoryController {
 
   markTouchEnd(): void {
     if (this.destroyed) return;
+    this.options.onGestureSettled();
     this.lastTouchY = null;
     this.historyRequestQueued = false;
     this.historyRequestEligible = false;
