@@ -54,11 +54,13 @@
   );
 
   // The space's own power levels govern the edge, so each candidate is asked.
-  // Rebuilt per run so a revoked space drops back out.
+  // Rebuilt per run so a revoked space drops back out. Asked on open, like the
+  // notification mode below: an effect here would re-run on every room list
+  // diff, and this menu is mounted once per row.
   const manageable = new SvelteSet<string>();
   let manageableRun = 0;
 
-  $effect(() => {
+  function readManageableSpaces(): void {
     const candidates = [...addableSpaces.map((space) => space.room_id), parentSpaceId].filter(
       (id): id is string => id !== null
     );
@@ -76,7 +78,7 @@
           console.debug('[sable room] space permissions unavailable', error);
         });
     }
-  });
+  }
 
   let offeredSpaces = $derived(addableSpaces.filter((space) => manageable.has(space.room_id)));
   let removableParent = $derived(
@@ -157,7 +159,9 @@
 
 <DropdownMenu.Root
   onOpenChange={(open) => {
-    if (open) void readNotificationMode();
+    if (!open) return;
+    void readNotificationMode();
+    readManageableSpaces();
   }}
 >
   <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>

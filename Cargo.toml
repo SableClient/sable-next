@@ -73,6 +73,15 @@ infallible_try_from = "deny"
 # Sizing the wasm bundle down belongs here, not on `release`, which also builds
 # the `src-tauri` desktop binary. `strip` keeps the metadata wasm-bindgen reads
 # and wasm-opt then drops.
+# The SDK and serde_json unoptimised were 70% of the CPU on a phone, measured
+# with simpleperf against a debug APK. Dependencies get the release treatment so
+# an on-device debug build is usable; our own crates stay unoptimised.
+[profile.dev.package."*"]
+opt-level = 3
+debug-assertions = false
+# Their symbols are what took the debug APK past 2 GB; ours are untouched.
+debug = false
+
 [profile.wasm-release]
 inherits = "release"
 opt-level = "z"
