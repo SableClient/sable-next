@@ -152,8 +152,14 @@ fn open_auth_url(app: AppHandle, url: String) -> Result<(), CommandErr> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG")
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    // Two SDK sites log once per room per sync response, which on a phone costs
+    // more than they are worth: heroes it cannot name, and the latest-event
+    // builder choking on the bare `{}` a space child removal carries.
+    let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
+        tracing_subscriber::EnvFilter::new(
+            "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off",
+        )
+    });
     if let Err(error) = tracing_subscriber::fmt().with_env_filter(filter).try_init() {
         eprintln!("could not install the log subscriber: {error}");
     }
