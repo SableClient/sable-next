@@ -202,8 +202,6 @@
     return anchorViewportCache.view;
   }
   const anchor = new TimelineAnchor(anchorViewport);
-  // `rootFontSize` flushes style, so this is refreshed with the layout pass
-  // rather than read on every scroll event.
   let nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * 16;
 
   // The virtualiser's helpers arm `reconcileScroll`, which forces the offset back
@@ -362,8 +360,6 @@
     if (anchorHolding) return;
     anchor.capture();
     if (anchor.held === null) return;
-    // The hold owns the position now, so a follow deferred earlier must not
-    // yank the reader to the end behind it.
     endFollowDeferred = false;
     const holdId = (anchorHoldSequence += 1);
     activeHoldId = holdId;
@@ -444,15 +440,13 @@
     anchor.release();
   }
 
-  // A gesture that could not scroll never settles through `onScroll`, so a follow
-  // dropped while it was pending has to be retried when it does.
   let endFollowDeferred = false;
 
   function scheduleFollowingEndReconciliation(afterGesture = false): void {
     if (followingEndReconciliationPending) return;
 
     followingEndReconciliationPending = true;
-    void tick().then(async () => {
+    void tick().then(() => {
       followingEndReconciliationPending = false;
       if (scrollMode.kind !== 'followingLive' || !viewport) return;
       if (!afterGesture && historyController.hasUserScrollPending) {
@@ -461,22 +455,7 @@
       }
       scrollToEndNow();
       nearLatest = true;
-      // An appended row is measured a frame after it renders, so the first write
-      // lands short of the end by whatever that row turned out to be.
-      const settling = viewport;
-      await new Promise(requestAnimationFrame);
-      if (!canFollowEnd(afterGesture)) return;
-      if (settling.scrollHeight - settling.scrollTop - settling.clientHeight > 1) scrollToEndNow();
     });
-  }
-
-  // Read through a call: the narrowing above does not survive an await. After the
-  // gesture has settled a still-pending flag only means it never scrolled.
-  function canFollowEnd(afterGesture: boolean): boolean {
-    return (
-      scrollMode.kind === 'followingLive' &&
-      (afterGesture || !historyController.hasUserScrollPending)
-    );
   }
 
   function isInitialLive(): boolean {

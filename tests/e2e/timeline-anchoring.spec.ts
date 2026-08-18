@@ -502,8 +502,6 @@ test('stays at the newest message when history lands in a room that fits', async
   await expect(timeline.jumpToLatest).toBeHidden();
 });
 
-// A wheel at the very bottom cannot move the offset, so it raises no scroll
-// event, the gesture never settles and the end-follow declines from then on.
 test('follows a sent message after a wheel that could not scroll', async ({
   page,
   app,

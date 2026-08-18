@@ -7,7 +7,6 @@ interface TimelineHistoryControllerOptions {
   isNearOldest: () => boolean;
   isVirtualizerScrolling: () => boolean;
   requestHistory: () => Promise<boolean>;
-  /** A gesture that could not scroll leaves work the scroll handler never sees. */
   onGestureSettled: () => void;
   debugLog: (event: string, details: object) => void;
   debugSnapshot: () => object | null;
@@ -180,8 +179,6 @@ export class TimelineHistoryController {
     this.wheelGestureTimer = setTimeout(() => {
       if (this.destroyed) return;
       this.wheelGestureTimer = null;
-      // Without a scroll there is no `scrollend` to wait for, and the gesture
-      // would never settle.
       if (
         !this.wheelUsesNativeScrollEnd ||
         !this.gestureSawScroll ||
