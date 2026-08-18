@@ -1,9 +1,6 @@
 # Tauri-specific dev tools and system dependencies.
 # Loaded via `MISE_ENV=tauri` (set by `mise run tauri:setup` or CI).
 
-[env]
-ANDROID_NDK_VERSION = "29.0.14206865"
-
 [settings]
 idiomatic_version_file_enable_tools = ["pnpm", "node", "rust"]
 experimental = true

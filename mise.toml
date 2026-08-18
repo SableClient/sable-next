@@ -3,6 +3,9 @@ min_version = '2026.7.11'
 [env]
 _.path = ["{{config_root}}/node_modules/.bin"]
 NODE_OPTIONS = "--max-old-space-size=4192"
+# Here rather than in mise.tauri.toml: the setup task's own MISE_ENV reaches the
+# commands it spawns, not the template that renders them.
+ANDROID_NDK_VERSION = "29.0.14206865"
 
 [settings]
 idiomatic_version_file_enable_tools = ["pnpm", "node", "rust"]
