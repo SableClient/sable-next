@@ -18,7 +18,6 @@
 <style>
   :global(.sable-switch) {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     cursor: pointer;
     display: inline-flex;
@@ -39,7 +38,6 @@
 
   :global(.sable-switch[data-state='checked']) {
     background: var(--sable-primary-main);
-    border-color: var(--sable-primary-main-line);
   }
 
   :global(.sable-switch[data-disabled]) {

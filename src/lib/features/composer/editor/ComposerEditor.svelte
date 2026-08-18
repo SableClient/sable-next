@@ -25,9 +25,6 @@
 
 <style>
   .editor {
-    background: var(--sable-bg-container);
-    border: 1px solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
     flex: 1;
     max-height: 10rem;
     min-height: 2.625rem;
@@ -35,11 +32,6 @@
     overflow-y: auto;
     padding: 0.5rem 3rem 0.5rem 0.75rem;
     position: relative;
-  }
-
-  .editor:focus-within {
-    border-color: var(--sable-primary-main);
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
   }
 
   .editor :global([contenteditable='true']) {

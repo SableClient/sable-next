@@ -148,7 +148,10 @@
 
 <style>
   .drawer-viewport {
-    height: 100dvh;
+    /* The app shell owns the viewport height and its top safe-area padding, so
+       remeasuring the viewport here would overflow the shell by the top inset
+       and lose the same amount at the bottom. */
+    height: 100%;
     overflow: hidden;
     touch-action: pan-y;
   }
@@ -175,6 +178,9 @@
 
   .navigation-panel {
     background: var(--sable-bg-container);
+
+    /* On the panel, not the shell, so its own fill covers the inset. */
+    padding-bottom: var(--safe-bottom);
   }
 
   .content-panel {
@@ -187,6 +193,7 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    padding-bottom: var(--safe-bottom);
   }
 
   @media (prefers-reduced-motion: no-preference) {

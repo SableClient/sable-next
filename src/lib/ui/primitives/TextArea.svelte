@@ -18,9 +18,6 @@
 
 <style>
   .text-area {
-    --form-control-background: var(--sable-surface-container);
-    --form-control-border: var(--sable-surface-container-line);
-    --form-control-color: var(--sable-surface-on-container);
     --form-control-padding-inline: var(--space-2);
     --form-control-padding-inline-end: var(--space-2);
 

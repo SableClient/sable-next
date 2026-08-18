@@ -473,7 +473,7 @@
   .composer-stack {
     --composer-gutter: var(--space-2);
 
-    margin: 0 auto calc(0.95rem + var(--safe-bottom));
+    margin: 0 auto 0.95rem;
     position: relative;
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }
@@ -524,14 +524,21 @@
   }
 
   .composer {
-    background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
+    /* The panel behind is surface-container, so the fill has to be the variant. */
+    background: var(--sable-surface-var-container);
+    border: 1px solid transparent;
     border-radius: var(--radius-card);
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
     position: relative;
     width: 100%;
+  }
+
+  /* The text entry only: `:focus-within` ringed the bar for every button too. */
+  .composer:has(:global([contenteditable='true']):focus) {
+    border-color: var(--sable-primary-main);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
   }
 
   .composer.dragging {
@@ -631,6 +638,7 @@
     .composer {
       transition:
         border-color var(--motion-fast) var(--motion-easing-standard),
+        box-shadow var(--motion-fast) var(--motion-easing-standard),
         padding var(--motion-slow) var(--motion-easing-emphasized);
     }
 
