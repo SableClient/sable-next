@@ -1,6 +1,7 @@
 #[cfg(any(mobile, test))]
 use sable_core::protocol::WebPushKeys;
 use sable_core::protocol::{CommandErr, NotificationView};
+use std::sync::Arc;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notifications::NotificationsExt;
 
@@ -107,7 +108,7 @@ fn pusher(
 #[cfg(mobile)]
 pub async fn register_push<R: Runtime>(
     app: &AppHandle<R>,
-    core: &sable_core::Core,
+    core: &Arc<sable_core::Core>,
     config: PushConfig,
 ) -> Result<(), CommandErr> {
     use sable_core::protocol::{Command, PusherView};
@@ -162,7 +163,7 @@ pub async fn register_push<R: Runtime>(
 #[expect(clippy::unused_async, reason = "mirrors the mobile signature")]
 pub async fn register_push<R: Runtime>(
     _app: &AppHandle<R>,
-    _core: &sable_core::Core,
+    _core: &Arc<sable_core::Core>,
     _config: PushConfig,
 ) -> Result<(), CommandErr> {
     Ok(())

@@ -33,7 +33,7 @@ tauri-plugin-os = "2.3.2"
 tauri-plugin-clipboard-manager = "2.3.2"
 # Push stays off here: the feature pulls in Firebase and APNs, which belong to
 # the mobile builds, not the desktop one.
-tauri-plugin-notifications = { version = "0.4", default-features = false }
+tauri-plugin-notifications = { workspace = true }
 sable-core = { path = "../crates/sable-core", version = "0.1.0" }
 tokio = { workspace = true }
 # default-features drags in reqwest and native-tls; ureq is a sync rustls
@@ -51,15 +51,11 @@ sentry = { version = "0.49", default-features = false, features = [
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2.4.1"
-tauri-plugin-notifications = { version = "0.4", default-features = false, features = [
-  "notify-rust",
-] }
+tauri-plugin-notifications = { workspace = true, features = ["notify-rust"] }
 
 # Push drags in Firebase and APNs, which only these two builds should carry.
 [target."cfg(any(target_os = \"android\", target_os = \"ios\"))".dependencies]
-tauri-plugin-notifications = { version = "0.4", default-features = false, features = [
-  "push-notifications",
-] }
+tauri-plugin-notifications = { workspace = true, features = ["push-notifications"] }
 
 [lints]
 workspace = true
