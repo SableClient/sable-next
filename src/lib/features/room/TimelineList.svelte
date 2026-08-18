@@ -270,8 +270,10 @@
         const frameDelta = previousScrollTop === null ? 0 : scrollTop - previousScrollTop;
         const contentDelta =
           previousScrollHeight === null ? 0 : scrollHeight - previousScrollHeight;
+        // A correction moves `scrollTop` on purpose, so requiring a still frame
+        // blinded this to the only frames worth measuring.
         const visualDelta =
-          frameDelta === 0 &&
+          (frameDelta === 0 || anchorHolding) &&
           anchorKey !== null &&
           anchorKey === previousAnchorKey &&
           previousAnchorTop !== null
@@ -498,9 +500,8 @@
       identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0) ||
       identityTracker.key(previousItems, previousItems.length - 1) !==
         identityTracker.key(items, items.length - 1);
-    historyController.resetForNewItems(
-      identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0)
-    );
+    const prepended = identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0);
+    historyController.resetForNewItems(prepended);
     const change = edgesChanged ? (historyDebugChange += 1) : historyDebugChange;
     if (edgesChanged) {
       historyDebugLog('items:before', {
@@ -517,9 +518,12 @@
     // wheel at offset zero raises no scroll event.
     const pinnedToEnd =
       viewport !== null && isNearLatest(viewport, TIMELINE_LAYOUT.jumpToLatestThreshold);
+    // Prepended history has to be held even at the end: a wheel in a room that
+    // fits the viewport raises no scroll event, so the gesture stays pending and
+    // the end-follow declines, stranding the newest message out of view.
     if (
       edgesChanged &&
-      !pinnedToEnd &&
+      (prepended || !pinnedToEnd) &&
       scrollMode.kind !== 'initialLive' &&
       scrollMode.kind !== 'focused'
     ) {

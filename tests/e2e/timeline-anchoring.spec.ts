@@ -469,3 +469,35 @@ test('anchors delayed history from a nonzero oldest-threshold offset', async ({
   await expect.poll(() => anchor.getAttribute('data-index'), { timeout: 3_000 }).toBe('29');
   await expect.poll(async () => (await anchor.boundingBox())?.y).toBeCloseTo(beforePrepend.y, 0);
 });
+
+// A room whose content does not overflow cannot raise a scroll event, so the
+// wheel's gesture flag stays set and the end-follow used to decline. Prepended
+// history then pushed the newest message out of view for good.
+test('stays at the newest message when history lands in a room that fits', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 1280, height: 1200 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await expect(timeline.initial).toHaveCount(0);
+  await expect.poll(() => timeline.scrollableHeight()).toBe(0);
+
+  await timeline.wheelUp(200);
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(
+    subscription,
+    Array.from({ length: 25 }, (_unused, index) => ({
+      op: 'insert' as const,
+      index,
+      value: timelineItem(`older-${String(index)}`, `Older history ${String(index)}`),
+    }))
+  );
+
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  await expect(timeline.jumpToLatest).toBeHidden();
+});
