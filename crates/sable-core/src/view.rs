@@ -11,7 +11,6 @@ use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::message::MessageType;
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
-use matrix_sdk::ruma::events::tag::TagName;
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventType};
 use matrix_sdk::ruma::room::{JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType};
 use matrix_sdk::ruma::{OwnedRoomId, UserId};
@@ -228,7 +227,7 @@ pub async fn enrich_room_fields<S: BuildHasher>(
                     is_space,
                     canonical_alias,
                     children,
-                    tags: room_tags(&room).await,
+                    tags: room_tags(&room),
                 }
             }
             None => RoomInfo {
@@ -371,18 +370,17 @@ const fn join_rule_summary_view(rule: &JoinRuleSummary) -> RoomJoinRuleView {
     }
 }
 
-async fn room_tags(room: &Room) -> Vec<RoomTag> {
-    let Ok(Some(tags)) = room.tags().await else {
-        return Vec::new();
-    };
-
-    tags.keys()
-        .filter_map(|name| match name {
-            TagName::Favorite => Some(RoomTag::Favourite),
-            TagName::LowPriority => Some(RoomTag::LowPriority),
-            _ => None,
-        })
-        .collect()
+/// The two tags a row shows are the two the SDK keeps as notable flags on
+/// cached room info, so this reads memory where `Room::tags` reads the store.
+fn room_tags(room: &Room) -> Vec<RoomTag> {
+    let mut tags = Vec::new();
+    if room.is_favourite() {
+        tags.push(RoomTag::Favourite);
+    }
+    if room.is_low_priority() {
+        tags.push(RoomTag::LowPriority);
+    }
+    tags
 }
 
 /// Sorted lexically on `order`, then oldest first; unordered entries sort last.

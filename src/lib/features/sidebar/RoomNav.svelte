@@ -44,6 +44,9 @@
       ? (findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null)
       : null
   );
+  // The id, not the summary: a room list diff hands back a fresh object for the
+  // same space, and the permission effect below would re-run on every one.
+  let activeSpaceId = $derived(activeSpace?.room_id ?? null);
   // Outside a space anyone may create a room; inside one it also has to land as
   // a child, which the space's own power levels govern.
   let canCreateHere = $derived(
@@ -250,8 +253,8 @@
   // Adding a room to a space writes `m.space.child` there, so the space's own
   // power levels decide whether creating from inside it is offered at all.
   $effect(() => {
-    const space = activeSpace;
-    if (!space) {
+    const spaceId = activeSpaceId;
+    if (!spaceId) {
       spacePermissions = null;
       return;
     }
@@ -259,7 +262,7 @@
     let current = true;
     spacePermissions = null;
     void core
-      .roomPermissions(space.room_id)
+      .roomPermissions(spaceId)
       .then((next) => {
         if (current) spacePermissions = next;
       })
