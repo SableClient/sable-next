@@ -193,6 +193,10 @@ pub fn run() {
             }
 
             let data_dir = app.path().app_data_dir()?;
+            // Android resolves that to the app data root, which the app
+            // itself may not write to; only `files` under it.
+            #[cfg(target_os = "android")]
+            let data_dir = data_dir.join("files");
             let (core, mut events) = Core::new(
                 data_dir.to_string_lossy().into_owned(),
                 Box::new(sable_core::store::FileSessionStore::new(&data_dir)),
