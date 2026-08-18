@@ -184,14 +184,6 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notifications::init())
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
-
             // Linux never registers schemes at install time, and a Windows dev
             // build skips the installer, so claim it at runtime.
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
