@@ -173,27 +173,27 @@
     height: 100%;
     min-width: 0;
     overflow: hidden;
+
+    /* The panels are what carry a background, so each covers its own inset. The
+       shell cannot: its one fill would have to match both of them. */
+    padding-bottom: var(--safe-bottom);
     width: 50%;
   }
 
   .navigation-panel {
     background: var(--sable-bg-container);
-
-    /* On the panel, not the shell, so its own fill covers the inset. */
-    padding-bottom: var(--safe-bottom);
   }
 
   .content-panel {
+    background: var(--sable-surface-container);
     flex-direction: column;
   }
 
   .content {
-    background: var(--sable-surface-container);
     display: flex;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    padding-bottom: var(--safe-bottom);
   }
 
   @media (prefers-reduced-motion: no-preference) {
