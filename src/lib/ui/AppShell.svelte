@@ -28,7 +28,8 @@
 
 <style>
   .app-shell {
-    height: 100dvh;
+    /* Tracks the webview resize above the keyboard. */
+    height: 100%;
   }
 
   .desktop-navigation {

@@ -13,7 +13,8 @@ const variableReferencePattern = /var\(\s*(--[a-z0-9_-]+)/gi;
 const literalColorPattern = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\()/gi;
 
 // Manually verified dependency-provided properties that source scanning cannot detect.
-const externalProperties = new Set(['--bits-combobox-anchor-width']);
+// --keyboard-height is injected by tauri-plugin-edge-to-edge on Android/iOS.
+const externalProperties = new Set(['--bits-combobox-anchor-width', '--keyboard-height']);
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });

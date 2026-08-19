@@ -269,6 +269,11 @@ html {
   --safe-left: var(--safe-area-inset-left);
 }
 
+/* Android resizes the webview; iOS lifts itself. */
+html[data-tauri-os='ios'] {
+  --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
+}
+
 html,
 body {
   height: 100%;

@@ -36,7 +36,8 @@ function syncEdge(
   color: string | undefined,
   last: string | undefined
 ): string {
-  if (color === undefined || color === last) return last;
+  if (color === undefined) return last ?? '';
+  if (color === last) return last;
   void invoke(command, { light: isLightColor(color) }).catch(() => {
     // A missing command means an older shell; the bars keep their icons.
   });

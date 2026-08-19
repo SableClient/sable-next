@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Snippet } from 'svelte';
+  import { isTauri } from '@tauri-apps/api/core';
+  import { type as osType } from '@tauri-apps/plugin-os';
   import { Tooltip } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import '../styles.css';
@@ -19,6 +21,10 @@
   provideCoreClient(core);
 
   onMount(() => {
+    if (isTauri()) {
+      // CSS keys the keyboard inset off this.
+      document.documentElement.dataset.tauriOs = osType();
+    }
     void core.start();
     return () => {
       core.stop();
