@@ -137,6 +137,23 @@ impl AccountRegistry {
             self.accounts.push(account);
         }
     }
+
+    pub fn reanchor_stores(&mut self, base_store_id: &str) -> bool {
+        let base = std::path::Path::new(base_store_id);
+        let mut changed = false;
+        for account in &mut self.accounts {
+            let anchored = account_store_id(base_store_id, &account.account_id);
+            // A legacy store id is the base dir itself.
+            if account.store_id == anchored
+                || std::path::Path::new(&account.store_id).starts_with(base)
+            {
+                continue;
+            }
+            account.store_id = anchored;
+            changed = true;
+        }
+        changed
+    }
 }
 
 #[must_use]
@@ -318,6 +335,28 @@ fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
 mod tests {
     use super::{AccountRegistry, account_store_id};
 
+    fn registry_json(store_id: &str) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "version": 1,
+            "active_account_id": "a1",
+            "next_account_id": 2,
+            "accounts": [{
+                "account_id": "a1",
+                "store_id": store_id,
+                "session": {
+                    "homeserver": "https://example.org",
+                    "credentials": {
+                        "kind": "password",
+                        "user_id": "@alice:example.org",
+                        "device_id": "DEVICEID",
+                        "access_token": "token"
+                    }
+                }
+            }]
+        }))
+        .unwrap()
+    }
+
     #[test]
     fn serializes_an_empty_registry() -> Result<(), serde_json::Error> {
         let bytes = serde_json::to_vec(&AccountRegistry::empty())?;
@@ -337,5 +376,42 @@ mod tests {
         let (_, first) = accounts.allocate_account("sable-next");
         let (_, second) = accounts.allocate_account("sable-next");
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn reanchors_a_store_id_left_under_an_old_data_dir() -> Result<(), serde_json::Error> {
+        let bytes = registry_json("/old/container/moe.sable.next-account-a1");
+        let (mut accounts, _) =
+            AccountRegistry::from_bytes(&bytes, "/new/container/moe.sable.next")?;
+
+        assert!(accounts.reanchor_stores("/new/container/moe.sable.next"));
+        assert_eq!(
+            accounts.accounts[0].store_id,
+            "/new/container/moe.sable.next-account-a1"
+        );
+        assert!(!accounts.reanchor_stores("/new/container/moe.sable.next"));
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_a_store_id_already_under_the_current_data_dir() -> Result<(), serde_json::Error> {
+        let bytes = registry_json("/data/moe.sable.next-account-a1");
+        let (mut accounts, _) = AccountRegistry::from_bytes(&bytes, "/data/moe.sable.next")?;
+        assert!(!accounts.reanchor_stores("/data/moe.sable.next"));
+
+        // Legacy single-store layout: the id is the base dir itself.
+        let bytes = registry_json("/data/moe.sable.next");
+        let (mut accounts, _) = AccountRegistry::from_bytes(&bytes, "/data/moe.sable.next")?;
+        assert!(!accounts.reanchor_stores("/data/moe.sable.next"));
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_relative_web_store_names() -> Result<(), serde_json::Error> {
+        let bytes = registry_json("sable-next-account-a1");
+        let (mut accounts, _) = AccountRegistry::from_bytes(&bytes, "sable-next")?;
+        assert!(!accounts.reanchor_stores("sable-next"));
+        assert_eq!(accounts.accounts[0].store_id, "sable-next-account-a1");
+        Ok(())
     }
 }

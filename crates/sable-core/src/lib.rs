@@ -623,9 +623,10 @@ impl Core {
             *accounts = Some(registry.clone());
             return Ok(registry);
         };
-        let (registry, migrated) = AccountRegistry::from_bytes(&bytes, &self.store_id)
+        let (mut registry, migrated) = AccountRegistry::from_bytes(&bytes, &self.store_id)
             .map_err(|error| self.failed("restore: parse session file", error))?;
-        if migrated {
+        let reanchored = registry.reanchor_stores(&self.store_id);
+        if migrated || reanchored {
             let bytes = serde_json::to_vec(&registry)
                 .map_err(|error| self.failed("migrate session registry", error))?;
             self.sessions
@@ -2834,6 +2835,47 @@ mod tests {
             Some(CoreEvent::SessionEnded { reason }) if reason == "token_rejected"
         ));
         assert_eq!(*bytes.lock().await, None);
+    }
+
+    #[tokio::test]
+    async fn accounts_are_reanchored_after_the_data_dir_moves() {
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1,
+            "active_account_id": "a1",
+            "next_account_id": 2,
+            "accounts": [{
+                "account_id": "a1",
+                "store_id": "/old/container/moe.sable.next-account-a1",
+                "session": {
+                    "homeserver": "https://example.org",
+                    "credentials": {
+                        "kind": "password",
+                        "user_id": "@alice:example.org",
+                        "device_id": "DEVICEID",
+                        "access_token": "token"
+                    }
+                }
+            }]
+        }))
+        .unwrap();
+        let saved = Arc::new(Mutex::new(Some(bytes)));
+        let (core, _rx) = Core::new(
+            "/new/container/moe.sable.next",
+            Box::new(TestSessionStore {
+                bytes: saved.clone(),
+            }),
+        );
+
+        let accounts = core.accounts().await.unwrap();
+        assert_eq!(
+            accounts.accounts[0].store_id,
+            "/new/container/moe.sable.next-account-a1"
+        );
+
+        let persisted = saved.lock().await.clone().unwrap();
+        let text = String::from_utf8_lossy(&persisted);
+        assert!(text.contains("/new/container/moe.sable.next-account-a1"));
+        assert!(!text.contains("/old/container"));
     }
 }
 

@@ -38,7 +38,11 @@ impl SessionStore for FileSessionStore {
                 .await
                 .map_err(|e| e.to_string())?;
         }
-        tokio::fs::write(&self.path, bytes)
+        let temporary = self.path.with_extension("tmp");
+        tokio::fs::write(&temporary, bytes)
+            .await
+            .map_err(|e| e.to_string())?;
+        tokio::fs::rename(&temporary, &self.path)
             .await
             .map_err(|e| e.to_string())
     }
@@ -81,5 +85,26 @@ impl SessionStore for MemorySessionStore {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         Ok(())
+    }
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod tests {
+    use super::{FileSessionStore, SessionStore};
+
+    #[tokio::test]
+    async fn a_saved_session_replaces_the_previous_file_without_leftovers() {
+        let dir = std::env::temp_dir().join(format!("sable-store-test-{}", std::process::id()));
+        let store = FileSessionStore::new(&dir);
+
+        store.save(b"first".to_vec()).await.unwrap();
+        store.save(b"second".to_vec()).await.unwrap();
+        assert_eq!(store.load().await, Some(b"second".to_vec()));
+        assert!(!dir.join("session.tmp").exists());
+
+        store.clear().await.unwrap();
+        assert_eq!(store.load().await, None);
+
+        tokio::fs::remove_dir_all(&dir).await.unwrap();
     }
 }
