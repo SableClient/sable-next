@@ -240,7 +240,9 @@ pub fn run() {
             register_push,
             sentry::set_native_sentry_enabled,
             #[cfg(target_os = "android")]
-            mobile::set_system_bars_light
+            mobile::set_status_bar_light,
+            #[cfg(target_os = "android")]
+            mobile::set_navigation_bar_light
         ])
         .run(tauri::generate_context!())
     {

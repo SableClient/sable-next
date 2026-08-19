@@ -14,7 +14,7 @@
   import { i18n } from '$lib/i18n';
   import Button from '$lib/ui/primitives/Button.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import { syncSystemBarIcons } from '$lib/platform/system-bars';
+  import { startSystemBarSync } from '$lib/platform/system-bars';
   import { preferences } from '$lib/settings/preferences.svelte';
   import { registerNativePush } from '$lib/features/notifications/native-push';
   import { pushOverride } from '$lib/features/notifications/push-config';
@@ -44,9 +44,10 @@
   });
 
   $effect(() => {
-    // Reading the theme is what makes this re-run when it changes.
-    void preferences.theme;
-    void syncSystemBarIcons();
+    // The bars only matter once the shell paints under them; the observer then
+    // re-samples on navigation, overlays and theme swaps by itself.
+    if (core.status !== 'ready') return;
+    return startSystemBarSync();
   });
 
   // Delegated, because settings links can appear in any surface that renders a body.

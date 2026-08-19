@@ -11,11 +11,16 @@
 use std::sync::OnceLock;
 
 use jni::objects::{JObject, JValue};
+use jni::strings::JNIString;
 use jni::{jni_sig, jni_str, EnvUnowned, JavaVM};
 
 static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
 
 #[no_mangle]
+#[expect(
+    unsafe_code,
+    reason = "the export symbol is fixed by the JNI naming convention"
+)]
 pub extern "system" fn Java_moe_sable_next_MainActivity_nativeInitSystemBars(
     mut env: EnvUnowned,
     _this: JObject,
@@ -29,17 +34,27 @@ pub extern "system" fn Java_moe_sable_next_MainActivity_nativeInitSystemBars(
 
 /// `light` asks for the icon treatment a light background needs: dark icons.
 #[tauri::command]
-pub fn set_system_bars_light(light: bool) -> Result<(), String> {
+pub fn set_status_bar_light(light: bool) -> Result<(), String> {
+    call_bar_light("setStatusBarLightNative", light)
+}
+
+/// `light` asks for the icon treatment a light background needs: dark icons.
+#[tauri::command]
+pub fn set_navigation_bar_light(light: bool) -> Result<(), String> {
+    call_bar_light("setNavigationBarLightNative", light)
+}
+
+fn call_bar_light(method: &str, light: bool) -> Result<(), String> {
     let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
     vm.attach_current_thread(|env| {
         let result = env.call_static_method(
             jni_str!("moe/sable/next/MainActivity"),
-            jni_str!("setSystemBarsLightNative"),
+            JNIString::new(method),
             jni_sig!("(Z)V"),
-            &[JValue::Bool(u8::from(light))],
+            &[JValue::Bool(light)],
         );
         if result.is_err() {
-            let _ = env.exception_clear();
+            env.exception_clear();
         }
         result.map(|_| ())
     })

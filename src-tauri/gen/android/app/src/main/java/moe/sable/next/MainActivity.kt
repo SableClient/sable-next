@@ -25,12 +25,21 @@ class MainActivity : TauriActivity() {
     // The bars stay transparent under edge-to-edge and the webview paints them,
     // so only the icon contrast is left. setStatusBarColor is a no-op from API 35.
     @JvmStatic
-    fun setSystemBarsLightNative(light: Boolean) {
+    fun setStatusBarLightNative(light: Boolean) {
       val activity = instance ?: return
       activity.runOnUiThread {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = light
+      }
+    }
+
+    @JvmStatic
+    fun setNavigationBarLightNative(light: Boolean) {
+      val activity = instance ?: return
+      activity.runOnUiThread {
+        val window = activity.window
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightNavigationBars = light
       }
     }
