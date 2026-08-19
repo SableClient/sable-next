@@ -14,6 +14,7 @@
   import { i18n } from '$lib/i18n';
   import Button from '$lib/ui/primitives/Button.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import { syncSystemBarIcons } from '$lib/platform/system-bars';
   import { preferences } from '$lib/settings/preferences.svelte';
   import { registerNativePush } from '$lib/features/notifications/native-push';
   import { pushOverride } from '$lib/features/notifications/push-config';
@@ -40,6 +41,12 @@
 
   $effect(() => {
     document.documentElement.dataset.underlineLinks = preferences.underlineLinks ? 'on' : 'off';
+  });
+
+  $effect(() => {
+    // Reading the theme is what makes this re-run when it changes.
+    void preferences.theme;
+    void syncSystemBarIcons();
   });
 
   // Delegated, because settings links can appear in any surface that renders a body.

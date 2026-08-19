@@ -148,9 +148,6 @@
 
 <style>
   .drawer-viewport {
-    /* The app shell owns the viewport height and its top safe-area padding, so
-       remeasuring the viewport here would overflow the shell by the top inset
-       and lose the same amount at the bottom. */
     height: 100%;
     overflow: hidden;
     touch-action: pan-y;
@@ -174,9 +171,9 @@
     min-width: 0;
     overflow: hidden;
 
-    /* The panels are what carry a background, so each covers its own inset. The
-       shell cannot: its one fill would have to match both of them. */
-    padding-bottom: var(--safe-bottom);
+    /* Both insets, on the panels: they are the elements that carry a background,
+       so each paints the region the webview draws under. */
+    padding-block: var(--safe-top) var(--safe-bottom);
     width: 50%;
   }
 
