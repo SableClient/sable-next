@@ -386,7 +386,7 @@
     padding: 0;
     pointer-events: auto;
     position: absolute;
-    top: 50dvh;
+    top: 50%;
     transform: translateY(-50%);
     transition:
       color var(--motion-normal) var(--motion-easing-standard),

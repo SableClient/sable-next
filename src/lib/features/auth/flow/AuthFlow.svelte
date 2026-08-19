@@ -645,8 +645,9 @@
   .auth-page {
     display: flex;
     flex-direction: column;
-    min-height: 100dvh;
+    min-height: 100%;
     padding: 2rem 1.5rem;
+    padding-bottom: calc(2rem + var(--safe-bottom));
   }
 
   .auth-content {
