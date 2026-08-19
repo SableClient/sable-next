@@ -109,7 +109,7 @@ jobs:
           build: 'true'
 
       - name: Upload web assets
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-assets
           path: |
@@ -231,7 +231,7 @@ jobs:
           test -s bundles || { echo "No desktop bundles found in $BUNDLE_PATH" >&2; exit 1; }
 
       - name: Attest desktop bundles
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ matrix.bundle-path }}/*/sable-next-*
 
@@ -308,7 +308,7 @@ jobs:
           mv "$aab" "$(dirname "$aab")/sable-next-${VERSION}-android-universal.aab"
 
       - name: Attest Android bundles
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             src-tauri/gen/android/app/build/outputs/apk/**/sable-next-*.apk
@@ -409,7 +409,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Attest iOS bundle
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ steps.ipa.outputs.path }}
 
