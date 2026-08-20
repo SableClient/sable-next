@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Collapsible } from 'bits-ui';
+  import { Collapsible, ContextMenu, Tooltip as BitsTooltip } from 'bits-ui';
+  import { onDestroy } from 'svelte';
 
   import type { MemberView } from '@/generated/MemberView';
   import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
@@ -191,11 +192,15 @@
   let sheetOpen = $state(false);
   let deleteOpen = $state(false);
   let reactionsOpen = $state(false);
+  let reactionActive = $state(0);
   let receiptsOpen = $state(false);
   let peekOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
+  let reactionPressTimer: ReturnType<typeof setTimeout> | undefined;
+  let reactionPressOrigin: { x: number; y: number } | null = null;
+  let reactionPressFired = false;
 
   function startPress(event: PointerEvent): void {
     if (event.pointerType === 'mouse' || !actionable) return;
@@ -220,8 +225,47 @@
     pressOrigin = null;
   }
 
+  function startReactionPress(event: PointerEvent, index: number): void {
+    if (event.pointerType === 'mouse') return;
+    event.stopPropagation();
+    reactionPressFired = false;
+    reactionPressOrigin = { x: event.clientX, y: event.clientY };
+    reactionPressTimer = setTimeout(() => {
+      reactionPressTimer = undefined;
+      reactionPressFired = true;
+      reactionActive = index;
+      reactionsOpen = true;
+    }, LONG_PRESS_MS);
+  }
+
+  function moveReactionPress(event: PointerEvent): void {
+    event.stopPropagation();
+    if (!reactionPressOrigin) return;
+    const moved =
+      Math.abs(event.clientX - reactionPressOrigin.x) > LONG_PRESS_SLOP_PX ||
+      Math.abs(event.clientY - reactionPressOrigin.y) > LONG_PRESS_SLOP_PX;
+    if (moved) endReactionPress();
+  }
+
+  function endReactionPress(event?: PointerEvent): void {
+    event?.stopPropagation();
+    if (reactionPressTimer) clearTimeout(reactionPressTimer);
+    reactionPressTimer = undefined;
+    reactionPressOrigin = null;
+  }
+
+  function openReactionDetails(event: MouseEvent, index: number): void {
+    event.preventDefault();
+    event.stopPropagation();
+    reactionActive = index;
+    reactionsOpen = true;
+  }
+
   // A virtualised row can unmount mid-press, so the pending timer has to go.
-  $effect(() => endPress);
+  onDestroy(() => {
+    if (pressTimer) clearTimeout(pressTimer);
+    if (reactionPressTimer) clearTimeout(reactionPressTimer);
+  });
 
   async function copyText(): Promise<void> {
     if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
@@ -238,257 +282,370 @@
   function openAccountFromPersona(): void {
     if (item.sender && messageRow) onSenderProfile?.(item.sender, messageRow);
   }
+
+  function reactionTooltip(senders: readonly string[], key: string): string {
+    const names = senders.map(
+      (sender) => members.find((member) => member.user_id === sender)?.display_name ?? sender
+    );
+    const people =
+      names.length === 1
+        ? names[0]
+        : names.length === 2
+          ? `${names[0]} and ${names[1]}`
+          : names.length === 3
+            ? `${names[0]}, ${names[1]}, and ${names[2]}`
+            : `${names.slice(0, 3).join(', ')}, and ${String(names.length - 3)} others`;
+    return `${people} reacted with ${key}`;
+  }
 </script>
 
 {#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
-  <article
-    bind:this={messageRow}
-    class={[
-      'message',
-      `layout-${layout}`,
-      {
-        collapsed,
-        pending,
-        highlighted,
-        selected,
-        persona: personaTint,
-        own: item.is_own,
-        'mention-silent': item.mention === 'silent',
-        'mention-loud': item.mention === 'loud',
-      },
-    ]}
-    style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
-    style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
-    onpointerdown={startPress}
-    onpointermove={movePress}
-    onpointerup={endPress}
-    onpointercancel={endPress}
-  >
-    {#if actionable}
-      <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
-      <MessageActionSheet
-        bind:open={sheetOpen}
-        preview={item.content.kind === 'message' ? item.content.body : null}
-        {...actions}
-      />
-      <DeleteMessageDialog
-        bind:open={deleteOpen}
-        preview={item.content.kind === 'message' ? item.content.body : null}
-        onConfirm={confirmDelete}
-      />
-      <ReactionsDialog bind:open={reactionsOpen} reactions={item.reactions} {members} />
-      <ReceiptsDialog bind:open={receiptsOpen} readers={item.read_by} {members} />
-    {/if}
-    {#if layout === 'compact'}
-      <div class="compact-gutter">
-        <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time>
-        <span class="compact-name" style:color={personaTint ? undefined : nameColor}>
-          {collapsed ? '' : senderName}
-        </span>
-      </div>
-    {:else if !collapsed}
-      {#if persona && item.sender}
-        <PersonaProfile
-          profile={persona}
-          accountId={item.sender}
-          {accountName}
-          label={$i18n.t('timeline.personaProfile', { name: senderName })}
-          onOpenAccount={openAccountFromPersona}
-          onOpenChange={onPersonaOpenChange}
-        >
-          <Avatar
-            class="message-avatar"
-            src={senderAvatar}
-            size="small"
-            color={avatarColor}
-            initials={initials(senderName)}
+  <ContextMenu.Root>
+    <ContextMenu.Trigger disabled={!actionable}>
+      <article
+        bind:this={messageRow}
+        class={[
+          'message',
+          `layout-${layout}`,
+          {
+            collapsed,
+            pending,
+            highlighted,
+            selected,
+            persona: personaTint,
+            own: item.is_own,
+            'mention-silent': item.mention === 'silent',
+            'mention-loud': item.mention === 'loud',
+          },
+        ]}
+        style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
+        style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
+        onpointerdown={startPress}
+        onpointermove={movePress}
+        onpointerup={endPress}
+        onpointercancel={endPress}
+      >
+        {#if actionable}
+          <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
+          <MessageActionSheet
+            bind:open={sheetOpen}
+            preview={item.content.kind === 'message' ? item.content.body : null}
+            {...actions}
           />
-        </PersonaProfile>
-      {:else if item.sender && onSenderProfile}
-        <button
-          class="avatar-button"
-          type="button"
-          aria-label={$i18n.t('timeline.senderProfile', { name: senderName })}
-          onclick={openSenderProfile}
-        >
-          <Avatar
-            class="message-avatar"
-            src={senderAvatar}
-            size="small"
-            color={avatarColor}
-            initials={initials(senderName)}
+          <DeleteMessageDialog
+            bind:open={deleteOpen}
+            preview={item.content.kind === 'message' ? item.content.body : null}
+            onConfirm={confirmDelete}
           />
-        </button>
-      {:else}
-        <Avatar
-          class="message-avatar"
-          src={senderAvatar}
-          size="small"
-          color={avatarColor}
-          initials={initials(senderName)}
-        />
-      {/if}
-    {/if}
-    <div class="message-content">
-      {#if !collapsed && layout !== 'compact'}
-        <header>
-          {#if !emote}
-            <span class="sender" style:color={personaTint ? undefined : nameColor}>
-              {senderName}
+          <ReactionsDialog
+            bind:open={reactionsOpen}
+            bind:active={reactionActive}
+            reactions={item.reactions}
+            {members}
+          />
+          <ReceiptsDialog bind:open={receiptsOpen} readers={item.read_by} {members} />
+        {/if}
+        {#if layout === 'compact'}
+          <div class="compact-gutter">
+            <time datetime={new Date(item.timestamp).toISOString()}
+              >{formatTime(item.timestamp)}</time
+            >
+            <span class="compact-name" style:color={personaTint ? undefined : nameColor}>
+              {collapsed ? '' : senderName}
             </span>
-          {/if}
-          {#each persona?.pronouns ?? [] as pronoun (pronoun.summary)}
-            <span class="pronouns" lang={pronoun.language ?? undefined}>{pronoun.summary}</span>
-          {/each}
+          </div>
+        {:else if !collapsed}
           {#if persona && item.sender}
-            {@const account = item.sender}
+            <PersonaProfile
+              profile={persona}
+              accountId={item.sender}
+              {accountName}
+              label={$i18n.t('timeline.personaProfile', { name: senderName })}
+              onOpenAccount={openAccountFromPersona}
+              onOpenChange={onPersonaOpenChange}
+            >
+              <Avatar
+                class="message-avatar"
+                src={senderAvatar}
+                size="small"
+                color={avatarColor}
+                initials={initials(senderName)}
+              />
+            </PersonaProfile>
+          {:else if item.sender && onSenderProfile}
             <button
-              class="via"
+              class="avatar-button"
               type="button"
-              aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
+              aria-label={$i18n.t('timeline.senderProfile', { name: senderName })}
               onclick={openSenderProfile}
             >
-              {$i18n.t('timeline.via')}<strong>{account}</strong>
+              <Avatar
+                class="message-avatar"
+                src={senderAvatar}
+                size="small"
+                color={avatarColor}
+                initials={initials(senderName)}
+              />
             </button>
+          {:else}
+            <Avatar
+              class="message-avatar"
+              src={senderAvatar}
+              size="small"
+              color={avatarColor}
+              initials={initials(senderName)}
+            />
           {/if}
-          <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time
-          >
-        </header>
-      {/if}
-      {#if item.in_reply_to}
-        {@const tint = tinted(replyPersona)}
-        {@const target = item.in_reply_to.event_id}
-        <button
-          class={['reply-preview', { persona: tint }]}
-          type="button"
-          style:--pmp-on-light={tint?.color_on_light ?? undefined}
-          style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
-          onclick={() => {
-            onJumpToEvent?.(target);
-          }}
-        >
-          <ReplyIcon class="reply-icon" />
-          <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
-        </button>
-      {/if}
-      {#if item.content.kind === 'message' && item.content.emote}
-        <div class="emote">
-          <span class="sender" style:color={nameColor}>* {senderName}</span>
-          <FormattedBody html={item.content.html} {onMatrixLink} />
-        </div>
-      {:else if item.content.kind === 'message'}
-        <div class={jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`}>
-          <FormattedBody html={item.content.html} {onMatrixLink} />
-          <!-- Trails the body, where the edit happened, not the header. -->
-          {#if item.content.edited}
-            <span class="edited">{$i18n.t('timeline.edited')}</span>
+        {/if}
+        <div class="message-content">
+          {#if !collapsed && layout !== 'compact'}
+            <header>
+              {#if !emote}
+                <span class="sender" style:color={personaTint ? undefined : nameColor}>
+                  {senderName}
+                </span>
+              {/if}
+              {#each persona?.pronouns ?? [] as pronoun (pronoun.summary)}
+                <span class="pronouns" lang={pronoun.language ?? undefined}>{pronoun.summary}</span>
+              {/each}
+              {#if persona && item.sender}
+                {@const account = item.sender}
+                <button
+                  class="via"
+                  type="button"
+                  aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
+                  onclick={openSenderProfile}
+                >
+                  {$i18n.t('timeline.via')}<strong>{account}</strong>
+                </button>
+              {/if}
+              <time datetime={new Date(item.timestamp).toISOString()}
+                >{formatTime(item.timestamp)}</time
+              >
+            </header>
           {/if}
-        </div>
-      {:else if item.content.kind === 'sticker'}
-        <MediaImage
-          class="sticker"
-          source={item.content.source}
-          alt={item.content.body}
-          width={304}
-          height={304}
-          intrinsicWidth={item.content.width}
-          intrinsicHeight={item.content.height}
-          mime={item.content.mime}
-          onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
-        />
-      {:else if item.content.kind === 'image'}
-        <MediaImage
-          class="image"
-          source={item.content.source}
-          alt={item.content.body}
-          width={800}
-          height={600}
-          intrinsicWidth={item.content.width}
-          intrinsicHeight={item.content.height}
-          mime={item.content.mime}
-          onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
-        />
-        {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
-      {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
-        <MediaContent
-          class="media"
-          source={item.content.source}
-          mime={item.content.mime}
-          body={item.content.body}
-          kind={item.content.kind}
-          width={item.content.kind === 'video' ? item.content.width : null}
-          height={item.content.kind === 'video' ? item.content.height : null}
-        />
-      {/if}
-      {#if item.reactions.length > 0}
-        {@const eventId = item.event_id}
-        <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
-          {#each item.reactions as reaction (reaction.key)}
-            {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
+          {#if item.in_reply_to}
+            {@const tint = tinted(replyPersona)}
+            {@const target = item.in_reply_to.event_id}
             <button
-              class={['reaction', { mine }]}
+              class={['reply-preview', { persona: tint }]}
               type="button"
-              aria-pressed={mine}
-              aria-label={$i18n.t('timeline.toggleReaction', {
-                key: reaction.key,
-                count: reaction.senders.length,
-              })}
-              disabled={eventId === null}
+              style:--pmp-on-light={tint?.color_on_light ?? undefined}
+              style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
               onclick={() => {
-                if (eventId) onToggleReaction?.(eventId, reaction.key);
+                onJumpToEvent?.(target);
               }}
             >
-              {#if reaction.key.startsWith('mxc://')}
-                <MediaImage
-                  class="reaction-image"
-                  source={reaction.key}
-                  alt={reaction.key}
-                  width={64}
-                  height={64}
-                />
-              {:else}
-                <em>{reaction.key}</em>
-              {/if}
-              {reaction.senders.length}
+              <ReplyIcon class="reply-icon" />
+              <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
             </button>
-          {/each}
-          {#if actionable && actions.onReact}
-            {@const react = actions.onReact}
-            <ReactionPicker
-              label={$i18n.t('timeline.addReaction')}
-              triggerClass="add-reaction"
-              {roomId}
-              onPick={react}
-            >
-              <PlusIcon />
-            </ReactionPicker>
+          {/if}
+          {#if item.content.kind === 'message' && item.content.emote}
+            <div class="emote">
+              <span class="sender" style:color={nameColor}>* {senderName}</span>
+              <FormattedBody html={item.content.html} {onMatrixLink} />
+            </div>
+          {:else if item.content.kind === 'message'}
+            <div class={jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`}>
+              <FormattedBody html={item.content.html} {onMatrixLink} />
+              <!-- Trails the body, where the edit happened, not the header. -->
+              {#if item.content.edited}
+                <span class="edited">{$i18n.t('timeline.edited')}</span>
+              {/if}
+            </div>
+          {:else if item.content.kind === 'sticker'}
+            <MediaImage
+              class="sticker"
+              source={item.content.source}
+              alt={item.content.body}
+              width={304}
+              height={304}
+              intrinsicWidth={item.content.width}
+              intrinsicHeight={item.content.height}
+              mime={item.content.mime}
+              onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
+            />
+          {:else if item.content.kind === 'image'}
+            <MediaImage
+              class="image"
+              source={item.content.source}
+              alt={item.content.body}
+              width={800}
+              height={600}
+              intrinsicWidth={item.content.width}
+              intrinsicHeight={item.content.height}
+              mime={item.content.mime}
+              onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
+            />
+            {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
+          {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
+            <MediaContent
+              class="media"
+              source={item.content.source}
+              mime={item.content.mime}
+              body={item.content.body}
+              kind={item.content.kind}
+              width={item.content.kind === 'video' ? item.content.width : null}
+              height={item.content.kind === 'video' ? item.content.height : null}
+            />
+          {/if}
+          {#if item.reactions.length > 0}
+            {@const eventId = item.event_id}
+            <BitsTooltip.Provider delayDuration={400} skipDelayDuration={100}>
+              <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
+                {#each item.reactions as reaction, index (reaction.key)}
+                  {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
+                  {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
+                    <button
+                      {...props}
+                      class={['reaction', { mine }]}
+                      type="button"
+                      aria-pressed={mine}
+                      aria-label={$i18n.t('timeline.toggleReaction', {
+                        key: reaction.key,
+                        count: reaction.senders.length,
+                      })}
+                      disabled={eventId === null}
+                      onclick={() => {
+                        if (reactionPressFired) {
+                          reactionPressFired = false;
+                          return;
+                        }
+                        if (eventId) onToggleReaction?.(eventId, reaction.key);
+                      }}
+                      oncontextmenu={(event) => {
+                        openReactionDetails(event, index);
+                      }}
+                      onpointerdown={(event) => {
+                        startReactionPress(event, index);
+                      }}
+                      onpointermove={moveReactionPress}
+                      onpointerup={endReactionPress}
+                      onpointercancel={endReactionPress}
+                    >
+                      {#if reaction.key.startsWith('mxc://')}
+                        <MediaImage
+                          class="reaction-image"
+                          source={reaction.key}
+                          alt={reaction.key}
+                          width={64}
+                          height={64}
+                        />
+                      {:else}
+                        <em>{reaction.key}</em>
+                      {/if}
+                      {reaction.senders.length}
+                    </button>
+                  {/snippet}
+                  <BitsTooltip.Root>
+                    <BitsTooltip.Trigger child={reactionTrigger} />
+                    <BitsTooltip.Portal>
+                      <BitsTooltip.Content
+                        class="reaction-tooltip"
+                        side="top"
+                        align="center"
+                        sideOffset={8}
+                      >
+                        {reactionTooltip(reaction.senders, reaction.key)}
+                      </BitsTooltip.Content>
+                    </BitsTooltip.Portal>
+                  </BitsTooltip.Root>
+                {/each}
+                {#if actionable && actions.onReact}
+                  {@const react = actions.onReact}
+                  <ReactionPicker
+                    label={$i18n.t('timeline.addReaction')}
+                    triggerClass="add-reaction"
+                    {roomId}
+                    onPick={react}
+                  >
+                    <PlusIcon />
+                  </ReactionPicker>
+                {/if}
+              </div>
+            </BitsTooltip.Provider>
+          {/if}
+          {#if upload}
+            <progress
+              class="upload"
+              max={upload.total}
+              value={upload.current}
+              aria-label={$i18n.t('timeline.uploading')}
+            ></progress>
+          {/if}
+          {#if stalled}
+            <p class="send-failure">
+              <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
+              {#if item.transaction_id}
+                {@const transactionId = item.transaction_id}
+                <button
+                  type="button"
+                  onclick={() => {
+                    onRetrySend?.(transactionId);
+                  }}
+                >
+                  {$i18n.t('timeline.retrySend')}
+                </button>
+                <button
+                  type="button"
+                  onclick={() => {
+                    onCancelSend?.(transactionId);
+                  }}
+                >
+                  {$i18n.t('timeline.cancelSend')}
+                </button>
+              {/if}
+            </p>
           {/if}
         </div>
-      {/if}
-      {#if upload}
-        <progress
-          class="upload"
-          max={upload.total}
-          value={upload.current}
-          aria-label={$i18n.t('timeline.uploading')}
-        ></progress>
-      {/if}
-      {#if stalled}
-        <p class="send-failure">
-          <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
-          {#if item.transaction_id}
-            {@const transactionId = item.transaction_id}
-            <button type="button" onclick={() => onRetrySend?.(transactionId)}>
-              {$i18n.t('timeline.retrySend')}
-            </button>
-            <button type="button" onclick={() => onCancelSend?.(transactionId)}>
-              {$i18n.t('timeline.cancelSend')}
-            </button>
+      </article>
+    </ContextMenu.Trigger>
+    {#if actionable}
+      <ContextMenu.Portal>
+        <ContextMenu.Content class="message-menu" loop collisionPadding={8}>
+          {#if actions.onReply}
+            <ContextMenu.Item onclick={actions.onReply}
+              >{$i18n.t('timeline.reply')}</ContextMenu.Item
+            >
+            <ContextMenu.Item onclick={actions.onReply}
+              >{$i18n.t('timeline.replyInThread')}</ContextMenu.Item
+            >
           {/if}
-        </p>
-      {/if}
-    </div>
-  </article>
+          {#if actions.onEdit}
+            <ContextMenu.Item onclick={actions.onEdit}
+              >{$i18n.t('timeline.editMessage')}</ContextMenu.Item
+            >
+          {/if}
+          {#if actions.onCopyText}
+            <ContextMenu.Item onclick={actions.onCopyText}
+              >{$i18n.t('timeline.copyMessage')}</ContextMenu.Item
+            >
+          {/if}
+          {#if actions.onCopyLink}
+            <ContextMenu.Item onclick={actions.onCopyLink}
+              >{$i18n.t('timeline.copyLink')}</ContextMenu.Item
+            >
+          {/if}
+          {#if actions.onViewReactions}
+            <ContextMenu.Item onclick={actions.onViewReactions}
+              >{$i18n.t('timeline.viewReactions')}</ContextMenu.Item
+            >
+          {/if}
+          {#if actions.onReadReceipts}
+            <ContextMenu.Item onclick={actions.onReadReceipts}
+              >{$i18n.t('timeline.readReceipts')}</ContextMenu.Item
+            >
+          {/if}
+          {#if actions.onDelete}
+            <ContextMenu.Separator class="message-menu-separator" />
+            <ContextMenu.Item class="message-menu-danger" onclick={actions.onDelete}
+              >{$i18n.t('timeline.deleteMessage')}</ContextMenu.Item
+            >
+          {/if}
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    {/if}
+  </ContextMenu.Root>
 {:else if item.content.kind === 'membership' || item.content.kind === 'profile_change'}
   <p class="state">
     <span class="state-rail" aria-hidden="true"></span>
@@ -1009,6 +1166,30 @@
     outline-offset: var(--focus-ring-offset);
   }
 
+  :global(.reaction-tooltip) {
+    animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
+    background: var(--sable-bg-container);
+    border: 1px solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-float);
+    box-sizing: border-box;
+    color: var(--sable-bg-on-container);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-body);
+    max-width: min(15rem, calc(100vw - 2rem));
+    overflow-wrap: anywhere;
+    padding: 0.5rem 0.625rem;
+    white-space: normal;
+    z-index: var(--layer-tooltip);
+  }
+
+  @keyframes tooltip-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.25rem) scale(0.96);
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .reaction {
       transition:
@@ -1018,6 +1199,12 @@
 
     .via {
       transition: background-color var(--motion-fast) var(--motion-easing-standard);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.reaction-tooltip) {
+      animation: none;
     }
   }
 

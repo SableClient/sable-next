@@ -13,10 +13,10 @@
     open?: boolean;
     reactions: readonly ReactionGroup[];
     members: readonly MemberView[];
+    active?: number;
   }
 
-  let { open = $bindable(false), reactions, members }: Props = $props();
-  let active = $state(0);
+  let { open = $bindable(false), reactions, members, active = $bindable(0) }: Props = $props();
   let group = $derived<ReactionGroup | undefined>(
     reactions[Math.min(active, reactions.length - 1)]
   );

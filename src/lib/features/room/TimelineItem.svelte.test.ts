@@ -123,3 +123,88 @@ test('a per-message profile takes the sender position and names the account behi
   expect(document.querySelector('header .via')?.textContent).toContain('@alice:example.org');
   await unmount(instance);
 });
+
+test('provides a formatted reaction attribution tooltip', async () => {
+  const reacted = {
+    ...item(false),
+    reactions: [{ key: '👍', senders: ['@alice:example.org'] }],
+  };
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: {
+      item: reacted,
+      collapsed: false,
+      members: [
+        {
+          user_id: '@alice:example.org',
+          display_name: 'Alice',
+          avatar_url: null,
+          power_level: 0,
+        },
+      ],
+    },
+  });
+  await tick();
+
+  const reaction = document.querySelector<HTMLButtonElement>('.reaction');
+  if (!reaction) throw new Error('reaction was not rendered');
+  vi.useFakeTimers();
+  reaction.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await vi.advanceTimersByTimeAsync(400);
+  await tick();
+
+  expect(document.querySelector('.reaction-tooltip')?.textContent).toBe('Alice reacted with 👍');
+  vi.useRealTimers();
+  await unmount(instance);
+});
+
+test('opens message actions on right click', async () => {
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false, onReply: vi.fn() },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+
+  expect(document.querySelector('.message-menu')?.textContent).toContain('Reply');
+  await unmount(instance);
+});
+
+test('long pressing a reaction opens its people list without toggling it', async () => {
+  vi.useFakeTimers();
+  const onToggleReaction = vi.fn();
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: {
+      item: { ...item(false), reactions: [{ key: '👍', senders: ['@alice:example.org'] }] },
+      collapsed: false,
+      onToggleReaction,
+      members: [
+        {
+          user_id: '@alice:example.org',
+          display_name: 'Alice',
+          avatar_url: null,
+          power_level: 0,
+        },
+      ],
+    },
+  });
+  await tick();
+  const reaction = document.querySelector<HTMLButtonElement>('.reaction');
+  if (!reaction) throw new Error('reaction was not rendered');
+
+  reaction.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
+  await vi.advanceTimersByTimeAsync(450);
+  await tick();
+  reaction.click();
+
+  expect(document.querySelector('.reactions-dialog')?.textContent).toContain('Alice');
+  expect(document.querySelector('.sheet-list')).toBeNull();
+  expect(onToggleReaction).not.toHaveBeenCalled();
+  vi.useRealTimers();
+  await unmount(instance);
+});
