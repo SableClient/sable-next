@@ -548,6 +548,59 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::SetAvatarUrl)
             }
 
+            Command::SetProfileField { field, value } => {
+                let account = $self.client().await?.account();
+                match value {
+                    Some(value) => {
+                        let value = ProfileFieldValue::new(&field, value)
+                            .map_err(|error| $self.failed("set_profile_field: invalid value", error))?;
+                        account
+                            .set_profile_field(value)
+                            .await
+                            .map_err(|error| $self.failed("set_profile_field", error))?;
+                    }
+                    None => {
+                        account
+                            .delete_profile_field(ProfileFieldName::from(field.as_str()))
+                            .await
+                            .map_err(|error| $self.failed("delete_profile_field", error))?;
+                    }
+                }
+
+                Ok(CommandOk::SetProfileField)
+            }
+
+            Command::AccountContacts => {
+                let emails = $self
+                    .client()
+                    .await?
+                    .account()
+                    .get_3pids()
+                    .await
+                    .map_err(|error| $self.failed("account_contacts", error))?
+                    .threepids
+                    .into_iter()
+                    .filter(|identifier| identifier.medium.as_str() == "email")
+                    .map(|identifier| identifier.address)
+                    .collect();
+
+                Ok(CommandOk::AccountContacts { emails })
+            }
+
+            Command::IgnoredUsers => {
+                let mut users = $self
+                    .client()
+                    .await?
+                    .subscribe_to_ignore_user_list_changes()
+                    .get()
+                    .iter()
+                    .filter_map(|user_id| user_id.parse().ok())
+                    .collect::<Vec<OwnedUserId>>();
+                users.sort();
+
+                Ok(CommandOk::IgnoredUsers { users })
+            }
+
             Command::IgnoreUser { user_id } => {
                 $self
                     .client()

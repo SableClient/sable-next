@@ -3,8 +3,18 @@ import type { CommandOk } from '@/generated/CommandOk';
 import type { CommandErr } from '@/generated/CommandErr';
 import type { CoreEvent } from '@/generated/CoreEvent';
 
+type AccountResponseFor<T extends Command['type']> = T extends 'account_contacts'
+  ? { type: 'account_contacts'; emails: string[] }
+  : T extends 'ignored_users'
+    ? { type: 'ignored_users'; users: string[] }
+    : T extends 'set_profile_field'
+      ? { type: 'set_profile_field' }
+      : never;
+
 /** Resolves a command's response from its tag, so `send` is typed end to end. */
-export type ResponseFor<T extends Command['type']> = Extract<CommandOk, { type: T }>;
+export type ResponseFor<T extends Command['type']> =
+  | Extract<CommandOk, { type: T }>
+  | AccountResponseFor<T>;
 
 export type Attachment = {
   roomId: string;

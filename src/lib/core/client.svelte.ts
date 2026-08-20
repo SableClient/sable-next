@@ -853,6 +853,21 @@ export class CoreClient {
     await this.ensureTransport().send({ type: 'set_avatar_url', url });
   }
 
+  async setProfileField(field: string, value: unknown): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_profile_field', field, value });
+    this.profileCache.delete(this.session?.user_id ?? '');
+  }
+
+  async accountContacts(): Promise<string[]> {
+    const response = await this.ensureTransport().send({ type: 'account_contacts' });
+    return response.emails;
+  }
+
+  async ignoredUsers(): Promise<string[]> {
+    const response = await this.ensureTransport().send({ type: 'ignored_users' });
+    return response.users;
+  }
+
   /** `m.direct` is client-owned; nothing else will correct it. */
   async setDirect(roomId: string, direct: boolean): Promise<void> {
     await this.ensureTransport().send({ type: 'set_direct', room_id: roomId, direct });

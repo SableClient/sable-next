@@ -91,6 +91,8 @@ html {
   --sable-focus-ring: rgb(110 86 207 / 40%);
   --sable-shadow: rgb(0 0 0 / 10%);
   --sable-overlay: rgb(0 0 0 / 40%);
+  --sable-picker-black: #000;
+  --sable-picker-white: #fff;
 }
 
 @media (prefers-color-scheme: dark) {

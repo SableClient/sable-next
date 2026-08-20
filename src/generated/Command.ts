@@ -54,7 +54,7 @@ via: Array<string>, } | { "type": "knock_room", address: string, via: Array<stri
 /**
  * A passphrase to unlock the key with. The key is returned either way.
  */
-passphrase: string | null, } | { "type": "reset_recovery_key", passphrase: string | null, } | { "type": "delete_device", device_id: string, password: string | null, } | { "type": "rename_device", device_id: string, display_name: string, } | { "type": "set_display_name", name: string | null, } | { "type": "set_avatar_url", url: string | null, } | { "type": "set_direct", room_id: string, direct: boolean, } | { "type": "ignore_user", user_id: string, } | { "type": "unignore_user", user_id: string, } | { "type": "set_typing", room_id: string, typing: boolean, } | { "type": "set_room_tag", room_id: string, tag: RoomTag, 
+passphrase: string | null, } | { "type": "reset_recovery_key", passphrase: string | null, } | { "type": "delete_device", device_id: string, password: string | null, } | { "type": "rename_device", device_id: string, display_name: string, } | { "type": "set_display_name", name: string | null, } | { "type": "set_avatar_url", url: string | null, } | { "type": "set_profile_field", field: string, value: unknown | null, } | { "type": "account_contacts" } | { "type": "ignored_users" } | { "type": "set_direct", room_id: string, direct: boolean, } | { "type": "ignore_user", user_id: string, } | { "type": "unignore_user", user_id: string, } | { "type": "set_typing", room_id: string, typing: boolean, } | { "type": "set_room_tag", room_id: string, tag: RoomTag,
 /**
  * False removes it.
  */

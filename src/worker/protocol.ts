@@ -1,6 +1,7 @@
 import type { Command } from '@/generated/Command';
 import type { CommandErr } from '@/generated/CommandErr';
 import type { CommandOk } from '@/generated/CommandOk';
+import type { AccountCommandOk } from '@/generated/AccountCommandOk';
 import type { CoreEvent } from '@/generated/CoreEvent';
 
 export type AttachmentRequest = {
@@ -22,7 +23,7 @@ export type WorkerRequest =
 
 /** Worker → page. Events carry no id because they answer nothing. */
 export type WorkerMessage =
-  | { id: number; ok: CommandOk }
+  | { id: number; ok: CommandOk | AccountCommandOk }
   | { id: number; err: CommandErr }
   // Transferred, not copied, so a thumbnail crosses once.
   | { id: number; bytes: Uint8Array<ArrayBuffer> }

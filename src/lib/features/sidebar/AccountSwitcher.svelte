@@ -62,7 +62,7 @@
   }
 
   function openProfile(): void {
-    void goto(resolve('/profile'));
+    void goto(resolve('/settings/account'));
   }
 
   // The pusher goes first: once the session ends there is no way to tell the

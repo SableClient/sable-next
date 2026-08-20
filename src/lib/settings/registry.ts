@@ -81,6 +81,8 @@ export interface SettingsCategory {
 
 /** The one settings section that is not preference-driven. */
 export const SETTINGS_DEVICES_SECTION = 'devices';
+/** Account data comes from the homeserver, not local preferences. */
+export const SETTINGS_ACCOUNT_SECTION = 'account';
 
 export function findCategory(id: string | undefined): SettingsCategory | undefined {
   return settingsCategories.find((category) => category.id === id);

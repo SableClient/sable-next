@@ -7,11 +7,16 @@
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
-  import { SETTINGS_DEVICES_SECTION, settingsCategories } from '$lib/settings/registry';
+  import {
+    SETTINGS_ACCOUNT_SECTION,
+    SETTINGS_DEVICES_SECTION,
+    settingsCategories,
+  } from '$lib/settings/registry';
   import { BREAKPOINTS } from '$lib/ui/breakpoints';
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
@@ -32,6 +37,7 @@
   const core = useCoreClient();
 
   const sections = [
+    { id: SETTINGS_ACCOUNT_SECTION, label: 'settings.account', icon: UserCircleIcon },
     ...settingsCategories.map((category) => ({
       id: category.id,
       label: category.name,

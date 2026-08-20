@@ -1,10 +1,10 @@
 import { goto, pushState, replaceState } from '$app/navigation';
 import { resolve } from '$app/paths';
 
-import { SETTINGS_DEVICES_SECTION, settingsCategories } from '$lib/settings/registry';
+import { SETTINGS_ACCOUNT_SECTION } from '$lib/settings/registry';
 
 export function defaultSettingsSection(): string {
-  return settingsCategories[0]?.id ?? SETTINGS_DEVICES_SECTION;
+  return SETTINGS_ACCOUNT_SECTION;
 }
 
 /** Modified clicks keep the link's own behaviour. */

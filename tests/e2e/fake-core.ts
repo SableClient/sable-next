@@ -45,6 +45,22 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       user_id: '@e2e:example.test',
       device_id: 'E2EDEVICE',
     };
+    const profile = {
+      user_id: session.user_id,
+      display_name: 'E2E User',
+      avatar_url: null,
+      bio: null,
+      hero_color: null,
+      hero_brightness: null,
+      banner_url: null,
+      status: null,
+      pronouns: [],
+      timezone: null,
+      name_color_light: null,
+      name_color_dark: null,
+      animal: null,
+      extra: [],
+    };
     const room = {
       room_id: '!room:example.test',
       canonical_alias: null,
@@ -174,6 +190,24 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           timelineSubscriptions.push(subscription);
         }
         if (workerMode === 'loading' && command === 'restore') return;
+        if (command === 'user_profile') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, profile } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'account_contacts' || command === 'ignored_users') {
+          const ok =
+            command === 'account_contacts'
+              ? { type: command, emails: [] }
+              : { type: command, users: [] };
+          window.setTimeout(() => {
+            this.onmessage?.({ data: { id: request.id, ok } } as MessageEvent);
+          });
+          return;
+        }
 
         const response =
           workerMode === 'error' && command === 'restore'

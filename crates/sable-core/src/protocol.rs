@@ -294,6 +294,13 @@ pub enum Command {
     SetAvatarUrl {
         url: Option<String>,
     },
+    SetProfileField {
+        field: String,
+        #[ts(type = "unknown | null")]
+        value: Option<serde_json::Value>,
+    },
+    AccountContacts,
+    IgnoredUsers,
     /// `m.direct` is client-owned account data. Nothing else will correct it.
     SetDirect {
         #[ts(type = "string")]
@@ -528,6 +535,14 @@ pub enum CommandOk {
     UserRelations {
         mutual_rooms: Vec<MutualRoomView>,
         ignored: bool,
+    },
+    SetProfileField,
+    AccountContacts {
+        emails: Vec<String>,
+    },
+    IgnoredUsers {
+        #[ts(type = "string[]")]
+        users: Vec<OwnedUserId>,
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
