@@ -23,6 +23,7 @@
   let position = $state<number | undefined>();
   let dragging = $state(false);
   let gesture: Gesture | undefined;
+  let settleFrame: number | undefined;
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   /** Routes whose own index is the room list. Anywhere else the list would
       hide the page that was asked for behind an inert panel. Keyed on the path
@@ -35,12 +36,33 @@
   // the gesture's last offset.
   $effect(() => {
     void pathname;
+    cancelSettling();
     position = undefined;
     dragging = false;
     gesture = undefined;
   });
 
+  function cancelSettling() {
+    if (settleFrame === undefined) return;
+
+    cancelAnimationFrame(settleFrame);
+    settleFrame = undefined;
+  }
+
+  function settleDrawer() {
+    dragging = false;
+    // Give the browser a rendered frame with transitions enabled before
+    // releasing the drag offset to the open or closed transform.
+    settleFrame = requestAnimationFrame(() => {
+      settleFrame = requestAnimationFrame(() => {
+        position = undefined;
+        settleFrame = undefined;
+      });
+    });
+  }
+
   function handleTouchStart(event: TouchEvent) {
+    cancelSettling();
     const target = event.currentTarget;
     if (!(target instanceof HTMLDivElement)) return;
 
@@ -85,8 +107,7 @@
       }
     }
 
-    dragging = false;
-    position = undefined;
+    settleDrawer();
   }
 
   function handleKeydown(event: KeyboardEvent) {
