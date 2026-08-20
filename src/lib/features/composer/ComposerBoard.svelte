@@ -14,9 +14,10 @@
     disabled?: boolean;
     onPick: (image: PackImageView, usage: ImageUsageView) => void;
     onPickUnicode: (emoji: string) => void;
+    onBeforeOpen?: () => void;
   }
 
-  let { roomId, desktop, disabled = false, onPick, onPickUnicode }: Props = $props();
+  let { roomId, desktop, disabled = false, onPick, onPickUnicode, onBeforeOpen }: Props = $props();
   let open = $state(false);
   let tab = $state<ImageUsageView>('emoticon');
 
@@ -52,6 +53,7 @@
     class="composer-board-trigger"
     {disabled}
     aria-label={$i18n.t('composer.emotesAndStickers')}
+    onpointerdown={onBeforeOpen}
     onclick={() => {
       open = true;
     }}

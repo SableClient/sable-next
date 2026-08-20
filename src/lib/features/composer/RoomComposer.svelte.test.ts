@@ -177,6 +177,57 @@ test('the editor stays editable after a send', async () => {
   void unmount(instance);
 });
 
+test('sending returns focus to the editor', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+
+  const editor = document.querySelector('[role="combobox"]');
+  if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
+  editor.focus();
+
+  const send = document.querySelector('button[type="submit"]');
+  if (!(send instanceof HTMLButtonElement)) throw new Error('send control not found');
+  const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+  send.dispatchEvent(mousedown);
+  expect(mousedown.defaultPrevented).toBe(true);
+  submit();
+
+  await vi.waitFor(() => {
+    expect(document.activeElement).toBe(document.querySelector('[role="combobox"]'));
+  });
+
+  void unmount(instance);
+});
+
+test('the editor keeps focus while a send is pending', async () => {
+  let resolveSend: (() => void) | undefined;
+  const instance = render({
+    roomId: '!room:example.org',
+    onSend: () =>
+      new Promise<void>((resolve) => {
+        resolveSend = resolve;
+      }),
+  });
+  await tick();
+
+  const editor = document.querySelector('[role="combobox"]');
+  if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
+  editor.focus();
+  await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+  submit();
+  await tick();
+
+  expect(document.activeElement).toBe(editor);
+  expect(editor.getAttribute('contenteditable')).toBe('true');
+
+  resolveSend?.();
+  await vi.waitFor(() => {
+    expect(document.querySelector('.staged-name')).toBeNull();
+  });
+
+  void unmount(instance);
+});
+
 test('a failed send puts the message back in the editor', async () => {
   const instance = render({
     roomId: '!room:example.org',

@@ -15,6 +15,7 @@
   import { createMediaQuery } from '$lib/ui/media-query.svelte';
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import Spinner from '$lib/ui/primitives/Spinner.svelte';
 
   import ComposerAttachments from './ComposerAttachments.svelte';
   import ComposerAutocomplete from './ComposerAutocomplete.svelte';
@@ -88,6 +89,8 @@
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
   let activeIndex = $state(0);
+  let previousContextId = $state<string | null>(null);
+  let previousContextKind = $state<ComposerContext['kind'] | null>(null);
   let members = $state.raw<MemberView[]>([]);
   let emotes = $state.raw<PackImageView[]>([]);
 
@@ -115,7 +118,7 @@
     describedBy: hintId,
     listboxId,
     activeOptionId: () => (panelOpen && suggestions.length > 0 ? optionId(active) : null),
-    editable: () => !sending,
+    editable: () => true,
     onSubmit: () => {
       void send();
     },
@@ -184,8 +187,42 @@
     }
   });
 
+  $effect(() => {
+    const contextId = context?.eventId ?? null;
+    if (contextId === previousContextId) return;
+
+    const wasActive = previousContextId !== null;
+    const wasEditing = previousContextKind === 'edit';
+    previousContextId = contextId;
+    previousContextKind = context?.kind ?? null;
+    const frame = requestAnimationFrame(() => {
+      if (contextId !== null) {
+        editor.focus();
+      } else if (wasActive && (wasEditing || !desktop) && !sending) {
+        editor.blur();
+        const activeElement = document.activeElement;
+        if (activeElement instanceof HTMLElement) activeElement.blur();
+      }
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  });
+
   function stopTyping(): void {
     onTyping(roomId, false).catch(() => {});
+  }
+
+  function blurEditor(): void {
+    editor.blur();
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) activeElement.blur();
+  }
+
+  function cancelContext(): void {
+    onCancelContext?.();
+    if (context?.kind === 'edit' || !desktop) blurEditor();
   }
 
   function updateTyping(): void {
@@ -224,7 +261,7 @@
       await onSend(roomId, message.body, message.formatted);
     } catch (cause) {
       console.debug('[sable composer] send failed', cause);
-      if (doc) editor.setDoc(doc);
+      if (doc && editor.isEmpty()) editor.setDoc(doc);
       staged = attachments;
       error = $i18n.t('timeline.sendFailed');
     } finally {
@@ -377,7 +414,7 @@
       ondragleave={handleDragleave}
     >
       {#if context}
-        <ComposerContextBanner {context} onCancel={onCancelContext} />
+        <ComposerContextBanner {context} onCancel={cancelContext} />
       {/if}
       {#if staged.length > 0}
         <ComposerAttachments
@@ -403,7 +440,12 @@
           void send();
         }}
       >
-        <ComposerDoor {desktop} disabled={sending} onPick={pick} />
+        <ComposerDoor
+          {desktop}
+          disabled={sending}
+          onPick={pick}
+          onBeforeOpen={!desktop ? blurEditor : undefined}
+        />
         <input
           bind:this={fileInput}
           class="composer-file"
@@ -436,6 +478,7 @@
             disabled={sending}
             onPick={pickFromBoard}
             onPickUnicode={pickUnicodeFromBoard}
+            onBeforeOpen={!desktop ? blurEditor : undefined}
           />
         </div>
         <IconButton
@@ -456,11 +499,20 @@
           variant="ghost"
           size="small"
           class="composer-send"
-          loading={sending}
-          disabled={!hasContent}
+          disabled={sending || !hasContent}
           label={$i18n.t('timeline.sendMessage')}
+          onpointerdown={(event: PointerEvent) => {
+            if (hasContent) event.preventDefault();
+          }}
+          onmousedown={(event: MouseEvent) => {
+            if (hasContent) event.preventDefault();
+          }}
         >
-          <PaperPlaneIcon weight="fill" />
+          {#if sending}
+            <Spinner small />
+          {:else}
+            <PaperPlaneIcon weight="fill" />
+          {/if}
         </IconButton>
       </form>
       <p class="composer-hint" id={hintId}>{$i18n.t('composer.hintSend')}</p>

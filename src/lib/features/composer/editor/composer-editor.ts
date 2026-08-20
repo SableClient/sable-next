@@ -161,6 +161,10 @@ export class ComposerEditor {
     this.view?.focus();
   }
 
+  blur(): void {
+    this.view?.dom.blur();
+  }
+
   clear(): void {
     const view = this.view;
     if (!view) return;

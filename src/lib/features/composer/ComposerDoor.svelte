@@ -12,9 +12,10 @@
     desktop: boolean;
     disabled?: boolean;
     onPick: (accept: string) => void;
+    onBeforeOpen?: () => void;
   }
 
-  let { desktop, disabled = false, onPick }: Props = $props();
+  let { desktop, disabled = false, onPick, onBeforeOpen }: Props = $props();
   let open = $state(false);
 
   const media = 'image/*,video/*';
@@ -53,6 +54,7 @@
     class="composer-door"
     {disabled}
     aria-label={$i18n.t('composer.insert')}
+    onpointerdown={onBeforeOpen}
     onclick={() => {
       open = true;
     }}

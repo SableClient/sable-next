@@ -223,6 +223,8 @@
     estimateSize: (index) =>
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
+    anchorTo: 'end',
+    followOnAppend: true,
     scrollEndThreshold: nearLatestPx,
     useScrollendEvent: true,
     overscan: 24,
@@ -554,6 +556,8 @@
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
       getItemKey: (index) => identityTracker.key(items, index),
+      anchorTo: 'end',
+      followOnAppend: true,
       scrollEndThreshold: nearLatestPx,
       useScrollendEvent: true,
       overscan: 8,
