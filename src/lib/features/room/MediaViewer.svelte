@@ -3,6 +3,7 @@
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
   import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
   import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -226,7 +227,8 @@
             />
           {:else if failed}
             <div class="error">
-              <strong>Unable to load this image</strong><span>Try again from the message.</span>
+              <strong>{$i18n.t('timeline.mediaUnavailable')}</strong>
+              <span>{$i18n.t('timeline.mediaUnavailableDetail')}</span>
             </div>
           {:else}
             <Spinner />

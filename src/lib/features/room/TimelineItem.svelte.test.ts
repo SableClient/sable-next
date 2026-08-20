@@ -80,6 +80,20 @@ test('keeps the sender header for an ordinary message', async () => {
   await unmount(instance);
 });
 
+test('does not mount hidden message dialogs', async () => {
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false },
+  });
+  await tick();
+
+  expect(document.querySelector('.sheet-list')).toBeNull();
+  expect(document.querySelector('.delete')).toBeNull();
+  expect(document.querySelector('.reactions-dialog')).toBeNull();
+  expect(document.querySelector('.receipts-dialog')).toBeNull();
+  await unmount(instance);
+});
+
 test('opens an image from a mobile pointer interaction', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onOpenMedia = vi.fn();

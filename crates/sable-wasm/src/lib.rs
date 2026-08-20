@@ -30,6 +30,8 @@ fn err_json(error: impl std::fmt::Display) -> String {
     .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
 }
 
+const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::latest_events::latest_event::builder=off,matrix_sdk_base::room::display_name=off";
+
 /// Without this the core's `tracing` output is discarded and a
 /// `Failed { log_id }` names a line that was never written.
 fn init_tracing(filter: &str) {
@@ -101,7 +103,7 @@ impl SableCore {
         log_filter: Option<String>,
     ) -> SableCore {
         console_error_panic_hook::set_once();
-        init_tracing(log_filter.as_deref().unwrap_or("info"));
+        init_tracing(log_filter.as_deref().unwrap_or(DEFAULT_LOG_FILTER));
 
         let (core, events) = Core::new(store_id, Box::new(JsSessionStore::new(load, save, clear)));
 

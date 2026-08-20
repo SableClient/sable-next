@@ -40,6 +40,89 @@ test('does not retry a failed media request in a render loop', async () => {
   await unmount(instance);
 });
 
+test('does not re-request media that the homeserver cannot provide', async () => {
+  core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
+  const props = {
+    source: 'mxc://example.org/unavailable-image',
+    alt: 'Image',
+    width: 800,
+    height: 600,
+  };
+  const first = mount(MediaImage, { target: document.body, props });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+  await unmount(first);
+
+  const second = mount(MediaImage, { target: document.body, props });
+  await tick();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+  await unmount(second);
+});
+
+test('shows an unavailable state instead of a blank image', async () => {
+  core.fetchMedia
+    .mockRejectedValueOnce(new Error('media unavailable'))
+    .mockResolvedValueOnce(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/unavailable-state',
+      alt: 'Holiday photo',
+      width: 800,
+      height: 600,
+      onclick: vi.fn(),
+      retryable: true,
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.media-image-unavailable')?.textContent).toContain(
+    'Holiday photo: Media unavailable'
+  );
+  const retry = document.querySelector<HTMLButtonElement>('.retry-media');
+  expect(retry?.disabled).toBe(false);
+  retry?.click();
+  await Promise.resolve();
+  await tick();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(document.querySelector('.media-image-unavailable')).toBeNull();
+  await unmount(instance);
+});
+
+test('backs off repeated manual retries', async () => {
+  core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/retry-backoff',
+      alt: 'Holiday photo',
+      width: 800,
+      height: 600,
+      retryable: true,
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  await vi.waitFor(() => {
+    expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  });
+
+  const retry = document.querySelector<HTMLButtonElement>('.retry-media');
+  expect(retry?.disabled).toBe(true);
+  expect(retry?.textContent).toContain('Retry in 2 seconds');
+  await unmount(instance);
+});
+
 test('renders clickable media as a button', async () => {
   const onclick = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));

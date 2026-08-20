@@ -832,6 +832,8 @@ pub struct SubscriptionId(pub u32);
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
+// These are independent room capabilities, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 pub struct RoomSummary {
     #[ts(type = "string")]
     pub room_id: OwnedRoomId,

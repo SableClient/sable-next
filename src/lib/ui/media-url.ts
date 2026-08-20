@@ -2,12 +2,17 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 /* Not `SvelteMap`: callers read the cache from inside an effect, so a reactive
    miss re-runs every waiting media element each time any other one resolves. */
-const objectUrls = new Map<string, string>();
+type CachedMediaUrl = { url: string; bytes: number };
+
+const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
+const unavailable = new Set<string>();
 const aspectRatios = new Map<string, number>();
 /* An object URL pins its blob until revoked. Far more than one viewport holds,
    so the least recently read entry is never one on screen. */
-const MAX_OBJECT_URLS = 256;
+const MAX_OBJECT_URLS = 64;
+const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
+let objectUrlBytes = 0;
 
 function cacheKey(source: string, width: number, height: number): string {
   return `${source}:${String(width)}:${String(height)}`;
@@ -54,12 +59,12 @@ export function mediaAspectRatio(source: string): number | null {
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
 export function cachedMediaUrl(source: string, width: number, height: number): string | undefined {
   const key = cacheKey(source, width, height);
-  const objectUrl = objectUrls.get(key);
-  if (objectUrl === undefined) return undefined;
+  const cached = objectUrls.get(key);
+  if (cached === undefined) return undefined;
   // Re-inserted so the map's own order is the eviction order.
   objectUrls.delete(key);
-  objectUrls.set(key, objectUrl);
-  return objectUrl;
+  objectUrls.set(key, cached);
+  return cached.url;
 }
 
 /**
@@ -75,6 +80,7 @@ export function loadMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const key = cacheKey(source, width, height);
+  if (unavailable.has(key)) return Promise.reject(new Error('Media unavailable'));
   const request =
     pending.get(key) ??
     core
@@ -84,11 +90,16 @@ export function loadMediaUrl(
         const blob = new Blob([bytes], { type });
         const publish = (): string => {
           const objectUrl = URL.createObjectURL(blob);
-          objectUrls.set(key, objectUrl);
-          for (const [oldestKey, oldestUrl] of objectUrls) {
-            if (objectUrls.size <= MAX_OBJECT_URLS) break;
-            URL.revokeObjectURL(oldestUrl);
+          objectUrls.set(key, { url: objectUrl, bytes: blob.size });
+          objectUrlBytes += blob.size;
+          for (const [oldestKey, oldest] of objectUrls) {
+            if (objectUrls.size <= MAX_OBJECT_URLS && objectUrlBytes <= MAX_OBJECT_URL_BYTES) {
+              break;
+            }
+            if (oldestKey === key && objectUrls.size === 1) break;
+            URL.revokeObjectURL(oldest.url);
             objectUrls.delete(oldestKey);
+            objectUrlBytes -= oldest.bytes;
           }
           return objectUrl;
         };
@@ -99,5 +110,19 @@ export function loadMediaUrl(
         pending.delete(key);
       });
   pending.set(key, request);
+  void request.catch(() => {
+    unavailable.add(key);
+  });
   return request;
+}
+
+export function retryMediaUrl(
+  core: Pick<CoreClient, 'fetchMedia'>,
+  source: string,
+  width: number,
+  height: number,
+  mime?: string | null
+): Promise<string> {
+  unavailable.delete(cacheKey(source, width, height));
+  return loadMediaUrl(core, source, width, height, mime);
 }

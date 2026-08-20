@@ -327,23 +327,31 @@
       >
         {#if actionable}
           <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
-          <MessageActionSheet
-            bind:open={sheetOpen}
-            preview={item.content.kind === 'message' ? item.content.body : null}
-            {...actions}
-          />
-          <DeleteMessageDialog
-            bind:open={deleteOpen}
-            preview={item.content.kind === 'message' ? item.content.body : null}
-            onConfirm={confirmDelete}
-          />
-          <ReactionsDialog
-            bind:open={reactionsOpen}
-            bind:active={reactionActive}
-            reactions={item.reactions}
-            {members}
-          />
-          <ReceiptsDialog bind:open={receiptsOpen} readers={item.read_by} {members} />
+          {#if sheetOpen}
+            <MessageActionSheet
+              bind:open={sheetOpen}
+              preview={item.content.kind === 'message' ? item.content.body : null}
+              {...actions}
+            />
+          {/if}
+          {#if deleteOpen}
+            <DeleteMessageDialog
+              bind:open={deleteOpen}
+              preview={item.content.kind === 'message' ? item.content.body : null}
+              onConfirm={confirmDelete}
+            />
+          {/if}
+          {#if reactionsOpen}
+            <ReactionsDialog
+              bind:open={reactionsOpen}
+              bind:active={reactionActive}
+              reactions={item.reactions}
+              {members}
+            />
+          {/if}
+          {#if receiptsOpen}
+            <ReceiptsDialog bind:open={receiptsOpen} readers={item.read_by} {members} />
+          {/if}
         {/if}
         {#if layout === 'compact'}
           <div class="compact-gutter">
@@ -463,6 +471,7 @@
               intrinsicWidth={item.content.width}
               intrinsicHeight={item.content.height}
               mime={item.content.mime}
+              retryable
               onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
             />
           {:else if item.content.kind === 'image'}
@@ -475,6 +484,7 @@
               intrinsicWidth={item.content.width}
               intrinsicHeight={item.content.height}
               mime={item.content.mime}
+              retryable
               onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
             />
             {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}

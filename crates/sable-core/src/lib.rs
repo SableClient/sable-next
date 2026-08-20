@@ -2526,8 +2526,8 @@ impl Core {
                     true,
                 )
                 .await
-                .map_err(|error| self.failed("media_thumbnail", error)),
-            Err(error) => Err(self.failed("media_thumbnail", error)),
+                .map_err(|_| CommandErr::Unavailable),
+            Err(_) => Err(CommandErr::Unavailable),
         }
     }
 

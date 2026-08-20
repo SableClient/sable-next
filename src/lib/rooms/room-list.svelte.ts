@@ -11,6 +11,7 @@ import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
+const NOTIFICATION_MODE_LOAD_CONCURRENCY = 8;
 
 export function roomPathId(room: RoomSummary): string {
   return room.canonical_alias ?? room.room_id;
@@ -126,20 +127,22 @@ export class RoomList {
     const generation = this.generation;
     const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
     for (const room of pending) this.loadingNotificationModes.add(room.room_id);
-    const results = await Promise.allSettled(
-      pending.map(async (room) => {
-        const settings = await this.core.notificationSettings(room.room_id);
-        return { roomId: room.room_id, mode: settings.room ?? settings.default };
-      })
-    );
+    const modes: { roomId: string; mode: NotificationModeView }[] = [];
+    for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_LOAD_CONCURRENCY) {
+      const results = await Promise.allSettled(
+        pending.slice(index, index + NOTIFICATION_MODE_LOAD_CONCURRENCY).map(async (room) => {
+          const settings = await this.core.notificationSettings(room.room_id);
+          return { roomId: room.room_id, mode: settings.room ?? settings.default };
+        })
+      );
+      for (const result of results) {
+        if (result.status === 'fulfilled') modes.push(result.value);
+      }
+    }
     for (const room of pending) this.loadingNotificationModes.delete(room.room_id);
     if (generation !== this.generation) return;
 
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        this.notificationModes.set(result.value.roomId, result.value.mode);
-      }
-    }
+    for (const { roomId, mode } of modes) this.notificationModes.set(roomId, mode);
     this.mutedRoomIds = new SvelteSet(
       [...this.notificationModes].filter(([, mode]) => mode === 'mute').map(([roomId]) => roomId)
     );

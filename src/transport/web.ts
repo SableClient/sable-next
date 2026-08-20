@@ -115,7 +115,9 @@ export function createWebTransport(): Transport {
       } else if ('bytes' in data) waiting.resolve(data.bytes);
       else if ('uri' in data) waiting.resolve(data.uri);
       else {
-        console.warn('[sable transport] command failed', { command, code: data.err.code });
+        if (command !== 'media' || data.err.code !== 'unavailable') {
+          console.warn('[sable transport] command failed', { command, code: data.err.code });
+        }
         waiting.reject(new CoreError(data.err));
       }
     };

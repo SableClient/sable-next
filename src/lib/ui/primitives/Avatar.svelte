@@ -29,6 +29,8 @@
   }: Props = $props();
 
   let accessibleLabel = $derived(alt ?? initials);
+  let failedSource = $state<string | null>(null);
+  let mediaFailed = $derived(failedSource === src);
 </script>
 
 <span
@@ -38,10 +40,17 @@
   role={decorative ? undefined : 'img'}
   aria-label={decorative ? undefined : accessibleLabel}
 >
-  {#if src?.startsWith('mxc://')}
-    <MediaImage class="avatar-image" source={src} alt="" width={96} height={96} />
-  {:else if src}
-    <img {src} alt="" />
+  {#if src?.startsWith('mxc://') && !mediaFailed}
+    <MediaImage
+      class="avatar-image"
+      source={src}
+      alt=""
+      width={96}
+      height={96}
+      onfailed={() => (failedSource = src)}
+    />
+  {:else if src && !mediaFailed}
+    <img {src} alt="" onerror={() => (failedSource = src)} />
   {:else}
     <span>{initials}</span>
   {/if}

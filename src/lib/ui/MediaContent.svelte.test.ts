@@ -51,3 +51,33 @@ test.each([
     await unmount(instance);
   }
 );
+
+test('labels unavailable attachments', async () => {
+  core.fetchMedia
+    .mockRejectedValueOnce(new Error('media unavailable'))
+    .mockResolvedValueOnce(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'file',
+      source: 'mxc://example.org/unavailable-file',
+      mime: 'application/pdf',
+      body: 'report.pdf',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.media-error')?.textContent).toContain(
+    'report.pdf: Media unavailable'
+  );
+  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  await Promise.resolve();
+  await tick();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(document.querySelector('.media-error')).toBeNull();
+  await unmount(instance);
+});
