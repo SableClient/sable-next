@@ -8,9 +8,10 @@
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from './LoginMethod.svelte';
   import PasswordLoginForm from './PasswordLoginForm.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
   import AuthField from '../shared/AuthField.svelte';
+  import LoginProviderButton from './LoginProviderButton.svelte';
 
   type LoginField = 'homeserver' | 'username' | 'password';
   type LoginMethodType = 'oidc' | 'sso';
@@ -126,18 +127,14 @@
     />
   </AuthField>
 
-  <div class="status-slot" aria-live="polite">
-    {#if isCheckingHomeserver}
-      <div class="status-message checking">
-        <Spinner small />
-        {$i18n.t('auth.checkingProvider')}
-      </div>
-    {:else if statusError}
-      <p class="status-message error" role="alert" title={statusError}>{statusError}</p>
-    {:else if loginFlows && availableLoginMethodCount === 0}
-      <p class="status-message muted">{$i18n.t('errors.unsupportedSignIn')}</p>
-    {/if}
-  </div>
+  <AuthStatusSlot
+    loading={isCheckingHomeserver}
+    loadingMessage={$i18n.t('auth.checkingProvider')}
+    message={statusError ??
+      (loginFlows && availableLoginMethodCount === 0 ? $i18n.t('errors.unsupportedSignIn') : null)}
+    tone={statusError ? 'error' : 'muted'}
+    multiline
+  />
 
   <div class="login-methods">
     <div class="method-slot" class:action-slot={hasLoginAction} id={methodSlotId}>
@@ -156,17 +153,14 @@
       {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
         <LoginMethod reducedMotion={prefersReducedMotion.current}>
           <div class="actions">
-            <Button
+            <LoginProviderButton
+              label={$i18n.t('auth.signInWithProvider', {
+                name: displayedHomeserver || 'matrix.org',
+              })}
+              launching={isLaunchingLogin}
               disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
               onclick={() => void onLaunchRedirectLogin('oidc')}
-              variant="primary"
-            >
-              {isLaunchingLogin
-                ? $i18n.t('auth.opening')
-                : $i18n.t('auth.signInWithProvider', {
-                    name: displayedHomeserver || 'matrix.org',
-                  })}
-            </Button>
+            />
           </div>
         </LoginMethod>
       {/if}
@@ -176,24 +170,22 @@
           {#if loginFlows.sso_identity_providers.length > 0}
             <div class="actions sso-actions">
               {#each loginFlows.sso_identity_providers as provider (provider.id)}
-                <Button
+                <LoginProviderButton
+                  label={$i18n.t('auth.signInWithProvider', { name: provider.name })}
+                  launching={isLaunchingLogin}
                   disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
                   onclick={() => void onLaunchRedirectLogin('sso', provider.id)}
-                  variant="primary"
-                >
-                  {$i18n.t('auth.signInWithProvider', { name: provider.name })}
-                </Button>
+                />
               {/each}
             </div>
           {:else}
             <div class="actions">
-              <Button
+              <LoginProviderButton
+                label={$i18n.t('auth.signInWithSso')}
+                launching={isLaunchingLogin}
                 disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
                 onclick={() => void onLaunchRedirectLogin('sso')}
-                variant="primary"
-              >
-                {isLaunchingLogin ? $i18n.t('auth.opening') : $i18n.t('auth.signInWithSso')}
-              </Button>
+              />
             </div>
           {/if}
         </LoginMethod>
@@ -202,19 +194,13 @@
       {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
         <LoginMethod reducedMotion={prefersReducedMotion.current}>
           <PasswordLoginForm
-            {username}
-            {password}
             invalidField={invalidField === 'homeserver' ? null : invalidField}
             {fieldError}
             {loginError}
             {isAuthenticating}
             isCheckingHomeserver={isLoginControlsDisabled}
-            onUsernameInput={(value: string) => {
-              username = value;
-            }}
-            onPasswordInput={(value: string) => {
-              password = value;
-            }}
+            bind:username
+            bind:password
             {onClearFieldError}
           />
         </LoginMethod>
@@ -297,62 +283,6 @@
     opacity: 0.65;
   }
 
-  .checking {
-    align-items: center;
-    color: var(--sable-sec-main);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: 0.5rem;
-    line-height: var(--line-height-body);
-    margin: 0;
-  }
-
-  .error {
-    color: var(--sable-crit-main);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
-    margin: 0;
-  }
-
-  .muted {
-    color: var(--sable-sec-main);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
-    margin: 0;
-  }
-
-  .status-message {
-    margin: 0;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .status-message.error,
-  .status-message.muted {
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-
-  .status-slot {
-    align-items: center;
-    display: flex;
-    height: calc(var(--font-size-small) * var(--line-height-body));
-    overflow: hidden;
-  }
-
-  @keyframes error-in {
-    from {
-      opacity: 0;
-    }
-
-    to {
-      opacity: 1;
-    }
-  }
-
   .login-form {
     min-width: 0;
   }
@@ -379,11 +309,5 @@
 
   .sso-actions {
     gap: 0.75rem;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .error {
-      animation: error-in var(--motion-normal) ease-out;
-    }
   }
 </style>

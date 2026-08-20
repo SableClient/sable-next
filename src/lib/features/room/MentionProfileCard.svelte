@@ -33,6 +33,7 @@
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
+  import MutualRoomsPanel from './MutualRoomsPanel.svelte';
   import { senderColor } from './timeline-format';
 
   interface Props {
@@ -57,7 +58,6 @@
     variant = 'popover',
   }: Props = $props();
   const core = useCoreClient();
-  const mutualRoomsShown = 5;
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
 
   let displayName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
@@ -147,8 +147,6 @@
   let sharedSpaces = $derived(mutualRooms.filter((room) => room.is_space));
   let sharedList = $derived(shared === 'spaces' ? sharedSpaces : sharedRooms);
   let sharedExpanded = $state(false);
-  let sharedShown = $derived(sharedExpanded ? sharedList : sharedList.slice(0, mutualRoomsShown));
-  let sharedRemainder = $derived(sharedList.length - sharedShown.length);
   let hasMeta = $derived(Boolean(pronouns || localTime || animalText || roleLabel));
 
   $effect(() => {
@@ -433,46 +431,18 @@
 {/snippet}
 
 {#snippet sharedPanel()}
-  <p class="profile-rooms-title">
-    {shared === 'spaces'
-      ? $i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })
-      : $i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length })}
-  </p>
-  <ul class="profile-rooms">
-    {#each sharedShown as room (room.room_id)}
-      <li>
-        <button
-          type="button"
-          onclick={() => {
-            openRoom(room.room_id);
-          }}
-        >
-          <span class="profile-rooms-monogram" aria-hidden="true">
-            {(room.name ?? room.room_id).replace(/^[#!]/, '').slice(0, 1).toUpperCase()}
-          </span>
-          {room.name ?? room.room_id}
-        </button>
-      </li>
-    {/each}
-  </ul>
-  <div class="profile-rooms-links">
-    {#if sharedRemainder > 0}
-      <button class="profile-rooms-link" type="button" onclick={() => (sharedExpanded = true)}>
-        {shared === 'spaces'
-          ? $i18n.t('timeline.profileSeeAllSpaces', { count: sharedList.length })
-          : $i18n.t('timeline.profileSeeAllRooms', { count: sharedList.length })}
-      </button>
-    {/if}
-    <button
-      class="profile-rooms-link"
-      type="button"
-      onclick={() => {
-        showShared(null);
-      }}
-    >
-      {$i18n.t('timeline.profileBackToProfile')}
-    </button>
-  </div>
+  <MutualRoomsPanel
+    kind={shared === 'spaces' ? 'spaces' : 'rooms'}
+    rooms={sharedList}
+    expanded={sharedExpanded}
+    onOpenRoom={openRoom}
+    onExpand={() => {
+      sharedExpanded = true;
+    }}
+    onBack={() => {
+      showShared(null);
+    }}
+  />
 {/snippet}
 
 {#snippet composer()}
@@ -620,80 +590,6 @@
   :global(.profile-action-overflow) {
     margin-left: auto;
     padding: 0.125rem var(--space-1);
-  }
-
-  .profile-rooms-title {
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    margin: 0 0 var(--space-1);
-  }
-
-  .profile-rooms {
-    display: grid;
-    font-size: var(--font-size-small);
-    gap: 0.125rem;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .profile-rooms button {
-    align-items: center;
-    background: none;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--sable-bg-on-container);
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    font-size: var(--font-size-small);
-    gap: var(--space-1);
-    padding: 0.25rem var(--space-1);
-    text-align: left;
-    width: 100%;
-  }
-
-  .profile-rooms-monogram {
-    align-items: center;
-    background: var(--sable-primary-container);
-    border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
-    display: inline-flex;
-    flex: none;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: 1.5rem;
-    justify-content: center;
-    width: 1.5rem;
-  }
-
-  .profile-rooms button:hover {
-    background: color-mix(in oklab, var(--sable-bg-on-container) 7%, transparent);
-  }
-
-  .profile-rooms-links {
-    display: grid;
-    gap: 0.25rem;
-    justify-items: start;
-    margin-top: var(--space-1);
-  }
-
-  .profile-rooms-link {
-    background: none;
-    border: 0;
-    color: var(--sable-primary-main);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-  }
-
-  .profile-rooms-link:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
   }
 
   :global(.profile-menu) {

@@ -18,8 +18,8 @@
   import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
+  import DeviceActionForm from './DeviceActionForm.svelte';
 
   const core = useCoreClient();
   let devices = $state<DeviceView[]>([]);
@@ -336,62 +336,24 @@
               </div>
 
               {#if editing === device.device_id}
-                <form
-                  class="device-form"
-                  onsubmit={(event) => {
-                    event.preventDefault();
-                    void saveName(device.device_id);
-                  }}
-                >
-                  <label for={'device-' + device.device_id}>{$i18n.t('settings.deviceName')}</label>
-                  <TextInput
-                    id={'device-' + device.device_id}
-                    bind:value={displayName}
-                    autofocus
-                    required
-                  />
-                  <div class="form-actions">
-                    <Button type="submit">{$i18n.t('settings.save')}</Button>
-                    <Button variant="ghost" onclick={cancelRename}
-                      >{$i18n.t('settings.cancel')}</Button
-                    >
-                  </div>
-                </form>
+                <DeviceActionForm
+                  mode="rename"
+                  deviceId={device.device_id}
+                  bind:displayName
+                  onSubmit={() => void saveName(device.device_id)}
+                  onCancel={cancelRename}
+                />
               {/if}
 
               {#if deleting === device.device_id}
-                <form
-                  class="device-form danger-form"
-                  onsubmit={(event) => {
-                    event.preventDefault();
-                    void removeDevice(device.device_id);
-                  }}
-                >
-                  <div class="row-copy">
-                    <strong>{$i18n.t('settings.removeDeviceConfirm')}</strong>
-                    <p>{$i18n.t('settings.removeDeviceDescription')}</p>
-                  </div>
-                  {#if !accountManagement}
-                    <label for={'password-' + device.device_id}
-                      >{$i18n.t('settings.password')}</label
-                    >
-                    <TextInput
-                      id={'password-' + device.device_id}
-                      type="password"
-                      bind:value={password}
-                      autocomplete="current-password"
-                      autofocus
-                    />
-                  {/if}
-                  <div class="form-actions">
-                    <Button type="submit" variant="danger"
-                      >{$i18n.t('settings.removeDevice')}</Button
-                    >
-                    <Button variant="ghost" onclick={cancelRemoval}
-                      >{$i18n.t('settings.cancel')}</Button
-                    >
-                  </div>
-                </form>
+                <DeviceActionForm
+                  mode="remove"
+                  deviceId={device.device_id}
+                  {accountManagement}
+                  bind:password
+                  onSubmit={() => void removeDevice(device.device_id)}
+                  onCancel={cancelRemoval}
+                />
               {/if}
             </li>
           {/each}
@@ -532,7 +494,6 @@
   .device-name-line,
   .device-meta,
   .device-actions,
-  .form-actions,
   .recovery-key-heading {
     align-items: center;
     display: flex;
@@ -551,43 +512,6 @@
     flex: 0 0 auto;
     padding-left: calc(var(--control-height-medium) + var(--space-3));
     width: 100%;
-  }
-
-  .form-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .form-actions :global(.sable-button) {
-    width: 100%;
-  }
-
-  .device-form {
-    background: var(--sable-surface-container);
-    border-top: 1px solid var(--sable-bg-container-line);
-    display: grid;
-    gap: var(--space-2);
-    grid-template-columns: 1fr;
-    padding: var(--space-3);
-    width: 100%;
-  }
-
-  .device-form > label {
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    grid-column: auto;
-  }
-
-  .device-form .form-actions {
-    align-self: end;
-  }
-
-  .danger-form {
-    border-left: calc(var(--space-1) / 2) solid var(--sable-crit-main);
-  }
-
-  .danger-form .row-copy {
-    grid-column: auto;
   }
 
   .loading-state,
@@ -658,17 +582,6 @@
       width: auto;
     }
 
-    .device-form {
-      grid-template-columns: minmax(0, 1fr) auto;
-      padding: var(--space-2) var(--space-3);
-      width: auto;
-    }
-
-    .device-form > label,
-    .danger-form .row-copy {
-      grid-column: 1 / -1;
-    }
-
     .device-summary {
       align-items: center;
       flex-wrap: nowrap;
@@ -677,15 +590,6 @@
 
     .device-actions {
       padding-left: 0;
-      width: auto;
-    }
-
-    .form-actions {
-      display: flex;
-      grid-template-columns: none;
-    }
-
-    .form-actions :global(.sable-button) {
       width: auto;
     }
   }

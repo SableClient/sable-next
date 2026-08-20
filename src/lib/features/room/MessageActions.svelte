@@ -7,6 +7,7 @@
   import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 
   import { i18n } from '$lib/i18n';
+  import IconButton from '$lib/ui/primitives/IconButton.svelte';
 
   import ReactionPicker from './ReactionPicker.svelte';
 
@@ -57,14 +58,26 @@
     </ReactionPicker>
   {/if}
   {#if onReply}
-    <button type="button" aria-label={$i18n.t('timeline.reply')} onclick={onReply}>
+    <IconButton
+      class="message-action-button"
+      size="small"
+      variant="ghost"
+      label={$i18n.t('timeline.reply')}
+      onclick={onReply}
+    >
       <ReplyIcon />
-    </button>
+    </IconButton>
   {/if}
   {#if onEdit}
-    <button type="button" aria-label={$i18n.t('timeline.editMessage')} onclick={onEdit}>
+    <IconButton
+      class="message-action-button"
+      size="small"
+      variant="ghost"
+      label={$i18n.t('timeline.editMessage')}
+      onclick={onEdit}
+    >
       <EditIcon />
-    </button>
+    </IconButton>
   {/if}
   {#if hasOverflow}
     <DropdownMenu.Root>

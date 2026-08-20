@@ -2,14 +2,7 @@
   import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
   import type { RoomSummary } from '@/generated/RoomSummary';
   import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
-  import { DropdownMenu } from 'bits-ui';
   import { SvelteSet } from 'svelte/reactivity';
-  import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
-  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
-  import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
-  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
-  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -19,7 +12,6 @@
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
   import Skeleton from '$lib/ui/primitives/Skeleton.svelte';
 
   import {
@@ -28,6 +20,7 @@
     type HierarchySection,
   } from './space-hierarchy';
   import { initials } from './timeline-format';
+  import SpaceLobbySection from './SpaceLobbySection.svelte';
 
   interface Props {
     space: RoomSummary | null;
@@ -225,159 +218,25 @@
     <p class="empty">{$i18n.t('room.lobbyEmpty')}</p>
   {:else}
     {#each sections as section (section.key)}
-      {@const isClosed = closed.has(section.key)}
-      <div class="section">
-        <div class="section-header">
-          <button
-            class="section-toggle"
-            type="button"
-            aria-expanded={!isClosed}
-            onclick={() => {
-              toggle(section.key);
-            }}
-          >
-            {#if section.space}
-              <Avatar
-                src={section.space.avatar_url}
-                initials={initials(label(section.space))}
-                size="small"
-                shape="room"
-              />
-              <span class="section-name">{label(section.space)}</span>
-              {#if section.suggested}
-                <span class="badge">{$i18n.t('room.lobbySuggested')}</span>
-              {/if}
-            {:else}
-              <span class="section-name">{$i18n.t('nav.rooms')}</span>
-            {/if}
-            <span class="caret" class:closed={isClosed} aria-hidden="true"><CaretDownIcon /></span>
-          </button>
-          {#if section.space}
-            {@const sectionSpace = section.space}
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger
-                class="room-menu-trigger"
-                aria-label={$i18n.t('room.menuLabel')}
-              >
-                <DotsThreeVerticalIcon />
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content
-                class="room-options-menu"
-                side="bottom"
-                align="end"
-                sideOffset={4}
-              >
-                <DropdownMenu.Item
-                  class="room-options-item"
-                  onSelect={() => {
-                    void copyLink(sectionSpace);
-                  }}
-                >
-                  <LinkIcon size={16} />
-                  {$i18n.t('room.menuCopyLink')}
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
-          {/if}
-        </div>
-
-        {#if !isClosed}
-          <div class="category">
-            <ul class="rooms">
-              {#each section.rooms as entry (entry.key)}
-                {@const child = entry.room}
-                {@const joined = joinedIds.has(child.room_id)}
-                <li class="room">
-                  <Avatar
-                    src={child.avatar_url}
-                    initials={initials(label(child))}
-                    size="small"
-                    shape="room"
-                  />
-                  <div class="room-text">
-                    <span class="room-name">
-                      {label(child)}
-                      {#if entry.suggested}
-                        <span class="badge">{$i18n.t('room.lobbySuggested')}</span>
-                      {/if}
-                    </span>
-                    <span class="room-meta">
-                      <span class="members">
-                        {$i18n.t('room.lobbyMembers', { count: child.num_joined_members })}
-                      </span>
-                      {#if child.topic}
-                        <span class="divider" aria-hidden="true">|</span>
-                        <span class="room-topic">{child.topic}</span>
-                      {/if}
-                    </span>
-                  </div>
-
-                  <div class="room-actions">
-                    {#if joined}
-                      <IconButton
-                        variant="ghost"
-                        size="small"
-                        label={$i18n.t('room.lobbyOpen')}
-                        onclick={() => {
-                          open(child);
-                        }}
-                      >
-                        <ArrowRightIcon />
-                      </IconButton>
-                    {:else}
-                      <Button
-                        size="small"
-                        loading={joining.has(child.room_id)}
-                        onclick={() => {
-                          void join(child);
-                        }}
-                      >
-                        <PlusIcon size={14} />
-                        {$i18n.t('room.lobbyJoin')}
-                      </Button>
-                    {/if}
-                    <DropdownMenu.Root>
-                      <DropdownMenu.Trigger
-                        class="room-menu-trigger"
-                        aria-label={$i18n.t('room.menuLabel')}
-                      >
-                        <DotsThreeVerticalIcon />
-                      </DropdownMenu.Trigger>
-                      <DropdownMenu.Content
-                        class="room-options-menu"
-                        side="bottom"
-                        align="end"
-                        sideOffset={4}
-                      >
-                        <DropdownMenu.Item
-                          class="room-options-item"
-                          onSelect={() => {
-                            void copyLink(child);
-                          }}
-                        >
-                          <LinkIcon size={16} />
-                          {$i18n.t('room.menuCopyLink')}
-                        </DropdownMenu.Item>
-                        {#if canManage}
-                          <DropdownMenu.Item
-                            class="room-options-item room-options-destructive"
-                            onSelect={() => {
-                              void remove(section, entry);
-                            }}
-                          >
-                            <TrashIcon size={16} />
-                            {$i18n.t('room.lobbyRemove')}
-                          </DropdownMenu.Item>
-                        {/if}
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Root>
-                  </div>
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
-      </div>
+      <SpaceLobbySection
+        {section}
+        closed={closed.has(section.key)}
+        {joinedIds}
+        {joining}
+        {canManage}
+        {label}
+        onToggle={toggle}
+        onOpen={open}
+        onJoin={(child: SpaceHierarchyRoomView) => {
+          void join(child);
+        }}
+        onCopyLink={(child: SpaceHierarchyRoomView) => {
+          void copyLink(child);
+        }}
+        onRemove={(section: HierarchySection, entry: HierarchyRoom) => {
+          void remove(section, entry);
+        }}
+      />
     {/each}
 
     {#if nextBatch !== null}
@@ -413,182 +272,6 @@
     max-width: 48ch;
   }
 
-  /* v1 keeps every section card flush; only the heading distinguishes depth. */
-  .section {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .section-header {
-    align-items: center;
-    display: flex;
-    gap: var(--space-1);
-    padding: 0 var(--space-1);
-  }
-
-  .section-toggle {
-    align-items: center;
-    background: none;
-    border: 0;
-    border-radius: var(--radius);
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    flex: 1;
-    font: inherit;
-    gap: var(--space-2);
-    min-width: 0;
-    padding: var(--space-1);
-    text-align: left;
-  }
-
-  .section-toggle:hover {
-    background: var(--sable-bg-container-hover);
-  }
-
-  .section-toggle:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .section-name {
-    font-size: var(--font-size-large);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .caret {
-    align-items: center;
-    color: var(--sable-surface-var-on-container);
-    display: inline-flex;
-  }
-
-  .caret.closed {
-    transform: rotate(-90deg);
-  }
-
-  .category {
-    background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
-    overflow: hidden;
-  }
-
-  .rooms {
-    display: grid;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .room {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .room + .room {
-    border-top: 1px solid var(--sable-bg-container-line);
-  }
-
-  .room:hover {
-    background: var(--sable-bg-container-hover);
-  }
-
-  :global(.room-avatar-skeleton) {
-    flex: none;
-    height: 2.25rem;
-    width: 2.25rem;
-  }
-
-  .room-text {
-    display: grid;
-    flex: 1;
-    gap: 0.125rem;
-    min-width: 0;
-  }
-
-  .room-name {
-    align-items: center;
-    display: flex;
-    font-weight: var(--font-weight-medium);
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .room-meta {
-    align-items: center;
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .members {
-    flex: none;
-  }
-
-  .divider {
-    color: var(--sable-surface-var-container-line);
-    flex: none;
-  }
-
-  .room-topic {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .badge {
-    background: var(--sable-surface-var-container);
-    border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
-    flex: none;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    padding: 0 0.375rem;
-  }
-
-  .room-actions {
-    align-items: center;
-    display: flex;
-    flex: none;
-    gap: var(--space-1);
-    margin-left: auto;
-  }
-
-  :global(.room-menu-trigger) {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
-    cursor: pointer;
-    display: inline-flex;
-    flex: none;
-    height: var(--control-height-small);
-    justify-content: center;
-    padding: 0;
-    width: var(--control-height-small);
-  }
-
-  :global(.room-menu-trigger:hover),
-  :global(.room-menu-trigger[data-state='open']) {
-    background: var(--sable-surface-var-container);
-    color: var(--sable-bg-on-container);
-  }
-
-  :global(.room-menu-trigger:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
   .empty {
     color: var(--sable-surface-var-on-container);
     margin: 0;
@@ -597,15 +280,5 @@
   .more {
     display: flex;
     justify-content: center;
-  }
-
-  @media (width >= 42rem) {
-    .room {
-      flex-wrap: nowrap;
-    }
-
-    .room-actions {
-      margin-left: 0;
-    }
   }
 </style>

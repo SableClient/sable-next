@@ -6,7 +6,7 @@
   import { roomPathParamFromId } from '$lib/rooms/room-list.svelte';
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
+  import FormField from '$lib/ui/primitives/FormField.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   const core = useCoreClient();
@@ -40,8 +40,11 @@
 </script>
 
 <form class="create-chat" onsubmit={submit}>
-  <div class="field">
-    <Label for="create-chat-user">{$i18n.t('direct.userIdLabel')}</Label>
+  <FormField
+    fieldId="create-chat-user"
+    label={$i18n.t('direct.userIdLabel')}
+    error={invalid ? $i18n.t('direct.invalid') : null}
+  >
     <TextInput
       id="create-chat-user"
       bind:value={userId}
@@ -51,10 +54,7 @@
       aria-invalid={invalid}
       placeholder={$i18n.t('direct.userIdPlaceholder')}
     />
-    {#if invalid}
-      <p class="error">{$i18n.t('direct.invalid')}</p>
-    {/if}
-  </div>
+  </FormField>
 
   {#if failed}
     <Alert variant="critical" role="alert">{$i18n.t('direct.failed')}</Alert>
@@ -69,16 +69,5 @@
   .create-chat {
     display: grid;
     gap: var(--space-4);
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .error {
-    color: var(--sable-crit-main);
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 </style>

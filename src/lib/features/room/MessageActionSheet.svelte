@@ -10,6 +10,7 @@
 
   import { i18n } from '$lib/i18n';
   import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
 
   import { readRecentReactions, rememberReaction } from '$lib/emoji/recents';
   import { shortcodeFor } from '$lib/emoji/emoji';
@@ -64,95 +65,104 @@
   {#if onReact}
     <div class="quick-strip" role="group" aria-label={$i18n.t('timeline.addReaction')}>
       {#each quick as emoji (emoji)}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
+          class="quick-reaction"
           aria-label={shortcodeFor(emoji) ?? emoji}
           onclick={() => {
             react(emoji);
-          }}>{emoji}</button
+          }}>{emoji}</Button
         >
       {/each}
     </div>
   {/if}
   <div class="sheet-list">
     {#if onReply}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onReply);
         }}
       >
         <ReplyIcon />{$i18n.t('timeline.reply')}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onReply);
         }}
       >
         <ThreadIcon />{$i18n.t('timeline.replyInThread')}
-      </button>
+      </Button>
     {/if}
     {#if onEdit}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onEdit);
         }}
       >
         <EditIcon />{$i18n.t('timeline.editMessage')}
-      </button>
+      </Button>
     {/if}
     {#if onCopyText}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onCopyText);
         }}
       >
         <CopyIcon />{$i18n.t('timeline.copyMessage')}
-      </button>
+      </Button>
     {/if}
     {#if onCopyLink}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onCopyLink);
         }}
       >
         <LinkIcon />{$i18n.t('timeline.copyLink')}
-      </button>
+      </Button>
     {/if}
     {#if onViewReactions}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onViewReactions);
         }}
       >
         <EmojiIcon />{$i18n.t('timeline.viewReactions')}
-      </button>
+      </Button>
     {/if}
     {#if onReadReceipts}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action"
         onclick={() => {
           run(onReadReceipts);
         }}
       >
         <ReceiptIcon />{$i18n.t('timeline.readReceipts')}
-      </button>
+      </Button>
     {/if}
     {#if onDelete}
-      <button
-        class="danger"
-        type="button"
+      <Button
+        variant="ghost"
+        class="sheet-action danger"
         onclick={() => {
           run(onDelete);
         }}
       >
         <TrashIcon />{$i18n.t('timeline.deleteMessage')}
-      </button>
+      </Button>
     {/if}
   </div>
 </BottomSheet>
@@ -165,17 +175,11 @@
     padding: 0 var(--space-2) var(--space-2);
   }
 
-  .quick-strip button {
-    aspect-ratio: 1;
+  :global(.quick-reaction) {
     background: var(--sable-surface-var-container);
-    border: 0;
-    border-radius: var(--radius);
-    cursor: pointer;
-    display: grid;
+    border-color: transparent;
     font-size: var(--font-size-large);
     line-height: 1;
-    min-height: var(--control-height-medium);
-    place-items: center center;
   }
 
   .sheet-source {
@@ -192,26 +196,19 @@
     display: grid;
   }
 
-  .sheet-list button {
-    align-items: center;
-    background: transparent;
-    border: 0;
+  :global(.sheet-action) {
     color: var(--sable-surface-on-container);
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    gap: var(--space-2);
     min-height: var(--control-height-large);
     padding: 0 var(--space-3);
     text-align: left;
     width: 100%;
   }
 
-  .sheet-list button:active {
+  :global(.sheet-action:active:not(:disabled)) {
     background: var(--sable-surface-container-active);
   }
 
-  .sheet-list .danger {
+  :global(.sheet-action.danger) {
     color: var(--sable-crit-main);
   }
 

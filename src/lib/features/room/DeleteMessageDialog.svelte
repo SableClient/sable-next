@@ -2,7 +2,7 @@
   import { i18n } from '$lib/i18n';
   import Button from '$lib/ui/primitives/Button.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
+  import FormField from '$lib/ui/primitives/FormField.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   interface Props {
@@ -35,8 +35,9 @@
       <p class="preview">{preview}</p>
     {/if}
     <div class="field">
-      <Label for="delete-reason">{$i18n.t('timeline.deleteReason')}</Label>
-      <TextInput id="delete-reason" bind:value={reason} autocomplete="off" />
+      <FormField fieldId="delete-reason" label={$i18n.t('timeline.deleteReason')}>
+        <TextInput id="delete-reason" bind:value={reason} autocomplete="off" />
+      </FormField>
     </div>
     <div class="actions">
       <Button variant="ghost" onclick={cancel}>{$i18n.t('timeline.cancel')}</Button>

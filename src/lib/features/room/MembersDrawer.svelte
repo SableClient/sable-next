@@ -4,8 +4,8 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '$lib/i18n';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import IdentityRow from '$lib/ui/primitives/IdentityRow.svelte';
   import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
@@ -107,25 +107,21 @@
         {#each filteredMembers as member (member.user_id)}
           {@const label = powerLevel(member)}
           <li>
-            <button
+            <IdentityRow
               class="member"
-              type="button"
-              aria-label={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
-              onclick={(event) => {
+              displayName={memberName(member)}
+              avatarUrl={member.avatar_url}
+              initials={initials(memberName(member))}
+              color={senderColor(member.user_id)}
+              ariaLabel={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
+              onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
                 openMemberProfile(member, event);
               }}
             >
-              <Avatar
-                size="small"
-                src={member.avatar_url}
-                initials={initials(memberName(member))}
-                color={senderColor(member.user_id)}
-              />
-              <span class="name">{memberName(member)}</span>
-              {#if label}
-                <span class="power-level"><StatusBadge {label} variant="secondary" /></span>
-              {/if}
-            </button>
+              {#snippet meta()}
+                {#if label}<StatusBadge {label} variant="secondary" />{/if}
+              {/snippet}
+            </IdentityRow>
           </li>
         {/each}
       </ul>
@@ -220,7 +216,7 @@
     min-height: 3rem;
   }
 
-  .member {
+  :global(.member) {
     align-items: center;
     background: transparent;
     border: 0;
@@ -234,18 +230,8 @@
     width: 100%;
   }
 
-  .member:hover {
+  :global(.member:hover) {
     background: var(--sable-surface-container);
-  }
-
-  .name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .power-level {
-    margin-left: auto;
   }
 
   @media (width >= 48rem) {

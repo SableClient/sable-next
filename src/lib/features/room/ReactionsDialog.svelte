@@ -3,8 +3,9 @@
   import type { ReactionGroup } from '@/generated/ReactionGroup';
 
   import { i18n } from '$lib/i18n';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
+  import IdentityRow from '$lib/ui/primitives/IdentityRow.svelte';
 
   import { initials, senderColor } from './timeline-format';
 
@@ -34,9 +35,10 @@
     <h2>{$i18n.t('timeline.viewReactions')}</h2>
     <div class="tabs" role="tablist" aria-label={$i18n.t('timeline.viewReactions')}>
       {#each reactions as reaction, index (reaction.key)}
-        <button
+        <Button
+          size="small"
+          variant="ghost"
           class={['tab', { active: reaction.key === group?.key }]}
-          type="button"
           role="tab"
           aria-selected={reaction.key === group?.key}
           onclick={() => {
@@ -45,20 +47,19 @@
         >
           <em>{reaction.key}</em>
           {reaction.senders.length}
-        </button>
+        </Button>
       {/each}
     </div>
     {#if group}
       <ul>
         {#each group.senders as sender (sender)}
           <li>
-            <Avatar
-              src={avatar(sender)}
-              size="small"
+            <IdentityRow
+              displayName={name(sender)}
+              avatarUrl={avatar(sender)}
               color={senderColor(sender)}
               initials={initials(name(sender))}
             />
-            <span class="who">{name(sender)}</span>
           </li>
         {/each}
       </ul>
@@ -85,7 +86,7 @@
     gap: 0.25rem;
   }
 
-  .tab {
+  :global(.tab) {
     align-items: center;
     background: var(--sable-surface-var-container);
     border: 1px solid var(--sable-surface-var-container-line);
@@ -99,13 +100,13 @@
     padding: 0.125rem 0.5rem;
   }
 
-  .tab.active {
+  :global(.tab.active) {
     background: var(--sable-primary-container);
     border-color: var(--sable-primary-container-line);
     color: var(--sable-primary-on-container);
   }
 
-  .tab em {
+  :global(.tab em) {
     font-style: normal;
   }
 
@@ -123,11 +124,5 @@
     align-items: center;
     display: flex;
     gap: var(--space-1);
-  }
-
-  .who {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 </style>

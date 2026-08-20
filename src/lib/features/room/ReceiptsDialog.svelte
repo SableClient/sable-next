@@ -2,9 +2,9 @@
   import type { MemberView } from '@/generated/MemberView';
 
   import { i18n } from '$lib/i18n';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
   import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
   import EmptyState from '$lib/ui/primitives/EmptyState.svelte';
+  import IdentityRow from '$lib/ui/primitives/IdentityRow.svelte';
 
   import { initials, senderColor } from './timeline-format';
 
@@ -34,13 +34,12 @@
       <ul>
         {#each readers as reader (reader)}
           <li>
-            <Avatar
-              src={avatar(reader)}
-              size="small"
+            <IdentityRow
+              displayName={name(reader)}
+              avatarUrl={avatar(reader)}
               color={senderColor(reader)}
               initials={initials(name(reader))}
             />
-            <span class="who">{name(reader)}</span>
           </li>
         {/each}
       </ul>
@@ -75,11 +74,5 @@
     align-items: center;
     display: flex;
     gap: var(--space-1);
-  }
-
-  .who {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 </style>

@@ -3,6 +3,7 @@
   import type { RegistrationResultView } from '@/generated/RegistrationResultView';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import Button from '$lib/ui/primitives/Button.svelte';
+  import FormActions from '$lib/ui/primitives/FormActions.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
@@ -42,7 +43,7 @@
     {#if fallback}
       <h3>{$i18n.t('auth.finishInBrowser')}</h3>
       <p>{$i18n.t('auth.finishInBrowserDescription', { server: homeserver })}</p>
-      <div class="actions">
+      <FormActions>
         <Button onclick={onOpenFallback} disabled={isRegistering} variant="primary">
           {$i18n.t('auth.openServerPage')}
         </Button>
@@ -50,7 +51,7 @@
           {#if isRegistering}<Spinner />{/if}
           {$i18n.t('auth.iFinished')}
         </Button>
-      </div>
+      </FormActions>
     {:else if emailStep}
       {#if !emailStep.email}
         <h3>{$i18n.t('auth.verifyEmail')}</h3>
@@ -133,7 +134,6 @@
 {/if}
 
 <style>
-  .actions,
   .email-form,
   .fallback-step {
     display: grid;

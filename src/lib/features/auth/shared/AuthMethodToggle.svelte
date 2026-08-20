@@ -1,5 +1,6 @@
 <script lang="ts">
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import Button from '$lib/ui/primitives/Button.svelte';
 
   interface Props {
     expanded: boolean;
@@ -13,9 +14,10 @@
   let { expanded, controls, showLabel, hideLabel, disabled = false, onToggle }: Props = $props();
 </script>
 
-<button
+<Button
+  variant="ghost"
+  size="small"
   class="method-toggle"
-  type="button"
   aria-expanded={expanded}
   aria-controls={controls}
   {disabled}
@@ -23,29 +25,22 @@
 >
   <span>{expanded ? hideLabel : showLabel}</span>
   <span class:expanded class="method-toggle-icon" aria-hidden="true"><CaretDownIcon /></span>
-</button>
+</Button>
 
 <style>
-  .method-toggle {
+  :global(.method-toggle) {
     align-items: center;
     background: transparent;
-    border: 0;
+    border-color: transparent;
     color: var(--sable-sec-main);
-    cursor: pointer;
-    display: flex;
     font-size: var(--font-size-small);
     gap: 0.5rem;
     justify-content: center;
     padding: 0.25rem;
   }
 
-  .method-toggle:hover {
+  :global(.method-toggle:hover:not(:disabled)) {
     color: var(--sable-bg-on-container);
-  }
-
-  .method-toggle:disabled {
-    cursor: default;
-    opacity: 0.65;
   }
 
   .method-toggle-icon {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useCoreClient } from '$lib/core/context';
   import { i18n } from '$lib/i18n';
+  import Button from './primitives/Button.svelte';
 
   const core = useCoreClient();
 
@@ -29,7 +30,7 @@
   <div class="banner" class:crash={notice.kind === 'crash'} role="alert">
     <p class="message">{notice.text}</p>
     {#if notice.kind === 'crash'}
-      <button type="button" onclick={reload}>{$i18n.t('errors.reload')}</button>
+      <Button size="small" variant="danger" onclick={reload}>{$i18n.t('errors.reload')}</Button>
     {/if}
   </div>
 {/if}
@@ -60,20 +61,7 @@
     margin: 0;
   }
 
-  button {
-    background: var(--sable-crit-main);
-    border: 0;
-    border-radius: var(--radius-pill);
-    color: var(--sable-crit-on-main);
-    cursor: pointer;
-    padding: var(--space-1) var(--space-2);
-  }
-
-  button:hover {
-    background: var(--sable-crit-main-hover);
-  }
-
-  button:active {
-    background: var(--sable-crit-main-active);
+  :global(.sable-button) {
+    flex: none;
   }
 </style>

@@ -10,6 +10,7 @@
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
   import { roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
   import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
   import IconButton from '$lib/ui/primitives/IconButton.svelte';
 
   interface Props {
@@ -72,16 +73,17 @@
     <h2 id={headingId}>{$i18n.t('inbox.notifications')}</h2>
     <div class="filters" role="group" aria-label={$i18n.t('inbox.filterLabel')}>
       {#each filters as value (value)}
-        <button
+        <Button
+          variant="ghost"
+          size="small"
           class={['filter', { active: value === filter }]}
-          type="button"
           aria-pressed={value === filter}
           onclick={() => {
             onFilter(value);
           }}
         >
           {$i18n.t(filterLabels[value])}
-        </button>
+        </Button>
       {/each}
     </div>
   </div>
@@ -164,37 +166,29 @@
     gap: var(--space-compact);
   }
 
-  .filter {
+  :global(.filter) {
     background: transparent;
-    border: 0;
+    border-color: transparent;
     border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
-    cursor: pointer;
-    font: inherit;
     font-size: var(--font-size-small);
-    min-height: var(--control-height-small);
     padding: 0 var(--space-2);
   }
 
-  .filter:hover {
+  :global(.filter:hover:not(:disabled)) {
     background: var(--sable-surface-var-container-hover);
     color: var(--sable-bg-on-container);
   }
 
-  .filter.active {
+  :global(.filter.active) {
     background: var(--sable-primary-container);
     color: var(--sable-primary-on-container);
     font-weight: var(--font-weight-medium);
   }
 
-  .filter.active:hover {
+  :global(.filter.active:hover:not(:disabled)) {
     background: var(--sable-primary-container-hover);
     color: var(--sable-primary-on-container);
-  }
-
-  .filter:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
   }
 
   .feed {
@@ -303,7 +297,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .row,
-    .filter {
+    :global(.filter) {
       transition: background var(--motion-fast) var(--motion-easing-standard);
     }
   }

@@ -5,10 +5,19 @@
     loading?: boolean;
     loadingMessage?: string;
     message?: string | null;
+    id?: string;
     multiline?: boolean;
+    tone?: 'error' | 'muted';
   }
 
-  let { loading = false, loadingMessage, message, multiline = false }: Props = $props();
+  let {
+    loading = false,
+    loadingMessage,
+    message,
+    id,
+    multiline = false,
+    tone = 'error',
+  }: Props = $props();
 </script>
 
 <div class="auth-status-slot" aria-live="polite">
@@ -18,7 +27,13 @@
       {loadingMessage}
     </div>
   {:else if message}
-    <p class="auth-status-message auth-status-error" class:multiline role="alert" title={message}>
+    <p
+      class="auth-status-message auth-status-{tone}"
+      class:multiline
+      {id}
+      role={tone === 'error' ? 'alert' : 'status'}
+      title={message}
+    >
       {message}
     </p>
   {/if}
@@ -48,13 +63,22 @@
     line-height: var(--line-height-body);
   }
 
-  .auth-status-error {
-    color: var(--sable-crit-main);
+  .auth-status-error,
+  .auth-status-muted {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
   }
 
-  .auth-status-error.multiline {
+  .auth-status-error {
+    color: var(--sable-crit-main);
+  }
+
+  .auth-status-muted {
+    color: var(--sable-sec-main);
+  }
+
+  .auth-status-error.multiline,
+  .auth-status-muted.multiline {
     -webkit-box-orient: vertical;
     display: -webkit-box;
     -webkit-line-clamp: 2;

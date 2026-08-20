@@ -6,7 +6,7 @@
   import { roomPathParamFromId } from '$lib/rooms/room-list.svelte';
   import Alert from '$lib/ui/primitives/Alert.svelte';
   import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
+  import FormField from '$lib/ui/primitives/FormField.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
 
   import { parseJoinAddress } from './join-address';
@@ -49,8 +49,11 @@
     </ul>
   </div>
 
-  <div class="field">
-    <Label for="join-address-input">{$i18n.t('room.joinAddressLabel')}</Label>
+  <FormField
+    fieldId="join-address-input"
+    label={$i18n.t('room.joinAddressLabel')}
+    error={invalid ? $i18n.t('room.joinInvalid') : null}
+  >
     <TextInput
       id="join-address-input"
       bind:value={address}
@@ -60,10 +63,7 @@
       aria-invalid={invalid}
       placeholder={$i18n.t('room.joinAddressPlaceholder')}
     />
-    {#if invalid}
-      <p class="error">{$i18n.t('room.joinInvalid')}</p>
-    {/if}
-  </div>
+  </FormField>
 
   {#if failed}
     <Alert variant="critical" role="alert">{$i18n.t('room.joinFailed')}</Alert>
@@ -78,11 +78,6 @@
   .join-address {
     display: grid;
     gap: var(--space-4);
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-1);
   }
 
   .examples {
@@ -100,11 +95,5 @@
     gap: 0.125rem;
     margin: 0;
     padding-left: var(--space-4);
-  }
-
-  .error {
-    color: var(--sable-crit-main);
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 </style>

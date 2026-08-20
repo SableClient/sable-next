@@ -726,7 +726,7 @@
           '-'}..{timelineDebugSample.lastVirtualIndex ?? '-'}
       </span>
       <span>scrolling {String(timelineDebugSample.isScrolling)}</span>
-      <button type="button" onclick={copyTimelineDebug}>Copy trace</button>
+      <Button size="small" variant="ghost" onclick={copyTimelineDebug}>Copy trace</Button>
     </aside>
   {/if}
   {#if stuckUnreadCount > 0}
@@ -872,7 +872,7 @@
     z-index: 3;
   }
 
-  .timeline-debug button {
+  :global(.timeline-debug button) {
     margin-top: var(--space-compact);
   }
 

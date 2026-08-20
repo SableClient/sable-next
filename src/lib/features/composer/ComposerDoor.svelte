@@ -6,6 +6,7 @@
 
   import { i18n } from '$lib/i18n';
   import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
+  import Button from '$lib/ui/primitives/Button.svelte';
 
   interface Props {
     desktop: boolean;
@@ -64,8 +65,9 @@
     closeLabel={$i18n.t('composer.closeInsert')}
   >
     <div class="door-sheet">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        class="door-action"
         onclick={() => {
           open = false;
           onPick(media);
@@ -73,9 +75,10 @@
       >
         <ImageIcon />
         {$i18n.t('composer.photoOrVideo')}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
+        class="door-action"
         onclick={() => {
           open = false;
           onPick(any);
@@ -83,7 +86,7 @@
       >
         <PaperclipIcon />
         {$i18n.t('composer.attachFile')}
-      </button>
+      </Button>
     </div>
   </BottomSheet>
 {/if}
@@ -95,26 +98,23 @@
     padding: 0 var(--space-2) var(--space-2);
   }
 
-  .door-sheet button {
-    align-items: center;
+  :global(.door-action) {
     background: transparent;
-    border: 0;
+    border-color: transparent;
     border-radius: var(--radius);
     color: inherit;
-    cursor: pointer;
-    display: flex;
-    font: inherit;
     gap: var(--space-2);
     min-height: 3rem;
     padding: 0 var(--space-2);
     text-align: left;
+    width: 100%;
   }
 
-  .door-sheet button:hover {
+  :global(.door-action:hover:not(:disabled)) {
     background: var(--sable-surface-container-hover);
   }
 
-  .door-sheet button :global(svg) {
+  :global(.door-action svg) {
     color: var(--sable-surface-var-on-container);
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);

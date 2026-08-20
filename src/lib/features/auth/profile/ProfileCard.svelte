@@ -5,6 +5,8 @@
   import Button from '$lib/ui/primitives/Button.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
+  import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
+  import FormActions from '$lib/ui/primitives/FormActions.svelte';
 
   interface Props {
     userId: string;
@@ -103,14 +105,12 @@
 
   {#if error}<Alert variant="critical" aria-live="polite">{error}</Alert>{/if}
 
-  <div class="actions">
+  <FormActions>
     <Button onclick={onContinue} loading={isSaving}>
       {$i18n.t('auth.continue')}
     </Button>
-    <button class="auth-link-button skip" type="button" onclick={onSkip} disabled={isSaving}>
-      {$i18n.t('auth.skipForNow')}
-    </button>
-  </div>
+    <AuthSecondaryAction label={$i18n.t('auth.skipForNow')} onclick={onSkip} disabled={isSaving} />
+  </FormActions>
 </section>
 
 <style>
@@ -132,14 +132,9 @@
     padding: 0.625rem 0.75rem;
   }
 
-  .actions,
-  .avatar-picker {
-    display: grid;
-    gap: 0.5rem;
-  }
-
   .avatar-picker {
     align-items: center;
+    display: grid;
     gap: 0.75rem;
     grid-template-columns: auto 1fr;
   }
@@ -197,10 +192,6 @@
     border-radius: var(--radius);
     padding: 0.625rem 0.5rem;
     text-align: center;
-  }
-
-  .skip {
-    justify-self: center;
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -2,34 +2,32 @@
   import { i18n } from '$lib/i18n';
   import { useCoreClient } from '$lib/core/context';
   import Button from '$lib/ui/primitives/Button.svelte';
+  import FormActions from '$lib/ui/primitives/FormActions.svelte';
   import Spinner from '$lib/ui/primitives/Spinner.svelte';
   import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
   import AuthField from '../shared/AuthField.svelte';
 
   interface Props {
-    username: string;
-    password: string;
+    username?: string;
+    password?: string;
     invalidField: 'username' | 'password' | null;
     fieldError: string | null;
     loginError: string | null;
     isAuthenticating: boolean;
     isCheckingHomeserver: boolean;
-    onUsernameInput: (value: string) => void;
-    onPasswordInput: (value: string) => void;
     onClearFieldError: (field: 'username' | 'password') => void;
   }
 
   let {
-    username,
-    password,
+    username = $bindable(''),
+    password = $bindable(''),
     invalidField,
     fieldError,
     loginError,
     isAuthenticating,
     isCheckingHomeserver,
-    onUsernameInput,
-    onPasswordInput,
     onClearFieldError,
   }: Props = $props();
 
@@ -53,8 +51,7 @@
       disabled={isAuthenticating || isCheckingHomeserver}
       aria-invalid={invalidField === 'username'}
       aria-describedby={error && invalidField === 'username' ? errorId : undefined}
-      oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-        onUsernameInput(event.currentTarget.value);
+      oninput={() => {
         onClearFieldError('username');
       }}
     />
@@ -66,28 +63,24 @@
       disabled={isAuthenticating || isCheckingHomeserver}
       invalid={invalidField === 'password'}
       describedBy={error && invalidField === 'password' ? errorId : undefined}
-      oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-        onPasswordInput(event.currentTarget.value);
+      oninput={() => {
         onClearFieldError('password');
       }}
     />
   </AuthField>
   <div class="submit-area">
-    <div class="error-slot">
-      {#if error}<p class="error" id={errorId} role="alert">{error}</p>{/if}
-    </div>
-    <div class="actions">
+    <AuthStatusSlot id={errorId} message={error} />
+    <FormActions>
       <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver} variant="primary">
         {#if isAuthenticating}<Spinner />{/if}{isAuthenticating
           ? $i18n.t('auth.signingIn')
           : $i18n.t('auth.signInWithPassword')}</Button
       >
-    </div>
+    </FormActions>
   </div>
 </div>
 
 <style>
-  .actions,
   .password-form {
     display: grid;
     gap: 0.75rem;
@@ -96,16 +89,5 @@
   .submit-area {
     display: grid;
     gap: 0.5rem;
-  }
-
-  .error {
-    color: var(--sable-crit-main);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
-    margin: 0;
-  }
-
-  .error-slot {
-    min-height: calc(var(--font-size-small) * var(--line-height-body));
   }
 </style>
