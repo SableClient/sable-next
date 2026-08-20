@@ -89,8 +89,7 @@
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
   let activeIndex = $state(0);
-  let previousContextId = $state<string | null>(null);
-  let previousContextKind = $state<ComposerContext['kind'] | null>(null);
+  let previousContext: ComposerContext | null = null;
   let members = $state.raw<MemberView[]>([]);
   let emotes = $state.raw<PackImageView[]>([]);
 
@@ -188,15 +187,13 @@
   });
 
   $effect(() => {
-    const contextId = context?.eventId ?? null;
-    if (contextId === previousContextId) return;
+    if (context === previousContext) return;
 
-    const wasActive = previousContextId !== null;
-    const wasEditing = previousContextKind === 'edit';
-    previousContextId = contextId;
-    previousContextKind = context?.kind ?? null;
+    const wasActive = previousContext !== null;
+    const wasEditing = previousContext?.kind === 'edit';
+    previousContext = context;
     const frame = requestAnimationFrame(() => {
-      if (contextId !== null) {
+      if (context !== null) {
         editor.focus();
       } else if (wasActive && (wasEditing || !desktop) && !sending) {
         editor.blur();
@@ -259,6 +256,7 @@
         attachments = rest;
       }
       await onSend(roomId, message.body, message.formatted);
+      editor.clearHistory();
     } catch (cause) {
       console.debug('[sable composer] send failed', cause);
       if (doc && editor.isEmpty()) editor.setDoc(doc);

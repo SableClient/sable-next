@@ -387,7 +387,7 @@
 
   function onReply(eventId: string): void {
     const item = timeline.items.find((entry) => entry.event_id === eventId);
-    if (!item || item.content.kind !== 'message') return;
+    if (!item || (item.content.kind !== 'message' && item.content.kind !== 'image')) return;
     composerContext = {
       kind: 'reply',
       eventId,

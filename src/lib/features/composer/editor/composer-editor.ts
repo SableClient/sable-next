@@ -2,7 +2,7 @@ import { baseKeymap } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
-import { EditorState, TextSelection, type Command } from 'prosemirror-state';
+import { EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
 
@@ -20,6 +20,35 @@ import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
 import { queryKey, queryPlugin } from './query-plugin';
 import { composerSchema } from './schema';
+
+const isAndroid = (): boolean => /Android \d/.test(navigator.userAgent);
+
+const androidBackspaceKeyEvent = (): KeyboardEvent =>
+  new KeyboardEvent('keydown', {
+    key: 'Backspace',
+    code: 'Backspace',
+    bubbles: true,
+    cancelable: true,
+  });
+
+function handleAndroidDeleteBackward(view: EditorView): void {
+  const cursor =
+    view.state.selection instanceof TextSelection ? view.state.selection.$cursor : null;
+  if (!cursor || cursor.pos <= 0) return;
+
+  const position = cursor.pos;
+  const contentSize = view.state.doc.content.size;
+  window.setTimeout(() => {
+    // The IME already changed the DOM, so let ProseMirror's observer handle it.
+    const cursorAfter =
+      view.state.selection instanceof TextSelection ? view.state.selection.$cursor : null;
+    if (!cursorAfter || cursorAfter.pos !== position) return;
+    if (view.state.doc.content.size !== contentSize) return;
+    if (view.someProp('handleKeyDown', (handler) => handler(view, androidBackspaceKeyEvent())))
+      return;
+    view.dispatch(view.state.tr.delete(position - 1, position));
+  }, 50);
+}
 
 const newline: Command = (state, dispatch, view) => {
   if (splitListEntry(state, dispatch, view)) return true;
@@ -58,8 +87,9 @@ export class ComposerEditor {
     return true;
   }
 
-  mount(node: HTMLElement): () => void {
-    const state = EditorState.create({
+  private createState(doc?: ProseMirrorNode): EditorState {
+    return EditorState.create({
+      ...(doc ? { doc } : {}),
       schema: composerSchema,
       plugins: [
         history(),
@@ -84,6 +114,10 @@ export class ComposerEditor {
         keymap(baseKeymap),
       ],
     });
+  }
+
+  mount(node: HTMLElement): () => void {
+    const state = this.createState();
 
     /* The constructor calls editable() and reads the attributes, so an unguarded
        build makes every option a dependency of the attachment that mounts it. */
@@ -102,6 +136,13 @@ export class ComposerEditor {
           },
           handlePaste: (_view, event) => this.handleFiles(filesFrom(event.clipboardData)),
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
+          handleDOMEvents: {
+            beforeinput: (view, event) => {
+              if (!isAndroid() || event.inputType !== 'deleteContentBackward') return false;
+              handleAndroidDeleteBackward(view);
+              return true;
+            },
+          },
           dispatchTransaction: (tr) => {
             const next = view.state.apply(tr);
             view.updateState(next);
@@ -171,10 +212,18 @@ export class ComposerEditor {
     view.dispatch(view.state.tr.delete(0, view.state.doc.content.size));
   }
 
+  clearHistory(): void {
+    const view = this.view;
+    if (!view) return;
+    view.updateState(this.createState(view.state.doc));
+  }
+
   setDoc(doc: ProseMirrorNode): void {
     const view = this.view;
     if (!view) return;
-    view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content));
+    const transaction = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content);
+    transaction.setSelection(Selection.atEnd(transaction.doc));
+    view.dispatch(transaction);
   }
 
   setText(text: string): void {

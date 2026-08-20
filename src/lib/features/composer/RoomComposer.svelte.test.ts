@@ -7,6 +7,7 @@ import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
+import { ComposerEditor } from './editor/composer-editor';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
@@ -43,13 +44,15 @@ interface ComposerProps {
   onSendAttachment?: (roomId: string, file: File) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
+  registerReply?: (reply: () => void) => void;
 }
 
-function render(composer: ComposerProps): ReturnType<typeof mount> {
+function render({ registerReply, ...composer }: ComposerProps): ReturnType<typeof mount> {
   return mount(Harness, {
     target: document.body,
     props: {
       core: core(),
+      registerReply,
       composer: {
         onSend: async () => {},
         onSendAttachment: async () => {},
@@ -199,6 +202,32 @@ test('sending returns focus to the editor', async () => {
   void unmount(instance);
 });
 
+test('replying to the same event restores focus to the editor', async () => {
+  let reply: (() => void) | undefined;
+  const instance = render({
+    roomId: '!room:example.org',
+    context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
+    registerReply: (next) => {
+      reply = next;
+    },
+  });
+  await tick();
+
+  const editor = document.querySelector('[role="combobox"]');
+  if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
+  await vi.waitFor(() => {
+    expect(document.activeElement).toBe(editor);
+  });
+
+  editor.blur();
+  reply?.();
+
+  await vi.waitFor(() => {
+    expect(document.activeElement).toBe(editor);
+  });
+  void unmount(instance);
+});
+
 test('the editor keeps focus while a send is pending', async () => {
   let resolveSend: (() => void) | undefined;
   const instance = render({
@@ -227,6 +256,39 @@ test('the editor keeps focus while a send is pending', async () => {
 
   void unmount(instance);
 });
+
+test.each([
+  ['successful', async () => {}, 1],
+  ['failed', async () => Promise.reject(new Error('offline')), 0],
+])(
+  'a %s send resets editor history only after it succeeds',
+  async (_outcome, onSend, expectedCalls) => {
+    const clearHistory = vi.spyOn(ComposerEditor.prototype, 'clearHistory');
+    try {
+      const instance = render({
+        roomId: '!room:example.org',
+        onSend,
+        context: { kind: 'edit', eventId: '$one:example.org', body: 'hold on' },
+      });
+      await tick();
+      submit();
+
+      if (expectedCalls === 0) {
+        await vi.waitFor(() => {
+          expect(document.querySelector('[role="alert"]')).not.toBeNull();
+        });
+      } else {
+        await vi.waitFor(() => {
+          expect(clearHistory).toHaveBeenCalledTimes(expectedCalls);
+        });
+      }
+      expect(clearHistory).toHaveBeenCalledTimes(expectedCalls);
+      void unmount(instance);
+    } finally {
+      clearHistory.mockRestore();
+    }
+  }
+);
 
 test('a failed send puts the message back in the editor', async () => {
   const instance = render({
