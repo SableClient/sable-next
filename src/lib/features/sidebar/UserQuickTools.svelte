@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { i18n } from '$lib/i18n';
+  import { i18n } from '#lib/i18n.js';
   import {
     defaultSettingsSection,
     openSettingsOver,
-  } from '$lib/features/settings/settings-navigation';
-  import { countInvites, countNotifications } from '$lib/features/inbox/inbox';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
-  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
+  } from '#lib/features/settings/settings-navigation.js';
+  import { countInvites, countNotifications } from '#lib/features/inbox/inbox.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
@@ -82,7 +81,7 @@
         <a
           class="quick-tool mobile-tool"
           class:active={toolActive}
-          href={resolve(item.href)}
+          href={item.href}
           onclick={(event) => {
             activateTool(event, item.href);
           }}
@@ -111,7 +110,7 @@
           {...props}
           class="quick-tool compact-tool sable-selection-layer"
           class:active={toolActive}
-          href={resolve(item.href)}
+          href={item.href}
           onclick={(event) => {
             activateTool(event, item.href);
           }}
@@ -139,7 +138,7 @@
             {...props}
             class="quick-tool desktop-tool sable-selection-layer"
             class:active={toolActive}
-            href={resolve(item.href)}
+            href={item.href}
             onclick={(event) => {
               activateTool(event, item.href);
             }}

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { RoomSummary } from '@/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   interface Props {
     open: boolean;

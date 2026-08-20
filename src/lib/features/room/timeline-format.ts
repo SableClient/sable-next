@@ -1,7 +1,7 @@
-import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
-import type { TimelineItemView } from '@/generated/TimelineItemView';
-import { preferences } from '$lib/settings/preferences.svelte';
-import type { TimelinePreferences } from '$lib/settings/preferences.svelte';
+import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;

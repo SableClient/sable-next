@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
 
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     label: string;

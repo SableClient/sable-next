@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { MemberView } from '@/generated/MemberView';
-  import type { ReactionGroup } from '@/generated/ReactionGroup';
+  import type { MemberView } from '#src/generated/MemberView';
+  import type { ReactionGroup } from '#src/generated/ReactionGroup';
 
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import IdentityRow from '$lib/ui/primitives/IdentityRow.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
 
   import { initials, senderColor } from './timeline-format';
 

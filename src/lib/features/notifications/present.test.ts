@@ -2,11 +2,11 @@
 
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import type { NotificationView } from '@/generated/NotificationView';
+import type { NotificationView } from '#src/generated/NotificationView';
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 
-import { preferences } from '$lib/settings/preferences.svelte';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { body, canPresent, tag, title } from './present';
 

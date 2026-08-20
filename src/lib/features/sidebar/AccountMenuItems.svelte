@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { SessionInfo } from '@/generated/SessionInfo';
-  import { i18n } from '$lib/i18n';
+  import type { SessionInfo } from '#src/generated/SessionInfo';
+  import { i18n } from '#lib/i18n.js';
   import { DropdownMenu } from 'bits-ui';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   interface Props {
     accounts: readonly SessionInfo[];
@@ -25,7 +25,7 @@
   }: Props = $props();
 
   function initials(userId: string): string {
-    return userId.replace(/^@/, '').slice(0, 1).toUpperCase() || '?';
+    return userId.replace(/^#src/, '').slice(0, 1).toUpperCase() || '?';
   }
 
   let otherAccounts = $derived(

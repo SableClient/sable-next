@@ -1,12 +1,12 @@
 <script lang="ts">
   import { prefersReducedMotion } from 'svelte/motion';
-  import { i18n } from '$lib/i18n';
-  import type { LoginFlowsView } from '@/generated/LoginFlowsView';
-  import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+  import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from '../login/LoginMethod.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import LegacyRegistrationForm from './LegacyRegistrationForm.svelte';
   import { REGISTRATION_METHOD_ORDER, registrationMethodAvailable } from './registration-methods';
 

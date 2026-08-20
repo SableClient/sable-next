@@ -1,5 +1,5 @@
-import { CoreError } from '@/transport';
-import { t } from '$lib/i18n';
+import { CoreError } from '#src/transport';
+import { t } from '#lib/i18n.js';
 
 interface VerificationErrorOptions {
   invalidRecoveryKey?: boolean;

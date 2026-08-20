@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
+  import { i18n } from '#lib/i18n.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   interface Props {
     roomName: string;

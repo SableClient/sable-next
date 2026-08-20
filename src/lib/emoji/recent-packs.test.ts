@@ -2,7 +2,7 @@
 
 import { afterEach, expect, test } from 'vitest';
 
-import { readRecent, writeRecent } from '$lib/emoji/recent-packs';
+import { readRecent, writeRecent } from '#lib/emoji/recent-packs.js';
 
 afterEach(() => {
   localStorage.clear();

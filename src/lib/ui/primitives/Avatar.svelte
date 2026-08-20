@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
 
-  import MediaImage from '$lib/ui/MediaImage.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
 
   type AvatarSize = 'small' | 'medium' | 'large';
   type AvatarShape = 'person' | 'room';

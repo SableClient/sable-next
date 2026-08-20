@@ -5,17 +5,17 @@ import {
   createRedirectUri,
   redirectLoginType,
   tauriRedirectUri,
-} from '$lib/auth/redirect';
-import type { LoginFlowsView } from '@/generated/LoginFlowsView';
-import type { RegistrationResultView } from '@/generated/RegistrationResultView';
-import type { CoreClient } from '$lib/core/client.svelte';
-import { t } from '$lib/i18n';
+} from '#lib/auth/redirect.js';
+import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
 import { SvelteSet, SvelteURL } from 'svelte/reactivity';
 import {
   authenticationError,
   logAuthenticationFailure,
   registrationError,
-} from '$lib/features/auth/registration/registration-errors';
+} from '#lib/features/auth/registration/registration-errors.js';
 
 type RedirectType = 'oidc' | 'sso';
 type RedirectIntent = 'login' | 'register';

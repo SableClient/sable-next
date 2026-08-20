@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 
-import type { RoomSummary } from '@/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 
-import { parseMatrixLink } from '$lib/features/room/matrix-link';
+import { parseMatrixLink } from '#lib/features/room/matrix-link.js';
 
 import { matrixToUrl, permalinkTarget, roomSectionPath, viaFor } from './permalink';
 

@@ -1,16 +1,16 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
+  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
   import {
     findRoomByPathId,
     roomPathParam,
     roomPathParamFromId,
     useRoomList,
-  } from '$lib/rooms/room-list.svelte';
-  import type { RoomSummary } from '@/generated/RoomSummary';
+  } from '#lib/rooms/room-list.svelte.js';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
   import { SvelteSet } from 'svelte/reactivity';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
@@ -18,9 +18,9 @@
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
-  import MediaImage from '$lib/ui/MediaImage.svelte';
-  import LeaveRoomDialog from '$lib/features/room/LeaveRoomDialog.svelte';
-  import RoomSettingsDialog from '$lib/features/room/RoomSettingsDialog.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
+  import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
+  import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
 
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
@@ -39,11 +39,13 @@
   let spacePermissions = $state<RoomPermissionsView | null>(null);
 
   let directSection = $derived(page.url.pathname.startsWith('/direct'));
+
   let activeSpace = $derived(
     page.url.pathname.startsWith('/space')
       ? (findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null)
       : null
   );
+
   // The id, not the summary: a room list diff hands back a fresh object for the
   // same space, and the permission effect below would re-run on every one.
   let activeSpaceId = $derived(activeSpace?.room_id ?? null);
@@ -56,19 +58,22 @@
   // navigation; the flat routes would drop back to Home.
   let createRoomHref = $derived(
     activeSpace === null
-      ? resolve('/create-room')
+      ? resolve('create-room')
       : resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(activeSpace) })
   );
+
   // A space browses its own children through the lobby; the public directory is
   // a home-level destination.
   let browseHref = $derived(
     activeSpace === null
-      ? resolve('/explore')
+      ? resolve('explore')
       : resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(activeSpace) })
   );
+
   let browseLabel = $derived(
     activeSpace === null ? $i18n.t('nav.exploreSpaces') : $i18n.t('nav.lobby')
   );
+
   let createRoomLabel = $derived(
     activeSpace === null ? $i18n.t('nav.createRoom') : $i18n.t('nav.createRoomInSpace')
   );
@@ -102,7 +107,7 @@
   const roomListId = $props.id();
   let roomsClosed = $state(false);
 
-  const newChatHref = resolve('/direct');
+  const newChatHref = resolve('direct');
   let listLabel = $derived(directSection ? $i18n.t('nav.chats') : $i18n.t('nav.rooms'));
   let listEmpty = $derived(
     directSection ? $i18n.t('nav.chatsEmpty') : $i18n.t('nav.roomsUnavailable')

@@ -15,7 +15,7 @@
     "test:e2e": "playwright test",
     "prepare": "svelte-kit sync || echo ''; mise exec -- lefthook install",
     "check:theme": "node scripts/check-theme-tokens.mjs",
-    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p tsconfig.service-worker.json",
+    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker/tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --watch",
     "lint": "eslint . --cache --cache-strategy content --max-warnings 0",
     "lint:fix": "eslint . --cache --cache-strategy content --fix",
@@ -38,7 +38,7 @@
     "@tauri-apps/plugin-dialog": "2.7.2",
     "@tauri-apps/plugin-fs": "2.5.1",
     "@tauri-apps/plugin-os": "2.3.2",
-    "bits-ui": "^2.18.1",
+    "bits-ui": "^2.19.0",
     "emojibase": "^17.0.0",
     "emojibase-data": "^17.0.0",
     "i18next": "^26.3.6",
@@ -61,9 +61,9 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@sentry/sveltekit": "^10.70.0",
-    "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.63.0",
-    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@sveltejs/adapter-static": "next",
+    "@sveltejs/kit": "next",
+    "@sveltejs/vite-plugin-svelte": "7.0.0-next.1",
     "@tauri-apps/cli": "2.11.4",
     "@types/katex": "^0.16.8",
     "@vitest/coverage-v8": "^4.1.10",
@@ -94,5 +94,14 @@
       "version": "24.14.0"
     }
   },
-  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
+  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be",
+  "imports": {
+    "#src/generated/*": "./src/generated/*.ts",
+    "#src/generated/wasm/*.js": "./src/generated/wasm/*.js",
+    "#src/platform/*": "./src/platform/*.ts",
+    "#src/transport": "./src/transport/index.ts",
+    "#src/worker/*": "./src/worker/*.ts",
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*"
+  }
 }

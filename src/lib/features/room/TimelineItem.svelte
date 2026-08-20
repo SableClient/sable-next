@@ -2,15 +2,15 @@
   import { Collapsible, ContextMenu, Tooltip as BitsTooltip } from 'bits-ui';
   import { onDestroy } from 'svelte';
 
-  import type { MemberView } from '@/generated/MemberView';
-  import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
-  import type { TimelineItemView } from '@/generated/TimelineItemView';
+  import type { MemberView } from '#src/generated/MemberView';
+  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+  import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
-  import { i18n } from '$lib/i18n';
-  import type { TimelineLayout } from '$lib/settings/preferences.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import MediaImage from '$lib/ui/MediaImage.svelte';
-  import MediaContent from '$lib/ui/MediaContent.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
+  import MediaContent from '#lib/ui/MediaContent.svelte';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 

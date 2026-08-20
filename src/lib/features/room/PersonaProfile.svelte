@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { Popover } from 'bits-ui';
-  import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
+  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
-  import { i18n } from '$lib/i18n';
-  import { createMediaQuery } from '$lib/ui/media-query.svelte';
-  import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { i18n } from '#lib/i18n.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
 
   import PersonaCard from './PersonaCard.svelte';
   import './avatar-button.css';

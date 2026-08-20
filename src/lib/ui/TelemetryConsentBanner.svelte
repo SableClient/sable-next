@@ -1,9 +1,9 @@
 <script lang="ts">
   import ShieldCheckIcon from 'phosphor-svelte/lib/ShieldCheckIcon';
 
-  import { i18n } from '$lib/i18n';
-  import { preferences, setPreference } from '$lib/settings/preferences.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   const configured = Boolean(import.meta.env.VITE_SENTRY_DSN);
   let answered = $state(preferences.telemetryAsked);

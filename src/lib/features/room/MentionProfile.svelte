@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { MemberView } from '@/generated/MemberView';
-  import type { ProfileView } from '@/generated/ProfileView';
-  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
+  import type { MemberView } from '#src/generated/MemberView';
+  import type { ProfileView } from '#src/generated/ProfileView';
+  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import { Popover } from 'bits-ui';
 
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
-  import { i18n } from '$lib/i18n';
-  import { createMediaQuery } from '$lib/ui/media-query.svelte';
-  import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { i18n } from '#lib/i18n.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
 
   import MentionProfileCard from './MentionProfileCard.svelte';
 

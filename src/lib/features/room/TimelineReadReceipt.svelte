@@ -1,7 +1,7 @@
 <script lang="ts">
   import { on } from 'svelte/events';
 
-  import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
+  import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
   import { readReceiptEventId } from './timeline-format';
 

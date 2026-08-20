@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { MemberView } from '@/generated/MemberView';
+  import type { MemberView } from '#src/generated/MemberView';
   import { Dialog } from 'bits-ui';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { i18n } from '$lib/i18n';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import IdentityRow from '$lib/ui/primitives/IdentityRow.svelte';
-  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
+  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import { initials, senderColor } from './timeline-format';
 

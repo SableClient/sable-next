@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import type { Snippet } from 'svelte';
-  import SettingsPanel from '$lib/features/settings/SettingsPanel.svelte';
+  import SettingsPanel from '#lib/features/settings/SettingsPanel.svelte';
 
   interface Props {
     children: Snippet;

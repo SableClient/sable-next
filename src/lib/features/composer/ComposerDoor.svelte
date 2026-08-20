@@ -4,9 +4,9 @@
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
-  import { i18n } from '$lib/i18n';
-  import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   interface Props {
     desktop: boolean;

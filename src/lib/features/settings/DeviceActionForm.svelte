@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   type Mode = 'rename' | 'remove';
 

@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '@/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
 import {
   codeBlockHeight,

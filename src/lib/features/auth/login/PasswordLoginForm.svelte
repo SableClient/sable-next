@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import { useCoreClient } from '$lib/core/context';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import FormActions from '$lib/ui/primitives/FormActions.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import FormActions from '#lib/ui/primitives/FormActions.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
   import AuthField from '../shared/AuthField.svelte';

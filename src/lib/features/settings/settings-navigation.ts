@@ -1,7 +1,7 @@
-import { goto, pushState, replaceState } from '$app/navigation';
+import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 
-import { SETTINGS_ACCOUNT_SECTION } from '$lib/settings/registry';
+import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
 
 export function defaultSettingsSection(): string {
   return SETTINGS_ACCOUNT_SECTION;
@@ -17,7 +17,7 @@ export function openSettingsOver(event: MouseEvent, section: string): void {
   if (!plainClick(event)) return;
 
   event.preventDefault();
-  pushState(resolve(`/settings/${section}`), { settings: { section } });
+  void goto(resolve(`settings/${section}`), { shallow: true, state: { settings: { section } } });
 }
 
 /** Section-to-section moves replace, so closing returns to the opening page. */
@@ -25,7 +25,12 @@ export function selectSettingsSection(event: MouseEvent, section: string): void 
   if (!plainClick(event)) return;
 
   event.preventDefault();
-  replaceState(resolve(`/settings/${section}`), { settings: { section } });
+
+  void goto(resolve(`settings/${section}`), {
+    shallow: true,
+    replace: true,
+    state: { settings: { section } },
+  });
 }
 
 /** Follows a settings link posted in a room. Phones navigate instead. */
@@ -40,9 +45,12 @@ export function followSettingsLink(
   event.preventDefault();
   const query = focus === undefined ? '' : `?focus=${encodeURIComponent(focus)}`;
   if (shallow) {
-    pushState(resolve(`/settings/${section}${query}`), { settings: { section } });
+    void goto(resolve(`settings/${section}${query}`), {
+      shallow: true,
+      state: { settings: { section } },
+    });
     return;
   }
 
-  void goto(resolve(`/settings/${section}${query}`));
+  void goto(resolve(`settings/${section}${query}`));
 }

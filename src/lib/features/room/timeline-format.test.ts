@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 
-import type { TimelineItemView } from '@/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
-import type { TimelinePreferences } from '$lib/settings/preferences.svelte';
+import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
 import {
   foldEventRuns,

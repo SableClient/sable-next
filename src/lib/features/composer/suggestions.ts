@@ -1,7 +1,7 @@
-import type { MemberView } from '@/generated/MemberView';
-import type { PackImageView } from '@/generated/PackImageView';
+import type { MemberView } from '#src/generated/MemberView';
+import type { PackImageView } from '#src/generated/PackImageView';
 
-import { searchReactionEmoji } from '$lib/emoji/emoji';
+import { searchReactionEmoji } from '#lib/emoji/emoji.js';
 
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
 

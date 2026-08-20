@@ -1,4 +1,4 @@
-import type { MemberView } from '@/generated/MemberView';
+import type { MemberView } from '#src/generated/MemberView';
 
 export class RoomMemberLoader {
   members = $state.raw<MemberView[]>([]);

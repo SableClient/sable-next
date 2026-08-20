@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n, t } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n, t } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';

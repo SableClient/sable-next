@@ -1,9 +1,9 @@
 import { resolve } from '$app/paths';
 
-import type { RoomSummary } from '@/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 
-import { splitVia } from '$lib/features/room/join-address';
-import { parseMatrixLink } from '$lib/features/room/matrix-link';
+import { splitVia } from '#lib/features/room/join-address.js';
+import { parseMatrixLink } from '#lib/features/room/matrix-link.js';
 
 import { findRoomByPathId, roomPathParam, roomPathParamFromId } from './room-list.svelte';
 

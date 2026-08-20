@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { PerMessageProfileView } from '@/generated/PerMessageProfileView';
+  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import ProfileCard from '$lib/ui/primitives/ProfileCard.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
 
   import { senderColor } from './timeline-format';
 

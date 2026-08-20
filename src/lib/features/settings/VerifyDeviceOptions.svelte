@@ -3,14 +3,14 @@
   import DesktopTowerIcon from 'phosphor-svelte/lib/DesktopTowerIcon';
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
 
-  import type { RecoveryStateView } from '@/generated/RecoveryStateView';
-  import { useCoreClient } from '$lib/core/context';
-  import { verificationErrorMessage } from '$lib/core/verification-errors';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import type { RecoveryStateView } from '#src/generated/RecoveryStateView';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { verificationErrorMessage } from '#lib/core/verification-errors.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     recovery: RecoveryStateView;

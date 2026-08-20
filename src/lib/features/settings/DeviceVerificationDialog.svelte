@@ -1,12 +1,12 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { verificationErrorMessage } from '$lib/core/verification-errors';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { verificationErrorMessage } from '#lib/core/verification-errors.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   const core = useCoreClient();
   let error = $state<string | null>(null);

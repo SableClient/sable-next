@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import FormField from '$lib/ui/primitives/FormField.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     open?: boolean;

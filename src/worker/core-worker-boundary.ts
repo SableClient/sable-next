@@ -1,6 +1,6 @@
-import type { CommandErr } from '@/generated/CommandErr';
-import type { CommandOk } from '@/generated/CommandOk';
-import type { CoreEvent } from '@/generated/CoreEvent';
+import type { CommandErr } from '#src/generated/CommandErr';
+import type { CommandOk } from '#src/generated/CommandOk';
+import type { CoreEvent } from '#src/generated/CoreEvent';
 import type { WorkerMessage, WorkerRequest } from './protocol';
 import { TimelineEventRouter } from './timeline-event-router';
 

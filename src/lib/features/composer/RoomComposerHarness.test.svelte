@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { CoreClient } from '$lib/core/client.svelte';
-  import { provideCoreClient } from '$lib/core/context';
+  import type { CoreClient } from '#lib/core/client.svelte.js';
+  import { provideCoreClient } from '#lib/core/context.js';
   import { untrack, type ComponentProps } from 'svelte';
 
   import RoomComposer from './RoomComposer.svelte';

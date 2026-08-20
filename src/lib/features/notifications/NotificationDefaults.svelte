@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { NotificationModeView } from '@/generated/NotificationModeView';
+  import type { NotificationModeView } from '#src/generated/NotificationModeView';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Select from '$lib/ui/primitives/Select.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
 
   import { settingsChanges } from './notifications.svelte';
   import { canPresent, permission, requestPermission } from './present';

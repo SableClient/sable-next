@@ -1,4 +1,4 @@
-import type { CoreClient } from '$lib/core/client.svelte';
+import type { CoreClient } from '#lib/core/client.svelte.js';
 
 /* Not `SvelteMap`: callers read the cache from inside an effect, so a reactive
    miss re-runs every waiting media element each time any other one resolves. */

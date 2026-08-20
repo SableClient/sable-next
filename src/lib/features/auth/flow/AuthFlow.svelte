@@ -1,13 +1,13 @@
 <script lang="ts">
-  import '$lib/features/auth/shared/auth-card.css';
+  import '#lib/features/auth/shared/auth-card.css';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { i18n } from '$lib/i18n';
-  import { useCoreClient } from '$lib/core/context';
-  import AuthFooter from '$lib/features/auth/shared/AuthFooter.svelte';
-  import AuthHeader from '$lib/features/auth/shared/AuthHeader.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import AuthFooter from '#lib/features/auth/shared/AuthFooter.svelte';
+  import AuthHeader from '#lib/features/auth/shared/AuthHeader.svelte';
   import AuthRedirectBridge from './AuthRedirectBridge.svelte';
   import AuthRail from './AuthRail.svelte';
   import AuthStageCard from './AuthStageCard.svelte';
@@ -16,7 +16,7 @@
   import { LoginController, type LoginField } from '../login/login-controller.svelte';
   import LoginForm from '../login/LoginForm.svelte';
   import DeviceVerificationCard from '../login/DeviceVerificationCard.svelte';
-  import DeviceVerificationDialog from '$lib/features/settings/DeviceVerificationDialog.svelte';
+  import DeviceVerificationDialog from '#lib/features/settings/DeviceVerificationDialog.svelte';
   import {
     RegistrationController,
     type RegistrationField,
@@ -29,31 +29,31 @@
   import { RedirectController } from './redirect-controller.svelte';
   import { homeserverFromAuthUrl, registrationTokenFromAuthUrl } from './auth-url';
   import { DEFAULT_HOMESERVER } from '../shared/homeservers';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   const core = useCoreClient();
   const isAddingAccount = page.url.searchParams.has('addAccount');
   const stageRegistry = [
     {
-      route: resolve('/login'),
+      route: resolve('login'),
       title: 'Sign in',
       completed: true,
       accessibilityLabel: 'Sign in to Sable',
     },
     {
-      route: resolve('/register'),
+      route: resolve('register'),
       title: 'Create account',
       completed: false,
       accessibilityLabel: 'Create your Matrix account',
     },
     {
-      route: resolve('/register/recovery'),
+      route: resolve('register/recovery'),
       title: 'Recovery setup',
       completed: false,
       accessibilityLabel: 'Set up account recovery',
     },
     {
-      route: resolve('/register/profile'),
+      route: resolve('register/profile'),
       title: 'Profile setup',
       completed: false,
       accessibilityLabel: 'Choose your profile details',
@@ -98,7 +98,7 @@
     onMarkLoggedIn: markLoggedIn,
     onMarkOnboardingPending: markOnboardingPending,
     onNavigateLoginVerification: navigateToLoginVerification,
-    onNavigateRegistrationRecovery: () => goto(resolve('/register/recovery')),
+    onNavigateRegistrationRecovery: () => goto(resolve('register/recovery')),
   });
 
   const registration = new RegistrationController(
@@ -112,7 +112,7 @@
         flow.isEditingHomeserver = true;
       },
       onMarkOnboardingPending: markOnboardingPending,
-      onRegistrationComplete: () => goto(resolve('/register/recovery')),
+      onRegistrationComplete: () => goto(resolve('register/recovery')),
       onOpenFallback: (fallback, onComplete) => {
         redirect.openFallback(fallback, onComplete);
       },
@@ -123,7 +123,7 @@
   const profile = new ProfileController({
     core,
     getUserId: () => core.session?.user_id ?? '',
-    onNavigateHome: () => goto(resolve('/home')),
+    onNavigateHome: () => goto(resolve('home')),
   });
 
   const login = new LoginController({
@@ -150,6 +150,7 @@
         (index === 2 && recoveryOnboardingComplete),
     }))
   );
+
   let activeIndex = $derived(furthestReachableStage(requestedStage, stages));
   let hasSecondaryStage = $derived(
     furthestReached >= 1 || core.status === 'signed-out' || isAddingAccount
@@ -172,8 +173,8 @@
   );
   let isLaunchingLogin = $derived(redirect.pendingIntent === 'login' && redirect.isLaunching);
   let loginVerificationPending = $state(false);
-  let isDeviceVerificationStage = $derived(page.url.pathname === resolve('/login/verify'));
-  let loginVerificationActive = $state(page.url.pathname === resolve('/login/verify'));
+  let isDeviceVerificationStage = $derived(page.url.pathname === resolve('login/verify'));
+  let loginVerificationActive = $state(page.url.pathname === resolve('login/verify'));
   let verificationDisplayedStage = $derived(isDeviceVerificationStage ? 1 : 0);
   let carouselDisplayedStage = $derived(
     loginVerificationActive ? verificationDisplayedStage : displayedStage
@@ -234,13 +235,13 @@
 
   $effect(() => {
     if (requestedStage < 2 || core.status !== 'signed-out') return;
-    void goto(resolve('/register'));
+    void goto(resolve('register'));
   });
 
   $effect(() => {
     if (isDeviceVerificationStage && core.status === 'signed-out') {
       loginVerificationActive = false;
-      void goto(resolve('/login'));
+      void goto(resolve('login'));
     }
   });
 
@@ -250,7 +251,7 @@
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     const rawMarker = localStorage.getItem(profileOnboardingMarker(userId));
     if (!rawMarker) {
-      void goto(resolve('/home'));
+      void goto(resolve('home'));
       return;
     }
     if (restoredMarkerFor === userId) return;
@@ -276,12 +277,12 @@
 
   async function navigateToLoginVerification(): Promise<void> {
     loginVerificationActive = true;
-    await goto(resolve('/login/verify'), { keepFocus: true, noScroll: true });
+    await goto(resolve('login/verify'), { reset: false });
     loginVerificationPending = false;
   }
 
   function showLoginStage(): void {
-    void goto(resolve('/login'), { keepFocus: true, noScroll: true });
+    void goto(resolve('login'), { reset: false });
   }
 
   function showRegistrationStage(): void {
@@ -291,7 +292,7 @@
   function finishLoginVerification(): void {
     loginVerificationActive = false;
     loginVerificationPending = false;
-    void goto(resolve('/home'));
+    void goto(resolve('home'));
   }
 
   function finishRecoveryOnboarding(): void {
@@ -353,15 +354,7 @@
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) enteringStage = null;
     }
     pendingStage = index;
-    void goto(
-      resolve(
-        stageRoute(index) as '/login' | '/register' | '/register/recovery' | '/register/profile'
-      ),
-      {
-        keepFocus: true,
-        noScroll: true,
-      }
-    ).finally(() => {
+    void goto(stageRoute(index), { reset: false }).finally(() => {
       pendingStage = null;
     });
   }
@@ -451,7 +444,7 @@
     }}
     onRegistrationComplete={() => {
       void core.start().then(() => {
-        if (core.status === 'ready') void goto(resolve('/register/recovery'));
+        if (core.status === 'ready') void goto(resolve('register/recovery'));
       });
     }}
     onCallbackWindow={() => {

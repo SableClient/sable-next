@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { RoomSummary } from '@/generated/RoomSummary';
-  import type { RoomTag } from '@/generated/RoomTag';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type { RoomTag } from '#src/generated/RoomTag';
   import { DropdownMenu } from 'bits-ui';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
@@ -11,14 +11,14 @@
   import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
-  import type { NotificationModeView } from '@/generated/NotificationModeView';
+  import type { NotificationModeView } from '#src/generated/NotificationModeView';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { settingsChanges } from '$lib/features/notifications/notifications.svelte';
-  import { i18n } from '$lib/i18n';
-  import { matrixToUrl } from '$lib/rooms/permalink';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { settingsChanges } from '#lib/features/notifications/notifications.svelte.js';
+  import { i18n } from '#lib/i18n.js';
+  import { matrixToUrl } from '#lib/rooms/permalink.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   interface Props {

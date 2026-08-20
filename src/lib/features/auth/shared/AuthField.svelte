@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
 
   interface Props {
     fieldId?: string;

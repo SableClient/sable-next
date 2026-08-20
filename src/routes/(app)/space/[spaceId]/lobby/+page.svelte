@@ -1,8 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
 
-  import SpaceLobby from '$lib/features/room/SpaceLobby.svelte';
-  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
+  import SpaceLobby from '#lib/features/room/SpaceLobby.svelte';
+  import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
 
   const roomList = useRoomList();
   let space = $derived(findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null);

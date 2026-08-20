@@ -1,9 +1,9 @@
-import type { LoginFlowsView } from '@/generated/LoginFlowsView';
-import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
-import type { RegistrationResultView } from '@/generated/RegistrationResultView';
-import type { CoreClient } from '$lib/core/client.svelte';
-import { t } from '$lib/i18n';
-import { CoreError } from '@/transport';
+import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
+import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
+import { CoreError } from '#src/transport';
 import { registrationError } from './registration-errors';
 
 export type RegistrationField =

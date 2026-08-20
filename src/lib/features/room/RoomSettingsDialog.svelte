@@ -1,25 +1,25 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { JoinRuleView } from '@/generated/JoinRuleView';
-  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
-  import type { RoomSummary } from '@/generated/RoomSummary';
+  import type { JoinRuleView } from '#src/generated/JoinRuleView';
+  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
   import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
   import HandIcon from 'phosphor-svelte/lib/HandIcon';
   import LockIcon from 'phosphor-svelte/lib/LockIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
-  import OptionCards from '$lib/ui/primitives/OptionCards.svelte';
-  import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
-  import TextArea from '$lib/ui/primitives/TextArea.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
+  import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
+  import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import { initials } from './timeline-format';
 

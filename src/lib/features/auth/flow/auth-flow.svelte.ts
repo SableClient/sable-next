@@ -1,14 +1,14 @@
-import type { LoginFlowsView } from '@/generated/LoginFlowsView';
-import type { RegistrationFlowsView } from '@/generated/RegistrationFlowsView';
-import type { CoreClient } from '$lib/core/client.svelte';
-import { t } from '$lib/i18n';
-import { CoreError } from '@/transport';
+import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
+import { CoreError } from '#src/transport';
 import {
   authenticationError,
   registrationError,
   registrationHomeserverError,
-} from '$lib/features/auth/registration/registration-errors';
-import { LEGACY_REGISTRATION_FALLBACK } from '$lib/features/auth/registration/registration-methods';
+} from '#lib/features/auth/registration/registration-errors.js';
+import { LEGACY_REGISTRATION_FALLBACK } from '#lib/features/auth/registration/registration-methods.js';
 
 export const AUTH_CARD_MOTION_MS = 450;
 export const LOGGED_IN_MARKER = 'sable-has-logged-in';

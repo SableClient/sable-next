@@ -6,7 +6,7 @@ import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
 
-import { preferences } from '$lib/settings/preferences.svelte';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { AutocompleteQuery } from '../autocomplete';
 import {
   activeMarks,

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 
-import type { ImagePackView } from '@/generated/ImagePackView';
-import type { MemberView } from '@/generated/MemberView';
-import type { CoreClient } from '$lib/core/client.svelte';
+import type { ImagePackView } from '#src/generated/ImagePackView';
+import type { MemberView } from '#src/generated/MemberView';
+import type { CoreClient } from '#lib/core/client.svelte.js';
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 

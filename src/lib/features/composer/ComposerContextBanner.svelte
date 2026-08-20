@@ -1,8 +1,8 @@
 <script lang="ts">
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { i18n } from '$lib/i18n';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import type { ComposerContext } from './composer-context';
 

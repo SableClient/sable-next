@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { ProfileView } from '@/generated/ProfileView';
+import type { ProfileView } from '#src/generated/ProfileView';
 
 const core = vi.hoisted(() => ({
   fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
@@ -14,7 +14,7 @@ const core = vi.hoisted(() => ({
   sendMessage: vi.fn<() => Promise<void>>(),
 }));
 
-vi.mock('$lib/core/context', () => ({
+vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 

@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '@/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
 

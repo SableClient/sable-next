@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { TimelineItemView } from '@/generated/TimelineItemView';
+  import type { TimelineItemView } from '#src/generated/TimelineItemView';
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
-  import { useCoreClient } from '$lib/core/context';
-  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
-  import { saveFile, savesNatively } from '$lib/platform/files';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { saveFile, savesNatively } from '#lib/platform/files.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';

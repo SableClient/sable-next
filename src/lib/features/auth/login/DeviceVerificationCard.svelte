@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
-  import { useCoreClient } from '$lib/core/context';
-  import { verificationErrorMessage } from '$lib/core/verification-errors';
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { verificationErrorMessage } from '#lib/core/verification-errors.js';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';

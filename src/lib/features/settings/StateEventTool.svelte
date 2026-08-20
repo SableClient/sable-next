@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
-  import Select from '$lib/ui/primitives/Select.svelte';
-  import TextArea from '$lib/ui/primitives/TextArea.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
+  import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   const core = useCoreClient();
   const roomList = useRoomList();

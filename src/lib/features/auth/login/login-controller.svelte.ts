@@ -1,10 +1,10 @@
-import type { LoginFlowsView } from '@/generated/LoginFlowsView';
-import type { CoreClient } from '$lib/core/client.svelte';
-import { t } from '$lib/i18n';
+import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
 import {
   authenticationError,
   logAuthenticationFailure,
-} from '$lib/features/auth/registration/registration-errors';
+} from '#lib/features/auth/registration/registration-errors.js';
 
 export type LoginField = 'homeserver' | 'username' | 'password';
 

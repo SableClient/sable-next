@@ -2,12 +2,12 @@
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { InviteActions } from '$lib/rooms/invites.svelte';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import MediaImage from '$lib/ui/MediaImage.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { InviteActions } from '#lib/rooms/invites.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
 
   interface Props {
     collapsed?: boolean;

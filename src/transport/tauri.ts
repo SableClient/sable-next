@@ -1,8 +1,8 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 
-import type { Command } from '@/generated/Command';
-import type { CommandErr } from '@/generated/CommandErr';
-import type { CoreEvent } from '@/generated/CoreEvent';
+import type { Command } from '#src/generated/Command';
+import type { CommandErr } from '#src/generated/CommandErr';
+import type { CoreEvent } from '#src/generated/CoreEvent';
 import { CoreError, type ResponseFor, type Transport } from './index';
 
 /**

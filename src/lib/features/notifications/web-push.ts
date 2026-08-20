@@ -1,5 +1,5 @@
-import type { CoreClient } from '$lib/core/client.svelte';
-import { preferences } from '$lib/settings/preferences.svelte';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { type PushConfig, pushConfig, type PushOverride } from './push-config';
 

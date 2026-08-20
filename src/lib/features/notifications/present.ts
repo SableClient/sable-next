@@ -1,8 +1,8 @@
 import { isTauri } from '@tauri-apps/api/core';
 
-import type { NotificationView } from '@/generated/NotificationView';
+import type { NotificationView } from '#src/generated/NotificationView';
 
-import { preferences } from '$lib/settings/preferences.svelte';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 export function canPresent(): boolean {
   return !isTauri() && typeof Notification !== 'undefined';

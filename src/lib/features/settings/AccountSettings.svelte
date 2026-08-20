@@ -1,15 +1,15 @@
 <script lang="ts">
-  import type { ProfileView } from '@/generated/ProfileView';
+  import type { ProfileView } from '#src/generated/ProfileView';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
 
   const core = useCoreClient();
@@ -25,7 +25,7 @@
 
   let userId = $derived(core.session?.user_id ?? '');
   let initials = $derived(
-    (displayName || userId).replace(/^@/, '').slice(0, 1).toUpperCase() || '?'
+    (displayName || userId).replace(/^#src/, '').slice(0, 1).toUpperCase() || '?'
   );
   let avatarUrl = $derived(avatarPreview ?? profile?.avatar_url ?? null);
   let nameChanged = $derived(displayName !== (profile?.display_name ?? ''));

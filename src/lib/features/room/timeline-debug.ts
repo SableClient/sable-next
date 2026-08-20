@@ -1,4 +1,4 @@
-import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
+import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 export interface TimelineDebugSample {
   time: number;

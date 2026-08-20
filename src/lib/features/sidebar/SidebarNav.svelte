@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import type { RoomSummary } from '@/generated/RoomSummary';
+  import { i18n } from '#lib/i18n.js';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
   import { onMount } from 'svelte';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
-  import { unreadSpaceIds } from '$lib/rooms/spaces';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { unreadSpaceIds } from '#lib/rooms/spaces.js';
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';

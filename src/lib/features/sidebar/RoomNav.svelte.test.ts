@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { RoomSummary } from '@/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 
 const pageState = vi.hoisted(() => ({
   url: { pathname: '/home' },
@@ -21,9 +21,11 @@ const coreStub = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/state', () => ({ page: pageState }));
-vi.mock('$lib/core/context', () => ({ useCoreClient: () => coreStub }));
-vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
-vi.mock('$lib/i18n', () => ({
+vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
+vi.mock('$app/paths', () => ({
+  resolve: (path: string) => (path.startsWith('/') ? path : `/${path}`),
+}));
+vi.mock('#lib/i18n.js', () => ({
   i18n: {
     subscribe(run: (value: { t: (key: string) => string }) => void) {
       run({ t: (key) => key });
@@ -31,7 +33,7 @@ vi.mock('$lib/i18n', () => ({
     },
   },
 }));
-vi.mock('$lib/rooms/room-list.svelte', () => ({
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => roomsFixture,
   findRoomByPathId: (rooms: readonly RoomSummary[], pathId: string | undefined) =>
     rooms.find((room) => room.room_id === pathId || room.canonical_alias === pathId),

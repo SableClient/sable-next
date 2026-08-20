@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { findCategory, SETTINGS_ACCOUNT_SECTION } from '$lib/settings/registry';
+  import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
   import AccountSettings from './AccountSettings.svelte';
   import DevicesSettings from './DevicesSettings.svelte';
   import SettingsCategoryView from './SettingsCategoryView.svelte';

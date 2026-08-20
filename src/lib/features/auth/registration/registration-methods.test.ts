@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { LoginFlowsView } from '@/generated/LoginFlowsView';
+import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
 import { registrationMethodAvailable } from './registration-methods';
 
 function flows(overrides: Partial<LoginFlowsView> = {}): LoginFlowsView {

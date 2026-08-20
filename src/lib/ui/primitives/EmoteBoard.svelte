@@ -1,17 +1,17 @@
 <script lang="ts">
-  import type { ImagePackView } from '@/generated/ImagePackView';
-  import type { ImageUsageView } from '@/generated/ImageUsageView';
-  import type { PackImageView } from '@/generated/PackImageView';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import MediaImage from '$lib/ui/MediaImage.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import type { ImagePackView } from '#src/generated/ImagePackView';
+  import type { ImageUsageView } from '#src/generated/ImageUsageView';
+  import type { PackImageView } from '#src/generated/PackImageView';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { emojiGroups, searchReactionEmoji, shortcodeFor } from '$lib/emoji/emoji';
-  import { readRecentReactions, rememberReaction } from '$lib/emoji/recents';
-  import { readRecent, writeRecent } from '$lib/emoji/recent-packs';
+  import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
+  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
+  import { readRecent, writeRecent } from '#lib/emoji/recent-packs.js';
 
   interface Props {
     roomId: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from 'svelte/elements';
-  import Combobox from '$lib/ui/primitives/Combobox.svelte';
+  import Combobox from '#lib/ui/primitives/Combobox.svelte';
   import { HOMESERVER_ITEMS } from './homeservers';
 
   interface Props {

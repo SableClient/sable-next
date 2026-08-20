@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import Skeleton from '$lib/ui/primitives/Skeleton.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
 
   const REVEAL_DELAY = 150;
   const rows = [

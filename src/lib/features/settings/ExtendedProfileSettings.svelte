@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { ProfileView } from '@/generated/ProfileView';
+  import type { ProfileView } from '#src/generated/ProfileView';
 
-  import { useCoreClient } from '$lib/core/context';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Select from '$lib/ui/primitives/Select.svelte';
-  import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
-  import TextArea from '$lib/ui/primitives/TextArea.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import ColorSetting from './ColorSetting.svelte';
 
   interface Props {

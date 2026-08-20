@@ -8,12 +8,12 @@
   import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
   import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 
-  import { i18n } from '$lib/i18n';
-  import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
-  import { readRecentReactions, rememberReaction } from '$lib/emoji/recents';
-  import { shortcodeFor } from '$lib/emoji/emoji';
+  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
+  import { shortcodeFor } from '#lib/emoji/emoji.js';
 
   interface Props {
     open?: boolean;

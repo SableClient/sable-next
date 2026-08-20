@@ -2,7 +2,7 @@
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
-  import MediaImage from '$lib/ui/MediaImage.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import Avatar from './Avatar.svelte';
 

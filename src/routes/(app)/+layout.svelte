@@ -2,25 +2,25 @@
   import type { Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { page } from '$app/state';
-  import AppShell from '$lib/ui/AppShell.svelte';
-  import SettingsPanel from '$lib/features/settings/SettingsPanel.svelte';
-  import { followSettingsLink } from '$lib/features/settings/settings-navigation';
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
-  import { createMediaQuery } from '$lib/ui/media-query.svelte';
-  import { useCoreClient } from '$lib/core/context';
-  import { provideRoomList, RoomList, roomPathParamFromId } from '$lib/rooms/room-list.svelte';
+  import AppShell from '#lib/ui/AppShell.svelte';
+  import SettingsPanel from '#lib/features/settings/SettingsPanel.svelte';
+  import { followSettingsLink } from '#lib/features/settings/settings-navigation.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { provideRoomList, RoomList, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import { startSystemBarSync } from '$lib/platform/system-bars';
-  import { preferences } from '$lib/settings/preferences.svelte';
-  import { registerNativePush } from '$lib/features/notifications/native-push';
-  import { pushOverride } from '$lib/features/notifications/push-config';
-  import { NotificationCenter } from '$lib/features/notifications/notifications.svelte';
-  import { rememberRoomNames } from '$lib/features/notifications/room-names';
-  import { syncPushSubscription } from '$lib/features/notifications/web-push';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { startSystemBarSync } from '#lib/platform/system-bars.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { registerNativePush } from '#lib/features/notifications/native-push.js';
+  import { pushOverride } from '#lib/features/notifications/push-config.js';
+  import { NotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
+  import { rememberRoomNames } from '#lib/features/notifications/room-names.js';
+  import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
 
   interface Props {
     children: Snippet;
@@ -35,7 +35,7 @@
 
   $effect(() => {
     if (core.status === 'signed-out') {
-      void goto(resolve('/login'), { replaceState: true });
+      void goto(resolve('login'), { replaceState: true });
     }
   });
 
@@ -102,6 +102,7 @@
       const message = (event as MessageEvent).data as
         | { type?: string; roomId?: string }
         | undefined;
+
       if (message?.type === 'sable:push-resubscribe') resync();
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
         void goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(message.roomId) }));

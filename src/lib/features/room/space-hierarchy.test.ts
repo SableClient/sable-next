@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import type { SpaceChildEdge } from '@/generated/SpaceChildEdge';
-import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
+import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
+import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 
 import { buildHierarchySections } from './space-hierarchy';
 

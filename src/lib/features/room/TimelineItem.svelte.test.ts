@@ -3,13 +3,13 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '@/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
 const core = vi.hoisted(() => ({
   fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
 }));
 
-vi.mock('$lib/core/context', () => ({
+vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 

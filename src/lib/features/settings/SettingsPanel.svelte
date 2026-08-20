@@ -10,18 +10,18 @@
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
   import {
     SETTINGS_ACCOUNT_SECTION,
     SETTINGS_DEVICES_SECTION,
     settingsCategories,
-  } from '$lib/settings/registry';
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
-  import { createMediaQuery } from '$lib/ui/media-query.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  } from '#lib/settings/registry.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsSectionContent from './SettingsSectionContent.svelte';
   import { defaultSettingsSection, selectSettingsSection } from './settings-navigation';
 
@@ -63,11 +63,11 @@
       return;
     }
 
-    void goto(resolve('/home'));
+    void goto(resolve('home'));
   }
 
   function back(): void {
-    void goto(resolve('/settings'));
+    void goto(resolve('settings'));
   }
 
   function logout(): void {
@@ -98,7 +98,7 @@
         <nav aria-label={$i18n.t('settings.sections')}>
           {#each sections as entry (entry.id)}
             {@const active = openSection === entry.id}
-            {@const href = resolve(`/settings/${entry.id}`)}
+            {@const href = resolve(`settings/${entry.id}`)}
             <a
               class="sable-selection-layer"
               {href}
@@ -120,8 +120,10 @@
           variant="danger"
           aria-label={$i18n.t('settings.logout')}
           onclick={logout}
-          ><SignOutIcon /><span class="logout-label">{$i18n.t('settings.logout')}</span></Button
         >
+          <SignOutIcon />
+          <span class="logout-label">{$i18n.t('settings.logout')}</span>
+        </Button>
       </aside>
     {/if}
 

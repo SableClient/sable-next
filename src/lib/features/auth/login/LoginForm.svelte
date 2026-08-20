@@ -1,10 +1,10 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
   import { prefersReducedMotion } from 'svelte/motion';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import type { LoginFlowsView } from '@/generated/LoginFlowsView';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from './LoginMethod.svelte';
   import PasswordLoginForm from './PasswordLoginForm.svelte';

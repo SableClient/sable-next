@@ -1,15 +1,15 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
 
-  import type { RoomPreviewView } from '@/generated/RoomPreviewView';
+  import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { roomSectionPath, viaFor } from '$lib/rooms/permalink';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { roomSectionPath, viaFor } from '#lib/rooms/permalink.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   interface Props {
     roomId: string;
@@ -75,7 +75,6 @@
     try {
       const joined = await core.joinRoom(address, routing);
       const target = roomSectionPath(roomList.rooms, joined, eventId);
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
       await goto(target, { replaceState: true });
     } catch (error) {
       console.warn('[sable room] join failed', error);

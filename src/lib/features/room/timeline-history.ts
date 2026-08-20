@@ -1,4 +1,4 @@
-import type { BackwardPaginationState } from '$lib/rooms/timeline.svelte';
+import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
 

@@ -7,7 +7,7 @@ const core = vi.hoisted(() => ({
   fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
 }));
 
-vi.mock('$lib/core/context', () => ({
+vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 

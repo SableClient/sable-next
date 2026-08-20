@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { PushDetails } from '$lib/config/runtime-config';
+import type { PushDetails } from '#lib/config/runtime-config.js';
 
 import {
   hasCompleteOverride,

@@ -7,25 +7,25 @@
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import PlusCircleIcon from 'phosphor-svelte/lib/PlusCircleIcon';
 
-  import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '$lib/config/links';
-  import { readReturningUser } from '$lib/features/auth/flow/auth-flow.svelte';
-  import { i18n } from '$lib/i18n';
-  import ActionCard from '$lib/ui/ActionCard.svelte';
-  import SableBrandMark from '$lib/ui/SableBrandMark.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import LinkButton from '$lib/ui/primitives/LinkButton.svelte';
+  import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/config/links.js';
+  import { readReturningUser } from '#lib/features/auth/flow/auth-flow.svelte.js';
+  import { i18n } from '#lib/i18n.js';
+  import ActionCard from '#lib/ui/ActionCard.svelte';
+  import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
 
   let hasLoggedInBefore = $state(false);
 
   const startCards = [
     {
-      href: resolve('/explore'),
+      href: resolve('explore'),
       icon: CompassIcon,
       title: 'home.findCommunityTitle',
       description: 'home.findCommunityDescription',
     },
     {
-      href: resolve('/create-room'),
+      href: resolve('create-room'),
       icon: PlusCircleIcon,
       title: 'home.startRoomTitle',
       description: 'home.startRoomDescription',

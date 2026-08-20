@@ -1,24 +1,28 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
-  import type { ProfileView } from '@/generated/ProfileView';
-  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
+  import type { ProfileView } from '#src/generated/ProfileView';
+  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { matrixToUrl, roomSectionPath } from '$lib/rooms/permalink';
-  import { findRoomByPathId, roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
-  import { RoomMemberLoader } from '$lib/rooms/room-members.svelte';
-  import { activeRoomTimeline } from '$lib/rooms/timeline.svelte';
-  import RoomComposer from '$lib/features/composer/RoomComposer.svelte';
-  import type { ComposerContext } from '$lib/features/composer/composer-context';
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
-  import { createMediaQuery } from '$lib/ui/media-query.svelte';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { matrixToUrl, roomSectionPath } from '#lib/rooms/permalink.js';
+  import {
+    findRoomByPathId,
+    roomPathParamFromId,
+    useRoomList,
+  } from '#lib/rooms/room-list.svelte.js';
+  import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
+  import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
+  import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
+  import type { ComposerContext } from '#lib/features/composer/composer-context.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
-  import { preferences } from '$lib/settings/preferences.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import MembersDrawer from './MembersDrawer.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -60,10 +64,12 @@
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
+
   let mediaItems = $derived(
     timeline.items.flatMap((entry) => {
       if (!entry.event_id || (entry.content.kind !== 'image' && entry.content.kind !== 'sticker'))
         return [];
+
       return [
         {
           ...entry.content,
@@ -190,8 +196,7 @@
     // back off the URL, undoing the navigation before it takes effect.
     if (eventId === null || eventId !== appliedEventId) return;
     if (!timelineFollowingLive || timeline.mode.kind !== 'live') return;
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
-    void goto(roomUrl(null), { replaceState: true, noScroll: true, keepFocus: true });
+    void goto(roomUrl(null), { replaceState: true, reset: false });
   });
 
   $effect(() => {
@@ -269,7 +274,6 @@
       link.kind === 'event' ? link.eventId : null,
       via
     );
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
     void goto(target);
   }
 
@@ -294,7 +298,7 @@
   /** RoomPage is mounted by the home, direct and space routes alike, so the
       current path has to survive the rewrite. */
   function roomUrl(eventId: string | null): string {
-    const url = new URL(page.url);
+    const url = new URL(page.url.href);
     if (eventId === null) url.searchParams.delete('event');
     else url.searchParams.set('event', eventId);
     return `${url.pathname}${url.search}`;
@@ -302,13 +306,12 @@
 
   // A history entry, so back is a way out of the anchor.
   function jumpToEvent(eventId: string): void {
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
-    void goto(roomUrl(eventId), { noScroll: true, keepFocus: true });
+    void goto(roomUrl(eventId), { reset: false });
   }
 
   function goBack(): void {
     if (page.url.pathname.startsWith('/direct/')) {
-      void goto(resolve('/direct'));
+      void goto(resolve('direct'));
       return;
     }
     if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
@@ -319,7 +322,7 @@
       );
       return;
     }
-    void goto(resolve('/home'));
+    void goto(resolve('home'));
   }
 
   async function sendMessage(

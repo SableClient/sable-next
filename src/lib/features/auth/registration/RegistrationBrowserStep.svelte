@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import type { RegistrationResultView } from '@/generated/RegistrationResultView';
+  import { i18n } from '#lib/i18n.js';
+  import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import FormActions from '$lib/ui/primitives/FormActions.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import FormActions from '#lib/ui/primitives/FormActions.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
 
   interface Props {

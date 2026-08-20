@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
 
-  import { findRoomByPathId, useRoomList } from '$lib/rooms/room-list.svelte';
+  import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
 
   import JoinBeforeNavigate from './JoinBeforeNavigate.svelte';
   import RoomView from './RoomView.svelte';

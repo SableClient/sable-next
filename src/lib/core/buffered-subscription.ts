@@ -1,4 +1,4 @@
-import type { SubscriptionId } from '@/generated/SubscriptionId';
+import type { SubscriptionId } from '#src/generated/SubscriptionId';
 
 interface SubscriptionDiff<Diff> {
   subscription: SubscriptionId;

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import FormActions from '$lib/ui/primitives/FormActions.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import FormActions from '#lib/ui/primitives/FormActions.svelte';
   import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
-  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';

@@ -1,9 +1,9 @@
 import * as Sentry from '@sentry/sveltekit';
 
-import type { Command } from '@/generated/Command';
-import type { CommandOk } from '@/generated/CommandOk';
-import type { CoreEvent } from '@/generated/CoreEvent';
-import type { WorkerMessage, WorkerRequest } from '@/worker/protocol';
+import type { Command } from '#src/generated/Command';
+import type { CommandOk } from '#src/generated/CommandOk';
+import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 

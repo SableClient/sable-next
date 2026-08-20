@@ -3,10 +3,11 @@
 /// <reference lib="webworker" />
 /// <reference types="@sveltejs/kit" />
 
-import { base } from '$service-worker';
+import { resolve } from '$app/paths';
 
-import { alert, type PushPayload, unreadCount } from '$lib/features/notifications/push-payload';
-import { roomName } from '$lib/features/notifications/room-names';
+import favicon from '#lib/assets/favicon.png';
+import { alert, type PushPayload, unreadCount } from '#lib/features/notifications/push-payload.js';
+import { roomName } from '#lib/features/notifications/room-names.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
@@ -31,7 +32,7 @@ async function present(payload: PushPayload | undefined): Promise<void> {
   await worker.registration.showNotification(showing.title, {
     body: showing.body,
     tag: showing.tag,
-    icon: `${base}/favicon.png`,
+    icon: favicon,
     data: { roomId: showing.roomId, eventId: showing.eventId },
   });
 }
@@ -55,7 +56,10 @@ async function open(roomId: string | undefined): Promise<void> {
     return;
   }
 
-  const target = roomId === undefined ? `${base}/` : `${base}/to/${encodeURIComponent(roomId)}`;
+  const target =
+    roomId === undefined
+      ? resolve('/')
+      : resolve('/(app)/to/[...permalink]', { permalink: encodeURIComponent(roomId) });
   await worker.clients.openWindow(target);
 }
 

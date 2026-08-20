@@ -7,8 +7,8 @@
   import TextStrikethroughIcon from 'phosphor-svelte/lib/TextStrikethroughIcon';
   import type { Component } from 'svelte';
 
-  import { i18n } from '$lib/i18n';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import type { FormatAction } from './editor/formatting';
 

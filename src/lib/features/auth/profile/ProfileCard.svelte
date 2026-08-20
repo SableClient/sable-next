@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
-  import FormActions from '$lib/ui/primitives/FormActions.svelte';
+  import FormActions from '#lib/ui/primitives/FormActions.svelte';
 
   interface Props {
     userId: string;

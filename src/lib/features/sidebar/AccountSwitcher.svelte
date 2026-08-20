@@ -1,15 +1,15 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { ProfileView } from '@/generated/ProfileView';
-  import { useCoreClient } from '$lib/core/context';
-  import { pushOverride } from '$lib/features/notifications/push-config';
-  import { dropPushSubscription } from '$lib/features/notifications/web-push';
-  import { i18n } from '$lib/i18n';
+  import type { ProfileView } from '#src/generated/ProfileView';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { pushOverride } from '#lib/features/notifications/push-config.js';
+  import { dropPushSubscription } from '#lib/features/notifications/web-push.js';
+  import { i18n } from '#lib/i18n.js';
   import { DropdownMenu } from 'bits-ui';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import ProfileCard from '$lib/ui/primitives/ProfileCard.svelte';
-  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
   import './sidebar-tools.css';
 
@@ -24,7 +24,7 @@
   let switching = $state(false);
   let profile = $state<ProfileView | null>(null);
   let initials = $derived(
-    core.session ? core.session.user_id.replace(/^@/, '').charAt(0).toUpperCase() || '?' : '?'
+    core.session ? core.session.user_id.replace(/^#src/, '').charAt(0).toUpperCase() || '?' : '?'
   );
   let activeProfile = $derived(profile?.user_id === core.session?.user_id ? profile : null);
   let displayName = $derived(activeProfile?.display_name ?? core.session?.user_id ?? '?');
@@ -51,18 +51,18 @@
     switching = true;
     try {
       await core.switchAccount(accountId);
-      await goto(resolve('/home'));
+      await goto(resolve('home'));
     } finally {
       switching = false;
     }
   }
 
   function openAddAccount(): void {
-    void goto(resolve('/login?addAccount=1'));
+    void goto(resolve('login?addAccount=1'));
   }
 
   function openProfile(): void {
-    void goto(resolve('/settings/account'));
+    void goto(resolve('settings/account'));
   }
 
   // The pusher goes first: once the session ends there is no way to tell the

@@ -6,8 +6,8 @@
   import MoreIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 
-  import { i18n } from '$lib/i18n';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import ReactionPicker from './ReactionPicker.svelte';
 

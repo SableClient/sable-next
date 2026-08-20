@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import SableBrandMark from '$lib/ui/SableBrandMark.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
 
   interface Props {
     hasLoggedInBefore: boolean;

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MutualRoomView } from '@/generated/MutualRoomView';
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import type { MutualRoomView } from '#src/generated/MutualRoomView';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   interface Props {
     kind: 'rooms' | 'spaces';

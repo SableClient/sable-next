@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Collapsible } from 'bits-ui';
-  import type { TimelineItemView } from '@/generated/TimelineItemView';
+  import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
-  import { i18n } from '$lib/i18n';
+  import { i18n } from '#lib/i18n.js';
 
   import { stateEventText } from './state-event-text';
   import { FOLD_SUMMARY_COUNT } from './timeline-format';

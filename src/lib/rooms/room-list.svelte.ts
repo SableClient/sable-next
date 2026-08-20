@@ -1,14 +1,14 @@
 import { createContext } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-import type { CoreEvent } from '@/generated/CoreEvent';
-import type { NotificationModeView } from '@/generated/NotificationModeView';
-import type { RoomSummary } from '@/generated/RoomSummary';
-import type { SubscriptionId } from '@/generated/SubscriptionId';
-import { applyDiffs } from '@/transport';
+import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { NotificationModeView } from '#src/generated/NotificationModeView';
+import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { SubscriptionId } from '#src/generated/SubscriptionId';
+import { applyDiffs } from '#src/transport';
 
-import { bufferSubscription } from '$lib/core/buffered-subscription';
-import type { CoreClient } from '$lib/core/client.svelte';
+import { bufferSubscription } from '#lib/core/buffered-subscription.js';
+import type { CoreClient } from '#lib/core/client.svelte.js';
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 

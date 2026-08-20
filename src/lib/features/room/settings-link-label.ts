@@ -1,5 +1,5 @@
-import { t } from '$lib/i18n';
-import { findCategory, findSettingByFocusId } from '$lib/settings/registry';
+import { t } from '#lib/i18n.js';
+import { findCategory, findSettingByFocusId } from '#lib/settings/registry.js';
 
 import type { SettingsLink } from './settings-link';
 

@@ -1,8 +1,8 @@
-import type { SubscriptionId } from '@/generated/SubscriptionId';
-import type { TimelineItemView } from '@/generated/TimelineItemView';
-import { applyDiffs } from '@/transport';
+import type { SubscriptionId } from '#src/generated/SubscriptionId';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import { applyDiffs } from '#src/transport';
 
-import type { CoreClient } from '$lib/core/client.svelte';
+import type { CoreClient } from '#lib/core/client.svelte.js';
 
 export type BackwardPaginationState = 'idle' | 'loading' | 'end';
 export type ForwardPaginationState = 'idle' | 'loading' | 'end';

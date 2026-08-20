@@ -1,6 +1,6 @@
 <script lang="ts">
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   interface Props {
     expanded: boolean;

@@ -1,4 +1,4 @@
-import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
+import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 
 export type HierarchyRoom = {
   room: SpaceHierarchyRoomView;

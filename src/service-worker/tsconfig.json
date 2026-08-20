@@ -1,0 +1,9 @@
+{
+  "extends": "$app/tsconfig/service-worker",
+  "include": ["index.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}

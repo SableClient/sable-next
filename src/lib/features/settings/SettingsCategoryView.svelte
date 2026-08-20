@@ -1,27 +1,27 @@
 <script lang="ts">
   import { page } from '$app/state';
 
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Select from '$lib/ui/primitives/Select.svelte';
-  import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
-  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
-  import Switch from '$lib/ui/primitives/Switch.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 
-  import { buildSettingsLink } from '$lib/features/room/settings-link';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import { syncNativeTelemetryConsent } from '$lib/observability/native-consent';
-  import { settingFocusId } from '$lib/settings/registry';
-  import type { SettingDefinition, SettingsCategory } from '$lib/settings/registry';
-  import { preferences, setPreference } from '$lib/settings/preferences.svelte';
-  import type { Preferences } from '$lib/settings/preferences.svelte';
+  import { buildSettingsLink } from '#lib/features/room/settings-link.js';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { syncNativeTelemetryConsent } from '#lib/observability/native-consent.js';
+  import { settingFocusId } from '#lib/settings/registry.js';
+  import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import type { Preferences } from '#lib/settings/preferences.svelte.js';
 
-  import NotificationDefaults from '$lib/features/notifications/NotificationDefaults.svelte';
-  import PushGateway from '$lib/features/notifications/PushGateway.svelte';
+  import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
+  import PushGateway from '#lib/features/notifications/PushGateway.svelte';
   import StateEventTool from './StateEventTool.svelte';
 
   interface Props {

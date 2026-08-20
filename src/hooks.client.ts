@@ -1,9 +1,10 @@
 import * as Sentry from '@sentry/sveltekit';
+import type { HandleClientError } from '@sveltejs/kit/hooks';
 
-import { syncNativeTelemetryConsent } from '$lib/observability/native-consent';
-import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '$lib/observability/scrubbers';
-import { preferences } from '$lib/settings/preferences.svelte';
-import { CoreError } from '@/transport';
+import { syncNativeTelemetryConsent } from '#lib/observability/native-consent.js';
+import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import { CoreError } from '#src/transport';
 
 const dsn = import.meta.env.VITE_SENTRY_DSN;
 const environment = import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.MODE;
@@ -92,4 +93,13 @@ if (dsn && preferences.errorReporting) {
 // The native process has its own DSN baked in and drops everything until told.
 syncNativeTelemetryConsent(preferences.errorReporting);
 
-export const handleError = Sentry.handleErrorWithSentry();
+export const handleError: HandleClientError = (input) => {
+  if (input.kind !== 'unknown') return;
+
+  Sentry.captureException(input.error, {
+    mechanism: {
+      type: 'auto.function.sveltekit.handle_error',
+      handled: false,
+    },
+  });
+};

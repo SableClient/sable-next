@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { SABLE_SOURCE_URL } from '$lib/config/links';
-  import { i18n } from '$lib/i18n';
+  import { SABLE_SOURCE_URL } from '#lib/config/links.js';
+  import { i18n } from '#lib/i18n.js';
 </script>
 
 <footer class="auth-footer">

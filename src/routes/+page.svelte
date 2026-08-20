@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { useCoreClient } from '$lib/core/context';
+  import { useCoreClient } from '#lib/core/context.js';
 
   const core = useCoreClient();
 
@@ -9,6 +9,6 @@
      decision has to wait for the status to settle rather than sample it once. */
   $effect(() => {
     if (core.status === 'idle' || core.status === 'starting') return;
-    void goto(resolve(core.status === 'ready' ? '/home' : '/login'), { replaceState: true });
+    void goto(core.status === 'ready' ? resolve('home') : resolve('login'), { replaceState: true });
   });
 </script>

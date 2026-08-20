@@ -4,12 +4,12 @@
   import { get } from 'svelte/store';
   import { createVirtualizer } from '@tanstack/svelte-virtual';
 
-  import type { MemberView } from '@/generated/MemberView';
-  import type { TimelineItemView } from '@/generated/TimelineItemView';
-  import { i18n } from '$lib/i18n';
-  import type { RoomTimeline } from '$lib/rooms/timeline.svelte';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import type { MemberView } from '#src/generated/MemberView';
+  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import { i18n } from '#lib/i18n.js';
+  import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   import TimelineItem from './TimelineItem.svelte';
   import type { MatrixLink } from './matrix-link';
@@ -49,7 +49,7 @@
     unreadCountAfter,
     visibleTimelineItems,
   } from './timeline-format';
-  import { preferences } from '$lib/settings/preferences.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
 
   interface Props {

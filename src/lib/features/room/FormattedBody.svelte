@@ -1,9 +1,9 @@
 <script lang="ts">
   import { on } from 'svelte/events';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
 
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';

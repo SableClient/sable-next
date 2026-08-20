@@ -1,6 +1,10 @@
 const AUTH_ROUTES = new Set(['login', 'register']);
 
-export function homeserverFromAuthUrl(url: URL, routeId: string | null): string | null {
+type AuthUrl = Pick<URL, 'pathname'> & {
+  searchParams: Pick<URLSearchParams, 'get'>;
+};
+
+export function homeserverFromAuthUrl(url: AuthUrl, routeId: string | null): string | null {
   const queryHomeserver = url.searchParams.get('server')?.trim();
   if (queryHomeserver) return queryHomeserver;
   // `/login/verify`, `/register/recovery` and `/register/profile` sit in the
@@ -21,7 +25,7 @@ export function homeserverFromAuthUrl(url: URL, routeId: string | null): string 
   }
 }
 
-export function registrationTokenFromAuthUrl(url: URL): string | null {
+export function registrationTokenFromAuthUrl(url: AuthUrl): string | null {
   if (!url.pathname.split('/').includes('register')) return null;
 
   for (const key of ['registration_token', 'registrationToken', 'token']) {

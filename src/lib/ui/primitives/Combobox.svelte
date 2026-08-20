@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Combobox as BitsCombobox } from 'bits-ui';
-  import { i18n } from '$lib/i18n';
+  import { i18n } from '#lib/i18n.js';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import TextInput from './TextInput.svelte';
   import type { HTMLInputAttributes } from 'svelte/elements';

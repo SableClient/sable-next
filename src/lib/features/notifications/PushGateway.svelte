@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { runtimeConfig } from '$lib/config/runtime-config';
-  import { i18n } from '$lib/i18n';
-  import { setPreference } from '$lib/settings/preferences.svelte';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
+  import { i18n } from '#lib/i18n.js';
+  import { setPreference } from '#lib/settings/preferences.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import {
     hasCompleteOverride,

@@ -7,18 +7,18 @@
 
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { roomPathParamFromId, useRoomList } from '$lib/rooms/room-list.svelte';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import Label from '$lib/ui/primitives/Label.svelte';
-  import OptionCards from '$lib/ui/primitives/OptionCards.svelte';
-  import Select from '$lib/ui/primitives/Select.svelte';
-  import Switch from '$lib/ui/primitives/Switch.svelte';
-  import TextArea from '$lib/ui/primitives/TextArea.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
+  import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
+  import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     /** Preselects the parent space, so creating from inside a space stays there. */

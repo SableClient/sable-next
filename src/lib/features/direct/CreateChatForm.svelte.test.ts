@@ -9,13 +9,13 @@ const core = vi.hoisted(() => ({
 
 const navigation = vi.hoisted(() => ({ goto: vi.fn<() => Promise<void>>() }));
 
-vi.mock('$lib/core/context', () => ({ useCoreClient: () => core }));
+vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
 vi.mock('$app/navigation', () => ({ goto: navigation.goto }));
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string>) =>
     path.replace('[roomId]', params.roomId),
 }));
-vi.mock('$lib/i18n', () => ({
+vi.mock('#lib/i18n.js', () => ({
   i18n: {
     subscribe(run: (value: { t: (key: string) => string }) => void) {
       run({ t: (key) => key });
@@ -23,7 +23,7 @@ vi.mock('$lib/i18n', () => ({
     },
   },
 }));
-vi.mock('$lib/rooms/room-list.svelte', () => ({
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParamFromId: (roomId: string) => encodeURIComponent(roomId),
 }));
 

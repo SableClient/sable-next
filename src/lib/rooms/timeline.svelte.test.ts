@@ -1,8 +1,8 @@
 import { expect, test, vi } from 'vitest';
 
-import type { CoreEvent } from '@/generated/CoreEvent';
-import type { TimelineItemView } from '@/generated/TimelineItemView';
-import type { CoreClient } from '$lib/core/client.svelte';
+import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { RoomTimeline } from './timeline.svelte';
 

@@ -2,10 +2,10 @@
   import { Dialog } from 'bits-ui';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import type { RecoveryStateView } from '@/generated/RecoveryStateView';
-  import { i18n } from '$lib/i18n';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import type { RecoveryStateView } from '#src/generated/RecoveryStateView';
+  import { i18n } from '#lib/i18n.js';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import VerifyDeviceOptions from './VerifyDeviceOptions.svelte';
 
   interface Props {

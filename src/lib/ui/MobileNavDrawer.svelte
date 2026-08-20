@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
-  import { i18n } from '$lib/i18n';
-  import SidebarNav from '$lib/features/sidebar/SidebarNav.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import SidebarNav from '#lib/features/sidebar/SidebarNav.svelte';
   import {
     finishSwipeGesture,
     startSwipeGesture,

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { MemberView } from '@/generated/MemberView';
-  import type { ProfileView } from '@/generated/ProfileView';
-  import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
+  import type { MemberView } from '#src/generated/MemberView';
+  import type { ProfileView } from '#src/generated/ProfileView';
+  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import { DropdownMenu } from 'bits-ui';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -23,14 +23,14 @@
 
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { MutualRoomView } from '@/generated/MutualRoomView';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import ProfileCard from '$lib/ui/primitives/ProfileCard.svelte';
-  import Skeleton from '$lib/ui/primitives/Skeleton.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import type { MutualRoomView } from '#src/generated/MutualRoomView';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
+  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
   import MutualRoomsPanel from './MutualRoomsPanel.svelte';

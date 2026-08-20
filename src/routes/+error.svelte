@@ -2,11 +2,11 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { i18n } from '$lib/i18n';
-  import Button from '$lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   function reloadApp(): void {
-    void goto(resolve('/home'));
+    void goto(resolve('home'));
   }
 </script>
 

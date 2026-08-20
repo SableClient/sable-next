@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SpaceHierarchyRoomView } from '@/generated/SpaceHierarchyRoomView';
+  import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
   import { DropdownMenu } from 'bits-ui';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
@@ -8,10 +8,10 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
-  import { i18n } from '$lib/i18n';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import type { HierarchyRoom, HierarchySection } from './space-hierarchy';
   import { initials } from './timeline-format';
 

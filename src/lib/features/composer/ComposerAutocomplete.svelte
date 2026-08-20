@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
-  import MediaImage from '$lib/ui/MediaImage.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import type { Suggestion } from './autocomplete';
 

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { ImageUsageView } from '@/generated/ImageUsageView';
-  import type { PackImageView } from '@/generated/PackImageView';
+  import type { ImageUsageView } from '#src/generated/ImageUsageView';
+  import type { PackImageView } from '#src/generated/PackImageView';
   import { Popover } from 'bits-ui';
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 
-  import { i18n } from '$lib/i18n';
-  import BottomSheet from '$lib/ui/primitives/BottomSheet.svelte';
-  import EmoteBoard from '$lib/ui/primitives/EmoteBoard.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
 
   interface Props {
     roomId: string;

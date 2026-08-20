@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { saveFile, savesNatively } from '$lib/platform/files';
-  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { saveFile, savesNatively } from '#lib/platform/files.js';
+  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
 
   interface Props {
     source: string;

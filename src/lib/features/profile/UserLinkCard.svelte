@@ -1,15 +1,15 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
 
-  import type { ProfileView } from '@/generated/ProfileView';
+  import type { ProfileView } from '#src/generated/ProfileView';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { roomSectionPath } from '$lib/rooms/permalink';
-  import { useRoomList } from '$lib/rooms/room-list.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   interface Props {
     userId: string;
@@ -26,7 +26,7 @@
   let failed = $state(false);
 
   let name = $derived(profile?.display_name ?? userId);
-  let initials = $derived(name.replace(/^@/, '').slice(0, 1).toUpperCase());
+  let initials = $derived(name.replace(/^#src/, '').slice(0, 1).toUpperCase());
 
   $effect(() => {
     const wanted = userId;
@@ -59,7 +59,6 @@
     try {
       const roomId = await core.createDm(userId);
       const target = roomSectionPath(roomList.rooms, roomId);
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route
       await goto(target, { replaceState: true });
     } catch (error) {
       console.warn('[sable profile] could not open a chat', error);

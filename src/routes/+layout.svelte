@@ -6,11 +6,11 @@
   import { Tooltip } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import '../styles.css';
-  import { createCoreClient } from '$lib/core/client.svelte';
-  import { provideCoreClient } from '$lib/core/context';
-  import CoreHealthBanner from '$lib/ui/CoreHealthBanner.svelte';
-  import TelemetryConsentBanner from '$lib/ui/TelemetryConsentBanner.svelte';
-  import favicon from '$lib/assets/favicon.png';
+  import { createCoreClient } from '#lib/core/client.svelte.js';
+  import { provideCoreClient } from '#lib/core/context.js';
+  import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
+  import TelemetryConsentBanner from '#lib/ui/TelemetryConsentBanner.svelte';
+  import favicon from '#lib/assets/favicon.png';
 
   interface Props {
     children: Snippet;

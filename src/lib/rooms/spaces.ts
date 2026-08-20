@@ -1,4 +1,4 @@
-import type { RoomSummary } from '@/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 
 export function unreadSpaceIds(
   spaces: readonly RoomSummary[],

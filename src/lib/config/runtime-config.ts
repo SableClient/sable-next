@@ -49,7 +49,7 @@ let loading: Promise<RuntimeConfig> | null = null;
 /** Read once per session. A network failure is left uncached so that being
     offline at boot does not disable push until the tab is reloaded. */
 export function runtimeConfig(): Promise<RuntimeConfig> {
-  loading ??= fetch(asset('/config.json'), { cache: 'no-cache' })
+  loading ??= fetch(asset('config.json'), { cache: 'no-cache' })
     .then((response) => (response.ok ? (response.json() as Promise<unknown>) : null))
     .then(parseRuntimeConfig)
     .catch(() => {

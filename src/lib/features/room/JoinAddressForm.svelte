@@ -1,13 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { roomPathParamFromId } from '$lib/rooms/room-list.svelte';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import FormField from '$lib/ui/primitives/FormField.svelte';
-  import TextInput from '$lib/ui/primitives/TextInput.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import { parseJoinAddress } from './join-address';
 

@@ -4,15 +4,15 @@
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import { cubicOut } from 'svelte/easing';
-  import { i18n } from '$lib/i18n';
+  import { i18n } from '#lib/i18n.js';
   import {
     finishSwipeGesture,
     startSwipeGesture,
     updateSwipeGesture,
     type SwipeGesture,
-  } from '$lib/ui/swipe-gesture';
+  } from '#lib/ui/swipe-gesture.js';
   import { AUTH_CARD_MOTION_MS } from './auth-flow.svelte';
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
 
   interface Props {
     activeIndex: number;

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { useCoreClient } from '$lib/core/context';
-  import { cachedMediaUrl, loadMediaUrl, mediaAspectRatio } from '$lib/ui/media-url';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { cachedMediaUrl, loadMediaUrl, mediaAspectRatio } from '#lib/ui/media-url.js';
 
   interface Props {
     source: string;

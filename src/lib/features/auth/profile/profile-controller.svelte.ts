@@ -1,5 +1,5 @@
-import type { CoreClient } from '$lib/core/client.svelte';
-import { t } from '$lib/i18n';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
 
 export function revokeAvatarPreview(preview: string | null): void {
   if (preview) URL.revokeObjectURL(preview);

@@ -2,7 +2,7 @@ import {
   findCategory,
   findSettingByFocusId,
   SETTINGS_DEVICES_SECTION,
-} from '$lib/settings/registry';
+} from '#lib/settings/registry.js';
 
 export interface SettingsLink {
   section: string;

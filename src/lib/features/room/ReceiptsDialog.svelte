@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { MemberView } from '@/generated/MemberView';
+  import type { MemberView } from '#src/generated/MemberView';
 
-  import { i18n } from '$lib/i18n';
-  import DialogFrame from '$lib/ui/primitives/DialogFrame.svelte';
-  import EmptyState from '$lib/ui/primitives/EmptyState.svelte';
-  import IdentityRow from '$lib/ui/primitives/IdentityRow.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
+  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
 
   import { initials, senderColor } from './timeline-format';
 

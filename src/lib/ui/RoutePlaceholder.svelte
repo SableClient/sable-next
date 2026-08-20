@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { i18n } from '$lib/i18n';
+  import { i18n } from '#lib/i18n.js';
 
   interface Props {
     title?: string;

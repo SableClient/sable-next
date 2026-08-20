@@ -1,5 +1,5 @@
-import { CoreError } from '@/transport';
-import { t } from '$lib/i18n';
+import { CoreError } from '#src/transport';
+import { t } from '#lib/i18n.js';
 
 export function logAuthenticationFailure(operation: string, value: unknown): void {
   const error = value instanceof CoreError ? value.detail : { code: 'unexpected' };

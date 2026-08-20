@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
   import Button from './primitives/Button.svelte';
 
   const core = useCoreClient();

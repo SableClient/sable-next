@@ -3,7 +3,11 @@
   import { on } from 'svelte/events';
   import { invoke, isTauri } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { callbackChannelName, redirectLoginType, scrubbedCallbackPath } from '$lib/auth/redirect';
+  import {
+    callbackChannelName,
+    redirectLoginType,
+    scrubbedCallbackPath,
+  } from '#lib/auth/redirect.js';
 
   interface Props {
     onCallback: (url: string) => void;

@@ -3,15 +3,15 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { RoomPermissionsView } from '@/generated/RoomPermissionsView';
-import type { RoomSummary } from '@/generated/RoomSummary';
+import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 
 const coreStub = vi.hoisted(() => ({
   roomPermissions: vi.fn(),
 }));
 
-vi.mock('$lib/core/context', () => ({ useCoreClient: () => coreStub }));
-vi.mock('$lib/i18n', () => ({
+vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
+vi.mock('#lib/i18n.js', () => ({
   i18n: {
     subscribe(run: (value: { t: (key: string) => string }) => void) {
       run({ t: (key) => key });

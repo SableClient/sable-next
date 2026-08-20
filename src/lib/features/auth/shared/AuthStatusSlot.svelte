@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   interface Props {
     loading?: boolean;

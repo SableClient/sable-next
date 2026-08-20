@@ -1,9 +1,9 @@
 import { page } from '$app/state';
 
-import type { NotificationView } from '@/generated/NotificationView';
+import type { NotificationView } from '#src/generated/NotificationView';
 
-import type { CoreClient } from '$lib/core/client.svelte';
-import { preferences } from '$lib/settings/preferences.svelte';
+import type { CoreClient } from '#lib/core/client.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { body, enabled, tag, title } from './present';
 

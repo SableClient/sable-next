@@ -6,18 +6,18 @@
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
   import { invoke, isTauri } from '@tauri-apps/api/core';
 
-  import type { DeviceView } from '@/generated/DeviceView';
-  import type { EncryptionStatusView } from '@/generated/EncryptionStatusView';
-  import { CoreError } from '@/transport';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n, t } from '$lib/i18n';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import AppPageShell from '$lib/ui/primitives/AppPageShell.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import SettingsSection from '$lib/ui/primitives/SettingsSection.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
-  import StatusBadge from '$lib/ui/primitives/StatusBadge.svelte';
+  import type { DeviceView } from '#src/generated/DeviceView';
+  import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+  import { CoreError } from '#src/transport';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n, t } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
 

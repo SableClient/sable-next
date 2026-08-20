@@ -1,5 +1,5 @@
-import type { MemberView } from '@/generated/MemberView';
-import type { PackImageView } from '@/generated/PackImageView';
+import type { MemberView } from '#src/generated/MemberView';
+import type { PackImageView } from '#src/generated/PackImageView';
 import { expect, test } from 'vitest';
 
 import type { AutocompleteQuery } from './autocomplete';

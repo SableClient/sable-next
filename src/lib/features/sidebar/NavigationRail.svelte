@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { Component } from 'svelte';
-  import type { RoomSummary } from '@/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { i18n } from '$lib/i18n';
-  import { roomPathParam } from '$lib/rooms/room-list.svelte';
-  import Tooltip from '$lib/ui/primitives/Tooltip.svelte';
-  import MediaImage from '$lib/ui/MediaImage.svelte';
+  import { i18n } from '#lib/i18n.js';
+  import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
@@ -47,7 +47,7 @@
 
   let items = $derived<readonly RailItem[]>([
     {
-      href: resolve('/home'),
+      href: resolve('home'),
       activePrefix: '/home',
       icon: HouseIcon,
       label: 'nav.home',
@@ -55,13 +55,13 @@
       unreadCount: homeHighlight ? homeUnread : undefined,
     },
     {
-      href: resolve('/navigate'),
+      href: resolve('navigate'),
       activePrefix: '/navigate',
       icon: MagnifyingGlassIcon,
       label: 'nav.navigate',
     },
     {
-      href: resolve('/direct'),
+      href: resolve('direct'),
       activePrefix: '/direct',
       icon: ChatsIcon,
       label: 'nav.direct',
@@ -87,7 +87,7 @@
   );
 
   const createItem: RailItem = {
-    href: resolve('/create-room'),
+    href: resolve('create-room'),
     activePrefix: '/create-room',
     icon: PlusIcon,
     label: 'nav.createRoom',
@@ -253,6 +253,7 @@
             >
           </a>
         {/snippet}
+
         <Tooltip label={$i18n.t(createItem.label)} side="right" {trigger} />
       </li>
     </ul>

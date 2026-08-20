@@ -1,21 +1,21 @@
 <script lang="ts">
-  import type { ImageUsageView } from '@/generated/ImageUsageView';
-  import type { MemberView } from '@/generated/MemberView';
-  import type { PackImageView } from '@/generated/PackImageView';
+  import type { ImageUsageView } from '#src/generated/ImageUsageView';
+  import type { MemberView } from '#src/generated/MemberView';
+  import type { PackImageView } from '#src/generated/PackImageView';
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
   import type { Snippet } from 'svelte';
 
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { pickFiles } from '$lib/platform/files';
-  import { BREAKPOINTS } from '$lib/ui/breakpoints';
-  import { cachedMediaUrl, loadMediaUrl } from '$lib/ui/media-url';
-  import { createMediaQuery } from '$lib/ui/media-query.svelte';
-  import Alert from '$lib/ui/primitives/Alert.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
-  import Spinner from '$lib/ui/primitives/Spinner.svelte';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { pickFiles } from '#lib/platform/files.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import ComposerAttachments from './ComposerAttachments.svelte';
   import ComposerAutocomplete from './ComposerAutocomplete.svelte';

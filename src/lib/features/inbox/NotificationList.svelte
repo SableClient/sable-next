@@ -1,17 +1,17 @@
 <script lang="ts">
-  import type { RoomSummary } from '@/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/RoomSummary';
   import { SvelteSet } from 'svelte/reactivity';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
 
   import { resolve } from '$app/paths';
-  import { useCoreClient } from '$lib/core/context';
-  import { i18n } from '$lib/i18n';
-  import { formatDate, formatTime, initials } from '$lib/features/room/timeline-format';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { formatDate, formatTime, initials } from '#lib/features/room/timeline-format.js';
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
-  import { roomPathParam, useRoomList } from '$lib/rooms/room-list.svelte';
-  import Avatar from '$lib/ui/primitives/Avatar.svelte';
-  import Button from '$lib/ui/primitives/Button.svelte';
-  import IconButton from '$lib/ui/primitives/IconButton.svelte';
+  import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   interface Props {
     filter: NotificationFilter;
