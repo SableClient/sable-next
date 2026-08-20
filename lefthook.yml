@@ -42,6 +42,9 @@ pre-push:
     - merge
     - rebase
   jobs:
+    - name: svelte-check
+      run: pnpm exec svelte-check --tsconfig ./tsconfig.json --fail-on-warnings
+
     - name: rust-clippy
       glob:
         - '*.rs'
