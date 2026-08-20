@@ -6,11 +6,11 @@
   "iconURL": "https://raw.githubusercontent.com/SableClient/sable-next/main/src-tauri/icons/icon.png",
   "website": "https://github.com/SableClient/sable-next",
   "tintColor": "#5CA399",
-  "featuredApps": ["moe.sable.next"],
+  "featuredApps": ["moe.sable.next.nightly"],
   "apps": [
     {
       "name": "Sable Next",
-      "bundleIdentifier": "moe.sable.next",
+      "bundleIdentifier": "moe.sable.next.nightly",
       "developerName": "SableClient",
       "subtitle": "Sable Next for iOS (nightly)",
       "localizedDescription": "Sable Next for iOS. Nightly builds from main; unsigned, resigned at install by AltStore/SideStore.",

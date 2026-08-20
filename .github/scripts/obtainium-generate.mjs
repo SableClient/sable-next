@@ -10,15 +10,16 @@ if (!version || !tag || !outputPath) {
 }
 
 const repository = 'SableClient/sable-next';
+const isNightly = tag === 'nightly';
 const apkName = `sable-next-${version}-android-universal.apk`;
 const apkUrl = `https://github.com/${repository}/releases/download/${tag}/${apkName}`;
 
 // Obtainium fills in every other setting from its own defaults on import.
 const additionalSettings = {
-  about: 'The next Sable Matrix client',
+  about: `The next Sable Matrix client${isNightly ? ' (nightly)' : ''}`,
   // The nightly tag name never changes, so the version has to come from the
   // release date instead.
-  ...(tag === 'nightly' && {
+  ...(isNightly && {
     includePrereleases: true,
     useLatestAssetDateAsReleaseDate: true,
     releaseDateAsVersion: true,
@@ -29,10 +30,10 @@ const additionalSettings = {
 const config = {
   apps: [
     {
-      id: 'moe.sable.next',
+      id: isNightly ? 'moe.sable.next.nightly' : 'moe.sable.next',
       url: `https://github.com/${repository}`,
       author: 'SableClient',
-      name: 'Sable Next',
+      name: isNightly ? 'Sable Next Nightly' : 'Sable Next',
       installedVersion: null,
       latestVersion: version,
       apkUrls: JSON.stringify([[apkName, apkUrl]]),

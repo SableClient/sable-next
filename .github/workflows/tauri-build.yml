@@ -93,6 +93,8 @@ jobs:
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && format('https://github.com/{0}/releases/download/nightly/latest.json', github.repository) || '' }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_ORG: ${{ vars.SENTRY_ORG }}
       SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
@@ -161,6 +163,8 @@ jobs:
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -204,11 +208,17 @@ jobs:
 
       - name: Stamp release version into tauri.conf.json
         shell: bash
-        run: node .github/scripts/set-tauri-version.mjs "$VERSION" $VERSION_ARGS
+        run: |
+          args="$VERSION_ARGS"
+          [ -n "$UPDATER_ENDPOINT" ] && args="$args --updater-endpoint=$UPDATER_ENDPOINT"
+          node .github/scripts/set-tauri-version.mjs "$VERSION" $args
 
       - name: Build desktop bundle
         shell: bash
-        run: pnpm tauri build --config src-tauri/tauri.ci.conf.json ${{ matrix.tauri-args }}
+        run: |
+          config='src-tauri/tauri.ci.conf.json'
+          [ "$IS_NIGHTLY" = 'true' ] && config="${config},src-tauri/tauri.nightly.conf.json"
+          pnpm tauri build --config "$config" ${{ matrix.tauri-args }}
 
       - name: Normalize bundle names
         shell: bash
@@ -268,6 +278,9 @@ jobs:
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && format('https://github.com/{0}/releases/download/nightly/latest.json', github.repository) || '' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -298,11 +311,16 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Stamp release version into tauri.conf.json
-        run: node .github/scripts/set-tauri-version.mjs "$VERSION"
+        run: |
+          args=''
+          [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
+          node .github/scripts/set-tauri-version.mjs "$VERSION" $args
 
       - name: Build Android bundles
         run: |
-          pnpm tauri android build --config src-tauri/tauri.ci.conf.json --apk --aab --target aarch64 armv7
+          config='src-tauri/tauri.ci.conf.json'
+          [ "$IS_NIGHTLY" = 'true' ] && config="${config},src-tauri/tauri.nightly.conf.json"
+          pnpm tauri android build --config "$config" --apk --aab --target aarch64 armv7
           out='src-tauri/gen/android/app/build/outputs'
           apk="$(find "$out/apk" -name '*.apk' -type f | head -n 1)"
           aab="$(find "$out/bundle" -name '*.aab' -type f | head -n 1)"
@@ -353,6 +371,7 @@ jobs:
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -394,7 +413,9 @@ jobs:
       - name: Build unsigned iOS bundle
         id: ipa
         run: |
-          pnpm tauri ios build --config src-tauri/tauri.ci.conf.json --no-sign --ci
+          config='src-tauri/tauri.ci.conf.json'
+          [ "$IS_NIGHTLY" = 'true' ] && config="${config},src-tauri/tauri.nightly.conf.json"
+          pnpm tauri ios build --config "$config" --no-sign --ci
           ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
           [ -n "$ipa" ] || { echo 'No iOS IPA found' >&2; exit 1; }
           target="$(dirname "$ipa")/sable-next-${VERSION}-ios-arm64.ipa"
@@ -548,3 +569,27 @@ jobs:
                 echo "Removing superseded nightly asset: $name"
                 gh release delete-asset nightly "$name" --yes
               done
+
+  updater-manifest:
+    name: Publish updater manifest
+    needs: [setup-release, desktop, android, ios]
+    if: ${{ always() && needs.setup-release.result == 'success' && needs.desktop.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Build updater manifest
+        run: node .github/scripts/build-updater-manifest.mjs
+      - name: Upload updater manifest
+        if: ${{ hashFiles('latest.json') != '' }}
+        run: gh release upload "$TAG" latest.json --clobber

@@ -6,6 +6,7 @@ import process from 'node:process';
 const args = process.argv.slice(2);
 const foldNightlyIntoPatch = args.includes('--apple-short-version');
 const msiVersion = args.includes('--msi');
+const updaterEndpoint = args.find((arg) => arg.startsWith('--updater-endpoint='))?.slice(19) ?? '';
 const [version] = args.filter((arg) => !arg.startsWith('--'));
 
 if (!version || !/^\d+\.\d+\.\d+/.test(version)) {
@@ -50,5 +51,10 @@ if (msiVersion) {
 const file = 'src-tauri/tauri.conf.json';
 const config = JSON.parse(readFileSync(file, 'utf8'));
 config.version = stampedVersion;
+if (updaterEndpoint) {
+  config.plugins ??= {};
+  config.plugins.updater ??= {};
+  config.plugins.updater.endpoints = [updaterEndpoint];
+}
 writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`Set ${file} version to ${stampedVersion}`);
