@@ -5,7 +5,9 @@
   "identifier": "moe.sable.next",
   "plugins": {
     "updater": {
-      "endpoints": ["https://github.com/SableClient/sable-next/releases/latest/download/latest.json"]
+      "endpoints": [
+        "https://github.com/SableClient/sable-next/releases/latest/download/latest.json"
+      ]
     }
   },
   "build": {
