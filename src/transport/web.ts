@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/sveltekit';
 
 import type { Command } from '@/generated/Command';
-import type { AccountCommandOk } from '@/generated/AccountCommandOk';
 import type { CommandOk } from '@/generated/CommandOk';
 import type { CoreEvent } from '@/generated/CoreEvent';
 import type { WorkerMessage, WorkerRequest } from '@/worker/protocol';
@@ -21,7 +20,7 @@ function requestLabel(request: WorkerRequest): RequestLabel | undefined {
 export function createWebTransport(): Transport {
   const listeners = new Set<(event: CoreEvent) => void>();
   // Which reply belongs to which id is a runtime fact, so it cannot be typed.
-  type Reply = CommandOk | AccountCommandOk | Uint8Array<ArrayBuffer> | string | null;
+  type Reply = CommandOk | Uint8Array<ArrayBuffer> | string | null;
   const pending = new Map<
     number,
     { resolve: (value: Reply) => void; reject: (error: unknown) => void }
