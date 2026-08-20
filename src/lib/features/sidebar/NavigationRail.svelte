@@ -22,23 +22,37 @@
     avatar?: string | null;
     navigateHref?: string;
     unread?: boolean;
+    unreadCount?: number;
   };
 
   interface Props {
     spaces: readonly RoomSummary[];
     unreadSpaceIds?: ReadonlySet<string>;
+    homeUnread?: number;
+    homeHighlight?: boolean;
+    directUnread?: number;
     mobile?: boolean;
     onNavigate?: (href: string) => void;
   }
 
-  let { spaces, unreadSpaceIds = new Set(), mobile = false, onNavigate }: Props = $props();
+  let {
+    spaces,
+    unreadSpaceIds = new Set(),
+    homeUnread = 0,
+    homeHighlight = false,
+    directUnread = 0,
+    mobile = false,
+    onNavigate,
+  }: Props = $props();
 
-  const items: readonly RailItem[] = [
+  let items = $derived<readonly RailItem[]>([
     {
       href: resolve('/home'),
       activePrefix: '/home',
       icon: HouseIcon,
       label: 'nav.home',
+      unread: homeUnread > 0,
+      unreadCount: homeHighlight ? homeUnread : undefined,
     },
     {
       href: resolve('/navigate'),
@@ -51,8 +65,9 @@
       activePrefix: '/direct',
       icon: ChatsIcon,
       label: 'nav.direct',
+      unreadCount: directUnread,
     },
-  ];
+  ]);
 
   let spaceItems = $derived<RailItem[]>(
     spaces.map((space) => {
@@ -141,7 +156,9 @@
                   {/if}
                 </span>
               {/if}
-              {#if item.unread}
+              {#if item.unreadCount}
+                <span class="unread-count" aria-hidden="true">{item.unreadCount}</span>
+              {:else if item.unread}
                 <span class="unread-dot" aria-hidden="true"></span>
               {/if}
             </a>
@@ -206,7 +223,9 @@
                     {/if}
                   </span>
                 {/if}
-                {#if item.unread}
+                {#if item.unreadCount}
+                  <span class="unread-count" aria-hidden="true">{item.unreadCount}</span>
+                {:else if item.unread}
                   <span class="unread-dot" aria-hidden="true"></span>
                 {/if}
               </a>
@@ -350,6 +369,25 @@
     right: 0.125rem;
     top: 0.125rem;
     width: 0.625rem;
+  }
+
+  .unread-count {
+    align-items: center;
+    background: var(--sable-primary-main);
+    border: 2px solid var(--sable-bg-container);
+    border-radius: 0.625rem;
+    box-sizing: border-box;
+    color: var(--sable-primary-on-main);
+    display: flex;
+    font-size: 0.625rem;
+    font-weight: var(--font-weight-bold);
+    justify-content: center;
+    line-height: 1;
+    min-width: 1.125rem;
+    padding: 0 0.1875rem;
+    position: absolute;
+    right: -0.125rem;
+    top: -0.125rem;
   }
 
   :global(.space-image) {

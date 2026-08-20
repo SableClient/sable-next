@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from '$lib/i18n';
+  import type { RoomSummary } from '@/generated/RoomSummary';
   import { onMount } from 'svelte';
   import { useRoomList } from '$lib/rooms/room-list.svelte';
   import { unreadSpaceIds } from '$lib/rooms/spaces';
@@ -32,7 +33,47 @@
 
     return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
+  let claimedRoomIds = $derived(
+    new Set(
+      roomList.rooms
+        .filter((room) => room.is_space && room.state === 'joined')
+        .flatMap((space) => space.space_children.map((child) => child.room_id))
+    )
+  );
   let unreadSpaces = $derived(unreadSpaceIds(spaces, roomList.rooms, roomList.mutedRoomIds));
+  let homeCounts = $derived(
+    unreadCounts(
+      roomList.rooms.filter(
+        (room) =>
+          room.state === 'joined' &&
+          !room.is_space &&
+          !room.is_direct &&
+          !claimedRoomIds.has(room.room_id) &&
+          !roomList.mutedRoomIds.has(room.room_id)
+      )
+    )
+  );
+  let homeUnread = $derived(homeCounts.highlight || homeCounts.unread);
+  let homeHighlight = $derived(homeCounts.highlight > 0);
+  let directCounts = $derived(
+    unreadCounts(
+      roomList.rooms.filter(
+        (room) =>
+          room.state === 'joined' && room.is_direct && !roomList.mutedRoomIds.has(room.room_id)
+      )
+    )
+  );
+  let directUnread = $derived(directCounts.highlight || directCounts.unread);
+
+  function unreadCounts(rooms: readonly RoomSummary[]) {
+    return rooms.reduce(
+      (total, room) => ({
+        unread: total.unread + room.unread,
+        highlight: total.highlight + room.highlight,
+      }),
+      { unread: 0, highlight: 0 }
+    );
+  }
 
   onMount(() => {
     const storedWidth = Number.parseInt(localStorage.getItem(ROOM_NAV_STORAGE_KEY) ?? '', 10);
@@ -95,7 +136,15 @@
   {#if mobile}
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="navigation-main">
-        <NavigationRail {spaces} unreadSpaceIds={unreadSpaces} mobile {onNavigate} />
+        <NavigationRail
+          {spaces}
+          unreadSpaceIds={unreadSpaces}
+          {homeUnread}
+          {homeHighlight}
+          {directUnread}
+          mobile
+          {onNavigate}
+        />
         <RoomNav {onNavigate} />
       </div>
       <UserQuickTools mobile {onNavigate} />
@@ -103,7 +152,13 @@
   {:else}
     <nav class="desktop-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="desktop-navigation-main">
-        <NavigationRail {spaces} unreadSpaceIds={unreadSpaces} />
+        <NavigationRail
+          {spaces}
+          unreadSpaceIds={unreadSpaces}
+          {homeUnread}
+          {homeHighlight}
+          {directUnread}
+        />
         <RoomNav width={roomNavWidth} {collapsed} />
         <button
           type="button"
