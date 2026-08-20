@@ -33,6 +33,8 @@ type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 const maxAttachmentBytes = 100 * 1024 * 1024;
 const profileCacheFreshMs = 10 * 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
+const MAX_PROFILE_CACHE_ENTRIES = 256;
+const MAX_RELATIONS_CACHE_ENTRIES = 128;
 
 async function resolveHomeserverInPage(
   homeserver: string,
@@ -431,6 +433,10 @@ export class CoreClient {
           fetchedAt: Date.now(),
           profile: response.profile,
         });
+        if (this.profileCache.size > MAX_PROFILE_CACHE_ENTRIES) {
+          const oldest = this.profileCache.keys().next().value;
+          if (oldest !== undefined) this.profileCache.delete(oldest);
+        }
         return response.profile;
       });
     this.profileRequests.set(userId, { accountId, request });
@@ -460,6 +466,10 @@ export class CoreClient {
     });
     const relations = { mutualRooms: response.mutual_rooms, ignored: response.ignored };
     this.relationsCache.set(userId, { accountId, fetchedAt: Date.now(), relations });
+    if (this.relationsCache.size > MAX_RELATIONS_CACHE_ENTRIES) {
+      const oldest = this.relationsCache.keys().next().value;
+      if (oldest !== undefined) this.relationsCache.delete(oldest);
+    }
     return relations;
   }
 

@@ -12,6 +12,7 @@ const aspectRatios = new Map<string, number>();
    so the least recently read entry is never one on screen. */
 const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
+const MAX_MEDIA_METADATA = 512;
 let objectUrlBytes = 0;
 
 function cacheKey(source: string, width: number, height: number): string {
@@ -46,6 +47,10 @@ function measure(source: string, type: string, blob: Blob): Promise<void> | null
     .then((bitmap) => {
       if (bitmap.width > 0 && bitmap.height > 0) {
         aspectRatios.set(source, bitmap.width / bitmap.height);
+        if (aspectRatios.size > MAX_MEDIA_METADATA) {
+          const oldest = aspectRatios.keys().next().value;
+          if (oldest !== undefined) aspectRatios.delete(oldest);
+        }
       }
       bitmap.close();
     })
@@ -112,6 +117,10 @@ export function loadMediaUrl(
   pending.set(key, request);
   void request.catch(() => {
     unavailable.add(key);
+    if (unavailable.size > MAX_MEDIA_METADATA) {
+      const oldest = unavailable.values().next().value;
+      if (oldest !== undefined) unavailable.delete(oldest);
+    }
   });
   return request;
 }

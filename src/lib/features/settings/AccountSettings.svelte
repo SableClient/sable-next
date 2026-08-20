@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
+
   import type { ProfileView } from '#src/generated/ProfileView';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -29,6 +31,10 @@
   );
   let avatarUrl = $derived(avatarPreview ?? profile?.avatar_url ?? null);
   let nameChanged = $derived(displayName !== (profile?.display_name ?? ''));
+
+  onDestroy(() => {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+  });
 
   $effect(() => {
     if (!userId) return;

@@ -92,6 +92,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 use url::Url;
 
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
+const MAX_CACHED_INACTIVE_TIMELINES: usize = 4;
 
 type ProfileResponse = matrix_sdk::ruma::api::client::profile::get_profile::v3::Response;
 
@@ -516,6 +517,7 @@ pub struct Core {
     events: mpsc::UnboundedSender<CoreEvent>,
     next_subscription: AtomicU32,
     next_log_id: AtomicU64,
+    next_timeline_access: AtomicU64,
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
     session_store_lock: Mutex<()>,
@@ -535,6 +537,7 @@ pub struct Core {
 struct CachedTimeline {
     timeline: Arc<Timeline>,
     hidden_events: bool,
+    last_access: u64,
 }
 
 enum PendingLogin {
@@ -593,6 +596,7 @@ impl Core {
             notification_content: AtomicBool::new(false),
             next_subscription: AtomicU32::new(1),
             next_log_id: AtomicU64::new(1),
+            next_timeline_access: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
             session_store_lock: Mutex::new(()),
@@ -636,6 +640,10 @@ impl Core {
 
     fn allocate_subscription(&self) -> SubscriptionId {
         SubscriptionId(self.next_subscription.fetch_add(1, Ordering::Relaxed))
+    }
+
+    fn next_timeline_access(&self) -> u64 {
+        self.next_timeline_access.fetch_add(1, Ordering::Relaxed)
     }
 
     async fn accounts(&self) -> Result<AccountRegistry, CommandErr> {
@@ -2186,8 +2194,6 @@ impl Core {
 
             let mut stream = Box::pin(stream);
             while let Some(diffs) = stream.next().await {
-                controller.add_one_page();
-
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
                     view::enrich_room_fields(&client, diff, &mut room_cache).await;
@@ -2614,10 +2620,14 @@ impl Core {
         room_id: &OwnedRoomId,
         hidden_events: bool,
     ) -> Result<Arc<Timeline>, CommandErr> {
-        if let Some(cached) = self.timelines.lock().await.get(room_id)
-            && cached.hidden_events == hidden_events
         {
-            return Ok(cached.timeline.clone());
+            let mut timelines = self.timelines.lock().await;
+            if let Some(cached) = timelines.get_mut(room_id)
+                && cached.hidden_events == hidden_events
+            {
+                cached.last_access = self.next_timeline_access();
+                return Ok(cached.timeline.clone());
+            }
         }
 
         let room = self.room(room_id).await?;
@@ -2627,15 +2637,42 @@ impl Core {
                 .map_err(|error| self.failed("build timeline", error))?,
         );
 
+        let subscribed_room_ids = self
+            .subscriptions
+            .lock()
+            .await
+            .values()
+            .filter_map(|subscription| match &subscription.kind {
+                SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
+                SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+            })
+            .collect::<std::collections::HashSet<_>>();
         let mut timelines = self.timelines.lock().await;
-        match timelines.get(room_id) {
-            Some(cached) if cached.hidden_events == hidden_events => Ok(cached.timeline.clone()),
+        match timelines.get_mut(room_id) {
+            Some(cached) if cached.hidden_events == hidden_events => {
+                cached.last_access = self.next_timeline_access();
+                Ok(cached.timeline.clone())
+            }
             _ => {
+                let inactive = timelines
+                    .keys()
+                    .filter(|id| !subscribed_room_ids.contains(*id))
+                    .count();
+                if inactive >= MAX_CACHED_INACTIVE_TIMELINES
+                    && let Some(evicted) = timelines
+                        .iter()
+                        .filter(|(id, _)| !subscribed_room_ids.contains(*id))
+                        .min_by_key(|(_, cached)| cached.last_access)
+                        .map(|(id, _)| id.clone())
+                {
+                    timelines.remove(&evicted);
+                }
                 timelines.insert(
                     room_id.clone(),
                     CachedTimeline {
                         timeline: timeline.clone(),
                         hidden_events,
+                        last_access: self.next_timeline_access(),
                     },
                 );
                 Ok(timeline)

@@ -400,6 +400,45 @@ async fn concurrent_first_access_returns_one_live_timeline() {
 }
 
 #[tokio::test]
+async fn inactive_timelines_use_least_recently_used_eviction() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    server.mock_room_state_encryption().plain().mount().await;
+    let room_ids = [
+        room_id!("!room1:example.org").to_owned(),
+        room_id!("!room2:example.org").to_owned(),
+        room_id!("!room3:example.org").to_owned(),
+        room_id!("!room4:example.org").to_owned(),
+        room_id!("!room5:example.org").to_owned(),
+    ];
+    for room_id in &room_ids {
+        server.sync_joined_room(&client, room_id).await;
+    }
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    for room_id in &room_ids[..4] {
+        core.live_timeline(room_id, false).await.unwrap();
+    }
+    core.live_timeline(&room_ids[0], false).await.unwrap();
+    core.live_timeline(&room_ids[4], false).await.unwrap();
+
+    let timelines = core.timelines.lock().await;
+    assert_eq!(timelines.len(), 4);
+    assert!(timelines.contains_key(&room_ids[0]));
+    assert!(!timelines.contains_key(&room_ids[1]));
+}
+
+#[tokio::test]
 async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
