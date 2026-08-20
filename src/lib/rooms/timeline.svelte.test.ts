@@ -261,12 +261,19 @@ class ReachedEndPaginationCore extends EventSettledPaginationCore {
   }
 }
 
-test('settles a reached-end live page without waiting for a diff', async () => {
+test('settles a reached-end live page after its diff arrives', async () => {
   const core = new ReachedEndPaginationCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   await timeline.start('!room:example.org');
 
   await expect(timeline.paginateBackward(25)).resolves.toBe(true);
+  expect(timeline.backwardPagination).toBe('loading');
+
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_front', value: item('history') }],
+  });
 
   expect(timeline.backwardPagination).toBe('end');
 });

@@ -409,10 +409,13 @@ test('anchors at latest after delayed initial history arrives', async ({
   await page.setViewportSize({ width: 1280, height: 900 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  // The short snapshot needs another history page. Do not reveal it at its
+  // intermediate position before the landing can anchor the complete page.
+  await expect(timeline.initial).toHaveCount(1);
 
   await expect(timeline.message('Delayed history 0')).toBeVisible({ timeout: 2_000 });
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  await expect(timeline.initial).toHaveCount(0);
 });
 
 test('anchors delayed history inserted after a stable date divider', async ({

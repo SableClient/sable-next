@@ -128,7 +128,7 @@ export class RoomTimeline {
           this.backwardPagination = state;
         } else {
           this.backwardPaginationCompletion = state;
-          if (!this.settleBackwardPagination(response.reached_end)) {
+          if (!this.settleBackwardPagination()) {
             this.backwardPaginationSettleTimer = setTimeout(() => {
               this.backwardPaginationSettleTimer = null;
               this.settleBackwardPagination(true);

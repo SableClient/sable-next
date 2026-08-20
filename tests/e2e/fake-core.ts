@@ -322,7 +322,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                       if (!room) throw new Error('unknown timeline room');
                                       state.page += 1;
                                       const reachedEnd =
-                                        workerMode === 'endless_history' ? false : state.page >= 2;
+                                        workerMode === 'endless_history'
+                                          ? false
+                                          : workerMode === 'delayed_history' || state.page >= 2;
                                       this.emit({
                                         type: 'timeline_pagination',
                                         subscription,

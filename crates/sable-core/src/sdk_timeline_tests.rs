@@ -31,7 +31,7 @@ use super::{
 };
 
 #[tokio::test]
-async fn started_sync_enters_offline_recovery_after_failure() {
+async fn started_sync_recovers_after_an_offline_failure() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     server
@@ -40,11 +40,11 @@ async fn started_sync_enters_offline_recovery_after_failure() {
         .expect(1..)
         .mount()
         .await;
-    server.mock_versions().error500().expect(1..).mount().await;
+    let versions_failure = server.mock_versions().error500().mount_as_scoped().await;
 
     let sync_service = session::start_sync(client).await.unwrap();
     let mut states = sync_service.state();
-    let terminal_state = tokio::time::timeout(Duration::from_secs(2), async {
+    let offline_state = tokio::time::timeout(Duration::from_secs(2), async {
         loop {
             let state = states.next().await.expect("open sync state stream");
             if matches!(state, SyncState::Offline | SyncState::Error(_)) {
@@ -55,7 +55,22 @@ async fn started_sync_enters_offline_recovery_after_failure() {
     .await
     .expect("sync failure state");
 
-    assert!(matches!(terminal_state, SyncState::Offline));
+    assert!(matches!(offline_state, SyncState::Offline));
+
+    drop(versions_failure);
+    server.mock_versions().ok().expect(1..).mount().await;
+    let recovered_state = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let state = states.next().await.expect("open sync state stream");
+            if matches!(state, SyncState::Running) {
+                break state;
+            }
+        }
+    })
+    .await
+    .expect("sync recovery state");
+
+    assert!(matches!(recovered_state, SyncState::Running));
     sync_service.stop().await;
 }
 
