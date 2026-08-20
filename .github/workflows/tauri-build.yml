@@ -316,12 +316,31 @@ jobs:
           [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
           node .github/scripts/set-tauri-version.mjs "$VERSION" $args
 
+      - name: Prepare nightly Android package
+        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
+        run: |
+          app_dir=src-tauri/gen/android/app
+          build_src_dir=src-tauri/gen/android/buildSrc
+          nightly_package_dir=moe/sable/next/nightly
+          nightly_source_dir="$RUNNER_TEMP/android-nightly-package"
+
+          # Tauri resolves sources from the active identifier's package path.
+          mkdir -p "$nightly_source_dir"
+          cp -a "$app_dir/src/main/java/moe/sable/next" "$nightly_source_dir/app"
+          cp -a "$build_src_dir/src/main/java/moe/sable/next" "$nightly_source_dir/buildSrc"
+          find "$nightly_source_dir" -type f -exec sed -i \
+            's/moe\.sable\.next/moe.sable.next.nightly/g' {} +
+          rm -rf "$app_dir/src/main/java/moe/sable/next" "$build_src_dir/src/main/java/moe/sable/next"
+          mkdir -p "$app_dir/src/main/java/moe/sable/next" "$build_src_dir/src/main/java/moe/sable/next"
+          mv "$nightly_source_dir/app" "$app_dir/src/main/java/$nightly_package_dir"
+          mv "$nightly_source_dir/buildSrc" "$build_src_dir/src/main/java/$nightly_package_dir"
+          sed -i 's/moe\.sable\.next/moe.sable.next.nightly/g' \
+            "$app_dir/build.gradle.kts" "$app_dir/src/main/AndroidManifest.xml"
+
       - name: Build Android bundles
         run: |
           config_args=(--config src-tauri/tauri.ci.conf.json)
           [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
-          rm -rf src-tauri/gen/android
-          pnpm tauri android init --ci "${config_args[@]}"
           pnpm tauri android build "${config_args[@]}" --apk --aab --target aarch64 armv7
           out='src-tauri/gen/android/app/build/outputs'
           apk="$(find "$out/apk" -name '*.apk' -type f | head -n 1)"
