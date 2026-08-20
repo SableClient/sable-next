@@ -1,6 +1,8 @@
 [advisories]
 version = 2
-yanked = "deny"
+# matrix-sdk 0.18 still resolves blake3's yanked arrayref 0.3.9; Cargo cannot
+# select arrayref 0.3.10 without introducing additional duplicate dependencies.
+yanked = "warn"
 unmaintained = "workspace"
 ignore = [
   { id = "RUSTSEC-2026-0194", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
@@ -36,6 +38,10 @@ deny = []
 # semver requirements. Keep the duplicate check strict for any new versions.
 skip = [
   { crate = "base64@0.21.7", reason = "swift-rs has not adopted base64 0.22 yet" },
+  { crate = "jni@0.21.1", reason = "Tauri and reqwest require jni 0.21 while the Android app uses jni 0.22" },
+  { crate = "jni@0.22.4", reason = "The Android app uses jni 0.22 while Tauri and reqwest require jni 0.21" },
+  { crate = "jni-sys@0.3.1", reason = "jni 0.21 requires jni-sys 0.3 while jni 0.22 requires jni-sys 0.4" },
+  { crate = "jni-sys@0.4.1", reason = "jni 0.22 requires jni-sys 0.4 while jni 0.21 requires jni-sys 0.3" },
   { crate = "base64@0.22.1", reason = "transitive dependencies have not adopted the base64 0.23 line" },
   { crate = "nix@0.30.1", reason = "wl-clipboard-rs has not adopted nix 0.31 yet" },
   { crate = "quick-xml@0.38.4", reason = "Tauri's plist pins quick-xml 0.38; wayland-scanner uses 0.41" },
@@ -81,8 +87,10 @@ skip = [
   { crate = "toml_edit@0.20.2", reason = "legacy Tauri dependencies require toml_edit 0.20" },
   { crate = "windows-link@0.1.3", reason = "windows 0.61 has an incompatible windows-link requirement" },
   { crate = "windows-sys@0.45.0", reason = "legacy platform crates require windows-sys 0.45" },
+  { crate = "windows-sys@0.52.0", reason = "ring and platform dependencies have incompatible windows-sys requirements" },
   { crate = "windows-sys@0.59.0", reason = "Tauri plugin dependencies require windows-sys 0.59" },
   { crate = "windows-sys@0.60.2", reason = "Tauri dependencies require windows-sys 0.60" },
+  { crate = "windows-sys@0.61.2", reason = "current Tauri and async dependencies require windows-sys 0.61" },
   { crate = "windows-targets@0.42.2", reason = "legacy platform crates require windows-targets 0.42" },
   { crate = "windows-targets@0.52.6", reason = "Tauri dependencies require windows-targets 0.52" },
   { crate = "windows_aarch64_gnullvm@0.42.2", reason = "paired with windows-targets 0.42.2 above" },
@@ -109,4 +117,8 @@ skip-tree = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/eleboucher/matrix-rust-sdk"]
+allow-git = [
+  "https://github.com/eleboucher/matrix-rust-sdk",
+  "https://github.com/eleboucher/tauri-plugin-notifications",
+  "https://github.com/SableClient/tauri-plugin-edge-to-edge",
+]

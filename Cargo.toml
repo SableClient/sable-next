@@ -15,10 +15,6 @@ futures-util = "0.3"
 tracing = "0.1"
 url = "2"
 ts-rs = "12"
-# The published crate hands back a bare token; the fork takes a VAPID key and
-# returns the keys a UnifiedPush distributor produces.
-tauri-plugin-notifications = { git = "https://github.com/eleboucher/tauri-plugin-notifications.git", rev = "a98f23f2b11fe082b1a2bdd87b527133e775acbd", default-features = false }
-
 [workspace.lints.rust]
 warnings = "deny"
 unsafe_code = "deny"

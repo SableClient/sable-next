@@ -32,7 +32,9 @@ tauri-plugin-os = "2.3.2"
 tauri-plugin-clipboard-manager = "2.3.2"
 # Push stays off here: the feature pulls in Firebase and APNs, which belong to
 # the mobile builds, not the desktop one.
-tauri-plugin-notifications = { workspace = true }
+# The published crate hands back a bare token; the fork takes a VAPID key and
+# returns the keys a UnifiedPush distributor produces.
+tauri-plugin-notifications = { version = "0.5.0-rc.11", git = "https://github.com/eleboucher/tauri-plugin-notifications.git", rev = "a98f23f2b11fe082b1a2bdd87b527133e775acbd", default-features = false }
 sable-core = { path = "../crates/sable-core", version = "0.1.0" }
 tokio = { workspace = true }
 # default-features drags in reqwest and native-tls; ureq is a sync rustls
@@ -50,7 +52,7 @@ sentry = { version = "0.49", default-features = false, features = [
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2.4.1"
-tauri-plugin-notifications = { workspace = true, features = ["notify-rust"] }
+tauri-plugin-notifications = { version = "0.5.0-rc.11", git = "https://github.com/eleboucher/tauri-plugin-notifications.git", rev = "a98f23f2b11fe082b1a2bdd87b527133e775acbd", default-features = false, features = ["notify-rust"] }
 
 # The system bar icon contrast is only reachable through the Activity's window.
 [target."cfg(target_os = \"android\")".dependencies]
@@ -58,10 +60,10 @@ jni = "0.22"
 
 # Push drags in Firebase and APNs, which only these two builds should carry.
 [target."cfg(any(target_os = \"android\", target_os = \"ios\"))".dependencies]
-tauri-plugin-notifications = { workspace = true, features = ["push-notifications"] }
+tauri-plugin-notifications = { version = "0.5.0-rc.11", git = "https://github.com/eleboucher/tauri-plugin-notifications.git", rev = "a98f23f2b11fe082b1a2bdd87b527133e775acbd", default-features = false, features = ["push-notifications"] }
 # Injects the --safe-area-inset-* custom properties: Android reports the system
 # bars to nobody, and `env()` there only covers a display cutout.
-tauri-plugin-edge-to-edge = { git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }
+tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }
 
 [lints]
 workspace = true
