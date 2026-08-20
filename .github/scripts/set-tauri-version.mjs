@@ -5,6 +5,7 @@ import process from 'node:process';
 
 const args = process.argv.slice(2);
 const foldNightlyIntoPatch = args.includes('--apple-short-version');
+const msiVersion = args.includes('--msi');
 const [version] = args.filter((arg) => !arg.startsWith('--'));
 
 if (!version || !/^\d+\.\d+\.\d+/.test(version)) {
@@ -33,6 +34,17 @@ if (foldNightlyIntoPatch) {
     process.exit(1);
   }
   stampedVersion = `${base}.${patch}`;
+}
+
+if (msiVersion) {
+  const nightly = /^(\d+\.\d+\.\d+)-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(
+    version
+  );
+  if (nightly) {
+    const [, base, yy, mm, dd] = nightly;
+    const day = Date.UTC(2000 + +yy, +mm - 1, +dd) / 86_400_000;
+    stampedVersion = `${base}-${day % 65_536}`;
+  }
 }
 
 const file = 'src-tauri/tauri.conf.json';

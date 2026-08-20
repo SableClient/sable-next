@@ -137,22 +137,26 @@ jobs:
             asset-platform: macos-universal
             rust-targets: aarch64-apple-darwin x86_64-apple-darwin
             tauri-args: --target universal-apple-darwin
+            version-args: ''
             bundle-path: target/universal-apple-darwin/release/bundle
           - name: Windows x86_64
             runner: windows-latest
             asset-platform: windows-x86_64
             rust-targets: ''
             tauri-args: ''
+            version-args: --msi
             bundle-path: target/release/bundle
           - name: Linux x86_64
             runner: ubuntu-24.04
             asset-platform: linux-x86_64
             rust-targets: ''
             tauri-args: ''
+            version-args: ''
             bundle-path: target/release/bundle
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
+      VERSION_ARGS: ${{ matrix.version-args }}
       # Read by src-tauri/build.rs, which bakes them into the binary.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
@@ -200,7 +204,7 @@ jobs:
 
       - name: Stamp release version into tauri.conf.json
         shell: bash
-        run: node .github/scripts/set-tauri-version.mjs "$VERSION"
+        run: node .github/scripts/set-tauri-version.mjs "$VERSION" $VERSION_ARGS
 
       - name: Build desktop bundle
         shell: bash
