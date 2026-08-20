@@ -320,6 +320,8 @@ jobs:
         run: |
           config_args=(--config src-tauri/tauri.ci.conf.json)
           [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
+          rm -rf src-tauri/gen/android
+          pnpm tauri android init --ci "${config_args[@]}"
           pnpm tauri android build "${config_args[@]}" --apk --aab --target aarch64 armv7
           out='src-tauri/gen/android/app/build/outputs'
           apk="$(find "$out/apk" -name '*.apk' -type f | head -n 1)"

@@ -45,7 +45,7 @@
   <AuthField fieldId="username" label={$i18n.t('auth.username')}>
     <TextInput
       id="username"
-      value={username}
+      bind:value={username}
       autocomplete="username"
       required
       disabled={isAuthenticating || isCheckingHomeserver}
@@ -58,7 +58,7 @@
   </AuthField>
   <AuthField fieldId="password" label={$i18n.t('auth.password')}>
     <PasswordField
-      value={password}
+      bind:value={password}
       bind:showPassword
       disabled={isAuthenticating || isCheckingHomeserver}
       invalid={invalidField === 'password'}

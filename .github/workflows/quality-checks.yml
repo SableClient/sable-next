@@ -37,6 +37,7 @@ jobs:
         with:
           name: web-assets
           path: |
+            .svelte-kit/generated
             .svelte-kit/output
             dist
             src/generated/wasm
