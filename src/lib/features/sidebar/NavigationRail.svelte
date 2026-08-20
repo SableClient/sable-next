@@ -275,11 +275,6 @@
     padding: 0.5rem 0;
   }
 
-  .rail-scroll > .rail-stack,
-  .rail-scroll > .dynamic-rail-region {
-    transform: translateX(0.25rem);
-  }
-
   .rail-bottom {
     gap: 0.5rem;
     padding: 0.5rem 0 0.75rem;
@@ -300,20 +295,27 @@
     background: currentcolor;
     border-radius: 0 0.25rem 0.25rem 0;
     content: '';
-    height: 1.5rem;
+    display: none;
+    height: 1rem;
     left: -0.75rem;
     position: absolute;
     transform: translateX(-50%);
     width: 3px;
   }
 
-  .rail-item:not(.active)::before {
-    display: none;
+  .rail-item:hover::before {
+    display: block;
+  }
+
+  .rail-item.active::before {
+    display: block;
+    height: 1.5rem;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .rail-item:hover {
       background: var(--sable-bg-container-hover);
+      transform: translateX(0.125rem);
     }
   }
 
@@ -374,7 +376,8 @@
     .rail-item {
       transition:
         border-color var(--motion-normal) var(--motion-easing-standard),
-        color var(--motion-normal) var(--motion-easing-standard);
+        color var(--motion-normal) var(--motion-easing-standard),
+        transform var(--motion-slow) cubic-bezier(0, 0.8, 0.67, 0.97);
     }
   }
 </style>
