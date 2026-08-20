@@ -33,6 +33,14 @@ export default defineConfig({
       testIgnore: /global\.(setup|teardown)\.ts/,
       use: devices['Desktop Chrome'],
     },
+    {
+      // Sable ships an iOS app, whose Tauri webview is WebKit. Keep this
+      // deliberately small so it catches compatibility regressions cheaply.
+      name: 'webkit',
+      dependencies: ['setup'],
+      testMatch: /(?:^|\/)(?:app-shell|login|navigation)\.spec\.ts$/,
+      use: devices['Desktop Safari'],
+    },
   ],
   webServer: {
     command: `pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,

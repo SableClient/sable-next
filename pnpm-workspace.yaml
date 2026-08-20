@@ -1,3 +1,5 @@
+blockExoticSubdeps: true
+
 allowBuilds:
   esbuild: true
   lightningcss: true
