@@ -40,6 +40,30 @@ test('does not retry a failed media request in a render loop', async () => {
   await unmount(instance);
 });
 
+test('renders clickable media as a button', async () => {
+  const onclick = vi.fn();
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/interactive',
+      alt: 'Image',
+      width: 800,
+      height: 600,
+      onclick,
+    },
+  });
+  const image = document.querySelector<HTMLElement>('.media-image');
+  if (!image) throw new Error('interactive media image was not rendered');
+
+  image.click();
+  await tick();
+
+  expect(image.tagName).toBe('BUTTON');
+  expect(onclick).toHaveBeenCalledOnce();
+  await unmount(instance);
+});
+
 test('shares a pending media request across component instances', async () => {
   const createObjectURL = vi.spyOn(URL, 'createObjectURL');
   let resolve!: (bytes: Uint8Array<ArrayBuffer>) => void;

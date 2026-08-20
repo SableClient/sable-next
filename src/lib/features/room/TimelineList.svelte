@@ -71,6 +71,7 @@
     roomId?: string;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
+    onOpenMedia?: (eventId: string) => void;
     readOnly?: boolean;
     canRedactOthers?: boolean;
     scrollLocked?: boolean;
@@ -97,6 +98,7 @@
     roomId,
     members = [],
     onJumpToEvent,
+    onOpenMedia,
     readOnly = false,
     canRedactOthers = false,
     scrollLocked = false,
@@ -795,6 +797,7 @@
                   {members}
                   layout={preferences.layout}
                   {onJumpToEvent}
+                  {onOpenMedia}
                   onPersonaOpenChange={setPersonaOpen}
                   {roomId}
                 />

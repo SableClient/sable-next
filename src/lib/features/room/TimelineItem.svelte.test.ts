@@ -41,6 +41,20 @@ function item(emote: boolean): TimelineItemView {
   };
 }
 
+function imageItem(): TimelineItemView {
+  return {
+    ...item(false),
+    content: {
+      kind: 'image',
+      body: 'photo.png',
+      source: 'mxc://example.org/photo',
+      mime: 'image/png',
+      width: 800,
+      height: 600,
+    },
+  };
+}
+
 test('reads an emote as one sentence, with the name only in the action', async () => {
   const instance = mount(TimelineItem, {
     target: document.body,
@@ -63,6 +77,25 @@ test('keeps the sender header for an ordinary message', async () => {
 
   expect(document.querySelector('header .sender')?.textContent).toBe('Alice');
   expect(document.querySelector('.emote')).toBeNull();
+  await unmount(instance);
+});
+
+test('opens an image from a mobile pointer interaction', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onOpenMedia = vi.fn();
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: imageItem(), collapsed: false, onOpenMedia },
+  });
+  await tick();
+  const image = document.querySelector<HTMLButtonElement>('.media-image');
+  if (!image) throw new Error('media trigger was not rendered');
+
+  image.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
+  image.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
+  image.click();
+
+  expect(onOpenMedia).toHaveBeenCalledWith('$item');
   await unmount(instance);
 });
 

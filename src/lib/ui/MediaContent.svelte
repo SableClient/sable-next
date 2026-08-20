@@ -142,6 +142,9 @@
     aspect-ratio: 16 / 9;
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
+    height: 100%;
+    margin-top: 0;
+    object-fit: contain;
     width: 100%;
   }
 

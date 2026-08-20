@@ -54,6 +54,7 @@
     layout?: TimelineLayout;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
+    onOpenMedia?: (eventId: string) => void;
     onPersonaOpenChange?: (open: boolean) => void;
   }
 
@@ -79,6 +80,7 @@
     layout = 'modern',
     members = [],
     onJumpToEvent,
+    onOpenMedia,
     onPersonaOpenChange,
   }: Props = $props();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
@@ -392,6 +394,7 @@
           intrinsicWidth={item.content.width}
           intrinsicHeight={item.content.height}
           mime={item.content.mime}
+          onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
         />
       {:else if item.content.kind === 'image'}
         <MediaImage
@@ -403,6 +406,7 @@
           intrinsicWidth={item.content.width}
           intrinsicHeight={item.content.height}
           mime={item.content.mime}
+          onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
         />
         {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
       {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}

@@ -11,6 +11,7 @@
     intrinsicHeight?: number | null;
     mime?: string | null;
     class?: string;
+    onclick?: () => void;
   }
 
   let {
@@ -22,6 +23,7 @@
     intrinsicHeight = null,
     mime = null,
     class: className = '',
+    onclick,
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
@@ -67,13 +69,34 @@
       active = false;
     };
   });
+
+  function stopTimelinePress(event: PointerEvent): void {
+    event.stopPropagation();
+  }
 </script>
 
-<span class={[className, 'media-image']} style:--media-ratio={aspectRatio}>
-  {#if url}
-    <img class="media-image-content" src={url} {alt} />
-  {/if}
-</span>
+{#if onclick}
+  <button
+    class={[className, 'media-image', 'interactive']}
+    style:--media-ratio={aspectRatio}
+    type="button"
+    aria-label={`Open ${alt || 'media'}`}
+    {onclick}
+    onpointerdown={stopTimelinePress}
+    onpointermove={stopTimelinePress}
+    onpointerup={stopTimelinePress}
+  >
+    {#if url}
+      <img class="media-image-content" src={url} {alt} />
+    {/if}
+  </button>
+{:else}
+  <span class={[className, 'media-image']} style:--media-ratio={aspectRatio}>
+    {#if url}
+      <img class="media-image-content" src={url} {alt} />
+    {/if}
+  </span>
+{/if}
 
 <style>
   .media-image {
@@ -88,5 +111,18 @@
     object-fit: contain;
     object-position: left top;
     width: 100%;
+  }
+
+  .media-image.interactive {
+    background: none;
+    border: 0;
+    cursor: zoom-in;
+    padding: 0;
+    text-align: left;
+  }
+
+  .media-image.interactive:focus-visible {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: 0.2rem;
   }
 </style>

@@ -25,6 +25,7 @@
   import RoomReadReceipts from './RoomReadReceipts.svelte';
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
+  import MediaViewer from './MediaViewer.svelte';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
   import { initials } from './timeline-format';
@@ -58,6 +59,20 @@
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
+  let mediaEventId = $state<string | null>(null);
+  let mediaItems = $derived(
+    timeline.items.flatMap((entry) => {
+      if (!entry.event_id || (entry.content.kind !== 'image' && entry.content.kind !== 'sticker'))
+        return [];
+      return [
+        {
+          ...entry.content,
+          eventId: entry.event_id,
+          sender: entry.sender_name ?? entry.sender ?? 'Unknown sender',
+        },
+      ];
+    })
+  );
   let latestReadBy = $derived.by(() => {
     const userId = core.session?.user_id;
     for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
@@ -398,6 +413,10 @@
   function clearComposerContext(): void {
     composerContext = null;
   }
+
+  function openMedia(eventId: string): void {
+    mediaEventId = eventId;
+  }
 </script>
 
 <main class="room-view" aria-label={$i18n.t('timeline.label')}>
@@ -429,6 +448,7 @@
         roomId={resolvedRoomId}
         members={memberLoader.members}
         onJumpToEvent={jumpToEvent}
+        onOpenMedia={openMedia}
         readOnly={permissions ? !permissions.can_post : false}
         canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}
@@ -513,6 +533,14 @@
     {profile}
     failed={profileFailed}
   />
+
+  {#if mediaEventId}
+    <MediaViewer
+      items={mediaItems}
+      selectedEventId={mediaEventId}
+      onClose={() => (mediaEventId = null)}
+    />
+  {/if}
 </main>
 
 <style>
