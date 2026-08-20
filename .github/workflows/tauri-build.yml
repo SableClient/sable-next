@@ -414,7 +414,9 @@ jobs:
       - name: Set up iOS project
         run: |
           brew install cocoapods
-          pnpm tauri ios init --ci
+          config_args=()
+          [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
+          pnpm tauri ios init --ci "${config_args[@]}"
 
       - name: Add Rust target
         run: |
