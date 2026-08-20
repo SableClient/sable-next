@@ -158,6 +158,7 @@
   }
 
   :global(.composer-door svg) {
+    display: block;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }

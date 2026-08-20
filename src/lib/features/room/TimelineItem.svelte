@@ -799,7 +799,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .message.highlighted {
-      animation: jump 6s var(--motion-easing-standard) infinite;
+      animation: jump 6s var(--motion-easing-standard);
     }
   }
 

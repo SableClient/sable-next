@@ -131,6 +131,7 @@
 
 <style>
   .message-actions {
+    align-items: center;
     background: var(--sable-surface-container);
     border: 1px solid var(--sable-surface-container-line);
     border-radius: var(--radius);
@@ -168,6 +169,7 @@
   }
 
   .message-actions :global(button > svg) {
+    display: block;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }

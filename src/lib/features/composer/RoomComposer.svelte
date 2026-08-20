@@ -599,7 +599,7 @@
   }
 
   .composer-row {
-    align-items: end;
+    align-items: center;
     display: flex;
     gap: 0.5rem;
     padding: 0.5rem;
@@ -647,6 +647,7 @@
   }
 
   :global(.composer-format svg) {
+    display: block;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
@@ -677,6 +678,7 @@
   }
 
   :global(.composer-send svg) {
+    display: block;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }

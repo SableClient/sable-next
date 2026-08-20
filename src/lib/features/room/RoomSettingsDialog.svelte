@@ -239,7 +239,7 @@
         description={$i18n.t('room.settingsAccessDescription')}
       >
         <div class="panel">
-          {#if unsettableRule}
+          {#if unsettableRule && canEditAccess}
             <Alert variant="warning" role="status">
               {$i18n.t('room.settingsJoinRuleUnsettable', {
                 rule: $i18n.t(`room.joinRule.${room?.join_rule ?? 'unknown'}`),
