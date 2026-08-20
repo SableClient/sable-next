@@ -5,7 +5,7 @@
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
-  import type { Snippet } from 'svelte';
+  import { onDestroy, type Snippet } from 'svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -130,37 +130,11 @@
     onQuery: (next) => {
       if (!next) dismissedAt = null;
       query = next;
+      if (next?.sigil === '@') void loadMembers();
+      if (next?.sigil === ':') void loadEmotes();
     },
     onNavigate: navigate,
     onFiles: stage,
-  });
-
-  $effect(() => {
-    if (query?.sigil === '@' && loadedMembersFor !== roomId) {
-      loadedMembersFor = roomId;
-      void core.roomMembers(roomId).then(
-        (loaded) => {
-          members = loaded;
-        },
-        () => {
-          loadedMembersFor = null;
-        }
-      );
-    }
-
-    if (query?.sigil === ':' && loadedEmotesFor !== roomId) {
-      loadedEmotesFor = roomId;
-      void core.imagePacks(roomId).then(
-        (packs) => {
-          emotes = packs
-            .flatMap((pack) => pack.images)
-            .filter((image) => image.usage.includes('emoticon'));
-        },
-        () => {
-          loadedEmotesFor = null;
-        }
-      );
-    }
   });
 
   $effect(() => {
@@ -170,11 +144,9 @@
     editor.syncActiveOption();
   });
 
-  $effect(() => {
-    return () => {
-      if (typingTimeout) clearTimeout(typingTimeout);
-      stopTyping();
-    };
+  onDestroy(() => {
+    if (typingTimeout) clearTimeout(typingTimeout);
+    stopTyping();
   });
 
   $effect(() => {
@@ -209,6 +181,28 @@
 
   function stopTyping(): void {
     onTyping(roomId, false).catch(() => {});
+  }
+
+  async function loadMembers(): Promise<void> {
+    if (loadedMembersFor === roomId) return;
+    loadedMembersFor = roomId;
+    try {
+      members = await core.roomMembers(roomId);
+    } catch {
+      loadedMembersFor = null;
+    }
+  }
+
+  async function loadEmotes(): Promise<void> {
+    if (loadedEmotesFor === roomId) return;
+    loadedEmotesFor = roomId;
+    try {
+      emotes = (await core.imagePacks(roomId))
+        .flatMap((pack) => pack.images)
+        .filter((image) => image.usage.includes('emoticon'));
+    } catch {
+      loadedEmotesFor = null;
+    }
   }
 
   function blurEditor(): void {
