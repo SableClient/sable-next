@@ -393,7 +393,10 @@
               {@const room = item.room}
               {@const name = room ? roomName(room) : item.roomId}
               {@const href = roomHref(item)}
-              {@const unread = room?.highlight || room?.unread || 0}
+              {@const unread =
+                room && !roomList.mutedRoomIds.has(room.room_id)
+                  ? room.highlight || room.unread
+                  : 0}
               <div class="room-row-wrap">
                 <a
                   class="room-row sable-selection-layer"

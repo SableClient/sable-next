@@ -32,7 +32,7 @@
 
     return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
-  let unreadSpaces = $derived(unreadSpaceIds(spaces, roomList.rooms));
+  let unreadSpaces = $derived(unreadSpaceIds(spaces, roomList.rooms, roomList.mutedRoomIds));
 
   onMount(() => {
     const storedWidth = Number.parseInt(localStorage.getItem(ROOM_NAV_STORAGE_KEY) ?? '', 10);

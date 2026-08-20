@@ -10,7 +10,10 @@ const pageState = vi.hoisted(() => ({
   params: {},
 }));
 
-const roomsFixture = vi.hoisted(() => ({ rooms: [] as RoomSummary[] }));
+const roomsFixture = vi.hoisted(() => ({
+  rooms: [] as RoomSummary[],
+  mutedRoomIds: new Set<string>(),
+}));
 
 const coreStub = vi.hoisted(() => ({
   roomPermissions: vi.fn(() => new Promise<never>(() => {})),
@@ -75,6 +78,7 @@ beforeEach(() => {
   pageState.url.pathname = '/home';
   pageState.params = {};
   roomsFixture.rooms = [];
+  roomsFixture.mutedRoomIds = new Set();
 });
 
 afterEach(() => {
@@ -174,5 +178,14 @@ test('direct page offers starting a chat instead of creating or browsing rooms',
   ).toEqual(['/direct']);
   expect(document.querySelector('.rooms-heading-label')?.textContent).toBe('nav.chats');
   expect(document.querySelector('.empty-rooms p')?.textContent).toBe('nav.chatsEmpty');
+  await unmount(instance);
+});
+
+test('does not show a badge for a muted room', async () => {
+  roomsFixture.rooms = [makeRoom({ room_id: '!muted:example.org', name: 'Muted', unread: 3 })];
+  roomsFixture.mutedRoomIds = new Set(['!muted:example.org']);
+
+  const instance = await mountNav();
+  expect(document.querySelector('.room-badge')).toBeNull();
   await unmount(instance);
 });

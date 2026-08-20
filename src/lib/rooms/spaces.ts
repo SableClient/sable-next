@@ -2,7 +2,8 @@ import type { RoomSummary } from '@/generated/RoomSummary';
 
 export function unreadSpaceIds(
   spaces: readonly RoomSummary[],
-  rooms: readonly RoomSummary[]
+  rooms: readonly RoomSummary[],
+  mutedRoomIds: ReadonlySet<string> = new Set()
 ): Set<string> {
   const roomsById = new Map(
     rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
@@ -18,7 +19,7 @@ export function unreadSpaceIds(
       const room = roomsById.get(child.room_id);
       if (!room) return false;
       if (room.is_space) return hasUnreadDescendant(room.room_id, visited);
-      return room.unread > 0 || room.highlight > 0;
+      return !mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0);
     });
   }
 
