@@ -38,7 +38,6 @@ pub fn set_status_bar_light(light: bool) -> Result<(), String> {
     call_bar_light("setStatusBarLightNative", light)
 }
 
-/// `light` asks for the icon treatment a light background needs: dark icons.
 #[tauri::command]
 pub fn set_navigation_bar_light(light: bool) -> Result<(), String> {
     call_bar_light("setNavigationBarLightNative", light)

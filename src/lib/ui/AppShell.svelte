@@ -28,7 +28,6 @@
 
 <style>
   .app-shell {
-    /* Tracks the webview resize above the keyboard. */
     height: 100%;
   }
 

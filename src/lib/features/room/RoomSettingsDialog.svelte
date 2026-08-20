@@ -31,7 +31,6 @@
 
   let { open, room, onOpenChange }: Props = $props();
   const core = useCoreClient();
-  const settableRules: JoinRuleView[] = ['public', 'invite', 'knock'];
   let permissions = $state<RoomPermissionsView | null>(null);
 
   let name = $state('');
@@ -44,6 +43,15 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let topic = $derived(room?.topic ?? '');
+  let settableRules = $derived.by(() => {
+    const rules: JoinRuleView[] = ['public', 'invite'];
+    if (room?.supports_knock) rules.push('knock');
+    if (room?.has_space_parent && room.supports_restricted) rules.push('restricted');
+    if (room?.has_space_parent && room.supports_knock_restricted) {
+      rules.push('knock_restricted');
+    }
+    return rules;
+  });
   let savedRule = $derived(settableRules.find((rule) => rule === room?.join_rule) ?? null);
   let joinRule = $derived<JoinRuleView | null>(pendingRule ?? savedRule);
   let unsettableRule = $derived(joinRule === null);
@@ -264,12 +272,36 @@
                 hint: $i18n.t('room.settingsJoinRuleInviteHint'),
                 icon: LockIcon,
               },
-              {
-                value: 'knock',
-                label: $i18n.t('room.settingsJoinRuleKnock'),
-                hint: $i18n.t('room.settingsJoinRuleKnockHint'),
-                icon: HandIcon,
-              },
+              ...(room?.supports_knock
+                ? [
+                    {
+                      value: 'knock' as const,
+                      label: $i18n.t('room.settingsJoinRuleKnock'),
+                      hint: $i18n.t('room.settingsJoinRuleKnockHint'),
+                      icon: HandIcon,
+                    },
+                  ]
+                : []),
+              ...(room?.has_space_parent && room.supports_restricted
+                ? [
+                    {
+                      value: 'restricted' as const,
+                      label: $i18n.t('room.settingsJoinRuleRestricted'),
+                      hint: $i18n.t('room.settingsJoinRuleRestrictedHint'),
+                      icon: LockIcon,
+                    },
+                  ]
+                : []),
+              ...(room?.has_space_parent && room.supports_knock_restricted
+                ? [
+                    {
+                      value: 'knock_restricted' as const,
+                      label: $i18n.t('room.settingsJoinRuleKnockRestricted'),
+                      hint: $i18n.t('room.settingsJoinRuleKnockRestrictedHint'),
+                      icon: HandIcon,
+                    },
+                  ]
+                : []),
             ]}
           />
 

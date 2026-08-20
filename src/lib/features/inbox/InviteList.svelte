@@ -178,7 +178,6 @@
     width: var(--icon-size-small);
   }
 
-  /* One line however many of kind, sender, date and alias the summary has. */
   .meta {
     align-items: center;
     color: var(--sable-surface-var-on-container);

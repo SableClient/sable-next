@@ -21,7 +21,7 @@ use std::{
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
-use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
+use matrix_sdk::deserialized_responses::{RawAnySyncOrStrippedState, SyncOrStrippedState};
 use matrix_sdk::encryption::verification::{
     SasState, SasVerification, VerificationRequest, VerificationRequestState,
 };
@@ -33,8 +33,8 @@ use matrix_sdk::encryption::{
 use matrix_sdk::event_cache::PaginationStatus;
 use matrix_sdk::executor::{AbortOnDrop, JoinHandleExt, spawn};
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
-use matrix_sdk::room::Receipts;
 use matrix_sdk::room::edit::EditedContent;
+use matrix_sdk::room::{ParentSpace, Receipts, Room};
 use matrix_sdk::ruma::api::client::account::IdentityServerInfo;
 use matrix_sdk::ruma::api::client::account::register::v3::Request as RegistrationRequest;
 use matrix_sdk::ruma::api::client::account::request_registration_token_via_email::v3::Request as RegistrationEmailRequest;
@@ -56,7 +56,7 @@ use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
-use matrix_sdk::ruma::events::room::join_rules::{JoinRule, RoomJoinRulesEventContent};
+use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
@@ -73,7 +73,7 @@ use matrix_sdk::ruma::{
     events::room::message::{Relation, RoomMessageEventContent, TextMessageEventContent},
     events::{
         AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent,
-        MessageLikeEventType, poll::unstable_start::UnstablePollStartEventContent,
+        MessageLikeEventType, SyncStateEvent, poll::unstable_start::UnstablePollStartEventContent,
     },
     room_version_rules::RoomVersionRules,
 };
@@ -551,6 +551,31 @@ enum SubscriptionKind {
     Other,
     LiveTimeline(OwnedRoomId),
     FocusedTimeline,
+}
+
+async fn join_rule_support(room: &Room) -> (bool, bool, bool) {
+    let Ok(Some(event)) = room
+        .get_state_event_static::<RoomCreateEventContent>()
+        .await
+    else {
+        return (false, false, false);
+    };
+    let room_version = match event.deserialize() {
+        Ok(SyncOrStrippedState::Sync(SyncStateEvent::Original(event))) => {
+            event.content.room_version
+        }
+        Ok(SyncOrStrippedState::Stripped(event)) => event.content.room_version,
+        _ => return (false, false, false),
+    };
+    let Some(rules) = room_version.rules() else {
+        return (false, false, false);
+    };
+
+    (
+        rules.authorization.knocking,
+        rules.authorization.restricted_join_rule,
+        rules.authorization.knock_restricted_join_rule,
+    )
 }
 
 impl Core {

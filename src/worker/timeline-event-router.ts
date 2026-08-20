@@ -4,7 +4,6 @@ import type { SubscriptionId } from '@/generated/SubscriptionId';
 type TimelineEvent = Extract<CoreEvent, { type: 'timeline_diff' | 'timeline_pagination' }>;
 const MAX_PENDING_EVENTS = 100;
 
-/** Routes timeline events to the port that created their subscription. */
 export class TimelineEventRouter<Owner> {
   private readonly owners = new Map<SubscriptionId, Owner>();
   private readonly pending = new Map<SubscriptionId, TimelineEvent[]>();

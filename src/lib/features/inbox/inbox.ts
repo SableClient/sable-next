@@ -46,7 +46,6 @@ export function countInvites(rooms: readonly RoomSummary[]): number {
   return rooms.reduce((total, room) => total + (room.state === 'invited' ? 1 : 0), 0);
 }
 
-/** The core reports an invitation as a latest event sent by the inviter. */
 export function inviter(room: RoomSummary): string | null {
   return room.latest_event?.sender ?? null;
 }

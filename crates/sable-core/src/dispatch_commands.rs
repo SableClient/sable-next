@@ -702,16 +702,54 @@ macro_rules! dispatch_commands {
             }
 
             Command::SetRoomJoinRule { room_id, rule } => {
-                let rule = match rule {
-                    JoinRuleView::Public => JoinRule::Public,
-                    JoinRuleView::Invite => JoinRule::Invite,
-                    JoinRuleView::Knock => JoinRule::Knock,
+                let room = $self.room(&room_id).await?;
+                let (supports_knock, supports_restricted, supports_knock_restricted) =
+                    join_rule_support(&room).await;
+                let content = match rule {
+                    JoinRuleView::Public => RoomJoinRulesEventContent::new(JoinRule::Public),
+                    JoinRuleView::Invite => RoomJoinRulesEventContent::new(JoinRule::Invite),
+                    JoinRuleView::Knock if supports_knock => {
+                        RoomJoinRulesEventContent::new(JoinRule::Knock)
+                    }
+                    JoinRuleView::Knock => return Err(CommandErr::Unsupported),
+                    JoinRuleView::Restricted if !supports_restricted => {
+                        return Err(CommandErr::Unsupported);
+                    }
+                    JoinRuleView::KnockRestricted if !supports_knock_restricted => {
+                        return Err(CommandErr::Unsupported);
+                    }
+                    JoinRuleView::Restricted | JoinRuleView::KnockRestricted => {
+                        let parents = room
+                            .parent_spaces()
+                            .await
+                            .map_err(|error| $self.room_error("set_room_join_rule: parents", error))?;
+                        pin_mut!(parents);
+                        let mut allow = Vec::new();
+
+                        while let Some(parent) = parents.next().await {
+                            let parent = parent.map_err(|error| {
+                                $self.room_error("set_room_join_rule: parent", error)
+                            })?;
+                            if let ParentSpace::Reciprocal(space) = parent
+                                && space.is_space()
+                            {
+                                allow.push(AllowRule::room_membership(space.room_id().to_owned()));
+                            }
+                        }
+
+                        if allow.is_empty() {
+                            return Err(CommandErr::Denied);
+                        }
+
+                        if matches!(rule, JoinRuleView::Restricted) {
+                            RoomJoinRulesEventContent::restricted(allow)
+                        } else {
+                            RoomJoinRulesEventContent::knock_restricted(allow)
+                        }
+                    }
                 };
 
-                $self
-                    .room(&room_id)
-                    .await?
-                    .send_state_event(RoomJoinRulesEventContent::new(rule))
+                room.send_state_event(content)
                     .await
                     .map_err(|error| $self.room_error("set_room_join_rule", error))?;
 

@@ -833,6 +833,10 @@ pub struct RoomSummary {
     /// `null` until the state event loads, which is not the same as `false`.
     pub encrypted: Option<bool>,
     pub is_space: bool,
+    pub has_space_parent: bool,
+    pub supports_knock: bool,
+    pub supports_restricted: bool,
+    pub supports_knock_restricted: bool,
     /// Already sorted by `order`, then the child event's age.
     #[ts(type = "Array<{ room_id: string, order: string | null, origin_server_ts: number }>")]
     pub space_children: Vec<SpaceChildEdge>,
@@ -933,10 +937,10 @@ pub enum JoinRuleView {
     Invite,
     /// Anyone may ask. A member approves.
     Knock,
+    Restricted,
+    KnockRestricted,
 }
 
-/// Wider than the settable `JoinRuleView`: a UI that cannot name the current
-/// rule would offer to replace it, silently widening or narrowing who may join.
 #[derive(Debug, Clone, Copy, Serialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]

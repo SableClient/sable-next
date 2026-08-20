@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 use std::sync::Arc;
 
+use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
-use matrix_sdk::room::{Room, RoomMember};
+use matrix_sdk::room::{ParentSpace, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
@@ -44,6 +45,10 @@ use crate::protocol::{
 
 pub struct RoomInfo {
     pub is_space: bool,
+    pub has_space_parent: bool,
+    pub supports_knock: bool,
+    pub supports_restricted: bool,
+    pub supports_knock_restricted: bool,
     pub canonical_alias: Option<String>,
     pub children: Vec<SpaceChildEdge>,
     pub tags: Vec<RoomTag>,
@@ -84,6 +89,10 @@ pub fn room_summary<S: BuildHasher>(
             RoomState::Banned => RoomStateView::Banned,
         },
         is_space: info.is_some_and(|i| i.is_space),
+        has_space_parent: info.is_some_and(|i| i.has_space_parent),
+        supports_knock: info.is_some_and(|i| i.supports_knock),
+        supports_restricted: info.is_some_and(|i| i.supports_restricted),
+        supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
         unread,
         highlight,
@@ -162,7 +171,6 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
     }
 }
 
-/// Only `m.room.message` earns a preview.
 fn remote_preview(event: &RemoteLatestEventValue) -> Option<String> {
     let any = event.raw().deserialize().ok()?;
 
@@ -215,6 +223,9 @@ pub async fn enrich_room_fields<S: BuildHasher>(
         let info = match client.get_room(room_id) {
             Some(room) => {
                 let is_space = room.is_space();
+                let has_space_parent = has_space_parent(&room).await;
+                let (supports_knock, supports_restricted, supports_knock_restricted) =
+                    crate::join_rule_support(&room).await;
                 let canonical_alias = room.canonical_alias().map(|alias| alias.to_string());
 
                 let children = if is_space {
@@ -225,6 +236,10 @@ pub async fn enrich_room_fields<S: BuildHasher>(
 
                 RoomInfo {
                     is_space,
+                    has_space_parent,
+                    supports_knock,
+                    supports_restricted,
+                    supports_knock_restricted,
                     canonical_alias,
                     children,
                     tags: room_tags(&room),
@@ -232,6 +247,10 @@ pub async fn enrich_room_fields<S: BuildHasher>(
             }
             None => RoomInfo {
                 is_space: false,
+                has_space_parent: false,
+                supports_knock: false,
+                supports_restricted: false,
+                supports_knock_restricted: false,
                 canonical_alias: None,
                 children: Vec::new(),
                 tags: Vec::new(),
@@ -239,6 +258,23 @@ pub async fn enrich_room_fields<S: BuildHasher>(
         };
         room_cache.insert(room_id.to_owned(), info);
     }
+}
+
+async fn has_space_parent(room: &Room) -> bool {
+    let Ok(parents) = room.parent_spaces().await else {
+        return false;
+    };
+    pin_mut!(parents);
+
+    while let Some(Ok(parent)) = parents.next().await {
+        if let ParentSpace::Reciprocal(space) = parent
+            && space.is_space()
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[must_use]

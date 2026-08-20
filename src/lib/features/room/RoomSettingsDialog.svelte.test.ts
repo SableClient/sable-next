@@ -34,6 +34,10 @@ const room: RoomSummary = {
   state: 'joined',
   encrypted: null,
   is_space: false,
+  has_space_parent: false,
+  supports_knock: true,
+  supports_restricted: true,
+  supports_knock_restricted: true,
   space_children: [],
   unread: 0,
   highlight: 0,
@@ -55,11 +59,18 @@ function permissions(canChangeJoinRule: boolean): RoomPermissionsView {
   };
 }
 
-async function render(canChangeJoinRule: boolean): Promise<ReturnType<typeof mount>> {
+async function render(
+  canChangeJoinRule: boolean,
+  hasSpaceParent = false
+): Promise<ReturnType<typeof mount>> {
   coreStub.roomPermissions.mockResolvedValue(permissions(canChangeJoinRule));
   const instance = mount(RoomSettingsDialog, {
     target: document.body,
-    props: { open: true, room, onOpenChange: () => {} },
+    props: {
+      open: true,
+      room: { ...room, has_space_parent: hasSpaceParent },
+      onOpenChange: () => {},
+    },
   });
   await tick();
   await tick();
@@ -76,7 +87,7 @@ test('does not offer to replace an unsupported join rule without permission', as
 
   expect(document.body.textContent).not.toContain('room.settingsJoinRuleUnsettable');
 
-  void unmount(instance);
+  await unmount(instance);
 });
 
 test('warns authorized users before replacing an unsupported join rule', async () => {
@@ -84,5 +95,15 @@ test('warns authorized users before replacing an unsupported join rule', async (
 
   expect(document.body.textContent).toContain('room.settingsJoinRuleUnsettable');
 
-  void unmount(instance);
+  await unmount(instance);
+});
+
+test('offers space-based rules to a room in a space', async () => {
+  const instance = await render(true, true);
+
+  expect(document.body.textContent).toContain('room.settingsJoinRuleRestricted');
+  expect(document.body.textContent).toContain('room.settingsJoinRuleKnockRestricted');
+  expect(document.body.textContent).not.toContain('room.settingsJoinRuleUnsettable');
+
+  await unmount(instance);
 });

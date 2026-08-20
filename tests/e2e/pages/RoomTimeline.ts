@@ -138,7 +138,6 @@ export class RoomTimeline {
     return sampling;
   }
 
-  /** The first and last row on screen, which is what a reader actually notices. */
   async visibleRange(): Promise<[string, string]> {
     const visible = this.items.filter({ visible: true });
     const [first, last] = await Promise.all([
