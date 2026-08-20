@@ -216,9 +216,9 @@ jobs:
       - name: Build desktop bundle
         shell: bash
         run: |
-          config='src-tauri/tauri.ci.conf.json'
-          [ "$IS_NIGHTLY" = 'true' ] && config="${config},src-tauri/tauri.nightly.conf.json"
-          pnpm tauri build --config "$config" ${{ matrix.tauri-args }}
+          config_args=(--config src-tauri/tauri.ci.conf.json)
+          [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
+          pnpm tauri build "${config_args[@]}" ${{ matrix.tauri-args }}
 
       - name: Normalize bundle names
         shell: bash
@@ -318,9 +318,9 @@ jobs:
 
       - name: Build Android bundles
         run: |
-          config='src-tauri/tauri.ci.conf.json'
-          [ "$IS_NIGHTLY" = 'true' ] && config="${config},src-tauri/tauri.nightly.conf.json"
-          pnpm tauri android build --config "$config" --apk --aab --target aarch64 armv7
+          config_args=(--config src-tauri/tauri.ci.conf.json)
+          [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
+          pnpm tauri android build "${config_args[@]}" --apk --aab --target aarch64 armv7
           out='src-tauri/gen/android/app/build/outputs'
           apk="$(find "$out/apk" -name '*.apk' -type f | head -n 1)"
           aab="$(find "$out/bundle" -name '*.aab' -type f | head -n 1)"
@@ -413,9 +413,9 @@ jobs:
       - name: Build unsigned iOS bundle
         id: ipa
         run: |
-          config='src-tauri/tauri.ci.conf.json'
-          [ "$IS_NIGHTLY" = 'true' ] && config="${config},src-tauri/tauri.nightly.conf.json"
-          pnpm tauri ios build --config "$config" --no-sign --ci
+          config_args=(--config src-tauri/tauri.ci.conf.json)
+          [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
+          pnpm tauri ios build "${config_args[@]}" --no-sign --ci
           ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
           [ -n "$ipa" ] || { echo 'No iOS IPA found' >&2; exit 1; }
           target="$(dirname "$ipa")/sable-next-${VERSION}-ios-arm64.ipa"
