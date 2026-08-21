@@ -6,10 +6,6 @@ inputs:
     description: Whether to build the static web app after generating WASM.
     required: false
     default: 'false'
-  build-command:
-    description: Command used when the app build is enabled.
-    required: false
-    default: pnpm run build
   install-mise-tools:
     description: Whether to install tools declared in mise.toml.
     required: false
@@ -60,4 +56,4 @@ runs:
       if: ${{ inputs.build == 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}
-      run: ${{ inputs.build-command }}
+      run: pnpm run build

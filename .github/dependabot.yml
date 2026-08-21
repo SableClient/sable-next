@@ -4,6 +4,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     labels: [dependencies, github_actions]
     open-pull-requests-limit: 5
     groups:
@@ -14,6 +16,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     labels: [dependencies, javascript]
     open-pull-requests-limit: 5
     groups:
@@ -24,6 +28,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     labels: [dependencies, rust]
     open-pull-requests-limit: 5
     groups:
@@ -34,6 +40,8 @@ updates:
     directory: /infra/web
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     labels: [dependencies, terraform]
     open-pull-requests-limit: 5
     groups:
