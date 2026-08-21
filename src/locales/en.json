@@ -154,6 +154,8 @@
     },
     "menuConvertToGroup": "Convert to group chat",
     "lobbyJoin": "Join",
+    "lobbyKnock": "Ask to join",
+    "lobbyKnockSent": "Request sent",
     "lobbyOpen": "Open",
     "lobbyRemove": "Remove",
     "lobbyMore": "Load more",

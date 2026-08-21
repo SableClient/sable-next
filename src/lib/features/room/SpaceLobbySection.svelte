@@ -13,13 +13,16 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import type { HierarchyRoom, HierarchySection } from './space-hierarchy';
+  import { lobbyAction } from './space-hierarchy';
   import { initials } from './timeline-format';
 
   interface Props {
     section: HierarchySection;
     closed: boolean;
     joinedIds: ReadonlySet<string>;
+    invitedIds: ReadonlySet<string>;
     joining: ReadonlySet<string>;
+    knocked: ReadonlySet<string>;
     canManage: boolean;
     label: (child: SpaceHierarchyRoomView) => string;
     onToggle: (key: string) => void;
@@ -33,7 +36,9 @@
     section,
     closed,
     joinedIds,
+    invitedIds,
     joining,
+    knocked,
     canManage,
     label,
     onToggle,
@@ -94,6 +99,7 @@
         {#each section.rooms as entry (entry.key)}
           {@const child = entry.room}
           {@const joined = joinedIds.has(child.room_id)}
+          {@const action = lobbyAction(child.join_rule, invitedIds.has(child.room_id))}
           <li class="room">
             <Avatar
               src={child.avatar_url}
@@ -128,15 +134,22 @@
                 >
                   <ArrowRightIcon />
                 </IconButton>
-              {:else}
+              {:else if action}
                 <Button
                   size="small"
+                  disabled={knocked.has(child.room_id)}
                   loading={joining.has(child.room_id)}
                   onclick={() => {
                     onJoin(child);
                   }}
                 >
-                  <PlusIcon size={14} />{$i18n.t('room.lobbyJoin')}
+                  <PlusIcon size={14} />{$i18n.t(
+                    knocked.has(child.room_id)
+                      ? 'room.lobbyKnockSent'
+                      : action === 'knock'
+                        ? 'room.lobbyKnock'
+                        : 'room.lobbyJoin'
+                  )}
                 </Button>
               {/if}
               <DropdownMenu.Root>

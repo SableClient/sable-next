@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 
-import { buildHierarchySections } from './space-hierarchy';
+import { buildHierarchySections, lobbyAction } from './space-hierarchy';
 
 function edge(roomId: string, overrides: Partial<SpaceChildEdge> = {}): SpaceChildEdge {
   return { room_id: roomId, order: null, origin_server_ts: 0, suggested: false, ...overrides };
@@ -27,6 +27,19 @@ function room(
     ...overrides,
   };
 }
+
+test.each([
+  ['public', false, 'join'],
+  ['restricted', false, 'join'],
+  ['knock_restricted', false, 'join'],
+  ['knock', false, 'knock'],
+  ['invite', true, 'join'],
+  ['invite', false, null],
+  ['private', false, null],
+  ['unknown', false, null],
+] as const)('selects the supported lobby action for %s rooms', (joinRule, invited, action) => {
+  expect(lobbyAction(joinRule, invited)).toBe(action);
+});
 
 test('rooms follow the order of the parent edges, not the response order', () => {
   const rooms = [

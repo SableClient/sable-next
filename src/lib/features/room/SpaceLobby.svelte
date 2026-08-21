@@ -16,6 +16,7 @@
 
   import {
     buildHierarchySections,
+    lobbyAction,
     type HierarchyRoom,
     type HierarchySection,
   } from './space-hierarchy';
@@ -30,6 +31,7 @@
   const core = useCoreClient();
   const roomList = useRoomList();
   const joining = new SvelteSet<string>();
+  const knocked = new SvelteSet<string>();
   const removed = new SvelteSet<string>();
   const closed = new SvelteSet<string>();
 
@@ -43,6 +45,9 @@
   let canManage = $derived(permissions?.can_manage_children ?? false);
   let joinedIds = $derived(
     new Set(roomList.rooms.filter((room) => room.state === 'joined').map((room) => room.room_id))
+  );
+  let invitedIds = $derived(
+    new Set(roomList.rooms.filter((room) => room.state === 'invited').map((room) => room.room_id))
   );
   let sections = $derived.by<HierarchySection[]>(() => {
     if (spaceId === null) return [];
@@ -64,6 +69,7 @@
     failed = false;
     loading = true;
     removed.clear();
+    knocked.clear();
     closed.clear();
 
     void core
@@ -142,7 +148,13 @@
     joining.add(child.room_id);
     try {
       // The alias is likelier to resolve for a room our server has not seen.
-      await core.joinRoom(child.canonical_alias ?? child.room_id);
+      const address = child.canonical_alias ?? child.room_id;
+      if (lobbyAction(child.join_rule, invitedIds.has(child.room_id)) === 'knock') {
+        await core.knockRoom(address);
+        knocked.add(child.room_id);
+        return;
+      }
+      await core.joinRoom(address);
       open(child);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
@@ -222,7 +234,9 @@
         {section}
         closed={closed.has(section.key)}
         {joinedIds}
+        {invitedIds}
         {joining}
+        {knocked}
         {canManage}
         {label}
         onToggle={toggle}

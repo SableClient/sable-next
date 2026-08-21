@@ -139,7 +139,7 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
             body: remote_preview(&event)?,
             timestamp: event.timestamp().map(|at| at.0.into()),
             sending: false,
-            event_id: event.event_id(),
+            event_id: event.event_id().map(ToOwned::to_owned),
         }),
 
         LatestEventValue::RemoteInvite {

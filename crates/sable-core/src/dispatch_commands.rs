@@ -184,10 +184,12 @@ macro_rules! dispatch_commands {
 
                 match in_reply_to {
                     // `send_reply` fills the thread relation itself.
-                    Some(event_id) => timeline
-                        .send_reply(content.into(), event_id)
-                        .await
-                        .map_err(|error| $self.failed("send_reply", error))?,
+                    Some(event_id) => {
+                        timeline
+                            .send_reply(content.into(), event_id)
+                            .await
+                            .map_err(|error| $self.failed("send_reply", error))?;
+                    }
                     None => {
                         timeline
                             .send(content.into())

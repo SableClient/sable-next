@@ -1,4 +1,5 @@
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
+import type { RoomJoinRuleView } from '#src/generated/RoomJoinRuleView';
 
 export type HierarchyRoom = {
   room: SpaceHierarchyRoomView;
@@ -17,6 +18,12 @@ export type HierarchySection = {
   key: string;
   rooms: HierarchyRoom[];
 };
+
+export function lobbyAction(joinRule: RoomJoinRuleView, invited: boolean): 'join' | 'knock' | null {
+  if (invited || ['public', 'restricted', 'knock_restricted'].includes(joinRule)) return 'join';
+  if (joinRule === 'knock') return 'knock';
+  return null;
+}
 
 /**
  * Groups the tree the way v1's lobby does: the root's own rooms first, then one

@@ -93,17 +93,17 @@ inherits = "dev"
 opt-level = 1
 debug = false
 
-# 0.18.0 plus a fix for an event cache panic that aborts the wasm core. Patching
+# 0.18.0 plus event-cache fixes that prevent invalid linked-chunk indices. Patching
 # one crate alone splits the family into two incompatible copies.
 [patch.crates-io]
-matrix-sdk = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-base = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-common = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-crypto = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-indexeddb = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-sqlite = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-store-encryption = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-ui = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-test = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-test-macros = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
-matrix-sdk-test-utils = { git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "723b1f80885216489df89640ce74b88f2a230373" }
+matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-base = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-common = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-crypto = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-indexeddb = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-sqlite = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-store-encryption = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-ui = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-test = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-test-macros = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-test-utils = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
