@@ -210,15 +210,14 @@
       <Select
         id="create-room-parent"
         value={parentSpace}
-        onchange={(event: Event & { currentTarget: HTMLSelectElement }) => {
-          parentChoice = event.currentTarget.value;
+        items={[
+          { value: '', label: $i18n.t('room.createParentNone') },
+          ...spaces.map((space) => ({ value: space.room_id, label: space.name ?? space.room_id })),
+        ]}
+        onValueChange={(value: string) => {
+          parentChoice = value;
         }}
-      >
-        <option value="">{$i18n.t('room.createParentNone')}</option>
-        {#each spaces as space (space.room_id)}
-          <option value={space.room_id}>{space.name ?? space.room_id}</option>
-        {/each}
-      </Select>
+      />
     </div>
   {/if}
 

@@ -13,6 +13,10 @@
 <input bind:value {...rest} class={['form-control', 'text-input', className]} />
 
 <style>
+  .text-input {
+    width: 100%;
+  }
+
   .text-input:autofill,
   .text-input:-webkit-autofill {
     border-color: var(--sable-primary-container-line);

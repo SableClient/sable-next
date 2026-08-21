@@ -123,13 +123,13 @@
     <Select
       bind:value={catalogSelection}
       aria-label="Install an official theme"
-      onchange={() => void installCatalog()}
-    >
-      <option value="">Choose an official theme</option>
-      {#each catalog as theme (theme.fullUrl)}
-        <option value={theme.fullUrl}>{theme.basename}</option>
-      {/each}
-    </Select>
+      placeholder="Choose an official theme"
+      items={[
+        { value: '', label: 'Choose an official theme' },
+        ...catalog.map((theme) => ({ value: theme.fullUrl, label: theme.basename })),
+      ]}
+      onValueChange={() => void installCatalog()}
+    />
   {/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if customThemes.themes.length > 0}
@@ -139,18 +139,17 @@
           {kind === 'light' ? 'Light theme' : 'Dark theme'}
           <Select
             value={selectedCustomThemeId(kind) ?? ''}
-            onchange={(event: Event) => {
-              const select = event.currentTarget;
-              if (select instanceof HTMLSelectElement) {
-                selectCustomTheme(kind, select.value || null);
-              }
+            placeholder="Built-in"
+            items={[
+              { value: '', label: 'Built-in' },
+              ...customThemes.themes
+                .filter((theme) => theme.kind === kind)
+                .map((theme) => ({ value: theme.id, label: theme.name })),
+            ]}
+            onValueChange={(value: string) => {
+              selectCustomTheme(kind, value || null);
             }}
-          >
-            <option value="">Built-in</option>
-            {#each customThemes.themes.filter((theme) => theme.kind === kind) as theme (theme.id)}
-              <option value={theme.id}>{theme.name}</option>
-            {/each}
-          </Select>
+          />
         </label>
       {/each}
     </div>

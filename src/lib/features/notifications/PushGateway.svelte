@@ -126,8 +126,11 @@
 
 <style>
   .gateway {
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius);
     display: grid;
     gap: var(--space-2);
+    padding: var(--space-3);
   }
 
   h3 {
@@ -149,6 +152,10 @@
   label {
     display: grid;
     gap: var(--space-1);
+  }
+
+  label :global(.text-input) {
+    width: 100%;
   }
 
   .actions {

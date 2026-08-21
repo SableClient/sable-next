@@ -8,6 +8,7 @@
     headingId: string;
     class?: ClassValue;
     icon?: Snippet;
+    titleActions?: Snippet;
     actions?: Snippet;
     children?: Snippet;
   };
@@ -18,6 +19,7 @@
     headingId,
     class: className = '',
     icon,
+    titleActions,
     actions,
     children,
   }: Props = $props();
@@ -27,7 +29,10 @@
   <header class="settings-section-header">
     {#if icon}<span class="settings-section-icon" aria-hidden="true">{@render icon()}</span>{/if}
     <div class="settings-section-heading">
-      <h2 id={headingId}>{title}</h2>
+      <div class="settings-section-title">
+        <h2 id={headingId}>{title}</h2>
+        {#if titleActions}{@render titleActions()}{/if}
+      </div>
       {#if description}<p>{description}</p>{/if}
     </div>
     {#if actions}<div class="settings-section-actions">{@render actions()}</div>{/if}
@@ -36,13 +41,6 @@
 </section>
 
 <style>
-  .settings-section {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-
   .settings-section-header {
     align-items: flex-start;
     display: flex;
@@ -54,6 +52,12 @@
   .settings-section-heading {
     flex: 1;
     min-width: 0;
+  }
+
+  .settings-section-title {
+    align-items: center;
+    display: flex;
+    gap: var(--space-1);
   }
 
   .settings-section-icon {
@@ -90,7 +94,8 @@
   }
 
   .settings-section-content {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius);
   }
 
   @media (width >= 42rem) {

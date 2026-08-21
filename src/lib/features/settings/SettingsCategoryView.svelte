@@ -135,14 +135,14 @@
                   {disabled}
                   aria-label={$i18n.t(setting.name)}
                   value={preferences[key]}
-                  onchange={(event: Event & { currentTarget: HTMLSelectElement }) => {
-                    setPreference(key, event.currentTarget.value as Preferences[typeof key]);
+                  items={setting.options.map((option) => ({
+                    value: option.value,
+                    label: $i18n.t(option.label),
+                  }))}
+                  onValueChange={(value) => {
+                    setPreference(key, value as Preferences[typeof key]);
                   }}
-                >
-                  {#each setting.options as option (option.value)}
-                    <option value={option.value}>{$i18n.t(option.label)}</option>
-                  {/each}
-                </Select>
+                />
               {:else}
                 {@const key = setting.key}
                 <Switch
@@ -202,7 +202,6 @@
 
   .settings-card {
     background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -268,10 +267,6 @@
     font-size: var(--font-size-small);
     margin: calc(var(--space-1) / 2) 0 0;
     max-width: 60ch;
-  }
-
-  .setting-row.gated .row-icon {
-    margin-left: var(--space-3);
   }
 
   .setting-row.disabled .row-icon,

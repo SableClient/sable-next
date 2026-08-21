@@ -241,9 +241,13 @@
           onReset={() => void save('colors', [['chat.commet.profile_color_scheme', null]])}
         />
         <label
-          >Background brightness <Select bind:value={brightness}
-            ><option value="light">Light</option><option value="dark">Dark</option></Select
-          ></label
+          >Background brightness <Select
+            bind:value={brightness}
+            items={[
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+          /></label
         >
         <Button type="submit" loading={saving === 'colors'}>Save</Button>
       </form>

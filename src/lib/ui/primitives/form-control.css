@@ -1,5 +1,3 @@
-/* With no border the fill is what identifies a field, so it cannot be a surface
-   a field sits on. The transparent border holds the metrics for focus and error. */
 .form-control {
   --form-control-background: var(--sable-surface-var-container);
   --form-control-color: var(--sable-surface-on-container);
@@ -7,7 +5,7 @@
   --form-control-padding-inline-end: var(--form-control-padding-inline);
 
   background: var(--form-control-background);
-  border: var(--border-width) solid transparent;
+  border: var(--border-width) solid var(--sable-surface-container-line);
   border-radius: var(--radius);
   box-sizing: border-box;
   color: var(--form-control-color);

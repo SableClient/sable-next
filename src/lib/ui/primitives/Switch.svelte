@@ -18,7 +18,9 @@
 <style>
   :global(.sable-switch) {
     background: var(--sable-surface-var-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius-pill);
+    box-sizing: border-box;
     cursor: pointer;
     display: inline-flex;
     flex: 0 0 auto;
@@ -38,6 +40,12 @@
 
   :global(.sable-switch[data-state='checked']) {
     background: var(--sable-primary-main);
+    border-color: var(--sable-primary-main);
+  }
+
+  :global(.sable-switch:focus-visible) {
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+    outline: none;
   }
 
   :global(.sable-switch[data-disabled]) {
@@ -46,7 +54,7 @@
   }
 
   :global(.sable-switch-thumb) {
-    background: var(--sable-bg-container);
+    background: var(--sable-surface-on-container);
     border-radius: var(--radius-pill);
     display: block;
     height: 1rem;

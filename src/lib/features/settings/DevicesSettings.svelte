@@ -1,8 +1,10 @@
 <script lang="ts">
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import DesktopTowerIcon from 'phosphor-svelte/lib/DesktopTowerIcon';
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
+  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
   import { invoke, isTauri } from '@tauri-apps/api/core';
 
@@ -10,7 +12,9 @@
   import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
   import { CoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
+  import { buildSettingsLink } from '#lib/features/room/settings-link.js';
   import { i18n, t } from '#lib/i18n.js';
+  import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -34,6 +38,7 @@
   let newRecoveryKey = $state<string | null>(null);
   let deleting = $state<string | null>(null);
   let verificationOpen = $state(false);
+  let linkCopied = $state(false);
   let currentDevice = $derived(devices.find((device) => device.is_own));
   let cancelled = false;
 
@@ -94,6 +99,16 @@
   function cancelRemoval(): void {
     deleting = null;
     password = '';
+  }
+
+  async function copyDevicesLink(): Promise<void> {
+    await navigator.clipboard.writeText(
+      buildSettingsLink(location.origin, SETTINGS_DEVICES_SECTION)
+    );
+    linkCopied = true;
+    setTimeout(() => {
+      linkCopied = false;
+    }, 2000);
   }
 
   async function saveName(deviceId: string): Promise<void> {
@@ -177,6 +192,17 @@
     disabled={loading}
   >
     <ArrowClockwiseIcon />
+  </IconButton>
+{/snippet}
+
+{#snippet devicesActions()}
+  <IconButton
+    variant="ghost"
+    size="small"
+    label={$i18n.t(linkCopied ? 'settings.linkCopied' : 'settings.copyLink')}
+    onclick={() => void copyDevicesLink()}
+  >
+    {#if linkCopied}<CheckIcon />{:else}<LinkIcon />{/if}
   </IconButton>
 {/snippet}
 
@@ -277,7 +303,11 @@
       {/if}
     </SettingsSection>
 
-    <SettingsSection headingId="devices-heading" title={$i18n.t('settings.signedInDevices')}>
+    <SettingsSection
+      headingId="devices-heading"
+      title={$i18n.t('settings.signedInDevices')}
+      titleActions={devicesActions}
+    >
       {#if loading}
         <div class="loading-state">
           <Spinner /><span>{$i18n.t('settings.loadingDevices')}</span>

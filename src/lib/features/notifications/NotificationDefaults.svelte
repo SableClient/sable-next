@@ -86,14 +86,11 @@
         <Select
           aria-label={$i18n.t('settings.notificationDefaultDirect')}
           value={direct}
-          onchange={(event: Event & { currentTarget: HTMLSelectElement }) => {
-            save(true, event.currentTarget.value as NotificationModeView);
+          items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
+          onValueChange={(value) => {
+            save(true, value as NotificationModeView);
           }}
-        >
-          {#each modes as mode (mode)}
-            <option value={mode}>{$i18n.t(modeLabels[mode])}</option>
-          {/each}
-        </Select>
+        />
       {/if}
     </label>
     <label>
@@ -102,14 +99,11 @@
         <Select
           aria-label={$i18n.t('settings.notificationDefaultGroup')}
           value={group}
-          onchange={(event: Event & { currentTarget: HTMLSelectElement }) => {
-            save(false, event.currentTarget.value as NotificationModeView);
+          items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
+          onValueChange={(value) => {
+            save(false, value as NotificationModeView);
           }}
-        >
-          {#each modes as mode (mode)}
-            <option value={mode}>{$i18n.t(modeLabels[mode])}</option>
-          {/each}
-        </Select>
+        />
       {/if}
     </label>
   </div>
@@ -117,8 +111,11 @@
 
 <style>
   .defaults {
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius);
     display: grid;
     gap: var(--space-2);
+    padding: var(--space-3);
   }
 
   h3 {
@@ -148,8 +145,9 @@
   @media (width >= 32rem) {
     label {
       align-items: center;
-      flex-direction: row;
+      display: grid;
       gap: var(--space-3);
+      grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
     }
   }
 </style>

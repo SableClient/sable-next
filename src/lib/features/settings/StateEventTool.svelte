@@ -61,12 +61,14 @@
 
   <div class="field">
     <Label for="state-event-room">{$i18n.t('settings.stateEventRoom')}</Label>
-    <Select id="state-event-room" bind:value={roomId}>
-      <option value=""></option>
-      {#each rooms as room (room.room_id)}
-        <option value={room.room_id}>{room.name ?? room.room_id}</option>
-      {/each}
-    </Select>
+    <Select
+      id="state-event-room"
+      bind:value={roomId}
+      items={[
+        { value: '', label: '' },
+        ...rooms.map((room) => ({ value: room.room_id, label: room.name ?? room.room_id })),
+      ]}
+    />
   </div>
 
   <div class="field">
