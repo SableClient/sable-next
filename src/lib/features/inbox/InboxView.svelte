@@ -1,51 +1,85 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import XIcon from 'phosphor-svelte/lib/XIcon';
   import { i18n } from '#lib/i18n.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { type NotificationFilter, parseFilter } from './inbox';
   import InviteList from './InviteList.svelte';
   import NotificationList from './NotificationList.svelte';
 
   interface Props {
-    onClose?: () => void;
+    variant?: 'page' | 'sheet';
   }
 
-  let { onClose }: Props = $props();
-  let filter = $derived(parseFilter(page.url.searchParams.get('filter')));
+  let { variant = 'page' }: Props = $props();
+  let previewFilter = $state<NotificationFilter>(parseFilter(page.url.searchParams.get('filter')));
+  let filter = $derived(
+    page.state.inbox ? previewFilter : parseFilter(page.url.searchParams.get('filter'))
+  );
 
   function selectFilter(value: NotificationFilter): void {
-    const url = new URL(page.url.href);
+    if (page.state.inbox) {
+      previewFilter = value;
+      return;
+    }
+
+    const url = new URL(resolve('inbox'), page.url.origin);
     if (value === 'all') url.searchParams.delete('filter');
     else url.searchParams.set('filter', value);
 
     void goto(`${url.pathname}${url.search}`, {
       replaceState: true,
       reset: false,
-      ...(page.state.inbox ? { shallow: true, state: { inbox: true } } : {}),
     });
   }
 </script>
 
-<AppPageShell title={$i18n.t('nav.inbox')} density="compact">
-  {#snippet actions()}
-    {#if onClose}
-      <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={onClose}>
-        <XIcon />
-      </IconButton>
-    {/if}
-  {/snippet}
-  <div class="inbox">
-    <InviteList />
-    <NotificationList {filter} onFilter={selectFilter} />
-  </div>
-</AppPageShell>
+<!-- eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the route renders the default page variant -->
+{#if variant === 'page'}
+  <AppPageShell title={$i18n.t('nav.inbox')} density="compact">
+    <div class="inbox">
+      <InviteList />
+      <NotificationList {filter} onFilter={selectFilter} />
+    </div>
+  </AppPageShell>
+{:else}
+  <section class="inbox-sheet" aria-label={$i18n.t('nav.inbox')}>
+    <header>
+      <h2>{$i18n.t('nav.inbox')}</h2>
+    </header>
+    <div class="inbox">
+      <InviteList />
+      <NotificationList {filter} onFilter={selectFilter} limit={5} />
+      <a class="view-all" href="/inbox">{$i18n.t('inbox.viewAll')}</a>
+    </div>
+  </section>
+{/if}
 
 <style>
   .inbox {
     display: grid;
     gap: var(--space-4);
+  }
+
+  .inbox-sheet {
+    display: grid;
+    gap: var(--space-4);
+    padding: 0 0.75rem var(--space-3) 1rem;
+  }
+
+  .inbox-sheet header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .inbox-sheet h2 {
+    font-size: var(--font-size-large);
+    margin: 0;
+  }
+
+  .view-all {
+    justify-self: end;
   }
 </style>

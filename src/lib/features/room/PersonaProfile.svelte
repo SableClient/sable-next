@@ -82,6 +82,9 @@
     bind:open
     label={$i18n.t('timeline.personaSheet')}
     closeLabel={$i18n.t('timeline.closeProfile')}
+    handleColor="var(--sable-bg-container)"
+    handleOpacity={1}
+    contentInset={false}
     onOpenChange={handleOpenChange}
   >
     <PersonaCard {profile} {accountId} {accountName} onOpenAccount={openAccount} variant="sheet" />

@@ -50,6 +50,7 @@
     "filterAll": "All",
     "filterMentions": "Mentions",
     "filterDirect": "Chats",
+    "viewAll": "View all notifications",
     "notificationsEmpty": "Nothing is waiting for you. Unread mentions and messages will show up here.",
     "markRead": "Mark {{room}} as read",
     "invitedBy": "Invited by {{name}}",

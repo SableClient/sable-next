@@ -16,9 +16,10 @@
   interface Props {
     filter: NotificationFilter;
     onFilter: (filter: NotificationFilter) => void;
+    limit?: number;
   }
 
-  let { filter, onFilter }: Props = $props();
+  let { filter, onFilter, limit }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const headingId = $props.id();
@@ -31,6 +32,7 @@
   };
 
   let rooms = $derived(notifications(roomList.rooms, filter));
+  let visibleRooms = $derived(limit === undefined ? rooms : rooms.slice(0, limit));
 
   function roomHref(room: RoomSummary): string {
     const param = roomPathParam(room);
@@ -88,11 +90,11 @@
     </div>
   </div>
 
-  {#if rooms.length === 0}
+  {#if visibleRooms.length === 0}
     <p class="empty">{$i18n.t('inbox.notificationsEmpty')}</p>
   {:else}
     <ul class="feed">
-      {#each rooms as room (room.room_id)}
+      {#each visibleRooms as room (room.room_id)}
         {@const name = roomName(room)}
         {@const count = notificationCount(room)}
         {@const line = preview(room)}

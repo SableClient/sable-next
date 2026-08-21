@@ -41,7 +41,7 @@
         align="end"
         sideOffset={8}
       >
-        <InboxView onClose={close} />
+        <InboxView variant="sheet" />
       </Popover.Content>
     </Popover.Portal>
   </Popover.Root>
@@ -50,11 +50,14 @@
     open={page.state.inbox === true}
     label={$i18n.t('nav.inbox')}
     closeLabel={$i18n.t('settings.close')}
+    background="var(--sable-surface-container)"
+    handleColor="var(--sable-surface-on-container)"
+    contentInset
     onOpenChange={(open) => {
       if (!open) close();
     }}
   >
-    <InboxView onClose={close} />
+    <InboxView variant="sheet" />
   </BottomSheet>
 {/if}
 

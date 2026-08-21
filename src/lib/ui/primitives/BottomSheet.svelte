@@ -7,6 +7,10 @@
     open?: boolean;
     label: string;
     closeLabel: string;
+    handleColor?: string;
+    handleOpacity?: number;
+    background?: string;
+    contentInset?: boolean;
     fullHeight?: boolean;
     onOpenChange?: (open: boolean) => void;
     children: Snippet;
@@ -16,6 +20,10 @@
     open = $bindable(false),
     label,
     closeLabel,
+    handleColor = 'var(--sable-surface-on-container)',
+    handleOpacity = 0.45,
+    background,
+    contentInset = true,
     fullHeight = false,
     onOpenChange,
     children,
@@ -82,11 +90,12 @@
   bind:open
   variant="sheet"
   {label}
-  contentStyle={`${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-2) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
+  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-2) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
   {onOpenChange}
 >
+  <div class:content-inset={contentInset}>{@render children()}</div>
   <button
-    class="handle"
+    class="bottom-sheet-handle"
     type="button"
     aria-label={closeLabel}
     onclick={handleClick}
@@ -94,13 +103,19 @@
     onpointermove={drag}
     onpointerup={endDrag}
     onpointercancel={endDrag}
-  ></button>
-  {@render children()}
+  >
+    <span
+      class="bottom-sheet-pill"
+      aria-hidden="true"
+      style:background={handleColor}
+      style:opacity={handleOpacity}
+    ></span>
+  </button>
 </DialogFrame>
 
 <style>
   /* Above sticky headers (z-index 1) in sheet content. */
-  .handle {
+  :global(.bottom-sheet-handle) {
     background: transparent;
     border: 0;
     border-radius: var(--radius-pill);
@@ -115,24 +130,28 @@
     touch-action: none;
     transform: translateX(-50%);
     width: 4rem;
-    z-index: 2;
+    z-index: 3;
   }
 
-  .handle:active {
+  :global(.bottom-sheet-handle):active {
     cursor: grabbing;
   }
 
-  .handle::after {
+  :global(.bottom-sheet-pill) {
     background: var(--sable-surface-var-container);
     border-radius: var(--radius-pill);
-    content: '';
+    display: block;
     height: 0.25rem;
     opacity: 0.45;
     width: 2.5rem;
   }
 
-  .handle:focus-visible {
+  :global(.bottom-sheet-handle):focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  .content-inset {
+    padding: var(--control-height-medium) 0 var(--space-4);
   }
 </style>
