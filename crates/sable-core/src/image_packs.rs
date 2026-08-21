@@ -107,6 +107,135 @@ pub fn pack_view(
     }
 }
 
+use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
+use matrix_sdk::ruma::api::client::state::get_state_events;
+use matrix_sdk::ruma::events::{GlobalAccountDataEventType, StateEventType};
+use matrix_sdk::ruma::{OwnedRoomId, RoomId};
+
+use crate::Core;
+use crate::protocol::{CommandErr, CommandOk};
+
+impl Core {
+    pub(crate) async fn image_packs(&self, room_id: OwnedRoomId) -> Result<CommandOk, CommandErr> {
+        let client = self.client().await?;
+        let mut packs = Vec::new();
+
+        let own = client
+            .account()
+            .account_data_raw(GlobalAccountDataEventType::from(USER_EMOTES))
+            .await
+            .map_err(|error| self.failed("image_packs_account", error))?;
+        if let Some(content) =
+            own.and_then(|raw| raw.deserialize_as_unchecked::<PackContent>().ok())
+        {
+            packs.push(pack_view(
+                content,
+                String::new(),
+                ImagePackOriginView::Account,
+                None,
+            ));
+        }
+
+        let room = self.room(&room_id).await?;
+        packs.extend(
+            Self::room_packs(&client, &room, ImagePackOriginView::Room, None)
+                .await
+                .map_err(|error| self.failed("image_packs_room", error))?,
+        );
+
+        let subscribed = client
+            .account()
+            .account_data_raw(GlobalAccountDataEventType::from(EMOTE_ROOMS))
+            .await
+            .map_err(|error| self.failed("image_packs_global", error))?;
+        if let Some(rooms) =
+            subscribed.and_then(|raw| raw.deserialize_as_unchecked::<EmoteRooms>().ok())
+        {
+            for (subscribed_id, state_keys) in rooms.rooms {
+                let Ok(parsed) = RoomId::parse(&subscribed_id) else {
+                    continue;
+                };
+                if parsed == room_id {
+                    continue;
+                }
+                let Some(subscribed_room) = client.get_room(&parsed) else {
+                    continue;
+                };
+                let wanted: Vec<String> = state_keys.into_keys().collect();
+                packs.extend(
+                    Self::room_packs(
+                        &client,
+                        &subscribed_room,
+                        ImagePackOriginView::Global,
+                        Some(&wanted),
+                    )
+                    .await
+                    .map_err(|error| self.failed("image_packs_global_room", error))?,
+                );
+            }
+        }
+
+        packs.retain(|pack| !pack.images.is_empty());
+        Ok(CommandOk::ImagePacks { packs })
+    }
+
+    /// `None` takes every pack the room publishes.
+    ///
+    /// `im.ponies.room_emotes` is not in the SDK's sliding-sync `required_state`
+    /// and that list has no extension point, so the store holds these events
+    /// only by luck. A room with none falls back to `/state` on the server.
+    async fn room_packs(
+        client: &matrix_sdk::Client,
+        room: &matrix_sdk::Room,
+        origin: ImagePackOriginView,
+        wanted: Option<&[String]>,
+    ) -> Result<Vec<ImagePackView>, matrix_sdk::Error> {
+        let stored = room
+            .get_state_events(StateEventType::from(ROOM_EMOTES))
+            .await?;
+        let mut parsed: Vec<RoomPackEvent> = stored
+            .iter()
+            .filter_map(|event| {
+                let json = match event {
+                    RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
+                    RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
+                };
+                serde_json::from_str::<RoomPackEvent>(json.get()).ok()
+            })
+            .collect();
+
+        if parsed.is_empty() {
+            let response = client
+                .send(get_state_events::v3::Request::new(
+                    room.room_id().to_owned(),
+                ))
+                .await?;
+            parsed = response
+                .room_state
+                .iter()
+                .filter_map(|raw| {
+                    let event = serde_json::from_str::<RoomPackEvent>(raw.json().get()).ok()?;
+                    (event.event_type == ROOM_EMOTES).then_some(event)
+                })
+                .collect();
+        }
+
+        let mut packs = Vec::new();
+        for event in parsed {
+            if wanted.is_some_and(|keys| !keys.contains(&event.state_key)) {
+                continue;
+            }
+            packs.push(pack_view(
+                event.content,
+                event.state_key,
+                origin,
+                Some(room.room_id().to_string()),
+            ));
+        }
+        Ok(packs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

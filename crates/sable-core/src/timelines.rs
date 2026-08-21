@@ -1,0 +1,166 @@
+use std::sync::Arc;
+
+use matrix_sdk::ruma::{
+    OwnedEventId, OwnedRoomId,
+    events::room::message::Relation,
+    events::{
+        AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent,
+        MessageLikeEventType, poll::unstable_start::UnstablePollStartEventContent,
+    },
+    room_version_rules::RoomVersionRules,
+};
+use matrix_sdk_ui::timeline::{
+    RoomExt, Timeline, TimelineEventFocusThreadMode, TimelineFocus, default_event_filter,
+};
+
+use crate::protocol::CommandErr;
+
+use crate::{CachedTimeline, Core, SubscriptionKind};
+
+const MAX_CACHED_INACTIVE_TIMELINES: usize = 4;
+
+impl Core {
+    /// Cached: building one twice gives the UI two streams for one room. Takes
+    /// whatever the subscriber built, since rebuilding here would orphan the
+    /// timeline the UI reads and send its local echo to the copy.
+    pub(crate) async fn timeline(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> Result<Arc<Timeline>, CommandErr> {
+        if let Some(cached) = self.timelines.lock().await.get(room_id) {
+            return Ok(cached.timeline.clone());
+        }
+        self.live_timeline(room_id, false).await
+    }
+
+    /// The cache holds one live timeline per room, so a `hidden_events` that no
+    /// longer matches replaces it rather than sitting alongside it.
+    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
+    pub(crate) async fn live_timeline(
+        &self,
+        room_id: &OwnedRoomId,
+        hidden_events: bool,
+    ) -> Result<Arc<Timeline>, CommandErr> {
+        {
+            let mut timelines = self.timelines.lock().await;
+            if let Some(cached) = timelines.get_mut(room_id)
+                && cached.hidden_events == hidden_events
+            {
+                cached.last_access = self.next_timeline_access();
+                return Ok(cached.timeline.clone());
+            }
+        }
+
+        let room = self.room(room_id).await?;
+        let timeline = Arc::new(
+            build_room_timeline(&room, None, hidden_events)
+                .await
+                .map_err(|error| self.failed("build timeline", error))?,
+        );
+
+        let subscribed_room_ids = self
+            .subscriptions
+            .lock()
+            .await
+            .values()
+            .filter_map(|subscription| match &subscription.kind {
+                SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
+                SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+            })
+            .collect::<std::collections::HashSet<_>>();
+        let mut timelines = self.timelines.lock().await;
+        match timelines.get_mut(room_id) {
+            Some(cached) if cached.hidden_events == hidden_events => {
+                cached.last_access = self.next_timeline_access();
+                Ok(cached.timeline.clone())
+            }
+            _ => {
+                let inactive = timelines
+                    .keys()
+                    .filter(|id| !subscribed_room_ids.contains(*id))
+                    .count();
+                if inactive >= MAX_CACHED_INACTIVE_TIMELINES
+                    && let Some(evicted) = timelines
+                        .iter()
+                        .filter(|(id, _)| !subscribed_room_ids.contains(*id))
+                        .min_by_key(|(_, cached)| cached.last_access)
+                        .map(|(id, _)| id.clone())
+                {
+                    timelines.remove(&evicted);
+                }
+                timelines.insert(
+                    room_id.clone(),
+                    CachedTimeline {
+                        timeline: timeline.clone(),
+                        hidden_events,
+                        last_access: self.next_timeline_access(),
+                    },
+                );
+                Ok(timeline)
+            }
+        }
+    }
+}
+
+/// Mirrors the aggregation arms of the SDK's `TimelineAction::from_event`: it
+/// folds these into another event's item whatever the filter says, so letting
+/// them past would strand read receipts on rows that never exist. Kept honest
+/// by `hidden_events_admit_only_events_the_sdk_can_render`.
+fn is_aggregation(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
+    let AnySyncTimelineEvent::MessageLike(message) = event else {
+        return false;
+    };
+
+    if let AnySyncMessageLikeEvent::RoomRedaction(redaction) = message {
+        return redaction.redacts(&rules.redaction).is_some();
+    }
+
+    let Some(content) = message.original_content() else {
+        return message.event_type() == MessageLikeEventType::Reaction;
+    };
+
+    match content {
+        AnyMessageLikeEventContent::Reaction(_)
+        | AnyMessageLikeEventContent::Beacon(_)
+        | AnyMessageLikeEventContent::RtcDecline(_)
+        | AnyMessageLikeEventContent::UnstablePollResponse(_)
+        | AnyMessageLikeEventContent::UnstablePollEnd(_) => true,
+        AnyMessageLikeEventContent::UnstablePollStart(poll) => {
+            matches!(poll, UnstablePollStartEventContent::Replacement(_))
+        }
+        AnyMessageLikeEventContent::RoomMessage(message) => {
+            matches!(message.relates_to, Some(Relation::Replacement(_)))
+        }
+        _ => false,
+    }
+}
+
+/// Everything the default filter keeps, plus the message-like events it drops
+/// for having no dedicated rendering — those become `HiddenEvent` items.
+pub(crate) fn hidden_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
+    default_event_filter(event, rules) || !is_aggregation(event, rules)
+}
+
+pub(crate) async fn build_room_timeline(
+    room: &matrix_sdk::Room,
+    event_id: Option<OwnedEventId>,
+    hidden_events: bool,
+) -> Result<Timeline, matrix_sdk_ui::timeline::Error> {
+    let builder = room.timeline_builder();
+    let builder = match event_id {
+        Some(event_id) => builder.with_focus(TimelineFocus::Event {
+            target: event_id,
+            num_context_events: 20,
+            thread_mode: TimelineEventFocusThreadMode::Automatic {
+                hide_threaded_events: false,
+            },
+        }),
+        None => builder,
+    };
+    let builder = if hidden_events {
+        builder.event_filter(hidden_event_filter)
+    } else {
+        builder
+    };
+    builder.build().await
+}

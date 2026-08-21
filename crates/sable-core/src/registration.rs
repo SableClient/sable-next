@@ -1,10 +1,16 @@
-use super::{
-    AuthData, AuthFlow, AuthType, ClientSecret, CommandErr, CommandOk, Core, Credentials,
-    EmailIdentity, ErrorKind, IdentityServerInfo, MatrixUserIdentifier, OwnedClientSecret,
-    OwnedSessionId, Password, PersistedSession, RegistrationEmailRequest, RegistrationRequest,
-    RegistrationResultView, RetryAfter, ThirdpartyIdCredentials, UInt, UiaaInfo, UserIdentifier,
-    protocol, session,
+use matrix_sdk::ruma::api::client::account::IdentityServerInfo;
+use matrix_sdk::ruma::api::client::account::register::v3::Request as RegistrationRequest;
+use matrix_sdk::ruma::api::client::account::request_registration_token_via_email::v3::Request as RegistrationEmailRequest;
+use matrix_sdk::ruma::api::client::uiaa::{
+    AuthData, AuthFlow, AuthType, EmailIdentity, MatrixUserIdentifier, Password,
+    ThirdpartyIdCredentials, UiaaInfo, UserIdentifier,
 };
+use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
+use matrix_sdk::ruma::{ClientSecret, OwnedClientSecret, OwnedSessionId, UInt};
+
+use crate::protocol::{CommandErr, CommandOk, RegistrationResultView};
+use crate::session::{Credentials, PersistedSession};
+use crate::{Core, protocol, session};
 use serde::Deserialize;
 use std::sync::{Arc, atomic::Ordering};
 use url::Url;

@@ -1281,7 +1281,10 @@ pub enum TimelineItemContentView {
     },
     /// MSC4274.
     Gallery {
+        /// The caption shared by the whole set.
         body: String,
+        /// Sanitised display HTML, safe to inject as-is.
+        html: String,
         items: Vec<GalleryItemView>,
     },
     /// MSC3381, with the responses and the end event already folded in.

@@ -106,6 +106,10 @@ fn is_language_class(value: &str) -> bool {
     })
 }
 
+/// Built once: the policy allocates a dozen hash containers, and `display_html`
+/// runs for every message row.
+static SANITIZER: LazyLock<Builder<'static>> = LazyLock::new(sanitizer);
+
 fn sanitizer() -> Builder<'static> {
     let mut builder = Builder::new();
     builder
@@ -395,7 +399,7 @@ fn sanitize(formatted: &str) -> String {
     }
     let html = Html::parse(formatted);
     html.sanitize_with(&MATRIX_POLICY);
-    sanitizer().clean(&html.to_string()).to_string()
+    SANITIZER.clean(&html.to_string()).to_string()
 }
 
 /// The HTML the UI renders for a message: the sender's `formatted_body` once

@@ -353,6 +353,37 @@ mod tests {
         .unwrap()
     }
 
+    /// A reader who signed in before multi-account keeps their session,
+    /// anchored to the store the single-account build wrote.
+    #[test]
+    fn adopts_a_legacy_single_account_session() -> Result<(), serde_json::Error> {
+        let legacy = serde_json::to_vec(&serde_json::json!({
+            "homeserver": "https://example.org",
+            "credentials": {
+                "kind": "password",
+                "user_id": "@alice:example.org",
+                "device_id": "DEVICEID",
+                "access_token": "token"
+            }
+        }))?;
+
+        let (accounts, migrated) = AccountRegistry::from_bytes(&legacy, "sable-next")?;
+
+        assert!(migrated);
+        assert_eq!(accounts.active_account_id.as_deref(), Some("a1"));
+        assert_eq!(accounts.next_account_id, 2);
+        let account = accounts.accounts.first().expect("the migrated account");
+        assert_eq!(account.account_id, "a1");
+        // Re-anchoring here would point the client at an empty crypto store.
+        assert_eq!(account.store_id, "sable-next");
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_bytes_that_are_neither_a_registry_nor_a_session() {
+        assert!(AccountRegistry::from_bytes(b"{\"nonsense\":true}", "sable-next").is_err());
+    }
+
     #[test]
     fn serializes_an_empty_registry() -> Result<(), serde_json::Error> {
         let bytes = serde_json::to_vec(&AccountRegistry::empty())?;

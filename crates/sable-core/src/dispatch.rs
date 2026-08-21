@@ -1,6 +1,52 @@
-macro_rules! dispatch_commands {
-    ($self:ident, $command:expr) => {
-        match $command {
+use std::sync::{Arc, atomic::Ordering};
+
+use futures_util::{StreamExt, pin_mut};
+use matrix_sdk::RoomMemberships;
+use matrix_sdk::room::edit::EditedContent;
+use matrix_sdk::room::{ParentSpace, Receipts};
+use matrix_sdk::ruma::api::client::room::Visibility;
+use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
+use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
+use matrix_sdk::ruma::events::InitialStateEvent;
+use matrix_sdk::ruma::events::room::ImageInfo;
+use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
+use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
+use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
+use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
+use matrix_sdk::ruma::events::sticker::StickerEventContent;
+use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
+use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
+use matrix_sdk::ruma::room::RoomType;
+use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk::ruma::{
+    OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, events::room::member::MembershipState,
+    events::room::message::RoomMessageEventContent,
+};
+use matrix_sdk_ui::timeline::TimelineEventItemId;
+
+use crate::protocol::{
+    Command, CommandErr, CommandOk, JoinRuleView, MutualRoomView, PaginationDirection, RoomTag,
+};
+use matrix_sdk_ui::notification_client::NotificationProcessSetup;
+
+use crate::media::mxc_uri;
+use crate::profiles::profile_view;
+use crate::rooms::join_rule_support;
+use crate::verification::encryption_status;
+use crate::{Core, SubscriptionKind};
+use crate::{notifications, protocol, session, view};
+
+impl Core {
+    /// Splitting this by command family needs a second match with an
+    /// unreachable arm, which `clippy::panic = "deny"` rules out.
+    ///
+    /// # Errors
+    ///
+    /// Returns a protocol error when the command is invalid, the user is not
+    /// authenticated, or the Matrix operation fails.
+    #[allow(clippy::too_many_lines)]
+    pub async fn dispatch(self: &Arc<Self>, command: Command) -> Result<CommandOk, CommandErr> {
+        match command {
             Command::DiscoverHomeserver { server_name } => {
                 let client = session::discovery_client(&server_name)
                     .await
@@ -15,12 +61,12 @@ macro_rules! dispatch_commands {
                 homeserver,
                 username,
                 password,
-            } => $self.login(homeserver, username, password).await,
+            } => self.login(homeserver, username, password).await,
 
-            Command::LoginFlows { homeserver } => $self.login_flows(homeserver).await,
+            Command::LoginFlows { homeserver } => self.login_flows(homeserver).await,
 
             Command::RegistrationFlows { homeserver } => {
-                $self.discover_registration_flows(homeserver).await
+                self.discover_registration_flows(homeserver).await
             }
 
             Command::Register {
@@ -30,33 +76,31 @@ macro_rules! dispatch_commands {
                 registration_email,
                 registration_token,
             } => {
-                $self
-                    .register(
-                        homeserver,
-                        username,
-                        password,
-                        registration_email,
-                        registration_token,
-                    )
-                    .await
+                self.register(
+                    homeserver,
+                    username,
+                    password,
+                    registration_email,
+                    registration_token,
+                )
+                .await
             }
 
             Command::RequestRegistrationEmail { email } => {
-                $self.request_registration_email(email).await
+                self.request_registration_email(email).await
             }
 
             Command::SubmitRegistrationEmail { token } => {
-                $self.submit_registration_email(token).await
+                self.submit_registration_email(token).await
             }
 
-            Command::ContinueRegistration => $self.continue_registration(true).await,
+            Command::ContinueRegistration => self.continue_registration(true).await,
 
             Command::CancelRegistration => {
-                $self
-                    .next_registration_attempt
+                self.next_registration_attempt
                     .fetch_add(1, Ordering::AcqRel);
-                $self.pending_registration.lock().await.take();
-                $self.pending_login.lock().await.take();
+                self.pending_registration.lock().await.take();
+                self.pending_login.lock().await.take();
                 Ok(CommandOk::CancelRegistration)
             }
 
@@ -65,13 +109,12 @@ macro_rules! dispatch_commands {
                 redirect_uri,
                 intent,
             } => {
-                $self
-                    .start_oidc_login(homeserver, redirect_uri, intent)
+                self.start_oidc_login(homeserver, redirect_uri, intent)
                     .await
             }
 
             Command::CompleteOidcLogin { callback_url } => {
-                $self.complete_oidc_login(callback_url).await
+                self.complete_oidc_login(callback_url).await
             }
 
             Command::StartSsoLogin {
@@ -80,40 +123,38 @@ macro_rules! dispatch_commands {
                 idp_id,
                 intent,
             } => {
-                $self
-                    .start_sso_login(homeserver, redirect_uri, idp_id, intent)
+                self.start_sso_login(homeserver, redirect_uri, idp_id, intent)
                     .await
             }
 
             Command::CompleteSsoLogin { callback_url } => {
-                $self.complete_sso_login(callback_url).await
+                self.complete_sso_login(callback_url).await
             }
 
-            Command::Restore => $self.restore().await,
+            Command::Restore => self.restore().await,
 
-            Command::ListAccounts => $self.list_accounts().await,
+            Command::ListAccounts => self.list_accounts().await,
 
-            Command::SwitchAccount { account_id } => $self.switch_account(account_id).await,
+            Command::SwitchAccount { account_id } => self.switch_account(account_id).await,
 
-            Command::RemoveAccount { account_id } => $self.remove_inactive_account(account_id).await,
+            Command::RemoveAccount { account_id } => self.remove_inactive_account(account_id).await,
 
-            Command::Logout => $self.logout().await,
+            Command::Logout => self.logout().await,
 
-            Command::SubscribeRoomList => $self.subscribe_room_list().await,
+            Command::SubscribeRoomList => self.subscribe_room_list().await,
 
             Command::SubscribeTimeline {
                 room_id,
                 event_id,
                 hidden_events,
             } => {
-                $self
-                    .subscribe_timeline(room_id, event_id, hidden_events)
+                self.subscribe_timeline(room_id, event_id, hidden_events)
                     .await
             }
 
             Command::Unsubscribe { subscription } => {
-                let _update = $self.room_subscription_lock.lock().await;
-                let Some(removed) = $self.subscriptions.lock().await.remove(&subscription) else {
+                let _update = self.room_subscription_lock.lock().await;
+                let Some(removed) = self.subscriptions.lock().await.remove(&subscription) else {
                     return Err(CommandErr::UnknownSubscription);
                 };
                 let live_room = match &removed.kind {
@@ -123,9 +164,9 @@ macro_rules! dispatch_commands {
                 drop(removed);
 
                 if let Some(room_id) = live_room {
-                    $self.sync_timeline_rooms_locked(None).await?;
+                    self.sync_timeline_rooms_locked(None).await?;
 
-                    let subscriptions = $self.subscriptions.lock().await;
+                    let subscriptions = self.subscriptions.lock().await;
                     let watched = subscriptions.values().any(|subscription| {
                         matches!(
                             &subscription.kind,
@@ -134,7 +175,7 @@ macro_rules! dispatch_commands {
                     });
                     drop(subscriptions);
                     if !watched {
-                        $self.timelines.lock().await.remove(&room_id);
+                        self.timelines.lock().await.remove(&room_id);
                     }
                 }
 
@@ -146,7 +187,7 @@ macro_rules! dispatch_commands {
                 direction,
                 count,
             } => {
-                let (timeline, focused) = $self
+                let (timeline, focused) = self
                     .subscriptions
                     .lock()
                     .await
@@ -167,7 +208,7 @@ macro_rules! dispatch_commands {
                     PaginationDirection::Backward => timeline.paginate_backwards(count).await,
                     PaginationDirection::Forward => timeline.paginate_forwards(count).await,
                 }
-                .map_err(|error| $self.failed("paginate", error))?;
+                .map_err(|error| self.failed("paginate", error))?;
 
                 Ok(CommandOk::Paginate {
                     direction,
@@ -181,7 +222,7 @@ macro_rules! dispatch_commands {
                 formatted,
                 in_reply_to,
             } => {
-                let timeline = $self.timeline(&room_id).await?;
+                let timeline = self.timeline(&room_id).await?;
                 let content = message_content(body, formatted);
 
                 match in_reply_to {
@@ -190,13 +231,13 @@ macro_rules! dispatch_commands {
                         timeline
                             .send_reply(content.into(), event_id)
                             .await
-                            .map_err(|error| $self.failed("send_reply", error))?;
+                            .map_err(|error| self.failed("send_reply", error))?;
                     }
                     None => {
                         timeline
                             .send(content.into())
                             .await
-                            .map_err(|error| $self.failed("send_message", error))?;
+                            .map_err(|error| self.failed("send_message", error))?;
                     }
                 }
 
@@ -209,11 +250,11 @@ macro_rules! dispatch_commands {
                     return Err(CommandErr::InvalidMedia);
                 }
 
-                let timeline = $self.timeline(&room_id).await?;
+                let timeline = self.timeline(&room_id).await?;
                 timeline
                     .send(StickerEventContent::new(body, ImageInfo::new(), url).into())
                     .await
-                    .map_err(|error| $self.failed("send_sticker", error))?;
+                    .map_err(|error| self.failed("send_sticker", error))?;
 
                 Ok(CommandOk::SendSticker)
             }
@@ -224,36 +265,34 @@ macro_rules! dispatch_commands {
                 body,
                 formatted,
             } => {
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .edit(
                         &TimelineEventItemId::EventId(event_id),
                         EditedContent::RoomMessage(message_content(body, formatted).into()),
                     )
                     .await
-                    .map_err(|error| $self.failed("edit_message", error))?;
+                    .map_err(|error| self.failed("edit_message", error))?;
 
                 Ok(CommandOk::EditMessage)
             }
 
             Command::FetchEventDetails { room_id, event_id } => {
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .fetch_details_for_event(&event_id)
                     .await
-                    .map_err(|error| $self.failed("fetch_event_details", error))?;
+                    .map_err(|error| self.failed("fetch_event_details", error))?;
 
                 Ok(CommandOk::FetchEventDetails)
             }
 
             Command::RoomMembers { room_id } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
                 let members = room
                     .members(RoomMemberships::JOIN)
                     .await
-                    .map_err(|error| $self.failed("room_members", error))?;
+                    .map_err(|error| self.failed("room_members", error))?;
 
                 Ok(CommandOk::RoomMembers {
                     members: members.iter().map(view::member_view).collect(),
@@ -261,11 +300,11 @@ macro_rules! dispatch_commands {
             }
 
             Command::RoomPermissions { room_id } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
                 let user_id = room
                     .client()
                     .user_id()
-                    .ok_or_else(|| $self.failed("room_permissions", "no session"))?
+                    .ok_or_else(|| self.failed("room_permissions", "no session"))?
                     .to_owned();
                 // An invited room carries only stripped state, so the levels are
                 // often absent. Spec defaults beat failing the whole command.
@@ -277,16 +316,16 @@ macro_rules! dispatch_commands {
                 )))
             }
 
-            Command::ImagePacks { room_id } => $self.image_packs(room_id).await,
+            Command::ImagePacks { room_id } => self.image_packs(room_id).await,
 
             Command::UserProfile { user_id } => {
-                let response = $self
+                let response = self
                     .client()
                     .await?
                     .account()
                     .fetch_user_profile_of(&user_id)
                     .await
-                    .map_err(|error| $self.failed("user_profile", error))?;
+                    .map_err(|error| self.failed("user_profile", error))?;
 
                 Ok(CommandOk::UserProfile {
                     profile: Box::new(profile_view(user_id, &response)),
@@ -294,7 +333,7 @@ macro_rules! dispatch_commands {
             }
 
             Command::UserRelations { user_id } => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let ignored = client
                     .subscribe_to_ignore_user_list_changes()
                     .get()
@@ -336,12 +375,11 @@ macro_rules! dispatch_commands {
                 event_id,
                 reason,
             } => {
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .redact(&TimelineEventItemId::EventId(event_id), reason.as_deref())
                     .await
-                    .map_err(|error| $self.failed("redact", error))?;
+                    .map_err(|error| self.failed("redact", error))?;
 
                 Ok(CommandOk::Redact)
             }
@@ -351,12 +389,11 @@ macro_rules! dispatch_commands {
                 event_id,
                 key,
             } => {
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
                     .await
-                    .map_err(|error| $self.failed("react", error))?;
+                    .map_err(|error| self.failed("react", error))?;
 
                 Ok(CommandOk::React)
             }
@@ -372,12 +409,11 @@ macro_rules! dispatch_commands {
                     .ok_or(CommandErr::InvalidPoll)?;
                 let content = matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::from(content);
 
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .send(content.into())
                     .await
-                    .map_err(|error| $self.failed("create poll", error))?;
+                    .map_err(|error| self.failed("create poll", error))?;
 
                 Ok(CommandOk::CreatePoll)
             }
@@ -388,41 +424,40 @@ macro_rules! dispatch_commands {
                 answers,
             } => {
                 let content = matrix_sdk::ruma::events::poll::unstable_response::UnstablePollResponseEventContent::new(
-                    answers, event_id,
-                );
+                answers, event_id,
+            );
 
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .send(content.into())
                     .await
-                    .map_err(|error| $self.failed("vote poll", error))?;
+                    .map_err(|error| self.failed("vote poll", error))?;
 
                 Ok(CommandOk::VotePoll)
             }
 
             Command::EndPoll { room_id, event_id } => {
-                let content = matrix_sdk::ruma::events::poll::unstable_end::UnstablePollEndEventContent::new(
-                    "The poll has closed.",
-                    event_id,
-                );
+                let content =
+                    matrix_sdk::ruma::events::poll::unstable_end::UnstablePollEndEventContent::new(
+                        "The poll has closed.",
+                        event_id,
+                    );
 
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .send(content.into())
                     .await
-                    .map_err(|error| $self.failed("end poll", error))?;
+                    .map_err(|error| self.failed("end poll", error))?;
 
                 Ok(CommandOk::EndPoll)
             }
 
             Command::EncryptionStatus => Ok(CommandOk::EncryptionStatus {
-                status: encryption_status(&$self.client().await?).await,
+                status: encryption_status(&self.client().await?).await,
             }),
 
             Command::Devices => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let own_device_id = client.device_id().map(ToOwned::to_owned);
                 let account_management = client.oauth().full_session().is_some()
                     && client
@@ -438,7 +473,7 @@ macro_rules! dispatch_commands {
                     .encryption()
                     .get_user_devices(&user_id)
                     .await
-                    .map_err(|error| $self.failed("devices", error))?;
+                    .map_err(|error| self.failed("devices", error))?;
 
                 Ok(CommandOk::Devices {
                     devices: devices
@@ -455,20 +490,19 @@ macro_rules! dispatch_commands {
             }
 
             Command::RecoverIdentity { recovery_key } => {
-                $self
-                    .client()
+                self.client()
                     .await?
                     .encryption()
                     .recovery()
                     .recover(&recovery_key)
                     .await
-                    .map_err(|error| $self.recovery_error(error))?;
+                    .map_err(|error| self.recovery_error(error))?;
 
                 Ok(CommandOk::RecoverIdentity)
             }
 
             Command::EnableRecovery { passphrase } => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let recovery = client.encryption().recovery();
                 let enable = recovery.enable();
 
@@ -476,13 +510,13 @@ macro_rules! dispatch_commands {
                     Some(passphrase) => enable.with_passphrase(passphrase).await,
                     None => enable.await,
                 }
-                .map_err(|error| $self.failed("enable_recovery", error))?;
+                .map_err(|error| self.failed("enable_recovery", error))?;
 
                 Ok(CommandOk::EnableRecovery { recovery_key })
             }
 
             Command::ResetRecoveryKey { passphrase } => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let recovery = client.encryption().recovery();
                 let reset = recovery.reset_key();
 
@@ -490,7 +524,7 @@ macro_rules! dispatch_commands {
                     Some(passphrase) => reset.with_passphrase(passphrase).await,
                     None => reset.await,
                 }
-                .map_err(|error| $self.failed("reset_recovery_key", error))?;
+                .map_err(|error| self.failed("reset_recovery_key", error))?;
 
                 Ok(CommandOk::ResetRecoveryKey { recovery_key })
             }
@@ -499,21 +533,21 @@ macro_rules! dispatch_commands {
                 device_id,
                 password,
             } => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let devices = [device_id];
 
                 if client.oauth().full_session().is_some()
-                    && let Ok(metadata) = client.oauth().server_metadata().await
-                    && let Some(url) = metadata.account_management_url_with_action(
-                        matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
-                            matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
-                        ),
-                    )
-                {
-                    return Ok(CommandOk::DeleteDevice {
-                        management_url: Some(url.to_string()),
-                    });
-                }
+                && let Ok(metadata) = client.oauth().server_metadata().await
+                && let Some(url) = metadata.account_management_url_with_action(
+                    matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
+                        matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
+                    ),
+                )
+            {
+                return Ok(CommandOk::DeleteDevice {
+                    management_url: Some(url.to_string()),
+                });
+            }
 
                 // The flows cannot be asked for up front.
                 let Err(error) = client.delete_devices(&devices, None).await else {
@@ -523,7 +557,7 @@ macro_rules! dispatch_commands {
                 };
 
                 let Some(uiaa) = error.as_uiaa_response() else {
-                    return Err($self.failed("delete_device", error));
+                    return Err(self.failed("delete_device", error));
                 };
 
                 // Recaptcha, SSO and terms need the server's fallback page.
@@ -557,7 +591,7 @@ macro_rules! dispatch_commands {
                     .map_err(|error| match error.as_uiaa_response() {
                         // A wrong password comes back as another challenge.
                         Some(_) => CommandErr::Denied,
-                        None => $self.failed("delete_device: auth", error),
+                        None => self.failed("delete_device: auth", error),
                     })?;
 
                 Ok(CommandOk::DeleteDevice {
@@ -569,24 +603,22 @@ macro_rules! dispatch_commands {
                 device_id,
                 display_name,
             } => {
-                $self
-                    .client()
+                self.client()
                     .await?
                     .rename_device(&device_id, &display_name)
                     .await
-                    .map_err(|error| $self.failed("rename_device", error))?;
+                    .map_err(|error| self.failed("rename_device", error))?;
 
                 Ok(CommandOk::RenameDevice)
             }
 
             Command::SetDisplayName { name } => {
-                $self
-                    .client()
+                self.client()
                     .await?
                     .account()
                     .set_display_name(name.as_deref())
                     .await
-                    .map_err(|error| $self.failed("set_display_name", error))?;
+                    .map_err(|error| self.failed("set_display_name", error))?;
 
                 Ok(CommandOk::SetDisplayName)
             }
@@ -597,33 +629,33 @@ macro_rules! dispatch_commands {
                     None => None,
                 };
 
-                $self
-                    .client()
+                self.client()
                     .await?
                     .account()
                     .set_avatar_url(url.as_deref())
                     .await
-                    .map_err(|error| $self.failed("set_avatar_url", error))?;
+                    .map_err(|error| self.failed("set_avatar_url", error))?;
 
                 Ok(CommandOk::SetAvatarUrl)
             }
 
             Command::SetProfileField { field, value } => {
-                let account = $self.client().await?.account();
+                let account = self.client().await?.account();
                 match value {
                     Some(value) => {
-                        let value = ProfileFieldValue::new(&field, value)
-                            .map_err(|error| $self.failed("set_profile_field: invalid value", error))?;
+                        let value = ProfileFieldValue::new(&field, value).map_err(|error| {
+                            self.failed("set_profile_field: invalid value", error)
+                        })?;
                         account
                             .set_profile_field(value)
                             .await
-                            .map_err(|error| $self.failed("set_profile_field", error))?;
+                            .map_err(|error| self.failed("set_profile_field", error))?;
                     }
                     None => {
                         account
                             .delete_profile_field(ProfileFieldName::from(field.as_str()))
                             .await
-                            .map_err(|error| $self.failed("delete_profile_field", error))?;
+                            .map_err(|error| self.failed("delete_profile_field", error))?;
                     }
                 }
 
@@ -631,13 +663,13 @@ macro_rules! dispatch_commands {
             }
 
             Command::AccountContacts => {
-                let emails = $self
+                let emails = self
                     .client()
                     .await?
                     .account()
                     .get_3pids()
                     .await
-                    .map_err(|error| $self.failed("account_contacts", error))?
+                    .map_err(|error| self.failed("account_contacts", error))?
                     .threepids
                     .into_iter()
                     .filter(|identifier| identifier.medium.as_str() == "email")
@@ -648,7 +680,7 @@ macro_rules! dispatch_commands {
             }
 
             Command::IgnoredUsers => {
-                let mut users = $self
+                let mut users = self
                     .client()
                     .await?
                     .subscribe_to_ignore_user_list_changes()
@@ -662,42 +694,39 @@ macro_rules! dispatch_commands {
             }
 
             Command::IgnoreUser { user_id } => {
-                $self
-                    .client()
+                self.client()
                     .await?
                     .account()
                     .ignore_user(&user_id)
                     .await
-                    .map_err(|error| $self.failed("ignore_user", error))?;
+                    .map_err(|error| self.failed("ignore_user", error))?;
 
                 Ok(CommandOk::IgnoreUser)
             }
 
             Command::UnignoreUser { user_id } => {
-                $self
-                    .client()
+                self.client()
                     .await?
                     .account()
                     .unignore_user(&user_id)
                     .await
-                    .map_err(|error| $self.failed("unignore_user", error))?;
+                    .map_err(|error| self.failed("unignore_user", error))?;
 
                 Ok(CommandOk::UnignoreUser)
             }
 
             Command::SetTyping { room_id, typing } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .typing_notice(typing)
                     .await
-                    .map_err(|error| $self.failed("set_typing", error))?;
+                    .map_err(|error| self.failed("set_typing", error))?;
 
                 Ok(CommandOk::SetTyping)
             }
 
             Command::NotificationSettings { room_id } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
 
                 Ok(CommandOk::NotificationSettings(
                     notifications::settings(&room).await,
@@ -705,56 +734,54 @@ macro_rules! dispatch_commands {
             }
 
             Command::DefaultNotificationModes => {
-                let (direct, group) = notifications::default_modes(&$self.client().await?).await;
+                let (direct, group) = notifications::default_modes(&self.client().await?).await;
 
                 Ok(CommandOk::DefaultNotificationModes { direct, group })
             }
 
             Command::SetPusher { pusher } => {
-                notifications::set_pusher(&$self.client().await?, pusher)
+                notifications::set_pusher(&self.client().await?, pusher)
                     .await
-                    .map_err(|error| $self.failed("set_pusher", error))?;
+                    .map_err(|error| self.failed("set_pusher", error))?;
 
                 Ok(CommandOk::SetPusher)
             }
 
             Command::RemovePusher { pushkey, app_id } => {
-                notifications::remove_pusher(&$self.client().await?, pushkey, app_id)
+                notifications::remove_pusher(&self.client().await?, pushkey, app_id)
                     .await
-                    .map_err(|error| $self.failed("remove_pusher", error))?;
+                    .map_err(|error| self.failed("remove_pusher", error))?;
 
                 Ok(CommandOk::RemovePusher)
             }
 
             Command::SetNotificationContent { visible } => {
-                $self
-                    .notification_content
-                    .store(visible, Ordering::Relaxed);
+                self.notification_content.store(visible, Ordering::Relaxed);
 
                 Ok(CommandOk::SetNotificationContent)
             }
 
             Command::SetRoomNotificationMode { room_id, mode } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
                 notifications::set_room_mode(&room, mode)
                     .await
-                    .map_err(|error| $self.failed("set_room_notification_mode", error))?;
+                    .map_err(|error| self.failed("set_room_notification_mode", error))?;
 
                 Ok(CommandOk::SetRoomNotificationMode)
             }
 
             Command::SetDefaultNotificationMode { direct, mode } => {
-                notifications::set_default_mode(&$self.client().await?, direct, mode)
+                notifications::set_default_mode(&self.client().await?, direct, mode)
                     .await
-                    .map_err(|error| $self.failed("set_default_notification_mode", error))?;
+                    .map_err(|error| self.failed("set_default_notification_mode", error))?;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
             }
 
             Command::Notification { room_id, event_id } => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let setup = NotificationProcessSetup::SingleProcess {
-                    sync_service: $self.sync_service().await?,
+                    sync_service: self.sync_service().await?,
                 };
 
                 Ok(CommandOk::Notification {
@@ -764,7 +791,7 @@ macro_rules! dispatch_commands {
             }
 
             Command::SetRoomTag { room_id, tag, set } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
                 let name = match tag {
                     RoomTag::Favourite => TagName::Favorite,
                     RoomTag::LowPriority => TagName::LowPriority,
@@ -773,26 +800,26 @@ macro_rules! dispatch_commands {
                 if set {
                     room.set_tag(name, TagInfo::new())
                         .await
-                        .map_err(|error| $self.room_error("set_room_tag", error))?;
+                        .map_err(|error| self.room_error("set_room_tag", error))?;
                 } else {
                     room.remove_tag(name)
                         .await
-                        .map_err(|error| $self.room_error("remove_room_tag", error))?;
+                        .map_err(|error| self.room_error("remove_room_tag", error))?;
                 }
 
                 Ok(CommandOk::SetRoomTag)
             }
 
             Command::SetDirect { room_id, direct } => {
-                let client = $self.client().await?;
-                let room = $self.room(&room_id).await?;
+                let client = self.client().await?;
+                let room = self.room(&room_id).await?;
 
                 if direct {
                     // `m.direct` is keyed by the other user, not by the room.
                     let members = room
                         .members(RoomMemberships::ACTIVE)
                         .await
-                        .map_err(|error| $self.failed("set_direct: members", error))?;
+                        .map_err(|error| self.failed("set_direct: members", error))?;
 
                     let others: Vec<OwnedUserId> = members
                         .iter()
@@ -804,18 +831,18 @@ macro_rules! dispatch_commands {
                         .account()
                         .mark_as_dm(&room_id, &others)
                         .await
-                        .map_err(|error| $self.failed("set_direct", error))?;
+                        .map_err(|error| self.failed("set_direct", error))?;
                 } else {
                     room.set_is_direct(false)
                         .await
-                        .map_err(|error| $self.failed("unset_direct", error))?;
+                        .map_err(|error| self.failed("unset_direct", error))?;
                 }
 
                 Ok(CommandOk::SetDirect)
             }
 
             Command::SetRoomJoinRule { room_id, rule } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
                 let (supports_knock, supports_restricted, supports_knock_restricted) =
                     join_rule_support(&room).await;
                 let content = match rule {
@@ -832,16 +859,15 @@ macro_rules! dispatch_commands {
                         return Err(CommandErr::Unsupported);
                     }
                     JoinRuleView::Restricted | JoinRuleView::KnockRestricted => {
-                        let parents = room
-                            .parent_spaces()
-                            .await
-                            .map_err(|error| $self.room_error("set_room_join_rule: parents", error))?;
+                        let parents = room.parent_spaces().await.map_err(|error| {
+                            self.room_error("set_room_join_rule: parents", error)
+                        })?;
                         pin_mut!(parents);
                         let mut allow = Vec::new();
 
                         while let Some(parent) = parents.next().await {
                             let parent = parent.map_err(|error| {
-                                $self.room_error("set_room_join_rule: parent", error)
+                                self.room_error("set_room_join_rule: parent", error)
                             })?;
                             if let ParentSpace::Reciprocal(space) = parent
                                 && space.is_space()
@@ -864,7 +890,7 @@ macro_rules! dispatch_commands {
 
                 room.send_state_event(content)
                     .await
-                    .map_err(|error| $self.room_error("set_room_join_rule", error))?;
+                    .map_err(|error| self.room_error("set_room_join_rule", error))?;
 
                 Ok(CommandOk::SetRoomJoinRule)
             }
@@ -875,53 +901,50 @@ macro_rules! dispatch_commands {
                 state_key,
                 content,
             } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .send_state_event_raw(&event_type, &state_key, &content)
                     .await
-                    .map_err(|error| $self.room_error("send_state_event", error))?;
+                    .map_err(|error| self.room_error("send_state_event", error))?;
 
                 Ok(CommandOk::SendStateEvent)
             }
 
             Command::SetRoomName { room_id, name } => {
                 // The spec clears a name with an empty one.
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .set_name(name.unwrap_or_default())
                     .await
-                    .map_err(|error| $self.room_error("set_room_name", error))?;
+                    .map_err(|error| self.room_error("set_room_name", error))?;
 
                 Ok(CommandOk::SetRoomName)
             }
 
             Command::SetRoomTopic { room_id, topic } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .set_room_topic(&topic)
                     .await
-                    .map_err(|error| $self.room_error("set_room_topic", error))?;
+                    .map_err(|error| self.room_error("set_room_topic", error))?;
 
                 Ok(CommandOk::SetRoomTopic)
             }
 
             Command::SetRoomAvatar { room_id, url } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
 
                 match url {
                     Some(url) => {
                         room.set_avatar_url(&mxc_uri(&url)?, None)
                             .await
-                            .map_err(|error| $self.room_error("set_room_avatar", error))?;
+                            .map_err(|error| self.room_error("set_room_avatar", error))?;
                     }
                     // State cannot be deleted, so empty content is the removal.
                     None => {
                         room.send_state_event(RoomAvatarEventContent::new())
                             .await
-                            .map_err(|error| $self.room_error("clear_room_avatar", error))?;
+                            .map_err(|error| self.room_error("clear_room_avatar", error))?;
                     }
                 }
 
@@ -933,12 +956,11 @@ macro_rules! dispatch_commands {
                 user_id,
                 power_level,
             } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .update_power_levels(vec![(&user_id, power_level.into())])
                     .await
-                    .map_err(|error| $self.room_error("set_user_power_level", error))?;
+                    .map_err(|error| self.room_error("set_user_power_level", error))?;
 
                 Ok(CommandOk::SetUserPowerLevel)
             }
@@ -948,12 +970,11 @@ macro_rules! dispatch_commands {
                 user_id,
                 reason,
             } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .kick_user(&user_id, reason.as_deref())
                     .await
-                    .map_err(|error| $self.room_error("kick_user", error))?;
+                    .map_err(|error| self.room_error("kick_user", error))?;
 
                 Ok(CommandOk::KickUser)
             }
@@ -963,12 +984,11 @@ macro_rules! dispatch_commands {
                 user_id,
                 reason,
             } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .ban_user(&user_id, reason.as_deref())
                     .await
-                    .map_err(|error| $self.room_error("ban_user", error))?;
+                    .map_err(|error| self.room_error("ban_user", error))?;
 
                 Ok(CommandOk::BanUser)
             }
@@ -978,54 +998,52 @@ macro_rules! dispatch_commands {
                 user_id,
                 reason,
             } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .unban_user(&user_id, reason.as_deref())
                     .await
-                    .map_err(|error| $self.room_error("unban_user", error))?;
+                    .map_err(|error| self.room_error("unban_user", error))?;
 
                 Ok(CommandOk::UnbanUser)
             }
 
             Command::RequestVerification { user_id } => {
-                let request = $self
+                let request = self
                     .client()
                     .await?
                     .encryption()
                     .get_user_identity(&user_id)
                     .await
-                    .map_err(|error| $self.failed("request_verification: identity", error))?
+                    .map_err(|error| self.failed("request_verification: identity", error))?
                     // No cross-signing identity: keys not downloaded, or none set.
                     .ok_or(CommandErr::Unavailable)?
                     .request_verification()
                     .await
-                    .map_err(|error| $self.failed("request_verification", error))?;
+                    .map_err(|error| self.failed("request_verification", error))?;
 
                 let flow_id = request.flow_id().to_owned();
-                $self.watch_verification(request);
+                self.watch_verification(request);
 
                 Ok(CommandOk::RequestVerification { flow_id })
             }
 
             Command::AcceptVerification { user_id, flow_id } => {
-                let request = $self.verification_request(&user_id, &flow_id).await?;
+                let request = self.verification_request(&user_id, &flow_id).await?;
 
                 request
                     .accept()
                     .await
-                    .map_err(|error| $self.failed("accept_verification", error))?;
+                    .map_err(|error| self.failed("accept_verification", error))?;
 
                 Ok(CommandOk::AcceptVerification)
             }
 
             Command::ConfirmVerification { user_id, flow_id } => {
-                $self
-                    .sas(&user_id, &flow_id)
+                self.sas(&user_id, &flow_id)
                     .await?
                     .confirm()
                     .await
-                    .map_err(|error| $self.failed("confirm_verification", error))?;
+                    .map_err(|error| self.failed("confirm_verification", error))?;
 
                 Ok(CommandOk::ConfirmVerification)
             }
@@ -1036,21 +1054,21 @@ macro_rules! dispatch_commands {
                 mismatch,
             } => {
                 // No SAS to report a mismatch on before the emoji show.
-                match $self.sas(&user_id, &flow_id).await {
+                match self.sas(&user_id, &flow_id).await {
                     Ok(sas) if mismatch => sas
                         .mismatch()
                         .await
-                        .map_err(|error| $self.failed("cancel_verification: mismatch", error))?,
+                        .map_err(|error| self.failed("cancel_verification: mismatch", error))?,
                     Ok(sas) => sas
                         .cancel()
                         .await
-                        .map_err(|error| $self.failed("cancel_verification: sas", error))?,
-                    Err(_) => $self
+                        .map_err(|error| self.failed("cancel_verification: sas", error))?,
+                    Err(_) => self
                         .verification_request(&user_id, &flow_id)
                         .await?
                         .cancel()
                         .await
-                        .map_err(|error| $self.failed("cancel_verification", error))?,
+                        .map_err(|error| self.failed("cancel_verification", error))?,
                 }
 
                 Ok(CommandOk::CancelVerification)
@@ -1065,7 +1083,7 @@ macro_rules! dispatch_commands {
                 invite,
                 parent_space,
             } => {
-                let client = $self.client().await?;
+                let client = self.client().await?;
                 let mut request = create_room::v3::Request::new();
                 request.name = name;
                 request.topic = topic;
@@ -1086,24 +1104,26 @@ macro_rules! dispatch_commands {
                     creation.room_type = Some(RoomType::Space);
                     request.creation_content = Some(
                         Raw::new(&creation)
-                            .map_err(|error| $self.failed("create_room: space type", error))?
+                            .map_err(|error| self.failed("create_room: space type", error))?
                             .cast_unchecked(),
                     );
                 } else if encrypted && !public {
                     // Anyone can join and read, so encryption only breaks previews.
-                    request.initial_state = vec![InitialStateEvent::with_empty_state_key(
-                        RoomEncryptionEventContent::with_recommended_defaults(),
-                    )
-                    .to_raw_any()];
+                    request.initial_state = vec![
+                        InitialStateEvent::with_empty_state_key(
+                            RoomEncryptionEventContent::with_recommended_defaults(),
+                        )
+                        .to_raw_any(),
+                    ];
                 }
 
                 let room = client
                     .create_room(request)
                     .await
-                    .map_err(|error| $self.failed("create_room", error))?;
+                    .map_err(|error| self.failed("create_room", error))?;
 
                 if let Some(space_id) = parent_space {
-                    $self.add_to_space(&space_id, room.room_id()).await?;
+                    self.add_to_space(&space_id, room.room_id()).await?;
                 }
 
                 Ok(CommandOk::CreateRoom {
@@ -1112,12 +1132,12 @@ macro_rules! dispatch_commands {
             }
 
             Command::CreateDm { user_id } => {
-                let room = $self
+                let room = self
                     .client()
                     .await?
                     .create_dm(&user_id)
                     .await
-                    .map_err(|error| $self.failed("create_dm", error))?;
+                    .map_err(|error| self.failed("create_dm", error))?;
 
                 Ok(CommandOk::CreateDm {
                     room_id: room.room_id().to_owned(),
@@ -1125,31 +1145,28 @@ macro_rules! dispatch_commands {
             }
 
             Command::AddToSpace { space_id, room_id } => {
-                $self.add_to_space(&space_id, &room_id).await?;
+                self.add_to_space(&space_id, &room_id).await?;
 
                 Ok(CommandOk::AddToSpace)
             }
 
             Command::SpaceHierarchy { space_id, from } => {
-                $self.space_hierarchy(&space_id, from).await
+                self.space_hierarchy(&space_id, from).await
             }
 
             Command::RemoveFromSpace { space_id, room_id } => {
                 // The spec delists by omitting `via`. The typed content has it
                 // non-optional and would send `{"via": []}`, a valid array.
-                $self
-                    .room(&space_id)
+                self.room(&space_id)
                     .await?
                     .send_state_event_raw("m.space.child", room_id.as_str(), &serde_json::json!({}))
                     .await
-                    .map_err(|error| $self.room_error("remove_from_space", error))?;
+                    .map_err(|error| self.room_error("remove_from_space", error))?;
 
                 Ok(CommandOk::RemoveFromSpace)
             }
 
-            Command::RoomPreview { address, via } => {
-                $self.room_preview(&address, &via).await
-            }
+            Command::RoomPreview { address, via } => self.room_preview(&address, &via).await,
 
             Command::JoinRoom { address, via } => {
                 let address =
@@ -1160,12 +1177,12 @@ macro_rules! dispatch_commands {
                     .filter_map(|server| ServerName::parse(server).ok())
                     .collect::<Vec<_>>();
 
-                let room = $self
+                let room = self
                     .client()
                     .await?
                     .join_room_by_id_or_alias(&address, &via)
                     .await
-                    .map_err(|error| $self.room_error("join_room", error))?;
+                    .map_err(|error| self.room_error("join_room", error))?;
 
                 Ok(CommandOk::JoinRoom {
                     room_id: room.room_id().to_owned(),
@@ -1176,10 +1193,10 @@ macro_rules! dispatch_commands {
                 address,
                 via,
                 reason,
-            } => $self.knock_room(&address, &via, reason).await,
+            } => self.knock_room(&address, &via, reason).await,
 
             Command::RoomViaServers { room_id } => {
-                let room = $self.room(&room_id).await?;
+                let room = self.room(&room_id).await?;
                 if room.canonical_alias().is_some() {
                     return Ok(CommandOk::RoomViaServers {
                         servers: Vec::new(),
@@ -1189,7 +1206,7 @@ macro_rules! dispatch_commands {
                 let members = room
                     .members(RoomMemberships::JOIN)
                     .await
-                    .map_err(|error| $self.failed("room_via_servers", error))?;
+                    .map_err(|error| self.failed("room_via_servers", error))?;
 
                 let ranked: Vec<(String, i32)> = members
                     .iter()
@@ -1207,26 +1224,24 @@ macro_rules! dispatch_commands {
             }
 
             Command::LeaveRoom { room_id } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .leave()
                     .await
-                    .map_err(|error| $self.room_error("leave_room", error))?;
+                    .map_err(|error| self.room_error("leave_room", error))?;
 
                 // Keeping it would hand a stale timeline back on rejoin.
-                $self.timelines.lock().await.remove(&room_id);
+                self.timelines.lock().await.remove(&room_id);
 
                 Ok(CommandOk::LeaveRoom)
             }
 
             Command::InviteUser { room_id, user_id } => {
-                $self
-                    .room(&room_id)
+                self.room(&room_id)
                     .await?
                     .invite_user_by_id(&user_id)
                     .await
-                    .map_err(|error| $self.room_error("invite_user", error))?;
+                    .map_err(|error| self.room_error("invite_user", error))?;
 
                 Ok(CommandOk::InviteUser)
             }
@@ -1235,8 +1250,7 @@ macro_rules! dispatch_commands {
                 // The read marker line tracks `m.fully_read`, so a receipt alone
                 // would leave it where it was. The server drops either unless
                 // newer, so the UI may send freely.
-                $self
-                    .timeline(&room_id)
+                self.timeline(&room_id)
                     .await?
                     .send_multiple_receipts(
                         Receipts::new()
@@ -1244,7 +1258,7 @@ macro_rules! dispatch_commands {
                             .fully_read_marker(event_id),
                     )
                     .await
-                    .map_err(|error| $self.failed("mark_read", error))?;
+                    .map_err(|error| self.failed("mark_read", error))?;
 
                 Ok(CommandOk::MarkRead)
             }
@@ -1253,14 +1267,13 @@ macro_rules! dispatch_commands {
                 room_id,
                 transaction_id,
             } => {
-                $self.client().await?.send_queue().set_enabled(true).await;
+                self.client().await?.send_queue().set_enabled(true).await;
 
-                $self
-                    .local_echo(&room_id, &transaction_id)
+                self.local_echo(&room_id, &transaction_id)
                     .await?
                     .unwedge()
                     .await
-                    .map_err(|error| $self.failed("retry_send", error))?;
+                    .map_err(|error| self.failed("retry_send", error))?;
 
                 Ok(CommandOk::RetrySend)
             }
@@ -1269,15 +1282,22 @@ macro_rules! dispatch_commands {
                 room_id,
                 transaction_id,
             } => {
-                let cancelled = $self
+                let cancelled = self
                     .local_echo(&room_id, &transaction_id)
                     .await?
                     .abort()
                     .await
-                    .map_err(|error| $self.failed("cancel_send", error))?;
+                    .map_err(|error| self.failed("cancel_send", error))?;
 
                 Ok(CommandOk::CancelSend { cancelled })
             }
         }
-    };
+    }
+}
+
+fn message_content(body: String, formatted: Option<String>) -> RoomMessageEventContent {
+    match formatted {
+        Some(html) => RoomMessageEventContent::text_html(body, html),
+        None => RoomMessageEventContent::text_plain(body),
+    }
 }

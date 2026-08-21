@@ -25,11 +25,12 @@ use wiremock::{
 };
 
 use super::{
-    Core, build_room_timeline,
-    protocol::{Command, CommandOk, CoreEvent},
+    Core,
+    protocol::{Command, CommandErr, CommandOk, CoreEvent},
     session::{self, Session},
     store::MemorySessionStore,
 };
+use crate::timelines::build_room_timeline;
 
 #[tokio::test]
 async fn started_sync_recovers_after_an_offline_failure() {
@@ -786,6 +787,47 @@ fn contents(
 }
 
 #[tokio::test]
+async fn a_poll_kind_we_do_not_recognise_withholds_its_tally() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!custom:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let start = event_id!("$poll");
+
+    let mut content = poll_content("lunch?", &["ramen"], false)
+        .expect("a question and one answer are a valid poll");
+    if let matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::New(new) =
+        &mut content
+    {
+        new.poll_start.kind =
+            matrix_sdk::ruma::events::poll::start::PollKind::from("org.example.secret");
+    }
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.event(content).event_id(start))
+                .add_timeline_event(
+                    factory
+                        .poll_response(vec!["0"], start)
+                        .event_id(event_id!("$vote")),
+                ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let poll = only_poll(&views).expect("a poll on the timeline");
+
+    assert!(poll.undisclosed);
+    assert_eq!(poll.answers.first().map(|answer| answer.votes), Some(None));
+}
+
+#[tokio::test]
 async fn a_location_reaches_the_view_with_its_coordinates_parsed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -904,7 +946,9 @@ async fn a_gallery_reaches_the_view_as_one_item_per_attachment() {
     )
     .into_iter()
     .find_map(|content| match content {
-        crate::protocol::TimelineItemContentView::Gallery { body, items } => Some((body, items)),
+        crate::protocol::TimelineItemContentView::Gallery { body, items, .. } => {
+            Some((body, items))
+        }
         _ => None,
     })
     .expect("a gallery on the timeline");
@@ -1035,4 +1079,73 @@ async fn joining_a_call_is_worded_as_a_join() {
             joined: true
         })]
     ));
+}
+
+/// The UI branches on these variants, so the mapping is a contract.
+/// `None` when the mocked server accepted the write.
+async fn room_command_error(response: ResponseTemplate) -> Option<crate::protocol::CommandErr> {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!errors:example.org");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server.sync_joined_room(&client, room_id).await;
+    server
+        .mock_room_send_state()
+        .respond_with(response)
+        .mount()
+        .await;
+
+    let (core, _events) = Core::new("errors", Box::new(MemorySessionStore::default()));
+    let error = room.set_room_topic("nope").await.err()?;
+
+    Some(core.room_error("set_room_topic", error))
+}
+
+#[tokio::test]
+async fn a_forbidden_room_write_is_reported_as_denied() {
+    let error = room_command_error(ResponseTemplate::new(403).set_body_json(json!({
+        "errcode": "M_FORBIDDEN",
+        "error": "You don't have permission",
+    })))
+    .await
+    .expect("the mocked server rejects the write");
+
+    assert!(
+        matches!(error, CommandErr::Denied),
+        "expected Denied, got {error:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_rate_limited_room_write_carries_the_delay_in_milliseconds() {
+    let error = room_command_error(ResponseTemplate::new(429).set_body_json(json!({
+        "errcode": "M_LIMIT_EXCEEDED",
+        "error": "Too many requests",
+        "retry_after_ms": 5000,
+    })))
+    .await
+    .expect("the mocked server rejects the write");
+
+    assert!(
+        matches!(
+            error,
+            CommandErr::RateLimited {
+                retry_after_ms: Some(5000)
+            }
+        ),
+        "expected RateLimited with 5000ms, got {error:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_unavailable_homeserver_is_retryable_rather_than_a_logged_failure() {
+    let error = room_command_error(ResponseTemplate::new(500))
+        .await
+        .expect("the mocked server rejects the write");
+
+    assert!(
+        matches!(error, CommandErr::Unavailable),
+        "expected Unavailable, got {error:?}"
+    );
 }

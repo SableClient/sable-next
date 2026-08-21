@@ -38,7 +38,7 @@ use crate::matrix_html::{
     display_html, has_profile_fallback_html, strip_profile_fallback_body,
     strip_profile_fallback_html,
 };
-use crate::pronoun_sets;
+use crate::profiles::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
     MentionView, PerMessageProfileView, PollAnswerView, PollView, ReactionGroup, ReplyView,
@@ -231,7 +231,7 @@ pub async fn enrich_room_fields<S: BuildHasher>(
                 let is_space = room.is_space();
                 let has_space_parent = has_space_parent(&room).await;
                 let (supports_knock, supports_restricted, supports_knock_restricted) =
-                    crate::join_rule_support(&room).await;
+                    crate::rooms::join_rule_support(&room).await;
                 let canonical_alias = room.canonical_alias().map(|alias| alias.to_string());
 
                 let children = if is_space {
@@ -472,9 +472,8 @@ pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> 
                 TimelineDetails::Ready(profile) => Some(profile),
                 _ => None,
             };
-            let raw = raw_content(event);
-            let prev_raw = raw_prev_content(event);
-            let message_profile = per_message_profile(raw.as_ref());
+            let raw = RawFields::read(event);
+            let message_profile = per_message_profile(raw.content.as_ref());
 
             TimelineItemView {
                 id,
@@ -487,13 +486,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> 
                     .and_then(|p: &Profile| p.avatar_url.as_ref())
                     .map(ToString::to_string),
                 timestamp: event.timestamp().0.into(),
-                content: content(
-                    event.content(),
-                    message_profile.as_ref(),
-                    raw.as_ref(),
-                    prev_raw.as_ref(),
-                    own_user_id,
-                ),
+                content: content(event.content(), message_profile.as_ref(), &raw, own_user_id),
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
@@ -590,20 +583,35 @@ fn mention(event: &EventTimelineItem, own_user_id: Option<&UserId>) -> MentionVi
 
 const PMP_KEYS: [&str; 2] = ["com.beeper.per_message_profile", "m.per_message_profile"];
 
-/// An edit replaces the content, carrying its own profile, so the latest event
-/// wins over the original.
-fn raw_content(event: &EventTimelineItem) -> Option<serde_json::Value> {
-    let raw = event.latest_json().or_else(|| event.original_json())?;
-    let json: serde_json::Value = raw.deserialize_as_unchecked().ok()?;
-    json.get("content").cloned()
+/// Narrow so serde skips the rest of the event; a whole-event `Value`
+/// materialises every `formatted_body`.
+#[derive(Default, serde::Deserialize)]
+struct RawFields {
+    content: Option<serde_json::Value>,
+    unsigned: Option<RawUnsigned>,
 }
 
-/// Lives in `unsigned`, and is the only source for an event type the SDK has no
-/// typed content for.
-fn raw_prev_content(event: &EventTimelineItem) -> Option<serde_json::Value> {
-    let raw = event.latest_json().or_else(|| event.original_json())?;
-    let json: serde_json::Value = raw.deserialize_as_unchecked().ok()?;
-    json.get("unsigned")?.get("prev_content").cloned()
+#[derive(serde::Deserialize)]
+struct RawUnsigned {
+    prev_content: Option<serde_json::Value>,
+}
+
+impl RawFields {
+    /// An edit replaces the content, carrying its own profile, so the latest
+    /// event wins over the original.
+    fn read(event: &EventTimelineItem) -> Self {
+        event
+            .latest_json()
+            .or_else(|| event.original_json())
+            .and_then(|raw| raw.deserialize_as_unchecked::<Self>().ok())
+            .unwrap_or_default()
+    }
+
+    /// A state event's previous content, which is the only source for an event
+    /// type the SDK has no typed content for.
+    fn prev_content(&self) -> Option<&serde_json::Value> {
+        self.unsigned.as_ref()?.prev_content.as_ref()
+    }
 }
 
 fn per_message_profile(content: Option<&serde_json::Value>) -> Option<PerMessageProfileView> {
@@ -690,34 +698,39 @@ fn text_message(
     }
 }
 
-/// `geo:lat,long` with optional `;`-separated parameters.
-fn geo_coordinates(geo_uri: &str) -> (Option<f64>, Option<f64>) {
-    let Some(rest) = geo_uri.strip_prefix("geo:") else {
-        return (None, None);
-    };
-    let coordinates = rest.split(';').next().unwrap_or(rest);
+/// RFC 5870 `geo:lat,long[,alt]` with optional `;`-separated parameters.
+fn geo_coordinates(geo_uri: &str) -> Option<(f64, f64)> {
+    // RFC 3986: schemes are case-insensitive.
+    let scheme = geo_uri.get(..4)?;
+    if !scheme.eq_ignore_ascii_case("geo:") {
+        return None;
+    }
+    let coordinates = geo_uri.get(4..)?.split(';').next()?;
     let mut parts = coordinates.split(',');
-    let latitude = parts.next().and_then(|part| part.trim().parse().ok());
-    let longitude = parts.next().and_then(|part| part.trim().parse().ok());
-    (latitude, longitude)
+    let latitude: f64 = parts.next()?.trim().parse().ok()?;
+    let longitude: f64 = parts.next()?.trim().parse().ok()?;
+
+    // RFC 5870 declares anything outside these ranges invalid.
+    ((-90.0..=90.0).contains(&latitude) && (-180.0..=180.0).contains(&longitude))
+        .then_some((latitude, longitude))
 }
 
 fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
     let results = state.results();
-    let ended = results.end_time.is_some();
-    let undisclosed = matches!(results.kind, PollKind::Undisclosed);
-    let reveal = ended || !undisclosed;
+    // MSC3381 says to assume `m.undisclosed` for a kind we do not recognise, so
+    // only an explicit `m.disclosed` reveals a running tally.
+    let undisclosed = !matches!(results.kind, PollKind::Disclosed);
+    let reveal = results.end_time.is_some() || !undisclosed;
+    let tally = results.votes;
 
     PollView {
         question: results.question,
         answers: results
             .answers
-            .iter()
+            .into_iter()
             .map(|answer| {
-                let voters = results.votes.get(&answer.id);
+                let voters = tally.get(&answer.id);
                 PollAnswerView {
-                    id: answer.id.clone(),
-                    text: answer.text.clone(),
                     votes: reveal.then(|| {
                         voters.map_or(0, |voters| u32::try_from(voters.len()).unwrap_or(u32::MAX))
                     }),
@@ -725,6 +738,8 @@ fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
                         voters
                             .is_some_and(|voters| voters.iter().any(|voter| voter == own.as_str()))
                     }),
+                    id: answer.id,
+                    text: answer.text,
                 }
             })
             .collect(),
@@ -735,33 +750,43 @@ fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
     }
 }
 
+/// `media.rs` reads a bare string back as a plain mxc URI, so the common case
+/// skips the serializer and the wrapper object.
+fn media_source(source: &MediaSource) -> String {
+    match source {
+        MediaSource::Plain(uri) => uri.as_str().to_owned(),
+        encrypted @ MediaSource::Encrypted(_) => {
+            serde_json::to_string(encrypted).unwrap_or_default()
+        }
+    }
+}
+
 fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
-    let source = |source: &MediaSource| serde_json::to_string(source).unwrap_or_default();
-    let dimension = |value: Option<UInt>| value.map(|value| i64::from(value).cast_unsigned());
+    let dimension = |value: Option<UInt>| value.map(u64::from);
 
     Some(match item {
         GalleryItemType::Image(image) => GalleryItemView::Image {
             body: image.body.clone(),
-            source: source(&image.source),
+            source: media_source(&image.source),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
         },
         GalleryItemType::Video(video) => GalleryItemView::Video {
             body: video.body.clone(),
-            source: source(&video.source),
+            source: media_source(&video.source),
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
         },
         GalleryItemType::Audio(audio) => GalleryItemView::Audio {
             body: audio.body.clone(),
-            source: source(&audio.source),
+            source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
         },
         GalleryItemType::File(file) => GalleryItemView::File {
             body: file.body.clone(),
-            source: source(&file.source),
+            source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
         },
         // The caption already describes the set, so an unrenderable item is
@@ -833,9 +858,12 @@ fn state_change(
         },
         // MSC3401 is unstable, so there is no typed content to read.
         AnyOtherStateEventContentChange::_Custom { event_type }
-            if CALL_MEMBER_TYPES.contains(&event_type.as_str()) =>
+            if event_type == CALL_MEMBER_TYPE =>
         {
-            let joined = in_call(content);
+            // A redaction takes the content with it; an empty content is a
+            // real leave.
+            let content = content?;
+            let joined = in_call(Some(content));
             // Moving between calls has no copy.
             if joined && in_call(prev_content) {
                 return None;
@@ -846,8 +874,8 @@ fn state_change(
     }
 }
 
-/// MSC3401 moved from an `application` key to a `memberships` array; both are
-/// still in the wild.
+/// The legacy MSC3401 shape is a `memberships` array; the session shape that
+/// replaced it carries a top-level `application`. Both are still in the wild.
 fn in_call(content: Option<&serde_json::Value>) -> bool {
     let Some(content) = content else {
         return false;
@@ -861,49 +889,58 @@ fn in_call(content: Option<&serde_json::Value>) -> bool {
         .is_some_and(|memberships| !memberships.is_empty())
 }
 
-const CALL_MEMBER_TYPES: [&str; 2] = ["m.call.member", "org.matrix.msc3401.call.member"];
+// ruma resolves the `m.call.member` alias to the unstable type, so only the
+// unstable one is ever seen here.
+const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
 
 fn message_content(
     message: &matrix_sdk_ui::timeline::Message,
     profile: Option<&PerMessageProfileView>,
 ) -> TimelineItemContentView {
-    let dimension = |value: Option<UInt>| value.map(|value| i64::from(value).cast_unsigned());
+    let dimension = |value: Option<UInt>| value.map(u64::from);
 
     match message.msgtype() {
         MessageType::Image(image) => TimelineItemContentView::Image {
             body: image.body.clone(),
-            source: serde_json::to_string(&image.source).unwrap_or_default(),
+            source: media_source(&image.source),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
         },
         MessageType::Video(video) => TimelineItemContentView::Video {
             body: video.body.clone(),
-            source: serde_json::to_string(&video.source).unwrap_or_default(),
+            source: media_source(&video.source),
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
         },
         MessageType::Audio(audio) => TimelineItemContentView::Audio {
             body: audio.body.clone(),
-            source: serde_json::to_string(&audio.source).unwrap_or_default(),
+            source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
         },
         MessageType::File(file) => TimelineItemContentView::File {
             body: file.body.clone(),
-            source: serde_json::to_string(&file.source).unwrap_or_default(),
+            source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
         },
         MessageType::Location(location) => {
-            let (latitude, longitude) = geo_coordinates(&location.geo_uri);
+            let coordinates = geo_coordinates(&location.geo_uri);
             TimelineItemContentView::Location {
                 body: location.body.clone(),
                 geo_uri: location.geo_uri.clone(),
-                latitude,
-                longitude,
+                latitude: coordinates.map(|(latitude, _)| latitude),
+                longitude: coordinates.map(|(_, longitude)| longitude),
             }
         }
         MessageType::Gallery(gallery) => TimelineItemContentView::Gallery {
+            html: display_html(
+                &gallery.body,
+                gallery
+                    .formatted
+                    .as_ref()
+                    .map(|formatted| formatted.body.as_str()),
+            ),
             body: gallery.body.clone(),
             items: gallery.itemtypes.iter().filter_map(gallery_item).collect(),
         },
@@ -914,8 +951,7 @@ fn message_content(
 fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
-    raw: Option<&serde_json::Value>,
-    prev_raw: Option<&serde_json::Value>,
+    raw: &RawFields,
     own_user_id: Option<&UserId>,
 ) -> TimelineItemContentView {
     let unsupported = |what: &str| TimelineItemContentView::Unsupported {
@@ -935,14 +971,8 @@ fn content(
                     body: sticker.body.clone(),
                     source: serde_json::to_string(&sticker.source).unwrap_or_default(),
                     mime: sticker.info.mimetype.clone(),
-                    width: sticker
-                        .info
-                        .width
-                        .map(|width| i64::from(width).cast_unsigned()),
-                    height: sticker
-                        .info
-                        .height
-                        .map(|height| i64::from(height).cast_unsigned()),
+                    width: sticker.info.width.map(u64::from),
+                    height: sticker.info.height.map(u64::from),
                 }
             }
             MsgLikeKind::Poll(state) => TimelineItemContentView::Poll {
@@ -951,7 +981,7 @@ fn content(
             MsgLikeKind::LiveLocation(_) => unsupported("live location"),
             MsgLikeKind::Other(other) => TimelineItemContentView::HiddenEvent {
                 event_type: other.event_type().to_string(),
-                content: raw.cloned(),
+                content: raw.content.clone(),
             },
         },
 
@@ -975,8 +1005,8 @@ fn content(
         TimelineItemContent::OtherState(state) => TimelineItemContentView::StateEvent {
             event_type: state.content().event_type().to_string(),
             state_key: state.state_key().to_owned(),
-            content: raw.cloned(),
-            change: state_change(state, raw, prev_raw),
+            change: state_change(state, raw.content.as_ref(), raw.prev_content()),
+            content: raw.content.clone(),
         },
         TimelineItemContent::CallInvite => unsupported("call invite"),
         _ => unsupported("event"),
@@ -1154,7 +1184,8 @@ pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>])
 mod tests {
     use serde_json::json;
 
-    use super::{geo_coordinates, in_call, via_servers};
+    use super::{clamp_power_level, geo_coordinates, in_call, per_message_profile, via_servers};
+    use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
 
     fn members(entries: &[(&str, i32)]) -> Vec<(String, i32)> {
         entries
@@ -1244,18 +1275,63 @@ mod tests {
     }
 
     #[test]
-    fn reads_a_geo_uri_with_and_without_parameters() {
-        assert_eq!(geo_coordinates("geo:51.5,-0.12"), (Some(51.5), Some(-0.12)));
-        assert_eq!(
-            geo_coordinates("geo:51.5,-0.12;u=35"),
-            (Some(51.5), Some(-0.12))
-        );
+    fn reads_a_geo_uri_with_parameters_an_altitude_or_an_upper_case_scheme() {
+        assert_eq!(geo_coordinates("geo:51.5,-0.12"), Some((51.5, -0.12)));
+        assert_eq!(geo_coordinates("geo:51.5,-0.12;u=35"), Some((51.5, -0.12)));
+        assert_eq!(geo_coordinates("geo:51.5,-0.12,120"), Some((51.5, -0.12)));
+        assert_eq!(geo_coordinates("GEO:51.5,-0.12"), Some((51.5, -0.12)));
     }
 
     #[test]
     fn leaves_an_unreadable_geo_uri_without_coordinates() {
-        assert_eq!(geo_coordinates("https://example.org/map"), (None, None));
-        assert_eq!(geo_coordinates("geo:somewhere"), (None, None));
+        assert_eq!(geo_coordinates("https://example.org/map"), None);
+        assert_eq!(geo_coordinates("geo:somewhere"), None);
+        assert_eq!(geo_coordinates("geo:"), None);
+        assert_eq!(geo_coordinates("geo:51.5"), None);
+    }
+
+    #[test]
+    fn rejects_coordinates_outside_the_ranges_rfc_5870_allows() {
+        assert_eq!(geo_coordinates("geo:91,0"), None);
+        assert_eq!(geo_coordinates("geo:0,181"), None);
+        assert_eq!(geo_coordinates("geo:-90,-180"), Some((-90.0, -180.0)));
+    }
+
+    #[test]
+    fn saturates_a_power_level_that_does_not_fit_and_treats_infinite_as_the_ceiling() {
+        use matrix_sdk::ruma::Int;
+
+        assert_eq!(clamp_power_level(UserPowerLevel::Int(Int::from(50))), 50);
+        assert_eq!(
+            clamp_power_level(UserPowerLevel::Int(Int::MAX)),
+            i32::MAX,
+            "a level above i32 must not wrap into a demotion"
+        );
+        assert_eq!(clamp_power_level(UserPowerLevel::Int(Int::MIN)), i32::MIN);
+        assert_eq!(clamp_power_level(UserPowerLevel::Infinite), i32::MAX);
+    }
+
+    #[test]
+    fn reads_a_per_message_profile_under_either_key() {
+        let beeper = json!({ "com.beeper.per_message_profile": { "displayname": "Kris" } });
+        let stable = json!({ "m.per_message_profile": { "displayname": "Kris" } });
+
+        for content in [&beeper, &stable] {
+            let profile = per_message_profile(Some(content)).expect("a profile under either key");
+            assert_eq!(profile.display_name.as_deref(), Some("Kris"));
+            assert!(!profile.has_fallback);
+        }
+
+        assert!(per_message_profile(Some(&json!({}))).is_none());
+        assert!(per_message_profile(None).is_none());
+    }
+
+    #[test]
+    fn a_blank_profile_name_reads_as_no_name_rather_than_an_empty_one() {
+        let content = json!({ "m.per_message_profile": { "displayname": "   " } });
+        let profile = per_message_profile(Some(&content)).expect("a profile");
+
+        assert_eq!(profile.display_name, None);
     }
 
     #[test]
