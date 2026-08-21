@@ -77,6 +77,17 @@ test('keeps the mobile quick tools visible on inbox', async ({ page, installRoom
   await expect(page.getByRole('button', { name: 'Account' }).last()).toBeVisible();
 });
 
+test('returns to the previous page when closing inbox', async ({ page, app, installRoomCore }) => {
+  await installRoomCore('ready');
+  await app.openHome();
+
+  await page.getByRole('link', { name: 'Inbox' }).first().click();
+  await expect(page).toHaveURL(/\/home$/);
+
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page).toHaveURL(/\/home$/);
+});
+
 test('opens a settings section over the app shell', async ({ page, app, signIn }) => {
   await signIn();
   await page.goto('/settings/appearance');

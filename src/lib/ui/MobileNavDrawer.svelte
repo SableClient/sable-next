@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
@@ -33,7 +34,10 @@
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/direct']);
   let pathname = $derived(page.url.pathname);
-  let open = $derived(LIST_INDEX_PATHS.has(pathname) || /^\/space\/[^/]+$/.test(pathname));
+  let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || /^\/space\/[^/]+$/.test(pathname));
+  let open = $derived(
+    page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open'
+  );
 
   // Navigating out from under a drag would otherwise leave the track pinned at
   // the gesture's last offset.
@@ -70,6 +74,14 @@
         position = undefined;
         settleFrame = undefined;
       });
+    });
+  }
+
+  function setOpen(next: boolean): void {
+    if (next === open) return;
+    void goto('', {
+      shallow: true,
+      state: { ...page.state, mobileDrawer: next ? 'open' : 'closed' },
     });
   }
 
@@ -111,11 +123,11 @@
     const result = finishSwipeGesture(activeGesture, currentPosition, cancelled);
     if (result.handled) {
       if (result.direction === 'right') {
-        open = true;
+        setOpen(true);
       } else if (result.direction === 'left') {
-        open = false;
+        setOpen(false);
       } else {
-        open = currentPosition > -activeGesture.width / 2;
+        setOpen(currentPosition > -activeGesture.width / 2);
       }
     }
 
@@ -125,10 +137,10 @@
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      open = false;
+      setOpen(false);
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
-      open = true;
+      setOpen(true);
     }
   }
 </script>
@@ -153,7 +165,7 @@
     aria-pressed={open}
     aria-describedby="drawer-instructions"
     onclick={() => {
-      open = !open;
+      setOpen(!open);
     }}
     onkeydown={handleKeydown}
   ></button>

@@ -115,6 +115,32 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page, a
   await expect(app.quickTools).toBeInViewport();
 });
 
+test('back closes the mobile room list before leaving a room', async ({
+  page,
+  app,
+  homeserver,
+  signIn,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn();
+  await app.openRoom(homeserver.timelineRoomId);
+
+  const drawerToggle = page.getByRole('button', { name: 'Show room list' });
+  await drawerToggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Show conversation' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+
+  await page.goBack();
+  await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show room list' })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  );
+});
+
 test('reopens a room after returning to the mobile room list', async ({
   page,
   app,

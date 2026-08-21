@@ -3,6 +3,10 @@ declare global {
     interface PageState {
       /** Settings opened as a shallow route over the page it was opened from. */
       settings?: { section: string };
+      /** Inbox opened as a shallow route over the page it was opened from. */
+      inbox?: true;
+      /** Phone room-list drawer state, kept in history for native back gestures. */
+      mobileDrawer?: 'open' | 'closed';
     }
   }
 

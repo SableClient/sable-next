@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import {
@@ -42,6 +43,30 @@
   ] as const;
 
   function activateTool(event: MouseEvent, href: string): void {
+    if (
+      href === '/inbox' &&
+      (page.url.pathname === href || page.state.inbox === true) &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      event.button === 0
+    ) {
+      event.preventDefault();
+      history.back();
+      return;
+    }
+
+    if (
+      href === '/inbox' &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      event.button === 0
+    ) {
+      event.preventDefault();
+      void goto('', { shallow: true, state: { ...page.state, inbox: true } });
+    }
+
     if (href === '/settings' && !mobile) {
       openSettingsOver(event, defaultSettingsSection());
       if (event.defaultPrevented) return;
@@ -57,6 +82,7 @@
   }
 
   function isToolActive(href: string): boolean {
+    if (href === '/inbox') return page.state.inbox === true || page.url.pathname === href;
     return page.url.pathname.startsWith(href);
   }
 
