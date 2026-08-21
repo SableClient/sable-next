@@ -93,6 +93,13 @@ inherits = "dev"
 opt-level = 1
 debug = false
 
+[profile.release]
+opt-level = "z"
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
 # 0.18.0 plus event-cache fixes that prevent invalid linked-chunk indices. Patching
 # one crate alone splits the family into two incompatible copies.
 [patch.crates-io]
