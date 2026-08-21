@@ -581,7 +581,7 @@ jobs:
         run: |
           gh api --method PATCH "repos/$REPOSITORY/git/refs/tags/nightly" \
             -f sha="$SHA" -F force=true
-          gh release edit nightly --prerelease --target "$SHA" --title 'Nightly (main)' \
+          gh release edit nightly --repo "$REPOSITORY" --prerelease --target "$SHA" --title 'Nightly (main)' \
             --notes "Rolling nightly build $VERSION from main at $SHA"
 
       # Stamped bundle names never clobber, so they accumulate and Obtainium
@@ -591,13 +591,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           STARTED_AT: ${{ needs.setup-release.outputs.started_at }}
         run: |
-          gh release view nightly --json assets \
+          gh release view nightly --repo "$REPOSITORY" --json assets \
             | jq -r --arg cutoff "$STARTED_AT" \
                 '.assets[] | select(.updatedAt <= $cutoff and (.name | endswith(".json") | not)) | .name' \
             | while read -r name; do
                 [ -n "$name" ] || continue
                 echo "Removing superseded nightly asset: $name"
-                gh release delete-asset nightly "$name" --yes
+                gh release delete-asset nightly "$name" --repo "$REPOSITORY" --yes
               done
 
   updater-manifest:
