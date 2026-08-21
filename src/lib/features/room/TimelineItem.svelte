@@ -4,8 +4,10 @@
 
   import type { MemberView } from '#src/generated/MemberView';
   import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+  import type { ProfileView } from '#src/generated/ProfileView';
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -84,6 +86,7 @@
     onOpenMedia,
     onPersonaOpenChange,
   }: Props = $props();
+  const core = useCoreClient();
   let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
   let persona = $derived(item.per_message_profile);
   let senderName = $derived(persona?.display_name ?? accountName);
@@ -136,6 +139,33 @@
   let nameColor = $derived(
     item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
   );
+  let profile = $state<ProfileView | null>(null);
+  let nameColorLight = $derived(
+    personaTint?.color_on_light ?? profile?.name_color_light ?? profile?.name_color_dark ?? null
+  );
+  let nameColorDark = $derived(
+    personaTint?.color_on_dark ?? profile?.name_color_dark ?? profile?.name_color_light ?? null
+  );
+  let nameTinted = $derived(nameColorLight !== null || nameColorDark !== null);
+
+  $effect(() => {
+    const userId = item.sender;
+    profile = null;
+    if (!userId || personaTint) return;
+
+    let current = true;
+    void core.userProfile(userId).then(
+      (next) => {
+        if (current) profile = next;
+      },
+      () => {
+        // A timeline should remain readable when an optional profile lookup fails.
+      }
+    );
+    return () => {
+      current = false;
+    };
+  });
 
   let actions = $derived.by(() => {
     const eventId = item.event_id ?? '';
@@ -320,6 +350,8 @@
         ]}
         style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
         style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
+        style:--name-color-on-light={nameColorLight ?? undefined}
+        style:--name-color-on-dark={nameColorDark ?? undefined}
         onpointerdown={startPress}
         onpointermove={movePress}
         onpointerup={endPress}
@@ -358,7 +390,11 @@
             <time datetime={new Date(item.timestamp).toISOString()}
               >{formatTime(item.timestamp)}</time
             >
-            <span class="compact-name" style:color={personaTint ? undefined : nameColor}>
+            <span
+              class="compact-name"
+              class:tinted={nameTinted}
+              style:color={nameTinted ? undefined : nameColor}
+            >
               {collapsed ? '' : senderName}
             </span>
           </div>
@@ -409,7 +445,11 @@
           {#if !collapsed && layout !== 'compact'}
             <header>
               {#if !emote}
-                <span class="sender" style:color={personaTint ? undefined : nameColor}>
+                <span
+                  class="sender"
+                  class:tinted={nameTinted}
+                  style:color={nameTinted ? undefined : nameColor}
+                >
                   {senderName}
                 </span>
               {/if}
@@ -450,7 +490,11 @@
           {/if}
           {#if item.content.kind === 'message' && item.content.emote}
             <div class="emote">
-              <span class="sender" style:color={nameColor}>* {senderName}</span>
+              <span
+                class="sender"
+                class:tinted={nameTinted}
+                style:color={nameTinted ? undefined : nameColor}>* {senderName}</span
+              >
               <FormattedBody html={item.content.html} {onMatrixLink} />
             </div>
           {:else if item.content.kind === 'message'}
@@ -881,6 +925,36 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .sender.tinted,
+  .compact-name.tinted {
+    color: var(--name-color-on-light);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) .sender.tinted,
+    :root:not(.light) .compact-name.tinted,
+    :root.dark .sender.tinted,
+    :root.dark .compact-name.tinted {
+      color: var(--name-color-on-dark);
+    }
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    .sender.tinted,
+    .compact-name.tinted {
+      color: oklch(from var(--name-color-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not(.light) .sender.tinted,
+      :root:not(.light) .compact-name.tinted,
+      :root.dark .sender.tinted,
+      :root.dark .compact-name.tinted {
+        color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
+      }
+    }
   }
 
   .persona {

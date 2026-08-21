@@ -7,16 +7,23 @@ import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
 const core = vi.hoisted(() => ({
   fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
+  userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
 }));
 
 vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => ({ rooms: [] }),
+}));
+
 import TimelineItem from './TimelineItem.svelte';
 
 afterEach(() => {
   document.body.replaceChildren();
+  core.userProfile.mockReset();
+  core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 });
 
 function item(emote: boolean): TimelineItemView {
@@ -77,6 +84,28 @@ test('keeps the sender header for an ordinary message', async () => {
 
   expect(document.querySelector('header .sender')?.textContent).toBe('Alice');
   expect(document.querySelector('.emote')).toBeNull();
+  await unmount(instance);
+});
+
+test('uses the sender profile name color in every message layout', async () => {
+  core.userProfile.mockResolvedValue({
+    name_color_light: '#4f7a3a',
+    name_color_dark: '#9fd07c',
+  });
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false },
+  });
+  await tick();
+
+  const name = document.querySelector<HTMLElement>('.sender');
+  expect(name?.classList.contains('tinted')).toBe(true);
+  expect(
+    document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-light')
+  ).toBe('#4f7a3a');
+  expect(
+    document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-dark')
+  ).toBe('#9fd07c');
   await unmount(instance);
 });
 
