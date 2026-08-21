@@ -55,11 +55,28 @@
   );
   let homeUnread = $derived(homeCounts.highlight || homeCounts.unread);
   let homeHighlight = $derived(homeCounts.highlight > 0);
+  let directRooms = $derived(
+    roomList.rooms
+      .filter(
+        (room) =>
+          room.state === 'joined' &&
+          room.is_direct &&
+          !roomList.mutedRoomIds.has(room.room_id) &&
+          (room.highlight > 0 || room.unread > 0)
+      )
+      .toSorted(
+        (left, right) => (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0)
+      )
+      .slice(0, 3)
+  );
   let directCounts = $derived(
     unreadCounts(
       roomList.rooms.filter(
         (room) =>
-          room.state === 'joined' && room.is_direct && !roomList.mutedRoomIds.has(room.room_id)
+          room.state === 'joined' &&
+          room.is_direct &&
+          !roomList.mutedRoomIds.has(room.room_id) &&
+          !directRooms.some((directRoom) => directRoom.room_id === room.room_id)
       )
     )
   );
@@ -141,6 +158,7 @@
           unreadSpaceIds={unreadSpaces}
           {homeUnread}
           {homeHighlight}
+          {directRooms}
           {directUnread}
           mobile
           {onNavigate}
@@ -157,6 +175,7 @@
           unreadSpaceIds={unreadSpaces}
           {homeUnread}
           {homeHighlight}
+          {directRooms}
           {directUnread}
         />
         <RoomNav width={roomNavWidth} {collapsed} />
