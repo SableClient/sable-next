@@ -741,6 +741,7 @@
     "hintSend": "Enter sends · Shift+Enter newline · ↑ edits your last message",
     "hintAutocomplete": "↑↓ move · Tab or Enter insert · Esc closes",
     "membersHeading": "Members · \"{{query}}\"",
+    "roomsHeading": "Rooms · \"{{query}}\"",
     "emotesHeading": "Emotes · \"{{query}}\"",
     "noSuggestions": "No matches",
     "autocompleteHint": "↑↓ move · Tab or Enter insert · Esc closes",

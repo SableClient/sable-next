@@ -10,6 +10,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
@@ -66,6 +67,7 @@
   }: Props = $props();
 
   const core = useCoreClient();
+  const roomList = useRoomList();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   const uid = $props.id();
   const hintId = `composer-hint-${uid}`;
@@ -96,7 +98,7 @@
   let desktop = $derived(appLayout.matches);
   let hasContent = $derived(!empty || staged.length > 0);
   let panelOpen = $derived(query !== null && dismissedAt !== query.start);
-  let suggestions = $derived(suggestionsFor(query, members, emotes));
+  let suggestions = $derived(suggestionsFor(query, members, emotes, roomList.rooms));
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
   let placeholder = $derived(
     staged.length > 0
@@ -339,6 +341,10 @@
       });
     }
 
+    if (sigil === '#') {
+      return composerSchema.nodes.mention.create({ userId: suggestion.id, name: suggestion.label });
+    }
+
     const shortcode = suggestion.id.replace(/^pack:/, '');
     const image = emotes.find((candidate) => candidate.shortcode === shortcode);
     if (!image) return composerSchema.text(suggestion.insert);
@@ -458,7 +464,9 @@
               sigil={query.sigil}
               heading={query.sigil === '@'
                 ? $i18n.t('composer.membersHeading', { query: query.query })
-                : $i18n.t('composer.emotesHeading', { query: query.query })}
+                : query.sigil === '#'
+                  ? $i18n.t('composer.roomsHeading', { query: query.query })
+                  : $i18n.t('composer.emotesHeading', { query: query.query })}
               {suggestions}
               {active}
               onSelect={commit}

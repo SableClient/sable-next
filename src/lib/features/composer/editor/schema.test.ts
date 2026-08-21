@@ -33,6 +33,34 @@ test('a mention serialises to the matrix.to anchor the timeline already parses',
   );
 });
 
+test('a room mention serialises to a room matrix.to anchor', () => {
+  const doc = composerSchema.node('doc', null, [
+    paragraph.create(null, [mention.create({ userId: '#general:example.org', name: '#General' })]),
+  ]);
+
+  expect(html(doc)).toBe('<p><a href="https://matrix.to/#/#general:example.org">#General</a></p>');
+});
+
+test('a room matrix.to anchor becomes a mention when pasted', () => {
+  const doc = parse('<p><a href="https://matrix.to/#/#general:example.org">#General</a></p>');
+
+  expect(doc.firstChild?.firstChild?.attrs).toEqual({
+    userId: '#general:example.org',
+    name: '#General',
+  });
+});
+
+test('a room permalink with via servers remains a room mention when pasted', () => {
+  const doc = parse(
+    '<p><a href="https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe">#Sable</a></p>'
+  );
+
+  expect(doc.firstChild?.firstChild?.attrs).toEqual({
+    userId: '!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe',
+    name: '#Sable',
+  });
+});
+
 test('an emote serialises to the MSC2545 image the sanitiser allows', () => {
   const doc = composerSchema.node('doc', null, [
     paragraph.create(null, [emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' })]),

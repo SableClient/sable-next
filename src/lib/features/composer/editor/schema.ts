@@ -71,7 +71,7 @@ export const composerSchema = new Schema({
       attrs: { userId: {}, name: {} },
       parseDOM: [
         {
-          tag: `a[href^="${matrixTo}@"]`,
+          tag: `a[href^="${matrixTo}@"], a[href^="${matrixTo}#"], a[href^="${matrixTo}!"]`,
           priority: 60,
           getAttrs: (dom) => ({
             userId: decodeURIComponent((dom.getAttribute('href') ?? '').slice(matrixTo.length)),

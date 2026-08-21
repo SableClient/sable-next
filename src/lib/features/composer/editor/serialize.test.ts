@@ -113,6 +113,17 @@ test('a mention keeps its name in the body and links in the formatted body', () 
   );
 });
 
+test('a room mention keeps its # name in the body and links in the formatted body', () => {
+  const message = serializeComposer(
+    docOf(para(mention.create({ userId: '#general:example.org', name: '#General' })))
+  );
+
+  expect(message).toEqual({
+    body: '#General',
+    formatted: '<a href="https://matrix.to/#/#general:example.org">#General</a>',
+  });
+});
+
 test('an emote keeps its shortcode in the body and an image in the formatted body', () => {
   const message = serializeComposer(
     docOf(para(emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' })))

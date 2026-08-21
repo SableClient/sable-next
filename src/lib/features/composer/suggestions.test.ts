@@ -1,5 +1,6 @@
 import type { MemberView } from '#src/generated/MemberView';
 import type { PackImageView } from '#src/generated/PackImageView';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 import { expect, test } from 'vitest';
 
 import type { AutocompleteQuery } from './autocomplete';
@@ -26,6 +27,14 @@ function emoteQuery(text: string): AutocompleteQuery {
   return { sigil: ':', query: text, start: 0, end: text.length + 1 };
 }
 
+function roomQuery(text: string): AutocompleteQuery {
+  return { sigil: '#', query: text, start: 0, end: text.length + 1 };
+}
+
+function room(room_id: string, name: string, canonical_alias: string | null = null): RoomSummary {
+  return { room_id, name, canonical_alias, avatar_url: null } as RoomSummary;
+}
+
 test('a member matches on display name or localpart, never on the homeserver', () => {
   const members = [
     member('@one:example.org', 'Member One'),
@@ -33,7 +42,7 @@ test('a member matches on display name or localpart, never on the homeserver', (
     member('@member:other.example', null),
   ];
 
-  expect(suggestionsFor(mentionQuery('member'), members, []).map((item) => item.id)).toEqual([
+  expect(suggestionsFor(mentionQuery('member'), members, [], []).map((item) => item.id)).toEqual([
     '@member:other.example',
     '@one:example.org',
   ]);
@@ -46,7 +55,7 @@ test('prefix matches come before contained ones, then alphabetical', () => {
     member('@b:example.org', 'Ana Diaz'),
   ];
 
-  expect(suggestionsFor(mentionQuery('an'), members, []).map((item) => item.label)).toEqual([
+  expect(suggestionsFor(mentionQuery('an'), members, [], []).map((item) => item.label)).toEqual([
     'Ana Diaz',
     'Anders Bo',
     'Zoe Anders',
@@ -54,7 +63,12 @@ test('prefix matches come before contained ones, then alphabetical', () => {
 });
 
 test('a member without a display name falls back to the user id', () => {
-  const suggestions = suggestionsFor(mentionQuery('one'), [member('@one:example.org', null)], []);
+  const suggestions = suggestionsFor(
+    mentionQuery('one'),
+    [member('@one:example.org', null)],
+    [],
+    []
+  );
 
   expect(suggestions.map((item) => item.insert)).toEqual(['@one:example.org']);
 });
@@ -64,11 +78,11 @@ test('at most eight suggestions reach the panel', () => {
     member(`@member${String(index)}:example.org`, `Member ${String(index)}`)
   );
 
-  expect(suggestionsFor(mentionQuery('member'), members, [])).toHaveLength(8);
+  expect(suggestionsFor(mentionQuery('member'), members, [], [])).toHaveLength(8);
 });
 
 test('pack emotes come first, then native emoji fill the panel', () => {
-  const suggestions = suggestionsFor(emoteQuery('wa'), [], [emote('unwave'), emote('wave')]);
+  const suggestions = suggestionsFor(emoteQuery('wa'), [], [emote('unwave'), emote('wave')], []);
 
   expect(suggestions.slice(0, 2).map((item) => item.insert)).toEqual([':wave:', ':unwave:']);
   expect(suggestions[0]?.imageUrl).toBe('mxc://example.org/wave');
@@ -77,12 +91,46 @@ test('pack emotes come first, then native emoji fill the panel', () => {
 });
 
 test('a shortcode with no pack match still finds a native emoji', () => {
-  const suggestions = suggestionsFor(emoteQuery('joy'), [], []);
+  const suggestions = suggestionsFor(emoteQuery('joy'), [], [], []);
 
   expect(suggestions[0]?.insert).toBe('😂');
   expect(suggestions[0]?.detail).toBe(':joy:');
 });
 
 test('no query means no suggestions', () => {
-  expect(suggestionsFor(null, [member('@one:example.org', 'One')], [emote('wave')])).toEqual([]);
+  expect(suggestionsFor(null, [member('@one:example.org', 'One')], [emote('wave')], [])).toEqual(
+    []
+  );
+});
+
+test('rooms match their name or alias and insert a # label', () => {
+  const suggestions = suggestionsFor(
+    roomQuery('gen'),
+    [],
+    [],
+    [
+      room('!one:example.org', 'General', '#general:example.org'),
+      room('!two:example.org', 'Off topic'),
+    ]
+  );
+
+  expect(suggestions).toEqual([
+    expect.objectContaining({
+      id: '#general:example.org',
+      insert: '#General',
+      label: '#General',
+      detail: '#general:example.org',
+    }),
+  ]);
+});
+
+test('a room name that already starts with # keeps a single #', () => {
+  const [suggestion] = suggestionsFor(
+    roomQuery('gen'),
+    [],
+    [],
+    [room('!one:example.org', '#General')]
+  );
+
+  expect(suggestion.label).toBe('#General');
 });

@@ -1,5 +1,6 @@
 import type { MemberView } from '#src/generated/MemberView';
 import type { PackImageView } from '#src/generated/PackImageView';
+import type { RoomSummary } from '#src/generated/RoomSummary';
 
 import { searchReactionEmoji } from '#lib/emoji/emoji.js';
 
@@ -75,15 +76,40 @@ function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Sug
   return [...packs, ...native];
 }
 
+function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggestion[] {
+  return rooms
+    .map((room) => ({ room, name: room.name ?? room.canonical_alias ?? room.room_id }))
+    .filter(({ room, name }) => {
+      const alias = room.canonical_alias ?? '';
+      return name.toLowerCase().includes(needle) || alias.toLowerCase().includes(needle);
+    })
+    .sort((left, right) => {
+      const byPrefix = rank(
+        left.name.toLowerCase().startsWith(needle),
+        right.name.toLowerCase().startsWith(needle)
+      );
+      return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
+    })
+    .slice(0, limit)
+    .map(({ room, name }) => ({
+      id: room.canonical_alias ?? room.room_id,
+      insert: name.startsWith('#') ? name : `#${name}`,
+      label: name.startsWith('#') ? name : `#${name}`,
+      detail: room.canonical_alias,
+      avatarUrl: room.avatar_url,
+    }));
+}
+
 export function suggestionsFor(
   query: AutocompleteQuery | null,
   members: readonly MemberView[],
-  emotes: readonly PackImageView[]
+  emotes: readonly PackImageView[],
+  rooms: readonly RoomSummary[]
 ): Suggestion[] {
   if (!query) return [];
   const needle = query.query.toLowerCase();
 
-  return query.sigil === '@'
-    ? memberSuggestions(needle, members)
-    : emoteSuggestions(needle, emotes);
+  if (query.sigil === '@') return memberSuggestions(needle, members);
+  if (query.sigil === '#') return roomSuggestions(needle, rooms);
+  return emoteSuggestions(needle, emotes);
 }

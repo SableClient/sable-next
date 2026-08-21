@@ -6,6 +6,18 @@ test('a sigil opens a query at the start of the draft or after whitespace', () =
   expect(activeQuery('@no', 3)).toEqual({ sigil: '@', query: 'no', start: 0, end: 3 });
   expect(activeQuery('hey @no', 7)).toEqual({ sigil: '@', query: 'no', start: 4, end: 7 });
   expect(activeQuery('blob :wav', 9)).toEqual({ sigil: ':', query: 'wav', start: 5, end: 9 });
+  expect(activeQuery('join #general', 13)).toEqual({
+    sigil: '#',
+    query: 'general',
+    start: 5,
+    end: 13,
+  });
+  expect(activeQuery('join #general:example.org', 25)).toEqual({
+    sigil: '#',
+    query: 'general:example.org',
+    start: 5,
+    end: 25,
+  });
 });
 
 test('a sigil glued to other text opens nothing', () => {

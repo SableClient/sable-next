@@ -5,6 +5,15 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 const core = vi.hoisted(() => ({
   fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
+  roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
+}));
+
+const roomList = vi.hoisted(() => ({
+  rooms: [] as { room_id: string; canonical_alias: string | null; name: string | null }[],
+}));
+
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => roomList,
 }));
 
 vi.mock('#lib/core/context.js', () => ({
@@ -15,6 +24,9 @@ import FormattedBody from './FormattedBody.svelte';
 
 afterEach(() => {
   core.fetchMedia.mockReset();
+  core.roomPreview.mockReset();
+  core.roomPreview.mockResolvedValue({ name: null });
+  roomList.rooms = [];
   document.body.replaceChildren();
 });
 
@@ -35,6 +47,54 @@ test('opens Matrix links through the room-level handler', async () => {
     { kind: 'event', roomId: '!room:example.org', eventId: '$event' },
     expect.any(HTMLAnchorElement)
   );
+  await unmount(instance);
+});
+
+test('turns a bare room permalink into a room mention', async () => {
+  const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
+  const instance = mount(FormattedBody, { target: document.body, props: { html: url } });
+  await tick();
+
+  const anchor = document.querySelector<HTMLAnchorElement>('a');
+  expect(anchor?.href).toBe(url);
+  expect(anchor?.dataset.matrixLink).toBe('room');
+  expect(anchor?.textContent).toBe('!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI');
+  await unmount(instance);
+});
+
+test('resolves a room permalink name through its via server', async () => {
+  core.roomPreview.mockResolvedValue({ name: 'Sable' });
+  const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
+  const instance = mount(FormattedBody, { target: document.body, props: { html: url } });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('a')?.textContent).toBe('#Sable');
+  });
+  expect(core.roomPreview).toHaveBeenCalledWith('!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI', [
+    'sable.moe',
+  ]);
+  await unmount(instance);
+});
+
+test('uses the local room-list name before requesting a preview', async () => {
+  roomList.rooms = [
+    {
+      room_id: '!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI',
+      canonical_alias: null,
+      name: 'Sable',
+    },
+  ];
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: {
+      html: 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe',
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('a')?.textContent).toBe('#Sable');
+  });
+  expect(core.roomPreview).not.toHaveBeenCalled();
   await unmount(instance);
 });
 

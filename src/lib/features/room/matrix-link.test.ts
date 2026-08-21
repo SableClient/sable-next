@@ -36,6 +36,14 @@ test.each([
   expect(parseMatrixLink(href)).toEqual(expected);
 });
 
+test('parses the shared Sable room permalink', () => {
+  expect(
+    parseMatrixLink(
+      'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe'
+    )
+  ).toEqual({ kind: 'room', roomId: '!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI' });
+});
+
 test('does not treat arbitrary URLs as Matrix links', () => {
   expect(parseMatrixLink('https://example.org/#/!room:example.org')).toBeNull();
 });

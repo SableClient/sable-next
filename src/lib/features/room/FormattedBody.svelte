@@ -3,10 +3,12 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
 
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';
+  import { splitVia } from './join-address';
   import { settingsLinkLabel } from './settings-link-label';
   import { parseSettingsLink } from './settings-link';
 
@@ -17,6 +19,7 @@
 
   let { html, onMatrixLink }: Props = $props();
   const core = useCoreClient();
+  const roomList = useRoomList();
 
   function resolveImages(node: HTMLElement): void {
     for (const image of node.querySelectorAll('img')) {
@@ -87,10 +90,18 @@
   function decorate(html: string) {
     return (node: HTMLElement) => {
       void html;
+      linkifyMatrixPermalinks(node);
       for (const anchor of node.querySelectorAll('a')) {
         const link = parseMatrixLink(anchor.href);
         if (link) {
           anchor.dataset.matrixLink = link.kind;
+          if (
+            link.kind !== 'user' &&
+            anchor.textContent.trim() === anchor.getAttribute('href')?.trim()
+          ) {
+            anchor.textContent = link.roomId;
+            void resolveRoomName(link, anchor);
+          }
           continue;
         }
 
@@ -129,6 +140,55 @@
         offKeydown();
       };
     };
+  }
+
+  async function resolveRoomName(
+    link: Exclude<MatrixLink, { kind: 'user' }>,
+    anchor: HTMLAnchorElement
+  ) {
+    const known = roomList.rooms.find(
+      (room) => room.room_id === link.roomId || room.canonical_alias === link.roomId
+    );
+    const name =
+      known?.name ??
+      (await core.roomPreview(link.roomId, splitVia(anchor.href).via).then(
+        (preview) => preview.name,
+        () => null
+      ));
+    if (name && anchor.isConnected) anchor.textContent = name.startsWith('#') ? name : `#${name}`;
+  }
+
+  function linkifyMatrixPermalinks(node: HTMLElement): void {
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let text = walker.nextNode();
+    while (text) {
+      if (!text.parentElement?.closest('a, code')) textNodes.push(text as Text);
+      text = walker.nextNode();
+    }
+
+    for (const textNode of textNodes) {
+      const source = textNode.data;
+      const matches = [...source.matchAll(/https?:\/\/matrix\.to\/#\/[^\s<]+/gi)].filter((match) =>
+        parseMatrixLink(match[0])
+      );
+      if (matches.length === 0) continue;
+
+      const fragment = document.createDocumentFragment();
+      let offset = 0;
+      for (const match of matches) {
+        const url = match[0];
+        const index = match.index;
+        fragment.append(source.slice(offset, index));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.textContent = url;
+        fragment.append(anchor);
+        offset = index + url.length;
+      }
+      fragment.append(source.slice(offset));
+      textNode.replaceWith(fragment);
+    }
   }
 
   /** Past this many lines a block collapses behind a toggle. */
