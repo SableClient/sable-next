@@ -60,6 +60,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: {{apple.bundle-version-short}}
         CFBundleVersion: "{{apple.bundle-version}}"
+        NSPhotoLibraryAddUsageDescription: Sable saves images to your photo library.
         # Mirrors plugins.deep-link in tauri.conf.json: the plugin only patches
         # these in when cargo reruns its build script, so a fresh `tauri ios
         # init` silently loses them unless they live here.

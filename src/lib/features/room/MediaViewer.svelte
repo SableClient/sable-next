@@ -5,7 +5,12 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
-  import { saveFile, savesNatively } from '#lib/platform/files.js';
+  import {
+    saveFile,
+    saveImageToPhotos,
+    savesNatively,
+    supportsPhotoLibrary,
+  } from '#lib/platform/files.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -42,6 +47,7 @@
   let zoom = $state(1);
   let rotation = $state(0);
   let pixelated = $state(false);
+  let canSaveToPhotos = $state(false);
   const touches = new SvelteMap<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let pinchZoom = 1;
@@ -63,6 +69,16 @@
       .catch(() => {
         if (active) failed = true;
       });
+    return () => {
+      active = false;
+    };
+  });
+
+  $effect(() => {
+    let active = true;
+    void supportsPhotoLibrary().then((supported) => {
+      if (active) canSaveToPhotos = supported;
+    });
     return () => {
       active = false;
     };
@@ -143,6 +159,11 @@
     anchor.download = filename;
     anchor.click();
   }
+
+  async function saveToPhotos(): Promise<void> {
+    if (!url) return;
+    await saveImageToPhotos(url, item.body || 'image', item.mime ?? undefined);
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -184,6 +205,14 @@
               variant="ghost"
               onclick={() => void download()}><DownloadSimpleIcon /></IconButton
             >
+            {#if canSaveToPhotos}
+              <IconButton
+                label="Save to photos"
+                size="medium"
+                variant="ghost"
+                onclick={() => void saveToPhotos()}><DownloadSimpleIcon /></IconButton
+              >
+            {/if}
             <IconButton
               class="desktop-control"
               label="Rotate image"

@@ -4,6 +4,8 @@
 //! except to move bytes or to reach something only this process has: the push
 //! registration, the system browser, the crash reporter.
 
+#[cfg(target_os = "ios")]
+mod ios;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;
@@ -186,6 +188,9 @@ pub fn run() {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let builder = builder.plugin(tauri_plugin_edge_to_edge::init());
 
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_android_fs::init());
+
     if let Err(error) = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
@@ -239,6 +244,8 @@ pub fn run() {
             open_auth_url,
             register_push,
             sentry::set_native_sentry_enabled,
+            #[cfg(target_os = "ios")]
+            ios::save_media_to_photos,
             #[cfg(target_os = "android")]
             mobile::set_status_bar_light,
             #[cfg(target_os = "android")]

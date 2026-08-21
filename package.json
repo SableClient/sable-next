@@ -54,7 +54,8 @@
     "prosemirror-schema-list": "^1.5.1",
     "prosemirror-state": "^1.4.4",
     "prosemirror-view": "^1.42.2",
-    "svelte-i18next": "^2.2.2"
+    "svelte-i18next": "^2.2.2",
+    "tauri-plugin-android-fs-api": "29.0.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
