@@ -43,7 +43,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    command: `SABLE_WASM_OUTPUT=src/generated/wasm-e2e pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
     url: origin,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
