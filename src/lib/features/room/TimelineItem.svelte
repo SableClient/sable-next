@@ -887,7 +887,8 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not(.light) .persona {
+    :root:not(.light) .persona,
+    :root.dark .persona {
       --pmp-ink: var(--pmp-on-dark, var(--sable-sec-on-container));
     }
   }
@@ -901,12 +902,26 @@
     }
 
     @media (prefers-color-scheme: dark) {
-      :root:not(.light) .persona {
+      :root:not(.light) .persona,
+      :root.dark .persona {
         --pmp-ink: oklch(
           from var(--pmp-on-dark, var(--sable-sec-on-container)) clamp(0.72, l, 0.92)
             clamp(0, c, 0.16) h
         );
       }
+    }
+  }
+
+  :root.dark .persona {
+    --pmp-ink: var(--pmp-on-dark, var(--sable-sec-on-container));
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    :root.dark .persona {
+      --pmp-ink: oklch(
+        from var(--pmp-on-dark, var(--sable-sec-on-container)) clamp(0.72, l, 0.92)
+          clamp(0, c, 0.16) h
+      );
     }
   }
 

@@ -137,7 +137,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.theme',
         description: 'settings.themeHint',
         type: 'select',
-        unavailable: true,
         options: [
           { value: 'system', label: 'settings.themeSystem' },
           { value: 'dark', label: 'settings.themeDark' },

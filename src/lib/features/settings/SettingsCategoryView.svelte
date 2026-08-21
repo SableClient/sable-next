@@ -23,6 +23,7 @@
   import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
   import PushGateway from '#lib/features/notifications/PushGateway.svelte';
   import StateEventTool from './StateEventTool.svelte';
+  import CustomThemes from './CustomThemes.svelte';
 
   interface Props {
     category: SettingsCategory;
@@ -164,6 +165,10 @@
       </ul>
     </section>
 
+    {#if category.id === 'appearance'}
+      <section class="settings-card custom-themes-card"><CustomThemes /></section>
+    {/if}
+
     {#if category.id === 'notifications'}
       <section class="settings-card">
         <NotificationDefaults />
@@ -200,6 +205,10 @@
     border: 1px solid var(--sable-bg-container-line);
     border-radius: var(--radius-card);
     overflow: hidden;
+  }
+
+  .custom-themes-card {
+    padding: var(--space-3);
   }
 
   .settings {

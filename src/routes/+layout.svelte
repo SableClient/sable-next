@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { on } from 'svelte/events';
   import type { Snippet } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
   import { type as osType } from '@tauri-apps/plugin-os';
@@ -11,6 +12,9 @@
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import TelemetryConsentBanner from '#lib/ui/TelemetryConsentBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { activeCustomThemeCss } from '#lib/settings/custom-themes.svelte.js';
+  import { applyCustomTheme, applyTheme, resolveTheme } from '#lib/settings/theme.js';
 
   interface Props {
     children: Snippet;
@@ -19,16 +23,30 @@
   let { children }: Props = $props();
   const core = createCoreClient();
   provideCoreClient(core);
+  let systemPrefersDark = $state(false);
 
   onMount(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const updateSystemTheme = (): void => {
+      systemPrefersDark = media.matches;
+    };
+    updateSystemTheme();
+    const stopListening = on(media, 'change', updateSystemTheme);
+
     if (isTauri()) {
       // CSS keys the keyboard inset off this.
       document.documentElement.dataset.tauriOs = osType();
     }
     void core.start();
     return () => {
+      stopListening();
       core.stop();
     };
+  });
+
+  $effect(() => {
+    applyTheme(preferences.theme, systemPrefersDark);
+    applyCustomTheme(activeCustomThemeCss(resolveTheme(preferences.theme, systemPrefersDark)));
   });
 </script>
 

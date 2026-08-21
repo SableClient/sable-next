@@ -5,6 +5,9 @@
 //! registration, the system browser, the crash reporter.
 
 #[cfg(target_os = "ios")]
+// Objective-C bindings expose PhotoKit calls as unsafe; keep that exception out
+// of the Rust-only application code.
+#[allow(unsafe_code)]
 mod ios;
 #[cfg(target_os = "android")]
 mod mobile;

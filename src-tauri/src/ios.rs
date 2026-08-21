@@ -12,7 +12,6 @@ use objc2_photos::{
     PHAccessLevel, PHAssetCreationRequest, PHAssetResourceType, PHAuthorizationStatus,
     PHPhotoLibrary,
 };
-use tokio::sync::oneshot;
 
 #[link(name = "Photos", kind = "framework")]
 extern "C" {}
@@ -21,7 +20,7 @@ fn allowed(status: PHAuthorizationStatus) -> bool {
     status == PHAuthorizationStatus::Authorized || status == PHAuthorizationStatus::Limited
 }
 
-async fn authorize() -> Result<(), String> {
+fn authorize_blocking() -> Result<(), String> {
     let status =
         unsafe { PHPhotoLibrary::authorizationStatusForAccessLevel(PHAccessLevel::AddOnly) };
     if allowed(status) {
@@ -31,7 +30,7 @@ async fn authorize() -> Result<(), String> {
         return Err("photo library access was denied".into());
     }
 
-    let (sender, receiver) = oneshot::channel();
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let sender = Mutex::new(Some(sender));
     let handler: RcBlock<dyn Fn(PHAuthorizationStatus)> = RcBlock::new(move |status| {
         if let Ok(mut sender) = sender.lock() {
@@ -48,13 +47,19 @@ async fn authorize() -> Result<(), String> {
     }
     if allowed(
         receiver
-            .await
+            .recv()
             .map_err(|_| "photo authorization request was cancelled")?,
     ) {
         Ok(())
     } else {
         Err("photo library access was denied".into())
     }
+}
+
+async fn authorize() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(authorize_blocking)
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 fn write_to_photos(bytes: &[u8], filename: &str) -> Result<(), String> {
