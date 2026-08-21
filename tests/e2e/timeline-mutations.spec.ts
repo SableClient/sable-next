@@ -116,8 +116,7 @@ test('an image without dimensions takes the file shape without losing the newest
   await expect.poll(() => core.subscribeCount()).toBe(1);
 
   const subscription = await core.subscription();
-  // This room does not overflow, so the reader is at the bottom. Growing a row
-  // above the newest message shifts the rows above it, not the message itself.
+  // This room does not overflow, so the reader starts at the bottom.
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   // No dimensions on the event, so the box comes from the 1000x400 file.
