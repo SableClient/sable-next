@@ -1,4 +1,5 @@
-import { readFileSync, renameSync, rmSync } from 'node:fs';
+import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 const release = process.argv.includes('--release');
@@ -56,3 +57,7 @@ if (release) {
 
 const generated = readFileSync(`${output}/sable_wasm_bg.wasm`);
 await WebAssembly.compile(generated);
+writeFileSync(
+  `${output}/sable_wasm_version.js`,
+  `export default '${createHash('sha256').update(generated).digest('hex')}';\n`
+);
