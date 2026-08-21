@@ -12,7 +12,6 @@
     type SwipeGesture,
   } from '#lib/ui/swipe-gesture.js';
   import { AUTH_CARD_MOTION_MS } from './auth-flow.svelte';
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
 
   interface Props {
     activeIndex: number;
@@ -71,13 +70,7 @@
   }
 
   function handleScroll(): void {
-    if (
-      window.matchMedia(BREAKPOINTS.appLayout).matches ||
-      isDragging ||
-      isNavigating ||
-      swipeGesture
-    )
-      return;
+    if (isDragging || isNavigating || swipeGesture) return;
     window.clearTimeout(scrollTimer);
     scrollTimer = window.setTimeout(activateNearestCard, 120);
   }

@@ -15,6 +15,14 @@ test('signs in with a password', async ({ auth, page }) => {
 
   await expect(page).toHaveURL(/\/login\/verify$/);
   await expect(auth.verificationCard).toBeVisible();
+  await page.locator('.rail').evaluate((rail) => {
+    rail.scrollLeft = 0;
+    rail.dispatchEvent(new Event('scroll'));
+  });
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(auth.username).toBeVisible();
+  await auth.nextStageButton.click();
+  await expect(page).toHaveURL(/\/login\/verify$/);
   await auth.previousStageButton.click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(auth.username).toBeVisible();
