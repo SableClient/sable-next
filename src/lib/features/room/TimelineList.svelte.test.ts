@@ -123,6 +123,25 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
   await unmount(instance);
 });
 
+test('does not read a viewport removed during initial positioning', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: () => Promise.resolve(false),
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await unmount(instance);
+  await runAnimationFrames();
+});
+
 test('does not leave follow mode for a virtualizer scroll correction', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));

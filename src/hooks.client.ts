@@ -12,7 +12,27 @@ const release = import.meta.env.VITE_APP_VERSION;
 const sampleEverything = environment === 'development' || environment === 'preview';
 
 const SESSION_ERROR_LIMIT = 50;
+const DYNAMIC_IMPORT_RELOAD_KEY = 'sable:dynamic-import-reload';
+const DYNAMIC_IMPORT_RELOAD_WINDOW_MS = 30_000;
 let sessionErrorCount = 0;
+
+function reloadForStaleDynamicImport(error: unknown): boolean {
+  if (
+    !(error instanceof Error) ||
+    !/(?:failed to fetch|error loading) dynamically imported module/i.test(error.message)
+  ) {
+    return false;
+  }
+
+  const reloadedAt = Number(sessionStorage.getItem(DYNAMIC_IMPORT_RELOAD_KEY));
+  if (Number.isFinite(reloadedAt) && Date.now() - reloadedAt < DYNAMIC_IMPORT_RELOAD_WINDOW_MS) {
+    return false;
+  }
+
+  sessionStorage.setItem(DYNAMIC_IMPORT_RELOAD_KEY, String(Date.now()));
+  location.reload();
+  return true;
+}
 
 if (dsn && preferences.errorReporting) {
   Sentry.init({
@@ -95,6 +115,7 @@ syncNativeTelemetryConsent(preferences.errorReporting);
 
 export const handleError: HandleClientError = (input) => {
   if (input.kind !== 'unknown') return;
+  if (reloadForStaleDynamicImport(input.error)) return;
 
   Sentry.captureException(input.error, {
     mechanism: {

@@ -219,6 +219,10 @@
     scrollToOffsetNow(viewport.scrollHeight);
   }
 
+  function currentViewport(): HTMLDivElement | null {
+    return viewport;
+  }
+
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: 0,
     getScrollElement: () => viewport,
@@ -483,10 +487,10 @@
 
       scrollToEndNow();
       await new Promise(requestAnimationFrame);
-      const activeViewport = viewport;
+      const activeViewport = currentViewport();
       // A frame has passed, so the mode has to be read afresh. Through a call,
       // which the narrowing from the check above does not reach into.
-      if (!isInitialLive()) return;
+      if (!isInitialLive() || !activeViewport) return;
       const distance =
         activeViewport.scrollHeight - activeViewport.scrollTop - activeViewport.clientHeight;
       if (distance > 1 || get(virtualizer).isScrolling) {
@@ -602,7 +606,9 @@
         scrollToEndNow();
         await new Promise(requestAnimationFrame);
         if (initialAnchorCancelled()) return;
-        const needsMoreHistory = viewport.scrollHeight <= viewport.clientHeight * 2;
+        const activeViewport = currentViewport();
+        if (!activeViewport) return;
+        const needsMoreHistory = activeViewport.scrollHeight <= activeViewport.clientHeight * 2;
         if (
           !initialHistoryRequested &&
           needsMoreHistory &&
