@@ -361,15 +361,19 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                     },
                                                   }))
                                                 : workerMode === 'delayed_history'
-                                                  ? items.slice(0, -1).map((value, index) => ({
+                                                  ? // Distinct ids: reusing the snapshot's would emit
+                                                    // duplicate events, which no server does.
+                                                    items.slice(0, -1).map((value, index) => ({
                                                       op: 'insert' as const,
                                                       index,
                                                       value: {
                                                         ...value,
+                                                        id: `delayed-older-${String(index)}`,
+                                                        event_id: `$delayed-older-${String(index)}:example.test`,
                                                         content: {
                                                           ...value.content,
-                                                          body: `Delayed history ${String(index)}`,
-                                                          html: `Delayed history ${String(index)}`,
+                                                          body: `Delayed older ${String(index)}`,
+                                                          html: `Delayed older ${String(index)}`,
                                                         },
                                                       },
                                                     }))

@@ -141,7 +141,8 @@
     get(virtualizer).scrollToIndex(index, { align: 'center', behavior: 'smooth' });
   });
   let viewport = $state<HTMLDivElement | null>(null);
-  let initialHistoryRequested = $state(false);
+  let initialFillState: 'idle' | 'running' | 'done' = 'idle';
+  let initialFillPages = 0;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
   let virtualizerViewportSize = 0;
@@ -230,7 +231,10 @@
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
     anchorTo: 'end',
-    followOnAppend: true,
+    // Arms `reconcileScroll`, which forces the virtualiser's own target back for
+    // five seconds, recomputed against the live viewport. End-following belongs
+    // to `scheduleFollowingEndReconciliation`.
+    followOnAppend: false,
     scrollEndThreshold: nearLatestPx,
     useScrollendEvent: true,
     overscan: 24,
@@ -457,7 +461,7 @@
     void tick().then(() => {
       followingEndReconciliationPending = false;
       if (scrollMode.kind !== 'followingLive' || !viewport) return;
-      if (!afterGesture && historyController.hasUserScrollPending) {
+      if (!afterGesture && historyController.isScrollGestureActive) {
         endFollowDeferred = true;
         return;
       }
@@ -470,8 +474,61 @@
     return scrollMode.kind === 'initialLive';
   }
 
+  function initialFillCancelled(): boolean {
+    return currentViewport() === null || !isInitialLive();
+  }
+
+  /**
+   * `paginateBackward` resolves before the diff carrying its events, so the store
+   * holds `loading` until the boundary moves. Bounded: a lost diff must not leave
+   * the timeline hidden. False only when the fill was cancelled.
+   */
+  async function awaitPaginationSettled(): Promise<boolean> {
+    const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
+    while (timeline.backwardPagination === 'loading') {
+      if (performance.now() >= deadline) return true;
+      await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval));
+      if (initialFillCancelled()) return false;
+    }
+    return true;
+  }
+
+  /** Pads out a snapshot too short to fill the viewport, while it is still hidden. */
+  async function fillInitialHistory(): Promise<void> {
+    while (initialFillPages < TIMELINE_LAYOUT.initialFillMaxPages) {
+      const node = currentViewport();
+      if (node === null || !isInitialLive()) return;
+      // `end` is the server reporting the start of the timeline.
+      if (timeline.backwardPagination !== 'idle') return;
+      // `scrollHeight` never reports less than the viewport, so it cannot tell a
+      // half-full snapshot from an exactly-full one.
+      const contentHeight = get(virtualizer).getTotalSize();
+      if (contentHeight >= node.clientHeight * TIMELINE_LAYOUT.initialFillViewports) return;
+      initialFillPages += 1;
+      const reachedStart = await onRequestHistory();
+      // The last page has to settle too, or the handover finds `loading` and declines.
+      if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
+      await tick();
+      await new Promise(requestAnimationFrame);
+      if (initialFillCancelled()) return;
+      scrollToEndNow();
+      if (reachedStart) return;
+    }
+  }
+
+  function startInitialHistoryFill(): void {
+    initialFillState = 'running';
+    void fillInitialHistory().finally(() => {
+      initialFillState = 'done';
+      scheduleInitialEndReconciliation();
+    });
+  }
+
   function scheduleInitialEndReconciliation(): void {
     if (scrollMode.kind !== 'initialLive' || initialEndReconciliationPending) return;
+    // Handing over mid-fill reveals the timeline between pages. An empty timeline
+    // never starts a fill, so it must not wait for one.
+    if (initialFillState !== 'done' && visibleItems.length > 0) return;
     // It reschedules itself until the end settles, and runs while hidden, so an
     // unbounded list would spin for as long as the room stayed open.
     if (initialEndReconciliationAttempts >= INITIAL_END_RECONCILIATION_LIMIT) {
@@ -497,11 +554,11 @@
         scheduleInitialEndReconciliation();
         return;
       }
-      if (!historyController.isRequestPending && timeline.backwardPagination !== 'loading') {
-        nearLatest = true;
-        setScrollMode({ kind: 'followingLive' });
-        scheduleFollowingEndReconciliation();
-      }
+      // The fill already waited out its pages; one landing after the deadline is
+      // a plain prepend, which the anchor hold covers.
+      nearLatest = true;
+      setScrollMode({ kind: 'followingLive' });
+      scheduleFollowingEndReconciliation();
     });
   }
 
@@ -563,7 +620,7 @@
       // Each function must retain the item ordering it was created for.
       getItemKey: (index) => identityTracker.key(items, index),
       anchorTo: 'end',
-      followOnAppend: true,
+      followOnAppend: false,
       scrollEndThreshold: nearLatestPx,
       useScrollendEvent: true,
       overscan: 8,
@@ -586,13 +643,15 @@
   });
 
   $effect(() => {
-    if (timeline.loading || visibleItems.length === 0 || !viewport) return;
+    // Read up front so the landing re-runs for every page the fill prepends.
+    const hasItems = visibleItems.length > 0;
+    if (timeline.loading || !viewport) return;
 
     const controller = new AbortController();
     void (async () => {
       await tick();
       await new Promise(requestAnimationFrame);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !hasItems) return;
       const focusedEventId = scrollMode.kind === 'focused' ? scrollMode.eventId : null;
       const focusIndex = focusedEventId
         ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
@@ -606,19 +665,13 @@
         scrollToEndNow();
         await new Promise(requestAnimationFrame);
         if (initialAnchorCancelled()) return;
-        const activeViewport = currentViewport();
-        if (!activeViewport) return;
-        const needsMoreHistory = activeViewport.scrollHeight <= activeViewport.clientHeight * 2;
-        if (
-          !initialHistoryRequested &&
-          needsMoreHistory &&
-          timeline.backwardPagination === 'idle'
-        ) {
-          initialHistoryRequested = true;
-          historyController.beginHistoryFill();
-          historyController.requestHistoryNow();
+        if (currentViewport() === null) return;
+        // The fill re-enters the reconciliation once it is done.
+        if (initialFillState === 'idle') {
+          startInitialHistoryFill();
           return;
         }
+        if (initialFillState === 'running') return;
         if (historyController.isRequestPending || timeline.backwardPagination === 'loading') return;
         scheduleInitialEndReconciliation();
       }
@@ -674,6 +727,36 @@
   }
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
+  }
+
+  /**
+   * A shrinking viewport leaves the offset where it was, so the newest event
+   * slides out of view. Nothing else recovers it: a resize raises no scroll event,
+   * so `scrollMode` never reaches `followingLive`.
+   */
+  function keepPinnedThroughResize(node: HTMLDivElement): () => void {
+    let previousHeight: number | null = null;
+    const observer = new ResizeObserver(() => {
+      const height = node.clientHeight;
+      const shrank = previousHeight !== null && height < previousHeight;
+      previousHeight = height;
+      // Growing is handled by the browser's own clamp.
+      if (!shrank) return;
+      // The fill, a permalink landing and an anchor hold each own the offset.
+      if (
+        !nearLatest ||
+        scrollMode.kind === 'initialLive' ||
+        scrollMode.kind === 'focused' ||
+        anchorHolding
+      ) {
+        return;
+      }
+      scrollToEndNow();
+    });
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
   }
 
   function setPersonaOpen(open: boolean): void {
@@ -757,6 +840,7 @@
       tabindex="0"
       onscroll={onScroll}
       {@attach userScrollMarker}
+      {@attach keepPinnedThroughResize}
       {@attach scrollLock(scrollLocked || personaOpen)}
       role="log"
     >
@@ -900,7 +984,9 @@
   }
 
   .viewport {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
     overflow: auto;
     overflow-anchor: none;
@@ -944,7 +1030,12 @@
     background: var(--sable-surface-container-line);
   }
 
+  /* A history that fits the viewport would otherwise stack against the top. An
+     auto margin collapses to zero once the rows overflow; `justify-content` would
+     push the overflow past the unreachable start edge instead. */
   .items {
+    flex: 0 0 auto;
+    margin-top: auto;
     position: relative;
     width: 100%;
   }

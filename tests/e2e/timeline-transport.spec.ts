@@ -30,11 +30,15 @@ test('subscribes once and loads initial room history', async ({
   await app.openRoomFromList('General');
 
   await expect(page.getByText('Welcome to General')).toBeVisible();
-  await expect.poll(() => core.timelineCommands()).toEqual(['subscribe_timeline']);
+  // The snapshot does not fill a window this tall, so the opening fill pads it
+  // out. This double reports the timeline start on its second page.
+  await expect.poll(() => core.paginateCount()).toBe(2);
+  expect(await core.subscribeCount()).toBe(1);
 
   // The prefetch fires on a settle, so a passing poll above proves nothing yet.
   await page.waitForTimeout(75);
-  expect(await core.timelineCommands()).toEqual(['subscribe_timeline']);
+  expect(await core.paginateCount()).toBe(2);
+  expect(await core.subscribeCount()).toBe(1);
 });
 
 test('does not resubscribe the timeline after a room refresh', async ({
@@ -70,7 +74,7 @@ test('keeps the active timeline while crossing the layout breakpoint', async ({
 
   await page.setViewportSize({ width: 390, height: 844 });
 
-  await expect.poll(() => core.timelineCommands()).toEqual(['subscribe_timeline']);
+  await expect.poll(() => core.subscribeCount()).toBe(1);
 });
 
 test('prefetches history within the oldest timeline items', async ({

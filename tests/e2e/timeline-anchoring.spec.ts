@@ -505,6 +505,34 @@ test('stays at the newest message when history lands in a room that fits', async
   await expect(timeline.jumpToLatest).toBeHidden();
 });
 
+// A context menu holds a press the viewport never sees released. A press is not
+// a scroll, so it must not stop the newest event from being followed.
+test('follows an appended event while a pointer rests on the timeline', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await expect(timeline.initial).toHaveCount(0);
+  await expect.poll(() => timeline.scrollableHeight()).toBeGreaterThan(100);
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+
+  await timeline.viewport.dispatchEvent('pointerdown');
+
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    { op: 'push_back' as const, value: timelineItem('appended-held', 'Appended while held') },
+  ]);
+
+  await expect(timeline.message('Appended while held')).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+});
+
 test('follows a sent message after a wheel that could not scroll', async ({
   page,
   app,

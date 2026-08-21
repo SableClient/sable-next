@@ -34,6 +34,12 @@ export class TimelineHistoryController {
   private wheelUsesNativeScrollEnd = false;
   private gestureSawScroll = false;
   private userScrollPending = false;
+  /**
+   * Any scroll clears `userScrollPending`, so a set flag means nothing has moved
+   * yet. From wheel, touch or keys that reads as "about to scroll"; from a bare
+   * press it does not, and a context menu can hold one indefinitely.
+   */
+  private pointerPressOnly = false;
   private readonly wheelHandler = (event: WheelEvent): void => {
     this.markWheelScroll(event);
   };
@@ -66,6 +72,10 @@ export class TimelineHistoryController {
 
   get hasUserScrollPending(): boolean {
     return this.userScrollPending;
+  }
+
+  get isScrollGestureActive(): boolean {
+    return this.userScrollPending && !this.pointerPressOnly;
   }
 
   get isRequestPending(): boolean {
@@ -168,11 +178,6 @@ export class TimelineHistoryController {
     this.requestHistory();
   }
 
-  requestHistoryNow(): void {
-    if (this.destroyed) return;
-    this.requestHistory();
-  }
-
   markWheelScroll(event: WheelEvent): void {
     if (this.destroyed) return;
     if (this.wheelGestureTimer !== null) clearTimeout(this.wheelGestureTimer);
@@ -190,6 +195,7 @@ export class TimelineHistoryController {
     if (!this.wheelGestureActive) this.gestureSawScroll = false;
     this.wheelGestureActive = true;
     this.userScrollPending = true;
+    this.pointerPressOnly = false;
     if (event.deltaY < 0 && this.historyInputArmed) {
       this.queueHistoryRequest();
     } else if (event.deltaY >= 0) {
@@ -237,6 +243,7 @@ export class TimelineHistoryController {
       event.key === ' ';
     if (!scrollKey) return;
     this.userScrollPending = true;
+    this.pointerPressOnly = false;
     if (upward && this.historyInputArmed) {
       this.queueHistoryRequest();
     } else if (!upward) {
@@ -258,6 +265,7 @@ export class TimelineHistoryController {
   markTouchStart(event: TouchEvent): void {
     if (this.destroyed) return;
     this.userScrollPending = true;
+    this.pointerPressOnly = false;
     this.historyInputArmed = true;
     this.lastTouchY = event.touches.item(0)?.clientY ?? null;
   }
@@ -267,6 +275,7 @@ export class TimelineHistoryController {
     const touchY = event.touches.item(0)?.clientY;
     if (touchY === undefined || this.lastTouchY === null) return;
     this.userScrollPending = true;
+    this.pointerPressOnly = false;
     const upward = touchY > this.lastTouchY;
     this.lastTouchY = touchY;
     if (upward) this.queueHistoryRequest();
@@ -285,6 +294,7 @@ export class TimelineHistoryController {
   markPointerStart(): void {
     if (this.destroyed) return;
     this.userScrollPending = true;
+    this.pointerPressOnly = true;
   }
 
   markPointerEnd(): void {

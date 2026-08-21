@@ -7,6 +7,8 @@ import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
+import { TIMELINE_LAYOUT } from './timeline-layout';
+
 import TimelineList from './TimelineList.svelte';
 
 let animationFrames: FrameRequestCallback[];
@@ -74,7 +76,35 @@ function viewport(): HTMLDivElement {
   return element;
 }
 
-test('fills a short live timeline after its initial page settles', async () => {
+function timelineViewport(): HTMLElement {
+  const element = document.querySelector('.timeline-viewport');
+  if (!(element instanceof HTMLElement)) throw new Error('timeline viewport wrapper not found');
+  return element;
+}
+
+test('fills a short live timeline until the server reports the timeline start', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 3));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(history).toHaveBeenCalledTimes(3);
+  await unmount(instance);
+});
+
+test('bounds the opening fill when the viewport never fills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
@@ -91,8 +121,118 @@ test('fills a short live timeline after its initial page settles', async () => {
   viewport();
   await tick();
   await runAnimationFrames();
+  await runAnimationFrames();
+
+  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.initialFillMaxPages);
+  await unmount(instance);
+});
+
+test('waits for a terminal page to settle before revealing the timeline', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  try {
+    const roomTimeline = timeline();
+    roomTimeline.items = [item('latest')];
+    // Production ordering: `paginate` resolves before the diff that settles it.
+    const history = vi.fn(() => {
+      roomTimeline.backwardPagination = 'loading';
+      return Promise.resolve(true);
+    });
+    const instance = mount(TimelineList, {
+      target: document.body,
+      props: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    });
+
+    viewport();
+    await tick();
+    await runAnimationFrames();
+
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(timelineViewport().classList.contains('initial')).toBe(true);
+
+    roomTimeline.backwardPagination = 'end';
+    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.initialFillPollInterval);
+    await runAnimationFrames();
+
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(timelineViewport().classList.contains('initial')).toBe(false);
+    await unmount(instance);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('reveals the timeline when a page never settles', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  try {
+    const roomTimeline = timeline();
+    roomTimeline.items = [item('latest')];
+    const history = vi.fn(() => {
+      roomTimeline.backwardPagination = 'loading';
+      return Promise.resolve(false);
+    });
+    const instance = mount(TimelineList, {
+      target: document.body,
+      props: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    });
+
+    viewport();
+    await tick();
+    await runAnimationFrames();
+    expect(timelineViewport().classList.contains('initial')).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.initialFillSettleTimeout);
+    await runAnimationFrames();
+
+    expect(timelineViewport().classList.contains('initial')).toBe(false);
+    await unmount(instance);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('keeps the timeline hidden until the opening fill settles', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  let releaseHistory = (): void => {};
+  const history = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        releaseHistory = () => {
+          resolve(true);
+        };
+      })
+  );
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(1);
+  expect(timelineViewport().classList.contains('initial')).toBe(true);
+
+  releaseHistory();
+  await runAnimationFrames();
+
+  expect(timelineViewport().classList.contains('initial')).toBe(false);
   await unmount(instance);
 });
 

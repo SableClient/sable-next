@@ -199,6 +199,27 @@ test('keeps the latest message visible when the composer grows', async ({
   await timeline.expectAtLatest(LATEST);
 });
 
+// A resize raises no scroll event, so nothing but the observer re-pins it.
+test('keeps the latest message visible when the composer grows under a held pointer', async ({
+  page,
+  app,
+  timeline,
+  homeserver,
+  signIn,
+}) => {
+  await page.setViewportSize({ width: 390, height: 420 });
+  await signIn();
+  await app.openRoom(homeserver.timelineRoomId);
+  await timeline.expectAtLatest(LATEST);
+
+  await timeline.viewport.dispatchEvent('pointerdown');
+  await app.composer.fill(
+    Array.from({ length: 6 }, (_, index) => `Line ${String(index + 1)}`).join('\n')
+  );
+
+  await timeline.expectAtLatest(LATEST);
+});
+
 test('stays at latest when a measured timeline item grows', async ({
   app,
   timeline,
