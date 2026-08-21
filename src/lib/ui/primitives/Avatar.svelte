@@ -57,7 +57,7 @@
     --avatar-size: var(--avatar-size-medium);
 
     align-items: center;
-    background: var(--sable-primary-container);
+    background: transparent;
     border-radius: var(--radius);
     color: var(--sable-primary-on-container);
     display: inline-flex;
