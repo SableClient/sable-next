@@ -1,6 +1,7 @@
 import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
+import { isScrolling, type Gesture } from './timeline-position';
 
 interface TimelineHistoryControllerOptions {
   getBackwardPagination: () => BackwardPaginationState;
@@ -33,13 +34,8 @@ export class TimelineHistoryController {
   private wheelGestureActive = false;
   private wheelUsesNativeScrollEnd = false;
   private gestureSawScroll = false;
-  private userScrollPending = false;
-  /**
-   * Any scroll clears `userScrollPending`, so a set flag means nothing has moved
-   * yet. From wheel, touch or keys that reads as "about to scroll"; from a bare
-   * press it does not, and a context menu can hold one indefinitely.
-   */
-  private pointerPressOnly = false;
+  /** Any scroll clears this, so a gesture still set here has not moved anything. */
+  private activeGesture: Gesture = 'none';
   private readonly wheelHandler = (event: WheelEvent): void => {
     this.markWheelScroll(event);
   };
@@ -70,12 +66,16 @@ export class TimelineHistoryController {
 
   constructor(private readonly options: TimelineHistoryControllerOptions) {}
 
+  get gesture(): Gesture {
+    return this.activeGesture;
+  }
+
   get hasUserScrollPending(): boolean {
-    return this.userScrollPending;
+    return this.activeGesture !== 'none';
   }
 
   get isScrollGestureActive(): boolean {
-    return this.userScrollPending && !this.pointerPressOnly;
+    return isScrolling(this.activeGesture);
   }
 
   get isRequestPending(): boolean {
@@ -85,7 +85,7 @@ export class TimelineHistoryController {
   clearUserScrollPending(): void {
     if (this.destroyed) return;
     this.gestureSawScroll = true;
-    this.userScrollPending = false;
+    this.activeGesture = 'none';
   }
 
   get isAnchorFailing(): boolean {
@@ -194,8 +194,7 @@ export class TimelineHistoryController {
     }, TIMELINE_LAYOUT.wheelGestureEndDelay);
     if (!this.wheelGestureActive) this.gestureSawScroll = false;
     this.wheelGestureActive = true;
-    this.userScrollPending = true;
-    this.pointerPressOnly = false;
+    this.activeGesture = 'wheel';
     if (event.deltaY < 0 && this.historyInputArmed) {
       this.queueHistoryRequest();
     } else if (event.deltaY >= 0) {
@@ -242,8 +241,7 @@ export class TimelineHistoryController {
       event.key === 'End' ||
       event.key === ' ';
     if (!scrollKey) return;
-    this.userScrollPending = true;
-    this.pointerPressOnly = false;
+    this.activeGesture = 'keys';
     if (upward && this.historyInputArmed) {
       this.queueHistoryRequest();
     } else if (!upward) {
@@ -264,8 +262,7 @@ export class TimelineHistoryController {
 
   markTouchStart(event: TouchEvent): void {
     if (this.destroyed) return;
-    this.userScrollPending = true;
-    this.pointerPressOnly = false;
+    this.activeGesture = 'touch';
     this.historyInputArmed = true;
     this.lastTouchY = event.touches.item(0)?.clientY ?? null;
   }
@@ -274,8 +271,7 @@ export class TimelineHistoryController {
     if (this.destroyed) return;
     const touchY = event.touches.item(0)?.clientY;
     if (touchY === undefined || this.lastTouchY === null) return;
-    this.userScrollPending = true;
-    this.pointerPressOnly = false;
+    this.activeGesture = 'touch';
     const upward = touchY > this.lastTouchY;
     this.lastTouchY = touchY;
     if (upward) this.queueHistoryRequest();
@@ -293,13 +289,12 @@ export class TimelineHistoryController {
 
   markPointerStart(): void {
     if (this.destroyed) return;
-    this.userScrollPending = true;
-    this.pointerPressOnly = true;
+    this.activeGesture = 'press';
   }
 
   markPointerEnd(): void {
     if (this.destroyed) return;
-    this.userScrollPending = false;
+    if (this.activeGesture === 'press') this.activeGesture = 'none';
   }
 
   attach(node: HTMLDivElement): () => void {
@@ -333,7 +328,7 @@ export class TimelineHistoryController {
     this.historyFillActive = false;
     this.historyFillPages = 0;
     this.wheelGestureActive = false;
-    this.userScrollPending = false;
+    this.activeGesture = 'none';
     this.anchorSuppressed = false;
     this.anchorDeferredRequest = false;
     this.anchorFailures = 0;

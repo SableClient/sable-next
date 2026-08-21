@@ -36,11 +36,11 @@
     type TimelineDebugSample,
   } from './timeline-debug';
   import {
-    initialTimelineScrollMode,
+    initialPosition,
     isNearLatest,
-    type TimelineScrollMode,
-  } from './timeline-scroll';
-  import { nextScrollMode } from './timeline-scroll-policy';
+    nextPosition,
+    type TimelinePosition,
+  } from './timeline-position';
   import FoldedEventRun from './FoldedEventRun.svelte';
   import {
     foldEventRuns,
@@ -135,10 +135,12 @@
     if (target === smoothTarget) return;
     const index = visibleItems.findIndex((item) => item.event_id === target);
     if (index < 0) return;
+    const offset = offsetOfIndex(index, 'center');
+    if (offset === null) return;
     smoothTarget = target;
-    setScrollMode({ kind: 'focused', eventId: target });
+    setPosition({ kind: 'focused', eventId: target });
     focusAnchored = true;
-    get(virtualizer).scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+    viewport?.scrollTo({ top: offset, behavior: 'smooth' });
   });
   let viewport = $state<HTMLDivElement | null>(null);
   let initialFillState: 'idle' | 'running' | 'done' = 'idle';
@@ -149,16 +151,15 @@
   let focusAnchored = false;
   // Only the mount-time target picks the mode; later ones go through the effect.
   // svelte-ignore state_referenced_locally
-  let scrollMode = $state<TimelineScrollMode>(initialTimelineScrollMode(focusEventId));
-  function setScrollMode(mode: TimelineScrollMode): void {
-    scrollMode = mode;
-    followingLive = mode.kind === 'followingLive';
+  let position = $state<TimelinePosition>(initialPosition(focusEventId));
+  function setPosition(next: TimelinePosition): void {
+    position = next;
+    followingLive = next.kind === 'pinned';
   }
   const initialItems: readonly TimelineItemView[] = [];
   const INITIAL_END_RECONCILIATION_LIMIT = 60;
   let initialEndReconciliationAttempts = 0;
   let initialEndReconciliationPending = false;
-  let followingEndReconciliationPending = false;
   let timelineDebugSample = $state<TimelineDebugSample | null>(null);
   const timelineDebugRecorder = new TimelineDebugRecorder();
   const identityTracker = new TimelineIdentityTracker();
@@ -168,13 +169,16 @@
   let historyDebugChange = 0;
 
   let anchorHolding = false;
-  let anchorRolling = false;
   let anchorCorrecting = false;
+  /** Abandoning a hold still has to tear it down, so the id stays addressable. */
+  let anchorAbandoned = false;
   let anchorHoldSequence = 0;
   let activeHoldId: number | null = null;
+  function anchorRolling(): boolean {
+    return !anchorHolding && anchor.held !== null;
+  }
   let measurementRevision = 0;
   let anchorCorrection: { by: string; delta: number; key: string | null } | null = null;
-  let anchorAbandoned = false;
   let anchorResidual: number | null = 0;
   let expectedSelfOffset: number | null = null;
   function recordSelfWrite(): void {
@@ -215,9 +219,8 @@
     recordSelfWrite();
   }
 
-  function scrollToEndNow(): void {
-    if (!viewport) return;
-    scrollToOffsetNow(viewport.scrollHeight);
+  function offsetOfIndex(index: number, align: 'start' | 'center' | 'end'): number | null {
+    return get(virtualizer).getOffsetForIndex(index, align)?.[0] ?? null;
   }
 
   function currentViewport(): HTMLDivElement | null {
@@ -230,10 +233,11 @@
     estimateSize: (index) =>
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
+    // `anchorTo` earns its place: it compensates the offset for a prepend during
+    // `setOptions`, before paint, which `holdAnchorThroughUpdate` cannot do from
+    // an effect. `followOnAppend` does not — it arms `reconcileScroll`, which
+    // forces the virtualiser's own stale target back for five seconds.
     anchorTo: 'end',
-    // Arms `reconcileScroll`, which forces the virtualiser's own target back for
-    // five seconds, recomputed against the live viewport. End-following belongs
-    // to `scheduleFollowingEndReconciliation`.
     followOnAppend: false,
     scrollEndThreshold: nearLatestPx,
     useScrollendEvent: true,
@@ -249,12 +253,12 @@
     isVirtualizerScrolling: () => get(virtualizer).isScrolling,
     requestHistory: () => onRequestHistory(),
     onGestureSettled: () => {
-      if (!endFollowDeferred) return;
-      endFollowDeferred = false;
-      scheduleFollowingEndReconciliation(true);
+      if (!commitDeferred) return;
+      commitDeferred = false;
+      scheduleCommit();
     },
     debugLog: historyDebugLog,
-    debugSnapshot: () => timelineDebugSnapshot(viewport, get(virtualizer), scrollMode.kind),
+    debugSnapshot: () => timelineDebugSnapshot(viewport, get(virtualizer), position.kind),
   });
 
   $effect(() => {
@@ -322,12 +326,12 @@
           maxVisualDelta,
           anchorResidual,
           maxAnchorResidual,
-          anchorGuard: anchorHolding ? 'hold' : anchorRolling ? 'rolling' : 'none',
+          anchorGuard: anchorHolding ? 'hold' : anchorRolling() ? 'rolling' : 'none',
           anchorCorrection,
           firstVirtualIndex: virtualItems[0]?.index ?? null,
           lastVirtualIndex: virtualItems.at(-1)?.index ?? null,
           isScrolling: instance.isScrolling,
-          scrollMode: scrollMode.kind,
+          scrollMode: position.kind,
           backwardPagination: timeline.backwardPagination,
         };
         timelineDebugRecorder.add(nextSample);
@@ -358,8 +362,10 @@
     virtualizerViewportSize = viewportSize;
     if (contentSizeChanged) measurementRevision += 1;
     if (contentSizeChanged) correctRollingAnchor();
-    if (scrollMode.kind === 'followingLive' && (contentSizeChanged || viewportSizeChanged)) {
-      scheduleFollowingEndReconciliation();
+    // `settling` is driven by the landing loop below, which commits and measures
+    // in step; a second committer racing it re-enters mid-measurement.
+    if (position.kind === 'pinned' && (contentSizeChanged || viewportSizeChanged)) {
+      scheduleCommit();
     }
     scheduleInitialEndReconciliation();
     const isScrolling = instance.isScrolling;
@@ -372,11 +378,10 @@
     if (anchorHolding) return;
     anchor.capture();
     if (anchor.held === null) return;
-    endFollowDeferred = false;
+    commitDeferred = false;
     const holdId = (anchorHoldSequence += 1);
     activeHoldId = holdId;
     anchorHolding = true;
-    anchorRolling = false;
     anchorAbandoned = false;
     historyController.suspendForAnchor();
     void (async () => {
@@ -409,8 +414,8 @@
       visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
     );
     if (!target || view.topOf(target.snapshot.key) !== null) return;
-    const offset = get(virtualizer).getOffsetForIndex(target.index, 'start')?.[0];
-    if (offset === undefined) return;
+    const offset = offsetOfIndex(target.index, 'start');
+    if (offset === null) return;
     scrollToOffsetNow(Math.max(0, offset - target.snapshot.top));
     await new Promise(requestAnimationFrame);
   }
@@ -428,16 +433,14 @@
   function refreshRollingAnchor(): void {
     if (anchorHolding || !viewport) return;
     if (isNearLatest(viewport, nearLatestPx)) {
-      anchorRolling = false;
       anchor.release();
       return;
     }
-    anchorRolling = true;
     anchor.capture();
   }
 
   function correctRollingAnchor(): void {
-    if (anchorHolding || anchorCorrecting || !anchorRolling) return;
+    if (anchorCorrecting || !anchorRolling()) return;
     anchorCorrecting = true;
     try {
       anchorResidual = anchor.restoreStationary();
@@ -452,26 +455,54 @@
     anchor.release();
   }
 
-  let endFollowDeferred = false;
+  let commitDeferred = false;
+  let commitScheduled = false;
 
-  function scheduleFollowingEndReconciliation(afterGesture = false): void {
-    if (followingEndReconciliationPending) return;
+  /**
+   * The one place the offset is written for a position that names the end.
+   * `anchored` and `focused` are owned by the anchor, which restores them from a
+   * captured row rather than from a computed offset.
+   */
+  function commit(): void {
+    const node = currentViewport();
+    if (!node || anchorHolding) return;
+    if (position.kind === 'anchored' || position.kind === 'focused') return;
+    // The gesture's own scroll event has not landed, so the position it will
+    // produce is not known yet. Committing now would take the reader to the end.
+    if (historyController.isScrollGestureActive) {
+      commitDeferred = true;
+      return;
+    }
+    scrollToOffsetNow(node.scrollHeight);
+    nearLatest = true;
+  }
 
-    followingEndReconciliationPending = true;
-    void tick().then(() => {
-      followingEndReconciliationPending = false;
-      if (scrollMode.kind !== 'followingLive' || !viewport) return;
-      if (!afterGesture && historyController.isScrollGestureActive) {
-        endFollowDeferred = true;
-        return;
-      }
-      scrollToEndNow();
-      nearLatest = true;
+  function unreadLandingKey(): string | null {
+    const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
+    if (index === -1 || index >= visibleItems.length - 1) return null;
+    return anchorKeyForItem(visibleItems[index]);
+  }
+
+  function landOn(key: string): void {
+    const index = visibleItems.findIndex((item) => anchorKeyForItem(item) === key);
+    if (index < 0) return;
+    const offset = offsetOfIndex(index, 'start');
+    if (offset === null) return;
+    scrollToOffsetNow(offset);
+    refreshRollingAnchor();
+  }
+
+  function scheduleCommit(): void {
+    if (commitScheduled) return;
+    commitScheduled = true;
+    requestAnimationFrame(() => {
+      commitScheduled = false;
+      commit();
     });
   }
 
   function isInitialLive(): boolean {
-    return scrollMode.kind === 'initialLive';
+    return position.kind === 'settling';
   }
 
   function initialFillCancelled(): boolean {
@@ -511,7 +542,7 @@
       await tick();
       await new Promise(requestAnimationFrame);
       if (initialFillCancelled()) return;
-      scrollToEndNow();
+      commit();
       if (reachedStart) return;
     }
   }
@@ -525,14 +556,21 @@
   }
 
   function scheduleInitialEndReconciliation(): void {
-    if (scrollMode.kind !== 'initialLive' || initialEndReconciliationPending) return;
+    if (position.kind !== 'settling' || initialEndReconciliationPending) return;
     // Handing over mid-fill reveals the timeline between pages. An empty timeline
     // never starts a fill, so it must not wait for one.
     if (initialFillState !== 'done' && visibleItems.length > 0) return;
     // It reschedules itself until the end settles, and runs while hidden, so an
     // unbounded list would spin for as long as the room stayed open.
     if (initialEndReconciliationAttempts >= INITIAL_END_RECONCILIATION_LIMIT) {
-      setScrollMode({ kind: 'followingLive' });
+      // Giving up on settling is not giving up on landing somewhere deliberate.
+      const landed = nextPosition(position, {
+        kind: 'fill-finished',
+        unreadKey: unreadLandingKey(),
+      });
+      setPosition(landed);
+      if (landed.kind === 'anchored') landOn(landed.key);
+      else scheduleCommit();
       return;
     }
     initialEndReconciliationAttempts += 1;
@@ -540,13 +578,13 @@
     initialEndReconciliationPending = true;
     void tick().then(async () => {
       initialEndReconciliationPending = false;
-      if (scrollMode.kind !== 'initialLive' || !viewport) return;
+      if (position.kind !== 'settling' || !viewport) return;
 
-      scrollToEndNow();
+      commit();
       await new Promise(requestAnimationFrame);
       const activeViewport = currentViewport();
-      // A frame has passed, so the mode has to be read afresh. Through a call,
-      // which the narrowing from the check above does not reach into.
+      // A frame has passed, so the position has to be read afresh. Through a
+      // call, which the narrowing from the check above does not reach into.
       if (!isInitialLive() || !activeViewport) return;
       const distance =
         activeViewport.scrollHeight - activeViewport.scrollTop - activeViewport.clientHeight;
@@ -556,9 +594,13 @@
       }
       // The fill already waited out its pages; one landing after the deadline is
       // a plain prepend, which the anchor hold covers.
-      nearLatest = true;
-      setScrollMode({ kind: 'followingLive' });
-      scheduleFollowingEndReconciliation();
+      const landed = nextPosition(position, {
+        kind: 'fill-finished',
+        unreadKey: unreadLandingKey(),
+      });
+      setPosition(landed);
+      if (landed.kind === 'anchored') landOn(landed.key);
+      else scheduleCommit();
     });
   }
 
@@ -587,7 +629,7 @@
         viewport: historyDebugSnapshot(),
       });
     }
-    // `scrollMode` goes stale: a programmatic scroll raises no gesture and a
+    // `position` goes stale: a programmatic scroll raises no gesture and a
     // wheel at offset zero raises no scroll event.
     const pinnedToEnd = viewport !== null && isNearLatest(viewport, nearLatestPx);
     // Prepended history has to be held even at the end: a wheel in a room that
@@ -596,8 +638,8 @@
     if (
       edgesChanged &&
       (prepended || !pinnedToEnd) &&
-      scrollMode.kind !== 'initialLive' &&
-      scrollMode.kind !== 'focused'
+      position.kind !== 'settling' &&
+      position.kind !== 'focused'
     ) {
       holdAnchorThroughUpdate();
     }
@@ -652,17 +694,18 @@
       await tick();
       await new Promise(requestAnimationFrame);
       if (controller.signal.aborted || !hasItems) return;
-      const focusedEventId = scrollMode.kind === 'focused' ? scrollMode.eventId : null;
+      const focusedEventId = position.kind === 'focused' ? position.eventId : null;
       const focusIndex = focusedEventId
         ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
         : -1;
       if (focusIndex >= 0 && !focusAnchored) {
-        get(virtualizer).scrollToIndex(focusIndex, { align: 'center' });
+        const offset = offsetOfIndex(focusIndex, 'center');
+        if (offset !== null) scrollToOffsetNow(offset);
         focusAnchored = true;
-      } else if (scrollMode.kind === 'initialLive') {
+      } else if (position.kind === 'settling') {
         const initialAnchorCancelled = (): boolean =>
-          controller.signal.aborted || scrollMode.kind !== 'initialLive';
-        scrollToEndNow();
+          controller.signal.aborted || position.kind !== 'settling';
+        commit();
         await new Promise(requestAnimationFrame);
         if (initialAnchorCancelled()) return;
         if (currentViewport() === null) return;
@@ -686,7 +729,7 @@
   }
 
   function historyDebugSnapshot(): object | null {
-    return timelineDebugSnapshot(viewport, get(virtualizer), scrollMode.kind);
+    return timelineDebugSnapshot(viewport, get(virtualizer), position.kind);
   }
 
   function historyDebugLog(event: string, details: object): void {
@@ -703,21 +746,21 @@
     // Holding an anchor against the user is worse than losing it.
     if (!wasSelfScroll && historyController.hasUserScrollPending) releaseAnchor();
     nearLatest = isNearLatest(viewport, nearLatestPx);
-    const next = nextScrollMode(scrollMode, {
+    refreshRollingAnchor();
+    const next = nextPosition(position, {
+      kind: 'user-scrolled',
       timelineMode: timeline.mode.kind,
       nearLatest,
-      userDroveLastScroll: historyController.hasUserScrollPending,
-      // The landing hands over on its own.
-      initialLandingComplete: false,
-      focusTarget: null,
+      gesture: historyController.gesture,
+      anchorKey: anchor.held?.key ?? null,
+      anchorTop: anchor.held?.top ?? 0,
     });
-    if (next !== scrollMode) setScrollMode(next);
-    refreshRollingAnchor();
+    if (next !== position) setPosition(next);
     historyController.refreshQueuedRequest();
     historyController.clearUserScrollPending();
     const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
     if (
-      scrollMode.kind === 'focused' &&
+      position.kind === 'focused' &&
       timeline.forwardPagination === 'idle' &&
       newestVisibleIndex !== undefined &&
       newestVisibleIndex >= visibleItems.length - TIMELINE_LAYOUT.historyPrefetchItems
@@ -732,7 +775,7 @@
   /**
    * A shrinking viewport leaves the offset where it was, so the newest event
    * slides out of view. Nothing else recovers it: a resize raises no scroll event,
-   * so `scrollMode` never reaches `followingLive`.
+   * so `position` never reaches `pinned`.
    */
   function keepPinnedThroughResize(node: HTMLDivElement): () => void {
     let previousHeight: number | null = null;
@@ -741,17 +784,7 @@
       const shrank = previousHeight !== null && height < previousHeight;
       previousHeight = height;
       // Growing is handled by the browser's own clamp.
-      if (!shrank) return;
-      // The fill, a permalink landing and an anchor hold each own the offset.
-      if (
-        !nearLatest ||
-        scrollMode.kind === 'initialLive' ||
-        scrollMode.kind === 'focused' ||
-        anchorHolding
-      ) {
-        return;
-      }
-      scrollToEndNow();
+      if (shrank) scheduleCommit();
     });
     observer.observe(node);
     return () => {
@@ -783,7 +816,7 @@
 
   function jumpToLatest(): void {
     historyController.finishHistoryFill();
-    setScrollMode({ kind: 'followingLive' });
+    setPosition({ kind: 'pinned' });
     viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
     nearLatest = true;
   }
@@ -830,7 +863,7 @@
     </p>
   {/if}
 
-  <div class={['timeline-viewport', { initial: scrollMode.kind === 'initialLive' }]}>
+  <div class={['timeline-viewport', { initial: position.kind === 'settling' }]}>
     <!-- A scrollable region has to be keyboard-operable. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div
@@ -901,9 +934,9 @@
     </div>
   </div>
 
-  {#if scrollMode.kind === 'initialLive'}<TimelineSkeleton />{/if}
+  {#if position.kind === 'settling'}<TimelineSkeleton />{/if}
 
-  {#if timeline.mode.kind === 'live' && scrollMode.kind === 'readingHistory' && visibleItems.length > 0}
+  {#if timeline.mode.kind === 'live' && position.kind === 'anchored' && visibleItems.length > 0}
     <Button
       type="button"
       class="jump-to-latest"

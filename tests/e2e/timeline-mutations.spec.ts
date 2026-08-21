@@ -24,11 +24,12 @@ test('an edit above the viewport does not move the reader', async ({
 
   const subscription = await core.subscription();
   const before = await timeline.visibleRange();
+  const index = await timeline.indexOfEvent('$general-1:example.test');
 
   await core.emitTimelineDiff(subscription, [
     {
       op: 'set',
-      index: 1,
+      index,
       value: {
         ...timelineItem('general-1', `Edited ${'and rewrapped '.repeat(12)}`),
         event_id: '$general-1:example.test',
@@ -100,7 +101,7 @@ test('history inserted above the viewport does not move the reader', async ({
   await expect.poll(() => timeline.visibleRange()).toEqual(before);
 });
 
-test('an image without dimensions takes the file shape without moving the reader', async ({
+test('an image without dimensions takes the file shape without losing the newest message', async ({
   page,
   app,
   timeline,
@@ -115,7 +116,9 @@ test('an image without dimensions takes the file shape without moving the reader
   await expect.poll(() => core.subscribeCount()).toBe(1);
 
   const subscription = await core.subscription();
-  const anchor = await timeline.fullyVisibleAnchor();
+  // This room does not overflow, so the reader is at the bottom. Growing a row
+  // above the newest message shifts the rows above it, not the message itself.
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   // No dimensions on the event, so the box comes from the 1000x400 file.
   await core.emitTimelineDiff(subscription, [
@@ -141,5 +144,5 @@ test('an image without dimensions takes the file shape without moving the reader
   if (!loaded) throw new Error('missing loaded image box');
 
   expect(loaded.width / loaded.height).toBeCloseTo(1000 / 400, 1);
-  await timeline.expectAnchorHeld(anchor);
+  await timeline.expectAtLatest('General message 19');
 });

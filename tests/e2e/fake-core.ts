@@ -5,6 +5,7 @@ export type RoomCoreMode =
   | 'loading'
   | 'error'
   | 'delayed_history'
+  | 'unread'
   | 'delayed_media'
   | 'delayed_pagination'
   | 'endless_history'
@@ -247,6 +248,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                   timestamp: 1_700_000_000_000,
                                 },
                               };
+                              const readMarker = {
+                                ...items[0],
+                                id: `${room.name.toLowerCase()}-read-marker`,
+                                event_id: null,
+                                sender: null,
+                                sender_name: null,
+                                content: { kind: 'read_marker' as const },
+                              };
                               return {
                                 type: 'subscribe_timeline',
                                 subscription,
@@ -264,7 +273,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                         }))
                                       : workerMode === 'delayed_pagination'
                                         ? [timelineStart, ...items]
-                                        : items,
+                                        : workerMode === 'unread'
+                                          ? [...items.slice(0, 5), readMarker, ...items.slice(5)]
+                                          : items,
                               };
                             })()
                           : command === 'room_members'

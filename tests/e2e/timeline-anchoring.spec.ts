@@ -507,6 +507,23 @@ test('stays at the newest message when history lands in a room that fits', async
 
 // A context menu holds a press the viewport never sees released. A press is not
 // a scroll, so it must not stop the newest event from being followed.
+test('opens at the first unread message rather than the newest', async ({
+  page,
+  app,
+  timeline,
+  installRoomCore,
+}) => {
+  await installRoomCore('unread');
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await expect(timeline.initial).toHaveCount(0);
+
+  await expect(timeline.message('General message 5')).toBeVisible();
+  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+});
+
 test('follows an appended event while a pointer rests on the timeline', async ({
   page,
   app,

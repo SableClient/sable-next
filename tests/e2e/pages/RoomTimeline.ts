@@ -35,6 +35,13 @@ export class RoomTimeline {
     return this.page.locator(`[data-event-id="${eventId}"]`);
   }
 
+  /** Diffs address rows by index, which a prepend shifts under the test. */
+  async indexOfEvent(eventId: string): Promise<number> {
+    const attribute = await this.itemByEventId(eventId).getAttribute('data-index');
+    if (attribute === null) throw new Error(`no rendered row for ${eventId}`);
+    return Number(attribute);
+  }
+
   itemByIndex(index: number): Locator {
     return this.page.locator(`[data-index="${String(index)}"]`);
   }
