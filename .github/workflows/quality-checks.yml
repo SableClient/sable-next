@@ -37,9 +37,6 @@ jobs:
         with:
           name: web-assets
           path: |
-            .svelte-kit/generated
-            .svelte-kit/output
-            dist
             src/generated/wasm
           if-no-files-found: error
           retention-days: 7

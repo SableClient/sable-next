@@ -74,7 +74,16 @@ tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/Sable
 block2 = "0.6"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSError", "NSString", "NSURL"] }
-objc2-photos = { version = "0.3.2", default-features = false, features = ["std", "PHPhotoLibrary", "PHAssetChangeRequest", "PHAssetCreationRequest", "PHChangeRequest", "PhotosTypes", "block2", "dispatch2"] }
+objc2-photos = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "PHPhotoLibrary",
+  "PHAssetChangeRequest",
+  "PHAssetCreationRequest",
+  "PHChangeRequest",
+  "PhotosTypes",
+  "block2",
+  "dispatch2",
+] }
 
 [lints]
 workspace = true
