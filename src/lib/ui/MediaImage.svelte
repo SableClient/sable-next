@@ -1,6 +1,8 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import {
     cachedMediaUrl,
     loadMediaUrl,
@@ -9,6 +11,7 @@
   } from '#lib/ui/media-url.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
+  import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
   interface Props {
     source: string;
@@ -45,7 +48,22 @@
   let clock = $state(Date.now());
   let loadGeneration = $state(0);
   let retryNextLoad = false;
+  let gifPreview = $state<HTMLCanvasElement>();
+  let gifImage = $state<HTMLImageElement>();
+  let gifPreviewReady = $state(false);
+  let gifPlaying = $state(false);
+  let gifFrames = $state<GifPlayback | null>(null);
+  /* Not `$state`: the loop would restart on every step if it tracked these. */
+  let gifFrameIndex = 0;
+  let gifFrameMs = DEFAULT_FRAME_MS;
+  let paintedCanvas: HTMLCanvasElement | undefined;
+  let paintedIndex = -1;
   let fileRatio = $state<number | null>(null);
+  let animatedGif = $derived(mime === 'image/gif');
+  let manualGif = $derived(animatedGif && !preferences.autoplayGifs);
+  let steppedGif = $derived(gifFrames !== null);
+  let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
+  let showCanvas = $derived(manualGif && gifPreviewReady && (steppedGif || !gifPlaying));
   let eventRatio = $derived.by(() => {
     const hasIntrinsicSize =
       intrinsicWidth !== null &&
@@ -64,6 +82,11 @@
     alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
   );
   let retryWait = $derived(Math.max(0, retryAt - clock));
+  let mediaLabel = $derived(
+    manualGif
+      ? $i18n.t(gifPlaying ? 'timeline.stopGif' : 'timeline.playGif')
+      : `Open ${alt || 'media'}`
+  );
   let retryLabel = $derived(
     retryWait === 0
       ? $i18n.t('timeline.retryMedia')
@@ -84,12 +107,15 @@
     let active = true;
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
-    const original = mime === 'image/svg+xml';
+    // A server's GIF thumbnail is a still frame; only the original moves.
+    const original = mime === 'image/svg+xml' || animatedGif;
     const requestWidth = original ? 0 : width;
     const requestHeight = original ? 0 : height;
     const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {
       fileRatio = mediaAspectRatio(core, source);
+      gifPreviewReady = false;
+      gifPlaying = false;
       url = cached;
       return;
     }
@@ -97,11 +123,15 @@
     url = null;
     failed = false;
     fileRatio = null;
+    gifPreviewReady = false;
+    gifPlaying = false;
     const load = retry ? retryMediaUrl : loadMediaUrl;
     void load(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
         fileRatio = mediaAspectRatio(core, source);
+        gifPreviewReady = false;
+        gifPlaying = false;
         url = nextUrl;
       })
       .catch(() => {
@@ -119,6 +149,72 @@
     };
   });
 
+  $effect(() => {
+    if (!url || !manualGif) return;
+    let playback: GifPlayback | null = null;
+    let active = true;
+    void openGifPlayback(url).then((opened) => {
+      if (!active || !opened) {
+        opened?.close();
+        return;
+      }
+      playback = opened;
+      gifFrames = opened;
+    });
+    return () => {
+      active = false;
+      playback?.close();
+      gifFrames = null;
+    };
+  });
+
+  $effect(() => {
+    const playback = gifFrames;
+    if (!playback || !gifPlaying) return;
+    let running = true;
+    // Read through a call: the flag is cleared from the teardown closure.
+    const stopped = (): boolean => !running;
+    const step = async (): Promise<void> => {
+      while (!stopped()) {
+        await new Promise((resolve) => setTimeout(resolve, gifFrameMs));
+        if (stopped()) return;
+        await paintFrame(playback, (gifFrameIndex + 1) % playback.frameCount);
+      }
+    };
+    void step();
+    return () => {
+      running = false;
+    };
+  });
+
+  // A canvas Svelte re-creates comes back blank, so the held frame is re-painted.
+  $effect(() => {
+    const playback = gifFrames;
+    const canvas = gifPreview;
+    if (!playback || !canvas || gifPlaying) return;
+    if (canvas === paintedCanvas && gifFrameIndex === paintedIndex) return;
+    // Claimed before decoding, or a second run paints the same frame again.
+    paintedCanvas = canvas;
+    paintedIndex = gifFrameIndex;
+    void paintFrame(playback, gifFrameIndex);
+  });
+
+  async function paintFrame(playback: GifPlayback, index: number): Promise<void> {
+    const frame = await playback.frame(index);
+    if (!frame) return;
+    if (gifPreview) {
+      gifPreview.width = frame.image.displayWidth;
+      gifPreview.height = frame.image.displayHeight;
+      gifPreview.getContext('2d')?.drawImage(frame.image, 0, 0);
+    }
+    frame.image.close();
+    paintedCanvas = gifPreview;
+    paintedIndex = index;
+    gifFrameIndex = index;
+    gifFrameMs = frame.durationMs;
+    gifPreviewReady = true;
+  }
+
   function stopTimelinePress(event: PointerEvent): void {
     event.stopPropagation();
   }
@@ -132,10 +228,57 @@
     retryNextLoad = true;
     loadGeneration += 1;
   }
+
+  /* The fallback where frames cannot be decoded. `drawImage` copies an animated
+     image's first frame, not the one on screen, so this holds the opening frame
+     however far in the reader stopped. */
+  function drawFrame(): boolean {
+    if (!gifPreview || !gifImage) return false;
+    gifPreview.width = gifImage.naturalWidth || width;
+    gifPreview.height = gifImage.naturalHeight || height;
+    gifPreview.getContext('2d')?.drawImage(gifImage, 0, 0);
+    return true;
+  }
+
+  function freezeFrame(): void {
+    gifPreviewReady = drawFrame();
+  }
+
+  /* A manual GIF is its own play/stop button, so the wrapper never swaps
+     element and the canvas survives. */
+  function activate(): void {
+    if (!manualGif) {
+      onclick?.();
+      return;
+    }
+    if (!gifPlaying) {
+      gifPlaying = true;
+    } else if (steppedGif || drawFrame()) {
+      gifPlaying = false;
+    }
+  }
 </script>
 
 {#snippet content()}
-  {#if url}
+  {#if url && manualGif}
+    <canvas
+      bind:this={gifPreview}
+      class={['media-image-content', 'gif-preview', { ready: showCanvas }]}>{alt}</canvas
+    >
+    {#if !steppedGif}
+      <img
+        bind:this={gifImage}
+        class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
+        src={url}
+        alt={showCanvas ? '' : alt}
+        aria-hidden={showCanvas ? 'true' : undefined}
+        onload={freezeFrame}
+      />
+    {/if}
+    {#if heldGif}
+      <span class="play-gif" aria-hidden="true"><PlayIcon /></span>
+    {/if}
+  {:else if url}
     <img class="media-image-content" src={url} {alt} />
   {:else if failed}
     <span class="media-image-unavailable">
@@ -150,13 +293,13 @@
   {/if}
 {/snippet}
 
-{#if onclick && !failed}
+{#if !failed && (manualGif || onclick)}
   <button
-    class={[className, 'media-image', 'interactive']}
+    class={[className, 'media-image', 'interactive', { gif: manualGif }]}
     style:--media-ratio={aspectRatio}
     type="button"
-    aria-label={`Open ${alt || 'media'}`}
-    {onclick}
+    aria-label={mediaLabel}
+    onclick={activate}
     onpointerdown={stopTimelinePress}
     onpointermove={stopTimelinePress}
     onpointerup={stopTimelinePress}
@@ -176,12 +319,42 @@
     aspect-ratio: var(--media-ratio);
     display: block;
     overflow: hidden;
+    position: relative;
   }
 
   .media-image-content {
     display: block;
     height: 100%;
+    object-fit: cover;
     width: 100%;
+  }
+
+  .gif-preview,
+  .gif-preview-source.ready {
+    display: none;
+  }
+
+  .gif-preview.ready {
+    display: block;
+  }
+
+  .play-gif {
+    align-items: center;
+    background: var(--sable-surface-container);
+    border-radius: 50%;
+    box-shadow: var(--shadow-float);
+    color: var(--sable-surface-on-container);
+    display: flex;
+    left: 50%;
+    padding: 0.5rem;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .play-gif :global(svg) {
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
   }
 
   .media-image-unavailable {
@@ -212,12 +385,16 @@
     text-align: left;
   }
 
+  .media-image.interactive.gif {
+    cursor: pointer;
+  }
+
   .media-image.interactive:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 0.2rem;
   }
 
-  .retry-media {
+  :global(button.retry-media) {
     margin-top: 0.25rem;
   }
 </style>

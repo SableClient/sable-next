@@ -12,9 +12,11 @@ vi.mock('#lib/core/context.js', () => ({
 }));
 
 import MediaImage from './MediaImage.svelte';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
   core.fetchMedia.mockReset();
+  preferences.autoplayGifs = true;
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -191,6 +193,162 @@ test('loads SVG images from the original rather than a thumbnail', async () => {
   await tick();
   await Promise.resolve();
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/vector', 0, 0);
+  await unmount(instance);
+});
+
+test('loads GIFs from the original so they animate', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/autoplayed',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/autoplayed', 0, 0);
+  await unmount(instance);
+});
+
+test('shows a static GIF preview until its play button is pressed', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:animated');
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/animated',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+    },
+  });
+
+  const container = document.querySelector<HTMLElement>('.media-image');
+  if (!container) throw new Error('media image was not rendered');
+  await vi.waitFor(() => {
+    expect(container.querySelector('.gif-preview-source')).not.toBeNull();
+  });
+  const preview = container.querySelector<HTMLImageElement>('.gif-preview-source');
+  if (!preview) throw new Error('GIF preview source was not rendered');
+  preview.dispatchEvent(new Event('load'));
+  await tick();
+
+  expect(container.querySelector('canvas')).not.toBeNull();
+  expect(container.querySelector('.play-gif')).not.toBeNull();
+  expect(container.querySelector('img:not(.gif-preview-source)')).toBeNull();
+
+  document.querySelector<HTMLButtonElement>('.play-gif')?.click();
+  await tick();
+  // The one image plays: hidden behind the canvas until now, shown from here.
+  const playing = document.querySelector<HTMLImageElement>('img');
+  expect(playing?.src).toBe('blob:animated');
+  expect(playing?.getAttribute('aria-hidden')).toBeNull();
+  expect(document.querySelector('.play-gif')).toBeNull();
+  await unmount(instance);
+});
+
+test('stops a playing GIF instead of opening the viewer', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onclick = vi.fn();
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/stoppable',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+      onclick,
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.gif-preview-source')).not.toBeNull();
+  });
+  document.querySelector('.gif-preview-source')?.dispatchEvent(new Event('load'));
+  await tick();
+  document.querySelector<HTMLButtonElement>('.play-gif')?.click();
+  await tick();
+
+  const playing = document.querySelector<HTMLButtonElement>('button.media-image');
+  if (!playing) throw new Error('playing GIF was not interactive');
+  playing.click();
+  await tick();
+
+  expect(onclick).not.toHaveBeenCalled();
+  expect(document.querySelector('.play-gif')).not.toBeNull();
+  // The wrapper never changes element, only what pressing it means.
+  expect(document.querySelector('button.media-image')?.getAttribute('aria-label')).toBe('Play GIF');
+  await unmount(instance);
+});
+
+test('steps GIF frames itself and stops on the frame it held', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stepped');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+  );
+  const decoded: number[] = [];
+  vi.stubGlobal(
+    'ImageDecoder',
+    class {
+      tracks = {
+        ready: Promise.resolve(),
+        selectedTrack: { animated: true, frameCount: 3 },
+      };
+      completed = Promise.resolve();
+      decode({ frameIndex }: { frameIndex: number }) {
+        decoded.push(frameIndex);
+        return Promise.resolve({
+          image: { displayWidth: 4, displayHeight: 4, duration: 20_000, close: () => {} },
+        });
+      }
+      close() {}
+    }
+  );
+
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/stepped',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+    },
+  });
+
+  // A frame is decoded and held, with no <img> left to animate on its own.
+  await vi.waitFor(() => {
+    expect(document.querySelector('.play-gif')).not.toBeNull();
+  });
+  expect(document.querySelector('img')).toBeNull();
+  expect(decoded.at(-1)).toBe(0);
+
+  const held = decoded.length;
+  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await vi.waitFor(() => {
+    expect(decoded.length).toBeGreaterThan(held + 2);
+  });
+  expect(decoded.slice(held, held + 3)).toEqual([1, 2, 0]);
+  expect(document.querySelector('.play-gif')).toBeNull();
+
+  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await tick();
+  const stopped = decoded.length;
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  expect(decoded.length).toBe(stopped);
+  expect(document.querySelector('.play-gif')).not.toBeNull();
   await unmount(instance);
 });
 

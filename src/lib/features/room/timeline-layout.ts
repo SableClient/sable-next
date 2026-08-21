@@ -19,7 +19,7 @@ export const TIMELINE_LAYOUT = {
   historyRequestMinInterval: 300,
   jumpToLatestRem: 5,
   wheelGestureEndDelay: 150,
-  mediaMaxRem: 32,
+  mediaMaxRem: 25,
   mediaMinRem: 15,
   stickerWidthRem: 9.5,
   messageInsetRem: 4,

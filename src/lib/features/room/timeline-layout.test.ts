@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 test('publishes the estimator media dimensions as inherited CSS properties', () => {
-  expect(TIMELINE_LAYOUT_STYLE).toBe('--timeline-media-max:32rem;--timeline-sticker-width:9.5rem');
+  expect(TIMELINE_LAYOUT_STYLE).toBe('--timeline-media-max:25rem;--timeline-sticker-width:9.5rem');
 });
 
 test('reads a valid root font size and falls back for invalid values', () => {
