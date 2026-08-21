@@ -6,6 +6,7 @@ use matrix_sdk::ruma::events::presence::PresenceEvent;
 use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
 use matrix_sdk::ruma::presence::PresenceState;
+use matrix_sdk_ui::room_list_service::State as RoomListState;
 use matrix_sdk_ui::sync_service::State as SyncState;
 
 use crate::protocol::{CoreEvent, PresenceView, SyncStatus};
@@ -51,35 +52,59 @@ impl Core {
         client: &matrix_sdk::Client,
         generation: u64,
     ) {
-        client.add_event_handler({
-            let core = self.clone();
-            move |event: OriginalSyncRoomMessageEvent,
-                  room: matrix_sdk::Room,
-                  client: matrix_sdk::Client,
-                  actions: Vec<Action>| {
-                let core = core.clone();
-
-                async move {
-                    if Some(event.sender.as_ref()) == client.user_id() {
+        let core = self.clone();
+        let client = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                let Ok(sync_service) = core.sync_service().await else {
+                    return;
+                };
+                let mut state = sync_service.room_list_service().state();
+                while !matches!(state.get(), RoomListState::Running) {
+                    if state.next().await.is_none() {
                         return;
-                    }
-                    if !notifications::notifies(&actions) {
-                        return;
-                    }
-
-                    let Ok(sync_service) = core.sync_service().await else {
-                        return;
-                    };
-                    let setup = NotificationProcessSetup::SingleProcess { sync_service };
-                    if let Some(notification) =
-                        notifications::notification(&client, setup, room.room_id(), &event.event_id)
-                            .await
-                    {
-                        core.emit_if_current(generation, CoreEvent::Notification { notification });
                     }
                 }
-            }
-        });
+
+                client.add_event_handler({
+                    let core = core.clone();
+                    move |event: OriginalSyncRoomMessageEvent,
+                          room: matrix_sdk::Room,
+                          client: matrix_sdk::Client,
+                          actions: Vec<Action>| {
+                        let core = core.clone();
+
+                        async move {
+                            if Some(event.sender.as_ref()) == client.user_id() {
+                                return;
+                            }
+                            if !notifications::notifies(&actions) {
+                                return;
+                            }
+
+                            let Ok(sync_service) = core.sync_service().await else {
+                                return;
+                            };
+                            let setup = NotificationProcessSetup::SingleProcess { sync_service };
+                            if let Some(notification) = notifications::notification(
+                                &client,
+                                setup,
+                                room.room_id(),
+                                &event.event_id,
+                            )
+                            .await
+                            {
+                                core.emit_if_current(
+                                    generation,
+                                    CoreEvent::Notification { notification },
+                                );
+                            }
+                        }
+                    }
+                });
+            })
+            .abort_on_drop(),
+        );
     }
 
     pub(crate) fn watch_notification_settings(
