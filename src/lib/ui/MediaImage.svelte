@@ -181,8 +181,6 @@
   .media-image-content {
     display: block;
     height: 100%;
-    object-fit: contain;
-    object-position: left top;
     width: 100%;
   }
 
