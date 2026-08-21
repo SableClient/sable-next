@@ -7,6 +7,8 @@ import type { WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 
+declare const __SABLE_WASM_VERSION__: string;
+
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
 function requestLabel(request: WorkerRequest): RequestLabel | undefined {
@@ -69,6 +71,9 @@ export function createWebTransport(): Transport {
     if (worker) return worker;
 
     const workerUrl = new URL(coreWorkerUrl, self.location.href);
+    // Shared workers outlive tabs, so changing their URL prevents an old glue
+    // module from being paired with a freshly generated WASM binary.
+    workerUrl.searchParams.set('wasm', __SABLE_WASM_VERSION__);
     const logFilter = new URLSearchParams(self.location.search).get('log');
     if (logFilter) workerUrl.searchParams.set('log', logFilter);
 

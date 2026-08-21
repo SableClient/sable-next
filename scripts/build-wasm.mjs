@@ -31,7 +31,7 @@ if (!version || cli.status !== 0 || cli.stdout.trim() !== `wasm-bindgen ${versio
 run('cargo', cargoArgs);
 
 const wasm = `target/wasm32-unknown-unknown/${profile}/sable_wasm.wasm`;
-const output = 'src/generated/wasm';
+const output = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 const bindgenArgs = ['--target', 'web', '--out-dir', output, '--out-name', 'sable_wasm'];
 
 if (release) bindgenArgs.push('--remove-name-section', '--remove-producers-section');

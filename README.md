@@ -22,6 +22,9 @@ mise run dev      # SvelteKit on http://localhost:3000
 another terminal, run `mise run wasm:watch`; Vite reloads after each regenerated
 bundle. Production builds generate the optimised WASM bundle automatically.
 
+`pnpm test:e2e` generates its WASM bundle in `src/generated/wasm-e2e/`, so it
+can run while the development server is using `src/generated/wasm/`.
+
 Run `mise tasks` for the full list.
 
 ## Apps (Tauri)

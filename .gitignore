@@ -7,6 +7,7 @@ devAssets
 
 # WASM build output (`mise run wasm:build`)
 src/generated/wasm/
+src/generated/wasm-e2e/
 
 .DS_Store
 Thumbs.db

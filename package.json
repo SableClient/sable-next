@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "svelte-kit sync && vitest run",
     "test:coverage": "svelte-kit sync && vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "SABLE_WASM_OUTPUT=src/generated/wasm-e2e playwright test",
     "prepare": "svelte-kit sync || echo ''; mise exec -- lefthook install",
     "check:theme": "node scripts/check-theme-tokens.mjs",
     "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker/tsconfig.json",
