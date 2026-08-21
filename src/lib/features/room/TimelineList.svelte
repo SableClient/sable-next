@@ -233,10 +233,10 @@
     estimateSize: (index) =>
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
-    // `anchorTo` earns its place: it compensates the offset for a prepend during
-    // `setOptions`, before paint, which `holdAnchorThroughUpdate` cannot do from
-    // an effect. `followOnAppend` does not — it arms `reconcileScroll`, which
-    // forces the virtualiser's own stale target back for five seconds.
+    // `anchorTo` compensates the offset for a prepend during `setOptions`, before
+    // paint, which `holdAnchorThroughUpdate` cannot do from an effect.
+    // `followOnAppend` only arms `reconcileScroll`, which forces the virtualiser's
+    // own stale target back for five seconds.
     anchorTo: 'end',
     followOnAppend: false,
     scrollEndThreshold: nearLatestPx,
@@ -458,17 +458,12 @@
   let commitDeferred = false;
   let commitScheduled = false;
 
-  /**
-   * The one place the offset is written for a position that names the end.
-   * `anchored` and `focused` are owned by the anchor, which restores them from a
-   * captured row rather than from a computed offset.
-   */
   function commit(): void {
     const node = currentViewport();
     if (!node || anchorHolding) return;
     if (position.kind === 'anchored' || position.kind === 'focused') return;
-    // The gesture's own scroll event has not landed, so the position it will
-    // produce is not known yet. Committing now would take the reader to the end.
+    // The gesture's scroll event has not landed, so the position it will produce
+    // is unknown. Committing now would take the reader to the end.
     if (historyController.isScrollGestureActive) {
       commitDeferred = true;
       return;
@@ -501,12 +496,12 @@
     });
   }
 
-  function isInitialLive(): boolean {
+  function isSettling(): boolean {
     return position.kind === 'settling';
   }
 
   function initialFillCancelled(): boolean {
-    return currentViewport() === null || !isInitialLive();
+    return currentViewport() === null || !isSettling();
   }
 
   /**
@@ -528,7 +523,7 @@
   async function fillInitialHistory(): Promise<void> {
     while (initialFillPages < TIMELINE_LAYOUT.initialFillMaxPages) {
       const node = currentViewport();
-      if (node === null || !isInitialLive()) return;
+      if (node === null || !isSettling()) return;
       // `end` is the server reporting the start of the timeline.
       if (timeline.backwardPagination !== 'idle') return;
       // `scrollHeight` never reports less than the viewport, so it cannot tell a
@@ -563,7 +558,6 @@
     // It reschedules itself until the end settles, and runs while hidden, so an
     // unbounded list would spin for as long as the room stayed open.
     if (initialEndReconciliationAttempts >= INITIAL_END_RECONCILIATION_LIMIT) {
-      // Giving up on settling is not giving up on landing somewhere deliberate.
       const landed = nextPosition(position, {
         kind: 'fill-finished',
         unreadKey: unreadLandingKey(),
@@ -585,7 +579,7 @@
       const activeViewport = currentViewport();
       // A frame has passed, so the position has to be read afresh. Through a
       // call, which the narrowing from the check above does not reach into.
-      if (!isInitialLive() || !activeViewport) return;
+      if (!isSettling() || !activeViewport) return;
       const distance =
         activeViewport.scrollHeight - activeViewport.scrollTop - activeViewport.clientHeight;
       if (distance > 1 || get(virtualizer).isScrolling) {
