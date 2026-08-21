@@ -35,12 +35,14 @@ test('sends the subscription snapshot before startup events buffered for its por
     const request = JSON.parse(command) as { type: string };
     if (request.type === 'subscribe_timeline') {
       emit(
-        JSON.stringify({
-          type: 'timeline_pagination',
-          subscription: 7,
-          loading: true,
-          reached_start: false,
-        })
+        JSON.stringify([
+          {
+            type: 'timeline_pagination',
+            subscription: 7,
+            loading: true,
+            reached_start: false,
+          },
+        ])
       );
       return Promise.resolve(
         JSON.stringify({ type: 'subscribe_timeline', subscription: 7, items: [] })

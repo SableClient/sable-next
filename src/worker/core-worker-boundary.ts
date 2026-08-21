@@ -62,19 +62,21 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
     broadcast({ panic: { message } });
   }
 
+  /** `json` is a `CoreEvent[]`: the core batches whatever had queued up. */
   function handleEvent(json: string): void {
-    const event = JSON.parse(json) as CoreEvent;
-    if (event.type === 'timeline_diff' || event.type === 'timeline_pagination') {
-      const owner = timelineEvents.route(event);
-      if (!owner) return;
-      try {
-        owner.postMessage({ event });
-      } catch {
-        closePort(owner);
+    for (const event of JSON.parse(json) as CoreEvent[]) {
+      if (event.type === 'timeline_diff' || event.type === 'timeline_pagination') {
+        const owner = timelineEvents.route(event);
+        if (!owner) continue;
+        try {
+          owner.postMessage({ event });
+        } catch {
+          closePort(owner);
+        }
+        continue;
       }
-      return;
+      broadcast({ event });
     }
-    broadcast({ event });
   }
 
   function connect(port: WorkerPort): void {

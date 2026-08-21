@@ -28,9 +28,11 @@ async function rawInvoke<T>(
 export function createTauriTransport(): Transport {
   const listeners = new Set<(event: CoreEvent) => void>();
 
-  const channel = new Channel<CoreEvent>();
-  channel.onmessage = (event) => {
-    for (const listener of listeners) listener(event);
+  const channel = new Channel<CoreEvent[]>();
+  channel.onmessage = (events) => {
+    for (const event of events) {
+      for (const listener of listeners) listener(event);
+    }
   };
 
   const ready = invoke<unknown>('subscribe_events', { channel });

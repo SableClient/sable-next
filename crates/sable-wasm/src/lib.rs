@@ -11,15 +11,17 @@ use std::{
     },
 };
 
-use futures_util::StreamExt;
 use js_sys::Function;
 use sable_core::{
     Core,
     protocol::{Command, CommandErr, CoreEvent},
 };
 use session_store::JsSessionStore;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::mpsc::UnboundedReceiver;
 use wasm_bindgen::{JsValue, prelude::*};
+
+/// Most events a single crossing into JS carries.
+const EVENT_BATCH_LIMIT: usize = 256;
 
 /// The rejection payload must stay valid `CommandErr` JSON, so never
 /// interpolate a message into hand-written JSON.
@@ -81,7 +83,7 @@ pub fn set_panic_handler(notify: Function) {
 #[wasm_bindgen]
 pub struct SableCore {
     core: Arc<Core>,
-    events: RefCell<Option<UnboundedReceiverStream<CoreEvent>>>,
+    events: RefCell<Option<UnboundedReceiver<CoreEvent>>>,
 }
 
 #[wasm_bindgen]
@@ -109,7 +111,7 @@ impl SableCore {
 
         SableCore {
             core,
-            events: RefCell::new(Some(UnboundedReceiverStream::new(events))),
+            events: RefCell::new(Some(events)),
         }
     }
 
@@ -179,7 +181,8 @@ impl SableCore {
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
 
-    /// Called once. Each event arrives as the JSON of `CoreEvent`.
+    /// Called once. Each call carries the JSON of a `CoreEvent[]`: whatever had
+    /// queued up when the batch was drained.
     ///
     /// # Errors
     ///
@@ -193,11 +196,13 @@ impl SableCore {
             .ok_or_else(|| JsValue::from_str("events are already subscribed"))?;
 
         wasm_bindgen_futures::spawn_local(async move {
-            while let Some(event) = events.next().await {
-                let Ok(json) = serde_json::to_string(&event) else {
+            let mut batch = Vec::new();
+            while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
+                let Ok(json) = serde_json::to_string(&batch) else {
                     tracing::error!("failed to serialize a core event");
                     break;
                 };
+                batch.clear();
                 if let Err(error) = on_event.call1(&JsValue::NULL, &JsValue::from_str(&json)) {
                     tracing::error!(?error, "event callback threw, stopping the event stream");
                     break;
