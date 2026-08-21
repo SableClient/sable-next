@@ -7,11 +7,19 @@
     open?: boolean;
     label: string;
     closeLabel: string;
+    fullHeight?: boolean;
     onOpenChange?: (open: boolean) => void;
     children: Snippet;
   }
 
-  let { open = $bindable(false), label, closeLabel, onOpenChange, children }: Props = $props();
+  let {
+    open = $bindable(false),
+    label,
+    closeLabel,
+    fullHeight = false,
+    onOpenChange,
+    children,
+  }: Props = $props();
   let pointerId = $state<number | null>(null);
   let startY = 0;
   let dragProgress = $state(0);
@@ -74,7 +82,7 @@
   bind:open
   variant="sheet"
   {label}
-  contentStyle={`transform: translateY(${String(dragProgress * 100)}%)`}
+  contentStyle={`${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-2) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
   {onOpenChange}
 >
   <button

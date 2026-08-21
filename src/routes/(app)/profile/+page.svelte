@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RoutePlaceholder from '#lib/ui/RoutePlaceholder.svelte';
+  import AccountManager from '#lib/features/sidebar/AccountManager.svelte';
 </script>
 
-<RoutePlaceholder titleKey="nav.profile" />
+<AccountManager />

@@ -787,6 +787,11 @@ export class CoreClient {
     this.status = 'ready';
   }
 
+  async removeAccount(accountId: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'remove_account', account_id: accountId });
+    await this.refreshAccounts();
+  }
+
   async logout(): Promise<void> {
     await this.ensureTransport().send({ type: 'logout' });
     this.generation += 1;

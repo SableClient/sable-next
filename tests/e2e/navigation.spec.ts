@@ -68,6 +68,15 @@ test('opens the chats list first, and reaches the new-chat form from there', asy
   await expect(page.getByRole('button', { name: 'Start chat' })).toBeVisible();
 });
 
+test('keeps the mobile quick tools visible on inbox', async ({ page, installRoomCore }) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/inbox');
+
+  await expect(page.getByRole('navigation', { name: 'Quick tools' }).last()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account' }).last()).toBeVisible();
+});
+
 test('opens a settings section over the app shell', async ({ page, app, signIn }) => {
   await signIn();
   await page.goto('/settings/appearance');

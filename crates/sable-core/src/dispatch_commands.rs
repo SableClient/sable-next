@@ -95,6 +95,8 @@ macro_rules! dispatch_commands {
 
             Command::SwitchAccount { account_id } => $self.switch_account(account_id).await,
 
+            Command::RemoveAccount { account_id } => $self.remove_inactive_account(account_id).await,
+
             Command::Logout => $self.logout().await,
 
             Command::SubscribeRoomList => $self.subscribe_room_list().await,

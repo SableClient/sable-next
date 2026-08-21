@@ -57,6 +57,9 @@ pub enum Command {
     SwitchAccount {
         account_id: String,
     },
+    RemoveAccount {
+        account_id: String,
+    },
     Logout,
 
     SubscribeRoomList,
@@ -495,6 +498,7 @@ pub enum CommandOk {
     SwitchAccount {
         session: SessionInfo,
     },
+    RemoveAccount,
     Logout,
 
     /// The snapshot. Everything after it carries the same `subscription`.

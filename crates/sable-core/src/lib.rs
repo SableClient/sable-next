@@ -1487,6 +1487,32 @@ impl Core {
         Ok(CommandOk::Logout)
     }
 
+    /// Removes a stored background account. The active session must be signed
+    /// out through `logout` so its sync service is stopped cleanly.
+    async fn remove_inactive_account(&self, account_id: String) -> Result<CommandOk, CommandErr> {
+        if self
+            .active_session_info()
+            .await
+            .as_ref()
+            .map(|session| &session.account_id)
+            == Some(&account_id)
+        {
+            return Err(CommandErr::Denied);
+        }
+
+        let accounts = self.accounts().await?;
+        if !accounts
+            .accounts
+            .iter()
+            .any(|account| account.account_id == account_id)
+        {
+            return Err(CommandErr::NotLoggedIn);
+        }
+
+        self.remove_account(Some(&account_id)).await?;
+        Ok(CommandOk::RemoveAccount)
+    }
+
     async fn persist(
         &self,
         account_id: &str,

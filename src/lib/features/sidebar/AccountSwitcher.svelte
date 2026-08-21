@@ -65,6 +65,10 @@
     void goto(resolve('settings/account'));
   }
 
+  function openAccounts(): void {
+    void goto(resolve('profile'));
+  }
+
   // The pusher goes first: once the session ends there is no way to tell the
   // homeserver to stop pushing to this browser.
   function logout(): void {
@@ -75,39 +79,14 @@
 </script>
 
 {#if mode === 'mobile'}
-  <DropdownMenu.Root>
-    <DropdownMenu.Trigger
-      class="quick-tool mobile-tool sable-selection-layer"
-      aria-label={$i18n.t('nav.switchAccount')}
-    >
-      <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
-    </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="account-popover" side="top" sideOffset={8}>
-      <ProfileCard
-        class="account-profile-header"
-        {displayName}
-        userId={core.session?.user_id ?? ''}
-        {avatarUrl}
-        color={activeProfile?.hero_color ?? 'var(--sable-primary-container)'}
-        heroColor={activeProfile?.hero_color}
-        heroBrightness={activeProfile?.hero_brightness}
-        bannerUrl={activeProfile?.banner_url}
-        status={activeProfile?.status?.text}
-        statusEmoji={activeProfile?.status?.emoji}
-        nameColorLight={activeProfile?.name_color_light}
-        nameColorDark={activeProfile?.name_color_dark}
-      />
-      <AccountMenuItems
-        accounts={core.accounts}
-        currentAccountId={core.session?.account_id}
-        {switching}
-        onSwitch={switchAccount}
-        onProfile={openProfile}
-        onLogout={logout}
-        onAddAccount={openAddAccount}
-      />
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
+  <button
+    class="quick-tool mobile-tool sable-selection-layer"
+    type="button"
+    aria-label={$i18n.t('nav.account')}
+    onclick={openAccounts}
+  >
+    <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
+  </button>
 {:else}
   {#snippet profileTrigger({ props }: { props: Record<string, unknown> })}
     <DropdownMenu.Root>

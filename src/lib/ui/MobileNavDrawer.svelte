@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import SidebarNav from '#lib/features/sidebar/SidebarNav.svelte';
+  import UserQuickTools from '#lib/features/sidebar/UserQuickTools.svelte';
   import {
     finishSwipeGesture,
     startSwipeGesture,
@@ -22,8 +23,10 @@
 
   let position = $state<number | undefined>();
   let dragging = $state(false);
+  let routeChanging = $state(false);
   let gesture: Gesture | undefined;
   let settleFrame: number | undefined;
+  let routeFrame: number | undefined;
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   /** Routes whose own index is the room list. Anywhere else the list would
       hide the page that was asked for behind an inert panel. Keyed on the path
@@ -37,9 +40,18 @@
   $effect(() => {
     void pathname;
     cancelSettling();
+    if (routeFrame !== undefined) cancelAnimationFrame(routeFrame);
+    routeChanging = true;
+    routeFrame = requestAnimationFrame(() => {
+      routeChanging = false;
+      routeFrame = undefined;
+    });
     position = undefined;
     dragging = false;
     gesture = undefined;
+    return () => {
+      if (routeFrame !== undefined) cancelAnimationFrame(routeFrame);
+    };
   });
 
   function cancelSettling() {
@@ -152,6 +164,7 @@
     class="drawer-track"
     class:open
     class:dragging
+    class:route-changing={routeChanging}
     style:transform={position === undefined
       ? undefined
       : `translate3d(${String(position)}px, 0, 0)`}
@@ -163,6 +176,7 @@
       <div class="content">
         {@render children()}
       </div>
+      <div class="mobile-quick-tools"><UserQuickTools mobile /></div>
     </section>
   </div>
 </div>
@@ -214,13 +228,21 @@
     overflow: hidden;
   }
 
+  .mobile-quick-tools {
+    flex: 0 0 auto;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    .drawer-track:not(.dragging) {
+    .drawer-track:not(.dragging, .route-changing) {
       transition: transform 220ms cubic-bezier(0.33, 1, 0.68, 1);
     }
   }
 
   @media (width >= 48rem) {
+    .mobile-quick-tools {
+      display: none;
+    }
+
     .drawer-viewport {
       margin-left: calc(var(--navigation-rail-width) + var(--room-nav-width));
     }
