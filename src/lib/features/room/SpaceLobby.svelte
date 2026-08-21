@@ -113,18 +113,21 @@
 
   async function loadMore(): Promise<void> {
     const target = spaceId;
-    if (!target || nextBatch === null || loading) return;
+    const batch = nextBatch;
+    if (!target || batch === null || loading) return;
 
     loading = true;
     try {
-      const page = await core.spaceHierarchy(target, nextBatch);
+      const page = await core.spaceHierarchy(target, batch);
+      if (spaceId !== target) return;
       rooms = [...rooms, ...page.rooms];
       nextBatch = page.nextBatch;
     } catch (error) {
+      if (spaceId !== target) return;
       console.warn('[sable lobby] further pages unavailable', error);
       failed = true;
     } finally {
-      loading = false;
+      if (spaceId === target) loading = false;
     }
   }
 

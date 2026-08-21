@@ -68,6 +68,7 @@
   });
 
   $effect(() => {
+    void core.accountRevision;
     if (core.status !== 'ready') return;
 
     void core.setNotificationContent(preferences.notificationContent).catch(() => {});
@@ -76,6 +77,7 @@
   // Not gated on `desktopNotifications`: the native shell alerts without the
   // webview, and that switch only governs the in-app ones.
   $effect(() => {
+    void core.accountRevision;
     if (core.status !== 'ready') return;
 
     void registerNativePush(pushOverride()).catch((error: unknown) => {
@@ -122,6 +124,7 @@
   });
 
   $effect(() => {
+    void core.accountRevision;
     if (core.status !== 'ready') return;
 
     void roomList.start();
@@ -134,12 +137,14 @@
 </script>
 
 {#if core.status === 'ready'}
-  <AppShell>
-    {@render children()}
-  </AppShell>
-  {#if page.state.settings}
-    <SettingsPanel shallow section={page.state.settings.section} />
-  {/if}
+  {#key core.accountRevision}
+    <AppShell>
+      {@render children()}
+    </AppShell>
+    {#if page.state.settings}
+      <SettingsPanel shallow section={page.state.settings.section} />
+    {/if}
+  {/key}
 {:else if core.status === 'error'}
   <main class="app-status" aria-labelledby="app-status-title">
     <div class="app-status-card" role="alert">

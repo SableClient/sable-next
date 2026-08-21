@@ -9,7 +9,7 @@
   }
 
   let { open = $bindable(false) }: Props = $props();
-  let section = $state<string | null>(null);
+  let section: string | null = $state(null);
 
   function close(): void {
     open = false;

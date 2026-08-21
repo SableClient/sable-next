@@ -4,7 +4,7 @@
   import type { ProfileView } from '#src/generated/ProfileView';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
-  import { dropPushSubscription } from '#lib/features/notifications/web-push.js';
+  import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
   import { DropdownMenu } from 'bits-ui';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -69,12 +69,8 @@
     void goto(resolve('profile'));
   }
 
-  // The pusher goes first: once the session ends there is no way to tell the
-  // homeserver to stop pushing to this browser.
   function logout(): void {
-    void dropPushSubscription(core, pushOverride())
-      .catch(() => {})
-      .finally(() => void core.logout());
+    void logoutWithPush(core, pushOverride());
   }
 </script>
 

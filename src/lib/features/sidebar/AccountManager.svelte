@@ -3,6 +3,8 @@
   import { resolve } from '$app/paths';
   import type { ProfileView } from '#src/generated/ProfileView';
   import { useCoreClient } from '#lib/core/context.js';
+  import { pushOverride } from '#lib/features/notifications/push-config.js';
+  import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -134,7 +136,10 @@
             onclick={() => void goto(resolve('settings/account'))}
             >{$i18n.t('nav.editProfile')}</Button
           >
-          <Button variant="danger" size="small" onclick={() => void core.logout()}
+          <Button
+            variant="danger"
+            size="small"
+            onclick={() => void logoutWithPush(core, pushOverride())}
             >{$i18n.t('settings.logout')}</Button
           >
         {:else}

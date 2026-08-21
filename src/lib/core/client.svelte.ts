@@ -92,11 +92,14 @@ export class CoreClient {
   crashed = $state<string | null>(null);
   sync = $state<SyncStatus | null>(null);
   unresponsive = $state(false);
+  accountRevision = $state(0);
 
   private transport: Transport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
+  private readonly accountChannel =
+    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('sable-active-account');
   /* Nothing renders from these, and a reactive map would make every mounted
      profile card re-run its effect on any other user's cache write. */
   /* eslint-disable svelte/prefer-svelte-reactivity */
@@ -114,6 +117,12 @@ export class CoreClient {
   >();
   private readonly resolvedHomeservers = new Map<string, string>();
   /* eslint-enable svelte/prefer-svelte-reactivity */
+
+  constructor() {
+    this.accountChannel?.addEventListener('message', () => {
+      void this.syncAccountFromWorker();
+    });
+  }
 
   async start(): Promise<void> {
     if (this.startPromise) return this.startPromise;
@@ -156,11 +165,13 @@ export class CoreClient {
       if (generation !== this.generation || transport !== this.transport) return;
 
       await this.refreshAccounts();
-      this.session = this.accounts.find((account) => account.user_id === response.user_id) ?? null;
+      this.replaceSession(
+        this.accounts.find((account) => account.user_id === response.user_id) ?? null
+      );
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.session = previousSession;
+        this.replaceSession(previousSession);
         this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       }
       throw error;
@@ -219,15 +230,17 @@ export class CoreClient {
       const result = response.result;
       if (result.state === 'complete') {
         await this.refreshAccounts();
-        this.session = this.accounts.find((account) => account.user_id === result.user_id) ?? null;
+        this.replaceSession(
+          this.accounts.find((account) => account.user_id === result.user_id) ?? null
+        );
         this.status = 'ready';
       } else {
-        this.session = previousSession;
+        this.replaceSession(previousSession);
         this.status = previousSession ? 'ready' : 'signed-out';
       }
       return result;
     } catch (error) {
-      this.session = previousSession;
+      this.replaceSession(previousSession);
       this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       throw error;
     }
@@ -238,7 +251,9 @@ export class CoreClient {
     const result = response.result;
     if (result.state === 'complete') {
       await this.refreshAccounts();
-      this.session = this.accounts.find((account) => account.user_id === result.user_id) ?? null;
+      this.replaceSession(
+        this.accounts.find((account) => account.user_id === result.user_id) ?? null
+      );
       this.status = 'ready';
     }
     return result;
@@ -302,11 +317,13 @@ export class CoreClient {
       if (generation !== this.generation || transport !== this.transport) return;
 
       await this.refreshAccounts();
-      this.session = this.accounts.find((account) => account.user_id === response.user_id) ?? null;
+      this.replaceSession(
+        this.accounts.find((account) => account.user_id === response.user_id) ?? null
+      );
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.session = previousSession;
+        this.replaceSession(previousSession);
         this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       }
       throw error;
@@ -353,11 +370,13 @@ export class CoreClient {
       if (generation !== this.generation || transport !== this.transport) return;
 
       await this.refreshAccounts();
-      this.session = this.accounts.find((account) => account.user_id === response.user_id) ?? null;
+      this.replaceSession(
+        this.accounts.find((account) => account.user_id === response.user_id) ?? null
+      );
       this.status = 'ready';
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
-        this.session = previousSession;
+        this.replaceSession(previousSession);
         this.status = previousSession ? 'ready' : this.statusAfterAuthenticationError(error);
       }
       throw error;
@@ -782,7 +801,7 @@ export class CoreClient {
       type: 'switch_account',
       account_id: accountId,
     });
-    this.session = response.session;
+    this.replaceSession(response.session);
     await this.refreshAccounts();
     this.status = 'ready';
   }
@@ -795,10 +814,9 @@ export class CoreClient {
   async logout(): Promise<void> {
     await this.ensureTransport().send({ type: 'logout' });
     this.generation += 1;
-    this.session = null;
+    this.replaceSession(null);
     this.accounts = [];
     this.verification = null;
-    this.resetCachedState();
     this.status = 'signed-out';
   }
 
@@ -967,10 +985,11 @@ export class CoreClient {
     this.generation += 1;
     this.startPromise = null;
     this.cleanupTransport();
-    this.session = null;
+    this.replaceSession(null, false);
     this.verification = null;
     this.resetCachedState();
     this.status = 'idle';
+    this.accountChannel?.close();
   }
 
   private resetCachedState(): void {
@@ -980,6 +999,33 @@ export class CoreClient {
     this.sync = null;
     this.crashed = null;
     this.unresponsive = false;
+  }
+
+  private replaceSession(session: CoreSession | null, broadcast = true): void {
+    const changed = this.session?.account_id !== session?.account_id;
+    if (changed) {
+      this.accountRevision += 1;
+      this.resetCachedState();
+    }
+    this.session = session;
+    if (changed && broadcast) this.accountChannel?.postMessage(null);
+  }
+
+  private async syncAccountFromWorker(): Promise<void> {
+    try {
+      const response = await this.ensureTransport().send({ type: 'restore' });
+      if (response.session) {
+        this.replaceSession(response.session);
+        await this.refreshAccounts();
+        this.status = 'ready';
+      } else {
+        this.replaceSession(null);
+        this.accounts = [];
+        this.status = 'signed-out';
+      }
+    } catch {
+      // The worker may have closed before this tab receives the broadcast.
+    }
   }
 
   private async startTransport(): Promise<void> {
@@ -992,18 +1038,18 @@ export class CoreClient {
       if (generation !== this.generation) return;
 
       if (response.session) {
-        this.session = response.session;
+        this.replaceSession(response.session);
         await this.refreshAccounts();
         this.status = 'ready';
       } else {
-        this.session = null;
+        this.replaceSession(null);
         this.accounts = [];
         this.status = 'signed-out';
       }
     } catch {
       if (generation !== this.generation) return;
 
-      this.session = null;
+      this.replaceSession(null);
       this.status = 'error';
       this.cleanupTransport();
     }
@@ -1017,6 +1063,9 @@ export class CoreClient {
     const unsubscribeEvents = transport.subscribe(this.handleEvent);
     const unsubscribeCrash = transport.subscribeCrash((message) => {
       this.crashed = message;
+      this.accountRevision += 1;
+      this.cleanupTransport();
+      this.status = 'error';
     });
     const unsubscribeStall = transport.subscribeStall((stalled) => {
       this.unresponsive = stalled;
@@ -1056,7 +1105,7 @@ export class CoreClient {
     }
     if (event.type !== 'session_ended') return;
 
-    this.session = null;
+    this.replaceSession(null);
     this.status = 'authenticating';
     void this.restoreFallbackAccount();
   };

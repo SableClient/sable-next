@@ -22,8 +22,12 @@ export function vapidBytes(key: string): Uint8Array<ArrayBuffer> {
 
 /** Includes the gateway and app id because retargeting leaves the endpoint
     unchanged, and the endpoint alone would then look already registered. */
-export function registrationMarker(endpoint: string, settings: PushConfig): string {
-  return [settings.gateway, settings.appId, endpoint].join('\n');
+export function registrationMarker(
+  accountId: string,
+  endpoint: string,
+  settings: PushConfig
+): string {
+  return [accountId, settings.gateway, settings.appId, endpoint].join('\n');
 }
 
 export function needsRegistering(marker: string, registered: string | null): boolean {
@@ -33,7 +37,7 @@ export function needsRegistering(marker: string, registered: string | null): boo
 /** A pusher left under the previous app id keeps pushing from the old gateway,
     doubling every notification. */
 function abandonedAppId(registered: string | null, appId: string): string | null {
-  const previous = registered?.split('\n')[1];
+  const previous = registered?.split('\n')[2];
   return previous !== undefined && previous !== appId ? previous : null;
 }
 
@@ -42,6 +46,8 @@ export async function syncPushSubscription(
   override: PushOverride
 ): Promise<void> {
   if (!canReceivePush() || Notification.permission !== 'granted') return;
+  const accountId = core.session?.account_id;
+  if (!accountId) return;
   const { resolved: settings } = await pushConfig(override);
   if (!settings) return;
 
@@ -57,7 +63,7 @@ export async function syncPushSubscription(
   if (endpoint === undefined || !keys?.p256dh || !keys.auth) return;
 
   const registered = localStorage.getItem(REGISTERED_ENDPOINT);
-  const marker = registrationMarker(endpoint, settings);
+  const marker = registrationMarker(accountId, endpoint, settings);
   if (!needsRegistering(marker, registered)) return;
 
   const abandoned = abandonedAppId(registered, settings.appId);
@@ -92,4 +98,13 @@ export async function dropPushSubscription(
   const { keys } = subscription.toJSON();
   if (keys?.p256dh) await core.removePusher(keys.p256dh, settings.appId);
   await subscription.unsubscribe();
+}
+
+export async function logoutWithPush(core: CoreClient, override: PushOverride): Promise<void> {
+  try {
+    await dropPushSubscription(core, override);
+  } catch {
+    // Logging out must continue if the pusher cannot be removed.
+  }
+  await core.logout();
 }

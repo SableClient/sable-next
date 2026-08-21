@@ -23,8 +23,8 @@ test('a VAPID key decodes from base64url whether or not it is padded', () => {
 });
 
 test('a rotated endpoint has to be registered again', () => {
-  const first = registrationMarker('https://push.example/a', shipped);
-  const second = registrationMarker('https://push.example/b', shipped);
+  const first = registrationMarker('account-a', 'https://push.example/a', shipped);
+  const second = registrationMarker('account-a', 'https://push.example/b', shipped);
 
   expect(needsRegistering(first, null)).toBe(true);
   expect(needsRegistering(first, second)).toBe(true);
@@ -39,6 +39,6 @@ test('retargeting the gateway re-registers though the endpoint is unchanged', ()
     vapid: 'my-key',
   };
 
-  const before = registrationMarker(endpoint, shipped);
-  expect(needsRegistering(registrationMarker(endpoint, mine), before)).toBe(true);
+  const before = registrationMarker('account-a', endpoint, shipped);
+  expect(needsRegistering(registrationMarker('account-a', endpoint, mine), before)).toBe(true);
 });

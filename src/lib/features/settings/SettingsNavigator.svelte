@@ -10,6 +10,8 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { pushOverride } from '#lib/features/notifications/push-config.js';
+  import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
   import {
     SETTINGS_ACCOUNT_SECTION,
@@ -89,7 +91,12 @@
           </a>
         {/each}
       </nav>
-      <Button block class="settings-logout" variant="danger" onclick={() => void core.logout()}>
+      <Button
+        block
+        class="settings-logout"
+        variant="danger"
+        onclick={() => void logoutWithPush(core, pushOverride())}
+      >
         <SignOutIcon />
         <span class="logout-label">{$i18n.t('settings.logout')}</span>
       </Button>
