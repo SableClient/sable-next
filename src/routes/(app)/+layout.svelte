@@ -15,6 +15,7 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { deliversWebPush } from '#lib/platform/notifications.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { registerNativePush } from '#lib/features/notifications/native-push.js';
@@ -89,7 +90,7 @@
   // The browser can rotate a subscription behind our back, so the worker asks
   // for a fresh look rather than the app polling for one.
   $effect(() => {
-    if (core.status !== 'ready' || !preferences.desktopNotifications) return;
+    if (core.status !== 'ready' || !preferences.desktopNotifications || !deliversWebPush()) return;
 
     // Read before the first await, or a retargeted gateway never re-registers.
     const override = pushOverride();

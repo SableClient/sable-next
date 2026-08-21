@@ -1,9 +1,11 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+
+import { deliversNativePush } from '#lib/platform/notifications.js';
 
 import { pushConfig, type PushOverride } from './push-config';
 
 export async function registerNativePush(override: PushOverride): Promise<void> {
-  if (!isTauri()) return;
+  if (!(await deliversNativePush())) return;
 
   const { resolved, details } = await pushConfig(override);
   if (!resolved) return;

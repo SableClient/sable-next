@@ -1,6 +1,7 @@
 <script lang="ts">
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { i18n } from '#lib/i18n.js';
+  import { deliversWebPush } from '#lib/platform/notifications.js';
   import { setPreference } from '#lib/settings/preferences.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -13,7 +14,6 @@
     type PushOverride,
     pushOverride,
   } from './push-config';
-  import { canReceivePush } from './web-push';
 
   const problemLabels: Record<OverrideProblem, string> = {
     incomplete: 'settings.pushGatewayIncomplete',
@@ -61,7 +61,7 @@
   <h3 id="push-gateway">{$i18n.t('settings.pushGateway')}</h3>
   <p class="hint">{$i18n.t('settings.pushGatewayHint')}</p>
 
-  {#if !canReceivePush()}
+  {#if !deliversWebPush()}
     <Alert variant="info">
       <p>{$i18n.t('settings.pushGatewayUnsupported')}</p>
     </Alert>

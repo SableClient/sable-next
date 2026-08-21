@@ -1,15 +1,10 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { deliversWebPush } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { type PushConfig, pushConfig, type PushOverride } from './push-config';
 
 const REGISTERED_ENDPOINT = 'sable-push-endpoint';
-
-export function canReceivePush(): boolean {
-  return (
-    typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in globalThis
-  );
-}
 
 /** A VAPID key travels as base64url and `applicationServerKey` wants bytes. */
 export function vapidBytes(key: string): Uint8Array<ArrayBuffer> {
@@ -45,7 +40,7 @@ export async function syncPushSubscription(
   core: CoreClient,
   override: PushOverride
 ): Promise<void> {
-  if (!canReceivePush() || Notification.permission !== 'granted') return;
+  if (!deliversWebPush() || Notification.permission !== 'granted') return;
   const accountId = core.session?.account_id;
   if (!accountId) return;
   const { resolved: settings } = await pushConfig(override);
@@ -86,7 +81,7 @@ export async function dropPushSubscription(
   core: CoreClient,
   override: PushOverride
 ): Promise<void> {
-  if (!canReceivePush()) return;
+  if (!deliversWebPush()) return;
   const { resolved: settings } = await pushConfig(override);
   if (!settings) return;
 

@@ -31,8 +31,15 @@
 
   let { category }: Props = $props();
 
+  const items = $derived(category.items.filter((setting) => setting.supported?.() !== false));
+
+  const shown = $derived(new Set(items.map((setting) => setting.key)));
+
+  /** A gate this platform never renders would disable its dependants forever. */
   function gated(setting: SettingDefinition): boolean {
-    return setting.gatedBy !== undefined && !preferences[setting.gatedBy];
+    return (
+      setting.gatedBy !== undefined && shown.has(setting.gatedBy) && !preferences[setting.gatedBy]
+    );
   }
 
   let focusId = $derived(page.url.searchParams.get('focus'));
@@ -51,7 +58,7 @@
 
   $effect(() => {
     const id = focusId;
-    if (id === null || !category.items.some((setting) => settingFocusId(setting.key) === id)) {
+    if (id === null || !items.some((setting) => settingFocusId(setting.key) === id)) {
       return;
     }
 
@@ -91,7 +98,7 @@
     <section class="settings-card" aria-labelledby={`settings-${category.id}`}>
       <h2 id={`settings-${category.id}`} class="screen-reader-only">{$i18n.t(category.name)}</h2>
       <ul class="settings">
-        {#each category.items as setting (setting.key)}
+        {#each items as setting (setting.key)}
           {@const disabled = setting.unavailable === true || gated(setting)}
           {@const anchor = settingFocusId(setting.key)}
           <li

@@ -1,23 +1,18 @@
-import { isTauri } from '@tauri-apps/api/core';
-
 import type { NotificationView } from '#src/generated/NotificationView';
 
+import { presentsInApp } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-export function canPresent(): boolean {
-  return !isTauri() && typeof Notification !== 'undefined';
-}
-
 export function enabled(): boolean {
-  return canPresent() && preferences.desktopNotifications && permission() === 'granted';
+  return presentsInApp() && preferences.desktopNotifications && permission() === 'granted';
 }
 
 export function permission(): NotificationPermission {
-  return canPresent() ? Notification.permission : 'denied';
+  return presentsInApp() ? Notification.permission : 'denied';
 }
 
 export async function requestPermission(): Promise<NotificationPermission> {
-  if (!canPresent()) return 'denied';
+  if (!presentsInApp()) return 'denied';
   return Notification.requestPermission();
 }
 

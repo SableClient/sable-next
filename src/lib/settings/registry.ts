@@ -29,6 +29,8 @@ import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 
+import { presentsInApp } from '#lib/platform/notifications.js';
+
 import type { FreeTextPreference, Preferences } from './preferences.svelte';
 
 export type BooleanPreference = {
@@ -55,6 +57,8 @@ interface BaseSetting {
   gatedBy?: BooleanPreference;
   /** The feature behind this setting does not exist yet; shown disabled. */
   unavailable?: true;
+  /** Left out entirely where the platform has nothing for it to switch. */
+  supported?: () => boolean;
 }
 
 export interface BooleanSetting extends BaseSetting {
@@ -328,7 +332,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.autoplayGifs',
         description: 'settings.autoplayGifsHint',
         type: 'boolean',
-        unavailable: true,
       },
       {
         key: 'urlPreviews',
@@ -352,6 +355,7 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.desktopNotifications',
         description: 'settings.desktopNotificationsHint',
         type: 'boolean',
+        supported: presentsInApp,
       },
       {
         key: 'notificationSounds',
@@ -360,6 +364,7 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.notificationSoundsHint',
         type: 'boolean',
         gatedBy: 'desktopNotifications',
+        supported: presentsInApp,
       },
       {
         key: 'notificationContent',

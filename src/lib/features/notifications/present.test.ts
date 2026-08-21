@@ -8,7 +8,7 @@ vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { body, canPresent, tag, title } from './present';
+import { body, tag, title } from './present';
 
 function view(overrides: Partial<NotificationView> = {}): NotificationView {
   return {
@@ -52,13 +52,4 @@ test('content stays out of the alert when the reader asked it to', () => {
 test('one alert per room and account, so a busy room replaces its own', () => {
   expect(tag(view())).toBe('@me:example.org !room:example.org');
   expect(tag(view({ room_id: '!other:example.org' }))).not.toBe(tag(view()));
-});
-
-test('the browser presents, and a native shell does not use this path', () => {
-  // happy-dom has no Notification of its own.
-  vi.stubGlobal('Notification', { permission: 'granted' });
-  expect(canPresent()).toBe(true);
-
-  vi.stubGlobal('Notification', undefined);
-  expect(canPresent()).toBe(false);
 });
