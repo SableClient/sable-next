@@ -583,7 +583,7 @@ impl Core {
                 let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
                 let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), password);
                 // Without the session id this starts a new flow.
-                auth.session = uiaa.session.clone();
+                auth.session.clone_from(&uiaa.session);
 
                 client
                     .delete_devices(&devices, Some(AuthData::Password(auth)))
