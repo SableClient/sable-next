@@ -61,7 +61,7 @@
   .action-card {
     align-items: flex-start;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-sizing: border-box;
     color: inherit;

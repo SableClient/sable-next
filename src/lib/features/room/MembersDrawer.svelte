@@ -137,7 +137,7 @@
     box-shadow: var(--shadow-dialog);
     display: flex;
     flex-direction: column;
-    inset: 0 0 0 auto;
+    inset: var(--safe-top) 0 var(--safe-bottom) auto;
     max-width: min(22rem, 85%);
     position: absolute;
     width: 100%;
@@ -155,7 +155,7 @@
   header {
     align-items: center;
     background: var(--sable-bg-container);
-    border-bottom: 1px solid var(--sable-surface-var-container);
+    border-bottom: var(--border-width) solid var(--sable-surface-var-container);
     display: flex;
     justify-content: space-between;
     min-height: 3.75rem;
@@ -195,7 +195,7 @@
 
   :global(.member-search-input) {
     background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     color: inherit;
     min-height: 2.5rem;
@@ -236,7 +236,7 @@
 
   @media (width >= 48rem) {
     .members-drawer:not(.compact) {
-      border-left: 1px solid var(--sable-surface-container-line);
+      border-left: var(--border-width) solid var(--sable-surface-container-line);
       box-shadow: none;
       flex: 0 0 16.625rem;
       inset: auto;

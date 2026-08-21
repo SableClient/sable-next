@@ -723,7 +723,7 @@
 
   .message.mention-silent,
   .message.mention-loud {
-    border-inline-start: 4px solid;
+    border-inline-start: calc(var(--border-width) * 4) solid;
     border-radius: 0 var(--radius) var(--radius) 0;
     padding-inline: 0.5rem;
   }
@@ -746,11 +746,12 @@
   .message:has(:focus-visible) {
     background: var(--sable-primary-container);
     border-radius: var(--radius);
-    box-shadow: inset 0 0 0 1px var(--sable-primary-container-line);
+    box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-container-line);
   }
 
   .message.collapsed {
     padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap));
+    padding-top: 0;
   }
 
   /* Identity has to persist when the header is gone. */
@@ -932,7 +933,7 @@
 
   .pronouns {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
@@ -946,7 +947,7 @@
   .via {
     align-items: center;
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
@@ -1084,7 +1085,7 @@
   .reply-preview {
     align-items: center;
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
@@ -1128,7 +1129,7 @@
   .reactions :global(.add-reaction) {
     align-items: center;
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
@@ -1141,7 +1142,7 @@
   .reaction {
     align-items: center;
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
@@ -1194,7 +1195,7 @@
   :global(.reaction-tooltip) {
     animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     box-sizing: border-box;
@@ -1268,14 +1269,14 @@
   }
 
   .state-rail {
-    border-top: 1px dashed var(--sable-surface-var-container-line);
+    border-top: var(--border-width) dashed var(--sable-surface-var-container-line);
     flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
     margin-inline-start: 0.75rem;
   }
 
   .redacted-label {
     align-items: center;
-    border: 1px dashed var(--sable-surface-var-container-line);
+    border: var(--border-width) dashed var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     display: inline-flex;
     gap: 0.25rem;
@@ -1285,7 +1286,7 @@
   .debug-event {
     align-items: baseline;
     background: var(--sable-surface-var-container);
-    border-block: 1px dashed var(--sable-surface-var-container-line);
+    border-block: var(--border-width) dashed var(--sable-surface-var-container-line);
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
@@ -1330,7 +1331,7 @@
 
   .undecryptable {
     background: var(--sable-surface-var-container);
-    border: 1px dashed var(--sable-surface-var-container-line);
+    border: var(--border-width) dashed var(--sable-surface-var-container-line);
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
@@ -1352,14 +1353,14 @@
 
   .date-divider::before,
   .date-divider::after {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
     content: '';
     flex: 1;
   }
 
   .date-divider span {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.06em;
@@ -1377,7 +1378,7 @@
   }
 
   .read-marker::before {
-    border-top: 1px solid var(--sable-success-main);
+    border-top: var(--border-width) solid var(--sable-success-main);
     content: '';
     flex: 1;
   }
@@ -1391,14 +1392,14 @@
   }
 
   .unread::before {
-    border-top: 2px solid var(--sable-primary-main-line);
+    border-top: calc(var(--border-width) * 2) solid var(--sable-primary-main-line);
     content: '';
     flex: 1;
   }
 
   .unread span {
     background: var(--sable-primary-container);
-    border: 1px solid var(--sable-primary-container-line);
+    border: var(--border-width) solid var(--sable-primary-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-primary-on-container);
     font-size: var(--font-size-small);
@@ -1464,8 +1465,8 @@
   /* `.body` only ever matches a media caption, which stays flat. */
   .message.layout-bubble :global(.formatted-body) {
     background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
     color: var(--sable-surface-on-container);
     max-width: 50rem;
     padding: var(--space-1) var(--space-2);

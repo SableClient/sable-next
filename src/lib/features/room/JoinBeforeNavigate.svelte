@@ -106,7 +106,7 @@
   {:else if preview === null}
     <div role="status"><Spinner /></div>
   {:else}
-    <Avatar src={preview.avatar_url} {initials} size="large" shape="room" />
+    <Avatar src={preview.avatar_url} {initials} size="large" />
     <h1 id="join-title">{title}</h1>
     {#if preview.canonical_alias}
       <p class="join-address">{preview.canonical_alias}</p>

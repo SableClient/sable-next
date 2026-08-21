@@ -5,8 +5,8 @@
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
-  import MediaImage from '#lib/ui/MediaImage.svelte';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
@@ -30,6 +30,7 @@
     unreadSpaceIds?: ReadonlySet<string>;
     homeUnread?: number;
     homeHighlight?: boolean;
+    directRooms?: readonly RoomSummary[];
     directUnread?: number;
     mobile?: boolean;
     onNavigate?: (href: string) => void;
@@ -40,6 +41,7 @@
     unreadSpaceIds = new Set(),
     homeUnread = 0,
     homeHighlight = false,
+    directRooms = [],
     directUnread = 0,
     mobile = false,
     onNavigate,
@@ -85,6 +87,22 @@
       };
     })
   );
+  let directItems = $derived<RailItem[]>(
+    directRooms.map((room) => {
+      const name = spaceName(room.name, room.room_id);
+      const href = resolve('/(app)/direct/[roomId]', { roomId: roomPathParam(room) });
+      const unread = room.highlight || room.unread;
+
+      return {
+        href,
+        activePrefix: href,
+        initial: initial(name),
+        avatar: room.avatar_url,
+        label: name,
+        unreadCount: unread,
+      };
+    })
+  );
 
   const createItem: RailItem = {
     href: resolve('create-room'),
@@ -123,7 +141,7 @@
   <div class="rail">
     <div class="rail-scroll">
       <ul class="rail-stack">
-        {#each [...items, ...spaceItems] as item (item.href)}
+        {#each [...items, ...directItems, ...spaceItems] as item (item.href)}
           {@const active = isActive(item)}
           <li>
             <a
@@ -142,19 +160,12 @@
                   ><item.icon weight={active ? 'fill' : 'regular'} /></span
                 >
               {:else}
-                <span class="space-initial" aria-hidden="true">
-                  {#if item.avatar}
-                    <MediaImage
-                      source={item.avatar}
-                      alt=""
-                      width={56}
-                      height={56}
-                      class="space-image"
-                    />
-                  {:else}
-                    {item.initial}
-                  {/if}
-                </span>
+                <Avatar
+                  class="space-initial"
+                  src={item.avatar}
+                  initials={item.initial}
+                  size="small"
+                />
               {/if}
               {#if item.unreadCount}
                 <span class="unread-count" aria-hidden="true">{item.unreadCount}</span>
@@ -190,7 +201,7 @@
   <div class="rail">
     <div class="rail-scroll">
       <ul class="rail-stack">
-        {#each [...items, ...spaceItems] as item (item.href)}
+        {#each [...items, ...directItems, ...spaceItems] as item (item.href)}
           {@const active = isActive(item)}
           {@const label = $i18n.t(item.label)}
           <li>
@@ -209,19 +220,12 @@
                     ><item.icon weight={active ? 'fill' : 'regular'} /></span
                   >
                 {:else}
-                  <span class="space-initial" aria-hidden="true">
-                    {#if item.avatar}
-                      <MediaImage
-                        source={item.avatar}
-                        alt=""
-                        width={56}
-                        height={56}
-                        class="space-image"
-                      />
-                    {:else}
-                      {item.initial}
-                    {/if}
-                  </span>
+                  <Avatar
+                    class="space-initial"
+                    src={item.avatar}
+                    initials={item.initial}
+                    size="small"
+                  />
                 {/if}
                 {#if item.unreadCount}
                   <span class="unread-count" aria-hidden="true">{item.unreadCount}</span>
@@ -263,7 +267,7 @@
 <style>
   .rail {
     background: var(--sable-bg-container);
-    border-right: 1px solid var(--sable-bg-container-line);
+    border-right: var(--border-width) solid var(--sable-bg-container-line);
     box-sizing: border-box;
     color: var(--sable-bg-on-container);
     display: flex;
@@ -280,7 +284,7 @@
   }
 
   .dynamic-rail-region {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
     margin: 0.25rem auto;
     width: 2rem;
   }
@@ -347,22 +351,9 @@
     display: flex;
   }
 
-  .space-initial {
-    align-items: center;
-    background: var(--sable-surface-var-container);
-    border-radius: var(--radius);
-    display: flex;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: var(--avatar-size-small);
-    justify-content: center;
-    overflow: hidden;
-    width: var(--avatar-size-small);
-  }
-
   .unread-dot {
     background: var(--sable-primary-main);
-    border: 2px solid var(--sable-bg-container);
+    border: calc(var(--border-width) * 2) solid var(--sable-bg-container);
     border-radius: 50%;
     box-sizing: border-box;
     height: 0.625rem;
@@ -375,8 +366,8 @@
   .unread-count {
     align-items: center;
     background: var(--sable-primary-main);
-    border: 2px solid var(--sable-bg-container);
-    border-radius: 0.625rem;
+    border: calc(var(--border-width) * 2) solid var(--sable-bg-container);
+    border-radius: var(--radius-pill);
     box-sizing: border-box;
     color: var(--sable-primary-on-main);
     display: flex;
@@ -391,16 +382,6 @@
     top: -0.125rem;
   }
 
-  :global(.space-image) {
-    height: 100%;
-    width: 100%;
-  }
-
-  :global(.space-image .media-image-content) {
-    object-fit: cover;
-    object-position: center;
-  }
-
   .icon :global(svg) {
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
@@ -408,7 +389,7 @@
 
   .rail-item:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: 2px;
+    outline-offset: var(--focus-ring-offset);
   }
 
   @media (prefers-reduced-motion: no-preference) {

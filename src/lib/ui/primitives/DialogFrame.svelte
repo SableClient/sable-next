@@ -80,6 +80,7 @@
     left: 50%;
     max-width: 68rem;
     overflow: hidden;
+    padding-block: var(--safe-top) var(--safe-bottom);
     top: 50%;
     transform: translate(-50%, -50%);
     width: 100%;
@@ -89,11 +90,11 @@
   :global(.sable-dialog-content-verification),
   :global(.sable-dialog-content-sheet) {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
     box-shadow: var(--shadow-dialog);
-    max-height: calc(100dvh - var(--space-2) * 2);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-2) * 2);
     overflow: auto;
     padding: var(--space-4);
 
@@ -122,8 +123,8 @@
 
   @media (width >= 48rem) {
     :global(.sable-dialog-content-settings) {
-      border: 1px solid var(--sable-surface-container-line);
-      border-radius: var(--radius-card);
+      border: var(--border-width) solid var(--sable-surface-container-line);
+      border-radius: var(--radius);
       height: min(52rem, calc(100dvh - 3rem));
       width: calc(100% - 3rem);
     }

@@ -75,7 +75,7 @@
 <style>
   .autocomplete {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     bottom: calc(100% + 0.5rem);
     box-shadow: var(--shadow-float);
@@ -96,12 +96,12 @@
   }
 
   .heading {
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     text-transform: uppercase;
   }
 
   .hint {
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
   }
 
   .empty {

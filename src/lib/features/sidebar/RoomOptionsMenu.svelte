@@ -316,7 +316,7 @@
 
   :global(.room-options-menu) {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     display: grid;

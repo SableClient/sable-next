@@ -164,7 +164,7 @@
 
   .settings-nav {
     background: var(--sable-surface-container);
-    border-right: 1px solid var(--sable-surface-container-line);
+    border-right: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 13.5rem;
     flex-direction: column;
@@ -195,7 +195,7 @@
 
   a {
     align-items: center;
-    border-left: 0.1875rem solid transparent;
+    border-left: calc(var(--border-width) * 3) solid transparent;
     color: inherit;
     display: flex;
     font-weight: var(--font-weight-medium);
@@ -253,7 +253,7 @@
 
   .section-bar {
     background: var(--sable-surface-container);
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     flex: 0 0 auto;
     gap: var(--space-1);
     justify-content: flex-start;

@@ -549,7 +549,7 @@
   :global(.profile-action) {
     align-items: center;
     background: none;
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-bg-on-container);
     cursor: pointer;
@@ -594,7 +594,7 @@
 
   :global(.profile-menu) {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     display: grid;
@@ -629,7 +629,7 @@
   }
 
   :global(.profile-menu-destructive) {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
     margin-top: 0.25rem;
     min-height: var(--control-height-medium);
   }

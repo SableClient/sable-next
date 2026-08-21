@@ -39,7 +39,7 @@
   .banner {
     align-items: center;
     background: var(--sable-warn-container);
-    border-block-end: 1px solid var(--sable-warn-container-line);
+    border-block-end: var(--border-width) solid var(--sable-warn-container-line);
     color: var(--sable-warn-on-container);
     display: flex;
     gap: var(--space-2);

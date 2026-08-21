@@ -1,6 +1,6 @@
 .sable-button {
   align-items: center;
-  border: 1px solid transparent;
+  border: var(--border-width) solid transparent;
   border-radius: var(--radius);
   box-sizing: border-box;
   cursor: pointer;

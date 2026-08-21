@@ -36,12 +36,7 @@
         {@const busy = answers.isAnswering(invite.room_id)}
         <li class="card">
           <div class="head">
-            <Avatar
-              src={invite.avatar_url}
-              initials={initials(name)}
-              shape={invite.is_direct ? 'person' : 'room'}
-              size="large"
-            />
+            <Avatar src={invite.avatar_url} initials={initials(name)} size="large" />
             <div class="identity">
               <p class="name">
                 <span class="name-text">{name}</span>
@@ -127,8 +122,8 @@
 
   .card {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     display: grid;
     gap: var(--space-3);
     padding: var(--space-3);

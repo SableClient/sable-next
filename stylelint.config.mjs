@@ -22,6 +22,11 @@ export default {
     'declaration-block-no-shorthand-property-overrides': true,
     'no-duplicate-at-import-rules': true,
     'keyframe-block-no-duplicate-selectors': true,
+    'declaration-property-value-disallowed-list': {
+      '/^border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?$/': [
+        '/\\b\\d*\\.?\\d+(?:px|rem|em)\\b/',
+      ],
+    },
 
     'defensive-css/require-prefers-reduced-motion': [true, { severity: 'error' }],
     'order/properties-alphabetical-order': true,

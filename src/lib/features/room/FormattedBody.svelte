@@ -332,7 +332,7 @@
   .formatted-body :global(a[data-matrix-link]),
   .formatted-body :global(a[data-settings-link]) {
     background: var(--sable-sec-container);
-    border: 1px solid var(--sable-sec-container-line);
+    border: var(--border-width) solid var(--sable-sec-container-line);
     border-radius: var(--radius);
     color: var(--sable-sec-on-container);
     display: inline-block;
@@ -353,7 +353,7 @@
   }
 
   .formatted-body :global(blockquote) {
-    border-left: 2px solid var(--sable-primary-main);
+    border-left: calc(var(--border-width) * 2) solid var(--sable-primary-main);
     margin: var(--space-compact) 0;
     padding-left: var(--space-1);
   }
@@ -361,7 +361,7 @@
   /* Inline code had no rule at all, so it read as prose. */
   .formatted-body :global(:not(pre) > code) {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: 0.25rem;
     font-family: var(--font-family-mono);
     font-size: 0.9em;
@@ -370,7 +370,7 @@
 
   .formatted-body :global(.code-block) {
     background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     margin: var(--space-compact) 0;
     overflow: hidden;
@@ -380,7 +380,7 @@
   .formatted-body :global(.code-head) {
     align-items: center;
     background: var(--sable-surface-var-container);
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     gap: var(--space-1);
     min-height: var(--control-height-small);
@@ -467,7 +467,7 @@
 
   .formatted-body :global(th),
   .formatted-body :global(td) {
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     padding: calc(var(--space-compact) / 2) var(--space-tight);
     text-align: left;
   }

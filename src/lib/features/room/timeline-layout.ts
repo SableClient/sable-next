@@ -22,7 +22,7 @@ export const TIMELINE_LAYOUT = {
   captionHeightRem: 1.5,
   replyPreviewRem: 1.875,
   reactionsRem: 1.875,
-  collapsedMessageRem: 3,
+  collapsedMessageRem: 2,
   messageRem: 4.5,
   dateDividerRem: 3.5,
   readMarkerRem: 2,

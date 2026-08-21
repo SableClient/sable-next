@@ -65,7 +65,7 @@
   .staged-item {
     align-items: center;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     display: flex;
     gap: 0.375rem;

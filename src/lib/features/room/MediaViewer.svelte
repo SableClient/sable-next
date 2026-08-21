@@ -327,7 +327,7 @@
   }
 
   .bottom-bar {
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
     justify-content: center;
     padding: 0.5rem max(0.75rem, var(--safe-left)) calc(0.5rem + var(--safe-bottom));
   }

@@ -283,7 +283,6 @@
                     size="small"
                     src={section.pack.avatar_url}
                     initials={packName(section.pack).slice(0, 2)}
-                    shape={origin === 'account' ? 'person' : 'room'}
                   />
                 {:else}
                   <MediaImage
@@ -491,7 +490,7 @@
 
   .board-head {
     align-items: center;
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     gap: var(--space-1);
     padding: var(--space-1);
@@ -532,7 +531,7 @@
   /* Fixed, or a long pack name widens the rail and squeezes the grid. */
   .rail {
     align-items: center;
-    border-right: 1px solid var(--sable-surface-container-line);
+    border-right: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 3.25rem;
     flex-direction: column;
@@ -629,7 +628,7 @@
 
   .free-text {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius);
     color: inherit;
     cursor: pointer;
@@ -680,7 +679,7 @@
 
   .preview {
     align-items: center;
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);

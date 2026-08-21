@@ -173,8 +173,8 @@
     --profile-panel-ground: var(--sable-surface-container);
 
     background: var(--profile-card-ground);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     overflow: hidden;
     position: relative;
   }
@@ -240,7 +240,7 @@
      the owner wrote, not a control. */
   .profile-card-status {
     background: var(--profile-panel-ground);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     -webkit-box-orient: vertical;
     display: -webkit-box;
@@ -314,7 +314,7 @@
      both edges of the panel. */
   .profile-card-panel.framed {
     background: var(--profile-panel-ground);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     overflow: clip;
   }
@@ -390,7 +390,7 @@
   }
 
   .profile-card-footer.divided {
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
   }
 
   @media (prefers-color-scheme: dark) {

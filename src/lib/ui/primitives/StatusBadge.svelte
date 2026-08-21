@@ -22,7 +22,7 @@
 
 <style>
   :global(.status-badge) {
-    border: 1px solid transparent;
+    border: var(--border-width) solid transparent;
     border-radius: var(--radius-pill);
     display: inline-flex;
     font-size: var(--font-size-small);

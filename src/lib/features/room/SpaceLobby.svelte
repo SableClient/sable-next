@@ -198,12 +198,7 @@
 
 <section class="lobby" aria-label={$i18n.t('nav.lobby')}>
   <header class="hero">
-    <Avatar
-      src={space?.avatar_url ?? null}
-      initials={initials(space?.name ?? '')}
-      size="large"
-      shape="room"
-    />
+    <Avatar src={space?.avatar_url ?? null} initials={initials(space?.name ?? '')} size="large" />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if space?.topic}<p class="topic">{space.topic}</p>{/if}
   </header>

@@ -38,8 +38,8 @@
 <style>
   .settings-section {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     overflow: hidden;
   }
 
@@ -90,7 +90,7 @@
   }
 
   .settings-section-content {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
   }
 
   @media (width >= 42rem) {

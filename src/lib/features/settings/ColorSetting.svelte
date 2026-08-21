@@ -164,7 +164,7 @@
   }
 
   :global(.swatch-button) {
-    border: 2px solid var(--sable-focus-ring);
+    border: calc(var(--border-width) * 2) solid var(--sable-focus-ring);
     border-radius: 50%;
     cursor: pointer;
     height: var(--control-height-medium);
@@ -180,7 +180,7 @@
 
   :global(.color-popover) {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     padding: var(--space-3);
@@ -202,9 +202,9 @@
   }
 
   .picker-cursor {
-    border: 2px solid var(--sable-bg-container);
+    border: calc(var(--border-width) * 2) solid var(--sable-bg-container);
     border-radius: 50%;
-    box-shadow: 0 0 0 1px var(--sable-bg-on-container);
+    box-shadow: 0 0 0 var(--border-width) var(--sable-bg-on-container);
     height: 0.75rem;
     position: absolute;
     transform: translate(-50%, -50%);

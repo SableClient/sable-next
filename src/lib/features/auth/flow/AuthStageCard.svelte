@@ -82,7 +82,7 @@
   }
 
   .stage-activation:focus-visible {
-    border-radius: var(--radius-card);
+    border-radius: var(--radius);
     box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
     outline: none;
   }

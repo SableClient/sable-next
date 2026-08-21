@@ -66,7 +66,7 @@
 <style>
   .device-form {
     background: var(--sable-surface-container);
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
     display: grid;
     gap: var(--space-2);
     grid-template-columns: 1fr;

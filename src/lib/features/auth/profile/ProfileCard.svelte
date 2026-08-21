@@ -157,7 +157,7 @@
   }
 
   .more-options {
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
     padding-top: 0.75rem;
   }
 
@@ -188,7 +188,7 @@
   }
 
   .placeholder-list span {
-    border: 1px dashed var(--sable-surface-container-line);
+    border: var(--border-width) dashed var(--sable-surface-container-line);
     border-radius: var(--radius);
     padding: 0.625rem 0.5rem;
     text-align: center;

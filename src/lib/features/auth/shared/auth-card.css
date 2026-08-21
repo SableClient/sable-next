@@ -1,7 +1,7 @@
 .auth-page .auth-card-surface {
   background: var(--sable-surface-container);
-  border: 1px solid var(--sable-surface-container-line);
-  border-radius: var(--radius-card);
+  border: var(--border-width) solid var(--sable-surface-container-line);
+  border-radius: var(--radius);
   display: grid;
   gap: 1rem;
   padding: 1.25rem;

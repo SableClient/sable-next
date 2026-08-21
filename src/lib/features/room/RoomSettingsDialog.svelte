@@ -193,7 +193,6 @@
               src={room?.avatar_url ?? null}
               initials={initials(room?.name ?? '')}
               size="large"
-              shape="room"
             />
             <div class="avatar-actions">
               <span class="field-label">{$i18n.t('room.settingsAvatarLabel')}</span>
@@ -343,7 +342,7 @@
 
   header {
     align-items: center;
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 auto;
     justify-content: space-between;
@@ -374,7 +373,7 @@
 
   footer {
     align-items: center;
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-2);

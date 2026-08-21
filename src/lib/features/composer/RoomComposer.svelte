@@ -570,8 +570,8 @@
   .composer {
     /* The panel behind is surface-container, so the fill has to be the variant. */
     background: var(--sable-surface-var-container);
-    border: 1px solid transparent;
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius);
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
@@ -630,12 +630,20 @@
     flex: 0 0 auto;
     height: var(--target);
     min-height: var(--target);
+    position: relative;
     width: var(--target);
   }
 
   :global(.composer-format[aria-pressed='true']) {
     background: var(--sable-primary-container);
     color: var(--sable-primary-on-container);
+  }
+
+  :global(.composer-format)::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   :global(.composer-format svg) {
@@ -673,6 +681,17 @@
     display: block;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  /* Keep desktop chat compact while preserving 40px pointer hit areas. */
+  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+    .composer {
+      --target: var(--control-height-small);
+    }
+
+    .composer-row {
+      padding: var(--space-compact);
+    }
   }
 
   :global(.send-error) {

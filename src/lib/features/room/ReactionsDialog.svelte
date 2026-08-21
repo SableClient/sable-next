@@ -89,7 +89,7 @@
   :global(.tab) {
     align-items: center;
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     color: inherit;
     cursor: pointer;

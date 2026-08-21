@@ -64,7 +64,6 @@
           src={section.space.avatar_url}
           initials={initials(label(section.space))}
           size="small"
-          shape="room"
         />
         <span class="section-name">{label(section.space)}</span>
         {#if section.suggested}<span class="badge">{$i18n.t('room.lobbySuggested')}</span>{/if}
@@ -101,12 +100,7 @@
           {@const joined = joinedIds.has(child.room_id)}
           {@const action = lobbyAction(child.join_rule, invitedIds.has(child.room_id))}
           <li class="room">
-            <Avatar
-              src={child.avatar_url}
-              initials={initials(label(child))}
-              size="small"
-              shape="room"
-            />
+            <Avatar src={child.avatar_url} initials={initials(label(child))} size="small" />
             <div class="room-text">
               <span class="room-name">
                 {label(child)}
@@ -251,8 +245,8 @@
 
   .category {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     overflow: hidden;
   }
 
@@ -272,7 +266,7 @@
   }
 
   .room + .room {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
   }
 
   .room:hover {

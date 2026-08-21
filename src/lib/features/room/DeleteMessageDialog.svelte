@@ -67,8 +67,8 @@
 
   .preview {
     background: var(--sable-surface-var-container);
-    border: 1px solid var(--sable-surface-var-container-line);
-    border-inline-start: 3px solid var(--sable-crit-main);
+    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    border-inline-start: calc(var(--border-width) * 3) solid var(--sable-crit-main);
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);

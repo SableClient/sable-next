@@ -151,7 +151,7 @@
   button {
     align-items: center;
     background: transparent;
-    border: 1px solid transparent;
+    border: var(--border-width) solid transparent;
     border-radius: var(--radius-pill);
     color: var(--sable-sec-main);
     cursor: pointer;
@@ -244,8 +244,8 @@
   }
 
   :global(.read-receipts-popover) {
-    border: 1px solid var(--sable-surface-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     display: flex;
     max-height: min(28rem, calc(100dvh - 2rem));

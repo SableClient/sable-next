@@ -97,7 +97,7 @@
   :global(.sable-tooltip) {
     animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     box-sizing: border-box;

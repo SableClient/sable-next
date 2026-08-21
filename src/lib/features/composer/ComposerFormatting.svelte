@@ -48,7 +48,7 @@
 
 <style>
   .formatting {
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     gap: 0.125rem;
     padding: 0.375rem 0.5rem;

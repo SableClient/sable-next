@@ -21,7 +21,7 @@
 
 <style>
   :global(.sable-alert) {
-    border: 1px solid;
+    border: var(--border-width) solid;
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-compact);

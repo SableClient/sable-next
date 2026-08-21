@@ -768,8 +768,10 @@
           {@const item = visibleItems[virtualItem.index]}
           {#if item}
             {@const run = folded.runs.get(item.id)}
+            {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
+            {@const groupStart = virtualItem.index > 0 && !collapsed}
             <div
-              class="item"
+              class={['item', { collapsed, 'group-start': groupStart }]}
               data-event-id={item.event_id ?? undefined}
               data-item-id={item.id}
               data-index={virtualItem.index}
@@ -781,7 +783,7 @@
               {:else}
                 <TimelineItem
                   {item}
-                  collapsed={isCollapsed(visibleItems, virtualItem.index)}
+                  {collapsed}
                   unreadCount={item.content.kind === 'read_marker'
                     ? unreadCountAfter(visibleItems, virtualItem.index)
                     : 0}
@@ -835,6 +837,7 @@
   }
 
   .timeline-content {
+    --timeline-group-gap: var(--space-1);
     --timeline-row-gap: var(--space-relaxed-tight);
     --timeline-row-padding: var(--space-compact);
 
@@ -847,12 +850,19 @@
 
   .timeline-content.spacing-compact {
     --timeline-row-gap: var(--space-compact);
-    --timeline-row-padding: 0.125rem;
   }
 
   .timeline-content.spacing-roomy {
     --timeline-row-gap: var(--space-2);
-    --timeline-row-padding: var(--space-1);
+  }
+
+  /* Chat can be denser on desktop without reducing mobile reading size. */
+  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+    .timeline-content {
+      --line-height-body: 1.47;
+
+      font-size: 0.9375rem;
+    }
   }
 
   .timeline-viewport {
@@ -871,7 +881,7 @@
 
   .timeline-debug {
     background: color-mix(in srgb, var(--sable-bg-container) 92%, transparent);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     display: grid;
     font-family: var(--font-family-mono);
@@ -949,6 +959,14 @@
     width: 100%;
   }
 
+  .item.collapsed {
+    padding-top: 0;
+  }
+
+  .item.group-start {
+    padding-top: calc(var(--timeline-row-padding) + var(--timeline-group-gap));
+  }
+
   .unread-pinned {
     align-items: center;
     display: flex;
@@ -963,14 +981,14 @@
   }
 
   .unread-pinned::before {
-    border-top: 2px solid var(--sable-primary-main-line);
+    border-top: calc(var(--border-width) * 2) solid var(--sable-primary-main-line);
     content: '';
     flex: 1;
   }
 
   .unread-pinned span {
     background: var(--sable-primary-container);
-    border: 1px solid var(--sable-primary-container-line);
+    border: var(--border-width) solid var(--sable-primary-container-line);
     border-radius: var(--radius-pill);
     color: var(--sable-primary-on-container);
     font-size: var(--font-size-small);

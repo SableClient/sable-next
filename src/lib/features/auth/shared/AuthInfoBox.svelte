@@ -19,7 +19,7 @@
   .auth-info-box {
     align-items: center;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-sizing: border-box;
     color: var(--sable-bg-on-container);

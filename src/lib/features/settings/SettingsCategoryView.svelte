@@ -202,8 +202,8 @@
 
   .settings-card {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     overflow: hidden;
   }
 
@@ -227,7 +227,7 @@
   }
 
   .setting-row + .setting-row {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
   }
 
   .row-icon {

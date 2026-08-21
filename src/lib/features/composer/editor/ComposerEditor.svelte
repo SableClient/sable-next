@@ -65,7 +65,7 @@
   }
 
   .editor :global(blockquote) {
-    border-inline-start: 3px solid var(--sable-primary-main);
+    border-inline-start: calc(var(--border-width) * 3) solid var(--sable-primary-main);
     margin: 0;
     padding-inline-start: var(--space-2);
   }
@@ -104,6 +104,17 @@
     top: 0.5rem;
   }
 
+  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+    .editor {
+      min-height: var(--control-height-small);
+      padding-block: 0.375rem;
+    }
+
+    .editor.empty::before {
+      top: 0.375rem;
+    }
+  }
+
   .editor :global(.composer-mention) {
     background: var(--sable-primary-container);
     border-radius: var(--radius-pill);
@@ -112,7 +123,7 @@
   }
 
   .editor :global(.composer-mention.selected) {
-    box-shadow: 0 0 0 2px var(--sable-focus-ring);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
   }
 
   .editor :global(.composer-emoticon img) {

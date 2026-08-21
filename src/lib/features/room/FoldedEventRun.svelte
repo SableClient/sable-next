@@ -55,7 +55,7 @@
   }
 
   .state-rail {
-    border-top: 1px dashed var(--sable-surface-var-container-line);
+    border-top: var(--border-width) dashed var(--sable-surface-var-container-line);
     flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
     margin-inline-start: 0.75rem;
   }

@@ -34,7 +34,7 @@
 <style>
   .context {
     align-items: center;
-    border-bottom: 1px solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);

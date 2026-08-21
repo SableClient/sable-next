@@ -264,8 +264,7 @@ html {
 
 :root {
   /* Sable Next */
-  --radius: 0.625rem;
-  --radius-card: calc(var(--radius) * 1.5);
+  --radius: 0.5rem;
   --radius-pill: 999px;
   --space-1: 0.5rem;
   --space-2: 0.75rem;
@@ -287,8 +286,9 @@ html {
   --avatar-size-small: 2.5rem;
   --avatar-size-medium: 3rem;
   --avatar-size-large: 4.5rem;
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
+  --border-width: 1px;
+  --focus-ring-width: calc(var(--border-width) * 2);
+  --focus-ring-offset: calc(var(--border-width) * 2);
   --motion-fast: 100ms;
   --motion-normal: 150ms;
   --motion-slow: 200ms;
@@ -304,7 +304,7 @@ html {
   --layer-popover: 300;
   --layer-menu: 400;
   --layer-tooltip: 500;
-  --page-gutter: var(--space-3);
+  --page-gutter: var(--space-2);
   --navigation-rail-width: 4.125rem;
   --timeline-row-gap: var(--space-relaxed-tight);
   --timeline-row-padding: var(--space-compact);
@@ -377,7 +377,7 @@ body {
 *::-webkit-scrollbar-thumb {
   background: transparent;
   background-clip: padding-box;
-  border: 2px solid transparent;
+  border: calc(var(--border-width) * 2) solid transparent;
   border-radius: var(--radius-pill);
 }
 
@@ -498,7 +498,7 @@ a:not([class]):hover {
 
 @media (width >= 42rem) {
   :root {
-    --page-gutter: 2rem;
+    --page-gutter: var(--space-3);
   }
 }
 

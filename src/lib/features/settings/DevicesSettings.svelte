@@ -389,7 +389,7 @@
 
   .status-item {
     align-items: center;
-    border-bottom: 1px solid var(--sable-bg-container-line);
+    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
     display: flex;
     gap: var(--space-2);
     min-width: 0;
@@ -443,7 +443,7 @@
 
   .setting-row {
     align-items: stretch;
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
@@ -472,7 +472,7 @@
   }
 
   .device + .device {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
   }
 
   .device-summary {
@@ -556,7 +556,7 @@
 
   :global(.recovery-key) code {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-warn-container-line);
+    border: var(--border-width) solid var(--sable-warn-container-line);
     border-radius: var(--radius);
     display: block;
     overflow-wrap: anywhere;

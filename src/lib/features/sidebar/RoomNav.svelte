@@ -472,7 +472,7 @@
 <style>
   .room-nav {
     background: var(--sable-bg-container);
-    border-right: 1px solid var(--sable-surface-container-line);
+    border-right: var(--border-width) solid var(--sable-surface-container-line);
     box-sizing: border-box;
     color: var(--sable-bg-on-container);
     display: flex;

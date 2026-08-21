@@ -52,6 +52,28 @@ function media(
   };
 }
 
+function message(id: string, sender: string, timestamp: number): TimelineItemView {
+  return {
+    id,
+    event_id: `$${id}`,
+    transaction_id: null,
+    send_state: null,
+    sender,
+    sender_name: sender,
+    sender_avatar: null,
+    timestamp,
+    content: { kind: 'message', body: 'Hello', html: '<p>Hello</p>', emote: false, edited: false },
+    in_reply_to: null,
+    thread_root: null,
+    thread_summary: null,
+    reactions: [],
+    is_own: false,
+    read_by: [],
+    per_message_profile: null,
+    mention: 'none',
+  };
+}
+
 test('uses intrinsic video geometry when available', () => {
   const item = media('video', 1920, 1080);
   const rem = 16;
@@ -79,6 +101,15 @@ test('uses an explicit fallback for videos without dimensions', () => {
 
 test('a message with no code block costs nothing extra', () => {
   expect(codeBlockHeight('<p>plain</p>', 16)).toBe(0);
+});
+
+test('estimates a collapsed modern message with its retained trailing spacing', () => {
+  const rem = 16;
+  const items = [message('one', '@alice:example.org', 0), message('two', '@alice:example.org', 1)];
+
+  expect(estimateTimelineItemSize(items, 1, 800, rem)).toBe(
+    TIMELINE_LAYOUT.collapsedMessageRem * rem
+  );
 });
 
 test('a code block is measured by its lines and capped at the collapse limit', () => {

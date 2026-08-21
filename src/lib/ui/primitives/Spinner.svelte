@@ -10,7 +10,7 @@
 
 <style>
   .spinner {
-    border: 2px solid var(--sable-bg-container-line);
+    border: calc(var(--border-width) * 2) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     border-right-color: var(--sable-primary-main);
     display: inline-block;

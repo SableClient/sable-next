@@ -10,7 +10,6 @@
     initials?: string;
     color?: string;
     size?: 'small' | 'medium' | 'large';
-    shape?: 'person' | 'room';
     class?: ClassValue;
     ariaLabel?: string;
     meta?: Snippet;
@@ -24,7 +23,6 @@
     initials = displayName.slice(0, 1),
     color,
     size = 'small',
-    shape = 'person',
     class: className = '',
     ariaLabel,
     meta,
@@ -40,14 +38,14 @@
     aria-label={ariaLabel}
     {onclick}
   >
-    <Avatar src={avatarUrl} {initials} {color} {size} {shape} />
+    <Avatar src={avatarUrl} {initials} {color} {size} />
     <span class="identity-row-name name">{displayName}</span>
     {#if meta}<span class="identity-row-meta">{@render meta()}</span>{/if}
     {@render children?.()}
   </button>
 {:else}
   <div class={['identity-row', className]}>
-    <Avatar src={avatarUrl} {initials} {color} {size} {shape} />
+    <Avatar src={avatarUrl} {initials} {color} {size} />
     <span class="identity-row-name name">{displayName}</span>
     {#if meta}<span class="identity-row-meta">{@render meta()}</span>{/if}
     {@render children?.()}

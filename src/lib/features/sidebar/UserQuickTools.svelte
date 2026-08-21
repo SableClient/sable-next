@@ -180,8 +180,8 @@
   .desktop-tools {
     align-items: center;
     background: var(--sable-surface-container);
-    border-right: 1px solid var(--sable-surface-container-line);
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-right: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
     box-sizing: border-box;
     display: flex;
     flex: 0 0 4.625rem;
@@ -198,7 +198,7 @@
   .compact-tools {
     align-items: center;
     background: var(--sable-bg-container);
-    border-right: 1px solid var(--sable-bg-container-line);
+    border-right: var(--border-width) solid var(--sable-bg-container-line);
     box-sizing: border-box;
     display: flex;
     flex: 0 0 var(--navigation-rail-width);
@@ -212,7 +212,7 @@
     align-items: center;
     background: var(--sable-surface-container);
     border-radius: var(--radius) var(--radius) 0 0;
-    border-top: 1px solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--sable-surface-container-line);
     box-sizing: border-box;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

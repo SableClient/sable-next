@@ -30,13 +30,7 @@
   >
     <BackIcon />
   </IconButton>
-  <Avatar
-    class="room-avatar"
-    src={roomAvatar}
-    initials={initials(roomName)}
-    size="small"
-    shape="room"
-  />
+  <Avatar class="room-avatar" src={roomAvatar} initials={initials(roomName)} size="small" />
   <h1>{roomName}</h1>
   <!-- Narrow viewports hide the label, leaving the icon as the only content. -->
   <Button
@@ -64,7 +58,7 @@
   .room-header {
     align-items: center;
     background: var(--sable-bg-container);
-    border-bottom: 1px solid var(--sable-surface-var-container);
+    border-bottom: var(--border-width) solid var(--sable-surface-var-container);
     display: flex;
     flex: 0 0 auto;
     gap: 0.625rem;

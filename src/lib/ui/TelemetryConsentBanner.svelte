@@ -51,8 +51,8 @@
   .consent {
     align-items: center;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     bottom: var(--space-3);
     box-shadow: var(--shadow-dialog);
     display: flex;

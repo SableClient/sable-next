@@ -181,7 +181,7 @@
 
   .combobox-menu {
     background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     overflow: hidden;
     width: var(--bits-combobox-anchor-width);

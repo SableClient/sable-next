@@ -171,8 +171,8 @@
   .app-status-card {
     align-items: center;
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
     display: flex;

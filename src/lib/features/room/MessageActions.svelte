@@ -133,7 +133,7 @@
   .message-actions {
     align-items: center;
     background: var(--sable-surface-container);
-    border: 1px solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     inset-inline-end: var(--space-2);
     bottom: calc(100% - var(--space-1));

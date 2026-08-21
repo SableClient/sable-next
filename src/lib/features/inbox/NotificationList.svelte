@@ -100,11 +100,7 @@
         <li>
           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomHref resolves the route itself -->
           <a class="row" href={roomHref(room)}>
-            <Avatar
-              src={room.avatar_url}
-              initials={initials(name)}
-              shape={room.is_direct ? 'person' : 'room'}
-            />
+            <Avatar src={room.avatar_url} initials={initials(name)} />
             <span class="body">
               <span class="head">
                 <span class="name">{name}</span>
@@ -193,8 +189,8 @@
 
   .feed {
     background: var(--sable-bg-container);
-    border: 1px solid var(--sable-bg-container-line);
-    border-radius: var(--radius-card);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
     list-style: none;
     margin: 0;
     overflow: hidden;
@@ -209,7 +205,7 @@
   }
 
   li + li {
-    border-top: 1px solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--sable-bg-container-line);
   }
 
   li:hover {
