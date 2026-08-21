@@ -798,17 +798,6 @@
     padding-top: 0;
   }
 
-  /* Identity has to persist when the header is gone. */
-  .message.persona.collapsed::before {
-    background: color-mix(in oklab, var(--pmp-ink) 55%, var(--sable-bg-container-line));
-    border-radius: var(--radius-pill);
-    content: '';
-    inset-block: 2px;
-    inset-inline-start: calc(var(--avatar-size-small) / 2 - 1px);
-    position: absolute;
-    width: 2px;
-  }
-
   .message.pending {
     opacity: 0.65;
   }
