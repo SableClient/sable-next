@@ -54,7 +54,14 @@ function item(content: TimelineItemView['content'], id: string = content.kind): 
   return { id, content } as TimelineItemView;
 }
 
-const message = item({ kind: 'message', body: 'hi', html: 'hi', emote: false, edited: false });
+const message = item({
+  kind: 'message',
+  body: 'hi',
+  html: 'hi',
+  emote: false,
+  notice: false,
+  edited: false,
+});
 const divider = item({ kind: 'date_divider', timestamp: 0 });
 const joined = item({ kind: 'membership', user_id: '@a:b', change: 'joined', display_name: null });
 const renamed = item({
@@ -118,8 +125,14 @@ test('gates raw state events behind both developer switches', () => {
 });
 
 test("keeps a persona message out of the account's collapsed run", () => {
-  const account = item({ kind: 'message', body: 'a', html: 'a', emote: false, edited: false }, 'a');
-  const persona = item({ kind: 'message', body: 'b', html: 'b', emote: false, edited: false }, 'b');
+  const account = item(
+    { kind: 'message', body: 'a', html: 'a', emote: false, notice: false, edited: false },
+    'a'
+  );
+  const persona = item(
+    { kind: 'message', body: 'b', html: 'b', emote: false, notice: false, edited: false },
+    'b'
+  );
   const items = [
     { ...account, sender: '@a:b', timestamp: 0 },
     { ...persona, sender: '@a:b', timestamp: 1000, per_message_profile: { id: 'kris' } },

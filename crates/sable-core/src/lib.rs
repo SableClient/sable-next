@@ -3,6 +3,7 @@
 pub mod image_packs;
 pub mod matrix_html;
 pub mod notifications;
+pub mod polls;
 pub mod protocol;
 mod registration;
 pub mod session;
@@ -795,8 +796,6 @@ impl Core {
         }
     }
 
-    /// Dispatches one protocol command to the Matrix client.
-    ///
     /// # Errors
     ///
     /// Returns a protocol error when the command is invalid, the user is not
@@ -924,8 +923,6 @@ impl Core {
             .and_then(matrix_sdk_ui::timeline::EventTimelineItem::local_echo_send_handle)
             .ok_or(CommandErr::UnknownLocalEcho)
     }
-
-    // session
 
     async fn login(
         self: &Arc<Self>,
@@ -1487,8 +1484,8 @@ impl Core {
         Ok(CommandOk::Logout)
     }
 
-    /// Removes a stored background account. The active session must be signed
-    /// out through `logout` so its sync service is stopped cleanly.
+    /// The active session must be signed out through `logout` so its sync
+    /// service is stopped cleanly.
     async fn remove_inactive_account(&self, account_id: String) -> Result<CommandOk, CommandErr> {
         if self
             .active_session_info()
@@ -2178,8 +2175,6 @@ impl Core {
         }));
         true
     }
-
-    // subscriptions
 
     async fn subscribe_room_list(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
         let sync_service = {

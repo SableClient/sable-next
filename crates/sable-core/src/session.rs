@@ -279,8 +279,6 @@ fn origin_url(redirect_uri: &Url) -> Url {
         .unwrap_or_else(|_| redirect_uri.clone())
 }
 
-/// Starts the sync service for an authenticated client.
-///
 /// # Errors
 ///
 /// Returns the sync-service error if its initial state cannot be built.
@@ -306,8 +304,6 @@ pub const fn oauth_session(client_id: String, user: UserSession) -> OAuthSession
     }
 }
 
-/// Discovers a homeserver and creates a client for it.
-///
 /// # Errors
 ///
 /// Returns the Matrix SDK build error if discovery cannot construct a client.

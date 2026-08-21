@@ -36,7 +36,7 @@ function item(emote: boolean): TimelineItemView {
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: 'waves', html: 'waves', emote, edited: false },
+    content: { kind: 'message', body: 'waves', html: 'waves', emote, notice: false, edited: false },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,

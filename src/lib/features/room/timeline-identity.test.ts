@@ -14,7 +14,7 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind: 'message', body: id, html: id, emote: false, edited: false },
+    content: { kind: 'message', body: id, html: id, emote: false, notice: false, edited: false },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,

@@ -5,8 +5,9 @@ use matrix_sdk::{
     ruma::{
         event_id,
         events::{
-            key::verification::done::KeyVerificationDoneEventContent, relation::Reference,
-            room::message::RoomMessageEventContent,
+            key::verification::done::KeyVerificationDoneEventContent,
+            relation::Reference,
+            room::message::{LocationMessageEventContent, MessageType, RoomMessageEventContent},
         },
         room_id,
     },
@@ -625,4 +626,413 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     assert_eq!(item.num_unread_messages(), 2);
     assert_eq!(summary.unread, 0);
     assert_eq!(summary.highlight, 0);
+}
+
+async fn timeline_views(
+    client: &matrix_sdk::Client,
+    room: &matrix_sdk::Room,
+    hidden_events: bool,
+) -> Option<Vec<crate::protocol::TimelineItemView>> {
+    let timeline = build_room_timeline(room, None, hidden_events).await.ok()?;
+
+    Some(
+        timeline
+            .items()
+            .await
+            .iter()
+            .map(|item| super::view::timeline_item(item, client.user_id()))
+            .collect(),
+    )
+}
+
+fn only_poll(views: &[crate::protocol::TimelineItemView]) -> Option<crate::protocol::PollView> {
+    views.iter().find_map(|view| match &view.content {
+        crate::protocol::TimelineItemContentView::Poll { poll } => Some(poll.clone()),
+        _ => None,
+    })
+}
+
+/// The factory's poll is undisclosed, which is ruma's default for an absent
+/// `kind`, so a disclosed poll has to be built here.
+fn poll_content(
+    question: &str,
+    answers: &[&str],
+    undisclosed: bool,
+) -> Option<matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent> {
+    let answers: Vec<String> = answers.iter().map(|text| (*text).to_owned()).collect();
+    let mut content = crate::polls::start(question, &answers, undisclosed, 1)?;
+    content.text = None;
+    Some(content.into())
+}
+
+#[tokio::test]
+async fn a_poll_carries_its_tally_and_the_answer_this_account_picked() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!poll:example.org");
+    let own = client.user_id().expect("a logged-in client").to_owned();
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let start = event_id!("$poll");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(
+                    factory
+                        .event(
+                            poll_content("lunch?", &["ramen", "curry"], false)
+                                .expect("a question and two answers are a valid poll"),
+                        )
+                        .event_id(start),
+                )
+                .add_timeline_event(
+                    factory
+                        .poll_response(vec!["1"], start)
+                        .sender(&own)
+                        .event_id(event_id!("$mine")),
+                )
+                .add_timeline_event(
+                    factory
+                        .poll_response(vec!["0"], start)
+                        .event_id(event_id!("$theirs")),
+                ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let poll = only_poll(&views).expect("a poll on the timeline");
+
+    assert_eq!(poll.question, "lunch?");
+    assert_eq!(poll.max_selections, 1);
+    assert!(!poll.undisclosed);
+    assert_eq!(poll.ended_at, None);
+    let answers: Vec<_> = poll
+        .answers
+        .iter()
+        .map(|answer| (answer.text.as_str(), answer.votes, answer.selected))
+        .collect();
+    assert_eq!(
+        answers,
+        [("ramen", Some(1), false), ("curry", Some(1), true)]
+    );
+}
+
+#[tokio::test]
+async fn an_undisclosed_poll_withholds_its_tally_until_it_closes() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!undisclosed:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let start = event_id!("$poll");
+
+    let content = poll_content("lunch?", &["ramen"], true)
+        .expect("a question and one answer are a valid poll");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.event(content).event_id(start))
+                .add_timeline_event(
+                    factory
+                        .poll_response(vec!["0"], start)
+                        .event_id(event_id!("$vote")),
+                ),
+        )
+        .await;
+
+    let open_views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let open = only_poll(&open_views).expect("a poll on the timeline");
+
+    assert!(open.undisclosed);
+    assert_eq!(open.answers.first().map(|answer| answer.votes), Some(None));
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .poll_end("closed", start)
+                    .event_id(event_id!("$end")),
+            ),
+        )
+        .await;
+
+    let closed_views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let closed = only_poll(&closed_views).expect("a poll on the timeline");
+
+    assert!(closed.ended_at.is_some());
+    assert_eq!(
+        closed.answers.first().map(|answer| answer.votes),
+        Some(Some(1))
+    );
+}
+
+fn contents(
+    views: &[crate::protocol::TimelineItemView],
+) -> Vec<crate::protocol::TimelineItemContentView> {
+    views.iter().map(|view| view.content.clone()).collect()
+}
+
+#[tokio::test]
+async fn a_location_reaches_the_view_with_its_coordinates_parsed() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!location:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .event(RoomMessageEventContent::new(MessageType::Location(
+                        LocationMessageEventContent::new(
+                            "Big Ben".to_owned(),
+                            "geo:51.5007,-0.1246;u=35".to_owned(),
+                        ),
+                    )))
+                    .event_id(event_id!("$where")),
+            ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let location = contents(&views)
+        .into_iter()
+        .find_map(|content| match content {
+            crate::protocol::TimelineItemContentView::Location {
+                body,
+                geo_uri,
+                latitude,
+                longitude,
+            } => Some((body, geo_uri, latitude, longitude)),
+            _ => None,
+        })
+        .expect("a location on the timeline");
+
+    assert_eq!(location.0, "Big Ben");
+    assert_eq!(location.1, "geo:51.5007,-0.1246;u=35");
+    assert_eq!(location.2, Some(51.5007));
+    assert_eq!(location.3, Some(-0.1246));
+}
+
+#[tokio::test]
+async fn a_notice_is_marked_as_one_rather_than_read_as_speech() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!notice:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.notice("build failed").event_id(event_id!("$bot")))
+                .add_timeline_event(factory.text_msg("hello").event_id(event_id!("$human"))),
+        )
+        .await;
+
+    let flags: Vec<_> = contents(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    )
+    .into_iter()
+    .filter_map(|content| match content {
+        crate::protocol::TimelineItemContentView::Message { body, notice, .. } => {
+            Some((body, notice))
+        }
+        _ => None,
+    })
+    .collect();
+
+    assert_eq!(
+        flags,
+        [
+            ("build failed".to_owned(), true),
+            ("hello".to_owned(), false)
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_gallery_reaches_the_view_as_one_item_per_attachment() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!gallery:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .gallery(
+                        "holiday".to_owned(),
+                        "beach.jpg".to_owned(),
+                        matrix_sdk::ruma::owned_mxc_uri!("mxc://example.org/beach"),
+                    )
+                    .event_id(event_id!("$gallery")),
+            ),
+        )
+        .await;
+
+    let gallery = contents(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    )
+    .into_iter()
+    .find_map(|content| match content {
+        crate::protocol::TimelineItemContentView::Gallery { body, items } => Some((body, items)),
+        _ => None,
+    })
+    .expect("a gallery on the timeline");
+
+    assert_eq!(gallery.0, "holiday");
+    assert!(matches!(
+        gallery.1.as_slice(),
+        [crate::protocol::GalleryItemView::Image { body, .. }] if body == "beach.jpg"
+    ));
+}
+
+fn state_changes(
+    views: &[crate::protocol::TimelineItemView],
+) -> Vec<Option<crate::protocol::StateChangeView>> {
+    views
+        .iter()
+        .filter_map(|view| match &view.content {
+            crate::protocol::TimelineItemContentView::StateEvent { change, .. } => {
+                Some(change.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_renamed_room_carries_both_names_and_a_new_topic_carries_its_text() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!named:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.room_name("second").event_id(event_id!("$name")))
+                .add_timeline_event(
+                    factory
+                        .room_topic("what we do")
+                        .event_id(event_id!("$topic")),
+                ),
+        )
+        .await;
+
+    let changes = state_changes(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    );
+
+    assert!(matches!(
+        changes.as_slice(),
+        [
+            Some(crate::protocol::StateChangeView::RoomName { name, previous: None }),
+            Some(crate::protocol::StateChangeView::RoomTopic { topic }),
+        ] if name.as_deref() == Some("second") && topic.as_deref() == Some("what we do")
+    ));
+}
+
+#[tokio::test]
+async fn a_pin_change_reports_what_was_added_and_dropped() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!pinned:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .room_pinned_events(vec![
+                        event_id!("$kept").to_owned(),
+                        event_id!("$new").to_owned(),
+                    ])
+                    .event_id(event_id!("$pin")),
+            ),
+        )
+        .await;
+
+    let changes = state_changes(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    );
+
+    assert!(matches!(
+        changes.as_slice(),
+        [Some(crate::protocol::StateChangeView::PinnedEvents { added, removed, total })]
+            if added.len() == 2 && removed.is_empty() && *total == 2
+    ));
+}
+
+#[tokio::test]
+async fn joining_a_call_is_worded_as_a_join() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!call:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .call_membership_state(ALICE.to_owned(), "DEVICE".to_owned())
+                    .event_id(event_id!("$joined")),
+            ),
+        )
+        .await;
+
+    let changes = state_changes(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    );
+
+    assert!(matches!(
+        changes.as_slice(),
+        [Some(crate::protocol::StateChangeView::CallMembership {
+            joined: true
+        })]
+    ));
 }

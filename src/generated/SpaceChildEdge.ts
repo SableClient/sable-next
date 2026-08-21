@@ -4,11 +4,7 @@ export type SpaceChildEdge = { room_id: string,
 /**
  * `m.space.child.content.order`, unordered children sort last.
  */
-order: string | null, 
-/**
- * Used to consistently order sibling child edges with equal `order` values.
- */
-origin_server_ts: number, 
+order: string | null, origin_server_ts: number, 
 /**
  * The parent marked this child as worth surfacing first.
  */

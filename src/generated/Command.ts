@@ -22,7 +22,19 @@ in_reply_to: string | null, } | { "type": "send_sticker", room_id: string,
 /**
  * `mxc://` only; the core rejects anything else.
  */
-url: string, body: string, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "mark_read", room_id: string, event_id: string, } | { "type": "retry_send", room_id: string, transaction_id: string, } | { "type": "cancel_send", room_id: string, transaction_id: string, } | { "type": "create_room", name: string | null, topic: string | null, is_space: boolean, 
+url: string, body: string, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
+/**
+ * Withholds the tally until the poll closes.
+ */
+undisclosed: boolean, max_selections: number, } | { "type": "vote_poll", room_id: string, 
+/**
+ * The poll's start event.
+ */
+event_id: string, 
+/**
+ * Answer ids, not their text.
+ */
+answers: Array<string>, } | { "type": "end_poll", room_id: string, event_id: string, } | { "type": "mark_read", room_id: string, event_id: string, } | { "type": "retry_send", room_id: string, transaction_id: string, } | { "type": "cancel_send", room_id: string, transaction_id: string, } | { "type": "create_room", name: string | null, topic: string | null, is_space: boolean, 
 /**
  * Published in the directory, joinable by link.
  */

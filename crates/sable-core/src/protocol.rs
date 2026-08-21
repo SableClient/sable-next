@@ -160,6 +160,34 @@ pub enum Command {
         event_id: OwnedEventId,
         key: String,
     },
+    /// MSC3381.
+    CreatePoll {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        question: String,
+        answers: Vec<String>,
+        /// Withholds the tally until the poll closes.
+        undisclosed: bool,
+        #[ts(type = "number")]
+        max_selections: u32,
+    },
+    /// Replaces any earlier vote by this account. An empty selection abstains.
+    VotePoll {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        /// The poll's start event.
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+        /// Answer ids, not their text.
+        answers: Vec<String>,
+    },
+    /// Irreversible.
+    EndPoll {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+    },
     MarkRead {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -218,7 +246,8 @@ pub enum Command {
         room_id: OwnedRoomId,
     },
 
-    // membership. Accepting an invite is `JoinRoom`, declining it `LeaveRoom`.
+    /// Accepting an invite is `JoinRoom`, declining it `LeaveRoom`.
+    ///
     /// Describes a room this account has not joined, so a link to one can be
     /// shown before committing to the join.
     RoomPreview {
@@ -555,6 +584,9 @@ pub enum CommandOk {
     FetchEventDetails,
     Redact,
     React,
+    CreatePoll,
+    VotePoll,
+    EndPoll,
     MarkRead,
     RetrySend,
     /// False when there was no such echo left to discard.
@@ -671,6 +703,8 @@ pub enum CommandErr {
     },
     UnknownVerification,
     InvalidMedia,
+    /// A poll needs a question and between 1 and 20 answers.
+    InvalidPoll,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
@@ -832,7 +866,7 @@ pub enum VectorDiff<T> {
 #[ts(export)]
 pub struct SubscriptionId(pub u32);
 
-// View types. Hand-narrowed, keeping the UI off the SDK's shapes.
+// Hand-narrowed, keeping the UI off the SDK's shapes.
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
@@ -1041,7 +1075,6 @@ pub struct SpaceChildEdge {
     pub room_id: OwnedRoomId,
     /// `m.space.child.content.order`, unordered children sort last.
     pub order: Option<String>,
-    /// Used to consistently order sibling child edges with equal `order` values.
     #[ts(type = "number")]
     pub origin_server_ts: u64,
     /// The parent marked this child as worth surfacing first.
@@ -1084,8 +1117,7 @@ pub struct TimelineItemView {
     pub mention: MentionView,
 }
 
-/// Whether this event mentions us, and how loudly. `Loud` covers `@room` and
-/// anything the push rules chose to highlight.
+/// `Loud` covers `@room` and anything the push rules chose to highlight.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
@@ -1197,6 +1229,7 @@ pub enum TimelineItemContentView {
         html: String,
         /// `m.emote`, which reads as an action by the sender rather than speech.
         emote: bool,
+        notice: bool,
         edited: bool,
     },
     Image {
@@ -1236,6 +1269,25 @@ pub enum TimelineItemContentView {
         #[ts(type = "number | null")]
         height: Option<u64>,
     },
+    /// The coordinates are absent for a `geo:` URI we cannot read; `geo_uri` is
+    /// passed through as sent either way.
+    Location {
+        body: String,
+        geo_uri: String,
+        #[ts(type = "number | null")]
+        latitude: Option<f64>,
+        #[ts(type = "number | null")]
+        longitude: Option<f64>,
+    },
+    /// MSC4274.
+    Gallery {
+        body: String,
+        items: Vec<GalleryItemView>,
+    },
+    /// MSC3381, with the responses and the end event already folded in.
+    Poll {
+        poll: PollView,
+    },
     Redacted,
     UnableToDecrypt {
         reason: String,
@@ -1266,6 +1318,8 @@ pub enum TimelineItemContentView {
         /// JSON is no longer around.
         #[ts(type = "unknown")]
         content: Option<serde_json::Value>,
+        /// `None` leaves the UI with only `event_type` to show.
+        change: Option<StateChangeView>,
     },
     /// A message-like event the SDK has no item for. Only ever reaches the UI
     /// when the timeline was built with hidden events on; the default filter
@@ -1288,6 +1342,94 @@ pub enum TimelineItemContentView {
     Unsupported {
         description: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StateChangeView {
+    RoomName {
+        name: Option<String>,
+        previous: Option<String>,
+    },
+    RoomTopic {
+        topic: Option<String>,
+    },
+    RoomAvatar {
+        removed: bool,
+    },
+    PinnedEvents {
+        #[ts(type = "string[]")]
+        added: Vec<OwnedEventId>,
+        #[ts(type = "string[]")]
+        removed: Vec<OwnedEventId>,
+        #[ts(type = "number")]
+        total: u32,
+    },
+    /// MSC3401. An update that neither joins nor leaves carries no change.
+    CallMembership {
+        joined: bool,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum GalleryItemView {
+    Image {
+        body: String,
+        source: String,
+        mime: Option<String>,
+        #[ts(type = "number | null")]
+        width: Option<u64>,
+        #[ts(type = "number | null")]
+        height: Option<u64>,
+    },
+    Video {
+        body: String,
+        source: String,
+        mime: Option<String>,
+        #[ts(type = "number | null")]
+        width: Option<u64>,
+        #[ts(type = "number | null")]
+        height: Option<u64>,
+    },
+    Audio {
+        body: String,
+        source: String,
+        mime: Option<String>,
+    },
+    File {
+        body: String,
+        source: String,
+        mime: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct PollView {
+    pub question: String,
+    pub answers: Vec<PollAnswerView>,
+    #[ts(type = "number")]
+    pub max_selections: u32,
+    /// Every answer's `votes` stays absent until `ended_at` is set.
+    pub undisclosed: bool,
+    /// Votes cast after this are not counted.
+    #[ts(type = "number | null")]
+    pub ended_at: Option<u64>,
+    pub edited: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct PollAnswerView {
+    pub id: String,
+    pub text: String,
+    /// Absent while an undisclosed poll is still open.
+    #[ts(type = "number | null")]
+    pub votes: Option<u32>,
+    pub selected: bool,
 }
 
 /// The SDK's `MembershipChange`, narrowed to the transitions worth wording.

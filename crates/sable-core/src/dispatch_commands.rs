@@ -361,6 +361,62 @@ macro_rules! dispatch_commands {
                 Ok(CommandOk::React)
             }
 
+            Command::CreatePoll {
+                room_id,
+                question,
+                answers,
+                undisclosed,
+                max_selections,
+            } => {
+                let content = crate::polls::start(&question, &answers, undisclosed, max_selections)
+                    .ok_or(CommandErr::InvalidPoll)?;
+                let content = matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::from(content);
+
+                $self
+                    .timeline(&room_id)
+                    .await?
+                    .send(content.into())
+                    .await
+                    .map_err(|error| $self.failed("create poll", error))?;
+
+                Ok(CommandOk::CreatePoll)
+            }
+
+            Command::VotePoll {
+                room_id,
+                event_id,
+                answers,
+            } => {
+                let content = matrix_sdk::ruma::events::poll::unstable_response::UnstablePollResponseEventContent::new(
+                    answers, event_id,
+                );
+
+                $self
+                    .timeline(&room_id)
+                    .await?
+                    .send(content.into())
+                    .await
+                    .map_err(|error| $self.failed("vote poll", error))?;
+
+                Ok(CommandOk::VotePoll)
+            }
+
+            Command::EndPoll { room_id, event_id } => {
+                let content = matrix_sdk::ruma::events::poll::unstable_end::UnstablePollEndEventContent::new(
+                    "The poll has closed.",
+                    event_id,
+                );
+
+                $self
+                    .timeline(&room_id)
+                    .await?
+                    .send(content.into())
+                    .await
+                    .map_err(|error| $self.failed("end poll", error))?;
+
+                Ok(CommandOk::EndPoll)
+            }
+
             Command::EncryptionStatus => Ok(CommandOk::EncryptionStatus {
                 status: encryption_status(&$self.client().await?).await,
             }),

@@ -7,12 +7,15 @@ use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{ParentSpace, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
+use matrix_sdk::ruma::UInt;
 use matrix_sdk::ruma::events::SyncStateEvent;
+use matrix_sdk::ruma::events::poll::start::PollKind;
+use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
-use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
-use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventType};
+use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
 use matrix_sdk::ruma::room::{JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType};
 use matrix_sdk::ruma::{OwnedRoomId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
@@ -20,8 +23,9 @@ use matrix_sdk_ui::{
     eyeball_im,
     room_list_service::RoomListItem,
     timeline::{
-        EventSendState, EventTimelineItem, MembershipChange, MsgLikeContent, MsgLikeKind, Profile,
-        TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+        AnyOtherStateEventContentChange, EventSendState, EventTimelineItem, MembershipChange,
+        MsgLikeContent, MsgLikeKind, OtherState, PollState, Profile, TimelineDetails, TimelineItem,
+        TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
     },
 };
 
@@ -36,11 +40,11 @@ use crate::matrix_html::{
 };
 use crate::pronoun_sets;
 use crate::protocol::{
-    DisplayNameChangeView, LatestEventView, MemberView, MembershipChangeView, MentionView,
-    PerMessageProfileView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
-    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SendStateView, SpaceChildEdge,
-    SpaceHierarchyRoomView, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
-    UploadProgressView, VectorDiff,
+    DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
+    MentionView, PerMessageProfileView, PollAnswerView, PollView, ReactionGroup, ReplyView,
+    RoomJoinRuleView, RoomPermissionsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag,
+    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
+    TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -298,7 +302,6 @@ pub fn space_hierarchy_room(
     }
 }
 
-/// Sorted lexically on `order`, then oldest first; unordered entries sort last.
 #[must_use]
 pub fn hierarchy_child_edges(
     events: &[matrix_sdk::ruma::serde::Raw<HierarchySpaceChildEvent>],
@@ -421,7 +424,6 @@ fn room_tags(room: &Room) -> Vec<RoomTag> {
     tags
 }
 
-/// Sorted lexically on `order`, then oldest first; unordered entries sort last.
 async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
     let Ok(events) = room
         .get_state_events_static::<SpaceChildEventContent>()
@@ -471,6 +473,7 @@ pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> 
                 _ => None,
             };
             let raw = raw_content(event);
+            let prev_raw = raw_prev_content(event);
             let message_profile = per_message_profile(raw.as_ref());
 
             TimelineItemView {
@@ -484,7 +487,13 @@ pub fn timeline_item(item: &Arc<TimelineItem>, own_user_id: Option<&UserId>) -> 
                     .and_then(|p: &Profile| p.avatar_url.as_ref())
                     .map(ToString::to_string),
                 timestamp: event.timestamp().0.into(),
-                content: content(event.content(), message_profile.as_ref(), raw.as_ref()),
+                content: content(
+                    event.content(),
+                    message_profile.as_ref(),
+                    raw.as_ref(),
+                    prev_raw.as_ref(),
+                    own_user_id,
+                ),
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
@@ -589,6 +598,14 @@ fn raw_content(event: &EventTimelineItem) -> Option<serde_json::Value> {
     json.get("content").cloned()
 }
 
+/// Lives in `unsigned`, and is the only source for an event type the SDK has no
+/// typed content for.
+fn raw_prev_content(event: &EventTimelineItem) -> Option<serde_json::Value> {
+    let raw = event.latest_json().or_else(|| event.original_json())?;
+    let json: serde_json::Value = raw.deserialize_as_unchecked().ok()?;
+    json.get("unsigned")?.get("prev_content").cloned()
+}
+
 fn per_message_profile(content: Option<&serde_json::Value>) -> Option<PerMessageProfileView> {
     let content = content?;
     let profile = PMP_KEYS.iter().find_map(|key| content.get(*key))?;
@@ -668,7 +685,229 @@ fn text_message(
         html: display_html(&body, formatted.as_deref()),
         body,
         emote: matches!(message.msgtype(), MessageType::Emote(_)),
+        notice: matches!(message.msgtype(), MessageType::Notice(_)),
         edited: message.is_edited(),
+    }
+}
+
+/// `geo:lat,long` with optional `;`-separated parameters.
+fn geo_coordinates(geo_uri: &str) -> (Option<f64>, Option<f64>) {
+    let Some(rest) = geo_uri.strip_prefix("geo:") else {
+        return (None, None);
+    };
+    let coordinates = rest.split(';').next().unwrap_or(rest);
+    let mut parts = coordinates.split(',');
+    let latitude = parts.next().and_then(|part| part.trim().parse().ok());
+    let longitude = parts.next().and_then(|part| part.trim().parse().ok());
+    (latitude, longitude)
+}
+
+fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
+    let results = state.results();
+    let ended = results.end_time.is_some();
+    let undisclosed = matches!(results.kind, PollKind::Undisclosed);
+    let reveal = ended || !undisclosed;
+
+    PollView {
+        question: results.question,
+        answers: results
+            .answers
+            .iter()
+            .map(|answer| {
+                let voters = results.votes.get(&answer.id);
+                PollAnswerView {
+                    id: answer.id.clone(),
+                    text: answer.text.clone(),
+                    votes: reveal.then(|| {
+                        voters.map_or(0, |voters| u32::try_from(voters.len()).unwrap_or(u32::MAX))
+                    }),
+                    selected: own_user_id.is_some_and(|own| {
+                        voters
+                            .is_some_and(|voters| voters.iter().any(|voter| voter == own.as_str()))
+                    }),
+                }
+            })
+            .collect(),
+        max_selections: u32::try_from(results.max_selections).unwrap_or(u32::MAX),
+        undisclosed,
+        ended_at: results.end_time.map(|at| at.0.into()),
+        edited: results.has_been_edited,
+    }
+}
+
+fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
+    let source = |source: &MediaSource| serde_json::to_string(source).unwrap_or_default();
+    let dimension = |value: Option<UInt>| value.map(|value| i64::from(value).cast_unsigned());
+
+    Some(match item {
+        GalleryItemType::Image(image) => GalleryItemView::Image {
+            body: image.body.clone(),
+            source: source(&image.source),
+            mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
+            width: dimension(image.info.as_ref().and_then(|info| info.width)),
+            height: dimension(image.info.as_ref().and_then(|info| info.height)),
+        },
+        GalleryItemType::Video(video) => GalleryItemView::Video {
+            body: video.body.clone(),
+            source: source(&video.source),
+            mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
+            width: dimension(video.info.as_ref().and_then(|info| info.width)),
+            height: dimension(video.info.as_ref().and_then(|info| info.height)),
+        },
+        GalleryItemType::Audio(audio) => GalleryItemView::Audio {
+            body: audio.body.clone(),
+            source: source(&audio.source),
+            mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+        },
+        GalleryItemType::File(file) => GalleryItemView::File {
+            body: file.body.clone(),
+            source: source(&file.source),
+            mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+        },
+        // The caption already describes the set, so an unrenderable item is
+        // dropped instead of leaving a gap.
+        _ => return None,
+    })
+}
+
+fn state_change(
+    state: &OtherState,
+    content: Option<&serde_json::Value>,
+    prev_content: Option<&serde_json::Value>,
+) -> Option<StateChangeView> {
+    let text = |value: &str| (!value.trim().is_empty()).then(|| value.to_owned());
+
+    match state.content() {
+        AnyOtherStateEventContentChange::RoomName(change) => match change {
+            StateEventContentChange::Original {
+                content,
+                prev_content,
+            } => Some(StateChangeView::RoomName {
+                name: text(&content.name),
+                previous: prev_content
+                    .as_ref()
+                    .and_then(|prev| prev.name.as_deref())
+                    .and_then(text),
+            }),
+            StateEventContentChange::Redacted(_) => None,
+        },
+        AnyOtherStateEventContentChange::RoomTopic(change) => match change {
+            StateEventContentChange::Original { content, .. } => Some(StateChangeView::RoomTopic {
+                topic: text(&content.topic),
+            }),
+            StateEventContentChange::Redacted(_) => None,
+        },
+        AnyOtherStateEventContentChange::RoomAvatar(change) => match change {
+            StateEventContentChange::Original { content, .. } => {
+                Some(StateChangeView::RoomAvatar {
+                    removed: content.url.is_none(),
+                })
+            }
+            StateEventContentChange::Redacted(_) => None,
+        },
+        AnyOtherStateEventContentChange::RoomPinnedEvents(change) => match change {
+            StateEventContentChange::Original {
+                content,
+                prev_content,
+            } => {
+                let previous = prev_content
+                    .as_ref()
+                    .and_then(|prev| prev.pinned.clone())
+                    .unwrap_or_default();
+                Some(StateChangeView::PinnedEvents {
+                    added: content
+                        .pinned
+                        .iter()
+                        .filter(|pin| !previous.contains(pin))
+                        .cloned()
+                        .collect(),
+                    removed: previous
+                        .iter()
+                        .filter(|pin| !content.pinned.contains(pin))
+                        .cloned()
+                        .collect(),
+                    total: u32::try_from(content.pinned.len()).unwrap_or(u32::MAX),
+                })
+            }
+            StateEventContentChange::Redacted(_) => None,
+        },
+        // MSC3401 is unstable, so there is no typed content to read.
+        AnyOtherStateEventContentChange::_Custom { event_type }
+            if CALL_MEMBER_TYPES.contains(&event_type.as_str()) =>
+        {
+            let joined = in_call(content);
+            // Moving between calls has no copy.
+            if joined && in_call(prev_content) {
+                return None;
+            }
+            Some(StateChangeView::CallMembership { joined })
+        }
+        _ => None,
+    }
+}
+
+/// MSC3401 moved from an `application` key to a `memberships` array; both are
+/// still in the wild.
+fn in_call(content: Option<&serde_json::Value>) -> bool {
+    let Some(content) = content else {
+        return false;
+    };
+    if content.get("application").is_some() {
+        return true;
+    }
+    content
+        .get("memberships")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|memberships| !memberships.is_empty())
+}
+
+const CALL_MEMBER_TYPES: [&str; 2] = ["m.call.member", "org.matrix.msc3401.call.member"];
+
+fn message_content(
+    message: &matrix_sdk_ui::timeline::Message,
+    profile: Option<&PerMessageProfileView>,
+) -> TimelineItemContentView {
+    let dimension = |value: Option<UInt>| value.map(|value| i64::from(value).cast_unsigned());
+
+    match message.msgtype() {
+        MessageType::Image(image) => TimelineItemContentView::Image {
+            body: image.body.clone(),
+            source: serde_json::to_string(&image.source).unwrap_or_default(),
+            mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
+            width: dimension(image.info.as_ref().and_then(|info| info.width)),
+            height: dimension(image.info.as_ref().and_then(|info| info.height)),
+        },
+        MessageType::Video(video) => TimelineItemContentView::Video {
+            body: video.body.clone(),
+            source: serde_json::to_string(&video.source).unwrap_or_default(),
+            mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
+            width: dimension(video.info.as_ref().and_then(|info| info.width)),
+            height: dimension(video.info.as_ref().and_then(|info| info.height)),
+        },
+        MessageType::Audio(audio) => TimelineItemContentView::Audio {
+            body: audio.body.clone(),
+            source: serde_json::to_string(&audio.source).unwrap_or_default(),
+            mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+        },
+        MessageType::File(file) => TimelineItemContentView::File {
+            body: file.body.clone(),
+            source: serde_json::to_string(&file.source).unwrap_or_default(),
+            mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+        },
+        MessageType::Location(location) => {
+            let (latitude, longitude) = geo_coordinates(&location.geo_uri);
+            TimelineItemContentView::Location {
+                body: location.body.clone(),
+                geo_uri: location.geo_uri.clone(),
+                latitude,
+                longitude,
+            }
+        }
+        MessageType::Gallery(gallery) => TimelineItemContentView::Gallery {
+            body: gallery.body.clone(),
+            items: gallery.itemtypes.iter().filter_map(gallery_item).collect(),
+        },
+        _ => text_message(message, profile),
     }
 }
 
@@ -676,6 +915,8 @@ fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
     raw: Option<&serde_json::Value>,
+    prev_raw: Option<&serde_json::Value>,
+    own_user_id: Option<&UserId>,
 ) -> TimelineItemContentView {
     let unsupported = |what: &str| TimelineItemContentView::Unsupported {
         description: what.to_owned(),
@@ -683,49 +924,7 @@ fn content(
 
     match content {
         TimelineItemContent::MsgLike(msg) => match &msg.kind {
-            MsgLikeKind::Message(message) => match message.msgtype() {
-                MessageType::Image(image) => TimelineItemContentView::Image {
-                    body: image.body.clone(),
-                    source: serde_json::to_string(&image.source).unwrap_or_default(),
-                    mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
-                    width: image
-                        .info
-                        .as_ref()
-                        .and_then(|info| info.width)
-                        .map(|width| i64::from(width).cast_unsigned()),
-                    height: image
-                        .info
-                        .as_ref()
-                        .and_then(|info| info.height)
-                        .map(|height| i64::from(height).cast_unsigned()),
-                },
-                MessageType::Video(video) => TimelineItemContentView::Video {
-                    body: video.body.clone(),
-                    source: serde_json::to_string(&video.source).unwrap_or_default(),
-                    mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
-                    width: video
-                        .info
-                        .as_ref()
-                        .and_then(|info| info.width)
-                        .map(|width| i64::from(width).cast_unsigned()),
-                    height: video
-                        .info
-                        .as_ref()
-                        .and_then(|info| info.height)
-                        .map(|height| i64::from(height).cast_unsigned()),
-                },
-                MessageType::Audio(audio) => TimelineItemContentView::Audio {
-                    body: audio.body.clone(),
-                    source: serde_json::to_string(&audio.source).unwrap_or_default(),
-                    mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
-                },
-                MessageType::File(file) => TimelineItemContentView::File {
-                    body: file.body.clone(),
-                    source: serde_json::to_string(&file.source).unwrap_or_default(),
-                    mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
-                },
-                _ => text_message(message, profile),
-            },
+            MsgLikeKind::Message(message) => message_content(message, profile),
             MsgLikeKind::Redacted => TimelineItemContentView::Redacted,
             MsgLikeKind::UnableToDecrypt(_) => TimelineItemContentView::UnableToDecrypt {
                 reason: "undecryptable".to_owned(),
@@ -746,7 +945,9 @@ fn content(
                         .map(|height| i64::from(height).cast_unsigned()),
                 }
             }
-            MsgLikeKind::Poll(_) => unsupported("poll"),
+            MsgLikeKind::Poll(state) => TimelineItemContentView::Poll {
+                poll: poll(state, own_user_id),
+            },
             MsgLikeKind::LiveLocation(_) => unsupported("live location"),
             MsgLikeKind::Other(other) => TimelineItemContentView::HiddenEvent {
                 event_type: other.event_type().to_string(),
@@ -775,6 +976,7 @@ fn content(
             event_type: state.content().event_type().to_string(),
             state_key: state.state_key().to_owned(),
             content: raw.cloned(),
+            change: state_change(state, raw, prev_raw),
         },
         TimelineItemContent::CallInvite => unsupported("call invite"),
         _ => unsupported("event"),
@@ -950,7 +1152,9 @@ pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>])
 
 #[cfg(test)]
 mod tests {
-    use super::via_servers;
+    use serde_json::json;
+
+    use super::{geo_coordinates, in_call, via_servers};
 
     fn members(entries: &[(&str, i32)]) -> Vec<(String, i32)> {
         entries
@@ -1020,7 +1224,6 @@ mod tests {
         assert!(via_servers(&[]).is_empty());
     }
 
-    /// Two clients linking the same room should produce the same link.
     #[test]
     fn breaks_ties_deterministically() {
         let tied_power = members(&[("@b:beta.example", 100), ("@a:alpha.example", 100)]);
@@ -1038,5 +1241,31 @@ mod tests {
     #[test]
     fn skips_a_user_id_with_no_server() {
         assert!(via_servers(&members(&[("malformed", 100)])).is_empty());
+    }
+
+    #[test]
+    fn reads_a_geo_uri_with_and_without_parameters() {
+        assert_eq!(geo_coordinates("geo:51.5,-0.12"), (Some(51.5), Some(-0.12)));
+        assert_eq!(
+            geo_coordinates("geo:51.5,-0.12;u=35"),
+            (Some(51.5), Some(-0.12))
+        );
+    }
+
+    #[test]
+    fn leaves_an_unreadable_geo_uri_without_coordinates() {
+        assert_eq!(geo_coordinates("https://example.org/map"), (None, None));
+        assert_eq!(geo_coordinates("geo:somewhere"), (None, None));
+    }
+
+    #[test]
+    fn recognises_both_call_membership_shapes_and_neither() {
+        assert!(in_call(Some(&json!({ "application": "m.call" }))));
+        assert!(in_call(Some(
+            &json!({ "memberships": [{ "call_id": "" }] })
+        )));
+        assert!(!in_call(Some(&json!({ "memberships": [] }))));
+        assert!(!in_call(Some(&json!({}))));
+        assert!(!in_call(None));
     }
 }

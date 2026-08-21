@@ -6,8 +6,12 @@ default-members = ["crates/sable-core", "src-tauri"]
 resolver = "3"
 
 [workspace.dependencies]
-matrix-sdk = { version = "0.18", default-features = false, features = ["e2e-encryption"] }
-matrix-sdk-ui = "0.18"
+# Without this the timeline never yields a `Gallery` message type.
+matrix-sdk = { version = "0.18", default-features = false, features = [
+  "e2e-encryption",
+  "unstable-msc4274",
+] }
+matrix-sdk-ui = { version = "0.18", features = ["unstable-msc4274"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "fs"] }
