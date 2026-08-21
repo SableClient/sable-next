@@ -132,6 +132,7 @@
 
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
   let ownMessage = $derived(item.is_own && item.content.kind === 'message');
+  let avatarColor = $derived(personaTint || item.is_own ? undefined : senderColor(item.sender));
   let nameColor = $derived(
     item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
   );
@@ -375,6 +376,7 @@
                 class="message-avatar"
                 src={senderAvatar}
                 size="small"
+                color={senderAvatar ? undefined : avatarColor}
                 initials={initials(senderName)}
               />
             </PersonaProfile>
@@ -389,6 +391,7 @@
                 class="message-avatar"
                 src={senderAvatar}
                 size="small"
+                color={senderAvatar ? undefined : avatarColor}
                 initials={initials(senderName)}
               />
             </button>
@@ -397,6 +400,7 @@
               class="message-avatar"
               src={senderAvatar}
               size="small"
+              color={senderAvatar ? undefined : avatarColor}
               initials={initials(senderName)}
             />
           {/if}
