@@ -8,6 +8,16 @@ export default mergeConfig(
   defineConfig({
     resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
     test: {
+      alias: {
+        '$app/paths/internal/client': new URL(
+          './node_modules/@sveltejs/kit/src/runtime/app/paths/internal/client.js',
+          import.meta.url
+        ).pathname,
+        '$app/paths': new URL(
+          './node_modules/@sveltejs/kit/src/runtime/app/paths/client.js',
+          import.meta.url
+        ).pathname,
+      },
       environment: 'node',
       include: ['src/**/*.test.ts'],
       coverage: {
