@@ -12,22 +12,32 @@ import {
   visibleTimelineItems,
 } from './timeline-format';
 
-const items = [{ event_id: '$latest' }] as TimelineItemView[];
-const visibleAtLatest = {
-  followingLive: true,
-  nearLatest: true,
+const items = [{ event_id: '$older' }, { event_id: '$latest' }] as TimelineItemView[];
+const scrolledPast = {
+  visibleEventId: '$latest',
   documentVisible: true,
   lastReadEventId: null,
 };
 
-test('marks the latest live event read only when the live end is visible', () => {
-  expect(readReceiptEventId(items, visibleAtLatest)).toBe('$latest');
-  expect(readReceiptEventId(items, { ...visibleAtLatest, nearLatest: false })).toBeNull();
-  expect(readReceiptEventId(items, { ...visibleAtLatest, lastReadEventId: '$latest' })).toBeNull();
+test('marks the newest event scrolled past', () => {
+  expect(readReceiptEventId(items, scrolledPast)).toBe('$latest');
+  expect(readReceiptEventId(items, { ...scrolledPast, visibleEventId: '$older' })).toBe('$older');
 });
 
-test('does not mark events read while anchored on one', () => {
-  expect(readReceiptEventId(items, { ...visibleAtLatest, followingLive: false })).toBeNull();
+test('does not repeat or rewind the receipt', () => {
+  expect(readReceiptEventId(items, { ...scrolledPast, lastReadEventId: '$latest' })).toBeNull();
+  expect(
+    readReceiptEventId(items, {
+      ...scrolledPast,
+      visibleEventId: '$older',
+      lastReadEventId: '$latest',
+    })
+  ).toBeNull();
+});
+
+test('reads nothing while the document is hidden or no row is past', () => {
+  expect(readReceiptEventId(items, { ...scrolledPast, documentVisible: false })).toBeNull();
+  expect(readReceiptEventId(items, { ...scrolledPast, visibleEventId: null })).toBeNull();
 });
 
 const defaults: TimelinePreferences = {
@@ -58,6 +68,7 @@ const topic = item({
   event_type: 'm.room.topic',
   state_key: '',
   content: null,
+  change: null,
 });
 
 test('hides profile changes and raw state events by default, keeping joins', () => {

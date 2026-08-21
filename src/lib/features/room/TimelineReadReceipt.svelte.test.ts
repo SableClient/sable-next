@@ -48,8 +48,7 @@ test('does not duplicate a read receipt while the first request is pending', asy
     target: document.body,
     props: {
       timeline,
-      followingLive: true,
-      nearLatest: true,
+      visibleEventId: '$latest',
       onRead: read,
     },
   });

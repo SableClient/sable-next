@@ -7,12 +7,12 @@
 
   interface Props {
     timeline: RoomTimeline;
-    followingLive: boolean;
-    nearLatest: boolean;
+    /** The newest event whose row is fully scrolled past. */
+    visibleEventId: string | null;
     onRead: (eventId: string) => Promise<void>;
   }
 
-  let { timeline, followingLive, nearLatest, onRead }: Props = $props();
+  let { timeline, visibleEventId, onRead }: Props = $props();
   let documentVisible = $state(true);
   let lastReadEventId: string | null = null;
   let readingEventId: string | null = null;
@@ -28,8 +28,7 @@
   $effect(() => {
     if (timeline.mode.kind !== 'live') return;
     const eventId = readReceiptEventId(timeline.items, {
-      followingLive,
-      nearLatest,
+      visibleEventId,
       documentVisible,
       lastReadEventId,
     });

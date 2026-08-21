@@ -45,6 +45,7 @@
   import {
     foldEventRuns,
     isCollapsed,
+    latestEventId,
     personasByEventId,
     unreadCountAfter,
     visibleTimelineItems,
@@ -111,6 +112,19 @@
   let visibleItems = $derived(folded.items);
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
+
+  // Reading down through unread history marks what has gone past the fold, not
+  // only what is on screen when the reader reaches the end.
+  let readEventId = $derived.by(() => {
+    if (position.kind === 'pinned') return latestEventId(timeline.items);
+    const bottom = ($virtualizer.scrollOffset ?? 0) + (viewport?.clientHeight ?? 0);
+    let seen: string | null = null;
+    for (const row of $virtualizer.getVirtualItems()) {
+      if (row.end > bottom) break;
+      seen = visibleItems[row.index]?.event_id ?? seen;
+    }
+    return seen;
+  });
 
   // Virtual rows are absolutely positioned, so the separator cannot be sticky
   // in flow; it is mirrored above once its own row has scrolled past the top.
@@ -623,6 +637,12 @@
         viewport: historyDebugSnapshot(),
       });
     }
+    // Sending goes to the newest event wherever the reader was, so a room opened
+    // on its first unread does not swallow the message just sent.
+    const sent = items.length > previousItems.length && items.at(-1)?.transaction_id !== null;
+    if (sent && position.kind === 'anchored') {
+      setPosition(nextPosition(position, { kind: 'jump-to-latest' }));
+    }
     // `position` goes stale: a programmatic scroll raises no gesture and a
     // wheel at offset zero raises no scroll event.
     const pinnedToEnd = viewport !== null && isNearLatest(viewport, nearLatestPx);
@@ -631,6 +651,7 @@
     // the end-follow declines, stranding the newest message out of view.
     if (
       edgesChanged &&
+      !sent &&
       (prepended || !pinnedToEnd) &&
       position.kind !== 'settling' &&
       position.kind !== 'focused'
@@ -816,7 +837,7 @@
   }
 </script>
 
-<TimelineReadReceipt {timeline} {followingLive} {nearLatest} {onRead} />
+<TimelineReadReceipt {timeline} visibleEventId={readEventId} {onRead} />
 
 {#if timeline.error}
   <Alert class="timeline-error" variant="critical" role="alert"

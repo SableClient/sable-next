@@ -180,27 +180,33 @@ export function isCollapsed(items: readonly TimelineItemView[], index: number): 
 
 export function latestEventId(items: readonly TimelineItemView[]): string | null {
   for (let index = items.length - 1; index >= 0; index -= 1) {
-    const eventId = items[index]?.event_id;
+    const eventId = items[index].event_id;
     if (eventId) return eventId;
   }
   return null;
 }
 
+/**
+ * The newest event scrolled past, never an older one: history loading below the
+ * reader, or a jump back up, would otherwise walk the receipt backwards.
+ */
 export function readReceiptEventId(
   items: readonly TimelineItemView[],
   options: {
-    followingLive: boolean;
-    nearLatest: boolean;
+    visibleEventId: string | null;
     documentVisible: boolean;
     lastReadEventId: string | null;
   }
 ): string | null {
-  if (!options.followingLive || !options.nearLatest || !options.documentVisible) {
-    return null;
-  }
+  const { visibleEventId, lastReadEventId } = options;
+  if (!options.documentVisible || visibleEventId === null) return null;
+  if (visibleEventId === lastReadEventId) return null;
+  if (lastReadEventId === null) return visibleEventId;
 
-  const eventId = latestEventId(items);
-  return eventId === options.lastReadEventId ? null : eventId;
+  const seen = items.findIndex((item) => item.event_id === lastReadEventId);
+  const next = items.findIndex((item) => item.event_id === visibleEventId);
+  if (seen === -1 || next === -1) return visibleEventId;
+  return next > seen ? visibleEventId : null;
 }
 
 export function formatTime(timestamp: number): string {

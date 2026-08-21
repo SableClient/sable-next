@@ -18,6 +18,10 @@ vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => ({ rooms: [] }),
+}));
+
 import MentionProfileCard from './MentionProfileCard.svelte';
 
 const emptyProfile: ProfileView = {
