@@ -107,7 +107,7 @@
   );
 
   const media: EmoteMedia = {
-    cached: (url) => cachedMediaUrl(url, emoteSize, emoteSize),
+    cached: (url) => cachedMediaUrl(core, url, emoteSize, emoteSize),
     load: (url) => loadMediaUrl(core, url, emoteSize, emoteSize),
   };
 

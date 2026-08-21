@@ -57,7 +57,7 @@
     zoom = 1;
     rotation = 0;
     failed = false;
-    const cached = cachedMediaUrl(item.source, 0, 0);
+    const cached = cachedMediaUrl(core, item.source, 0, 0);
     url = cached ?? null;
     const request = cached
       ? Promise.resolve(cached)

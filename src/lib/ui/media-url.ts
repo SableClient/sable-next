@@ -15,8 +15,17 @@ const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
 let objectUrlBytes = 0;
 
-function cacheKey(source: string, width: number, height: number): string {
-  return `${source}:${String(width)}:${String(height)}`;
+function cacheKey(
+  accountId: string | undefined,
+  source: string,
+  width: number,
+  height: number
+): string {
+  return `${accountId ?? ''}:${source}:${String(width)}:${String(height)}`;
+}
+
+function metadataKey(accountId: string | undefined, source: string): string {
+  return `${accountId ?? ''}:${source}`;
 }
 
 function startsWith(bytes: Uint8Array, signature: number[], offset = 0): boolean {
@@ -37,16 +46,16 @@ function imageMime(bytes: Uint8Array): string | undefined {
   return undefined;
 }
 
-function measure(source: string, type: string, blob: Blob): Promise<void> | null {
+function measure(key: string, type: string, blob: Blob): Promise<void> | null {
   // An empty type is a sniffer miss: encrypted attachments often carry no mime.
   const worthDecoding = type === '' || type.startsWith('image/');
-  if (!worthDecoding || aspectRatios.has(source) || typeof createImageBitmap !== 'function') {
+  if (!worthDecoding || aspectRatios.has(key) || typeof createImageBitmap !== 'function') {
     return null;
   }
   return createImageBitmap(blob)
     .then((bitmap) => {
       if (bitmap.width > 0 && bitmap.height > 0) {
-        aspectRatios.set(source, bitmap.width / bitmap.height);
+        aspectRatios.set(key, bitmap.width / bitmap.height);
         if (aspectRatios.size > MAX_MEDIA_METADATA) {
           const oldest = aspectRatios.keys().next().value;
           if (oldest !== undefined) aspectRatios.delete(oldest);
@@ -57,13 +66,18 @@ function measure(source: string, type: string, blob: Blob): Promise<void> | null
     .catch(() => {});
 }
 
-export function mediaAspectRatio(source: string): number | null {
-  return aspectRatios.get(source) ?? null;
+export function mediaAspectRatio(core: Pick<CoreClient, 'session'>, source: string): number | null {
+  return aspectRatios.get(metadataKey(core.session?.account_id, source)) ?? null;
 }
 
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
-export function cachedMediaUrl(source: string, width: number, height: number): string | undefined {
-  const key = cacheKey(source, width, height);
+export function cachedMediaUrl(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number
+): string | undefined {
+  const key = cacheKey(core.session?.account_id, source, width, height);
   const cached = objectUrls.get(key);
   if (cached === undefined) return undefined;
   // Re-inserted so the map's own order is the eviction order.
@@ -78,13 +92,13 @@ export function cachedMediaUrl(source: string, width: number, height: number): s
  * and size, shared by every message referencing it.
  */
 export function loadMediaUrl(
-  core: Pick<CoreClient, 'fetchMedia'>,
+  core: Pick<CoreClient, 'fetchMedia' | 'session'>,
   source: string,
   width: number,
   height: number,
   mime?: string | null
 ): Promise<string> {
-  const key = cacheKey(source, width, height);
+  const key = cacheKey(core.session?.account_id, source, width, height);
   if (unavailable.has(key)) return Promise.reject(new Error('Media unavailable'));
   const request =
     pending.get(key) ??
@@ -108,7 +122,7 @@ export function loadMediaUrl(
           }
           return objectUrl;
         };
-        const measuring = measure(source, type, blob);
+        const measuring = measure(metadataKey(core.session?.account_id, source), type, blob);
         return measuring === null ? publish() : measuring.then(publish);
       })
       .finally(() => {
@@ -126,12 +140,12 @@ export function loadMediaUrl(
 }
 
 export function retryMediaUrl(
-  core: Pick<CoreClient, 'fetchMedia'>,
+  core: Pick<CoreClient, 'fetchMedia' | 'session'>,
   source: string,
   width: number,
   height: number,
   mime?: string | null
 ): Promise<string> {
-  unavailable.delete(cacheKey(source, width, height));
+  unavailable.delete(cacheKey(core.session?.account_id, source, width, height));
   return loadMediaUrl(core, source, width, height, mime);
 }

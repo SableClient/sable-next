@@ -83,7 +83,7 @@
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
     failed = false;
-    const cached = cachedMediaUrl(source, 0, 0);
+    const cached = cachedMediaUrl(core, source, 0, 0);
     if (cached !== undefined) {
       url = cached;
       return;

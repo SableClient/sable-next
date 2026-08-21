@@ -11,6 +11,7 @@ test('evicts object URLs when cached media exceeds the byte budget', async () =>
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:media-${String(nextUrl++)}`);
   const core = {
+    session: { account_id: 'account-a', user_id: '@a:example.org', device_id: 'device-a' },
     fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))),
   };
 
@@ -18,4 +19,22 @@ test('evicts object URLs when cached media exceeds the byte budget', async () =>
   await loadMediaUrl(core, 'mxc://example.org/second', 800, 600);
 
   expect(revoke).toHaveBeenCalledWith('blob:media-0');
+});
+
+test('does not share a media URL between accounts', async () => {
+  let nextUrl = 0;
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:account-${String(nextUrl++)}`);
+  const source = 'mxc://example.org/account-scoped';
+  const accountA = {
+    session: { account_id: 'account-a', user_id: '@a:example.org', device_id: 'device-a' },
+    fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))),
+  };
+  const accountB = {
+    session: { account_id: 'account-b', user_id: '@b:example.org', device_id: 'device-b' },
+    fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([2]))),
+  };
+
+  await expect(loadMediaUrl(accountA, source, 96, 96)).resolves.toBe('blob:account-0');
+  await expect(loadMediaUrl(accountB, source, 96, 96)).resolves.toBe('blob:account-1');
+  expect(accountB.fetchMedia).toHaveBeenCalledOnce();
 });

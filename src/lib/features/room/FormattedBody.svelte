@@ -42,7 +42,7 @@
       const [width, height] = emoticon ? [0, 0] : [640, 480];
       image.dataset.mediaPending = '';
       image.removeAttribute('src');
-      const cached = cachedMediaUrl(source, width, height);
+      const cached = cachedMediaUrl(core, source, width, height);
       if (cached !== undefined) {
         paint(image, cached);
         continue;

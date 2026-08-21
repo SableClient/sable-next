@@ -87,9 +87,9 @@
     const original = mime === 'image/svg+xml';
     const requestWidth = original ? 0 : width;
     const requestHeight = original ? 0 : height;
-    const cached = cachedMediaUrl(source, requestWidth, requestHeight);
+    const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {
-      fileRatio = mediaAspectRatio(source);
+      fileRatio = mediaAspectRatio(core, source);
       url = cached;
       return;
     }
@@ -101,7 +101,7 @@
     void load(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
-        fileRatio = mediaAspectRatio(source);
+        fileRatio = mediaAspectRatio(core, source);
         url = nextUrl;
       })
       .catch(() => {
