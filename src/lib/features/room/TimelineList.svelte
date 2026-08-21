@@ -1115,7 +1115,15 @@
     padding: 0.125rem 0.5rem;
   }
 
-  :global(.jump-to-latest) {
+  /* Container tokens are a translucent tint in some themes, which the messages
+     scrolling underneath show through. The element selector outranks the
+     variant's own background. */
+  :global(button.jump-to-latest) {
+    background-color: var(--sable-bg-container);
+    background-image: linear-gradient(
+      var(--sable-primary-container),
+      var(--sable-primary-container)
+    );
     bottom: 1rem;
     box-shadow: var(--shadow-float);
     left: 50%;
