@@ -34,6 +34,7 @@
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/direct']);
   let pathname = $derived(page.url.pathname);
+  let showMobileQuickTools = $derived(page.params.roomId === undefined);
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || /^\/space\/[^/]+$/.test(pathname));
   let open = $derived(
     page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open'
@@ -188,7 +189,9 @@
       <div class="content">
         {@render children()}
       </div>
-      <div class="mobile-quick-tools"><UserQuickTools mobile /></div>
+      {#if showMobileQuickTools}
+        <div class="mobile-quick-tools"><UserQuickTools mobile /></div>
+      {/if}
     </section>
   </div>
 </div>

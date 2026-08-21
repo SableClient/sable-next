@@ -108,7 +108,7 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page, a
 
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
   await expect(app.backToRooms).toBeVisible();
-  await expect(app.quickTools).not.toBeInViewport();
+  await expect(page.locator('.mobile-quick-tools')).toHaveCount(0);
 
   await app.backToRooms.click();
 
