@@ -5,9 +5,15 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-const pageState = vi.hoisted(() => ({ url: { pathname: '/home' } }));
+const pageState = vi.hoisted(() => ({ url: { pathname: '/home', search: '', hash: '' } }));
+const navigation = vi.hoisted(() => ({ afterNavigate: null as (() => void) | null }));
 
 vi.mock('$app/state', () => ({ page: pageState }));
+vi.mock('$app/navigation', () => ({
+  afterNavigate: (callback: () => void) => {
+    navigation.afterNavigate = callback;
+  },
+}));
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string> = {}) => {
     const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
@@ -31,10 +37,36 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
 import NavigationRail from './NavigationRail.svelte';
+import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 
 afterEach(() => {
   document.body.replaceChildren();
+  localStorage.clear();
 });
+
+function space(): RoomSummary {
+  return {
+    room_id: '!space:example.org',
+    canonical_alias: null,
+    name: 'Space',
+    topic: null,
+    avatar_url: null,
+    is_direct: false,
+    join_rule: 'invite',
+    tags: [],
+    state: 'joined',
+    encrypted: null,
+    is_space: true,
+    has_space_parent: false,
+    supports_knock: true,
+    supports_restricted: true,
+    supports_knock_restricted: true,
+    space_children: [],
+    unread: 0,
+    highlight: 0,
+    latest_event: null,
+  };
+}
 
 test('badges home mentions and unread direct chats', async () => {
   const instance = mount(NavigationRail, {
@@ -94,6 +126,55 @@ test('shows unread direct rooms as individual avatars', async () => {
   expect(directLink?.getAttribute('aria-label')).toBe('Alice');
   expect(directLink?.querySelector('.space-initial')?.textContent.trim()).toBe('A');
   expect(directLink?.querySelector('.unread-count')?.textContent).toBe('2');
+
+  await unmount(instance);
+});
+
+test('restores a space to its last desktop route', () => {
+  expect(
+    spaceNavigationHref(
+      '/space/!space%3Aexample.org',
+      '/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event',
+      false
+    )
+  ).toBe('/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event');
+  expect(
+    spaceNavigationHref('/space/!space%3Aexample.org', '/home/!room%3Aexample.org', false)
+  ).toBe('/space/!space%3Aexample.org');
+});
+
+test('records the active desktop space route after navigation', async () => {
+  const instance = mount(NavigationRail, { target: document.body, props: { spaces: [space()] } });
+  await tick();
+
+  pageState.url = {
+    pathname: '/space/!space%3Aexample.org/!room%3Aexample.org',
+    search: '?event=%24event',
+    hash: '#reply',
+  };
+  navigation.afterNavigate?.();
+
+  expect(savedSpacePaths()).toEqual({
+    '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event#reply',
+  });
+
+  await unmount(instance);
+});
+
+test('opens a space root on mobile even when it has a saved route', async () => {
+  localStorage.setItem(
+    'sable-space-paths',
+    JSON.stringify({ '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org' })
+  );
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [space()], mobile: true },
+  });
+  await tick();
+
+  expect(document.querySelector('[aria-label="Space"]')?.getAttribute('href')).toBe(
+    '/space/!space%3Aexample.org'
+  );
 
   await unmount(instance);
 });

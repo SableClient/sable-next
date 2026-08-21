@@ -2,9 +2,11 @@
   import type { Component } from 'svelte';
   import type { RoomSummary } from '#src/generated/RoomSummary';
   import { resolve } from '$app/paths';
+  import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
+  import { saveSpacePath, savedSpacePaths, spaceNavigationHref } from './space-paths.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
@@ -46,6 +48,7 @@
     mobile = false,
     onNavigate,
   }: Props = $props();
+  let spacePaths = $state(savedSpacePaths());
 
   let items = $derived<readonly RailItem[]>([
     {
@@ -75,11 +78,13 @@
     spaces.map((space) => {
       const name = spaceName(space.name, space.room_id);
       const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) });
+      const savedPath = spacePaths[space.room_id];
+      const navigateHref = spaceNavigationHref(href, savedPath, mobile);
 
       return {
         href,
         activePrefix: href,
-        navigateHref: href,
+        navigateHref,
         initial: initial(name),
         avatar: space.avatar_url,
         label: name,
@@ -133,6 +138,20 @@
   function navigate(item: RailItem): void {
     onNavigate?.(item.navigateHref ?? item.href);
   }
+
+  afterNavigate(() => {
+    if (mobile) return;
+
+    const path = `${page.url.pathname}${page.url.search}${page.url.hash}`;
+    const space = spaces.find((candidate) => {
+      const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(candidate) });
+      return path === href || path.startsWith(`${href}/`);
+    });
+    if (!space || spacePaths[space.room_id] === path) return;
+
+    spacePaths = { ...spacePaths, [space.room_id]: path };
+    saveSpacePath(space.room_id, path);
+  });
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- every rail href is
@@ -148,7 +167,7 @@
               class="rail-item sable-selection-layer"
               class:space-item={Boolean(item.initial)}
               class:active
-              href={item.href}
+              href={item.navigateHref ?? item.href}
               onclick={() => {
                 navigate(item);
               }}
@@ -211,7 +230,7 @@
                 class="rail-item sable-selection-layer"
                 class:space-item={Boolean(item.initial)}
                 class:active
-                href={item.href}
+                href={item.navigateHref ?? item.href}
                 aria-label={label}
                 aria-current={active ? 'page' : undefined}
               >
