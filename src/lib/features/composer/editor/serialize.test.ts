@@ -21,7 +21,11 @@ function para(content: ProseMirrorNode | ProseMirrorNode[]): ProseMirrorNode {
 test('plain text sends no formatted body', () => {
   const message = serializeComposer(docOf(para(composerSchema.text('just words'))));
 
-  expect(message).toEqual({ body: 'just words', formatted: null });
+  expect(message).toEqual({
+    body: 'just words',
+    formatted: null,
+    mentions: { userIds: [], room: false },
+  });
 });
 
 test('a bold mark serialises to markdown in the body and html in the formatted body', () => {
@@ -121,6 +125,7 @@ test('a room mention keeps its # name in the body and links in the formatted bod
   expect(message).toEqual({
     body: '#General',
     formatted: '<a href="https://matrix.to/#/#general:example.org">#General</a>',
+    mentions: { userIds: [], room: false },
   });
 });
 
@@ -142,4 +147,30 @@ test('several paragraphs stay several paragraphs', () => {
 
   expect(message.body).toBe('one\n\ntwo');
   expect(message.formatted).toBeNull();
+});
+
+test('a user pill becomes an m.mentions entry, once', () => {
+  const message = serializeComposer(
+    docOf(
+      para([
+        composerSchema.nodes.mention.create({ userId: '@one:example.org', name: 'One' }),
+        composerSchema.text(' and '),
+        composerSchema.nodes.mention.create({ userId: '@one:example.org', name: 'One' }),
+      ])
+    )
+  );
+
+  expect(message.mentions).toEqual({ userIds: ['@one:example.org'], room: false });
+});
+
+test('@room in the body asks for a room mention', () => {
+  const message = serializeComposer(docOf(para(composerSchema.text('@room heads up'))));
+
+  expect(message.mentions).toEqual({ userIds: [], room: true });
+});
+
+test('a word ending in @room is not a room mention', () => {
+  const message = serializeComposer(docOf(para(composerSchema.text('mail me at me@room'))));
+
+  expect(message.mentions.room).toBe(false);
 });

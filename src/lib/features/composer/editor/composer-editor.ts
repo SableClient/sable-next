@@ -1,7 +1,7 @@
 import { baseKeymap } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
-import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import { DOMParser, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
@@ -87,6 +87,28 @@ export class ComposerEditor {
     return true;
   }
 
+  private enter: Command = (state, dispatch, view) => {
+    if (this.options.onNavigate('Enter')) return true;
+    return preferences.enterForNewline ? newline(state, dispatch, view) : this.submit();
+  };
+
+  private domAttributes(): Record<string, string> {
+    const activeOption = this.options.activeOptionId();
+
+    return {
+      'aria-label': this.options.label(),
+      role: 'combobox',
+      'aria-controls': this.options.listboxId,
+      'aria-expanded': activeOption === null ? 'false' : 'true',
+      ...(activeOption === null ? {} : { 'aria-activedescendant': activeOption }),
+      'aria-multiline': 'true',
+      spellcheck: 'true',
+      autocapitalize: 'sentences',
+      enterkeyhint: preferences.enterForNewline ? 'enter' : 'send',
+      ...(this.options.describedBy ? { 'aria-describedby': this.options.describedBy } : {}),
+    };
+  }
+
   private createState(doc?: ProseMirrorNode): EditorState {
     return EditorState.create({
       ...(doc ? { doc } : {}),
@@ -104,12 +126,10 @@ export class ComposerEditor {
           ArrowDown: () => this.options.onNavigate('ArrowDown'),
           Tab: () => this.options.onNavigate('Tab'),
           Escape: () => this.options.onNavigate('Escape'),
-          Enter: (state, dispatch, view) => {
-            if (this.options.onNavigate('Enter')) return true;
-            return preferences.enterForNewline ? newline(state, dispatch, view) : this.submit();
-          },
+          Enter: this.enter,
           'Shift-Enter': (state, dispatch, view) =>
             preferences.enterForNewline ? this.submit() : newline(state, dispatch, view),
+          'Mod-Enter': () => this.submit(),
         }),
         keymap(baseKeymap),
       ],
@@ -127,20 +147,27 @@ export class ComposerEditor {
           state,
           editable: () => this.options.editable(),
           nodeViews: composerNodeViews(this.options.media),
-          attributes: {
-            'aria-label': this.options.label(),
-            role: 'combobox',
-            'aria-controls': this.options.listboxId,
-            'aria-expanded': 'false',
-            ...(this.options.describedBy ? { 'aria-describedby': this.options.describedBy } : {}),
-          },
+          attributes: () => this.domAttributes(),
           handlePaste: (_view, event) => this.handleFiles(filesFrom(event.clipboardData)),
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
             beforeinput: (view, event) => {
-              if (!isAndroid() || event.inputType !== 'deleteContentBackward') return false;
-              handleAndroidDeleteBackward(view);
-              return true;
+              if (!isAndroid()) return false;
+              if (event.inputType === 'deleteContentBackward') {
+                handleAndroidDeleteBackward(view);
+                return true;
+              }
+              if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+                event.preventDefault();
+                return this.enter(
+                  view.state,
+                  (tr) => {
+                    view.dispatch(tr);
+                  },
+                  view
+                );
+              }
+              return false;
             },
           },
           dispatchTransaction: (tr) => {
@@ -168,17 +195,13 @@ export class ComposerEditor {
   }
 
   syncLabel(): void {
-    this.view?.dom.setAttribute('aria-label', this.options.label());
+    void this.options.label();
+    this.view?.setProps({});
   }
 
   syncActiveOption(): void {
-    const dom = this.view?.dom;
-    if (!dom) return;
-
-    const id = this.options.activeOptionId();
-    dom.setAttribute('aria-expanded', id === null ? 'false' : 'true');
-    if (id === null) dom.removeAttribute('aria-activedescendant');
-    else dom.setAttribute('aria-activedescendant', id);
+    void this.options.activeOptionId();
+    this.view?.setProps({});
   }
 
   isEmpty(): boolean {
@@ -224,6 +247,12 @@ export class ComposerEditor {
     const transaction = view.state.tr.replaceWith(0, view.state.doc.content.size, doc.content);
     transaction.setSelection(Selection.atEnd(transaction.doc));
     view.dispatch(transaction);
+  }
+
+  setHtml(html: string): void {
+    const holder = document.createElement('div');
+    holder.innerHTML = html;
+    this.setDoc(DOMParser.fromSchema(composerSchema).parse(holder));
   }
 
   setText(text: string): void {

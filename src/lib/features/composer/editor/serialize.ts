@@ -1,11 +1,14 @@
 import { defaultMarkdownSerializer, MarkdownSerializer } from 'prosemirror-markdown';
 import { DOMSerializer, type Node as ProseMirrorNode } from 'prosemirror-model';
 
+import type { OutgoingMentions } from '#lib/core/client.svelte.js';
+
 import { composerSchema } from './schema';
 
 export interface ComposerMessage {
   body: string;
   formatted: string | null;
+  mentions: OutgoingMentions;
 }
 
 const markdown = new MarkdownSerializer(
@@ -48,7 +51,21 @@ function html(doc: ProseMirrorNode): string {
 
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const body = markdown.serialize(doc).trim();
-  if (body === '') return { body, formatted: null };
+  const mentions = mentionsOf(doc, body);
+  if (body === '') return { body, formatted: null, mentions };
 
-  return { body, formatted: isPlain(doc) ? null : html(doc) };
+  return { body, formatted: isPlain(doc) ? null : html(doc), mentions };
+}
+
+export function mentionsOf(doc: ProseMirrorNode, body: string): OutgoingMentions {
+  const userIds = new Set<string>();
+
+  doc.descendants((node) => {
+    if (node.type !== composerSchema.nodes.mention) return true;
+    const userId = node.attrs.userId as string;
+    if (userId.startsWith('@')) userIds.add(userId);
+    return false;
+  });
+
+  return { userIds: [...userIds], room: /(^|\s)@room(\s|$)/.test(body) };
 }

@@ -1188,8 +1188,8 @@
 
   .reply-preview {
     align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: transparent;
+    border: 0;
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
@@ -1206,7 +1206,7 @@
   }
 
   .reply-preview:hover {
-    background: var(--sable-surface-var-container-hover);
+    background: var(--sable-surface-var-container);
   }
 
   .reply-preview :global(.reply-icon) {

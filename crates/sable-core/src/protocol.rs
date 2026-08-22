@@ -122,6 +122,11 @@ pub enum Command {
         /// thread from the replied-to event.
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
+        #[serde(default)]
+        #[ts(type = "string[]")]
+        mentions: Vec<OwnedUserId>,
+        #[serde(default)]
+        mentions_room: bool,
     },
     SendSticker {
         #[ts(type = "string")]
@@ -129,6 +134,9 @@ pub enum Command {
         /// `mxc://` only; the core rejects anything else.
         url: String,
         body: String,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        in_reply_to: Option<OwnedEventId>,
     },
     /// `edited` on the view flips once the server has the replacement.
     EditMessage {
@@ -138,6 +146,11 @@ pub enum Command {
         event_id: OwnedEventId,
         body: String,
         formatted: Option<String>,
+        #[serde(default)]
+        #[ts(type = "string[]")]
+        mentions: Vec<OwnedUserId>,
+        #[serde(default)]
+        mentions_room: bool,
     },
     /// The filled-in details arrive as a timeline diff, not as the response.
     FetchEventDetails {
@@ -159,6 +172,15 @@ pub enum Command {
         #[ts(type = "string")]
         event_id: OwnedEventId,
         key: String,
+    },
+    SendLocation {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        body: String,
+        geo_uri: String,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        in_reply_to: Option<OwnedEventId>,
     },
     /// MSC3381.
     CreatePoll {
@@ -580,6 +602,7 @@ pub enum CommandOk {
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
     SendSticker,
+    SendLocation,
     EditMessage,
     FetchEventDetails,
     Redact,
@@ -705,6 +728,7 @@ pub enum CommandErr {
     InvalidMedia,
     /// A poll needs a question and between 1 and 20 answers.
     InvalidPoll,
+    InvalidLocation,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.

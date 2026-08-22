@@ -15,6 +15,7 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { clearDrafts } from '#lib/features/composer/composer-drafts.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -37,6 +38,7 @@
 
   $effect(() => {
     if (core.status === 'signed-out') {
+      clearDrafts();
       void goto(resolve('login'), { replaceState: true });
     }
   });

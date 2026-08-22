@@ -699,7 +699,7 @@ fn text_message(
 }
 
 /// RFC 5870 `geo:lat,long[,alt]` with optional `;`-separated parameters.
-fn geo_coordinates(geo_uri: &str) -> Option<(f64, f64)> {
+pub(crate) fn geo_coordinates(geo_uri: &str) -> Option<(f64, f64)> {
     // RFC 3986: schemes are case-insensitive.
     let scheme = geo_uri.get(..4)?;
     if !scheme.eq_ignore_ascii_case("geo:") {

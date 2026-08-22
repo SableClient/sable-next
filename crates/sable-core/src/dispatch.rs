@@ -8,19 +8,21 @@ use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::events::InitialStateEvent;
+use matrix_sdk::ruma::events::relation::{InReplyTo, Reply};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
+use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, events::room::member::MembershipState,
-    events::room::message::RoomMessageEventContent,
+    OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, events::Mentions,
+    events::room::member::MembershipState, events::room::message::RoomMessageEventContent,
 };
 use matrix_sdk_ui::timeline::TimelineEventItemId;
 
@@ -221,9 +223,11 @@ impl Core {
                 body,
                 formatted,
                 in_reply_to,
+                mentions,
+                mentions_room,
             } => {
                 let timeline = self.timeline(&room_id).await?;
-                let content = message_content(body, formatted);
+                let content = message_content(body, formatted, mentions, mentions_room);
 
                 match in_reply_to {
                     // `send_reply` fills the thread relation itself.
@@ -244,15 +248,27 @@ impl Core {
                 Ok(CommandOk::SendMessage)
             }
 
-            Command::SendSticker { room_id, url, body } => {
+            Command::SendSticker {
+                room_id,
+                url,
+                body,
+                in_reply_to,
+            } => {
                 let url = OwnedMxcUri::from(url);
                 if url.parts().is_err() {
                     return Err(CommandErr::InvalidMedia);
                 }
 
                 let timeline = self.timeline(&room_id).await?;
+                let mut content = StickerEventContent::new(body, ImageInfo::new(), url);
+
+                if let Some(event_id) = in_reply_to {
+                    content.relates_to =
+                        Some(Relation::Reply(Reply::new(InReplyTo::new(event_id))));
+                }
+
                 timeline
-                    .send(StickerEventContent::new(body, ImageInfo::new(), url).into())
+                    .send(content.into())
                     .await
                     .map_err(|error| self.failed("send_sticker", error))?;
 
@@ -264,12 +280,16 @@ impl Core {
                 event_id,
                 body,
                 formatted,
+                mentions,
+                mentions_room,
             } => {
                 self.timeline(&room_id)
                     .await?
                     .edit(
                         &TimelineEventItemId::EventId(event_id),
-                        EditedContent::RoomMessage(message_content(body, formatted).into()),
+                        EditedContent::RoomMessage(
+                            message_content(body, formatted, mentions, mentions_room).into(),
+                        ),
                     )
                     .await
                     .map_err(|error| self.failed("edit_message", error))?;
@@ -396,6 +416,25 @@ impl Core {
                     .map_err(|error| self.failed("react", error))?;
 
                 Ok(CommandOk::React)
+            }
+
+            Command::SendLocation {
+                room_id,
+                body,
+                geo_uri,
+                in_reply_to,
+            } => {
+                if view::geo_coordinates(&geo_uri).is_none() {
+                    return Err(CommandErr::InvalidLocation);
+                }
+
+                self.timeline(&room_id)
+                    .await?
+                    .send_location(body, geo_uri, None, None, None, in_reply_to)
+                    .await
+                    .map_err(|error| self.failed("send_location", error))?;
+
+                Ok(CommandOk::SendLocation)
             }
 
             Command::CreatePoll {
@@ -1295,9 +1334,70 @@ impl Core {
     }
 }
 
-fn message_content(body: String, formatted: Option<String>) -> RoomMessageEventContent {
-    match formatted {
+fn message_content(
+    body: String,
+    formatted: Option<String>,
+    mentions: Vec<OwnedUserId>,
+    room: bool,
+) -> RoomMessageEventContent {
+    let content = match formatted {
         Some(html) => RoomMessageEventContent::text_html(body, html),
         None => RoomMessageEventContent::text_plain(body),
+    };
+
+    if mentions.is_empty() && !room {
+        return content;
+    }
+
+    let mut wanted = Mentions::with_user_ids(mentions);
+    wanted.room = room;
+    content.add_mentions(wanted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::message_content;
+    use crate::view;
+    use matrix_sdk::ruma::owned_user_id;
+
+    #[test]
+    fn a_message_without_pills_carries_no_mentions() {
+        let content = message_content("hello".to_owned(), None, Vec::new(), false);
+
+        assert!(content.mentions.is_none());
+    }
+
+    #[test]
+    fn pills_become_m_mentions() {
+        let content = message_content(
+            "hi One".to_owned(),
+            None,
+            vec![owned_user_id!("@one:example.org")],
+            false,
+        );
+
+        let mentions = content.mentions.expect("mentions");
+        assert!(
+            mentions
+                .user_ids
+                .contains(&owned_user_id!("@one:example.org"))
+        );
+        assert!(!mentions.room);
+    }
+
+    #[test]
+    fn a_geo_uri_is_checked_before_it_is_sent() {
+        assert!(view::geo_coordinates("geo:48.8584,2.2945").is_some());
+        assert!(view::geo_coordinates("48.8584,2.2945").is_none());
+        assert!(view::geo_coordinates("geo:91,0").is_none());
+    }
+
+    #[test]
+    fn a_room_mention_needs_no_user_ids() {
+        let content = message_content("@room heads up".to_owned(), None, Vec::new(), true);
+
+        let mentions = content.mentions.expect("mentions");
+        assert!(mentions.user_ids.is_empty());
+        assert!(mentions.room);
     }
 }

@@ -199,6 +199,31 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           });
           return;
         }
+        if (command === 'room_permissions') {
+          const roomId = (request.command as { room_id?: string }).room_id ?? '';
+          const canPost = roomId !== '!second:example.test';
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: {
+                id: request.id,
+                ok: {
+                  type: command,
+                  own_power_level: canPost ? 100 : 0,
+                  can_post: canPost,
+                  can_redact_others: canPost,
+                  can_invite: canPost,
+                  can_kick: canPost,
+                  can_ban: canPost,
+                  can_change_settings: canPost,
+                  can_change_join_rule: canPost,
+                  can_change_power_levels: canPost,
+                  can_manage_children: canPost,
+                },
+              },
+            } as MessageEvent);
+          });
+          return;
+        }
         if (command === 'account_contacts' || command === 'ignored_users') {
           const ok =
             command === 'account_contacts'

@@ -340,13 +340,8 @@ html {
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   --safe-top: var(--safe-area-inset-top);
   --safe-right: var(--safe-area-inset-right);
-  --safe-bottom: var(--safe-area-inset-bottom);
-  --safe-left: var(--safe-area-inset-left);
-}
-
-/* Android resizes the webview; iOS lifts itself. */
-html[data-tauri-os='ios'] {
   --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
+  --safe-left: var(--safe-area-inset-left);
 }
 
 html,

@@ -11,9 +11,10 @@
     core: CoreClient;
     composer: ComponentProps<typeof RoomComposer>;
     registerReply?: (reply: () => void) => void;
+    registerContext?: (set: (next: ComposerContext | null) => void) => void;
   }
 
-  let { core, composer, registerReply }: Props = $props();
+  let { core, composer, registerReply, registerContext }: Props = $props();
   let context = $state<ComposerContext | null>(
     untrack(() => composer.context as ComposerContext | null)
   );
@@ -28,6 +29,11 @@
   }
 
   untrack(() => registerReply?.(reply));
+  untrack(() =>
+    registerContext?.((next) => {
+      context = next;
+    })
+  );
 </script>
 
 <RoomComposer {...composer} {context} />

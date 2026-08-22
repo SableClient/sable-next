@@ -7,11 +7,13 @@ import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
+import { clearDrafts } from './composer-drafts';
 import { ComposerEditor } from './editor/composer-editor';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
   document.body.replaceChildren();
+  clearDrafts();
 });
 
 const members: MemberView[] = [
@@ -40,19 +42,31 @@ function core(): CoreClient {
 
 interface ComposerProps {
   roomId: string;
-  onSend?: (roomId: string, body: string, formatted?: string | null) => Promise<void>;
-  onSendAttachment?: (roomId: string, file: File) => Promise<void>;
+  onSend?: (
+    roomId: string,
+    body: string,
+    formatted: string | null,
+    mentions: { userIds: string[]; room: boolean }
+  ) => Promise<void>;
+  onSendAttachment?: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
+  readOnly?: boolean;
   registerReply?: (reply: () => void) => void;
+  registerContext?: (set: (next: ComposerContext | null) => void) => void;
 }
 
-function render({ registerReply, ...composer }: ComposerProps): ReturnType<typeof mount> {
+function render({
+  registerReply,
+  registerContext,
+  ...composer
+}: ComposerProps): ReturnType<typeof mount> {
   return mount(Harness, {
     target: document.body,
     props: {
       core: core(),
       registerReply,
+      registerContext,
       composer: {
         onSend: async () => {},
         onSendAttachment: async () => {},
@@ -122,7 +136,7 @@ test('stages any selected attachment, not only images, and sends it on submit', 
   submit();
   await tick();
 
-  expect(attachment).toHaveBeenCalledWith('!room:example.org', file);
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {});
   void unmount(instance);
 });
 
@@ -149,7 +163,79 @@ test('stages files dropped on the composer, and drops one on demand', async () =
   await tick();
 
   expect(attachment).toHaveBeenCalledTimes(1);
-  expect(attachment).toHaveBeenCalledWith('!room:example.org', second);
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', second, {});
+  void unmount(instance);
+});
+
+test('text rides a lone attachment as its caption', async () => {
+  const attachment = vi.fn(async () => {});
+  const message = vi.fn(async () => {});
+  const instance = render({
+    roomId: '!room:example.org',
+    onSendAttachment: attachment,
+    onSend: message,
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'look at this' },
+  });
+  await tick();
+  const file = new File(['one'], 'one.png', { type: 'image/png' });
+
+  await pick(file);
+  submit();
+  await tick();
+
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { caption: 'look at this' });
+  expect(message).not.toHaveBeenCalled();
+  void unmount(instance);
+});
+
+test('text follows two attachments as its own message', async () => {
+  const attachment = vi.fn(async () => {});
+  const message = vi.fn(async () => {});
+  const instance = render({
+    roomId: '!room:example.org',
+    onSendAttachment: attachment,
+    onSend: message,
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'both of these' },
+  });
+  await tick();
+
+  await pick(
+    new File(['one'], 'one.png', { type: 'image/png' }),
+    new File(['two'], 'two.png', { type: 'image/png' })
+  );
+  submit();
+  await vi.waitFor(() => {
+    expect(message).toHaveBeenCalled();
+  });
+
+  expect(attachment).toHaveBeenCalledTimes(2);
+  expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', expect.anything(), {});
+  expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', expect.anything(), {});
+  expect(message).toHaveBeenCalledWith('!room:example.org', 'both of these', null, {
+    userIds: [],
+    room: false,
+  });
+  void unmount(instance);
+});
+
+test('a drop the editor already took is not staged a second time', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+
+  const editable = document.querySelector('[role="combobox"]');
+  if (!editable) throw new Error('editor surface not found');
+  const drop = new Event('drop', { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, 'dataTransfer', {
+    value: { files: [new File(['one'], 'one.png', { type: 'image/png' })] },
+  });
+  editable.addEventListener('drop', (event) => {
+    event.preventDefault();
+  });
+
+  editable.dispatchEvent(drop);
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
   void unmount(instance);
 });
 
@@ -344,5 +430,102 @@ test('a failed attachment keeps the file staged and reports the failure', async 
   });
 
   expect(stagedNames()).toEqual(['one.png']);
+  void unmount(instance);
+});
+
+test('a read-only room offers an empty box in place of the composer', async () => {
+  const instance = render({ roomId: '!room:example.org', readOnly: true });
+  await tick();
+
+  expect(document.querySelector('p.locked')?.textContent).toBe(
+    'You do not have permission to post in this room'
+  );
+  expect(document.querySelector('[role="combobox"]')).toBeNull();
+  expect(document.querySelectorAll('.composer button')).toHaveLength(0);
+  void unmount(instance);
+});
+
+test('a staged file survives leaving the room and coming back', async () => {
+  const first = render({ roomId: '!room:example.org' });
+  await tick();
+  await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+
+  await unmount(first);
+  document.body.replaceChildren();
+  const second = render({ roomId: '!room:example.org' });
+  await tick();
+
+  expect(stagedNames()).toEqual(['one.png']);
+  void unmount(second);
+});
+
+test('another room does not inherit the draft', async () => {
+  const first = render({ roomId: '!room:example.org' });
+  await tick();
+  await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+
+  await unmount(first);
+  document.body.replaceChildren();
+  const second = render({ roomId: '!other:example.org' });
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
+  void unmount(second);
+});
+
+test('an edit hands back the draft it interrupted', async () => {
+  let setContext: ((next: ComposerContext | null) => void) | undefined;
+  const instance = render({
+    roomId: '!room:example.org',
+    registerContext: (set) => {
+      setContext = set;
+    },
+  });
+  await tick();
+  setContext?.({ kind: 'edit', eventId: '$draft:example.org', body: 'half a thought' });
+  await tick();
+  setContext?.(null);
+  await tick();
+  setContext?.({ kind: 'edit', eventId: '$one:example.org', body: 'the older message' });
+  await tick();
+
+  expect(editorText()).toBe('the older message');
+
+  setContext?.(null);
+  await tick();
+
+  expect(editorText()).toBe('half a thought');
+  void unmount(instance);
+});
+
+test('an oversized file is refused before it is staged', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+  const huge = new File(['x'], 'huge.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(huge, 'size', { value: 101 * 1024 * 1024 });
+
+  await pick(huge);
+
+  expect(stagedNames()).toEqual([]);
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('huge.bin');
+  void unmount(instance);
+});
+
+test('a batch over the limit is refused as a batch', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+  const half = (): File => {
+    const file = new File(['x'], 'half.bin', { type: 'application/octet-stream' });
+    Object.defineProperty(file, 'size', { value: 60 * 1024 * 1024 });
+    return file;
+  };
+
+  await pick(half());
+  expect(stagedNames()).toEqual(['half.bin']);
+
+  await pick(half());
+
+  expect(stagedNames()).toEqual(['half.bin']);
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('more than');
   void unmount(instance);
 });

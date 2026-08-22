@@ -25,12 +25,19 @@ import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
 import type { VerificationView } from '#src/generated/VerificationView';
 
+import { maxAttachmentBytes } from './limits';
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
-const maxAttachmentBytes = 100 * 1024 * 1024;
+export interface OutgoingMentions {
+  userIds: string[];
+  room: boolean;
+}
+
+const noMentions: OutgoingMentions = { userIds: [], room: false };
+
 const profileCacheFreshMs = 10 * 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
@@ -625,7 +632,8 @@ export class CoreClient {
     roomId: string,
     body: string,
     inReplyTo: string | null = null,
-    formatted: string | null = null
+    formatted: string | null = null,
+    mentions: OutgoingMentions = noMentions
   ): Promise<void> {
     await this.ensureTransport().send({
       type: 'send_message',
@@ -633,18 +641,47 @@ export class CoreClient {
       body,
       formatted,
       in_reply_to: inReplyTo,
+      mentions: mentions.userIds,
+      mentions_room: mentions.room,
     });
   }
 
-  async sendSticker(roomId: string, url: string, body: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'send_sticker', room_id: roomId, url, body });
+  async sendSticker(
+    roomId: string,
+    url: string,
+    body: string,
+    inReplyTo: string | null = null
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'send_sticker',
+      room_id: roomId,
+      url,
+      body,
+      in_reply_to: inReplyTo,
+    });
+  }
+
+  async sendLocation(
+    roomId: string,
+    body: string,
+    geoUri: string,
+    inReplyTo: string | null = null
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'send_location',
+      room_id: roomId,
+      body,
+      geo_uri: geoUri,
+      in_reply_to: inReplyTo,
+    });
   }
 
   async editMessage(
     roomId: string,
     eventId: string,
     body: string,
-    formatted: string | null = null
+    formatted: string | null = null,
+    mentions: OutgoingMentions = noMentions
   ): Promise<void> {
     await this.ensureTransport().send({
       type: 'edit_message',
@@ -652,6 +689,8 @@ export class CoreClient {
       event_id: eventId,
       body,
       formatted,
+      mentions: mentions.userIds,
+      mentions_room: mentions.room,
     });
   }
 
@@ -683,6 +722,41 @@ export class CoreClient {
     });
   }
 
+  async createPoll(
+    roomId: string,
+    question: string,
+    answers: readonly string[],
+    undisclosed = false,
+    maxSelections = 1
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'create_poll',
+      room_id: roomId,
+      question,
+      answers: [...answers],
+      undisclosed,
+      max_selections: maxSelections,
+    });
+  }
+
+  /** Replaces any earlier vote; an empty selection abstains. */
+  async votePoll(roomId: string, eventId: string, answers: readonly string[]): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'vote_poll',
+      room_id: roomId,
+      event_id: eventId,
+      answers: [...answers],
+    });
+  }
+
+  async endPoll(roomId: string, eventId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'end_poll',
+      room_id: roomId,
+      event_id: eventId,
+    });
+  }
+
   async retrySend(roomId: string, transactionId: string): Promise<void> {
     await this.ensureTransport().send({
       type: 'retry_send',
@@ -699,7 +773,11 @@ export class CoreClient {
     });
   }
 
-  async sendAttachment(roomId: string, file: File): Promise<void> {
+  async sendAttachment(
+    roomId: string,
+    file: File,
+    options: { caption?: string | null; inReplyTo?: string | null } = {}
+  ): Promise<void> {
     if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
     const bytes = new Uint8Array(await file.arrayBuffer());
     await this.ensureTransport().sendAttachment({
@@ -707,6 +785,8 @@ export class CoreClient {
       filename: file.name,
       mime: file.type || 'application/octet-stream',
       bytes,
+      caption: options.caption ?? null,
+      inReplyTo: options.inReplyTo ?? null,
     });
   }
 

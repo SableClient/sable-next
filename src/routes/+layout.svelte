@@ -12,6 +12,7 @@
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import TelemetryConsentBanner from '#lib/ui/TelemetryConsentBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
+  import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { activeCustomThemeCss } from '#lib/settings/custom-themes.svelte.js';
   import { applyCustomTheme, applyTheme, resolveTheme } from '#lib/settings/theme.js';
@@ -34,12 +35,13 @@
     const stopListening = on(media, 'change', updateSystemTheme);
 
     if (isTauri()) {
-      // CSS keys the keyboard inset off this.
       document.documentElement.dataset.tauriOs = osType();
     }
+    const stopTrackingKeyboard = trackKeyboardInset();
     void core.start();
     return () => {
       stopListening();
+      stopTrackingKeyboard();
       core.stop();
     };
   });

@@ -5,7 +5,7 @@ import { undo } from 'prosemirror-history';
 import type { EditorView } from 'prosemirror-view';
 
 import { activeQuery } from '../autocomplete';
-import { ComposerEditor } from './composer-editor';
+import { ComposerEditor, type ComposerEditorOptions } from './composer-editor';
 import { composerSchema } from './schema';
 import { serializeComposer } from './serialize';
 
@@ -20,7 +20,7 @@ afterEach(() => {
   Object.defineProperty(navigator, 'userAgent', { configurable: true, value: defaultUserAgent });
 });
 
-function open(): ComposerEditor {
+function openWith(overrides: Partial<ComposerEditorOptions> = {}): ComposerEditor {
   const host = document.createElement('div');
   document.body.append(host);
   const editor = new ComposerEditor({
@@ -34,9 +34,14 @@ function open(): ComposerEditor {
     onQuery: () => {},
     onNavigate: () => false,
     onFiles: () => {},
+    ...overrides,
   });
   dispose = editor.mount(host);
   return editor;
+}
+
+function open(): ComposerEditor {
+  return openWith();
 }
 
 function query(editor: ComposerEditor): { start: number; end: number; sigil: string } {
@@ -58,10 +63,11 @@ function surface(): HTMLElement {
   return element;
 }
 
-function beforeInput(element: HTMLElement, inputType: string): void {
+function beforeInput(element: HTMLElement, inputType: string): Event {
   const event = new Event('beforeinput', { bubbles: true, cancelable: true });
   Object.assign(event, { inputType });
   element.dispatchEvent(event);
+  return event;
 }
 
 function setUserAgent(userAgent: string): void {
@@ -138,6 +144,30 @@ describe('history reset', () => {
   });
 });
 
+describe('setHtml', () => {
+  test('keeps the marks of a formatted message', () => {
+    const editor = open();
+
+    editor.setHtml('<p>look <strong>here</strong></p>');
+    const doc = editor.doc();
+
+    expect(doc && serializeComposer(doc).body).toBe('look **here**');
+  });
+
+  test('keeps a mention as a mention, not as a link', () => {
+    const editor = open();
+
+    editor.setHtml('<p>ask <a href="https://matrix.to/#/@one:example.org">Member One</a></p>');
+    const doc = editor.doc();
+
+    expect(doc && serializeComposer(doc)).toEqual({
+      body: 'ask Member One',
+      formatted: 'ask <a href="https://matrix.to/#/@one:example.org">Member One</a>',
+      mentions: { userIds: ['@one:example.org'], room: false },
+    });
+  });
+});
+
 describe('Android backspace fallback', () => {
   const androidUserAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
 
@@ -184,6 +214,34 @@ describe('Android backspace fallback', () => {
     vi.advanceTimersByTime(50);
 
     expect(editor.doc()?.textContent).toBe('hi');
+  });
+});
+
+describe('Android enter', () => {
+  const androidUserAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
+
+  test.each(['insertParagraph', 'insertLineBreak'])('submits on %s', (inputType) => {
+    setUserAgent(androidUserAgent);
+    const submit = vi.fn();
+    const editor = openWith({ onSubmit: submit });
+    editor.setText('hi');
+
+    const event = beforeInput(surface(), inputType);
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+    expect(editor.doc()?.textContent).toBe('hi');
+  });
+
+  test('leaves the paragraph to ProseMirror off Android', () => {
+    setUserAgent(defaultUserAgent);
+    const submit = vi.fn();
+    openWith({ onSubmit: submit });
+
+    const event = beforeInput(surface(), 'insertParagraph');
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 });
 

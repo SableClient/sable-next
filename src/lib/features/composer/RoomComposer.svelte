@@ -7,10 +7,13 @@
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
   import { onDestroy, type Snippet } from 'svelte';
 
+  import type { OutgoingMentions } from '#lib/core/client.svelte.js';
+  import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
@@ -23,28 +26,52 @@
   import ComposerBoard from './ComposerBoard.svelte';
   import ComposerContextBanner from './ComposerContextBanner.svelte';
   import ComposerDoor from './ComposerDoor.svelte';
+  import PollComposer from './PollComposer.svelte';
   import ComposerFormatting from './ComposerFormatting.svelte';
+  import LocationComposer from './LocationComposer.svelte';
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
-  import type { ComposerContext } from './composer-context';
-  import { filesFrom, stageFiles, unstageFile, type StagedFile } from './composer-files';
+  import { formattedForEditing, type ComposerContext } from './composer-context';
+  import { clearDraft, readDraft, writeDraft } from './composer-drafts';
+  import {
+    filesFrom,
+    formatSize,
+    stageFiles,
+    unstageFile,
+    type StagedFile,
+  } from './composer-files';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
   import type { FormatAction } from './editor/formatting';
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import { serializeComposer } from './editor/serialize';
+  import { sendFailureKey } from './send-failure';
+  import { SendQueue } from './send-queue';
   import { suggestionsFor } from './suggestions';
 
   const emoteSize = 24;
 
   interface Props {
     roomId: string;
-    onSend: (roomId: string, body: string, formatted?: string | null) => Promise<void>;
-    onSendAttachment: (roomId: string, file: File) => Promise<void>;
+    onSend: (
+      roomId: string,
+      body: string,
+      formatted: string | null,
+      mentions: OutgoingMentions
+    ) => Promise<void>;
+    onSendAttachment: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
     onSendSticker?: (roomId: string, url: string, body: string) => Promise<void>;
+    onCreatePoll?: (
+      roomId: string,
+      question: string,
+      answers: string[],
+      undisclosed: boolean
+    ) => Promise<void>;
+    onSendLocation?: (roomId: string, body: string, geoUri: string) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
     typingLabel?: string | null;
     roomName?: string | null;
+    readOnly?: boolean;
     statusTrailing?: Snippet;
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
@@ -57,9 +84,12 @@
     onSend,
     onSendAttachment,
     onSendSticker,
+    onCreatePoll,
+    onSendLocation,
     onTyping,
     typingLabel = null,
     roomName = null,
+    readOnly = false,
     statusTrailing,
     context = null,
     onCancelContext,
@@ -76,17 +106,21 @@
 
   let prefilledFor: string | null = null;
   let nextStagedId = 0;
+  let restored = false;
+  let preEdit: ProseMirrorNode | undefined;
   let loadedMembersFor = $state<string | null>(null);
   let loadedEmotesFor = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
 
   let staged = $state<StagedFile[]>([]);
-  let sending = $state(false);
+  let inFlight = $state(0);
   let error = $state<string | null>(null);
+  let pollOpen = $state(false);
+  let locationOpen = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
   let activeFormats = $state.raw<FormatAction[]>([]);
-  let formattingOpen = $state(false);
+  let formattingOpen = $state(preferences.formattingToolbar);
   let dragging = $state(false);
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
@@ -96,6 +130,7 @@
   let emotes = $state.raw<PackImageView[]>([]);
 
   let desktop = $derived(appLayout.matches);
+  let sending = $derived(inFlight > 0);
   let hasContent = $derived(!empty || staged.length > 0);
   let panelOpen = $derived(query !== null && dismissedAt !== query.start);
   let suggestions = $derived(suggestionsFor(query, members, emotes, roomList.rooms));
@@ -119,7 +154,7 @@
     describedBy: hintId,
     listboxId,
     activeOptionId: () => (panelOpen && suggestions.length > 0 ? optionId(active) : null),
-    editable: () => true,
+    editable: () => !readOnly,
     onSubmit: () => {
       void send();
     },
@@ -146,17 +181,42 @@
     editor.syncActiveOption();
   });
 
+  const queue = new SendQueue();
+
+  $effect(() => {
+    if (restored) return;
+    restored = true;
+
+    const draft = readDraft(roomId);
+    if (!draft) return;
+    staged = draft.staged;
+    nextStagedId = draft.nextStagedId;
+    if (draft.doc) editor.setDoc(composerSchema.nodeFromJSON(draft.doc));
+  });
+
   onDestroy(() => {
     if (typingTimeout) clearTimeout(typingTimeout);
     stopTyping();
+    queue.dispose();
+
+    const doc = preEdit ?? (editor.isEmpty() ? undefined : editor.doc());
+    if (!doc && staged.length === 0) clearDraft(roomId);
+    else writeDraft(roomId, { doc: doc?.toJSON() ?? null, staged, nextStagedId });
   });
 
   $effect(() => {
     if (context?.kind === 'edit' && prefilledFor !== context.eventId) {
+      if (prefilledFor === null && !editor.isEmpty()) preEdit = editor.doc();
       prefilledFor = context.eventId;
-      editor.setText(context.body);
+      const formatted = formattedForEditing(context.html);
+      if (formatted === null) editor.setText(context.body);
+      else editor.setHtml(formatted);
     } else if (context === null) {
       prefilledFor = null;
+      if (preEdit) {
+        editor.setDoc(preEdit);
+        preEdit = undefined;
+      }
     }
   });
 
@@ -232,12 +292,12 @@
   }
 
   async function send(): Promise<void> {
-    if (!hasContent || sending) return;
+    if (!hasContent || readOnly) return;
 
     const doc = editor.doc();
-    let attachments = staged;
+    let unsent = staged;
 
-    sending = true;
+    inFlight += 1;
     error = null;
     editor.clear();
     staged = [];
@@ -245,21 +305,29 @@
     stopTyping();
 
     try {
-      const message = doc ? serializeComposer(doc) : { body: '', formatted: null };
-      while (attachments.length > 0) {
-        const [next, ...rest] = attachments;
-        await onSendAttachment(roomId, next.file);
-        attachments = rest;
-      }
-      await onSend(roomId, message.body, message.formatted);
+      await queue.enqueue(async () => {
+        const message = doc
+          ? serializeComposer(doc)
+          : { body: '', formatted: null, mentions: { userIds: [], room: false } };
+        const captioned = unsent.length === 1 && message.body !== '';
+
+        while (unsent.length > 0) {
+          const [next, ...rest] = unsent;
+          await onSendAttachment(roomId, next.file, captioned ? { caption: message.body } : {});
+          unsent = rest;
+        }
+
+        if (captioned || message.body === '') return;
+        await onSend(roomId, message.body, message.formatted, message.mentions);
+      });
       editor.clearHistory();
     } catch (cause) {
       console.debug('[sable composer] send failed', cause);
       if (doc && editor.isEmpty()) editor.setDoc(doc);
-      staged = attachments;
-      error = $i18n.t('timeline.sendFailed');
+      staged = [...unsent, ...staged];
+      error = $i18n.t(sendFailureKey(cause));
     } finally {
-      sending = false;
+      inFlight -= 1;
     }
   }
 
@@ -275,7 +343,7 @@
         error = null;
       } catch (cause) {
         console.debug('[sable composer] sticker failed', cause);
-        error = $i18n.t('timeline.sendFailed');
+        error = $i18n.t(sendFailureKey(cause));
       }
       return;
     }
@@ -288,6 +356,25 @@
 
   function stage(files: File[]): void {
     if (files.length === 0) return;
+
+    const tooLarge = files.find((file) => file.size > maxAttachmentBytes);
+    if (tooLarge) {
+      error = $i18n.t('composer.tooLarge', {
+        name: tooLarge.name,
+        limit: formatSize(maxAttachmentBytes),
+      });
+      return;
+    }
+
+    const total = [...staged.map((item) => item.file), ...files].reduce(
+      (bytes, file) => bytes + file.size,
+      0
+    );
+    if (total > maxAttachmentBytes) {
+      error = $i18n.t('composer.batchTooLarge', { limit: formatSize(maxAttachmentBytes) });
+      return;
+    }
+
     staged = stageFiles(staged, files, () => nextStagedId++);
   }
 
@@ -313,8 +400,10 @@
   }
 
   function handleDrop(event: DragEvent): void {
-    const files = filesFrom(event.dataTransfer);
     dragging = false;
+    if (event.defaultPrevented) return;
+
+    const files = filesFrom(event.dataTransfer);
     if (files.length === 0) return;
     event.preventDefault();
     stage(files);
@@ -366,6 +455,10 @@
         onEditLast();
         return true;
       }
+      if (key === 'Escape' && context) {
+        cancelContext();
+        return true;
+      }
       return false;
     }
 
@@ -402,130 +495,176 @@
       {@render statusTrailing()}
     {/if}
   </div>
-  <div class="composer-shell">
-    <div
-      class={['composer', { dragging }]}
-      role="group"
-      aria-label={$i18n.t('timeline.messagePlaceholder')}
-      ondrop={handleDrop}
-      ondragover={handleDragover}
-      ondragleave={handleDragleave}
-    >
-      {#if context}
-        <ComposerContextBanner {context} onCancel={cancelContext} />
-      {/if}
-      {#if staged.length > 0}
-        <ComposerAttachments
-          files={staged}
-          disabled={sending}
-          onRemove={(id: number) => {
-            staged = unstageFile(staged, id);
-          }}
-        />
-      {/if}
-      {#if formattingOpen}
-        <ComposerFormatting
-          active={activeFormats}
-          onFormat={(action: FormatAction) => {
-            editor.format(action);
-          }}
-        />
-      {/if}
-      <form
-        class="composer-row"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void send();
-        }}
+  {#if readOnly}
+    <div class="composer-shell">
+      <div class="composer">
+        <div class="composer-row">
+          <p class="locked">{$i18n.t('composer.readOnly')}</p>
+        </div>
+      </div>
+    </div>
+  {:else}
+    <div class="composer-shell">
+      <div
+        class={['composer', { dragging }]}
+        role="group"
+        aria-label={$i18n.t('timeline.messagePlaceholder')}
+        ondrop={handleDrop}
+        ondragover={handleDragover}
+        ondragleave={handleDragleave}
       >
-        <ComposerDoor
-          {desktop}
-          disabled={sending}
-          onPick={pick}
-          onBeforeOpen={!desktop ? blurEditor : undefined}
-        />
-        <input
-          bind:this={fileInput}
-          class="composer-file"
-          id="composer-file-{uid}"
-          name="attachment"
-          type="file"
-          multiple
-          tabindex="-1"
-          aria-hidden="true"
-          onchange={stageFromInput}
-        />
-        <div class="composer-field">
-          <ComposerEditorView {editor} {empty} {placeholder} />
-          {#if panelOpen && query}
-            <ComposerAutocomplete
-              id={listboxId}
-              {optionId}
-              sigil={query.sigil}
-              heading={query.sigil === '@'
-                ? $i18n.t('composer.membersHeading', { query: query.query })
-                : query.sigil === '#'
-                  ? $i18n.t('composer.roomsHeading', { query: query.query })
-                  : $i18n.t('composer.emotesHeading', { query: query.query })}
-              {suggestions}
-              {active}
-              onSelect={commit}
-            />
-          {/if}
-          <ComposerBoard
-            {roomId}
+        {#if context}
+          <ComposerContextBanner {context} onCancel={cancelContext} />
+        {/if}
+        {#if staged.length > 0}
+          <ComposerAttachments
+            files={staged}
+            onRemove={(id: number) => {
+              staged = unstageFile(staged, id);
+            }}
+          />
+        {/if}
+        {#if formattingOpen}
+          <ComposerFormatting
+            active={activeFormats}
+            onFormat={(action: FormatAction) => {
+              editor.format(action);
+            }}
+          />
+        {/if}
+        <form
+          class="composer-row"
+          onsubmit={(event) => {
+            event.preventDefault();
+            void send();
+          }}
+        >
+          <ComposerDoor
             {desktop}
-            disabled={sending}
-            onPick={pickFromBoard}
-            onPickUnicode={pickUnicodeFromBoard}
+            onPick={pick}
+            onPoll={onCreatePoll
+              ? () => {
+                  pollOpen = true;
+                }
+              : undefined}
+            onLocation={onSendLocation
+              ? () => {
+                  locationOpen = true;
+                }
+              : undefined}
             onBeforeOpen={!desktop ? blurEditor : undefined}
           />
-        </div>
-        <IconButton
-          variant="ghost"
-          size="small"
-          class="composer-format"
-          disabled={sending}
-          aria-pressed={formattingOpen}
-          label={$i18n.t('composer.formatting')}
-          onclick={() => {
-            formattingOpen = !formattingOpen;
-          }}
-        >
-          <TextAaIcon />
-        </IconButton>
-        <IconButton
-          type="submit"
-          variant="ghost"
-          size="small"
-          class="composer-send"
-          disabled={sending || !hasContent}
-          label={$i18n.t('timeline.sendMessage')}
-          onpointerdown={(event: PointerEvent) => {
-            if (hasContent) event.preventDefault();
-          }}
-          onmousedown={(event: MouseEvent) => {
-            if (hasContent) event.preventDefault();
-          }}
-        >
-          {#if sending}
-            <Spinner small />
-          {:else}
-            <PaperPlaneIcon weight="fill" />
-          {/if}
-        </IconButton>
-      </form>
-      <p class="composer-hint" id={hintId}>{$i18n.t('composer.hintSend')}</p>
+          <input
+            bind:this={fileInput}
+            class="composer-file"
+            id="composer-file-{uid}"
+            name="attachment"
+            type="file"
+            multiple
+            tabindex="-1"
+            aria-hidden="true"
+            onchange={stageFromInput}
+          />
+          <div class="composer-field">
+            <ComposerEditorView {editor} {empty} {placeholder} />
+            {#if panelOpen && query}
+              <ComposerAutocomplete
+                id={listboxId}
+                {optionId}
+                sigil={query.sigil}
+                heading={query.sigil === '@'
+                  ? $i18n.t('composer.membersHeading', { query: query.query })
+                  : query.sigil === '#'
+                    ? $i18n.t('composer.roomsHeading', { query: query.query })
+                    : $i18n.t('composer.emotesHeading', { query: query.query })}
+                {suggestions}
+                {active}
+                onSelect={commit}
+              />
+            {/if}
+            <ComposerBoard
+              {roomId}
+              {desktop}
+              onPick={pickFromBoard}
+              onPickUnicode={pickUnicodeFromBoard}
+              onBeforeOpen={!desktop ? blurEditor : undefined}
+            />
+          </div>
+          <IconButton
+            variant="ghost"
+            size="small"
+            class="composer-format"
+            aria-pressed={formattingOpen}
+            label={$i18n.t('composer.formatting')}
+            onclick={() => {
+              formattingOpen = !formattingOpen;
+            }}
+          >
+            <TextAaIcon />
+          </IconButton>
+          <IconButton
+            type="submit"
+            variant="ghost"
+            size="small"
+            class="composer-send"
+            disabled={!hasContent}
+            label={$i18n.t('timeline.sendMessage')}
+            onpointerdown={(event: PointerEvent) => {
+              if (hasContent) event.preventDefault();
+            }}
+            onmousedown={(event: MouseEvent) => {
+              if (hasContent) event.preventDefault();
+            }}
+          >
+            {#if sending}
+              <Spinner small />
+            {:else}
+              <PaperPlaneIcon weight="fill" />
+            {/if}
+          </IconButton>
+        </form>
+        <p class="composer-hint" id={hintId}>
+          {preferences.enterForNewline
+            ? $i18n.t('composer.hintSendModifier')
+            : $i18n.t('composer.hintSend')}
+        </p>
+      </div>
     </div>
-  </div>
+  {/if}
   {#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
 </div>
+
+{#if onSendLocation}
+  <LocationComposer
+    bind:open={locationOpen}
+    onSend={(body: string, geoUri: string) => {
+      void queue.enqueue(async () => {
+        try {
+          await onSendLocation(roomId, body, geoUri);
+          error = null;
+        } catch (cause) {
+          console.debug('[sable composer] location failed', cause);
+          error = $i18n.t(sendFailureKey(cause));
+        }
+      });
+    }}
+  />
+{/if}
+
+{#if onCreatePoll}
+  <PollComposer
+    bind:open={pollOpen}
+    onCreate={(question: string, answers: string[], undisclosed: boolean) => {
+      void onCreatePoll(roomId, question, answers, undisclosed);
+    }}
+  />
+{/if}
 
 <style>
   .composer-stack {
     --composer-gutter: var(--space-2);
 
-    margin: 0 auto 0.95rem;
+    margin: 0 auto;
     position: relative;
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }
@@ -604,6 +743,17 @@
     gap: 0.5rem;
     padding: 0.5rem;
     width: 100%;
+  }
+
+  .locked {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    margin: 0;
+    min-height: 2.625rem;
+    padding: 0.5rem 0.75rem;
   }
 
   .composer-field {
@@ -699,6 +849,11 @@
 
     .composer-row {
       padding: var(--space-compact);
+    }
+
+    .locked {
+      min-height: var(--control-height-small);
+      padding-block: 0.375rem;
     }
   }
 

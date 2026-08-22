@@ -217,10 +217,7 @@
     height: 100%;
     min-width: 0;
     overflow: hidden;
-
-    /* Both insets, on the panels: they are the elements that carry a background,
-       so each paints the region the webview draws under. */
-    padding-block: var(--safe-top) var(--safe-bottom);
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
     width: 50%;
   }
 

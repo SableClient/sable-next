@@ -137,7 +137,7 @@
     box-shadow: var(--shadow-dialog);
     display: flex;
     flex-direction: column;
-    inset: var(--safe-top) 0 var(--safe-bottom) auto;
+    inset: 0 0 0 auto;
     max-width: min(22rem, 85%);
     position: absolute;
     width: 100%;

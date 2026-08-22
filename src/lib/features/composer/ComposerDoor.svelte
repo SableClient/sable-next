@@ -2,6 +2,7 @@
   import { DropdownMenu } from 'bits-ui';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
+  import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
@@ -14,10 +15,11 @@
     disabled?: boolean;
     onPick: (accept: string) => void;
     onPoll?: () => void;
+    onLocation?: () => void;
     onBeforeOpen?: () => void;
   }
 
-  let { desktop, disabled = false, onPick, onPoll, onBeforeOpen }: Props = $props();
+  let { desktop, disabled = false, onPick, onPoll, onLocation, onBeforeOpen }: Props = $props();
   let open = $state(false);
 
   const media = 'image/*,video/*';
@@ -51,6 +53,12 @@
           <DropdownMenu.Item onclick={onPoll}>
             <ChartBarIcon />
             {$i18n.t('composer.poll')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if onLocation}
+          <DropdownMenu.Item onclick={onLocation}>
+            <MapPinIcon />
+            {$i18n.t('composer.location')}
           </DropdownMenu.Item>
         {/if}
       </DropdownMenu.Content>
@@ -108,6 +116,19 @@
         >
           <ChartBarIcon />
           {$i18n.t('composer.poll')}
+        </Button>
+      {/if}
+      {#if onLocation}
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onLocation();
+          }}
+        >
+          <MapPinIcon />
+          {$i18n.t('composer.location')}
         </Button>
       {/if}
     </div>

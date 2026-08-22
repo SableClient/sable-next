@@ -11,6 +11,19 @@ const runtimeDeclarationPattern = /style:\s*(--[a-z0-9_-]+)\s*=/gi;
 const setPropertyPattern = /setProperty\(\s*['"](--[a-z0-9_-]+)['"]/gi;
 const variableReferencePattern = /var\(\s*(--[a-z0-9_-]+)/gi;
 const literalColorPattern = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\()/gi;
+const safeAreaPattern = /--safe-(?:top|right|bottom|left)\b/gi;
+
+// An inset must be applied once, by the element that paints under the system
+// bar. Everything nested inside one of these already sits in cleared space, so a
+// second reference doubles the gap -- which is only visible on a device.
+const safeAreaOwners = new Set([
+  'src/styles.css',
+  'src/lib/ui/MobileNavDrawer.svelte',
+  'src/lib/ui/primitives/BottomSheet.svelte',
+  'src/lib/ui/primitives/DialogFrame.svelte',
+  'src/lib/features/room/MediaViewer.svelte',
+  'src/lib/features/auth/flow/AuthFlow.svelte',
+]);
 
 // Manually verified dependency-provided properties that source scanning cannot detect.
 // --keyboard-height is injected by tauri-plugin-edge-to-edge on Android/iOS.
@@ -51,6 +64,7 @@ const files = await sourceFiles(sourceRoot);
 const declared = new Map();
 const referenced = new Map();
 const literalColors = [];
+const safeAreaTrespassers = [];
 
 for (const file of files) {
   const source = await readFile(file, 'utf8');
@@ -75,6 +89,13 @@ for (const file of files) {
     addLocation(referenced, property, file, source, match.index);
   }
 
+  const path = relative(root, file).split('\\').join('/');
+  if (!safeAreaOwners.has(path)) {
+    for (const match of source.matchAll(safeAreaPattern)) {
+      safeAreaTrespassers.push(`${path}:${lineNumber(source, match.index)} (${match[0]})`);
+    }
+  }
+
   const isStyleFile = styleExtensions.has(file.slice(file.lastIndexOf('.')));
   if (
     isStyleFile &&
@@ -91,7 +112,7 @@ const missing = [...referenced.keys()]
   .filter((property) => !declared.has(property) && !externalProperties.has(property))
   .sort();
 
-if (missing.length > 0 || literalColors.length > 0) {
+if (missing.length > 0 || literalColors.length > 0 || safeAreaTrespassers.length > 0) {
   if (missing.length > 0) {
     console.error('Unknown project custom properties:');
     for (const property of missing) {
@@ -102,8 +123,14 @@ if (missing.length > 0 || literalColors.length > 0) {
     console.error('Literal colors must be declared as theme tokens in src/styles.css:');
     for (const location of literalColors) console.error(`  ${location}`);
   }
+  if (safeAreaTrespassers.length > 0) {
+    console.error('Safe-area insets may only be applied by a surface root:');
+    for (const owner of [...safeAreaOwners].sort()) console.error(`  owner: ${owner}`);
+    for (const location of safeAreaTrespassers) console.error(`  ${location}`);
+  }
   process.exitCode = 1;
 } else {
   const checked = [...new Set([...declared.keys(), ...referenced.keys()])].sort();
   console.log(`Checked ${checked.length} project custom properties; all references are declared.`);
+  console.log(`Safe-area insets are applied only by the ${safeAreaOwners.size} surface roots.`);
 }

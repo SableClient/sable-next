@@ -343,8 +343,6 @@
     composerContext = null;
   }
 
-  // The reply relation belongs to the first event of a send, which is an
-  // attachment whenever there is one.
   async function sendAttachment(
     targetRoomId: string,
     file: File,
@@ -356,7 +354,9 @@
   }
 
   async function sendSticker(targetRoomId: string, url: string, body: string): Promise<void> {
-    await core.sendSticker(targetRoomId, url, body);
+    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
+    await core.sendSticker(targetRoomId, url, body, replyTo);
+    if (replyTo !== null) composerContext = null;
   }
 
   async function createPoll(
@@ -366,6 +366,12 @@
     undisclosed: boolean
   ): Promise<void> {
     await core.createPoll(targetRoomId, question, answers, undisclosed);
+  }
+
+  async function sendLocation(targetRoomId: string, body: string, geoUri: string): Promise<void> {
+    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
+    await core.sendLocation(targetRoomId, body, geoUri, replyTo);
+    if (replyTo !== null) composerContext = null;
   }
 
   async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
@@ -495,6 +501,7 @@
           onSendAttachment={sendAttachment}
           onSendSticker={sendSticker}
           onCreatePoll={createPoll}
+          onSendLocation={sendLocation}
           onTyping={setTyping}
           {typingLabel}
           {roomName}
@@ -582,6 +589,7 @@
     height: 100%;
     min-height: 0;
     min-width: 0;
+    position: relative;
   }
 
   .timeline {
@@ -595,9 +603,8 @@
     position: relative;
   }
 
-  /* Clears the navigation bar, and the soft keyboard where it overlays. */
   .composer-dock {
     flex: 0 0 auto;
-    padding-bottom: var(--safe-bottom);
+    padding-bottom: 0.95rem;
   }
 </style>

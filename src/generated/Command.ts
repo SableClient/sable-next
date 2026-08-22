@@ -18,11 +18,11 @@ hidden_events: boolean, } | { "type": "unsubscribe", subscription: SubscriptionI
  * Replying inside a thread needs no extra field: the SDK infers the
  * thread from the replied-to event.
  */
-in_reply_to: string | null, } | { "type": "send_sticker", room_id: string, 
+in_reply_to: string | null, mentions: string[], mentions_room: boolean, } | { "type": "send_sticker", room_id: string, 
 /**
  * `mxc://` only; the core rejects anything else.
  */
-url: string, body: string, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
+url: string, body: string, in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, mentions: string[], mentions_room: boolean, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "send_location", room_id: string, body: string, geo_uri: string, in_reply_to: string | null, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
 /**
  * Withholds the tally until the poll closes.
  */

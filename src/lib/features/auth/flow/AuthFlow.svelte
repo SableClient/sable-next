@@ -640,7 +640,7 @@
     flex-direction: column;
     min-height: 100%;
     padding: 2rem 1.5rem;
-    padding-bottom: calc(2rem + var(--safe-bottom));
+    padding-block: calc(2rem + var(--safe-top)) calc(2rem + var(--safe-bottom));
   }
 
   .auth-content {
