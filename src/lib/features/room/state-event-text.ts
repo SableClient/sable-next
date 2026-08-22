@@ -61,3 +61,39 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
       return t('timeline.redacted');
   }
 }
+
+const SUBJECT_MARKER = '\u0000';
+
+export function stateEventSubject(
+  item: TimelineItemView,
+  t: Translate
+): { userId: string; name: string; before: string; after: string } | null {
+  const content = item.content;
+  let userId: string | null;
+  let name: string | null;
+  switch (content.kind) {
+    case 'membership':
+      userId = content.user_id;
+      name = content.display_name ?? content.user_id;
+      break;
+    case 'profile_change':
+      userId = content.user_id;
+      name = content.display_name?.old ?? content.user_id;
+      break;
+    case 'state_event':
+      if (content.change === null) return null;
+      userId = item.sender;
+      name = item.sender_name ?? item.sender;
+      break;
+    default:
+      return null;
+  }
+  if (!userId || !name) return null;
+
+  const text = stateEventText(item, (key, values) =>
+    values && 'user' in values ? t(key, { ...values, user: SUBJECT_MARKER }) : t(key, values)
+  );
+  const at = text.indexOf(SUBJECT_MARKER);
+  if (at === -1) return null;
+  return { userId, name, before: text.slice(0, at), after: text.slice(at + 1) };
+}

@@ -283,3 +283,37 @@ test('renders a redacted row and a worded state change without throwing', async 
     target.remove();
   }
 });
+
+test('shows every pronoun set from the sender account profile', async () => {
+  core.userProfile.mockResolvedValue({
+    pronouns: [
+      { summary: 'she/her', language: null },
+      { summary: 'they/them', language: null },
+    ],
+  });
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('header .pronouns')).toHaveLength(2);
+  });
+  await unmount(instance);
+});
+
+test('tolerates repeated pronoun summaries', async () => {
+  core.userProfile.mockResolvedValue({
+    pronouns: [
+      { summary: 'she/her', language: 'en' },
+      { summary: 'she/her', language: 'fr' },
+    ],
+  });
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('header .pronouns')).toHaveLength(2);
+  });
+  await unmount(instance);
+});

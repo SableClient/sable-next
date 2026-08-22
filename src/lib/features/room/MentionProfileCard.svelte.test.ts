@@ -154,3 +154,42 @@ test('renders the extended profile fields', async () => {
   expect(document.querySelector('.profile-extra dt')?.textContent).toBe('net.example.mood');
   await unmount(instance);
 });
+
+test('reserves the metadata row while the profile is still loading', async () => {
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: null,
+    },
+  });
+  await tick();
+
+  expect(document.querySelectorAll('.profile-card-meta .sable-skeleton')).toHaveLength(2);
+  await unmount(instance);
+});
+
+test('keeps a failed profile silent when the room member still names the user', async () => {
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Room Alice',
+        avatar_url: null,
+        power_level: 0,
+      },
+      profile: null,
+      failed: true,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('[role="status"]')).toBeNull();
+  expect(document.querySelector('.profile-card-name')?.textContent).toBe('Room Alice');
+  await unmount(instance);
+});

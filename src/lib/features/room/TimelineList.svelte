@@ -42,9 +42,7 @@
     nextPosition,
     type TimelinePosition,
   } from './timeline-position';
-  import FoldedEventRun from './FoldedEventRun.svelte';
   import {
-    foldEventRuns,
     isCollapsed,
     latestEventId,
     personasByEventId,
@@ -53,6 +51,7 @@
   } from './timeline-format';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
+  import TypingIndicator from './TypingIndicator.svelte';
 
   interface Props {
     timeline: RoomTimeline;
@@ -81,6 +80,7 @@
     scrollLocked?: boolean;
     nearLatest?: boolean;
     followingLive?: boolean;
+    typingLabel?: string | null;
   }
 
   let {
@@ -112,11 +112,9 @@
     /* The parent reads this through its binding, which eslint cannot see. */
     /* eslint-disable-next-line no-useless-assignment */
     followingLive = $bindable(false),
+    typingLabel = null,
   }: Props = $props();
-  let folded = $derived(
-    foldEventRuns(visibleTimelineItems(timeline.items, preferences, { readOnly }))
-  );
-  let visibleItems = $derived(folded.items);
+  let visibleItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
 
@@ -914,7 +912,6 @@
         {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
           {@const item = visibleItems[virtualItem.index]}
           {#if item}
-            {@const run = folded.runs.get(item.id)}
             {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
             {@const groupStart = virtualItem.index > 0 && !collapsed}
             <div
@@ -925,40 +922,36 @@
               style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
               {@attach measure}
             >
-              {#if run}
-                <FoldedEventRun {run} />
-              {:else}
-                <TimelineItem
-                  {item}
-                  {collapsed}
-                  unreadCount={item.content.kind === 'read_marker'
-                    ? unreadCountAfter(visibleItems, virtualItem.index)
-                    : 0}
-                  replyPersona={item.in_reply_to
-                    ? (personas.get(item.in_reply_to.event_id) ?? null)
-                    : null}
-                  highlighted={focusEventId !== null && item.event_id === focusEventId}
-                  {onMatrixLink}
-                  {onCopyLink}
-                  {onSenderProfile}
-                  {onRetrySend}
-                  {onCancelSend}
-                  {currentUserId}
-                  {onToggleReaction}
-                  {onReply}
-                  {onEdit}
-                  {onDelete}
-                  {canRedactOthers}
-                  {members}
-                  layout={preferences.layout}
-                  {onJumpToEvent}
-                  {onOpenMedia}
-                  {onVotePoll}
-                  {onEndPoll}
-                  onPersonaOpenChange={setPersonaOpen}
-                  {roomId}
-                />
-              {/if}
+              <TimelineItem
+                {item}
+                {collapsed}
+                unreadCount={item.content.kind === 'read_marker'
+                  ? unreadCountAfter(visibleItems, virtualItem.index)
+                  : 0}
+                replyPersona={item.in_reply_to
+                  ? (personas.get(item.in_reply_to.event_id) ?? null)
+                  : null}
+                highlighted={focusEventId !== null && item.event_id === focusEventId}
+                {onMatrixLink}
+                {onCopyLink}
+                {onSenderProfile}
+                {onRetrySend}
+                {onCancelSend}
+                {currentUserId}
+                {onToggleReaction}
+                {onReply}
+                {onEdit}
+                {onDelete}
+                {canRedactOthers}
+                {members}
+                layout={preferences.layout}
+                {onJumpToEvent}
+                {onOpenMedia}
+                {onVotePoll}
+                {onEndPoll}
+                onPersonaOpenChange={setPersonaOpen}
+                {roomId}
+              />
             </div>
           {/if}
         {/each}
@@ -988,6 +981,8 @@
       onclick={jumpToLatest}>{$i18n.t('timeline.jumpToLatest')}</Button
     >
   {/if}
+
+  <TypingIndicator label={typingLabel} />
 </div>
 
 <style>

@@ -50,6 +50,30 @@ test('opens Matrix links through the room-level handler', async () => {
   await unmount(instance);
 });
 
+test('prefixes a user mention with its sigil', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<a href="https://matrix.to/#/@ana:example.org">Ana</a>' },
+  });
+  await tick();
+
+  const anchor = document.querySelector<HTMLAnchorElement>('a');
+  expect(anchor?.dataset.matrixLink).toBe('user');
+  expect(anchor?.textContent).toBe('@Ana');
+  await unmount(instance);
+});
+
+test('leaves a user mention that already carries its sigil alone', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<a href="https://matrix.to/#/@ana:example.org">@ana:example.org</a>' },
+  });
+  await tick();
+
+  expect(document.querySelector('a')?.textContent).toBe('@ana:example.org');
+  await unmount(instance);
+});
+
 test('turns a bare room permalink into a room mention', async () => {
   const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
   const instance = mount(FormattedBody, { target: document.body, props: { html: url } });

@@ -138,40 +138,6 @@ export function personasByEventId(
   return personas;
 }
 
-const FOLDABLE_KINDS = new Set(['membership', 'profile_change', 'state_event', 'hidden_event']);
-const FOLD_MIN_RUN = 3;
-export const FOLD_SUMMARY_COUNT = 2;
-
-export interface FoldedTimeline {
-  items: TimelineItemView[];
-  runs: Map<string, TimelineItemView[]>;
-}
-
-export function foldEventRuns(items: readonly TimelineItemView[]): FoldedTimeline {
-  const folded: TimelineItemView[] = [];
-  const runs = new Map<string, TimelineItemView[]>();
-
-  let index = 0;
-  while (index < items.length) {
-    const item = items[index];
-    if (!FOLDABLE_KINDS.has(item.content.kind)) {
-      folded.push(item);
-      index += 1;
-      continue;
-    }
-
-    let end = index + 1;
-    while (end < items.length && FOLDABLE_KINDS.has(items[end].content.kind)) end += 1;
-    const run = items.slice(index, end);
-    folded.push(item);
-    if (run.length >= FOLD_MIN_RUN) runs.set(item.id, run);
-    else folded.push(...run.slice(1));
-    index = end;
-  }
-
-  return { items: folded, runs };
-}
-
 const senderColors = [
   'var(--sable-primary-main)',
   'var(--sable-sec-main)',

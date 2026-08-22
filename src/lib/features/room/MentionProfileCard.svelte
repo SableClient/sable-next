@@ -102,7 +102,7 @@
     });
   });
   let extra = $derived(currentProfile?.extra ?? []);
-  let showFailure = $derived(failed && !currentProfile);
+  let showFailure = $derived(failed && !currentProfile && member === null);
   let profileLoading = $derived(!currentProfile && !failed);
   let isSelf = $derived(core.session?.user_id === userId);
   let canMessage = $derived(core.session !== null && !isSelf);
@@ -414,12 +414,9 @@
   </DropdownMenu.Root>
 {/snippet}
 
-{#snippet bioPlaceholder()}
-  <div class="profile-bio-placeholder">
-    <Skeleton style="height: 0.8125rem; width: 90%" />
-    <Skeleton style="height: 0.8125rem; width: 75%" />
-    <Skeleton style="height: 0.8125rem; width: 45%" />
-  </div>
+{#snippet metaPlaceholder()}
+  <span class="profile-meta-item"><Skeleton style="height: 0.8125rem; width: 5rem" /></span>
+  <span class="profile-meta-item"><Skeleton style="height: 0.8125rem; width: 7rem" /></span>
 {/snippet}
 
 {#snippet bioPanel()}
@@ -505,15 +502,9 @@
   nameColorDark={currentProfile?.name_color_dark}
   bioMoreLabel={shared ? undefined : $i18n.t('timeline.profileBioMore')}
   bioLessLabel={shared ? undefined : $i18n.t('timeline.profileBioLess')}
-  meta={hasMeta ? metaRow : undefined}
+  meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
-  children={shared
-    ? sharedPanel
-    : showFailure || currentProfile?.bio
-      ? bioPanel
-      : profileLoading
-        ? bioPlaceholder
-        : undefined}
+  children={shared ? sharedPanel : showFailure || currentProfile?.bio ? bioPanel : undefined}
   footer={!shared && extra.length > 0 ? miscData : undefined}
   composer={canMessage ? composer : undefined}
   {variant}
@@ -676,11 +667,6 @@
     color: var(--sable-crit-main);
     font-size: var(--font-size-small);
     margin: var(--space-1) 0 0;
-  }
-
-  .profile-bio-placeholder {
-    display: grid;
-    gap: 0.375rem;
   }
 
   .profile-extra {

@@ -95,10 +95,12 @@
         const link = parseMatrixLink(anchor.href);
         if (link) {
           anchor.dataset.matrixLink = link.kind;
-          if (
-            link.kind !== 'user' &&
-            anchor.textContent.trim() === anchor.getAttribute('href')?.trim()
-          ) {
+          if (link.kind === 'user') {
+            const label = anchor.textContent.trim();
+            if (label && !label.startsWith('@')) anchor.textContent = `@${label}`;
+            continue;
+          }
+          if (anchor.textContent.trim() === anchor.getAttribute('href')?.trim()) {
             anchor.textContent = link.roomId;
             void resolveRoomName(link, anchor);
           }

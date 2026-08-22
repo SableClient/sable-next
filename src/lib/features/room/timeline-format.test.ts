@@ -6,10 +6,9 @@ import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
-import { stateEventText } from './state-event-text';
+import { stateEventSubject, stateEventText } from './state-event-text';
 import {
   canRedact,
-  foldEventRuns,
   isCollapsed,
   jumboEmojiLevel,
   readReceiptEventId,
@@ -145,23 +144,6 @@ test("keeps a persona message out of the account's collapsed run", () => {
   expect(isCollapsed(items, 1)).toBe(false);
 });
 
-test('folds a contiguous run of three or more events behind its head', () => {
-  const left = item(
-    { kind: 'membership', user_id: '@c:b', change: 'left', display_name: null },
-    'c'
-  );
-  const run = [joined, renamed, left];
-  const folded = foldEventRuns([message, ...run, message]);
-
-  expect(folded.items).toEqual([message, joined, message]);
-  expect(folded.runs.get(joined.id)).toEqual(run);
-});
-
-test('leaves short runs and message-separated events unfolded', () => {
-  expect(foldEventRuns([joined, renamed]).runs.size).toBe(0);
-  expect(foldEventRuns([joined, message, renamed, message, topic]).runs.size).toBe(0);
-});
-
 test('drops a divider whose whole run was filtered out', () => {
   expect(visibleTimelineItems([divider, renamed, divider, message], defaults)).toEqual([
     divider,
@@ -290,4 +272,39 @@ test('a room whose every event is redacted is not blank at the shipped default',
   expect(visibleTimelineItems([deleted], { ...defaults, showTombstoneEvents: true })).toEqual([
     deleted,
   ]);
+});
+
+test('splits the state copy around the subject so the name can open a profile', () => {
+  const interpolate = (key: string, values?: Record<string, unknown>) =>
+    `${key} by ${String(values?.user)}.`;
+
+  expect(stateEventSubject(joined, interpolate)).toEqual({
+    userId: '@a:b',
+    name: '@a:b',
+    before: 'timeline.membership.joined by ',
+    after: '.',
+  });
+  expect(stateEventSubject(renamed, interpolate)?.name).toBe('a');
+  expect(stateEventSubject(stateChange({ kind: 'room_topic', topic: null }), interpolate)).toEqual({
+    userId: '@alice:example.org',
+    name: 'Alice',
+    before: 'timeline.roomTopicRemoved by ',
+    after: '.',
+  });
+});
+
+test('leaves copy with no subject unlinked', () => {
+  expect(stateEventSubject(message, (k) => k)).toBeNull();
+  expect(
+    stateEventSubject(
+      item({
+        kind: 'state_event',
+        event_type: 'm.room.power_levels',
+        state_key: '',
+        content: null,
+        change: null,
+      }),
+      (k) => k
+    )
+  ).toBeNull();
 });

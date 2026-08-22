@@ -28,7 +28,7 @@
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import type { MatrixLink } from './matrix-link';
-  import { stateEventText } from './state-event-text';
+  import StateEventText from './StateEventText.svelte';
   import './avatar-button.css';
   import {
     formatDate,
@@ -467,7 +467,7 @@
                   {senderName}
                 </span>
               {/if}
-              {#each persona?.pronouns ?? [] as pronoun (pronoun.summary)}
+              {#each persona?.pronouns ?? profile?.pronouns ?? [] as pronoun, index (index)}
                 <span class="pronouns" lang={pronoun.language ?? undefined}>{pronoun.summary}</span>
               {/each}
               {#if persona && item.sender}
@@ -739,14 +739,14 @@
 {:else if item.content.kind === 'membership' || item.content.kind === 'profile_change' || (item.content.kind === 'state_event' && item.content.change !== null)}
   <p class="state">
     <span class="state-rail" aria-hidden="true"></span>
-    {stateEventText(item, $i18n.t)}
+    <StateEventText {item} {onSenderProfile} />
   </p>
 {:else if item.content.kind === 'state_event' || item.content.kind === 'hidden_event'}
   {@const raw = item.content.content}
   <div class="debug-event">
     <code>{item.content.event_type}</code>
     <div class="debug-body">
-      <span>{stateEventText(item, $i18n.t)}</span>
+      <span><StateEventText {item} {onSenderProfile} /></span>
       {#if raw !== null}
         <Collapsible.Root bind:open={peekOpen}>
           <Collapsible.Trigger class="debug-peek-trigger">

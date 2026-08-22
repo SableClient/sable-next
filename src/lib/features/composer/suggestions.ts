@@ -38,13 +38,16 @@ function memberSuggestions(needle: string, members: readonly MemberView[]): Sugg
       return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
     })
     .slice(0, limit)
-    .map(({ member, name }) => ({
-      id: member.user_id,
-      insert: name,
-      label: name,
-      detail: member.user_id,
-      avatarUrl: member.avatar_url,
-    }));
+    .map(({ member, name }) => {
+      const label = name.startsWith('@') ? name : `@${name}`;
+      return {
+        id: member.user_id,
+        insert: label,
+        label,
+        detail: member.user_id,
+        avatarUrl: member.avatar_url,
+      };
+    });
 }
 
 function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Suggestion[] {

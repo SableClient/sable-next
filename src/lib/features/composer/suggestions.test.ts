@@ -56,9 +56,9 @@ test('prefix matches come before contained ones, then alphabetical', () => {
   ];
 
   expect(suggestionsFor(mentionQuery('an'), members, [], []).map((item) => item.label)).toEqual([
-    'Ana Diaz',
-    'Anders Bo',
-    'Zoe Anders',
+    '@Ana Diaz',
+    '@Anders Bo',
+    '@Zoe Anders',
   ]);
 });
 
