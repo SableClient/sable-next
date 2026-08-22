@@ -1032,7 +1032,7 @@
     --timeline-row-gap: var(--space-2);
   }
 
-  /* Chat leads a little tighter on desktop; the reading size stays 1rem. */
+  /* Desktop chat leads tighter; the type size is the same as everywhere else. */
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
     .timeline-content {
       --line-height-body: 1.47;

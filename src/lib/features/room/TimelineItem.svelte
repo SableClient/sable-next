@@ -842,8 +842,7 @@
     border-radius: var(--radius);
   }
 
-  /* An emoji-only message scales by glyph count, so this ramp is sized to the
-     glyph rather than to the type scale the surrounding text uses. */
+  /* Glyph sizes for emoji-only messages, deliberately off the type scale. */
   .jumbo {
     --jumbo-size-1: 2.4rem;
     --jumbo-size-2: 1.9rem;
