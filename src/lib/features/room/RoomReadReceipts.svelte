@@ -221,7 +221,7 @@
   :global(.sable-avatar.receipt-face) {
     --avatar-size: 1.125rem;
 
-    font-size: 0.5625rem;
+    font-size: var(--font-size-small);
   }
 
   .overflow {
@@ -231,7 +231,7 @@
     box-shadow: 0 0 0 0.125rem var(--stack-ring);
     color: var(--sable-surface-var-on-container);
     display: inline-flex;
-    font-size: 0.625rem;
+    font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
     height: 1.125rem;
     justify-content: center;

@@ -1032,12 +1032,10 @@
     --timeline-row-gap: var(--space-2);
   }
 
-  /* Chat can be denser on desktop without reducing mobile reading size. */
+  /* Chat leads a little tighter on desktop; the reading size stays 1rem. */
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
     .timeline-content {
       --line-height-body: 1.47;
-
-      font-size: 0.9375rem;
     }
   }
 

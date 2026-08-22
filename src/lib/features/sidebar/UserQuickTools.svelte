@@ -192,7 +192,7 @@
     background: var(--sable-primary-main);
     border-radius: var(--radius-pill);
     color: var(--sable-primary-on-main);
-    font-size: 0.6875rem;
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     line-height: 1rem;
     min-width: 1rem;

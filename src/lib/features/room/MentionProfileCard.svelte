@@ -415,8 +415,12 @@
 {/snippet}
 
 {#snippet metaPlaceholder()}
-  <span class="profile-meta-item"><Skeleton style="height: 0.8125rem; width: 5rem" /></span>
-  <span class="profile-meta-item"><Skeleton style="height: 0.8125rem; width: 7rem" /></span>
+  <span class="profile-meta-item"
+    ><Skeleton style="height: var(--font-size-small); width: 5rem" /></span
+  >
+  <span class="profile-meta-item"
+    ><Skeleton style="height: var(--font-size-small); width: 7rem" /></span
+  >
 {/snippet}
 
 {#snippet bioPanel()}

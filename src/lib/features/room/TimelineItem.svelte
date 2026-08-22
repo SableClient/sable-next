@@ -842,23 +842,32 @@
     border-radius: var(--radius);
   }
 
+  /* An emoji-only message scales by glyph count, so this ramp is sized to the
+     glyph rather than to the type scale the surrounding text uses. */
+  .jumbo {
+    --jumbo-size-1: 2.4rem;
+    --jumbo-size-2: 1.9rem;
+    --jumbo-size-3: 1.5rem;
+    --jumbo-size-4: 1.25rem;
+  }
+
   .jumbo-1 {
-    font-size: 2.4rem;
+    font-size: var(--jumbo-size-1);
     line-height: 1.15;
   }
 
   .jumbo-2 {
-    font-size: 1.9rem;
+    font-size: var(--jumbo-size-2);
     line-height: 1.2;
   }
 
   .jumbo-3 {
-    font-size: 1.5rem;
+    font-size: var(--jumbo-size-3);
     line-height: 1.3;
   }
 
   .jumbo-4 {
-    font-size: 1.25rem;
+    font-size: var(--jumbo-size-4);
     line-height: 1.35;
   }
 

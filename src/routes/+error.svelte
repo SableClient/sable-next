@@ -35,6 +35,8 @@
   }
 
   .error-content {
+    --error-code-size: clamp(4rem, 16vw, 8rem);
+
     align-items: center;
     display: flex;
     flex-direction: column;
@@ -45,7 +47,7 @@
 
   .error-code {
     color: var(--sable-primary-main);
-    font-size: clamp(4rem, 16vw, 8rem);
+    font-size: var(--error-code-size);
     font-weight: var(--font-weight-bold);
     line-height: 0.9;
     margin: 0;

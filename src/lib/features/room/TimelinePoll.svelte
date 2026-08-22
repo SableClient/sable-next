@@ -116,14 +116,14 @@
   }
 
   .question {
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
     margin: 0;
   }
 
   .edited {
     color: var(--sable-surface-var-on-container);
-    font-size: 0.75rem;
-    font-weight: 400;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-normal);
     margin-inline-start: 0.375rem;
   }
 
@@ -190,14 +190,14 @@
 
   .count {
     color: var(--sable-surface-var-on-container);
-    font-size: 0.8125rem;
+    font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
   }
 
   .footer {
     color: var(--sable-surface-var-on-container);
     display: flex;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-small);
     gap: 0.5rem;
     margin: 0;
   }
@@ -215,7 +215,7 @@
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--font-size-small);
     padding: 0.25rem 0.5rem;
   }
 

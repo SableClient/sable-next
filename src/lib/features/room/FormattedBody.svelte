@@ -331,6 +331,11 @@
 <div class="formatted-body" {@attach decorate(html)}>{@html html}</div>
 
 <style>
+  .formatted-body {
+    /* Relative so inline code keeps its ratio inside a heading too. */
+    --inline-code-scale: 0.9em;
+  }
+
   .formatted-body,
   .formatted-body :global(p) {
     line-height: var(--line-height-body);
@@ -430,7 +435,7 @@
     border: var(--border-width) solid var(--sable-surface-var-container-line);
     border-radius: 0.25rem;
     font-family: var(--font-family-mono);
-    font-size: 0.9em;
+    font-size: var(--inline-code-scale);
     padding: 0 0.25rem;
   }
 

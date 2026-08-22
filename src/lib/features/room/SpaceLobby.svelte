@@ -218,7 +218,7 @@
             <Skeleton class="room-avatar-skeleton" />
             <div class="room-text">
               <Skeleton style="height: 1rem; width: 30%" />
-              <Skeleton style="height: 0.8125rem; width: 60%" />
+              <Skeleton style="height: var(--font-size-small); width: 60%" />
             </div>
           </li>
         {/each}

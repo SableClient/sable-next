@@ -390,7 +390,7 @@
     box-sizing: border-box;
     color: var(--sable-primary-on-main);
     display: flex;
-    font-size: 0.625rem;
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     justify-content: center;
     line-height: 1;

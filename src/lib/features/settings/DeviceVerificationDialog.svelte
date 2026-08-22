@@ -166,7 +166,7 @@
   }
 
   .emoji-item span {
-    font-size: 2.25rem;
+    font-size: var(--font-size-display);
     line-height: 1;
   }
 

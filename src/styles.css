@@ -317,11 +317,12 @@ html {
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 
   /* Font sizes */
-  --font-size-small: 0.8125rem;
-  --font-size-body: 1rem;
+  --font-size-small: 0.875rem;
+  --font-size-body: 0.9375rem;
   --font-size-medium: 1.125rem;
   --font-size-large: 1.25rem;
   --font-size-xlarge: 1.75rem;
+  --font-size-display: 2.25rem;
 
   /* Font weights */
   --font-weight-normal: 400;

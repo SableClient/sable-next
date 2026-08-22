@@ -228,8 +228,8 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-3);
-    min-height: calc(var(--control-height-medium) + var(--space-4));
-    padding: var(--space-3);
+    min-height: calc(var(--control-height-medium) + var(--space-2));
+    padding: var(--space-2) var(--space-3);
   }
 
   .setting-row + .setting-row {
@@ -243,14 +243,14 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
-    height: var(--control-height-medium);
+    height: var(--control-height-small);
     justify-content: center;
-    width: var(--control-height-medium);
+    width: var(--control-height-small);
   }
 
   .row-icon :global(svg) {
-    height: var(--icon-size-medium);
-    width: var(--icon-size-medium);
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .row-copy {
@@ -313,7 +313,7 @@
     display: flex;
     flex: 0 0 auto;
     justify-content: flex-start;
-    padding-left: calc(var(--control-height-medium) + var(--space-3));
+    padding-left: calc(var(--control-height-small) + var(--space-3));
     width: 100%;
   }
 
@@ -339,7 +339,6 @@
   @media (width >= 42rem) {
     .setting-row {
       flex-wrap: nowrap;
-      padding: var(--space-2) var(--space-3);
     }
 
     .row-control {

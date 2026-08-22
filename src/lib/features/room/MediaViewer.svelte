@@ -364,7 +364,7 @@
   .heading span,
   .bottom-bar p {
     color: var(--sable-surface-var-on-container);
-    font-size: 0.8rem;
+    font-size: var(--font-size-small);
     margin: 0;
   }
 

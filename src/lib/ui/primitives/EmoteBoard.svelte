@@ -612,7 +612,7 @@
 
   /* Sized to the 32px custom emote beside it, not to the surrounding type. */
   .grids .unicode button {
-    font-size: 1.75rem;
+    font-size: var(--font-size-xlarge);
     line-height: 1;
     width: 100%;
   }

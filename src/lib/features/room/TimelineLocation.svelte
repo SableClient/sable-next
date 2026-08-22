@@ -64,7 +64,7 @@
 
   .coordinates {
     color: var(--sable-surface-var-on-container);
-    font-size: 0.8125rem;
+    font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
   }
 </style>
