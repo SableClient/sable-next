@@ -1,6 +1,7 @@
 <script lang="ts">
   import { DropdownMenu } from 'bits-ui';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
+  import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
@@ -12,10 +13,11 @@
     desktop: boolean;
     disabled?: boolean;
     onPick: (accept: string) => void;
+    onPoll?: () => void;
     onBeforeOpen?: () => void;
   }
 
-  let { desktop, disabled = false, onPick, onBeforeOpen }: Props = $props();
+  let { desktop, disabled = false, onPick, onPoll, onBeforeOpen }: Props = $props();
   let open = $state(false);
 
   const media = 'image/*,video/*';
@@ -45,6 +47,12 @@
           <PaperclipIcon />
           {$i18n.t('composer.attachFile')}
         </DropdownMenu.Item>
+        {#if onPoll}
+          <DropdownMenu.Item onclick={onPoll}>
+            <ChartBarIcon />
+            {$i18n.t('composer.poll')}
+          </DropdownMenu.Item>
+        {/if}
       </DropdownMenu.Content>
     </DropdownMenu.Portal>
   </DropdownMenu.Root>
@@ -89,6 +97,19 @@
         <PaperclipIcon />
         {$i18n.t('composer.attachFile')}
       </Button>
+      {#if onPoll}
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onPoll();
+          }}
+        >
+          <ChartBarIcon />
+          {$i18n.t('composer.poll')}
+        </Button>
+      {/if}
     </div>
   </BottomSheet>
 {/if}

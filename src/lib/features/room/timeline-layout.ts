@@ -37,6 +37,14 @@ export const TIMELINE_LAYOUT = {
   debugRowRem: 2.25,
   undecryptableRem: 2.5,
   audioHeightPx: 58,
+  /* Question, footer, the card's own padding and the gaps between them. */
+  pollChromeRem: 5.3,
+  /* One answer button: padding, border and a single line of label. */
+  pollAnswerRem: 2.375,
+  pollAnswerGapRem: 0.375,
+  locationRem: 2.4,
+  locationCoordinatesRem: 1.2,
+  galleryGapRem: 0.25,
   /** Matches the collapse threshold in FormattedBody. */
   codeLineLimit: 14,
   /** Measured: the mono font's metrics push the line box past --code-line-height. */
@@ -165,6 +173,33 @@ export function estimateTimelineItemSize(
       );
       return contentWidth * ratio + chrome + trimmings;
     }
+    case 'poll': {
+      const count = item.content.poll.answers.length;
+      const answers =
+        count * TIMELINE_LAYOUT.pollAnswerRem * rem +
+        Math.max(count - 1, 0) * TIMELINE_LAYOUT.pollAnswerGapRem * rem;
+      return TIMELINE_LAYOUT.pollChromeRem * rem + answers + chrome + trimmings;
+    }
+    case 'location': {
+      const coordinates =
+        item.content.latitude === null ? 0 : TIMELINE_LAYOUT.locationCoordinatesRem * rem;
+      return TIMELINE_LAYOUT.locationRem * rem + coordinates + chrome + trimmings;
+    }
+    case 'gallery': {
+      const columns = item.content.items.length > 1 ? 2 : 1;
+      const rows = Math.ceil(item.content.items.length / columns);
+      const gaps = Math.max(rows - 1, 0) * TIMELINE_LAYOUT.galleryGapRem * rem;
+      // Tiles share one column width, so the first item's shape sets the row
+      // height for the whole grid.
+      const sized = item.content.items.find((tile) => 'width' in tile) ?? null;
+      const ratio = inverseAspectRatio(
+        sized && 'width' in sized ? sized.width : null,
+        sized && 'height' in sized ? sized.height : null,
+        TIMELINE_LAYOUT.pictureRatio
+      );
+      const caption = item.content.body ? TIMELINE_LAYOUT.captionHeightRem * rem : 0;
+      return rows * ((contentWidth - gaps) / columns) * ratio + gaps + chrome + caption + trimmings;
+    }
     case 'audio':
       return TIMELINE_LAYOUT.audioHeightPx + chrome + trimmings;
     case 'file':
@@ -179,10 +214,14 @@ export function estimateTimelineItemSize(
     case 'unsupported':
       return TIMELINE_LAYOUT.stateRowRem * rem;
     case 'state_event':
-      return TIMELINE_LAYOUT.debugRowRem * rem;
+      return item.content.change
+        ? TIMELINE_LAYOUT.stateRowRem * rem
+        : TIMELINE_LAYOUT.debugRowRem * rem;
     case 'unable_to_decrypt':
       return TIMELINE_LAYOUT.undecryptableRem * rem;
-    default:
+    case 'timeline_start':
       return TIMELINE_LAYOUT.separatorRem * rem;
+    case 'hidden_event':
+      return TIMELINE_LAYOUT.debugRowRem * rem;
   }
 }

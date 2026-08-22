@@ -251,3 +251,35 @@ test('long pressing a reaction opens its people list without toggling it', async
   vi.useRealTimers();
   await unmount(instance);
 });
+
+test('renders a redacted row and a worded state change without throwing', async () => {
+  for (const content of [
+    { kind: 'redacted' } as const,
+    {
+      kind: 'state_event',
+      event_type: 'm.room.topic',
+      state_key: '',
+      content: null,
+      change: { kind: 'room_topic', topic: 'what we do' },
+    } as const,
+    {
+      kind: 'state_event',
+      event_type: 'm.room.power_levels',
+      state_key: '',
+      content: { users: {} },
+      change: null,
+    } as const,
+  ]) {
+    const target = document.createElement('div');
+    document.body.append(target);
+    const component = mount(TimelineItem, {
+      target,
+      props: { item: { ...item(false), content }, collapsed: false },
+    });
+    await tick();
+
+    expect(target.textContent.trim(), `${content.kind} rendered empty`).not.toBe('');
+    void unmount(component);
+    target.remove();
+  }
+});

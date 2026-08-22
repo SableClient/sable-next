@@ -92,7 +92,7 @@ const DEFAULTS: Preferences = {
   hideMembershipEvents: false,
   hideProfileChanges: true,
   hideMemberInReadOnly: true,
-  showTombstoneEvents: false,
+  showTombstoneEvents: true,
   hideReadReceipts: false,
   hideTypingIndicators: false,
 

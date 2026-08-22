@@ -1,7 +1,36 @@
 import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
+
+const MESSAGE_ROW_KINDS = [
+  'message',
+  'image',
+  'video',
+  'audio',
+  'file',
+  'sticker',
+  'gallery',
+  'location',
+  'poll',
+] as const satisfies readonly TimelineItemContentView['kind'][];
+
+export type MessageContent = Extract<
+  TimelineItemContentView,
+  { kind: (typeof MESSAGE_ROW_KINDS)[number] }
+>;
+
+/** Rows that carry a sender, a hover menu and reactions. */
+export function isMessageRow(content: TimelineItemContentView): content is MessageContent {
+  return (MESSAGE_ROW_KINDS as readonly string[]).includes(content.kind);
+}
+
+/** An image, a poll or a location you posted is yours to delete too. */
+export function canRedact(item: TimelineItemView, canRedactOthers: boolean): boolean {
+  if (!isMessageRow(item.content)) return false;
+  return item.is_own || canRedactOthers;
+}
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
@@ -44,6 +73,8 @@ function isVisibleEvent(
     case 'redacted':
       return preferences.showTombstoneEvents;
     case 'state_event':
+      if (item.content.change) return true;
+      return preferences.showHiddenEvents && preferences.showNonStandardEvents;
     case 'hidden_event':
       return preferences.showHiddenEvents && preferences.showNonStandardEvents;
     default:
@@ -73,13 +104,16 @@ export function visibleTimelineItems(
   return visible.reverse();
 }
 
-const MESSAGE_KINDS = new Set([
+const UNREAD_KINDS = new Set<TimelineItemContentView['kind']>([
   'message',
   'image',
   'video',
   'audio',
   'file',
   'sticker',
+  'gallery',
+  'location',
+  'poll',
   'unable_to_decrypt',
 ]);
 
@@ -87,7 +121,7 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
   let count = 0;
   for (let next = index + 1; next < items.length; next += 1) {
     const item = items[next];
-    if (!item.is_own && MESSAGE_KINDS.has(item.content.kind)) count += 1;
+    if (!item.is_own && UNREAD_KINDS.has(item.content.kind)) count += 1;
   }
   return count;
 }

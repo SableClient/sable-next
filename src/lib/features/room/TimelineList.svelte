@@ -13,6 +13,7 @@
 
   import TimelineItem from './TimelineItem.svelte';
   import type { MatrixLink } from './matrix-link';
+  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
@@ -67,12 +68,14 @@
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
-    onEdit?: (eventId: string, body: string) => void;
+    onEdit?: (eventId: string, body: string, html: string | null) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     roomId?: string;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
+    onVotePoll?: (eventId: string, answers: string[]) => void;
+    onEndPoll?: (eventId: string) => void;
     readOnly?: boolean;
     canRedactOthers?: boolean;
     scrollLocked?: boolean;
@@ -100,10 +103,14 @@
     members = [],
     onJumpToEvent,
     onOpenMedia,
+    onVotePoll,
+    onEndPoll,
     readOnly = false,
     canRedactOthers = false,
     scrollLocked = false,
     nearLatest = $bindable(true),
+    // The parent reads this through its binding, which eslint cannot see.
+    // eslint-disable-next-line no-useless-assignment
     followingLive = $bindable(false),
   }: Props = $props();
   let folded = $derived(
@@ -938,6 +945,8 @@
                   layout={preferences.layout}
                   {onJumpToEvent}
                   {onOpenMedia}
+                  {onVotePoll}
+                  {onEndPoll}
                   onPersonaOpenChange={setPersonaOpen}
                   {roomId}
                 />
@@ -949,7 +958,18 @@
     </div>
   </div>
 
-  {#if position.kind === 'settling'}<TimelineSkeleton />{/if}
+  {#if position.kind === 'settling'}
+    <TimelineSkeleton />
+  {:else if visibleItems.length === 0}
+    <!-- A room can filter down to nothing; without this that is a blank void. -->
+    <EmptyState
+      class="timeline-empty"
+      title={timeline.items.length > 0
+        ? $i18n.t('timeline.allFiltered')
+        : $i18n.t('timeline.noMessages')}
+      description={timeline.items.length > 0 ? $i18n.t('timeline.allFilteredHint') : undefined}
+    />
+  {/if}
 
   {#if timeline.mode.kind === 'live' && position.kind === 'anchored' && visibleItems.length > 0}
     <Button

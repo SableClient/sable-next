@@ -17,6 +17,9 @@
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 
   import FormattedBody from './FormattedBody.svelte';
+  import TimelineGallery from './TimelineGallery.svelte';
+  import TimelineLocation from './TimelineLocation.svelte';
+  import TimelinePoll from './TimelinePoll.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
   import PersonaProfile from './PersonaProfile.svelte';
@@ -31,6 +34,8 @@
     formatDate,
     formatTime,
     initials,
+    canRedact,
+    isMessageRow,
     jumboEmojiLevel,
     senderColor,
   } from './timeline-format';
@@ -49,7 +54,7 @@
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
-    onEdit?: (eventId: string, body: string) => void;
+    onEdit?: (eventId: string, body: string, html: string | null) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     onCopyLink?: (eventId: string) => void;
     canRedactOthers?: boolean;
@@ -58,6 +63,8 @@
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
+    onVotePoll?: (eventId: string, answers: string[]) => void;
+    onEndPoll?: (eventId: string) => void;
     onPersonaOpenChange?: (open: boolean) => void;
   }
 
@@ -84,6 +91,8 @@
     members = [],
     onJumpToEvent,
     onOpenMedia,
+    onVotePoll,
+    onEndPoll,
     onPersonaOpenChange,
   }: Props = $props();
   const core = useCoreClient();
@@ -117,6 +126,7 @@
     return separator === -1 ? body : body.slice(separator + 2);
   }
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
+  let notice = $derived(item.content.kind === 'message' && item.content.notice);
   let jumbo = $derived(
     item.content.kind === 'message' && !item.content.emote
       ? jumboEmojiLevel(item.content.body)
@@ -134,7 +144,10 @@
   );
 
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
-  let ownMessage = $derived(item.is_own && item.content.kind === 'message');
+  /* Editing needs a body to put back in the composer, so it is text-only.
+     Redaction is not. */
+  let ownText = $derived(item.is_own && item.content.kind === 'message');
+  let redactable = $derived(canRedact(item, canRedactOthers));
   let avatarColor = $derived(personaTint || item.is_own ? undefined : senderColor(item.sender));
   let nameColor = $derived(
     item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
@@ -170,6 +183,7 @@
   let actions = $derived.by(() => {
     const eventId = item.event_id ?? '';
     const body = item.content.kind === 'message' ? item.content.body : null;
+    const html = item.content.kind === 'message' ? item.content.html : null;
     return {
       onReact: onToggleReaction
         ? (emoji: string) => {
@@ -191,13 +205,13 @@
           }
         : undefined,
       onEdit:
-        ownMessage && onEdit && body !== null
+        ownText && onEdit && body !== null
           ? () => {
-              onEdit(eventId, body);
+              onEdit(eventId, body, html);
             }
           : undefined,
       onDelete:
-        (ownMessage || canRedactOthers) && onDelete
+        redactable && onDelete
           ? () => {
               deleteOpen = true;
             }
@@ -329,7 +343,7 @@
   }
 </script>
 
-{#if item.content.kind === 'message' || item.content.kind === 'image' || item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file' || item.content.kind === 'sticker'}
+{#if isMessageRow(item.content)}
   <ContextMenu.Root>
     <ContextMenu.Trigger disabled={!actionable}>
       <article
@@ -498,7 +512,7 @@
               <FormattedBody html={item.content.html} {onMatrixLink} />
             </div>
           {:else if item.content.kind === 'message'}
-            <div class={jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`}>
+            <div class={[jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`, { notice }]}>
               <FormattedBody html={item.content.html} {onMatrixLink} />
               <!-- Trails the body, where the edit happened, not the header. -->
               {#if item.content.edited}
@@ -532,6 +546,28 @@
               onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
             />
             {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
+          {:else if item.content.kind === 'gallery'}
+            <TimelineGallery
+              items={item.content.items}
+              body={item.content.body}
+              html={item.content.html}
+              {onMatrixLink}
+            />
+          {:else if item.content.kind === 'location'}
+            <TimelineLocation
+              body={item.content.body}
+              geoUri={item.content.geo_uri}
+              latitude={item.content.latitude}
+              longitude={item.content.longitude}
+            />
+          {:else if item.content.kind === 'poll'}
+            <TimelinePoll
+              poll={item.content.poll}
+              eventId={item.event_id}
+              canEnd={item.is_own || canRedactOthers}
+              onVote={onVotePoll}
+              onEnd={onEndPoll}
+            />
           {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
             <MediaContent
               class="media"
@@ -700,7 +736,7 @@
       </ContextMenu.Portal>
     {/if}
   </ContextMenu.Root>
-{:else if item.content.kind === 'membership' || item.content.kind === 'profile_change'}
+{:else if item.content.kind === 'membership' || item.content.kind === 'profile_change' || (item.content.kind === 'state_event' && item.content.change !== null)}
   <p class="state">
     <span class="state-rail" aria-hidden="true"></span>
     {stateEventText(item, $i18n.t)}
@@ -1063,6 +1099,11 @@
 
   .edited {
     margin-inline-start: 0.25rem;
+  }
+
+  /* `m.notice` is usually a bot, and reads as an aside. */
+  .notice {
+    color: var(--sable-surface-var-on-container);
   }
 
   .send-failure {

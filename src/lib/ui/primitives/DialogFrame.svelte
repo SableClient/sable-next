@@ -114,10 +114,14 @@
       border-radius: var(--radius);
       bottom: auto;
       left: 50%;
-      max-width: 34rem;
+      max-width: min(34rem, calc(100vw - 3rem));
       padding: calc(var(--space-2) * 2);
       top: 50%;
       transform: translate(-50%, -50%);
+
+      /* The mobile rule sets `width: 100%`, which held the panel at its max
+         and left narrower content stranded against one edge. */
+      width: fit-content;
     }
   }
 

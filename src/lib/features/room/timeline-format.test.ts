@@ -1,10 +1,14 @@
 import { expect, test } from 'vitest';
 
+import type { StateChangeView } from '#src/generated/StateChangeView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
+import { stateEventText } from './state-event-text';
 import {
+  canRedact,
   foldEventRuns,
   isCollapsed,
   jumboEmojiLevel,
@@ -184,4 +188,106 @@ test('leaves ordinary text alone', () => {
   // Digits are Emoji_Component, so a bare number must not count as emoji.
   expect(jumboEmojiLevel('123')).toBeNull();
   expect(jumboEmojiLevel('👍👍👍👍👍👍👍👍👍')).toBeNull();
+});
+
+function stateChange(change: StateChangeView): TimelineItemView {
+  return {
+    ...item({
+      kind: 'state_event',
+      event_type: 'm.room.topic',
+      state_key: '',
+      content: null,
+      change,
+    }),
+    sender: '@alice:example.org',
+    sender_name: 'Alice',
+  };
+}
+
+test('words the state changes the core recognises', () => {
+  const t = (key: string, values?: Record<string, unknown>) =>
+    `${key}:${JSON.stringify(values ?? {})}`;
+
+  expect(stateEventText(stateChange({ kind: 'room_name', name: 'Lobby', previous: null }), t)).toBe(
+    'timeline.roomNameSet:{"user":"Alice","name":"Lobby"}'
+  );
+  expect(
+    stateEventText(stateChange({ kind: 'room_name', name: 'Lobby', previous: 'Old' }), t)
+  ).toBe('timeline.roomNameChanged:{"user":"Alice","name":"Lobby"}');
+  expect(stateEventText(stateChange({ kind: 'room_name', name: null, previous: 'Old' }), t)).toBe(
+    'timeline.roomNameRemoved:{"user":"Alice"}'
+  );
+  expect(stateEventText(stateChange({ kind: 'room_topic', topic: null }), t)).toBe(
+    'timeline.roomTopicRemoved:{"user":"Alice"}'
+  );
+  expect(stateEventText(stateChange({ kind: 'room_avatar', removed: true }), t)).toBe(
+    'timeline.roomAvatarRemoved:{"user":"Alice"}'
+  );
+  expect(stateEventText(stateChange({ kind: 'call_membership', joined: true }), t)).toBe(
+    'timeline.callJoined:{"user":"Alice"}'
+  );
+});
+
+test('distinguishes pinning, unpinning and a mixed pin change', () => {
+  const key = (change: StateChangeView) => stateEventText(stateChange(change), (k) => k);
+
+  expect(key({ kind: 'pinned_events', added: ['$a'], removed: [], total: 1 })).toBe(
+    'timeline.pinnedAdded'
+  );
+  expect(key({ kind: 'pinned_events', added: [], removed: ['$a'], total: 0 })).toBe(
+    'timeline.pinnedRemoved'
+  );
+  expect(key({ kind: 'pinned_events', added: ['$b'], removed: ['$a'], total: 1 })).toBe(
+    'timeline.pinnedChanged'
+  );
+});
+
+test('an unworded state event keeps its raw type and stays behind the dev toggles', () => {
+  const raw = item({
+    kind: 'state_event',
+    event_type: 'm.room.power_levels',
+    state_key: '',
+    content: null,
+    change: null,
+  });
+
+  expect(stateEventText(raw, (k) => k)).toBe('timeline.stateEvent');
+  expect(visibleTimelineItems([raw], defaults)).toEqual([]);
+  expect(
+    visibleTimelineItems([stateChange({ kind: 'room_topic', topic: 'hi' })], defaults)
+  ).toHaveLength(1);
+});
+
+test('anything you sent is yours to redact, not only your text', () => {
+  const own = (content: TimelineItemView['content']) =>
+    ({ ...item(content), is_own: true }) as TimelineItemView;
+  const theirs = (content: TimelineItemView['content']) =>
+    ({ ...item(content), is_own: false }) as TimelineItemView;
+  const image = {
+    kind: 'image',
+    body: 'photo.png',
+    source: 'mxc://example.org/p',
+    mime: null,
+    width: 8,
+    height: 8,
+  } as const;
+
+  expect(canRedact(own(message.content), false)).toBe(true);
+  expect(canRedact(own(image), false), 'an image you sent must be deletable').toBe(true);
+  expect(canRedact(theirs(image), false)).toBe(false);
+  expect(canRedact(theirs(image), true)).toBe(true);
+  // A divider or a state row is not an event anyone can redact.
+  expect(canRedact(own(divider.content), true)).toBe(false);
+  expect(canRedact(own(joined.content), true)).toBe(false);
+});
+
+test('a room whose every event is redacted is not blank at the shipped default', () => {
+  const deleted = item({ kind: 'redacted' }, 'gone');
+
+  // A room can be all-redacted — delete every poll in it and this is what is
+  // left — and hiding those rows left nothing on screen at all.
+  expect(preferences.showTombstoneEvents).toBe(true);
+  expect(visibleTimelineItems([deleted], { ...defaults, showTombstoneEvents: true })).toEqual([
+    deleted,
+  ]);
 });

@@ -47,46 +47,50 @@
 </DialogFrame>
 
 <style>
+  /* `DialogFrame`'s verification variant pads the panel already. */
   .delete {
     display: grid;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    width: min(26rem, calc(100vw - 2rem));
+    gap: var(--space-2);
+    width: min(27rem, 100%);
   }
 
   h2 {
     font-size: var(--font-size-large);
+    line-height: 1.3;
     margin: 0;
   }
 
   .explain {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+    line-height: 1.45;
     margin: 0;
   }
 
   .preview {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-inline-start: calc(var(--border-width) * 3) solid var(--sable-crit-main);
-    border-radius: var(--radius);
+    border-inline-start: calc(var(--border-width) * 2) solid var(--sable-crit-main);
+    -webkit-box-orient: vertical;
     color: var(--sable-surface-var-on-container);
+    display: -webkit-box;
     font-size: var(--font-size-small);
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    line-height: 1.45;
     margin: 0;
     overflow: hidden;
-    padding: var(--space-1) var(--space-2);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    padding-inline-start: var(--space-2);
   }
 
   .field {
     display: grid;
     gap: 0.25rem;
+    margin-block-start: 0.25rem;
   }
 
   .actions {
     display: flex;
     gap: var(--space-1);
     justify-content: flex-end;
+    margin-block-start: var(--space-1);
   }
 </style>
