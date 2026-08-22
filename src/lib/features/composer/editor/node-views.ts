@@ -4,6 +4,7 @@ import type { NodeView, NodeViewConstructor } from 'prosemirror-view';
 export interface EmoteMedia {
   cached: (url: string) => string | undefined;
   load: (url: string) => Promise<string>;
+  hold: (url: string) => () => void;
 }
 
 abstract class AtomNodeView implements NodeView {
@@ -37,6 +38,7 @@ class MentionNodeView extends AtomNodeView {
 
 class EmoticonNodeView extends AtomNodeView {
   private destroyed = false;
+  private release: () => void;
 
   constructor(
     node: ProseMirrorNode,
@@ -46,6 +48,7 @@ class EmoticonNodeView extends AtomNodeView {
     const url = node.attrs.url as string;
     const label = `:${node.attrs.shortcode as string}:`;
 
+    this.release = this.media.hold(url);
     const cached = this.media.cached(url);
     if (cached) {
       this.paint(cached, label);
@@ -70,6 +73,7 @@ class EmoticonNodeView extends AtomNodeView {
 
   destroy(): void {
     this.destroyed = true;
+    this.release();
   }
 }
 

@@ -15,7 +15,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
-  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -144,6 +144,7 @@
   const media: EmoteMedia = {
     cached: (url) => cachedMediaUrl(core, url, emoteSize, emoteSize),
     load: (url) => loadMediaUrl(core, url, emoteSize, emoteSize),
+    hold: (url) => holdMediaUrl(core, url, emoteSize, emoteSize),
   };
 
   const editor = new ComposerEditor({

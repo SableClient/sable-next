@@ -27,7 +27,7 @@ function openWith(overrides: Partial<ComposerEditorOptions> = {}): ComposerEdito
   const host = document.createElement('div');
   document.body.append(host);
   const editor = new ComposerEditor({
-    media: { cached: () => undefined, load: () => Promise.resolve('blob:x') },
+    media: { cached: () => undefined, load: () => Promise.resolve('blob:x'), hold: () => () => {} },
     label: () => 'Send a message',
     listboxId: 'suggestions',
     activeOptionId: () => null,
@@ -292,7 +292,7 @@ test('the active option is written straight onto the editor node', () => {
   document.body.append(host);
   let activeId: string | null = null;
   const editor = new ComposerEditor({
-    media: { cached: () => undefined, load: () => Promise.resolve('blob:x') },
+    media: { cached: () => undefined, load: () => Promise.resolve('blob:x'), hold: () => () => {} },
     label: () => 'Send a message',
     listboxId: 'suggestions',
     activeOptionId: () => activeId,

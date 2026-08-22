@@ -4,7 +4,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
 
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';
@@ -21,7 +21,8 @@
   const core = useCoreClient();
   const roomList = useRoomList();
 
-  function resolveImages(node: HTMLElement): void {
+  function resolveImages(node: HTMLElement): (() => void)[] {
+    const releases: (() => void)[] = [];
     for (const image of node.querySelectorAll('img')) {
       if (image.dataset.mediaHandled !== undefined) continue;
       image.dataset.mediaHandled = '';
@@ -45,6 +46,7 @@
       const [width, height] = emoticon ? [0, 0] : [640, 480];
       image.dataset.mediaPending = '';
       image.removeAttribute('src');
+      releases.push(holdMediaUrl(core, source, width, height));
       const cached = cachedMediaUrl(core, source, width, height);
       if (cached !== undefined) {
         paint(image, cached);
@@ -59,6 +61,7 @@
           if (image.isConnected) image.replaceWith(fallbackLabel(image, emoticon));
         });
     }
+    return releases;
   }
 
   function paint(image: HTMLImageElement, url: string): void {
@@ -130,7 +133,7 @@
         element.ariaPressed = 'true';
       }
 
-      resolveImages(node);
+      const releases = resolveImages(node);
       decorateCodeBlocks(node);
       const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
       if (maths.length > 0) void renderMaths(maths);
@@ -140,6 +143,7 @@
       return () => {
         offClick();
         offKeydown();
+        for (const release of releases) release();
       };
     };
   }

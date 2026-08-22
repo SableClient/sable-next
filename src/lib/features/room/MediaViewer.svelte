@@ -4,7 +4,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import {
     saveFile,
     saveImageToPhotos,
@@ -57,6 +57,7 @@
     zoom = 1;
     rotation = 0;
     failed = false;
+    const release = holdMediaUrl(core, item.source, 0, 0);
     const cached = cachedMediaUrl(core, item.source, 0, 0);
     url = cached ?? null;
     const request = cached
@@ -71,6 +72,7 @@
       });
     return () => {
       active = false;
+      release();
     };
   });
 

@@ -5,6 +5,7 @@
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import {
     cachedMediaUrl,
+    holdMediaUrl,
     loadMediaUrl,
     mediaAspectRatio,
     retryMediaUrl,
@@ -111,13 +112,14 @@
     const original = mime === 'image/svg+xml' || animatedGif;
     const requestWidth = original ? 0 : width;
     const requestHeight = original ? 0 : height;
+    const release = holdMediaUrl(core, source, requestWidth, requestHeight);
     const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {
       fileRatio = mediaAspectRatio(core, source);
       gifPreviewReady = false;
       gifPlaying = false;
       url = cached;
-      return;
+      return release;
     }
 
     url = null;
@@ -146,6 +148,7 @@
 
     return () => {
       active = false;
+      release();
     };
   });
 

@@ -8,8 +8,8 @@ const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
 const unavailable = new Set<string>();
 const aspectRatios = new Map<string, number>();
-/* An object URL pins its blob until revoked. Far more than one viewport holds,
-   so the least recently read entry is never one on screen. */
+const holds = new Map<string, number>();
+/* An object URL pins its blob until revoked. Held entries are exempt. */
 const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
@@ -70,6 +70,31 @@ export function mediaAspectRatio(core: Pick<CoreClient, 'session'>, source: stri
   return aspectRatios.get(metadataKey(core.session?.account_id, source)) ?? null;
 }
 
+function evict(published: string): void {
+  for (const [oldestKey, oldest] of objectUrls) {
+    if (objectUrls.size <= MAX_OBJECT_URLS && objectUrlBytes <= MAX_OBJECT_URL_BYTES) break;
+    if (oldestKey === published || holds.has(oldestKey)) continue;
+    URL.revokeObjectURL(oldest.url);
+    objectUrls.delete(oldestKey);
+    objectUrlBytes -= oldest.bytes;
+  }
+}
+
+export function holdMediaUrl(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number
+): () => void {
+  const key = cacheKey(core.session?.account_id, source, width, height);
+  holds.set(key, (holds.get(key) ?? 0) + 1);
+  return () => {
+    const remaining = (holds.get(key) ?? 1) - 1;
+    if (remaining > 0) holds.set(key, remaining);
+    else holds.delete(key);
+  };
+}
+
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
 export function cachedMediaUrl(
   core: Pick<CoreClient, 'session'>,
@@ -111,15 +136,7 @@ export function loadMediaUrl(
           const objectUrl = URL.createObjectURL(blob);
           objectUrls.set(key, { url: objectUrl, bytes: blob.size });
           objectUrlBytes += blob.size;
-          for (const [oldestKey, oldest] of objectUrls) {
-            if (objectUrls.size <= MAX_OBJECT_URLS && objectUrlBytes <= MAX_OBJECT_URL_BYTES) {
-              break;
-            }
-            if (oldestKey === key && objectUrls.size === 1) break;
-            URL.revokeObjectURL(oldest.url);
-            objectUrls.delete(oldestKey);
-            objectUrlBytes -= oldest.bytes;
-          }
+          evict(key);
           return objectUrl;
         };
         const measuring = measure(metadataKey(core.session?.account_id, source), type, blob);

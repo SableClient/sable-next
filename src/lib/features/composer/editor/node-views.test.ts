@@ -11,6 +11,7 @@ function views(media: Partial<EmoteMedia> = {}): ReturnType<typeof composerNodeV
   return composerNodeViews({
     cached: () => undefined,
     load: () => Promise.resolve('blob:emote'),
+    hold: () => () => {},
     ...media,
   });
 }

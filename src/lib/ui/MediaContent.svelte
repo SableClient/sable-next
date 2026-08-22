@@ -2,7 +2,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
-  import { cachedMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
+  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import Button from '#lib/ui/primitives/Button.svelte';
 
   interface Props {
@@ -83,10 +83,11 @@
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
     failed = false;
+    const release = holdMediaUrl(core, source, 0, 0);
     const cached = cachedMediaUrl(core, source, 0, 0);
     if (cached !== undefined) {
       url = cached;
-      return;
+      return release;
     }
 
     url = null;
@@ -105,6 +106,7 @@
       });
     return () => {
       active = false;
+      release();
     };
   });
 
