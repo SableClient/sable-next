@@ -109,8 +109,8 @@
     canRedactOthers = false,
     scrollLocked = false,
     nearLatest = $bindable(true),
-    // The parent reads this through its binding, which eslint cannot see.
-    // eslint-disable-next-line no-useless-assignment
+    /* The parent reads this through its binding, which eslint cannot see. */
+    /* eslint-disable-next-line no-useless-assignment */
     followingLive = $bindable(false),
   }: Props = $props();
   let folded = $derived(
@@ -646,9 +646,17 @@
     }
     // Sending goes to the newest event wherever the reader was, so a room opened
     // on its first unread does not swallow the message just sent.
-    const sent = items.length > previousItems.length && items.at(-1)?.transaction_id !== null;
-    if (sent && position.kind === 'anchored') {
+    // A prepend also grows the list, so the newest row having changed is what
+    // separates a send from history arriving.
+    const appended =
+      identityTracker.key(previousItems, previousItems.length - 1) !==
+      identityTracker.key(items, items.length - 1);
+    const sent = appended && items.at(-1)?.transaction_id != null;
+    if (sent && position.kind !== 'pinned') {
       setPosition(nextPosition(position, { kind: 'jump-to-latest' }));
+      // The virtualiser does not report the append as a size change here, so the
+      // offset cannot wait on `handleVirtualizerChange` to schedule it.
+      scheduleCommit();
     }
     // `position` goes stale: a programmatic scroll raises no gesture and a
     // wheel at offset zero raises no scroll event.

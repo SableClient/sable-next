@@ -550,6 +550,40 @@ test('follows an appended event while a pointer rests on the timeline', async ({
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 });
 
+// A room opened on its first unread is anchored, not pinned, so the message just
+// sent lands below the fold unless sending goes to the newest event.
+test('follows a sent message from a room opened on its first unread', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('unread');
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await expect(timeline.initial).toHaveCount(0);
+  await expect(timeline.jumpToLatest).toBeVisible();
+
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back' as const,
+      value: {
+        ...timelineItem('echo', 'A message I just sent'),
+        event_id: null,
+        transaction_id: 'txn-1',
+        is_own: true,
+      },
+    },
+  ]);
+
+  // Promptly: following on the next frame is the point, not eventually.
+  await expect.poll(() => timeline.distanceFromBottom(), { timeout: 1_000 }).toBe(0);
+  await expect(timeline.itemById('echo')).toBeInViewport();
+});
+
 test('follows a sent message after a wheel that could not scroll', async ({
   page,
   app,
