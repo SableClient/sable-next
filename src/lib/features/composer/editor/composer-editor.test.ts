@@ -2,8 +2,10 @@
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { undo } from 'prosemirror-history';
+import { Selection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { activeQuery } from '../autocomplete';
 import { ComposerEditor, type ComposerEditorOptions } from './composer-editor';
 import { composerSchema } from './schema';
@@ -13,6 +15,7 @@ let dispose: (() => void) | undefined;
 const defaultUserAgent = navigator.userAgent;
 
 afterEach(() => {
+  preferences.enterForNewline = false;
   dispose?.();
   dispose = undefined;
   document.body.replaceChildren();
@@ -273,4 +276,81 @@ test('the active option is written straight onto the editor node', () => {
   editor.syncActiveOption();
   expect(surface?.getAttribute('aria-activedescendant')).toBeNull();
   expect(surface?.getAttribute('aria-expanded')).toBe('false');
+});
+
+function press(editor: ComposerEditor, key: string, shift = false): void {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    shiftKey: shift,
+    bubbles: true,
+    cancelable: true,
+  });
+  view(editor).someProp('handleKeyDown', (handler) => handler(view(editor), event));
+}
+
+describe('block editing', () => {
+  test('shift+enter inserts a soft break instead of a second paragraph', () => {
+    const editor = open();
+    editor.setText('one');
+    press(editor, 'Enter', true);
+    editor.insert(composerSchema.text('two'));
+
+    const doc = editor.doc();
+    expect(doc?.childCount).toBe(1);
+    expect(doc?.firstChild?.child(1).type.name).toBe('hard_break');
+  });
+
+  test('a soft break keeps the marks, so the message still sends formatted', () => {
+    const editor = open();
+    editor.setHtml('<p><strong>one</strong></p>');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+    );
+    press(editor, 'Enter', true);
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(doc.childCount).toBe(1);
+    expect(serializeComposer(doc).formatted).toContain('<strong>');
+  });
+
+  test('enter inside a code block adds a newline rather than a second block', () => {
+    const editor = open();
+    editor.setHtml('<pre>a</pre>');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+    );
+    press(editor, 'Enter');
+
+    const doc = editor.doc();
+    expect(doc?.childCount).toBe(1);
+    expect(doc?.firstChild?.type.name).toBe('code_block');
+    expect(doc?.firstChild?.textContent).toBe('a\n');
+  });
+
+  test('enter on an empty line inside a quote lifts out of it', () => {
+    preferences.enterForNewline = true;
+    const editor = open();
+    editor.setHtml('<blockquote><p>a</p><p></p></blockquote>');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+    );
+    press(editor, 'Enter');
+
+    const doc = editor.doc();
+    expect(doc?.childCount).toBe(2);
+    expect(doc?.child(1).type.name).toBe('paragraph');
+  });
+
+  test('a selection-only transaction does not report a document change', () => {
+    const changes: boolean[] = [];
+    const editor = openWith({ onChange: (_empty, _marks, docChanged) => changes.push(docChanged) });
+    editor.setText('hello');
+    changes.length = 0;
+
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atStart(view(editor).state.doc))
+    );
+    expect(changes).toEqual([false]);
+  });
 });

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { EditorState } from 'prosemirror-state';
+import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, expect, test } from 'vitest';
 
@@ -86,4 +86,43 @@ test('a bullet marker opens a list', () => {
 
   expect(view?.state.doc.firstChild?.type.name).toBe('bullet_list');
   expect(view?.state.doc.textContent).toBe('item');
+});
+
+test('an underscore inside a word does not become emphasis', () => {
+  open();
+  type('call snake_case_name now');
+
+  expect(view?.state.doc.textContent).toBe('call snake_case_name now');
+  expect(marksOn('call snake_case_name now')).toEqual([]);
+});
+
+test('an underscore around a word still becomes emphasis', () => {
+  open();
+  type('say _hi_ now');
+
+  expect(view?.state.doc.textContent).toBe('say hi now');
+  expect(marksOn('hi')).toEqual(['em']);
+});
+
+test('a bold marker typed inside a code span stays literal', () => {
+  const editor = open();
+  const code = composerSchema.text('ab', [composerSchema.marks.code.create()]);
+  const tr = editor.state.tr.replaceWith(
+    0,
+    editor.state.doc.content.size,
+    composerSchema.node('paragraph', null, code)
+  );
+  editor.dispatch(tr.setSelection(TextSelection.create(tr.doc, 2)));
+  type('**b**');
+
+  expect(view?.state.doc.textContent).toBe('a**b**b');
+  expect(marksOn('a**b**b')).toEqual(['code']);
+});
+
+test('a mark rule keeps the marks the range already carried', () => {
+  open();
+  type('**a ~~b~~ c**');
+
+  expect(view?.state.doc.textContent).toBe('a b c');
+  expect(marksOn('b').sort()).toEqual(['strike', 'strong']);
 });

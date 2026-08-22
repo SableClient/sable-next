@@ -1,6 +1,6 @@
 import { Schema } from 'prosemirror-model';
 
-const matrixTo = 'https://matrix.to/#/';
+export const matrixTo = 'https://matrix.to/#/';
 
 export const composerSchema = new Schema({
   nodes: {
@@ -63,6 +63,13 @@ export const composerSchema = new Schema({
       toDOM: () => ['li', 0],
     },
     text: { group: 'inline' },
+    hard_break: {
+      inline: true,
+      group: 'inline',
+      selectable: false,
+      parseDOM: [{ tag: 'br' }],
+      toDOM: () => ['br'],
+    },
     mention: {
       inline: true,
       atom: true,
@@ -129,6 +136,8 @@ export const composerSchema = new Schema({
       toDOM: () => ['del', 0],
     },
     code: {
+      code: true,
+      excludes: '_',
       parseDOM: [{ tag: 'code' }],
       toDOM: () => ['code', 0],
     },

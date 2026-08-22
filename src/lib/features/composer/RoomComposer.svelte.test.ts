@@ -7,6 +7,7 @@ import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { clearDrafts } from './composer-drafts';
 import { ComposerEditor } from './editor/composer-editor';
 import Harness from './RoomComposerHarness.test.svelte';
@@ -14,6 +15,8 @@ import Harness from './RoomComposerHarness.test.svelte';
 afterEach(() => {
   document.body.replaceChildren();
   clearDrafts();
+  setPreference('formattingToolbar', false);
+  setPreference('richTextComposer', true);
 });
 
 const members: MemberView[] = [
@@ -528,4 +531,52 @@ test('a batch over the limit is refused as a batch', async () => {
   expect(stagedNames()).toEqual(['half.bin']);
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('more than');
   void unmount(instance);
+});
+
+function formattingToggle(): HTMLElement {
+  const element = document.querySelector('.composer-format');
+  if (!(element instanceof HTMLElement)) throw new Error('formatting toggle not found');
+  return element;
+}
+
+function formattingBar(): Element | null {
+  return document.querySelector('.formatting');
+}
+
+test('the formatting toolbar follows its setting', async () => {
+  const app = render({ roomId: '!room:example.org' });
+  await tick();
+  expect(formattingBar()).toBeNull();
+
+  setPreference('formattingToolbar', true);
+  await tick();
+  expect(formattingBar()).not.toBeNull();
+
+  void unmount(app);
+});
+
+test('the toolbar toggle writes the setting back, so it survives a remount', async () => {
+  const first = render({ roomId: '!room:example.org' });
+  await tick();
+  formattingToggle().click();
+  await tick();
+
+  expect(formattingToggle().getAttribute('aria-pressed')).toBe('true');
+  void unmount(first);
+
+  const second = render({ roomId: '!room:example.org' });
+  await tick();
+  expect(formattingBar()).not.toBeNull();
+  void unmount(second);
+});
+
+test('neither the toolbar nor its toggle appear without rich text', async () => {
+  setPreference('formattingToolbar', true);
+  setPreference('richTextComposer', false);
+  const app = render({ roomId: '!room:example.org' });
+  await tick();
+
+  expect(document.querySelector('.composer-format')).toBeNull();
+  expect(formattingBar()).toBeNull();
+  void unmount(app);
 });

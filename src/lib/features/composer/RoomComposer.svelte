@@ -13,7 +13,7 @@
   import { i18n } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { cachedMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
@@ -44,7 +44,7 @@
   import type { FormatAction } from './editor/formatting';
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
-  import { serializeComposer } from './editor/serialize';
+  import { serializeComposer, serializePlain } from './editor/serialize';
   import { sendFailureKey } from './send-failure';
   import { SendQueue } from './send-queue';
   import { suggestionsFor } from './suggestions';
@@ -120,7 +120,9 @@
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
   let activeFormats = $state.raw<FormatAction[]>([]);
-  let formattingOpen = $state(preferences.formattingToolbar);
+  let formattingOpen = $derived(preferences.formattingToolbar);
+  let richText = $derived(preferences.richTextComposer);
+  let configuredRich = preferences.richTextComposer;
   let dragging = $state(false);
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
@@ -158,11 +160,11 @@
     onSubmit: () => {
       void send();
     },
-    onChange: (next, marks) => {
+    onChange: (next, marks, docChanged) => {
       empty = next;
       activeFormats = marks;
       activeIndex = 0;
-      updateTyping();
+      if (docChanged) updateTyping();
     },
     onQuery: (next) => {
       if (!next) dismissedAt = null;
@@ -179,6 +181,13 @@
     void active;
     void suggestions.length;
     editor.syncActiveOption();
+  });
+
+  $effect(() => {
+    const next = richText;
+    if (next === configuredRich) return;
+    configuredRich = next;
+    editor.reconfigure();
   });
 
   const queue = new SendQueue();
@@ -208,7 +217,9 @@
     if (context?.kind === 'edit' && prefilledFor !== context.eventId) {
       if (prefilledFor === null && !editor.isEmpty()) preEdit = editor.doc();
       prefilledFor = context.eventId;
-      const formatted = formattedForEditing(context.html);
+      /* In plain-text mode the body already is the markdown source, so
+         parsing the HTML back into marks would lose it again on send. */
+      const formatted = richText ? formattedForEditing(context.html) : null;
       if (formatted === null) editor.setText(context.body);
       else editor.setHtml(formatted);
     } else if (context === null) {
@@ -307,7 +318,9 @@
     try {
       await queue.enqueue(async () => {
         const message = doc
-          ? serializeComposer(doc)
+          ? richText
+            ? serializeComposer(doc)
+            : serializePlain(doc)
           : { body: '', formatted: null, mentions: { userIds: [], room: false } };
         const captioned = unsent.length === 1 && message.body !== '';
 
@@ -524,7 +537,7 @@
             }}
           />
         {/if}
-        {#if formattingOpen}
+        {#if formattingOpen && richText}
           <ComposerFormatting
             active={activeFormats}
             onFormat={(action: FormatAction) => {
@@ -590,18 +603,20 @@
               onBeforeOpen={!desktop ? blurEditor : undefined}
             />
           </div>
-          <IconButton
-            variant="ghost"
-            size="small"
-            class="composer-format"
-            aria-pressed={formattingOpen}
-            label={$i18n.t('composer.formatting')}
-            onclick={() => {
-              formattingOpen = !formattingOpen;
-            }}
-          >
-            <TextAaIcon />
-          </IconButton>
+          {#if richText}
+            <IconButton
+              variant="ghost"
+              size="small"
+              class="composer-format"
+              aria-pressed={formattingOpen}
+              label={$i18n.t('composer.formatting')}
+              onclick={() => {
+                setPreference('formattingToolbar', !formattingOpen);
+              }}
+            >
+              <TextAaIcon />
+            </IconButton>
+          {/if}
           <IconButton
             type="submit"
             variant="ghost"
@@ -662,7 +677,7 @@
 
 <style>
   .composer-stack {
-    --composer-gutter: var(--space-2);
+    --composer-gutter: var(--space-1);
 
     margin: 0 auto;
     position: relative;
@@ -680,7 +695,7 @@
     display: flex;
     gap: 0.75rem;
     justify-content: space-between;
-    min-height: 1.75rem;
+    min-height: 1.25rem;
   }
 
   .typing {
@@ -741,7 +756,7 @@
     align-items: center;
     display: flex;
     gap: 0.5rem;
-    padding: 0.5rem;
+    padding: var(--space-compact);
     width: 100%;
   }
 
@@ -752,8 +767,8 @@
     flex: 1;
     justify-content: center;
     margin: 0;
-    min-height: 2.625rem;
-    padding: 0.5rem 0.75rem;
+    min-height: var(--target);
+    padding: var(--space-1) var(--space-2);
   }
 
   .composer-field {
@@ -841,22 +856,6 @@
     width: var(--icon-size-small);
   }
 
-  /* Keep desktop chat compact while preserving 40px pointer hit areas. */
-  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
-    .composer {
-      --target: var(--control-height-small);
-    }
-
-    .composer-row {
-      padding: var(--space-compact);
-    }
-
-    .locked {
-      min-height: var(--control-height-small);
-      padding-block: 0.375rem;
-    }
-  }
-
   :global(.send-error) {
     font-size: var(--font-size-small);
     margin: 0;
@@ -880,6 +879,13 @@
 
     .typing-dots i:nth-child(3) {
       animation-delay: 0.3s;
+    }
+  }
+
+  /* 36px against the 40px fine-pointer hit area still clears the 0.5rem gap. */
+  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+    .composer {
+      --target: var(--control-height-small);
     }
   }
 

@@ -652,6 +652,8 @@
     "composerDescription": "How the message box behaves as you write.",
     "enterForNewline": "Enter inserts a newline",
     "enterForNewlineHint": "Shift+Enter sends instead. Handy on touch keyboards.",
+    "richTextComposer": "Rich text editor",
+    "richTextComposerHint": "Formats as you type. Turn off to type Markdown literally; it is still formatted when sent.",
     "formattingToolbar": "Formatting toolbar",
     "formattingToolbarHint": "Keeps the bold, italic and list controls always open.",
     "privacyTitle": "Privacy",

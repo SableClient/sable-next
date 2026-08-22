@@ -21,6 +21,7 @@ export interface Preferences {
 
   enterForNewline: boolean;
   formattingToolbar: boolean;
+  richTextComposer: boolean;
 
   sendTypingNotifications: boolean;
   sendReadReceipts: boolean;
@@ -98,6 +99,7 @@ const DEFAULTS: Preferences = {
 
   enterForNewline: false,
   formattingToolbar: false,
+  richTextComposer: true,
 
   sendTypingNotifications: true,
   sendReadReceipts: true,

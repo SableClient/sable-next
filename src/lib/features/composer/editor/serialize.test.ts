@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { composerSchema } from './schema';
-import { serializeComposer } from './serialize';
+import { serializeComposer, serializePlain } from './serialize';
 
 const { doc, paragraph, heading, blockquote, bullet_list, list_item, mention, emoticon } =
   composerSchema.nodes;
@@ -173,4 +173,50 @@ test('a word ending in @room is not a room mention', () => {
   const message = serializeComposer(docOf(para(composerSchema.text('mail me at me@room'))));
 
   expect(message.mentions.room).toBe(false);
+});
+
+test('a soft break keeps its formatting and leaves no escape in the body', () => {
+  const { hard_break: hb } = composerSchema.nodes;
+  const message = serializeComposer(
+    docOf(
+      para([composerSchema.text('one', [strong.create()]), hb.create(), composerSchema.text('two')])
+    )
+  );
+
+  expect(message.body).toBe('**one**\ntwo');
+  expect(message.formatted).toBe('<strong>one</strong><br>two');
+});
+
+describe('plain text mode', () => {
+  test('the body is what was typed and the html is parsed from it', () => {
+    const message = serializePlain(docOf(para(composerSchema.text('say **hi** now'))));
+
+    expect(message.body).toBe('say **hi** now');
+    expect(message.formatted).toBe('say <strong>hi</strong> now');
+  });
+
+  test('markdown characters are not escaped back into the body', () => {
+    const message = serializePlain(docOf(para(composerSchema.text('a *b* c'))));
+    expect(message.body).toBe('a *b* c');
+  });
+
+  test('plain prose sends without a formatted body', () => {
+    const message = serializePlain(docOf(para(composerSchema.text('just words'))));
+
+    expect(message.body).toBe('just words');
+    expect(message.formatted).toBeNull();
+  });
+
+  test('strikethrough parses even though commonmark leaves it off', () => {
+    const message = serializePlain(docOf(para(composerSchema.text('a ~~b~~ c'))));
+    expect(message.formatted).toBe('a <del>b</del> c');
+  });
+
+  test('a mention keeps its user id and renders as a matrix.to link', () => {
+    const who = mention.create({ userId: '@amp:example.org', name: 'amp' });
+    const message = serializePlain(docOf(para([who, composerSchema.text(' hi')])));
+
+    expect(message.mentions.userIds).toEqual(['@amp:example.org']);
+    expect(message.formatted).toContain('https://matrix.to/#/@amp:example.org');
+  });
 });

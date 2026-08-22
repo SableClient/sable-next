@@ -27,17 +27,20 @@
   .editor {
     flex: 1;
     max-height: 10rem;
-    min-height: 2.625rem;
+    min-height: var(--target);
     min-width: 0;
     overflow-y: auto;
-    padding: 0.5rem 3rem 0.5rem 0.75rem;
+
+    /* The right reserve is the sticker button, which is absolutely positioned
+       inside the field and so does not push the text itself. */
+    padding: var(--space-1) calc(var(--target) + var(--space-compact)) var(--space-1) var(--space-1);
     position: relative;
   }
 
+  /* `white-space` comes from prosemirror.css, imported by `composer-editor.ts`. */
   .editor :global([contenteditable='true']) {
     outline: 0;
     overflow-wrap: anywhere;
-    white-space: pre-wrap;
   }
 
   .editor :global([contenteditable='true'] p) {
@@ -98,21 +101,10 @@
   .editor.empty::before {
     color: var(--sable-surface-var-on-container);
     content: attr(data-placeholder);
-    left: 0.75rem;
+    left: var(--space-1);
     pointer-events: none;
     position: absolute;
-    top: 0.5rem;
-  }
-
-  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
-    .editor {
-      min-height: var(--control-height-small);
-      padding-block: 0.375rem;
-    }
-
-    .editor.empty::before {
-      top: 0.375rem;
-    }
+    top: var(--space-1);
   }
 
   .editor :global(.composer-mention) {
@@ -120,6 +112,12 @@
     border-radius: var(--radius-pill);
     color: var(--sable-primary-on-container);
     padding: 0 0.375rem;
+  }
+
+  /* ProseMirror's own class; the themed `.selected` below paints instead. */
+  /* stylelint-disable-next-line selector-class-pattern */
+  .editor :global(.ProseMirror-selectednode) {
+    outline: 0;
   }
 
   .editor :global(.composer-mention.selected) {
