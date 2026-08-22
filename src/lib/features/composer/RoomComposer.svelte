@@ -5,7 +5,7 @@
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
-  import { onDestroy, type Snippet } from 'svelte';
+  import { onDestroy } from 'svelte';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { maxAttachmentBytes } from '#lib/core/limits.js';
@@ -69,10 +69,8 @@
     ) => Promise<void>;
     onSendLocation?: (roomId: string, body: string, geoUri: string) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
-    typingLabel?: string | null;
     roomName?: string | null;
     readOnly?: boolean;
-    statusTrailing?: Snippet;
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     onCancelContext?: () => void;
@@ -87,10 +85,8 @@
     onCreatePoll,
     onSendLocation,
     onTyping,
-    typingLabel = null,
     roomName = null,
     readOnly = false,
-    statusTrailing,
     context = null,
     onCancelContext,
     onEditLast,
@@ -454,11 +450,22 @@
     return composerSchema.nodes.emoticon.create({ url: image.url, shortcode });
   }
 
+  /** The servers cost a round trip, so the mention is inserted without them. */
+  async function attachVia(address: string): Promise<void> {
+    if (!address.startsWith('!')) return;
+    try {
+      editor.attachVia(address, await core.roomViaServers(address));
+    } catch (error) {
+      console.debug('[sable composer] via servers unavailable', error);
+    }
+  }
+
   function commit(suggestion: Suggestion): void {
     const current = query;
     if (!current) return;
 
     editor.replaceQuery(current, nodeFor(current.sigil, suggestion));
+    if (current.sigil === '#') void attachVia(suggestion.id);
     updateTyping();
   }
 
@@ -497,17 +504,6 @@
 </script>
 
 <div class="composer-stack">
-  <div class="status-row">
-    <div class="typing" aria-hidden={typingLabel === null} aria-live="polite" role="status">
-      {#if typingLabel}
-        <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span>{typingLabel}</span>
-      {/if}
-    </div>
-    {#if statusTrailing}
-      {@render statusTrailing()}
-    {/if}
-  </div>
   {#if readOnly}
     <div class="composer-shell">
       <div class="composer">
@@ -690,39 +686,6 @@
     }
   }
 
-  .status-row {
-    align-items: center;
-    display: flex;
-    gap: 0.75rem;
-    justify-content: space-between;
-    min-height: 1.25rem;
-  }
-
-  .typing {
-    align-items: center;
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: 0.375rem;
-    line-height: 1.25rem;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-
-  .typing-dots {
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: 0.1875rem;
-  }
-
-  .typing-dots i {
-    background: var(--sable-primary-main);
-    border-radius: 50%;
-    height: 0.25rem;
-    width: 0.25rem;
-  }
-
   .composer-shell {
     align-items: end;
     display: flex;
@@ -868,38 +831,12 @@
         box-shadow var(--motion-fast) var(--motion-easing-standard),
         padding var(--motion-slow) var(--motion-easing-emphasized);
     }
-
-    .typing-dots i {
-      animation: typing-dot 1.2s infinite ease-in-out;
-    }
-
-    .typing-dots i:nth-child(2) {
-      animation-delay: 0.15s;
-    }
-
-    .typing-dots i:nth-child(3) {
-      animation-delay: 0.3s;
-    }
   }
 
   /* 36px against the 40px fine-pointer hit area still clears the 0.5rem gap. */
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
     .composer {
       --target: var(--control-height-small);
-    }
-  }
-
-  @keyframes typing-dot {
-    0%,
-    60%,
-    100% {
-      opacity: 0.3;
-      transform: translateY(0);
-    }
-
-    30% {
-      opacity: 1;
-      transform: translateY(-0.1875rem);
     }
   }
 </style>

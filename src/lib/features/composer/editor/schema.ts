@@ -1,6 +1,15 @@
 import { Schema } from 'prosemirror-model';
 
+import { splitVia } from '#lib/features/room/join-address.js';
+
 export const matrixTo = 'https://matrix.to/#/';
+
+/** A room id is not routable without `via`; an alias resolves on its own. */
+export function mentionHref(userId: string, via: readonly string[]): string {
+  if (!userId.startsWith('!') || via.length === 0) return `${matrixTo}${userId}`;
+  const query = new URLSearchParams(via.map((server) => ['via', server]));
+  return `${matrixTo}${userId}?${query.toString()}`;
+}
 
 export const composerSchema = new Schema({
   nodes: {
@@ -75,20 +84,24 @@ export const composerSchema = new Schema({
       atom: true,
       group: 'inline',
       selectable: true,
-      attrs: { userId: {}, name: {} },
+      attrs: { userId: {}, name: {}, via: { default: [] as string[] } },
       parseDOM: [
         {
           tag: `a[href^="${matrixTo}@"], a[href^="${matrixTo}#"], a[href^="${matrixTo}!"]`,
           priority: 60,
-          getAttrs: (dom) => ({
-            userId: decodeURIComponent((dom.getAttribute('href') ?? '').slice(matrixTo.length)),
-            name: dom.textContent,
-          }),
+          getAttrs: (dom) => {
+            const { href, via } = splitVia(dom.getAttribute('href') ?? '');
+            return {
+              userId: decodeURIComponent(href.slice(matrixTo.length)),
+              name: dom.textContent,
+              via,
+            };
+          },
         },
       ],
       toDOM: (node) => [
         'a',
-        { href: `${matrixTo}${node.attrs.userId as string}` },
+        { href: mentionHref(node.attrs.userId as string, node.attrs.via as string[]) },
         node.attrs.name as string,
       ],
     },

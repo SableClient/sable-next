@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import { Popover } from 'bits-ui';
   import { cubicOut } from 'svelte/easing';
   import { prefersReducedMotion } from 'svelte/motion';
@@ -74,7 +73,6 @@
         open = true;
       }}
     >
-      <ChecksIcon aria-hidden="true" weight="bold" />
       <span class="stack">
         {#each seen.slice(0, MAX_FACES) as reader (reader.userId)}
           <span
@@ -92,10 +90,10 @@
             />
           </span>
         {/each}
+        {#if readers.length > MAX_FACES}
+          <span class="overflow">+{readers.length - MAX_FACES}</span>
+        {/if}
       </span>
-      {#key readers.length}
-        <span class="count">{readers.length}</span>
-      {/key}
     </button>
   {/if}
 </div>
@@ -158,9 +156,9 @@
     display: inline-flex;
     font: inherit;
     gap: var(--space-tight);
-    height: 1.75rem;
+    height: 1.375rem;
     max-width: 100%;
-    padding: 0 var(--space-1) 0 var(--space-tight);
+    padding: 0 var(--space-tight);
     position: relative;
     transition:
       background-color var(--motion-fast) var(--motion-easing-standard),
@@ -169,7 +167,6 @@
     white-space: nowrap;
   }
 
-  /* The row reserves 1.75rem, so the tap area grows without changing layout. */
   button::after {
     content: '';
     inset: -0.25rem 0;
@@ -206,13 +203,6 @@
     outline-offset: 0.15rem;
   }
 
-  button :global(svg) {
-    color: var(--sable-success-main);
-    flex: none;
-    height: 0.875rem;
-    width: 0.875rem;
-  }
-
   .stack {
     align-items: center;
     display: flex;
@@ -221,7 +211,7 @@
   }
 
   .stack > * + * {
-    margin-left: -0.4375rem;
+    margin-left: -0.375rem;
   }
 
   .stack :global(.receipt-face) {
@@ -229,18 +219,25 @@
   }
 
   :global(.sable-avatar.receipt-face) {
-    --avatar-size: 1.25rem;
+    --avatar-size: 1.125rem;
 
-    font-size: 0.625rem;
+    font-size: 0.5625rem;
   }
 
-  .count {
-    font-size: var(--font-size-small);
+  .overflow {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius-pill);
+    box-shadow: 0 0 0 0.125rem var(--stack-ring);
+    color: var(--sable-surface-var-on-container);
+    display: inline-flex;
+    font-size: 0.625rem;
     font-variant-numeric: tabular-nums;
-    font-weight: var(--font-weight-medium);
-    letter-spacing: 0.01em;
+    height: 1.125rem;
+    justify-content: center;
     line-height: 1;
-    padding-left: 0.125rem;
+    min-width: 1.125rem;
+    padding: 0 0.1875rem;
   }
 
   :global(.read-receipts-popover) {
@@ -258,18 +255,5 @@
   :global(.read-receipts-popover .members-drawer) {
     max-height: 100%;
     min-height: 0;
-  }
-
-  @keyframes count-in {
-    from {
-      opacity: 0;
-      transform: translateY(-0.1875rem);
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .count {
-      animation: count-in var(--motion-normal) var(--motion-easing-emphasized);
-    }
   }
 </style>

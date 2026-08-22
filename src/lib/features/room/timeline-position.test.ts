@@ -49,6 +49,7 @@ const event = fc.oneof(
     kind: fc.constant('user-scrolled' as const),
     timelineMode,
     nearLatest: fc.boolean(),
+    movedAway: fc.boolean(),
     gesture,
     anchorKey: fc.option(fc.string({ minLength: 1 }), { nil: null }),
     anchorTop: fc.integer({ min: -500, max: 500 }),
@@ -98,6 +99,21 @@ describe('nextPosition', () => {
         kind: 'user-scrolled',
         timelineMode: 'live',
         nearLatest: false,
+        movedAway: true,
+        gesture: 'wheel',
+        anchorKey: 'event:$b',
+        anchorTop: 12,
+      })
+    ).toEqual({ kind: 'anchored', key: 'event:$b', top: 12 });
+  });
+
+  test('reading back inside the band does not snap to the newest event', () => {
+    expect(
+      nextPosition(pinned, {
+        kind: 'user-scrolled',
+        timelineMode: 'live',
+        nearLatest: true,
+        movedAway: true,
         gesture: 'wheel',
         anchorKey: 'event:$b',
         anchorTop: 12,
@@ -111,6 +127,7 @@ describe('nextPosition', () => {
         kind: 'user-scrolled',
         timelineMode: 'live',
         nearLatest: true,
+        movedAway: false,
         gesture: 'wheel',
         anchorKey: 'event:$b',
         anchorTop: 12,
@@ -132,6 +149,7 @@ describe('properties', () => {
               kind: 'user-scrolled',
               timelineMode: 'live',
               nearLatest,
+              movedAway: false,
               gesture: g,
               anchorKey,
               anchorTop: 0,
@@ -176,7 +194,7 @@ describe('properties', () => {
         const after = nextPosition(settling, next);
         if (after.kind === 'settling') return;
         if (next.kind === 'user-scrolled') {
-          expect(isScrolling(next.gesture) && !next.nearLatest).toBe(true);
+          expect(isScrolling(next.gesture) && (!next.nearLatest || next.movedAway)).toBe(true);
           return;
         }
         expect(['focus-requested', 'fill-finished', 'jump-to-latest']).toContain(next.kind);
@@ -192,6 +210,7 @@ describe('properties', () => {
             kind: 'user-scrolled',
             timelineMode: 'live',
             nearLatest: true,
+            movedAway: false,
             gesture: g,
             anchorKey: 'event:$a',
             anchorTop: 0,
@@ -218,6 +237,7 @@ describe('properties', () => {
             kind: 'user-scrolled',
             timelineMode: 'live',
             nearLatest: true,
+            movedAway: false,
             gesture: g,
             anchorKey: 'event:$a',
             anchorTop: 0,
@@ -235,6 +255,7 @@ describe('properties', () => {
             kind: 'user-scrolled',
             timelineMode: 'focused',
             nearLatest,
+            movedAway: false,
             gesture: g,
             anchorKey: 'event:$a',
             anchorTop: 0,

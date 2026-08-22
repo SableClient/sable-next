@@ -8,6 +8,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { matrixToUrl } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -181,9 +182,8 @@
 
   async function copyLink(child: SpaceHierarchyRoomView): Promise<void> {
     try {
-      await navigator.clipboard.writeText(
-        `https://matrix.to/#/${child.canonical_alias ?? child.room_id}`
-      );
+      const via = child.canonical_alias ? [] : await core.roomViaServers(child.room_id);
+      await navigator.clipboard.writeText(matrixToUrl(child.canonical_alias ?? child.room_id, via));
     } catch (error) {
       console.debug('[sable lobby] clipboard unavailable', error);
     }

@@ -9,7 +9,7 @@ import { DOMSerializer, type Node as ProseMirrorNode } from 'prosemirror-model';
 
 import type { OutgoingMentions } from '#lib/core/client.svelte.js';
 
-import { composerSchema, matrixTo } from './schema';
+import { composerSchema, mentionHref } from './schema';
 
 export interface ComposerMessage {
   body: string;
@@ -128,7 +128,8 @@ function plainTextOf(doc: ProseMirrorNode): string {
     if (node.type === hardBreak) return '\n';
     if (node.type === emoticon) return `:${node.attrs.shortcode as string}:`;
     if (node.type === mention) {
-      return `[${node.attrs.name as string}](${matrixTo}${node.attrs.userId as string})`;
+      const href = mentionHref(node.attrs.userId as string, node.attrs.via as string[]);
+      return `[${node.attrs.name as string}](${href})`;
     }
     return '';
   });

@@ -97,6 +97,7 @@ export function domAnchorViewport(viewport: HTMLElement): AnchorViewport {
       const viewportTop = viewport.getBoundingClientRect().top;
       const height = viewport.clientHeight;
       const events: AnchorSnapshot[] = [];
+      const clipped: AnchorSnapshot[] = [];
       const virtual: AnchorSnapshot[] = [];
       for (const row of viewport.querySelectorAll<HTMLElement>('.item[data-item-id]')) {
         const itemId = row.dataset.itemId;
@@ -105,12 +106,15 @@ export function domAnchorViewport(viewport: HTMLElement): AnchorViewport {
         const top = rowTop(row, viewportTop);
         if (top >= height || top + row.offsetHeight <= 0) continue;
         if (eventId === undefined) virtual.push({ key: `${ITEM_KEY_PREFIX}${itemId}`, top });
+        // The row straddling the top edge is the one a prepend reshapes: what
+        // precedes it changes, so it gains or loses its sender header.
+        else if (top < 0) clipped.push({ key: eventId, top });
         else events.push({ key: eventId, top });
       }
       // A divider never moves when history is prepended into its day, and absolute
       // positioning means document order is not visual order.
       const byTop = (left: AnchorSnapshot, right: AnchorSnapshot): number => left.top - right.top;
-      return [...events.sort(byTop), ...virtual.sort(byTop)];
+      return [...events.sort(byTop), ...clipped.sort(byTop), ...virtual.sort(byTop)];
     },
     scrollBy(delta) {
       viewport.scrollBy(0, delta);

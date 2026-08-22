@@ -15,6 +15,8 @@ export type TimelineEvent =
       kind: 'user-scrolled';
       timelineMode: 'live' | 'focused';
       nearLatest: boolean;
+      /** The offset moved back through the timeline. */
+      movedAway: boolean;
       gesture: Gesture;
       anchorKey: string | null;
       anchorTop: number;
@@ -59,7 +61,9 @@ export function nextPosition(current: TimelinePosition, event: TimelineEvent): T
     case 'user-scrolled': {
       // The end of a permalink's loaded context is not the live end.
       if (event.timelineMode !== 'live') return current;
-      if (event.nearLatest) {
+      // The band that counts as the end is wide enough to read a message
+      // inside, so reading back within it is not an arrival at the end.
+      if (event.nearLatest && !(event.movedAway && isScrolling(event.gesture))) {
         // The fill rescrolls to the end until it settles, so arriving there
         // proves nothing about the reader.
         if (current.kind === 'settling') return current;

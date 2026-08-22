@@ -60,6 +60,11 @@ export class RoomTimeline {
     return this.viewport.evaluate((element) => element.scrollHeight - element.clientHeight);
   }
 
+  /** Mirrors `isNearOldest` in `TimelineHistoryController`. */
+  prefetchBand(): Promise<number> {
+    return this.viewport.evaluate((element) => element.clientHeight * 2);
+  }
+
   scrollTop(): Promise<number> {
     return this.viewport.evaluate((element) => element.scrollTop);
   }

@@ -489,9 +489,23 @@
         canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}
         scrollLocked={profileOpen || receiptsOpen}
+        {typingLabel}
         bind:nearLatest={timelineAtBottom}
         bind:followingLive={timelineFollowingLive}
-      />
+      >
+        {#snippet footTrailing()}
+          {#if !preferences.hideReadReceipts}
+            <RoomReadReceipts
+              bind:open={receiptsOpen}
+              readers={latestReadBy}
+              members={receiptMembers}
+              loading={memberLoader.loading}
+              visible={timelineAtBottom}
+              onMemberProfile={openProfile}
+            />
+          {/if}
+        {/snippet}
+      </TimelineList>
     {/key}
     <div class="composer-dock">
       {#key resolvedRoomId}
@@ -503,26 +517,12 @@
           onCreatePoll={createPoll}
           onSendLocation={sendLocation}
           onTyping={setTyping}
-          {typingLabel}
           {roomName}
           readOnly={permissions ? !permissions.can_post : false}
           context={composerContext}
           onCancelContext={clearComposerContext}
           onEditLast={editLastOwnMessage}
-        >
-          {#snippet statusTrailing()}
-            {#if !preferences.hideReadReceipts}
-              <RoomReadReceipts
-                bind:open={receiptsOpen}
-                readers={latestReadBy}
-                members={receiptMembers}
-                loading={memberLoader.loading}
-                visible={timelineAtBottom}
-                onMemberProfile={openProfile}
-              />
-            {/if}
-          {/snippet}
-        </RoomComposer>
+        />
       {/key}
     </div>
   </div>

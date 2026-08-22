@@ -7,8 +7,9 @@ import { expect, test } from './fixtures/test';
 const PAGES = 12;
 const DRIFT = 2;
 
-// Still red: a page landing moves the anchored row about 24px against a 2px
-// target. Kept skipped so the reproduction survives.
+// Still red, but no longer on the anchor: the second page never arrives, because
+// the first fill clears `historyInputArmed` and a wheel gesture does not re-arm
+// it while `historyFillActive`. The single-prepend case is asserted below.
 test.fixme('holds the anchor through a long scroll back', async ({
   page,
   app,
@@ -25,7 +26,12 @@ test.fixme('holds the anchor through a long scroll back', async ({
 
   for (let round = 0; round < PAGES; round += 1) {
     const before = await core.paginateCount();
-    await timeline.wheelUp(240);
+    // A held anchor keeps the reader on their row, so the page just prepended
+    // sits entirely above them and one gesture no longer reaches the prefetch
+    // band. Wheel until it does, and no further.
+    do {
+      await timeline.wheelUp(240);
+    } while ((await timeline.scrollTop()) > (await timeline.prefetchBand()));
     // The gesture moves the anchor by design. Wait for it to settle so the only
     // movement the sampling below can see is the prepend landing.
     await page.waitForTimeout(200);
@@ -64,4 +70,38 @@ test.fixme('holds the anchor through a long scroll back', async ({
   // One page per gesture: a cascade would show up here long before the anchor
   // assertions started failing.
   expect(await core.paginateCount()).toBe(PAGES);
+});
+
+// The row above the reader gains a sender header when the arriving page ends
+// with a different sender, and that measurement lands after Svelte has already
+// positioned the rows.
+test('holds the reader when a prepend regroups the row above them', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('endless_history');
+  await page.setViewportSize({ width: 1280, height: 420 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await expect(timeline.initial).toHaveCount(0);
+  await expect.poll(() => core.subscribeCount()).toBe(1);
+
+  const before = await core.paginateCount();
+  do {
+    await timeline.wheelUp(240);
+  } while ((await timeline.scrollTop()) > (await timeline.prefetchBand()));
+  await page.waitForTimeout(200);
+
+  const anchor = await timeline.fullyVisibleAnchor();
+  const positions = await timeline.sampleAnchorWhile(anchor.itemId, 900, async () => {
+    await expect.poll(() => core.paginateCount()).toBeGreaterThan(before);
+  });
+
+  expect(positions.length, 'the anchor was sampled zero times').toBeGreaterThan(0);
+  const drift = Math.max(...positions.map((position) => Math.abs(position - anchor.y)));
+  expect(drift, `the reader drifted ${drift.toFixed(1)}px mid-flight`).toBeLessThanOrEqual(DRIFT);
+  await timeline.expectAnchorHeld(anchor, { tolerance: DRIFT });
 });

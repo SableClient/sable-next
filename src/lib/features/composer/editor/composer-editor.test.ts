@@ -107,6 +107,45 @@ test('committing a mention keeps the text that came before it', () => {
   expect(serializeComposer(doc).body).toBe('hi Me');
 });
 
+describe('attachVia', () => {
+  const roomMention = () =>
+    composerSchema.nodes.mention.create({ userId: '!abc:example.org', name: '#Sable' });
+
+  test('patches the servers into a room mention already inserted', () => {
+    const editor = open();
+    editor.insert(roomMention());
+
+    editor.attachVia('!abc:example.org', ['sable.moe']);
+    const doc = editor.doc();
+
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<a href="https://matrix.to/#/!abc:example.org?via=sable.moe">#Sable</a> '
+    );
+  });
+
+  test('leaves the text the user typed while it resolved alone', () => {
+    const editor = open();
+    editor.insert(roomMention());
+    editor.insert(composerSchema.text('later'));
+
+    editor.attachVia('!abc:example.org', ['sable.moe']);
+    const doc = editor.doc();
+
+    expect(doc && serializeComposer(doc).body).toBe('#Sable later');
+  });
+
+  test('does not become its own undo step', () => {
+    const editor = open();
+    editor.insert(roomMention());
+
+    editor.attachVia('!abc:example.org', ['sable.moe']);
+    const editorView = view(editor);
+    undo(editorView.state, editorView.dispatch);
+
+    expect(editor.isEmpty()).toBe(true);
+  });
+});
+
 test('a mention-only document is not empty', () => {
   const editor = open();
   editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));

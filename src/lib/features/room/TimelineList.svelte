@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { get } from 'svelte/store';
   import { createVirtualizer } from '@tanstack/svelte-virtual';
@@ -81,6 +81,7 @@
     nearLatest?: boolean;
     followingLive?: boolean;
     typingLabel?: string | null;
+    footTrailing?: Snippet;
   }
 
   let {
@@ -113,6 +114,7 @@
     /* eslint-disable-next-line no-useless-assignment */
     followingLive = $bindable(false),
     typingLabel = null,
+    footTrailing,
   }: Props = $props();
   let visibleItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
   let personas = $derived(personasByEventId(timeline.items));
@@ -264,7 +266,17 @@
     onChange: handleVirtualizerChange,
   });
 
-  get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = () => false;
+  // A row above the reader is measured after Svelte has positioned it, so the
+  // DOM anchor can only correct the shift a frame after it is painted. The
+  // virtualiser knows the delta first. Unlike `followOnAppend`, the adjustment
+  // sets no `scrollState`, so nothing arms `reconcileScroll`.
+  get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
+    const offset = instance.scrollOffset;
+    if (offset === null || item.start >= offset) return false;
+    // `onScroll` abandons a held anchor for any offset it did not write itself.
+    expectedSelfOffset = (viewport?.scrollTop ?? offset) + delta;
+    return true;
+  };
 
   historyController = new TimelineHistoryController({
     getBackwardPagination: () => timeline.backwardPagination,
@@ -765,6 +777,7 @@
     console.log(`[timeline-history] ${event} ${JSON.stringify(details)}`);
   }
 
+  let previousScrollTop = 0;
   function onScroll(): void {
     if (!viewport) return;
     const wasSelfScroll =
@@ -774,11 +787,14 @@
     // Holding an anchor against the user is worse than losing it.
     if (!wasSelfScroll && historyController.hasUserScrollPending) releaseAnchor();
     nearLatest = isNearLatest(viewport, nearLatestPx);
+    const movedAway = viewport.scrollTop < previousScrollTop;
+    previousScrollTop = viewport.scrollTop;
     refreshRollingAnchor();
     const next = nextPosition(position, {
       kind: 'user-scrolled',
       timelineMode: timeline.mode.kind,
       nearLatest,
+      movedAway,
       gesture: historyController.gesture,
       anchorKey: anchor.held?.key ?? null,
       anchorTop: anchor.held?.top ?? 0,
@@ -982,7 +998,12 @@
     >
   {/if}
 
-  <TypingIndicator label={typingLabel} />
+  <div class="timeline-foot">
+    <TypingIndicator label={typingLabel} />
+    {#if footTrailing}
+      <div class="foot-trailing">{@render footTrailing()}</div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -1157,6 +1178,20 @@
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
     padding: 0.125rem 0.5rem;
+  }
+
+  .timeline-foot {
+    align-items: center;
+    display: flex;
+    flex: none;
+    gap: var(--space-1);
+    height: 1.5rem;
+    justify-content: space-between;
+    padding: 0 var(--page-gutter);
+  }
+
+  .foot-trailing {
+    flex: none;
   }
 
   /* Container tokens are a translucent tint in some themes, which the messages
