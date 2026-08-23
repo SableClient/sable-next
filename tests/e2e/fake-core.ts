@@ -118,6 +118,60 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       workerMode === 'spaces'
         ? [room, secondRoom, invitedRoom, alphaSpace, betaSpace, gammaSpace]
         : [room, secondRoom, invitedRoom];
+    const hierarchyRoom = (
+      roomId: string,
+      name: string,
+      overrides: Record<string, unknown> = {}
+    ) => ({
+      room_id: roomId,
+      canonical_alias: null,
+      name,
+      topic: null,
+      avatar_url: null,
+      is_space: false,
+      is_voice: false,
+      num_joined_members: 3,
+      join_rule: 'public',
+      guest_can_join: false,
+      children: [],
+      ...overrides,
+    });
+
+    const childEdge = (roomId: string, order: number) => ({
+      room_id: roomId,
+      order: null,
+      origin_server_ts: order,
+      suggested: false,
+    });
+
+    const hierarchyPages: Record<string, { rooms: unknown[]; next_batch: string | null }> = {
+      '': {
+        rooms: [
+          hierarchyRoom('!alpha:example.test', 'Alpha', {
+            is_space: true,
+            children: [childEdge('!nested:example.test', 1), childEdge('!late:example.test', 2)],
+          }),
+          hierarchyRoom('!nested:example.test', 'Nested', {
+            is_space: true,
+            children: [childEdge('!deep:example.test', 1)],
+          }),
+        ],
+        next_batch: 'page-two',
+      },
+      'page-two': {
+        rooms: [
+          hierarchyRoom('!late:example.test', 'Late Arrival'),
+          hierarchyRoom('!deep:example.test', 'Deep Room'),
+        ],
+        next_batch: null,
+      },
+    };
+
+    const hierarchyPage = (from: string) => {
+      const page = hierarchyPages[from] ?? { rooms: [], next_batch: null };
+      return { type: 'space_hierarchy', rooms: page.rooms, next_batch: page.next_batch };
+    };
+
     const SIDEBAR_KEY = 'e2e-space-sidebar';
     const readSidebar = (): unknown[] => {
       try {
@@ -599,7 +653,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                   >
                                                 ),
                                               }
-                                            : { type: command },
+                                            : command === 'space_hierarchy'
+                                              ? hierarchyPage(
+                                                  (request.command as { from?: string | null })
+                                                    .from ?? ''
+                                                )
+                                              : { type: command },
               };
 
         window.setTimeout(

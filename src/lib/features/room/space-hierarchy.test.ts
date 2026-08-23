@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 
-import { buildHierarchySections, lobbyAction } from './space-hierarchy';
+import { buildHierarchySections, lobbyAction, lobbyPhase } from './space-hierarchy';
 
 function edge(roomId: string, overrides: Partial<SpaceChildEdge> = {}): SpaceChildEdge {
   return { room_id: roomId, order: null, origin_server_ts: 0, suggested: false, ...overrides };
@@ -134,4 +134,34 @@ test('children the response never described are skipped', () => {
 
   const sections = buildHierarchySections(rooms, '!space');
   expect(sections[0].rooms.map((entry) => entry.room.room_id)).toEqual(['!a']);
+});
+
+test('a first page of nothing but subspaces yields no sections yet', () => {
+  const rooms = [
+    room('!root', { is_space: true, children: [edge('!sub')] }),
+    room('!sub', { is_space: true, children: [edge('!chat')] }),
+  ];
+
+  expect(buildHierarchySections(rooms, '!root')).toEqual([]);
+});
+
+test('a pending page is not an empty space', () => {
+  expect(lobbyPhase(0, false, true)).toBe('loading');
+  expect(lobbyPhase(0, true, false)).toBe('loading');
+  expect(lobbyPhase(0, false, false)).toBe('empty');
+  expect(lobbyPhase(3, false, true)).toBe('ready');
+  expect(lobbyPhase(3, true, true)).toBe('ready');
+});
+
+test('a child on a later page does not drop its whole section', () => {
+  const firstPage = [
+    room('!root', { is_space: true, children: [edge('!early'), edge('!late')] }),
+    room('!early'),
+  ];
+  const [section] = buildHierarchySections(firstPage, '!root');
+  expect(section.rooms.map((entry) => entry.room.room_id)).toEqual(['!early']);
+
+  const bothPages = [...firstPage, room('!late')];
+  const [complete] = buildHierarchySections(bothPages, '!root');
+  expect(complete.rooms.map((entry) => entry.room.room_id)).toEqual(['!early', '!late']);
 });

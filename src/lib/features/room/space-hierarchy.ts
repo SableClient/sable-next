@@ -85,3 +85,10 @@ export function buildHierarchySections(
   walk(rootId, null, false, 0, [rootId]);
   return sections;
 }
+
+export type LobbyPhase = 'loading' | 'empty' | 'ready';
+
+export function lobbyPhase(sectionCount: number, loading: boolean, morePages: boolean): LobbyPhase {
+  if (sectionCount > 0) return 'ready';
+  return loading || morePages ? 'loading' : 'empty';
+}

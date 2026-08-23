@@ -18,6 +18,7 @@
   import {
     buildHierarchySections,
     lobbyAction,
+    lobbyPhase,
     type HierarchyRoom,
     type HierarchySection,
   } from './space-hierarchy';
@@ -42,6 +43,10 @@
   let failed = $state(false);
   let permissions = $state<RoomPermissionsView | null>(null);
 
+  const MAX_HIERARCHY_PAGES = 20;
+
+  let resume = { cancelled: false };
+
   let spaceId = $derived(space?.room_id ?? null);
   let canManage = $derived(permissions?.can_manage_children ?? false);
   let joinedIds = $derived(
@@ -59,39 +64,61 @@
       }))
       .filter((section) => section.rooms.length > 0);
   });
+  let phase = $derived(lobbyPhase(sections.length, loading, nextBatch !== null && !failed));
 
   $effect(() => {
     const target = spaceId;
     if (!target) return;
 
-    let current = true;
+    resume.cancelled = true;
+    const load = { cancelled: false };
+    resume = load;
     rooms = [];
     nextBatch = null;
     failed = false;
-    loading = true;
     removed.clear();
     knocked.clear();
     closed.clear();
 
-    void core
-      .spaceHierarchy(target)
-      .then((page) => {
-        if (!current) return;
-        rooms = page.rooms;
-        nextBatch = page.nextBatch;
-      })
-      .catch((error: unknown) => {
-        console.warn('[sable lobby] hierarchy unavailable', error);
-        if (current) failed = true;
-      })
-      .finally(() => {
-        if (current) loading = false;
-      });
+    void loadAllPages(target, load);
 
     return () => {
-      current = false;
+      load.cancelled = true;
     };
   });
+
+  async function loadAllPages(
+    target: string,
+    load: { cancelled: boolean },
+    startFrom: string | null = null,
+    known: readonly SpaceHierarchyRoomView[] = []
+  ): Promise<void> {
+    let from: string | null = startFrom;
+    let collected: SpaceHierarchyRoomView[] = [...known];
+    loading = true;
+
+    for (let page = 0; page < MAX_HIERARCHY_PAGES; page += 1) {
+      try {
+        const next = await core.spaceHierarchy(target, from);
+        if (load.cancelled) return;
+
+        collected = [...collected, ...next.rooms];
+        rooms = collected;
+        nextBatch = next.nextBatch;
+        failed = false;
+        from = next.nextBatch;
+      } catch (error) {
+        if (load.cancelled) return;
+        console.warn('[sable lobby] hierarchy unavailable', error);
+        failed = true;
+        break;
+      }
+
+      if (from === null) break;
+    }
+
+    if (!load.cancelled) loading = false;
+  }
 
   $effect(() => {
     const target = spaceId;
@@ -114,22 +141,10 @@
 
   async function loadMore(): Promise<void> {
     const target = spaceId;
-    const batch = nextBatch;
-    if (!target || batch === null || loading) return;
+    if (!target || nextBatch === null || loading) return;
 
-    loading = true;
-    try {
-      const page = await core.spaceHierarchy(target, batch);
-      if (spaceId !== target) return;
-      rooms = [...rooms, ...page.rooms];
-      nextBatch = page.nextBatch;
-    } catch (error) {
-      if (spaceId !== target) return;
-      console.warn('[sable lobby] further pages unavailable', error);
-      failed = true;
-    } finally {
-      if (spaceId === target) loading = false;
-    }
+    resume = { cancelled: false };
+    await loadAllPages(target, resume, nextBatch, rooms);
   }
 
   function open(child: SpaceHierarchyRoomView): void {
@@ -210,7 +225,7 @@
     <Alert variant="critical" role="alert">{$i18n.t('room.lobbyFailed')}</Alert>
   {/if}
 
-  {#if loading && sections.length === 0}
+  {#if phase === 'loading'}
     <div class="category">
       <ul class="rooms">
         {#each [0, 1, 2] as placeholder (placeholder)}
@@ -224,7 +239,7 @@
         {/each}
       </ul>
     </div>
-  {:else if sections.length === 0 && !failed}
+  {:else if phase === 'empty'}
     <p class="empty">{$i18n.t('room.lobbyEmpty')}</p>
   {:else}
     {#each sections as section (section.key)}
@@ -250,12 +265,12 @@
         }}
       />
     {/each}
+  {/if}
 
-    {#if nextBatch !== null}
-      <div class="more">
-        <Button {loading} onclick={loadMore}>{$i18n.t('room.lobbyMore')}</Button>
-      </div>
-    {/if}
+  {#if nextBatch !== null}
+    <div class="more">
+      <Button {loading} onclick={loadMore}>{$i18n.t('room.lobbyMore')}</Button>
+    </div>
   {/if}
 </section>
 
