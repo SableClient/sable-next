@@ -2,6 +2,7 @@
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
   import LockIcon from 'phosphor-svelte/lib/LockIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -9,6 +10,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
   import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -32,7 +34,7 @@
 
   let name = $state('');
   let topic = $state('');
-  let kind = $state<'room' | 'space'>('room');
+  let kind = $state<CreateRoomKind>('text');
   let access = $state<'private' | 'public'>('private');
   let encrypted = $state(true);
   // `parentSpaceId` arrives once the room list has loaded, so the field follows
@@ -47,7 +49,7 @@
 
   let spaces = $derived(roomList.rooms.filter((room) => room.is_space && room.state === 'joined'));
   // The core ignores `encrypted` for a space or a public room.
-  let encryptable = $derived(kind === 'room' && access === 'private');
+  let encryptable = $derived(kind !== 'space' && access === 'private');
   let canSubmit = $derived(name.trim() !== '' && !submitting);
 
   function addInvite(): void {
@@ -83,7 +85,7 @@
       const roomId = await core.createRoom({
         name: name.trim(),
         topic: topic.trim() === '' ? null : topic.trim(),
-        isSpace: kind === 'space',
+        kind,
         public: access === 'public',
         encrypted: encryptable && encrypted,
         // A `$state` array is a Proxy, which postMessage cannot clone.
@@ -140,15 +142,21 @@
     <OptionCards
       label={$i18n.t('room.createKindLabel')}
       value={kind}
-      onSelect={(next: 'room' | 'space') => {
+      onSelect={(next: CreateRoomKind) => {
         kind = next;
       }}
       options={[
         {
-          value: 'room',
+          value: 'text',
           label: $i18n.t('room.createKindRoom'),
           hint: $i18n.t('room.createKindRoomHint'),
           icon: ChatsIcon,
+        },
+        {
+          value: 'voice',
+          label: $i18n.t('room.createKindVoice'),
+          hint: $i18n.t('room.createKindVoiceHint'),
+          icon: SpeakerHighIcon,
         },
         {
           value: 'space',

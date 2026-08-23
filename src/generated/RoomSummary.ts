@@ -16,7 +16,16 @@ state: RoomStateView,
 /**
  * `null` until the state event loads, which is not the same as `false`.
  */
-encrypted: boolean | null, is_space: boolean, has_space_parent: boolean, supports_knock: boolean, supports_restricted: boolean, supports_knock_restricted: boolean, 
+encrypted: boolean | null, is_space: boolean, 
+/**
+ * An `m.room.create` with the MSC3417 call type.
+ */
+is_voice: boolean, 
+/**
+ * Members in the room's call, oldest first and one entry per user however
+ * many devices they joined with.
+ */
+call_participants: string[], has_space_parent: boolean, supports_knock: boolean, supports_restricted: boolean, supports_knock_restricted: boolean, 
 /**
  * Already sorted by `order`, then the child event's age.
  */

@@ -27,7 +27,8 @@ use matrix_sdk::ruma::{
 use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::protocol::{
-    Command, CommandErr, CommandOk, JoinRuleView, MutualRoomView, PaginationDirection, RoomTag,
+    Command, CommandErr, CommandOk, CreateRoomKind, JoinRuleView, MutualRoomView,
+    PaginationDirection, RoomTag,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -1116,7 +1117,7 @@ impl Core {
             Command::CreateRoom {
                 name,
                 topic,
-                is_space,
+                kind,
                 public,
                 encrypted,
                 invite,
@@ -1138,22 +1139,62 @@ impl Core {
                     RoomPreset::PrivateChat
                 });
 
-                if is_space {
+                if let Some(room_type) = match kind {
+                    CreateRoomKind::Text => None,
+                    CreateRoomKind::Space => Some(RoomType::Space),
+                    CreateRoomKind::Voice => Some(RoomType::Call),
+                } {
                     let mut creation = RoomCreateEventContent::new_v11();
-                    creation.room_type = Some(RoomType::Space);
+                    creation.room_type = Some(room_type);
                     request.creation_content = Some(
                         Raw::new(&creation)
-                            .map_err(|error| self.failed("create_room: space type", error))?
+                            .map_err(|error| self.failed("create_room: room type", error))?
                             .cast_unchecked(),
                     );
-                } else if encrypted && !public {
-                    // Anyone can join and read, so encryption only breaks previews.
-                    request.initial_state = vec![
+                }
+
+                if matches!(kind, CreateRoomKind::Voice) {
+                    // Joining a call means writing your own membership, which the
+                    // defaults reserve for moderators. The override is a shallow
+                    // merge, so naming `events` drops the server's whole default
+                    // map: re-state it or anyone can rename the room.
+                    request.power_level_content_override = Some(
+                        Raw::new(&serde_json::json!({
+                            "events": {
+                                "m.room.avatar": 50,
+                                "m.room.canonical_alias": 50,
+                                "m.room.encryption": 100,
+                                "m.room.history_visibility": 100,
+                                "m.room.name": 50,
+                                "m.room.power_levels": 100,
+                                "m.room.server_acl": 100,
+                                "m.room.tombstone": 100,
+                                (view::CALL_MEMBER_TYPE): 0,
+                            },
+                        }))
+                        .map_err(|error| self.failed("create_room: call power levels", error))?
+                        .cast_unchecked(),
+                    );
+                    request.initial_state.push(
+                        Raw::new(&serde_json::json!({
+                            "type": view::CALL_TYPE,
+                            "state_key": "",
+                            "content": {},
+                        }))
+                        .map_err(|error| self.failed("create_room: call state", error))?
+                        .cast_unchecked(),
+                    );
+                }
+
+                // Anyone can join and read a public room, so encryption only
+                // breaks previews.
+                if encrypted && !public && !matches!(kind, CreateRoomKind::Space) {
+                    request.initial_state.push(
                         InitialStateEvent::with_empty_state_key(
                             RoomEncryptionEventContent::with_recommended_defaults(),
                         )
                         .to_raw_any(),
-                    ];
+                    );
                 }
 
                 let room = client

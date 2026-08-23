@@ -2,22 +2,54 @@
   import { i18n } from '#lib/i18n.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
+  import type { MemberView } from '#src/generated/MemberView';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
+  import { senderColor } from './timeline-format';
+
+  const MAX_FACES = 3;
+
   interface Props {
     roomName: string;
     roomAvatar: string | null;
+    isVoice: boolean;
+    /** Set for a text room too, when a call is running in it. */
+    callParticipants: readonly string[];
+    members: readonly MemberView[];
     onBack: () => void;
     onMembers: () => void;
     onSettings: () => void;
     initials: (name: string) => string;
   }
 
-  let { roomName, roomAvatar, onBack, onMembers, onSettings, initials }: Props = $props();
+  let {
+    roomName,
+    roomAvatar,
+    isVoice,
+    callParticipants,
+    members,
+    onBack,
+    onMembers,
+    onSettings,
+    initials,
+  }: Props = $props();
+
+  let inVoice = $derived(
+    callParticipants.map((userId) => {
+      const member = members.find((entry) => entry.user_id === userId);
+      return { userId, name: member?.display_name ?? userId, avatar: member?.avatar_url ?? null };
+    })
+  );
+  let voiceLabel = $derived(
+    inVoice.length > 0
+      ? $i18n.t('timeline.inVoiceNames', { names: inVoice.map((entry) => entry.name).join(', ') })
+      : $i18n.t('nav.voiceRoom')
+  );
 </script>
 
 <header class="room-header">
@@ -32,6 +64,31 @@
   </IconButton>
   <Avatar class="room-avatar" src={roomAvatar} initials={initials(roomName)} size="small" />
   <h1>{roomName}</h1>
+  {#if isVoice || inVoice.length > 0}
+    <!-- One named graphic: the faces inside carry no name of their own. -->
+    <span
+      class="voice-chip"
+      class:live={inVoice.length > 0}
+      role="img"
+      title={voiceLabel}
+      aria-label={voiceLabel}
+    >
+      <SpeakerHighIcon />
+      {#if inVoice.length > 0}
+        <span class="voice-faces">
+          {#each inVoice.slice(0, MAX_FACES) as participant (participant.userId)}
+            <Avatar
+              class="voice-face"
+              src={participant.avatar}
+              initials={initials(participant.name)}
+              color={senderColor(participant.userId)}
+            />
+          {/each}
+        </span>
+        <span class="voice-count">{inVoice.length}</span>
+      {/if}
+    </span>
+  {/if}
   <!-- Narrow viewports hide the label, leaving the icon as the only content. -->
   <Button
     class="members-button"
@@ -78,6 +135,46 @@
   :global(.sable-avatar.room-avatar) {
     background: var(--sable-primary-main);
     color: var(--sable-primary-on-main);
+  }
+
+  .voice-chip {
+    align-items: center;
+    background: var(--sable-surface-var-container);
+    border-radius: var(--radius-pill);
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+  }
+
+  .voice-chip.live {
+    background: var(--sable-primary-container);
+    color: var(--sable-primary-on-container);
+  }
+
+  .voice-chip :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .voice-faces {
+    display: flex;
+  }
+
+  .voice-faces :global(.sable-avatar.voice-face) {
+    border: var(--border-width) solid var(--sable-bg-container);
+    height: 1.25rem;
+    width: 1.25rem;
+  }
+
+  .voice-faces :global(.sable-avatar.voice-face:not(:first-child)) {
+    margin-left: -0.375rem;
+  }
+
+  .voice-count {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
   }
 
   :global(.back-button),

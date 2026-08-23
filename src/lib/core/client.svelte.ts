@@ -20,6 +20,7 @@ import type { SubscriptionId } from '#src/generated/SubscriptionId';
 import type { SyncStatus } from '#src/generated/SyncStatus';
 import type { PaginationDirection } from '#src/generated/PaginationDirection';
 import type { MutualRoomView } from '#src/generated/MutualRoomView';
+import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
 import type { ProfileView } from '#src/generated/ProfileView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
@@ -81,7 +82,7 @@ export type ActiveVerification = { flowId: string; state: VerificationView };
 export type CreateRoomOptions = {
   name?: string | null;
   topic?: string | null;
-  isSpace?: boolean;
+  kind?: CreateRoomKind;
   /** Published in the directory, joinable by link. */
   public?: boolean;
   /** Ignored for a space or a public room. */
@@ -544,7 +545,7 @@ export class CoreClient {
       type: 'create_room',
       name: options.name ?? null,
       topic: options.topic ?? null,
-      is_space: options.isSpace ?? false,
+      kind: options.kind ?? 'text',
       public: options.public ?? false,
       encrypted: options.encrypted ?? true,
       invite: options.invite ?? [],

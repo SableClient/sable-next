@@ -228,11 +228,10 @@ pub enum Command {
         transaction_id: String,
     },
 
-    /// A space is an `m.room.create` with `type: m.space`.
     CreateRoom {
         name: Option<String>,
         topic: Option<String>,
-        is_space: bool,
+        kind: CreateRoomKind,
         /// Published in the directory, joinable by link.
         public: bool,
         /// Ignored for a space or a public room.
@@ -770,6 +769,17 @@ pub enum PaginationDirection {
     Forward,
 }
 
+/// The `m.room.create` type to ask for: `m.space`, the MSC3417 call type, or
+/// none at all.
+#[derive(Debug, Clone, Copy, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum CreateRoomKind {
+    Text,
+    Space,
+    Voice,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 #[serde(tag = "state", rename_all = "snake_case")]
@@ -912,6 +922,12 @@ pub struct RoomSummary {
     /// `null` until the state event loads, which is not the same as `false`.
     pub encrypted: Option<bool>,
     pub is_space: bool,
+    /// An `m.room.create` with the MSC3417 call type.
+    pub is_voice: bool,
+    /// Members in the room's call, oldest first and one entry per user however
+    /// many devices they joined with.
+    #[ts(type = "string[]")]
+    pub call_participants: Vec<OwnedUserId>,
     pub has_space_parent: bool,
     pub supports_knock: bool,
     pub supports_restricted: bool,
@@ -1066,6 +1082,7 @@ pub struct RoomPreviewView {
     pub topic: Option<String>,
     pub avatar_url: Option<String>,
     pub is_space: bool,
+    pub is_voice: bool,
     pub num_joined_members: u32,
     pub join_rule: RoomJoinRuleView,
     /// `null` when this account has no membership in the room.
@@ -1084,6 +1101,7 @@ pub struct SpaceHierarchyRoomView {
     pub topic: Option<String>,
     pub avatar_url: Option<String>,
     pub is_space: bool,
+    pub is_voice: bool,
     pub num_joined_members: u32,
     pub join_rule: RoomJoinRuleView,
     pub guest_can_join: bool,

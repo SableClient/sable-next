@@ -6,7 +6,7 @@ import type { SpaceChildEdge } from "./SpaceChildEdge";
  * One room in a space's hierarchy. The root space is included, so a caller can
  * walk the tree from it.
  */
-export type SpaceHierarchyRoomView = { room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_space: boolean, num_joined_members: number, join_rule: RoomJoinRuleView, guest_can_join: boolean, 
+export type SpaceHierarchyRoomView = { room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_space: boolean, is_voice: boolean, num_joined_members: number, join_rule: RoomJoinRuleView, guest_can_join: boolean, 
 /**
  * This room's own `m.space.child` edges, already sorted. Empty unless it is
  * a space.

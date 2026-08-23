@@ -25,6 +25,8 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     state: 'joined',
     encrypted: null,
     is_space: false,
+    is_voice: false,
+    call_participants: [],
     has_space_parent: false,
     supports_knock: true,
     supports_restricted: true,

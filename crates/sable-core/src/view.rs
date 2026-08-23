@@ -17,7 +17,7 @@ use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLev
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
 use matrix_sdk::ruma::room::{JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType};
-use matrix_sdk::ruma::{OwnedRoomId, UserId};
+use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_ui::{
     eyeball_im,
@@ -95,6 +95,8 @@ pub fn room_summary<S: BuildHasher>(
             RoomState::Banned => RoomStateView::Banned,
         },
         is_space: info.is_some_and(|i| i.is_space),
+        is_voice: item.is_call(),
+        call_participants: call_participants(item.active_room_call_participants()),
         has_space_parent: info.is_some_and(|i| i.has_space_parent),
         supports_knock: info.is_some_and(|i| i.supports_knock),
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
@@ -104,6 +106,17 @@ pub fn room_summary<S: BuildHasher>(
         highlight,
         latest_event: latest_event(item),
     }
+}
+
+/// The SDK lists one entry per joined device, so a user on two appears twice.
+fn call_participants(joined: Vec<OwnedUserId>) -> Vec<OwnedUserId> {
+    let mut participants: Vec<OwnedUserId> = Vec::with_capacity(joined.len());
+    for user_id in joined {
+        if !participants.contains(&user_id) {
+            participants.push(user_id);
+        }
+    }
+    participants
 }
 
 fn unread_counts(item: &RoomListItem) -> (u32, u32) {
@@ -295,6 +308,7 @@ pub fn space_hierarchy_room(
         topic: summary.topic.clone(),
         avatar_url: summary.avatar_url.as_ref().map(ToString::to_string),
         is_space: summary.room_type == Some(RoomType::Space),
+        is_voice: summary.room_type == Some(RoomType::Call),
         num_joined_members: u32::try_from(summary.num_joined_members).unwrap_or(u32::MAX),
         join_rule: join_rule_summary_view(&summary.join_rule),
         guest_can_join: summary.guest_can_join,
@@ -384,6 +398,7 @@ pub fn room_preview_view(preview: &RoomPreview) -> RoomPreviewView {
         topic: preview.topic.clone(),
         avatar_url: preview.avatar_url.as_ref().map(ToString::to_string),
         is_space: preview.room_type == Some(RoomType::Space),
+        is_voice: preview.room_type == Some(RoomType::Call),
         num_joined_members: u32::try_from(preview.num_joined_members).unwrap_or(u32::MAX),
         join_rule: preview
             .join_rule
@@ -891,7 +906,11 @@ fn in_call(content: Option<&serde_json::Value>) -> bool {
 
 // ruma resolves the `m.call.member` alias to the unstable type, so only the
 // unstable one is ever seen here.
-const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
+pub(crate) const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
+
+/// The MSC3401 marker a voice room carries. Written on creation and never read
+/// back: it is there for other clients.
+pub(crate) const CALL_TYPE: &str = "org.matrix.msc3401.call";
 
 fn message_content(
     message: &matrix_sdk_ui::timeline::Message,
@@ -1182,9 +1201,13 @@ pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>])
 
 #[cfg(test)]
 mod tests {
+    use matrix_sdk::ruma::OwnedUserId;
     use serde_json::json;
 
-    use super::{clamp_power_level, geo_coordinates, in_call, per_message_profile, via_servers};
+    use super::{
+        call_participants, clamp_power_level, geo_coordinates, in_call, per_message_profile,
+        via_servers,
+    };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
 
     fn members(entries: &[(&str, i32)]) -> Vec<(String, i32)> {
@@ -1343,5 +1366,20 @@ mod tests {
         assert!(!in_call(Some(&json!({ "memberships": [] }))));
         assert!(!in_call(Some(&json!({}))));
         assert!(!in_call(None));
+    }
+
+    #[test]
+    fn one_participant_per_user_however_many_devices_joined() {
+        let user = |id: &str| OwnedUserId::try_from(id).unwrap();
+
+        assert_eq!(
+            call_participants(vec![
+                user("@a:example.org"),
+                user("@b:example.org"),
+                user("@a:example.org"),
+            ]),
+            vec![user("@a:example.org"), user("@b:example.org")]
+        );
+        assert!(call_participants(Vec::new()).is_empty());
     }
 }

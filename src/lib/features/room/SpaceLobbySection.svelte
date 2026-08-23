@@ -104,6 +104,7 @@
             <div class="room-text">
               <span class="room-name">
                 {label(child)}
+                {#if child.is_voice}<span class="badge">{$i18n.t('nav.voiceRoom')}</span>{/if}
                 {#if entry.suggested}<span class="badge">{$i18n.t('room.lobbySuggested')}</span
                   >{/if}
               </span>

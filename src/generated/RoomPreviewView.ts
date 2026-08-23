@@ -9,7 +9,7 @@ export type RoomPreviewView = {
 /**
  * Resolved, since the preview may have been asked for by alias.
  */
-room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_space: boolean, num_joined_members: number, join_rule: RoomJoinRuleView, 
+room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_space: boolean, is_voice: boolean, num_joined_members: number, join_rule: RoomJoinRuleView, 
 /**
  * `null` when this account has no membership in the room.
  */

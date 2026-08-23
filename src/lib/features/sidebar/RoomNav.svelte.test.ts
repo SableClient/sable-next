@@ -56,6 +56,8 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     state: 'joined',
     encrypted: null,
     is_space: false,
+    is_voice: false,
+    call_participants: [],
     has_space_parent: false,
     supports_knock: true,
     supports_restricted: true,
@@ -193,5 +195,41 @@ test('does not show a badge for a muted room', async () => {
 
   const instance = await mountNav();
   expect(document.querySelector('.room-badge')).toBeNull();
+  await unmount(instance);
+});
+
+test('a voice room shows a speaker icon and the live count', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!voice:example.org', name: 'Voice', is_voice: true }),
+    makeRoom({
+      room_id: '!busy:example.org',
+      name: 'Busy voice',
+      is_voice: true,
+      call_participants: ['@a:example.org', '@b:example.org'],
+    }),
+  ];
+
+  const instance = await mountNav();
+  const icons = Array.from(document.querySelectorAll('.room-icon'));
+  expect(icons.every((icon) => icon.classList.contains('voice'))).toBe(true);
+  expect(icons.every((icon) => icon.querySelector('svg') !== null)).toBe(true);
+  expect(
+    Array.from(document.querySelectorAll('.voice-badge')).map((node) => node.textContent)
+  ).toEqual(['2']);
+  await unmount(instance);
+});
+
+test('an active call in a text room shows the live count without the voice icon', async () => {
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!plain:example.org',
+      name: 'Plain',
+      call_participants: ['@a:example.org'],
+    }),
+  ];
+
+  const instance = await mountNav();
+  expect(document.querySelector('.room-icon')?.classList.contains('voice')).toBe(false);
+  expect(document.querySelector('.voice-badge')?.textContent).toBe('1');
   await unmount(instance);
 });

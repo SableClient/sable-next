@@ -20,6 +20,7 @@ function room(
     topic: null,
     avatar_url: null,
     is_space: false,
+    is_voice: false,
     num_joined_members: 1,
     join_rule: 'public',
     guest_can_join: false,

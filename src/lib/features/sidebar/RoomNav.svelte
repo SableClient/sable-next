@@ -18,6 +18,7 @@
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
   import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
@@ -402,6 +403,7 @@
                 room && !roomList.mutedRoomIds.has(room.room_id)
                   ? room.highlight || room.unread
                   : 0}
+              {@const live = room?.call_participants.length ?? 0}
               <div class="room-row-wrap">
                 <a
                   class="room-row sable-selection-layer"
@@ -412,7 +414,7 @@
                   aria-label={collapsed ? name : undefined}
                   aria-current={page.url.pathname === href ? 'page' : undefined}
                 >
-                  <span class="room-icon" aria-hidden="true">
+                  <span class="room-icon" class:voice={room?.is_voice} aria-hidden="true">
                     {#if room?.avatar_url}
                       <MediaImage
                         source={room.avatar_url}
@@ -421,12 +423,20 @@
                         height={56}
                         class="room-image"
                       />
+                    {:else if room?.is_voice}
+                      <SpeakerHighIcon />
                     {:else}
                       {initial(name)}
                     {/if}
                   </span>
                   {#if !collapsed}
                     <span class="room-name">{name}</span>
+                    {#if live > 0}
+                      <span
+                        class="voice-badge"
+                        aria-label={$i18n.t('nav.voiceLive', { count: live })}>{live}</span
+                      >
+                    {/if}
                     {#if unread > 0}
                       <span
                         class:highlight={(room?.highlight ?? 0) > 0}
@@ -734,6 +744,22 @@
 
   .room-name {
     flex: 1;
+  }
+
+  .room-icon.voice {
+    font-size: var(--font-size-body);
+  }
+
+  .voice-badge {
+    align-items: center;
+    background: var(--sable-primary-main);
+    border-radius: var(--radius-pill);
+    color: var(--sable-primary-on-main);
+    display: flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    min-width: 1.25rem;
+    padding: 0.125rem 0.375rem;
   }
 
   .room-badge {

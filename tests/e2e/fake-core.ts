@@ -71,6 +71,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       state: 'joined',
       encrypted: true,
       is_space: false,
+      is_voice: false,
+      call_participants: [] as string[],
       space_children: [],
       unread: 2,
       highlight: 1,

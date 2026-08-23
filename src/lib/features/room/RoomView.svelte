@@ -458,6 +458,9 @@
     <RoomHeader
       {roomName}
       {roomAvatar}
+      isVoice={resolvedRoom?.is_voice ?? false}
+      callParticipants={resolvedRoom?.call_participants ?? []}
+      members={memberLoader.members}
       onBack={goBack}
       onMembers={toggleMembers}
       onSettings={() => (settingsOpen = true)}
