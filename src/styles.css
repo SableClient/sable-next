@@ -324,6 +324,10 @@ html {
   --font-size-xlarge: 1.75rem;
   --font-size-display: 2.25rem;
 
+  /* iOS zooms the viewport when a focused field renders text under 16px, so
+     every text-entry surface floors its own size with this. */
+  --font-size-input-min: 0px;
+
   /* Font weights */
   --font-weight-normal: 400;
   --font-weight-medium: 600;
@@ -390,6 +394,12 @@ body {
 
 :root[data-underline-links='off'] {
   --link-decoration: none;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --font-size-input-min: 1rem;
+  }
 }
 
 body {

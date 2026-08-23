@@ -651,7 +651,7 @@
 
   .profile-composer :global(.profile-composer-input) {
     flex: 1 1 auto;
-    font-size: var(--font-size-small);
+    font-size: max(var(--font-size-small), var(--font-size-input-min));
     height: var(--control-height-small);
     min-height: 0;
     min-width: 0;

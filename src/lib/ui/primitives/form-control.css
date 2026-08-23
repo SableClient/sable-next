@@ -10,6 +10,7 @@
   box-sizing: border-box;
   color: var(--form-control-color);
   font: inherit;
+  font-size: max(var(--font-size-body), var(--font-size-input-min));
   min-height: var(--control-height-medium);
   padding: var(--control-padding-block) var(--form-control-padding-inline-end)
     var(--control-padding-block) var(--form-control-padding-inline);

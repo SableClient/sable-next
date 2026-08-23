@@ -39,6 +39,7 @@
 
   /* `white-space` comes from prosemirror.css, imported by `composer-editor.ts`. */
   .editor :global([contenteditable='true']) {
+    font-size: max(var(--font-size-body), var(--font-size-input-min));
     outline: 0;
     overflow-wrap: anywhere;
   }

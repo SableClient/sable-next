@@ -518,7 +518,7 @@
   }
 
   .board :global(.board-search) {
-    font-size: var(--font-size-small);
+    font-size: max(var(--font-size-small), var(--font-size-input-min));
     min-width: 0;
   }
 
