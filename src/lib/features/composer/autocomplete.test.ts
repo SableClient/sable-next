@@ -30,6 +30,17 @@ test('the query ends at the first space, and a bare sigil opens nothing', () => 
   expect(activeQuery('@no one', 7)).toBeNull();
 });
 
+test('a one-letter needle opens a member but not an emoji', () => {
+  expect(activeQuery('@n', 2)).toEqual({ sigil: '@', query: 'n', start: 0, end: 2 });
+  expect(activeQuery('#g', 2)).toEqual({ sigil: '#', query: 'g', start: 0, end: 2 });
+  expect(activeQuery(':w', 2)).toBeNull();
+  expect(activeQuery(':wa', 3)).toEqual({ sigil: ':', query: 'wa', start: 0, end: 3 });
+});
+
+test('a colon mid-prose no longer opens the picker on one letter', () => {
+  expect(activeQuery('note:t', 6)).toBeNull();
+});
+
 test('the nearest sigil to the caret wins', () => {
   expect(activeQuery('hey @nour :wav', 14)).toEqual({
     sigil: ':',

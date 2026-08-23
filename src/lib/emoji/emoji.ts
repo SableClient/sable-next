@@ -64,10 +64,16 @@ const order: EmojiGroupId[] = [
   'flag',
 ];
 
-function build(): { groups: EmojiGroup[]; all: ReactionEmoji[]; byEmoji: Map<string, string> } {
+function build(): {
+  groups: EmojiGroup[];
+  all: ReactionEmoji[];
+  byEmoji: Map<string, string>;
+  byShortcode: Map<string, string>;
+} {
   const buckets = new Map<EmojiGroupId, ReactionEmoji[]>();
   const all: ReactionEmoji[] = [];
   const byEmoji = new Map<string, string>();
+  const byShortcode = new Map<string, string>();
 
   for (const entry of compact) {
     const id: EmojiGroupId | undefined = groupOf[entry.group ?? 8];
@@ -88,12 +94,14 @@ function build(): { groups: EmojiGroup[]; all: ReactionEmoji[]; byEmoji: Map<str
     else buckets.set(id, [item]);
     all.push(item);
     byEmoji.set(entry.unicode, shortcode);
+    for (const code of codes) if (!byShortcode.has(code)) byShortcode.set(code, entry.unicode);
   }
 
   return {
     groups: order.map((id) => ({ id, emojis: buckets.get(id) ?? [] })),
     all,
     byEmoji,
+    byShortcode,
   };
 }
 
@@ -127,4 +135,8 @@ export function searchReactionEmoji(query: string, limit = 24): ReactionEmoji[] 
 
 export function shortcodeFor(emoji: string): string | null {
   return built.byEmoji.get(emoji) ?? null;
+}
+
+export function emojiForShortcode(shortcode: string): string | null {
+  return built.byShortcode.get(shortcode.toLowerCase()) ?? null;
 }

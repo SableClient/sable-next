@@ -1,13 +1,8 @@
 import { chainCommands, lift, toggleMark } from 'prosemirror-commands';
-import {
-  InputRule,
-  inputRules,
-  textblockTypeInputRule,
-  wrappingInputRule,
-} from 'prosemirror-inputrules';
+import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
 import type { MarkType, NodeType } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
-import type { Command, EditorState, Plugin } from 'prosemirror-state';
+import type { Command, EditorState } from 'prosemirror-state';
 import { wrapIn } from 'prosemirror-commands';
 
 import { composerSchema } from './schema';
@@ -38,29 +33,25 @@ function markRule(pattern: RegExp, type: MarkType): InputRule {
   );
 }
 
-export function formattingRules(): Plugin {
-  return inputRules({
-    rules: [
-      markRule(/\*\*([^*]+)\*\*$/, marks.strong),
-      markRule(/(?<!\*)\*([^*]+)\*$/, marks.em),
-      markRule(/(?<![\p{L}\p{N}_])_([^_]+)_$/u, marks.em),
-      markRule(/~~([^~]+)~~$/, marks.strike),
-      markRule(/`([^`]+)`$/, marks.code),
-      textblockTypeInputRule(/^(#{1,3})\s$/, nodes.heading, (match) => ({
-        level: match[1].length,
-      })),
-      wrappingInputRule(/^\s*>\s$/, nodes.blockquote),
-      wrappingInputRule(/^\s*([-+*])\s$/, nodes.bullet_list),
-      wrappingInputRule(
-        /^(\d+)\.\s$/,
-        nodes.ordered_list,
-        (match) => ({ order: Number(match[1]) }),
-        (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
-      ),
-      textblockTypeInputRule(/^```$/, nodes.code_block),
-    ],
-  });
-}
+export const formattingInputRules: readonly InputRule[] = [
+  markRule(/\*\*([^*]+)\*\*$/, marks.strong),
+  markRule(/(?<!\*)\*([^*]+)\*$/, marks.em),
+  markRule(/(?<![\p{L}\p{N}_])_([^_]+)_$/u, marks.em),
+  markRule(/~~([^~]+)~~$/, marks.strike),
+  markRule(/`([^`]+)`$/, marks.code),
+  textblockTypeInputRule(/^(#{1,3})\s$/, nodes.heading, (match) => ({
+    level: match[1].length,
+  })),
+  wrappingInputRule(/^\s*>\s$/, nodes.blockquote),
+  wrappingInputRule(/^\s*([-+*])\s$/, nodes.bullet_list),
+  wrappingInputRule(
+    /^(\d+)\.\s$/,
+    nodes.ordered_list,
+    (match) => ({ order: Number(match[1]) }),
+    (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
+  ),
+  textblockTypeInputRule(/^```$/, nodes.code_block),
+];
 
 export const formattingKeymap: Record<string, Command> = {
   'Mod-b': toggleMark(marks.strong),

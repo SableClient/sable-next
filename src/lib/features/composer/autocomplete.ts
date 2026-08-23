@@ -19,7 +19,11 @@ export interface AutocompleteQuery {
   end: number;
 }
 
-const sigils: AutocompleteSigil[] = ['@', '#', ':'];
+const sigils: [AutocompleteSigil, number][] = [
+  ['@', 1],
+  ['#', 1],
+  [':', 2],
+];
 const maxQueryLength = 32;
 
 /**
@@ -29,7 +33,7 @@ const maxQueryLength = 32;
 export function activeQuery(draft: string, caret: number): AutocompleteQuery | null {
   const upToCaret = draft.slice(0, caret);
 
-  for (const sigil of sigils) {
+  for (const [sigil, minQueryLength] of sigils) {
     const start = upToCaret.lastIndexOf(sigil);
     if (start === -1) continue;
 
@@ -37,7 +41,7 @@ export function activeQuery(draft: string, caret: number): AutocompleteQuery | n
     if (before !== '' && !/\s/.test(before)) continue;
 
     const query = upToCaret.slice(start + 1);
-    if (query.length === 0 || query.length > maxQueryLength) continue;
+    if (query.length < minQueryLength || query.length > maxQueryLength) continue;
     if (/\s/.test(query) || (sigil !== '#' && query.includes(':'))) continue;
 
     return { sigil, query, start, end: caret };

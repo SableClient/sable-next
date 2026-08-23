@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 
+import { inputRules } from 'prosemirror-inputrules';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, expect, test } from 'vitest';
 
-import { formattingRules } from './formatting';
+import { formattingInputRules } from './formatting';
 import { composerSchema } from './schema';
 
 let view: EditorView | undefined;
@@ -31,7 +32,10 @@ function open(): EditorView {
   const host = document.createElement('div');
   document.body.append(host);
   view = new EditorView(host, {
-    state: EditorState.create({ schema: composerSchema, plugins: [formattingRules()] }),
+    state: EditorState.create({
+      schema: composerSchema,
+      plugins: [inputRules({ rules: formattingInputRules })],
+    }),
   });
   return view;
 }

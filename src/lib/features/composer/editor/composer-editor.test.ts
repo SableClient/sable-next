@@ -28,6 +28,7 @@ function openWith(overrides: Partial<ComposerEditorOptions> = {}): ComposerEdito
   document.body.append(host);
   const editor = new ComposerEditor({
     media: { cached: () => undefined, load: () => Promise.resolve('blob:x'), hold: () => () => {} },
+    emotes: () => [],
     label: () => 'Send a message',
     listboxId: 'suggestions',
     activeOptionId: () => null,
@@ -79,11 +80,11 @@ function setUserAgent(userAgent: string): void {
 
 test('committing an emote keeps the text that came before it', () => {
   const editor = open();
-  editor.setText('hey :v');
+  editor.setText('hey :vv');
 
   const found = query(editor);
   editor.replaceQuery(
-    { sigil: ':', query: 'v', start: found.start, end: found.end },
+    { sigil: ':', query: 'vv', start: found.start, end: found.end },
     composerSchema.nodes.emoticon.create({ url: 'mxc://example.org/vv', shortcode: 'vv' })
   );
 
@@ -293,6 +294,7 @@ test('the active option is written straight onto the editor node', () => {
   let activeId: string | null = null;
   const editor = new ComposerEditor({
     media: { cached: () => undefined, load: () => Promise.resolve('blob:x'), hold: () => () => {} },
+    emotes: () => [],
     label: () => 'Send a message',
     listboxId: 'suggestions',
     activeOptionId: () => activeId,

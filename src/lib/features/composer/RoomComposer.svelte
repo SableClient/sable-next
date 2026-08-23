@@ -152,6 +152,7 @@
 
   const editor = new ComposerEditor({
     media,
+    emotes: () => emotes,
     label: () => $i18n.t('timeline.messagePlaceholder'),
     describedBy: hintId,
     listboxId,
