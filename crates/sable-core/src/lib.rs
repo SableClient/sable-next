@@ -69,6 +69,7 @@ pub struct Core {
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
     notification_content: AtomicBool,
     search_index: Mutex<search::MessageIndex>,
+    search_crawl: Mutex<search::CrawlProgress>,
     call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
 }
 
@@ -131,6 +132,7 @@ impl Core {
             room_subscription_lock: Mutex::new(()),
             timelines: Mutex::new(HashMap::new()),
             search_index: Mutex::new(search::MessageIndex::new()),
+            search_crawl: Mutex::new(search::CrawlProgress::default()),
             call_sessions: Mutex::new(HashMap::new()),
         });
         (core, rx)

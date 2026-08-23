@@ -127,6 +127,49 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return [];
       }
     };
+    const searchHits = (payload: Record<string, unknown>) => {
+      const query = (typeof payload.query === 'string' ? payload.query : '').toLowerCase();
+      const filter = (payload.filter ?? {}) as {
+        rooms?: string[];
+        senders?: string[];
+        phrases?: string[];
+        not_rooms?: string[];
+        not_senders?: string[];
+        exclude?: string[];
+      };
+      const offset = Number(payload.offset ?? 0);
+      const newestFirst = payload.order === 'recent';
+
+      return [room, secondRoom]
+        .filter(
+          (candidate) =>
+            (!filter.rooms?.length || filter.rooms.includes(candidate.room_id)) &&
+            !filter.not_rooms?.includes(candidate.room_id)
+        )
+        .flatMap((candidate) =>
+          timelineItems(candidate.name)
+            .filter((item) => {
+              const body = item.content.body.toLowerCase();
+              if (query !== '' && !query.split(/\s+/).every((word) => body.includes(word)))
+                return false;
+              if (filter.senders?.length && !filter.senders.includes(item.sender)) return false;
+              if (filter.not_senders?.includes(item.sender)) return false;
+              if ((filter.exclude ?? []).some((term) => body.includes(term.toLowerCase())))
+                return false;
+              return (filter.phrases ?? []).every((phrase) => body.includes(phrase.toLowerCase()));
+            })
+            .map((item) => ({
+              room_id: candidate.room_id,
+              event_id: item.event_id,
+              body: item.content.body,
+              sender: item.sender,
+              origin_server_ts: item.timestamp,
+              score: 1,
+            }))
+        )
+        .sort((left, right) => (newestFirst ? right.origin_server_ts - left.origin_server_ts : 0))
+        .slice(offset, offset + Number(payload.limit ?? 30));
+    };
 
     const timelineItems = (roomName: string) =>
       Array.from({ length: 20 }, (_, index) => ({
@@ -221,9 +264,19 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         }
         if (workerMode === 'loading' && command === 'restore') return;
         if (command === 'user_profile') {
+          const requested = (request.command as { user_id?: string }).user_id ?? profile.user_id;
+          const localpart = requested.replace(/^@/, '').split(':')[0];
+          const named = {
+            ...profile,
+            user_id: requested,
+            display_name:
+              requested === profile.user_id
+                ? profile.display_name
+                : `${localpart.charAt(0).toUpperCase()}${localpart.slice(1)}`,
+          };
           window.setTimeout(() => {
             this.onmessage?.({
-              data: { id: request.id, ok: { type: command, profile } },
+              data: { id: request.id, ok: { type: command, profile: named } },
             } as MessageEvent);
           });
           return;
@@ -266,6 +319,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           sessionStorage.setItem(SIDEBAR_KEY, JSON.stringify(items));
           window.setTimeout(() => {
             this.onmessage?.({ data: { id: request.id, ok: { type: command } } } as MessageEvent);
+
             this.emit({ type: 'space_sidebar_changed', items });
           });
           return;
@@ -535,7 +589,17 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                         ? { type: command }
                                         : command === 'unsubscribe'
                                           ? { type: 'unsubscribe' }
-                                          : { type: command },
+                                          : command === 'search_messages'
+                                            ? {
+                                                type: 'search_messages',
+                                                hits: searchHits(
+                                                  request.command as unknown as Record<
+                                                    string,
+                                                    unknown
+                                                  >
+                                                ),
+                                              }
+                                            : { type: command },
               };
 
         window.setTimeout(

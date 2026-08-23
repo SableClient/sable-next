@@ -2,6 +2,7 @@
   import { i18n } from '#lib/i18n.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import type { MemberView } from '#src/generated/MemberView';
@@ -23,6 +24,7 @@
     members: readonly MemberView[];
     onBack: () => void;
     onMembers: () => void;
+    onSearch: () => void;
     onSettings: () => void;
     initials: (name: string) => string;
   }
@@ -35,6 +37,7 @@
     members,
     onBack,
     onMembers,
+    onSearch,
     onSettings,
     initials,
   }: Props = $props();
@@ -100,6 +103,15 @@
     <UsersIcon />
     <span>{$i18n.t('timeline.members')}</span>
   </Button>
+  <IconButton
+    class="search-button"
+    variant="ghost"
+    size="small"
+    label={$i18n.t('search.open')}
+    onclick={onSearch}
+  >
+    <MagnifyingGlassIcon />
+  </IconButton>
   <IconButton
     class="settings-button"
     variant="ghost"

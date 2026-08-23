@@ -7,6 +7,8 @@ import type { NotificationModeView } from "./NotificationModeView";
 import type { PaginationDirection } from "./PaginationDirection";
 import type { PusherView } from "./PusherView";
 import type { RoomTag } from "./RoomTag";
+import type { SearchFilter } from "./SearchFilter";
+import type { SearchOrder } from "./SearchOrder";
 import type { SidebarItemView } from "./SidebarItemView";
 import type { SubscriptionId } from "./SubscriptionId";
 
@@ -86,4 +88,4 @@ mode: NotificationModeView | null, } | { "type": "set_default_notification_mode"
  * The emoji differed. An attack signal the other side must be told
  * about. A plain cancel is not.
  */
-mismatch: boolean, } | { "type": "search_messages", query: string, room_id: string | null, limit: number, offset: number, } | { "type": "join_call", room_id: string, livekit_service_url: string, } | { "type": "leave_call", session: CallSessionId, };
+mismatch: boolean, } | { "type": "search_messages", query: string, filter: SearchFilter, order: SearchOrder, limit: number, offset: number, } | { "type": "join_call", room_id: string, livekit_service_url: string, } | { "type": "leave_call", session: CallSessionId, };

@@ -11,7 +11,11 @@ import type { NotificationModeView } from '#src/generated/NotificationModeView';
 import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
+import type { OpenIdTokenView } from '#src/generated/OpenIdTokenView';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+import type { SearchFilter } from '#src/generated/SearchFilter';
+import type { SearchHitView } from '#src/generated/SearchHitView';
+import type { SearchOrder } from '#src/generated/SearchOrder';
 import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 import type { SidebarItemView } from '#src/generated/SidebarItemView';
@@ -44,6 +48,20 @@ const profileCacheFreshMs = 10 * 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
+const EMPTY_SEARCH_FILTER: SearchFilter = {
+  rooms: [],
+  senders: [],
+  mentions: [],
+  has: [],
+  not_rooms: [],
+  not_senders: [],
+  not_mentions: [],
+  not_has: [],
+  after_ts: null,
+  before_ts: null,
+  phrases: [],
+  exclude: [],
+};
 
 async function resolveHomeserverInPage(
   homeserver: string,
@@ -438,6 +456,42 @@ export class CoreClient {
     return response;
   }
 
+  async searchMessages(
+    query: string,
+    options: {
+      filter?: SearchFilter;
+      order?: SearchOrder;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<SearchHitView[]> {
+    const response = await this.ensureTransport().send({
+      type: 'search_messages',
+      query,
+      filter: options.filter ?? EMPTY_SEARCH_FILTER,
+      order: options.order ?? 'rank',
+      limit: options.limit ?? 30,
+      offset: options.offset ?? 0,
+    });
+    return response.hits;
+  }
+
+  async joinCall(
+    roomId: string,
+    livekitServiceUrl: string
+  ): Promise<{ session: number; openidToken: OpenIdTokenView }> {
+    const response = await this.ensureTransport().send({
+      type: 'join_call',
+      room_id: roomId,
+      livekit_service_url: livekitServiceUrl,
+    });
+    return { session: response.session, openidToken: response.openid_token };
+  }
+
+  async leaveCall(session: number): Promise<void> {
+    await this.ensureTransport().send({ type: 'leave_call', session });
+  }
+
   async imagePacks(roomId: string): Promise<ImagePackView[]> {
     const response = await this.ensureTransport().send({ type: 'image_packs', room_id: roomId });
     return response.packs;
@@ -630,6 +684,8 @@ export class CoreClient {
     });
   }
 
+  /** Empty until the account arranges the rail; the room list supplies the
+      order until then. */
   async spaceSidebar(): Promise<SidebarItemView[]> {
     const response = await this.ensureTransport().send({ type: 'space_sidebar' });
     return response.items;

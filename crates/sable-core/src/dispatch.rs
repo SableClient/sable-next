@@ -356,17 +356,17 @@ impl Core {
 
             Command::SearchMessages {
                 query,
-                room_id,
+                filter,
+                order,
                 limit,
                 offset,
             } => {
-                let limit = (limit as usize).min(MAX_SEARCH_RESULTS);
-                let offset = offset as usize;
-                let index = self.search_index.lock().await;
-
-                let hits = room_id.map_or_else(
-                    || index.search_all(&query, limit, offset),
-                    |room_id| index.search_room(&room_id, &query, limit, offset),
+                let hits = self.search_index.lock().await.search(
+                    &query,
+                    &filter,
+                    order,
+                    (limit as usize).min(MAX_SEARCH_RESULTS),
+                    offset as usize,
                 );
 
                 Ok(CommandOk::SearchMessages {

@@ -38,7 +38,7 @@
     { href: '/settings', icon: GearIcon, label: 'nav.settings' },
   ] as const;
   const compactTools = [
-    { href: '/navigate', icon: MagnifyingGlassIcon, label: 'nav.navigate' },
+    { href: '/search', icon: MagnifyingGlassIcon, label: 'search.title' },
     ...desktopTools,
   ] as const;
 

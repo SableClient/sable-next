@@ -30,6 +30,7 @@
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
@@ -92,6 +93,12 @@
       label: 'nav.home',
       unread: homeUnread > 0,
       unreadCount: homeHighlight ? homeUnread : undefined,
+    },
+    {
+      href: resolve('/(app)/search'),
+      activePrefix: '/search',
+      icon: MagnifyingGlassIcon,
+      label: 'search.title',
     },
     {
       href: resolve('direct'),

@@ -44,15 +44,15 @@
     "roomOptions": "Room options",
     "createRoomInSpace": "Create room in space",
     "folder": "Folder",
-    "folderExpand": "Folder {{name}}",
-    "folderCollapse": "Collapse {{name}}",
     "folderRename": "Rename folder",
     "folderRenameDescription": "Choose a short label. Leave it empty to show the space names again.",
     "folderName": "Folder name",
     "folderSave": "Save",
     "folderCancel": "Cancel",
+    "folderCollapse": "Collapse {{name}}",
     "folderUngroup": "Ungroup folder",
-    "folderRemoveSpace": "Remove from folder"
+    "folderRemoveSpace": "Remove from folder",
+    "folderExpand": "Folder {{name}}"
   },
   "inbox": {
     "notifications": "Notifications",
@@ -835,5 +835,30 @@
     "pollUndisclosed": "Hide results until the poll closes",
     "pollCreate": "Create poll",
     "pollCancel": "Cancel"
+  },
+  "search": {
+    "title": "Search messages",
+    "open": "Search messages",
+    "close": "Close search",
+    "placeholder": "Search messages — try from:ada in:#general has:image",
+    "hint": "Search messages this device has already loaded. Use from:, in:, mentions:, has:, before:, after:, during:, \"exact phrase\" and -exclude. Quote a value with spaces, like in:\"Design crew\".",
+    "searching": "Searching…",
+    "empty": "No messages matched.",
+    "failed": "Search failed.",
+    "loadMore": "Load more results",
+    "order": "Sort results",
+    "orderRank": "Relevance",
+    "orderRecent": "Newest",
+    "unsupported": "Not supported yet: {{operators}}",
+    "unresolved": "No match for {{targets}}",
+    "suggestions": "Search suggestions",
+    "count": "{{count}} result",
+    "count_other": "{{count}} results",
+    "recoveryFilter": "Remove a filter ({{filters}})",
+    "recoveryPhrase": "Drop the quotes to match words separately",
+    "recoveryExclude": "Remove an -excluded term",
+    "recoveryTerms": "Try fewer or different words",
+    "activeFilters": "Active filters",
+    "removeFilter": "Remove {{filter}}"
   }
 }

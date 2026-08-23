@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 // "Create room" is omitted: the rail and the room list both render that link,
 // so the name is ambiguous. rooms.spec.ts covers the page.
 const RAIL_DESTINATIONS = [
-  { link: 'Navigate', path: '/navigate' },
+  { link: 'Search messages', path: '/search' },
   { link: 'Direct messages', path: '/direct' },
 ] as const;
 

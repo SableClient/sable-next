@@ -1,33 +1,128 @@
+mod crawl;
 mod tokenize;
 
-use std::collections::{HashMap, HashSet};
+pub(crate) use crawl::CrawlProgress;
+
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use linkify::LinkFinder;
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RoomEventCache;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::{
-    OriginalSyncRoomMessageEvent, Relation, sanitize::remove_plain_reply_fallback,
+    MessageType, OriginalSyncRoomMessageEvent, Relation, sanitize::remove_plain_reply_fallback,
 };
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, room::redaction::SyncRoomRedactionEvent,
 };
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId};
 use probly_search::{Index, score::bm25};
 
 use crate::Core;
+use crate::protocol::{SearchAttachment, SearchFilter, SearchOrder};
 
 const BODY_FIELD_COUNT: usize = 1;
 const BODY_FIELD_BOOST: [f64; BODY_FIELD_COUNT] = [1.0];
 const EVENTS_PER_INGEST_YIELD: usize = 256;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
+const MAX_INDEXED_MESSAGES: usize = 50_000;
+
 type DocKey = u32;
 
 struct Body(String);
+
+struct Document {
+    event_id: OwnedEventId,
+    body: String,
+    sender: OwnedUserId,
+    origin_server_ts: u64,
+    attachment: Option<SearchAttachment>,
+    has_link: bool,
+    mentions: Vec<OwnedUserId>,
+}
+
+impl Document {
+    fn carries(&self, attachment: SearchAttachment) -> bool {
+        match attachment {
+            SearchAttachment::Link => self.has_link,
+            other => self.attachment == Some(other),
+        }
+    }
+
+    fn matches(&self, filter: &SearchFilter) -> bool {
+        if !filter.senders.is_empty() && !filter.senders.contains(&self.sender) {
+            return false;
+        }
+        if filter.not_senders.contains(&self.sender) {
+            return false;
+        }
+        if filter
+            .not_mentions
+            .iter()
+            .any(|mention| self.mentions.contains(mention))
+        {
+            return false;
+        }
+        if filter
+            .not_has
+            .iter()
+            .any(|attachment| self.carries(*attachment))
+        {
+            return false;
+        }
+        if !filter.mentions.is_empty()
+            && !filter
+                .mentions
+                .iter()
+                .any(|mention| self.mentions.contains(mention))
+        {
+            return false;
+        }
+        if !filter.has.is_empty()
+            && !filter
+                .has
+                .iter()
+                .any(|attachment| self.carries(*attachment))
+        {
+            return false;
+        }
+        if filter
+            .after_ts
+            .is_some_and(|after| self.origin_server_ts < after)
+        {
+            return false;
+        }
+        if filter
+            .before_ts
+            .is_some_and(|before| self.origin_server_ts > before)
+        {
+            return false;
+        }
+
+        let folded = self.body.to_lowercase();
+        if !filter
+            .phrases
+            .iter()
+            .all(|phrase| folded.contains(&phrase.to_lowercase()))
+        {
+            return false;
+        }
+        if filter
+            .exclude
+            .iter()
+            .any(|term| folded.contains(&term.to_lowercase()))
+        {
+            return false;
+        }
+
+        true
+    }
+}
 
 fn body_field(body: &Body) -> Vec<&str> {
     vec![body.0.as_str()]
@@ -35,9 +130,10 @@ fn body_field(body: &Body) -> Vec<&str> {
 
 struct RoomIndex {
     index: Index<DocKey>,
-    documents: HashMap<DocKey, (OwnedEventId, String)>,
+    documents: HashMap<DocKey, Document>,
     key_of: HashMap<OwnedEventId, DocKey>,
     classified: HashSet<OwnedEventId>,
+    by_age: BTreeSet<(u64, DocKey)>,
     next_key: DocKey,
     retired_keys: usize,
 }
@@ -49,9 +145,33 @@ impl RoomIndex {
             documents: HashMap::new(),
             key_of: HashMap::new(),
             classified: HashSet::new(),
+            by_age: BTreeSet::new(),
             next_key: 0,
             retired_keys: 0,
         }
+    }
+
+    fn len(&self) -> usize {
+        self.documents.len()
+    }
+
+    fn oldest(&self) -> Option<(u64, DocKey)> {
+        self.by_age.first().copied()
+    }
+
+    fn newest_ts(&self) -> Option<u64> {
+        self.by_age.last().map(|&(ts, _)| ts)
+    }
+
+    fn evict(&mut self, key: DocKey) {
+        let Some(document) = self.documents.remove(&key) else {
+            return;
+        };
+        self.by_age.remove(&(document.origin_server_ts, key));
+        self.key_of.remove(&document.event_id);
+        self.index.remove_document(key);
+        self.retired_keys = self.retired_keys.saturating_add(1);
+        self.vacuum_if_due();
     }
 
     fn already_classified(&self, event_id: &EventId) -> bool {
@@ -64,38 +184,51 @@ impl RoomIndex {
 
     fn indexed_body(&self, event_id: &OwnedEventId) -> Option<&String> {
         let key = self.key_of.get(event_id)?;
-        self.documents.get(key).map(|(_, body)| body)
+        self.documents.get(key).map(|document| &document.body)
     }
 
-    fn upsert(&mut self, event_id: OwnedEventId, body: String) {
-        if self.indexed_body(&event_id) == Some(&body) {
+    fn upsert(&mut self, document: Document) {
+        if self.indexed_body(&document.event_id) == Some(&document.body) {
             return;
         }
-        self.retire(&event_id);
+        self.retire(&document.event_id);
 
         let key = self.take_unused_key();
-        let body = Body(body);
+        let body = Body(document.body);
         self.index
             .add_document(&[body_field], tokenize::tokenize, key, &body);
-        self.key_of.insert(event_id.clone(), key);
-        self.documents.insert(key, (event_id, body.0));
+        self.key_of.insert(document.event_id.clone(), key);
+        self.by_age.insert((document.origin_server_ts, key));
+        self.documents.insert(
+            key,
+            Document {
+                body: body.0,
+                ..document
+            },
+        );
     }
 
     fn remove(&mut self, event_id: &OwnedEventId) {
         self.retire(event_id);
-        if self.retired_keys >= RETIRED_KEYS_BEFORE_VACUUM {
-            self.index.vacuum();
-            self.retired_keys = 0;
-        }
+        self.vacuum_if_due();
     }
 
     fn retire(&mut self, event_id: &OwnedEventId) {
         let Some(key) = self.key_of.remove(event_id) else {
             return;
         };
-        self.documents.remove(&key);
+        if let Some(document) = self.documents.remove(&key) {
+            self.by_age.remove(&(document.origin_server_ts, key));
+        }
         self.index.remove_document(key);
         self.retired_keys = self.retired_keys.saturating_add(1);
+    }
+
+    fn vacuum_if_due(&mut self) {
+        if self.retired_keys >= RETIRED_KEYS_BEFORE_VACUUM {
+            self.index.vacuum();
+            self.retired_keys = 0;
+        }
     }
 
     const fn take_unused_key(&mut self) -> DocKey {
@@ -104,11 +237,21 @@ impl RoomIndex {
         key
     }
 
-    fn matches<'index>(
+    fn ranked<'index>(
         &'index self,
         room_id: &'index OwnedRoomId,
         query: &str,
+        filter: &SearchFilter,
     ) -> Vec<Ranked<'index>> {
+        if query.is_empty() {
+            return self
+                .documents
+                .values()
+                .filter(|document| document.matches(filter))
+                .map(|document| Ranked::from_document(room_id, document, 0.0))
+                .collect();
+        }
+
         self.index
             .query(
                 query,
@@ -118,11 +261,10 @@ impl RoomIndex {
             )
             .into_iter()
             .filter_map(|result| {
-                Some(Ranked {
-                    room_id,
-                    event_id: self.documents.get(&result.key)?.0.as_ref(),
-                    score: result.score,
-                })
+                let document = self.documents.get(&result.key)?;
+                document
+                    .matches(filter)
+                    .then(|| Ranked::from_document(room_id, document, result.score))
             })
             .collect()
     }
@@ -130,25 +272,45 @@ impl RoomIndex {
 
 pub(crate) struct MessageIndex {
     rooms: HashMap<OwnedRoomId, RoomIndex>,
+    capacity: usize,
 }
 
 pub(crate) struct Hit {
     pub(crate) room_id: OwnedRoomId,
     pub(crate) event_id: OwnedEventId,
     pub(crate) body: String,
+    pub(crate) sender: OwnedUserId,
+    pub(crate) origin_server_ts: u64,
     pub(crate) score: f64,
 }
 
 struct Ranked<'index> {
     room_id: &'index OwnedRoomId,
     event_id: &'index EventId,
+    origin_server_ts: u64,
     score: f64,
+}
+
+impl<'index> Ranked<'index> {
+    fn from_document(room_id: &'index OwnedRoomId, document: &'index Document, score: f64) -> Self {
+        Self {
+            room_id,
+            event_id: document.event_id.as_ref(),
+            origin_server_ts: document.origin_server_ts,
+            score,
+        }
+    }
 }
 
 impl MessageIndex {
     pub(crate) fn new() -> Self {
+        Self::with_capacity(MAX_INDEXED_MESSAGES)
+    }
+
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             rooms: HashMap::new(),
+            capacity,
         }
     }
 
@@ -156,30 +318,64 @@ impl MessageIndex {
         self.rooms.remove(room_id);
     }
 
-    pub(crate) fn search_room(
+    pub(crate) fn documents(&self) -> usize {
+        self.rooms.values().map(RoomIndex::len).sum()
+    }
+
+    pub(crate) fn is_full(&self) -> bool {
+        self.documents() >= self.capacity
+    }
+
+    pub(crate) fn newest_per_room(&self) -> HashMap<OwnedRoomId, Option<u64>> {
+        self.rooms
+            .iter()
+            .map(|(room_id, index)| (room_id.clone(), index.newest_ts()))
+            .collect()
+    }
+
+    fn trim_to_capacity(&mut self) {
+        let mut held = self.documents();
+
+        while held > self.capacity {
+            let Some((room_id, key)) = self
+                .rooms
+                .iter()
+                .filter_map(|(room_id, index)| {
+                    index.oldest().map(|(ts, key)| (ts, room_id.clone(), key))
+                })
+                .min()
+                .map(|(_, room_id, key)| (room_id, key))
+            else {
+                return;
+            };
+
+            let Some(index) = self.rooms.get_mut(&room_id) else {
+                return;
+            };
+            index.evict(key);
+            held -= 1;
+        }
+    }
+
+    pub(crate) fn search(
         &self,
-        room_id: &OwnedRoomId,
         query: &str,
+        filter: &SearchFilter,
+        order: SearchOrder,
         limit: usize,
         offset: usize,
     ) -> Vec<Hit> {
         let ranked = self
             .rooms
-            .get(room_id)
-            .map(|index| index.matches(room_id, query))
-            .unwrap_or_default();
-
-        self.materialize(page_ranked(ranked, limit, offset))
-    }
-
-    pub(crate) fn search_all(&self, query: &str, limit: usize, offset: usize) -> Vec<Hit> {
-        let ranked = self
-            .rooms
             .iter()
-            .flat_map(|(room_id, index)| index.matches(room_id, query))
+            .filter(|(room_id, _)| {
+                (filter.rooms.is_empty() || filter.rooms.iter().any(|wanted| wanted == *room_id))
+                    && !filter.not_rooms.iter().any(|denied| denied == *room_id)
+            })
+            .flat_map(|(room_id, index)| index.ranked(room_id, query, filter))
             .collect();
 
-        self.materialize(page_ranked(ranked, limit, offset))
+        self.materialize(page_ranked(ranked, order, limit, offset))
     }
 
     fn materialize(&self, ranked: Vec<Ranked<'_>>) -> Vec<Hit> {
@@ -188,11 +384,13 @@ impl MessageIndex {
             .filter_map(|entry| {
                 let index = self.rooms.get(entry.room_id)?;
                 let key = index.key_of.get(entry.event_id)?;
-                let (event_id, body) = index.documents.get(key)?;
+                let document = index.documents.get(key)?;
                 Some(Hit {
                     room_id: entry.room_id.clone(),
-                    event_id: event_id.clone(),
-                    body: body.clone(),
+                    event_id: document.event_id.clone(),
+                    body: document.body.clone(),
+                    sender: document.sender.clone(),
+                    origin_server_ts: document.origin_server_ts,
                     score: entry.score,
                 })
             })
@@ -206,15 +404,19 @@ impl MessageIndex {
         cache: &RoomEventCache,
         rules: &RedactionRules,
     ) {
-        let index = self
-            .rooms
+        self.rooms
             .entry(room_id.clone())
             .or_insert_with(RoomIndex::new);
 
         for (position, event) in events.into_iter().enumerate() {
             if position > 0 && position.is_multiple_of(EVENTS_PER_INGEST_YIELD) {
+                self.trim_to_capacity();
                 matrix_sdk::sleep::sleep(Duration::ZERO).await;
             }
+
+            let Some(index) = self.rooms.get_mut(room_id) else {
+                return;
+            };
 
             let Some(event_id) = event.event_id() else {
                 continue;
@@ -239,7 +441,15 @@ impl MessageIndex {
                         .await
                         .unwrap_or_else(|| indexable_body(original.content.body()));
 
-                    index.upsert(target, body);
+                    index.upsert(Document {
+                        event_id: target,
+                        has_link: contains_link(&body),
+                        body,
+                        sender: original.sender.clone(),
+                        origin_server_ts: original.origin_server_ts.get().into(),
+                        attachment: attachment_of(&original.content.msgtype),
+                        mentions: mentioned_users(original),
+                    });
                 }
 
                 AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
@@ -251,6 +461,8 @@ impl MessageIndex {
                 _ => {}
             }
         }
+
+        self.trim_to_capacity();
     }
 }
 
@@ -262,14 +474,30 @@ fn by_rank(left: &Ranked<'_>, right: &Ranked<'_>) -> std::cmp::Ordering {
         .then_with(|| left.event_id.cmp(right.event_id))
 }
 
-fn page_ranked(mut ranked: Vec<Ranked<'_>>, limit: usize, offset: usize) -> Vec<Ranked<'_>> {
+fn by_recency(left: &Ranked<'_>, right: &Ranked<'_>) -> std::cmp::Ordering {
+    right
+        .origin_server_ts
+        .cmp(&left.origin_server_ts)
+        .then_with(|| left.event_id.cmp(right.event_id))
+}
+
+fn page_ranked(
+    mut ranked: Vec<Ranked<'_>>,
+    order: SearchOrder,
+    limit: usize,
+    offset: usize,
+) -> Vec<Ranked<'_>> {
+    let compare = match order {
+        SearchOrder::Rank => by_rank,
+        SearchOrder::Recent => by_recency,
+    };
     let wanted = offset.saturating_add(limit);
 
     if wanted < ranked.len() {
-        ranked.select_nth_unstable_by(wanted, by_rank);
+        ranked.select_nth_unstable_by(wanted, compare);
         ranked.truncate(wanted);
     }
-    ranked.sort_unstable_by(by_rank);
+    ranked.sort_unstable_by(compare);
 
     ranked.drain(..offset.min(ranked.len()));
     ranked.truncate(limit);
@@ -285,6 +513,29 @@ fn edited_or_own_event_id(original: &OriginalSyncRoomMessageEvent) -> OwnedEvent
 
 fn indexable_body(body: &str) -> String {
     remove_plain_reply_fallback(body).to_owned()
+}
+
+const fn attachment_of(msgtype: &MessageType) -> Option<SearchAttachment> {
+    Some(match msgtype {
+        MessageType::Image(_) => SearchAttachment::Image,
+        MessageType::Video(_) => SearchAttachment::Video,
+        MessageType::Audio(_) => SearchAttachment::Audio,
+        MessageType::File(_) => SearchAttachment::File,
+        _ => return None,
+    })
+}
+
+fn contains_link(body: &str) -> bool {
+    LinkFinder::new().links(body).next().is_some()
+}
+
+fn mentioned_users(original: &OriginalSyncRoomMessageEvent) -> Vec<OwnedUserId> {
+    original
+        .content
+        .mentions
+        .as_ref()
+        .map(|mentions| mentions.user_ids.iter().cloned().collect())
+        .unwrap_or_default()
 }
 
 fn redacted_event_id(
@@ -324,6 +575,26 @@ async fn latest_body(cache: &RoomEventCache, event_id: &OwnedEventId) -> Option<
 }
 
 impl Core {
+    pub(crate) async fn prime_persisted_rooms(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        for room in client.joined_rooms() {
+            let room_id = room.room_id().to_owned();
+
+            let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await else {
+                continue;
+            };
+            let Ok(events) = cache.events().await else {
+                continue;
+            };
+
+            let rules = room.clone_info().room_version_rules_or_default().redaction;
+            self.search_index
+                .lock()
+                .await
+                .ingest(&room_id, events, &cache, &rules)
+                .await;
+        }
+    }
+
     pub(crate) fn watch_ignored_users(self: &Arc<Self>, client: &matrix_sdk::Client) {
         let core = self.clone();
         let mut changes = client.subscribe_to_ignore_user_list_changes();
@@ -332,6 +603,7 @@ impl Core {
             spawn(async move {
                 while changes.next().await.is_some() {
                     *core.search_index.lock().await = MessageIndex::new();
+                    core.search_crawl.lock().await.reset();
                 }
             })
             .abort_on_drop(),
@@ -346,6 +618,8 @@ impl Core {
             spawn(async move {
                 let mut updates = client.event_cache().subscribe_to_room_generic_updates();
 
+                core.prime_persisted_rooms(&client).await;
+
                 loop {
                     let room_id = match updates.recv().await {
                         Ok(update) => update.room_id,
@@ -357,6 +631,10 @@ impl Core {
                         core.search_index.lock().await.forget_room(&room_id);
                         continue;
                     };
+
+                    if core.search_crawl.lock().await.is_ingesting(&room_id) {
+                        continue;
+                    }
 
                     let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await
                     else {
@@ -387,10 +665,30 @@ mod tests {
         EventId, event_id, events::room::message::RoomMessageEventContentWithoutRelation, room_id,
         user_id,
     };
-    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use matrix_sdk::test_utils::mocks::{MatrixMockServer, RoomMessagesResponseTemplate};
     use matrix_sdk_test::{JoinedRoomBuilder, async_test, event_factory::EventFactory};
+    use std::time::Duration;
 
     use super::MessageIndex;
+
+    pub(super) fn in_room(
+        index: &MessageIndex,
+        room_id: &matrix_sdk::ruma::OwnedRoomId,
+        query: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Vec<super::Hit> {
+        index.search(
+            query,
+            &super::SearchFilter {
+                rooms: vec![room_id.clone()],
+                ..super::SearchFilter::default()
+            },
+            super::SearchOrder::Rank,
+            limit,
+            offset,
+        )
+    }
 
     async fn reingest_whole_room(
         index: &mut MessageIndex,
@@ -401,6 +699,361 @@ mod tests {
         index
             .ingest(room_id, events, cache, &RedactionRules::V11)
             .await;
+    }
+
+    fn document(
+        seed: &str,
+        body: &str,
+        sender: &str,
+        ts: u64,
+        attachment: Option<super::SearchAttachment>,
+        mentions: Vec<matrix_sdk::ruma::OwnedUserId>,
+    ) -> super::Document {
+        super::Document {
+            event_id: EventId::parse(format!("${seed}")).expect("event id"),
+            has_link: super::contains_link(body),
+            body: body.to_owned(),
+            sender: matrix_sdk::ruma::UserId::parse(sender).expect("user id"),
+            origin_server_ts: ts,
+            attachment,
+            mentions,
+        }
+    }
+
+    fn filtered_index() -> (MessageIndex, matrix_sdk::ruma::OwnedRoomId) {
+        let room = matrix_sdk::ruma::RoomId::parse("!filters:localhost").expect("room id");
+        let mut index = MessageIndex::new();
+        let room_index = index
+            .rooms
+            .entry(room.clone())
+            .or_insert_with(super::RoomIndex::new);
+
+        room_index.upsert(document(
+            "erwan",
+            "the deploy pipeline is broken",
+            "@erwan:localhost",
+            1_000,
+            None,
+            Vec::new(),
+        ));
+        room_index.upsert(document(
+            "alice",
+            "deploy finished, see https://example.org/build",
+            "@alice:localhost",
+            2_000,
+            None,
+            vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
+        ));
+        room_index.upsert(document(
+            "screenshot",
+            "deploy screenshot.png",
+            "@alice:localhost",
+            3_000,
+            Some(super::SearchAttachment::Image),
+            Vec::new(),
+        ));
+
+        (index, room)
+    }
+
+    fn found(index: &MessageIndex, query: &str, filter: &super::SearchFilter) -> Vec<String> {
+        index
+            .search(query, filter, super::SearchOrder::Rank, 20, 0)
+            .into_iter()
+            .map(|hit| hit.event_id.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn test_from_narrows_to_one_sender() {
+        let (index, _room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                senders: vec![matrix_sdk::ruma::user_id!("@alice:localhost").to_owned()],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert_eq!(hits.len(), 2);
+        assert!(!hits.contains(&"$erwan".to_owned()));
+    }
+
+    #[test]
+    fn test_mentions_matches_only_messages_pinging_the_user() {
+        let (index, _room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                mentions: vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert_eq!(hits, vec!["$alice"]);
+    }
+
+    #[test]
+    fn test_has_image_and_has_link_select_by_content() {
+        let (index, _room) = filtered_index();
+
+        assert_eq!(
+            found(
+                &index,
+                "deploy",
+                &super::SearchFilter {
+                    has: vec![super::SearchAttachment::Image],
+                    ..super::SearchFilter::default()
+                }
+            ),
+            vec!["$screenshot"]
+        );
+        assert_eq!(
+            found(
+                &index,
+                "deploy",
+                &super::SearchFilter {
+                    has: vec![super::SearchAttachment::Link],
+                    ..super::SearchFilter::default()
+                }
+            ),
+            vec!["$alice"]
+        );
+    }
+
+    #[test]
+    fn test_date_bounds_are_inclusive_on_both_ends() {
+        let (index, _room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                after_ts: Some(2_000),
+                before_ts: Some(3_000),
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert_eq!(hits.len(), 2);
+        assert!(!hits.contains(&"$erwan".to_owned()));
+    }
+
+    #[test]
+    fn test_a_quoted_phrase_must_appear_verbatim() {
+        let (index, _room) = filtered_index();
+
+        assert_eq!(
+            found(
+                &index,
+                "deploy",
+                &super::SearchFilter {
+                    phrases: vec!["pipeline is broken".to_owned()],
+                    ..super::SearchFilter::default()
+                }
+            ),
+            vec!["$erwan"]
+        );
+    }
+
+    #[test]
+    fn test_an_excluded_term_removes_matches() {
+        let (index, _room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                exclude: vec!["screenshot".to_owned()],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert!(!hits.contains(&"$screenshot".to_owned()));
+    }
+
+    #[test]
+    fn test_recent_order_ignores_relevance() {
+        let (index, _room) = filtered_index();
+
+        let hits: Vec<String> = index
+            .search(
+                "deploy",
+                &super::SearchFilter::default(),
+                super::SearchOrder::Recent,
+                20,
+                0,
+            )
+            .into_iter()
+            .map(|hit| hit.event_id.to_string())
+            .collect();
+
+        assert_eq!(hits, vec!["$screenshot", "$alice", "$erwan"]);
+    }
+
+    #[test]
+    fn test_an_empty_query_with_filters_still_lists_messages() {
+        let (index, _room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "",
+            &super::SearchFilter {
+                senders: vec![matrix_sdk::ruma::user_id!("@alice:localhost").to_owned()],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert_eq!(hits.len(), 2);
+    }
+
+    #[test]
+    fn test_a_room_filter_excludes_other_rooms() {
+        let (mut index, room) = filtered_index();
+        let other = matrix_sdk::ruma::RoomId::parse("!other:localhost").expect("room id");
+        index
+            .rooms
+            .entry(other)
+            .or_insert_with(super::RoomIndex::new)
+            .upsert(document(
+                "elsewhere",
+                "deploy elsewhere",
+                "@erwan:localhost",
+                4_000,
+                None,
+                Vec::new(),
+            ));
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                rooms: vec![room],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert!(!hits.contains(&"$elsewhere".to_owned()));
+        assert_eq!(hits.len(), 3);
+    }
+
+    #[async_test]
+    async fn test_a_room_with_no_new_activity_is_indexed_from_its_persisted_cache() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!quiet:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    factory
+                        .text_msg("archived thought")
+                        .event_id(event_id!("$archived")),
+                ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-prime",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+
+        let index = core.search_index.lock().await;
+        assert_eq!(
+            in_room(&index, &room_id, "archived", 10, 0).len(),
+            1,
+            "a room with no new activity must be indexed from its persisted cache"
+        );
+        drop(index);
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_back_pagination_reaches_the_index_and_notifies_it() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!backfill:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous")
+                    .add_timeline_event(
+                        factory
+                            .text_msg("latest deploy")
+                            .event_id(event_id!("$latest")),
+                    ),
+            )
+            .await;
+
+        let (cache, _drop) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+
+        let mut index = MessageIndex::new();
+        reingest_whole_room(&mut index, &cache, &room_id).await;
+        assert!(
+            in_room(&index, &room_id, "archaeology", 10, 0).is_empty(),
+            "the older message is not in the cache yet"
+        );
+
+        let mut updates = client.event_cache().subscribe_to_room_generic_updates();
+
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default().events(vec![
+                factory
+                    .text_msg("older archaeology")
+                    .event_id(event_id!("$older")),
+            ]))
+            .mock_once()
+            .mount()
+            .await;
+
+        let timeline = crate::timelines::build_room_timeline(&room, None, false)
+            .await
+            .expect("timeline");
+        timeline.paginate_backwards(10).await.expect("paginate");
+
+        let notified = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let Ok(update) = updates.recv().await
+                    && update.room_id == room_id
+                {
+                    return true;
+                }
+            }
+        })
+        .await
+        .unwrap_or(false);
+        assert!(notified, "back-pagination must wake the indexer");
+
+        reingest_whole_room(&mut index, &cache, &room_id).await;
+
+        let hits = in_room(&index, &room_id, "archaeology", 10, 0);
+        assert_eq!(hits.len(), 1, "the backfilled message must be searchable");
+        assert_eq!(hits[0].event_id, event_id!("$older"));
     }
 
     #[async_test]
@@ -437,7 +1090,7 @@ mod tests {
         let mut index = MessageIndex::new();
         reingest_whole_room(&mut index, &cache, &room_id).await;
 
-        let hits = index.search_room(&room_id, "deploying", 10, 0);
+        let hits = in_room(&index, &room_id, "deploying", 10, 0);
         assert_eq!(hits.len(), 1, "{hits:?}", hits = hits.len());
         assert_eq!(hits[0].event_id, original_id);
 
@@ -461,11 +1114,11 @@ mod tests {
         reingest_whole_room(&mut index, &cache, &room_id).await;
 
         assert!(
-            index.search_room(&room_id, "deploying", 10, 0).is_empty(),
+            in_room(&index, &room_id, "deploying", 10, 0).is_empty(),
             "an edited message must not still match its old body"
         );
 
-        let hits = index.search_room(&room_id, "rollback", 10, 0);
+        let hits = in_room(&index, &room_id, "rollback", 10, 0);
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].event_id, original_id);
         assert_eq!(hits[0].body, "the rollback finished");
@@ -519,7 +1172,7 @@ mod tests {
             .expect("room event cache");
         let mut index = MessageIndex::new();
         reingest_whole_room(&mut index, &cache, &room_id).await;
-        assert_eq!(index.search_room(&room_id, "regrettable", 10, 0).len(), 1);
+        assert_eq!(in_room(&index, &room_id, "regrettable", 10, 0).len(), 1);
 
         server
             .sync_room(
@@ -535,7 +1188,7 @@ mod tests {
         reingest_whole_room(&mut index, &cache, &room_id).await;
 
         assert!(
-            index.search_room(&room_id, "regrettable", 10, 0).is_empty(),
+            in_room(&index, &room_id, "regrettable", 10, 0).is_empty(),
             "a redacted message must leave no indexed body behind"
         );
 
@@ -577,9 +1230,9 @@ mod tests {
         let ids =
             |hits: Vec<super::Hit>| hits.into_iter().map(|hit| hit.event_id).collect::<Vec<_>>();
 
-        let first = ids(index.search_room(&room_id, "paginate", 2, 0));
-        let second = ids(index.search_room(&room_id, "paginate", 2, 2));
-        let last = ids(index.search_room(&room_id, "paginate", 2, 4));
+        let first = ids(in_room(&index, &room_id, "paginate", 2, 0));
+        let second = ids(in_room(&index, &room_id, "paginate", 2, 2));
+        let last = ids(in_room(&index, &room_id, "paginate", 2, 4));
         assert_eq!(first.len(), 2);
         assert_eq!(second.len(), 2);
         assert_eq!(last.len(), 1, "five matches paged two at a time");
@@ -592,7 +1245,7 @@ mod tests {
 
         assert_eq!(
             first,
-            ids(index.search_room(&room_id, "paginate", 2, 0)),
+            ids(in_room(&index, &room_id, "paginate", 2, 0)),
             "the same page must come back twice"
         );
 
@@ -626,12 +1279,302 @@ mod tests {
             .expect("room event cache");
         let mut index = MessageIndex::new();
         reingest_whole_room(&mut index, &cache, &room_id).await;
-        assert_eq!(index.search_room(&room_id, "secret", 10, 0).len(), 1);
+        assert_eq!(in_room(&index, &room_id, "secret", 10, 0).len(), 1);
 
         index.forget_room(&room_id);
 
-        assert!(index.search_room(&room_id, "secret", 10, 0).is_empty());
-        assert!(index.search_all("secret", 10, 0).is_empty());
+        assert!(in_room(&index, &room_id, "secret", 10, 0).is_empty());
+        assert!(
+            index
+                .search(
+                    "secret",
+                    &super::SearchFilter::default(),
+                    super::SearchOrder::Rank,
+                    10,
+                    0,
+                )
+                .is_empty()
+        );
+
+        drop(room);
+    }
+
+    #[test]
+    fn test_a_denied_sender_is_dropped_by_identity() {
+        let (index, room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                rooms: vec![room],
+                not_senders: vec![matrix_sdk::ruma::user_id!("@alice:localhost").to_owned()],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert_eq!(hits, vec!["$erwan".to_owned()]);
+    }
+
+    #[test]
+    fn test_a_denied_attachment_is_dropped_by_kind() {
+        let (index, room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                rooms: vec![room],
+                not_has: vec![super::SearchAttachment::Image],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert!(!hits.contains(&"$screenshot".to_owned()));
+        assert!(hits.contains(&"$erwan".to_owned()));
+    }
+
+    #[test]
+    fn test_a_denied_mention_is_dropped_by_identity() {
+        let (index, room) = filtered_index();
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                rooms: vec![room],
+                not_mentions: vec![matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned()],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert!(!hits.contains(&"$alice".to_owned()));
+    }
+
+    #[test]
+    fn test_a_denied_room_is_skipped_even_with_no_room_filter() {
+        let (mut index, room) = filtered_index();
+        let other = matrix_sdk::ruma::RoomId::parse("!other:localhost").expect("room id");
+        index
+            .rooms
+            .entry(other.clone())
+            .or_insert_with(super::RoomIndex::new)
+            .upsert(document(
+                "elsewhere",
+                "deploy elsewhere",
+                "@erwan:localhost",
+                4_000,
+                None,
+                Vec::new(),
+            ));
+
+        let hits = found(
+            &index,
+            "deploy",
+            &super::SearchFilter {
+                not_rooms: vec![other],
+                ..super::SearchFilter::default()
+            },
+        );
+
+        assert!(!hits.contains(&"$elsewhere".to_owned()));
+        assert!(hits.contains(&"$erwan".to_owned()));
+        drop(room);
+    }
+
+    fn seed(index: &mut MessageIndex, room: &matrix_sdk::ruma::OwnedRoomId, seeds: &[(&str, u64)]) {
+        let room_index = index
+            .rooms
+            .entry(room.clone())
+            .or_insert_with(super::RoomIndex::new);
+
+        for &(name, ts) in seeds {
+            room_index.upsert(document(
+                name,
+                &format!("deploy note {name}"),
+                "@erwan:localhost",
+                ts,
+                None,
+                Vec::new(),
+            ));
+        }
+    }
+
+    #[test]
+    fn test_the_budget_evicts_the_oldest_message_first() {
+        let room = matrix_sdk::ruma::RoomId::parse("!budget:localhost").expect("room id");
+        let mut index = MessageIndex::with_capacity(2);
+        seed(
+            &mut index,
+            &room,
+            &[("oldest", 1_000), ("middle", 2_000), ("newest", 3_000)],
+        );
+
+        index.trim_to_capacity();
+
+        assert_eq!(index.documents(), 2, "the budget must be respected");
+        let kept = found(&index, "deploy", &super::SearchFilter::default());
+        assert!(
+            !kept.contains(&"$oldest".to_owned()),
+            "the oldest message must be the one dropped, kept: {kept:?}"
+        );
+        assert!(kept.contains(&"$newest".to_owned()));
+    }
+
+    #[test]
+    fn test_the_budget_spans_rooms_rather_than_each_room_separately() {
+        let busy = matrix_sdk::ruma::RoomId::parse("!busy:localhost").expect("room id");
+        let quiet = matrix_sdk::ruma::RoomId::parse("!quiet:localhost").expect("room id");
+        let mut index = MessageIndex::with_capacity(2);
+
+        seed(&mut index, &busy, &[("recent", 9_000), ("newer", 8_000)]);
+        seed(&mut index, &quiet, &[("ancient", 10)]);
+
+        index.trim_to_capacity();
+
+        assert_eq!(index.documents(), 2);
+        assert!(
+            in_room(&index, &quiet, "deploy", 10, 0).is_empty(),
+            "the budget spans rooms"
+        );
+        assert_eq!(in_room(&index, &busy, "deploy", 10, 0).len(), 2);
+    }
+
+    #[test]
+    fn test_a_full_index_reports_itself_full() {
+        let room = matrix_sdk::ruma::RoomId::parse("!full:localhost").expect("room id");
+        let mut index = MessageIndex::with_capacity(2);
+
+        seed(&mut index, &room, &[("one", 1_000)]);
+        assert!(!index.is_full(), "one of two is not full");
+
+        seed(&mut index, &room, &[("two", 2_000)]);
+        assert!(index.is_full());
+    }
+
+    #[async_test]
+    async fn test_an_evicted_message_is_not_resurrected_by_the_next_ingest() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!churn:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .add_timeline_event(
+                        factory
+                            .text_msg("older sediment")
+                            .event_id(event_id!("$older")),
+                    )
+                    .add_timeline_event(
+                        factory
+                            .text_msg("newer sediment")
+                            .event_id(event_id!("$newer")),
+                    ),
+            )
+            .await;
+
+        let (cache, _drop) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+
+        let mut index = MessageIndex::with_capacity(1);
+        reingest_whole_room(&mut index, &cache, &room_id).await;
+
+        let kept = in_room(&index, &room_id, "sediment", 10, 0);
+        assert_eq!(kept.len(), 1, "the budget holds one message");
+        assert_eq!(kept[0].event_id, event_id!("$newer"));
+
+        reingest_whole_room(&mut index, &cache, &room_id).await;
+
+        let after = in_room(&index, &room_id, "sediment", 10, 0);
+        assert_eq!(
+            after.len(),
+            1,
+            "re-ingesting must not churn the evicted message back in"
+        );
+        assert_eq!(after[0].event_id, event_id!("$newer"));
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_the_crawler_deepens_a_room_and_records_reaching_its_start() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!crawl:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous")
+                    .add_timeline_event(
+                        factory
+                            .text_msg("latest deploy")
+                            .event_id(event_id!("$latest")),
+                    ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-crawl",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+        assert!(
+            in_room(
+                &*core.search_index.lock().await,
+                &room_id,
+                "archaeology",
+                10,
+                0
+            )
+            .is_empty(),
+            "nothing has paged back to the older message yet"
+        );
+
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default().events(vec![
+                factory
+                    .text_msg("older archaeology")
+                    .event_id(event_id!("$older")),
+            ]))
+            .mock_once()
+            .mount()
+            .await;
+
+        let reached_start = core
+            .crawl_once(&client, &room_id)
+            .await
+            .expect("crawl one batch");
+
+        let hits = in_room(
+            &*core.search_index.lock().await,
+            &room_id,
+            "archaeology",
+            10,
+            0,
+        );
+        assert_eq!(hits.len(), 1, "the crawler must index what it paginated");
+        assert_eq!(hits[0].event_id, event_id!("$older"));
+        assert!(reached_start);
 
         drop(room);
     }
@@ -722,6 +1665,18 @@ mod stress {
         EventId::parse(format!("$stress{seed}:localhost")).expect("generated event id")
     }
 
+    fn stress_document(seed: usize, body: String) -> super::Document {
+        super::Document {
+            event_id: event_id(seed),
+            body,
+            sender: matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned(),
+            origin_server_ts: 0,
+            attachment: None,
+            has_link: false,
+            mentions: Vec::new(),
+        }
+    }
+
     fn room_id() -> matrix_sdk::ruma::OwnedRoomId {
         matrix_sdk::ruma::RoomId::parse("!stress:localhost").expect("room id")
     }
@@ -742,7 +1697,7 @@ mod stress {
         let mut index = RoomIndex::new();
         let started = Instant::now();
         for seed in 0..count {
-            index.upsert(event_id(seed), message(seed));
+            index.upsert(stress_document(seed, message(seed)));
         }
         let indexing = started.elapsed();
 
@@ -765,18 +1720,21 @@ mod stress {
         owner.rooms.insert(room.clone(), index);
 
         let started = Instant::now();
-        let common_hits = owner.search_room(&room, "deploy", 20, 0).len();
+        let common_hits = super::tests::in_room(&owner, &room, "deploy", 20, 0).len();
         let common = started.elapsed();
 
         let started = Instant::now();
-        let selective_hits = owner.search_room(&room, SELECTIVE_TERM, 20, 0).len();
+        let selective_hits = super::tests::in_room(&owner, &room, SELECTIVE_TERM, 20, 0).len();
         let selective = started.elapsed();
 
         let mut index = owner.rooms.remove(&room).expect("room index");
 
         let started = Instant::now();
         for seed in 0..(count / 100).max(1) {
-            index.upsert(event_id(seed), format!("edited {}", message(seed + 7)));
+            index.upsert(stress_document(
+                seed,
+                format!("edited {}", message(seed + 7)),
+            ));
         }
         let edits = started.elapsed();
 

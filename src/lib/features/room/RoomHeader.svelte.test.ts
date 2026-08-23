@@ -23,6 +23,7 @@ function mountHeader(props: {
       members,
       onBack: () => {},
       onMembers: () => {},
+      onSearch: () => {},
       onSettings: () => {},
       initials,
       ...props,

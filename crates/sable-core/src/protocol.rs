@@ -515,8 +515,10 @@ pub enum Command {
 
     SearchMessages {
         query: String,
-        #[ts(type = "string | null")]
-        room_id: Option<OwnedRoomId>,
+        #[serde(default)]
+        filter: SearchFilter,
+        #[serde(default)]
+        order: SearchOrder,
         limit: u32,
         offset: u32,
     },
@@ -961,6 +963,52 @@ pub struct SubscriptionId(pub u32);
 #[ts(export)]
 pub struct CallSessionId(pub u32);
 
+#[derive(Debug, Clone, Copy, Default, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchOrder {
+    #[default]
+    Rank,
+    Recent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchAttachment {
+    Image,
+    Video,
+    Audio,
+    File,
+    Link,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, TS)]
+#[ts(export)]
+#[serde(default)]
+pub struct SearchFilter {
+    #[ts(type = "string[]")]
+    pub rooms: Vec<OwnedRoomId>,
+    #[ts(type = "string[]")]
+    pub senders: Vec<OwnedUserId>,
+    #[ts(type = "string[]")]
+    pub mentions: Vec<OwnedUserId>,
+    pub has: Vec<SearchAttachment>,
+    #[ts(type = "string[]")]
+    pub not_rooms: Vec<OwnedRoomId>,
+    #[ts(type = "string[]")]
+    pub not_senders: Vec<OwnedUserId>,
+    #[ts(type = "string[]")]
+    pub not_mentions: Vec<OwnedUserId>,
+    pub not_has: Vec<SearchAttachment>,
+    #[ts(type = "number | null")]
+    pub after_ts: Option<u64>,
+    #[ts(type = "number | null")]
+    pub before_ts: Option<u64>,
+    pub phrases: Vec<String>,
+    pub exclude: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct OpenIdTokenView {
@@ -978,6 +1026,10 @@ pub struct SearchHitView {
     #[ts(type = "string")]
     pub event_id: OwnedEventId,
     pub body: String,
+    #[ts(type = "string")]
+    pub sender: OwnedUserId,
+    #[ts(type = "number")]
+    pub origin_server_ts: u64,
     pub score: f64,
 }
 

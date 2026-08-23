@@ -1204,6 +1204,8 @@ pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {
         room_id: hit.room_id,
         event_id: hit.event_id,
         body: hit.body,
+        sender: hit.sender,
+        origin_server_ts: hit.origin_server_ts,
         score: hit.score,
     }
 }

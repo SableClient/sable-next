@@ -58,4 +58,18 @@ test('the signed-in surfaces have no accessibility violations', async ({
 
   await expect(page.getByRole('main')).toHaveCount(1);
   expect(await violations(page)).toEqual([]);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/search');
+  const field = page.getByRole('combobox', { name: /Search messages/ });
+  await field.fill('in:Timeline from:e2e ');
+  await expect(page.locator('.chip')).toHaveCount(2);
+
+  await expect(page.getByRole('main')).toHaveCount(1);
+  expect(await violations(page)).toEqual([]);
+
+  await field.press('Alt+ArrowDown');
+  await expect(page.getByRole('listbox')).toBeVisible();
+
+  expect(await violations(page)).toEqual([]);
 });
