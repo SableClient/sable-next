@@ -6,6 +6,10 @@ pre-commit:
   jobs:
     - name: scripts
       glob: '*.{js,mjs,cjs,ts,mts,cts}'
+      # oxfmt ignores src/generated, so a commit whose only TypeScript is
+      # regenerated bindings would hand it zero targets and fail.
+      exclude:
+        - 'src/generated/*'
       group:
         piped: true
         jobs:
