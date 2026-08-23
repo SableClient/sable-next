@@ -2,6 +2,7 @@
 
 mod accounts;
 mod auth;
+mod calls;
 mod dispatch;
 mod errors;
 pub mod image_packs;
@@ -13,6 +14,7 @@ pub mod profiles;
 pub mod protocol;
 mod registration;
 mod rooms;
+pub mod search;
 pub mod session;
 pub mod store;
 mod subscriptions;
@@ -31,6 +33,7 @@ use std::{
 
 use matrix_sdk::executor::AbortOnDrop;
 use matrix_sdk::ruma::OwnedRoomId;
+use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
 use matrix_sdk_ui::timeline::Timeline;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use url::Url;
@@ -64,6 +67,15 @@ pub struct Core {
     room_subscription_lock: Mutex<()>,
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
     notification_content: AtomicBool,
+    search_index: Mutex<search::MessageIndex>,
+    call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
+}
+
+struct CallSession {
+    room_id: OwnedRoomId,
+    state_key: CallMemberStateKey,
+    delay_id: Option<String>,
+    _postpone: Option<Task>,
 }
 
 struct CachedTimeline {
@@ -117,6 +129,8 @@ impl Core {
             subscriptions: Mutex::new(HashMap::new()),
             room_subscription_lock: Mutex::new(()),
             timelines: Mutex::new(HashMap::new()),
+            search_index: Mutex::new(search::MessageIndex::new()),
+            call_sessions: Mutex::new(HashMap::new()),
         });
         (core, rx)
     }

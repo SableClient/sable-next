@@ -508,6 +508,24 @@ pub enum Command {
         /// about. A plain cancel is not.
         mismatch: bool,
     },
+
+    SearchMessages {
+        query: String,
+        #[ts(type = "string | null")]
+        room_id: Option<OwnedRoomId>,
+        limit: u32,
+        offset: u32,
+    },
+
+    JoinCall {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        livekit_service_url: String,
+    },
+
+    LeaveCall {
+        session: CallSessionId,
+    },
 }
 
 /// Paired with `Command` by variant name, so the generated TS resolves a
@@ -586,6 +604,14 @@ pub enum CommandOk {
     RoomMembers {
         members: Vec<MemberView>,
     },
+    SearchMessages {
+        hits: Vec<SearchHitView>,
+    },
+    JoinCall {
+        session: CallSessionId,
+        openid_token: OpenIdTokenView,
+    },
+    LeaveCall,
     RoomPermissions(RoomPermissionsView),
     NotificationSettings(NotificationSettingsView),
     DefaultNotificationModes {
@@ -731,6 +757,7 @@ pub enum CommandOk {
 pub enum CommandErr {
     NotLoggedIn,
     UnknownSubscription,
+    UnknownCall,
     InvalidPaginationDirection,
     UnknownRoom,
     UnknownHomeserver,
@@ -917,6 +944,30 @@ pub enum VectorDiff<T> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct SubscriptionId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CallSessionId(pub u32);
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct OpenIdTokenView {
+    pub access_token: String,
+    pub matrix_server_name: String,
+    #[ts(type = "number")]
+    pub expires_in_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct SearchHitView {
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    #[ts(type = "string")]
+    pub event_id: OwnedEventId,
+    pub body: String,
+    pub score: f64,
+}
 
 // Hand-narrowed, keeping the UI off the SDK's shapes.
 

@@ -16,6 +16,19 @@ ts-rs = { workspace = true }
 url = { workspace = true }
 ammonia = "4"
 async-trait = "0.1"
+probly-search = "2.0"
+charabia = { version = "0.10", default-features = false, features = [
+  "greek",
+  "hebrew",
+  "thai",
+  "khmer",
+  "vietnamese",
+  "turkish",
+  "swedish-recomposition",
+  "german-segmentation",
+  "chinese-normalization",
+] }
+rust-stemmers = "1.2"
 html-escape = "0.2"
 linkify = "0.11"
 

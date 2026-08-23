@@ -43,8 +43,8 @@ use crate::protocol::{
     DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
     MentionView, PerMessageProfileView, PollAnswerView, PollView, ReactionGroup, ReplyView,
     RoomJoinRuleView, RoomPermissionsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag,
-    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
-    TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
+    SearchHitView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView,
+    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -1196,6 +1196,15 @@ pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>])
                 let _ = item.display_name().await;
             }
         }
+    }
+}
+
+pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {
+    SearchHitView {
+        room_id: hit.room_id,
+        event_id: hit.event_id,
+        body: hit.body,
+        score: hit.score,
     }
 }
 

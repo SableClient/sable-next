@@ -8,6 +8,7 @@ use crate::protocol::{CommandErr, CommandOk, CoreEvent, SessionInfo};
 use crate::session::{Credentials, PersistedAccount, PersistedSession, Session};
 
 use crate::Core;
+use crate::search;
 use crate::session;
 use crate::watchers::sync_status;
 
@@ -304,6 +305,8 @@ impl Core {
             .clear();
         self.subscriptions.lock().await.clear();
         self.timelines.lock().await.clear();
+        self.call_sessions.lock().await.clear();
+        *self.search_index.lock().await = search::MessageIndex::new();
         self.session.write().await.take()
     }
 
@@ -360,6 +363,8 @@ impl Core {
         self.watch_notifications(&client, generation);
         self.watch_notification_settings(&client, generation);
         self.watch_send_queue(&client);
+        self.watch_search_index(&client);
+        self.watch_ignored_users(&client);
 
         client
             .send_queue()
