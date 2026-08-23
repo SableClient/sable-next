@@ -244,6 +244,11 @@ pub fn run() {
                 }
             });
 
+            #[cfg(target_os = "ios")]
+            if let Some(window) = app.get_webview_window("main") {
+                ios::hide_form_accessory_bar(&window);
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -1,5 +1,5 @@
 use std::{
-    ffi::OsStr,
+    ffi::{CString, OsStr},
     sync::{
         atomic::{AtomicU64, Ordering},
         Mutex,
@@ -7,6 +7,11 @@ use std::{
 };
 
 use block2::RcBlock;
+use objc2::{
+    msg_send,
+    runtime::{AnyClass, AnyObject, ClassBuilder, Sel},
+    sel,
+};
 use objc2_foundation::{NSString, NSURL};
 use objc2_photos::{
     PHAccessLevel, PHAssetCreationRequest, PHAssetResourceType, PHAuthorizationStatus,
@@ -107,4 +112,48 @@ pub async fn save_media_to_photos(
     tauri::async_runtime::spawn_blocking(move || write_to_photos(&bytes, &filename))
         .await
         .map_err(|error| error.to_string())?
+}
+
+// iOS shows a form accessory bar (prev/next arrows and Done) above the keyboard
+// for web inputs. WKWebView exposes no API to turn it off, so swap the private
+// WKContentView's class for a runtime subclass whose inputAccessoryView is nil,
+// the same approach as Capacitor's hideFormAccessoryBar.
+extern "C-unwind" fn input_accessory_view_nil(_this: &AnyObject, _cmd: Sel) -> *mut AnyObject {
+    std::ptr::null_mut()
+}
+
+pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
+    let _ = window.with_webview(|webview| unsafe {
+        let webview: *mut AnyObject = webview.inner().cast();
+        let scroll_view: *mut AnyObject = msg_send![&*webview, scrollView];
+        let subviews: *mut AnyObject = msg_send![&*scroll_view, subviews];
+        let count: usize = msg_send![&*subviews, count];
+        for index in 0..count {
+            let subview: *mut AnyObject = msg_send![&*subviews, objectAtIndex: index];
+            let class = (*subview).class();
+            if !class.name().to_bytes().starts_with(b"WKContent") {
+                continue;
+            }
+            let Ok(name) =
+                CString::new(format!("{}_NoAccessoryBar", class.name().to_string_lossy()))
+            else {
+                continue;
+            };
+            // Registered once per process; a second window finds it by name.
+            let subclass = match AnyClass::get(&name) {
+                Some(subclass) => subclass,
+                None => {
+                    let Some(mut builder) = ClassBuilder::new(&name, class) else {
+                        continue;
+                    };
+                    builder.add_method(
+                        sel!(inputAccessoryView),
+                        input_accessory_view_nil as extern "C-unwind" fn(_, _) -> _,
+                    );
+                    builder.register()
+                }
+            };
+            AnyObject::set_class(&*subview, subclass);
+        }
+    });
 }
