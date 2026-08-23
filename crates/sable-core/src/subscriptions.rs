@@ -4,7 +4,10 @@ use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::event_cache::PaginationStatus;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
-use matrix_sdk_ui::room_list_service::filters::new_filter_non_left;
+use matrix_sdk_ui::room_list_service::RoomListLoadingState;
+use matrix_sdk_ui::room_list_service::filters::{
+    new_filter_all, new_filter_deduplicate_versions, new_filter_non_left,
+};
 
 use crate::protocol::{CommandErr, CommandOk, CoreEvent, SubscriptionId};
 
@@ -13,6 +16,10 @@ use crate::view;
 use crate::{Core, Subscription, SubscriptionKind};
 
 const ROOM_LIST_PAGE_SIZE: usize = 200;
+
+const fn pages_for(total: u32) -> usize {
+    (total as usize).div_ceil(ROOM_LIST_PAGE_SIZE)
+}
 
 impl Core {
     pub(crate) async fn subscribe_room_list(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
@@ -46,14 +53,30 @@ impl Core {
                 }
             };
 
+            let loading = room_list.loading_state();
             let (stream, controller) = room_list.entries_with_dynamic_adapters(ROOM_LIST_PAGE_SIZE);
-            controller.set_filter(Box::new(new_filter_non_left()));
+            controller.set_filter(Box::new(new_filter_all(vec![
+                Box::new(new_filter_non_left()),
+                Box::new(new_filter_deduplicate_versions()),
+            ])));
 
             // Stable over a stream's life, so resolved once per room.
             let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();
 
             let mut stream = Box::pin(stream);
+            let mut grown_to = 0;
             while let Some(diffs) = stream.next().await {
+                if let RoomListLoadingState::Loaded {
+                    maximum_number_of_rooms: Some(total),
+                } = loading.get()
+                    && total > grown_to
+                {
+                    for _ in 0..pages_for(total) {
+                        controller.add_one_page();
+                    }
+                    grown_to = total;
+                }
+
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
                     view::enrich_room_fields(&client, diff, &mut room_cache).await;

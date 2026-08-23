@@ -1,15 +1,20 @@
+use matrix_sdk::config::RequestConfig;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
-use matrix_sdk::ruma::{OwnedRoomId, RoomId, RoomOrAliasId, ServerName, events::SyncStateEvent};
+use matrix_sdk::ruma::{
+    OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt, events::SyncStateEvent,
+};
 use matrix_sdk::send_queue::SendHandle;
 
 use crate::protocol::{CommandErr, CommandOk};
 
 use crate::Core;
 use crate::view;
+
+const HIERARCHY_PAGE_SIZE: u32 = 100;
 
 impl Core {
     /// Without a `via` server the edge is ignored.
@@ -92,9 +97,11 @@ impl Core {
 
         let mut request = get_hierarchy::v1::Request::new(space_id.clone());
         request.from = from;
+        request.limit = Some(UInt::from(HIERARCHY_PAGE_SIZE));
 
         let response = client
             .send(request)
+            .with_request_config(RequestConfig::short_retry())
             .await
             .map_err(|error| self.failed("space_hierarchy", error))?;
 
