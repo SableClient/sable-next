@@ -1,0 +1,125 @@
+import type { Locator, Page } from '@playwright/test';
+
+import { expect, test } from './fixtures/test';
+
+function rail(page: Page): Locator {
+  return page.getByRole('navigation', { name: 'Primary navigation' });
+}
+
+function railLink(page: Page, name: string): Locator {
+  return rail(page).getByRole('link', { name });
+}
+
+function railSpaces(page: Page): Locator {
+  return rail(page).locator('.rail-slot a[href^="/space/"]');
+}
+
+async function spaceOrder(page: Page): Promise<(string | null)[]> {
+  return railSpaces(page).evaluateAll((links) =>
+    links.map((link) => link.getAttribute('aria-label'))
+  );
+}
+
+async function openRail(page: Page): Promise<void> {
+  await page.goto('/home');
+  await expect(railSpaces(page)).toHaveCount(3);
+}
+
+async function group(page: Page): Promise<void> {
+  await railLink(page, 'Beta').dragTo(railLink(page, 'Alpha'));
+  await expect(page.getByRole('button', { name: 'Alpha, Beta' })).toBeVisible();
+}
+
+test.beforeEach(async ({ page, installRoomCore }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installRoomCore('spaces');
+});
+
+test('dragging one space onto another groups them into a folder', async ({ page }) => {
+  await openRail(page);
+
+  await group(page);
+
+  const folder = page.getByRole('button', { name: 'Alpha, Beta' });
+  await expect(folder).toHaveAttribute('aria-expanded', 'false');
+  await expect(spaceOrder(page)).resolves.toEqual(['Gamma']);
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Alpha, Beta' })).toBeVisible();
+});
+
+test('dragging above or below a space reorders the rail', async ({ page }) => {
+  await openRail(page);
+
+  await railLink(page, 'Gamma').dragTo(railLink(page, 'Alpha'), {
+    targetPosition: { x: 20, y: 2 },
+  });
+
+  await expect(spaceOrder(page)).resolves.toEqual(['Gamma', 'Alpha', 'Beta']);
+
+  await railLink(page, 'Gamma').dragTo(railLink(page, 'Beta'), {
+    targetPosition: { x: 20, y: 40 },
+  });
+
+  await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Beta', 'Gamma']);
+});
+
+test('a folder opens to its spaces and takes another one by drag', async ({ page }) => {
+  await openRail(page);
+  await group(page);
+
+  await page.getByRole('button', { name: 'Alpha, Beta' }).click();
+  await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Beta', 'Gamma']);
+
+  await railLink(page, 'Gamma').dragTo(railLink(page, 'Alpha'), {
+    targetPosition: { x: 17, y: 30 },
+  });
+
+  await expect(page.getByRole('button', { name: 'Collapse Alpha, Gamma, Beta' })).toBeVisible();
+  await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Gamma', 'Beta']);
+});
+
+test('a folder can be taken apart from its menu', async ({ page }) => {
+  await openRail(page);
+  await group(page);
+  await page.getByRole('button', { name: 'Alpha, Beta' }).click();
+
+  await page.getByRole('button', { name: 'Collapse Alpha, Beta' }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Ungroup folder' }).click();
+
+  await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Beta', 'Gamma']);
+  await expect(page.getByRole('button', { name: /^Collapse/ })).toHaveCount(0);
+});
+
+test('a space can be lifted out of a folder that holds only it', async ({ page }) => {
+  await openRail(page);
+  await group(page);
+  await page.getByRole('button', { name: 'Alpha, Beta' }).click();
+
+  await railLink(page, 'Beta').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Remove from folder' }).click();
+  await expect(page.getByRole('button', { name: 'Collapse Alpha' })).toBeVisible();
+
+  await railLink(page, 'Alpha').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Remove from folder' }).click();
+
+  await expect(page.getByRole('button', { name: /^Collapse/ })).toHaveCount(0);
+  await expect(railSpaces(page)).toHaveCount(3);
+});
+
+test('a folder can be renamed, and the name shown instead of the space names', async ({ page }) => {
+  await openRail(page);
+  await group(page);
+
+  await page.getByRole('button', { name: 'Alpha, Beta' }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename folder' }).click();
+
+  const field = page.getByRole('textbox', { name: 'Folder name' });
+  await expect(field).toHaveValue('Alpha, Beta');
+  await field.fill('Work');
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect(page.getByRole('button', { name: 'Work' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Work' })).toBeVisible();
+});

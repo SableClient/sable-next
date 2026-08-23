@@ -16,6 +16,7 @@ mod registration;
 mod rooms;
 pub mod search;
 pub mod session;
+pub mod spaces;
 pub mod store;
 mod subscriptions;
 mod timelines;

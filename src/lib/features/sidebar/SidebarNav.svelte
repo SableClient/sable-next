@@ -4,6 +4,19 @@
   import { onMount } from 'svelte';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { unreadSpaceIds } from '#lib/rooms/spaces.js';
+  import {
+    applyDrop,
+    folderName,
+    mergeSpaces,
+    removeFromFolder,
+    renameFolder,
+    ungroupFolder,
+    type DropInstruction,
+    type LayoutRef,
+    type SidebarFolder,
+  } from '#lib/spaces/sidebar-layout.js';
+  import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
+  import FolderRenameDialog from './FolderRenameDialog.svelte';
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
@@ -22,6 +35,8 @@
 
   let { mobile = false, onNavigate, roomNavWidth = $bindable(224) }: Props = $props();
   const roomList = useRoomList();
+  const spaceSidebar = useSpaceSidebar();
+  let renamingFolder = $state<SidebarFolder | null>(null);
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
@@ -41,6 +56,12 @@
     )
   );
   let unreadSpaces = $derived(unreadSpaceIds(spaces, roomList.rooms, roomList.mutedRoomIds));
+  let entries = $derived(
+    mergeSpaces(
+      spaceSidebar.items,
+      spaces.map((space) => space.room_id)
+    )
+  );
   let homeCounts = $derived(
     unreadCounts(
       roomList.rooms.filter(
@@ -147,6 +168,39 @@
   function persistRoomNavWidth() {
     localStorage.setItem(ROOM_NAV_STORAGE_KEY, String(roomNavWidth));
   }
+
+  function folderLabel(folder: SidebarFolder): string {
+    return (
+      folderName(
+        folder,
+        (roomId) => roomList.rooms.find((room) => room.room_id === roomId)?.name ?? null
+      ) ?? ''
+    );
+  }
+
+  const railProps = {
+    get layout() {
+      return entries;
+    },
+    get openFolders() {
+      return spaceSidebar.openFolders;
+    },
+    onToggleFolder: (folderId: string) => {
+      spaceSidebar.toggleFolder(folderId);
+    },
+    onRenameFolder: (folder: SidebarFolder) => {
+      renamingFolder = folder;
+    },
+    onUngroupFolder: (folderId: string) => {
+      spaceSidebar.write(ungroupFolder(entries, folderId));
+    },
+    onRemoveFromFolder: (roomId: string, folderId: string) => {
+      spaceSidebar.write(removeFromFolder(entries, roomId, folderId));
+    },
+    onReorder: (source: LayoutRef, target: LayoutRef, instruction: DropInstruction) => {
+      spaceSidebar.write(applyDrop(entries, source, target, instruction));
+    },
+  };
 </script>
 
 <aside class="sidebar">
@@ -162,6 +216,7 @@
           {directUnread}
           mobile
           {onNavigate}
+          {...railProps}
         />
         <RoomNav {onNavigate} />
       </div>
@@ -177,6 +232,7 @@
           {homeHighlight}
           {directRooms}
           {directUnread}
+          {...railProps}
         />
         <RoomNav width={roomNavWidth} {collapsed} />
         <button
@@ -203,6 +259,16 @@
       {/if}
     </nav>
   {/if}
+  <FolderRenameDialog
+    folder={renamingFolder}
+    shownName={renamingFolder === null ? '' : folderLabel(renamingFolder)}
+    onOpenChange={(open: boolean) => {
+      if (!open) renamingFolder = null;
+    }}
+    onRename={(folderId: string, name: string) => {
+      spaceSidebar.write(renameFolder(entries, folderId, name));
+    }}
+  />
 </aside>
 
 <style>

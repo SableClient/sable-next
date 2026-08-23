@@ -10,6 +10,7 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { provideRoomList, RoomList, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+  import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { i18n } from '#lib/i18n.js';
@@ -33,6 +34,8 @@
   const core = useCoreClient();
   const roomList = new RoomList(core);
   provideRoomList(roomList);
+  const spaceSidebar = new SpaceSidebar();
+  provideSpaceSidebar(spaceSidebar);
   const notifications = new NotificationCenter();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
@@ -132,9 +135,11 @@
     if (core.status !== 'ready') return;
 
     void roomList.start();
+    void spaceSidebar.start(core);
     notifications.start(core);
     return () => {
       roomList.stop();
+      spaceSidebar.stop();
       notifications.stop();
     };
   });

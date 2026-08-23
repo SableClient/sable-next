@@ -3,6 +3,7 @@ import type { EncryptionStatusView } from "./EncryptionStatusView";
 import type { NotificationView } from "./NotificationView";
 import type { PresenceView } from "./PresenceView";
 import type { RoomSummary } from "./RoomSummary";
+import type { SidebarItemView } from "./SidebarItemView";
 import type { SubscriptionId } from "./SubscriptionId";
 import type { SyncStatus } from "./SyncStatus";
 import type { TimelineItemView } from "./TimelineItemView";
@@ -12,4 +13,4 @@ import type { VerificationView } from "./VerificationView";
 /**
  * Pushed, unsolicited. Never a reply to a command.
  */
-export type CoreEvent = { "type": "sync_status" } & SyncStatus | { "type": "session_ended", reason: string, } | { "type": "room_list_diff", subscription: SubscriptionId, diffs: Array<VectorDiff<RoomSummary>>, } | { "type": "timeline_diff", subscription: SubscriptionId, diffs: Array<VectorDiff<TimelineItemView>>, } | { "type": "timeline_pagination", subscription: SubscriptionId, loading: boolean, reached_start: boolean, } | { "type": "typing", room_id: string, user_ids: string[], } | { "type": "encryption_status", status: EncryptionStatusView, } | { "type": "notification", notification: NotificationView, } | { "type": "notification_settings_changed" } | { "type": "verification", user_id: string, flow_id: string, state: VerificationView, } | { "type": "presence", user_id: string, presence: PresenceView, status_message: string | null, last_active_ago: number | null, };
+export type CoreEvent = { "type": "sync_status" } & SyncStatus | { "type": "session_ended", reason: string, } | { "type": "room_list_diff", subscription: SubscriptionId, diffs: Array<VectorDiff<RoomSummary>>, } | { "type": "timeline_diff", subscription: SubscriptionId, diffs: Array<VectorDiff<TimelineItemView>>, } | { "type": "timeline_pagination", subscription: SubscriptionId, loading: boolean, reached_start: boolean, } | { "type": "typing", room_id: string, user_ids: string[], } | { "type": "encryption_status", status: EncryptionStatusView, } | { "type": "notification", notification: NotificationView, } | { "type": "notification_settings_changed" } | { "type": "space_sidebar_changed", items: Array<SidebarItemView>, } | { "type": "verification", user_id: string, flow_id: string, state: VerificationView, } | { "type": "presence", user_id: string, presence: PresenceView, status_message: string | null, last_active_ago: number | null, };

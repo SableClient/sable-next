@@ -15,6 +15,7 @@ use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
 use crate::Core;
 use crate::notifications;
+use crate::spaces::{self, SidebarSpacesEvent};
 
 impl Core {
     pub(crate) fn watch_send_queue(self: &Arc<Self>, client: &matrix_sdk::Client) {
@@ -162,6 +163,28 @@ impl Core {
             })
             .abort_on_drop(),
         );
+    }
+
+    pub(crate) fn watch_space_sidebar(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        generation: u64,
+    ) {
+        client.add_event_handler({
+            let core = self.clone();
+            move |event: SidebarSpacesEvent| {
+                let core = core.clone();
+
+                async move {
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::SpaceSidebarChanged {
+                            items: spaces::items(&event.content),
+                        },
+                    );
+                }
+            }
+        });
     }
 
     /// Ordinary sync events, so one handler each covers every room. Per-room

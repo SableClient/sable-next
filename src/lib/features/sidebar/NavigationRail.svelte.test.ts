@@ -25,8 +25,13 @@ vi.mock('$app/paths', () => ({
 }));
 vi.mock('#lib/i18n.js', () => ({
   i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
+    subscribe(
+      run: (value: { t: (key: string, params?: Record<string, string>) => string }) => void
+    ) {
+      run({
+        t: (key: string, params?: Record<string, string>) =>
+          params === undefined ? key : `${key}:${Object.values(params).join(',')}`,
+      });
       return () => {};
     },
   },
@@ -44,11 +49,11 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function space(): RoomSummary {
+function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
   return {
-    room_id: '!space:example.org',
+    room_id: roomId,
     canonical_alias: null,
-    name: 'Space',
+    name,
     topic: null,
     avatar_url: null,
     is_direct: false,
@@ -179,6 +184,173 @@ test('opens a space root on mobile even when it has a saved route', async () => 
   expect(document.querySelector('[aria-label="Space"]')?.getAttribute('href')).toBe(
     '/space/!space%3Aexample.org'
   );
+
+  await unmount(instance);
+});
+
+test('orders spaces by the stored layout and appends unplaced ones', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [{ kind: 'space', room_id: '!b:example.org' }],
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(
+    [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'))
+  ).toEqual(['Beta', 'Alpha']);
+
+  await unmount(instance);
+});
+
+test('shows a collapsed folder as one tab, with the names of the spaces inside', async () => {
+  const toggled: string[] = [];
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [
+        { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!b:example.org'] },
+      ],
+      unreadSpaceIds: new Set(['!b:example.org']),
+      openFolders: new Set<string>(),
+      onToggleFolder: (folderId: string) => toggled.push(folderId),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  const folder = document.querySelector<HTMLButtonElement>('.folder-preview');
+  expect(folder?.getAttribute('aria-label')).toBe('nav.folderExpand:Alpha, Beta');
+  expect(folder?.getAttribute('aria-expanded')).toBe('false');
+  expect(folder?.querySelectorAll('.folder-tile')).toHaveLength(2);
+  expect(folder?.querySelector('.unread-dot')).not.toBeNull();
+  expect(document.querySelectorAll('.rail-slot a')).toHaveLength(0);
+
+  folder?.click();
+  expect(toggled).toEqual(['f']);
+
+  await unmount(instance);
+});
+
+test('shows the spaces of an open folder, and a way to shut it', async () => {
+  const toggled: string[] = [];
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [
+        { kind: 'folder', id: 'f', name: 'Work', content: ['!a:example.org', '!b:example.org'] },
+      ],
+      openFolders: new Set(['f']),
+      onToggleFolder: (folderId: string) => toggled.push(folderId),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.folder-preview')).toBeNull();
+  expect(
+    [...document.querySelectorAll('.folder-open .rail-slot a')].map((link) =>
+      link.getAttribute('aria-label')
+    )
+  ).toEqual(['Alpha', 'Beta']);
+
+  const collapse = document.querySelector<HTMLButtonElement>('.folder-collapse');
+  expect(collapse?.getAttribute('aria-label')).toBe('nav.folderCollapse:Work');
+  expect(collapse?.getAttribute('aria-expanded')).toBe('true');
+  collapse?.click();
+  expect(toggled).toEqual(['f']);
+
+  await unmount(instance);
+});
+
+test('a space that left the room list drops out of its folder', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha')],
+      layout: [
+        { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!gone:example.org'] },
+      ],
+      openFolders: new Set(['f']),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(
+    [...document.querySelectorAll('.folder-open .rail-slot a')].map((link) =>
+      link.getAttribute('aria-label')
+    )
+  ).toEqual(['Alpha']);
+
+  await unmount(instance);
+});
+
+test('offers a way out of a folder holding a single space', async () => {
+  const removed: [string, string][] = [];
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha')],
+      layout: [{ kind: 'folder', id: 'f', name: null, content: ['!a:example.org'] }],
+      openFolders: new Set(['f']),
+      onRemoveFromFolder: (roomId: string, folderId: string) => removed.push([roomId, folderId]),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  const anchor = document.querySelector('.rail-menu-anchor');
+  expect(anchor).not.toBeNull();
+  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+
+  const item = [...document.querySelectorAll<HTMLElement>('.space-menu-item')].find(
+    (element) => element.textContent.trim() === 'nav.folderRemoveSpace'
+  );
+  expect(item).not.toBeUndefined();
+  item?.click();
+  await tick();
+
+  expect(removed).toEqual([['!a:example.org', 'f']]);
+
+  await unmount(instance);
+});
+
+test('the mobile rail does not arm dragging', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [space('!a:example.org', 'Alpha')], mobile: true },
+  });
+  await tick();
+
+  expect(document.querySelector('.rail-slot')?.getAttribute('draggable')).toBeNull();
+
+  await unmount(instance);
+});
+
+test('a folder whose spaces are all unresolved renders nothing', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha')],
+      layout: [
+        { kind: 'folder', id: 'f', name: null, content: ['!gone:example.org'] },
+        { kind: 'space', room_id: '!a:example.org' },
+      ],
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.folder-preview')).toBeNull();
+  expect(document.querySelectorAll('.rail-slot a')).toHaveLength(1);
 
   await unmount(instance);
 });

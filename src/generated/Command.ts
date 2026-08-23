@@ -7,6 +7,7 @@ import type { NotificationModeView } from "./NotificationModeView";
 import type { PaginationDirection } from "./PaginationDirection";
 import type { PusherView } from "./PusherView";
 import type { RoomTag } from "./RoomTag";
+import type { SidebarItemView } from "./SidebarItemView";
 import type { SubscriptionId } from "./SubscriptionId";
 
 export type Command = { "type": "discover_homeserver", server_name: string, } | { "type": "login", homeserver: string, username: string, password: string, } | { "type": "login_flows", homeserver: string, } | { "type": "registration_flows", homeserver: string, } | { "type": "register", homeserver: string, username: string, password: string, registration_email: string | null, registration_token: string | null, } | { "type": "request_registration_email", email: string, } | { "type": "submit_registration_email", token: string, } | { "type": "continue_registration" } | { "type": "cancel_registration" } | { "type": "start_oidc_login", homeserver: string, redirect_uri: string, intent: AuthIntent, } | { "type": "complete_oidc_login", callback_url: string, } | { "type": "start_sso_login", homeserver: string, redirect_uri: string, idp_id: string | null, intent: AuthIntent, } | { "type": "complete_sso_login", callback_url: string, } | { "type": "restore" } | { "type": "list_accounts" } | { "type": "switch_account", account_id: string, } | { "type": "remove_account", account_id: string, } | { "type": "logout" } | { "type": "subscribe_room_list" } | { "type": "subscribe_timeline", room_id: string, event_id: string | null, 
@@ -52,7 +53,7 @@ encrypted: boolean, invite: string[],
 /**
  * Adds an `m.space.child` edge from this space.
  */
-parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "space_hierarchy", space_id: string, from: string | null, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "room_preview", 
+parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "space_hierarchy", space_id: string, from: string | null, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "space_sidebar" } | { "type": "set_space_sidebar", items: Array<SidebarItemView>, } | { "type": "room_preview", 
 /**
  * A room id or an alias, as `JoinRoom` takes.
  */

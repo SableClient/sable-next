@@ -42,7 +42,17 @@
     "showConversation": "Show conversation",
     "mobilePanelInstructions": "Swipe right to show the room list or left to show the conversation. Use the left and right arrow keys to switch panels.",
     "roomOptions": "Room options",
-    "createRoomInSpace": "Create room in space"
+    "createRoomInSpace": "Create room in space",
+    "folder": "Folder",
+    "folderExpand": "Folder {{name}}",
+    "folderCollapse": "Collapse {{name}}",
+    "folderRename": "Rename folder",
+    "folderRenameDescription": "Choose a short label. Leave it empty to show the space names again.",
+    "folderName": "Folder name",
+    "folderSave": "Save",
+    "folderCancel": "Cancel",
+    "folderUngroup": "Ungroup folder",
+    "folderRemoveSpace": "Remove from folder"
   },
   "inbox": {
     "notifications": "Notifications",

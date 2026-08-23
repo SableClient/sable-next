@@ -283,6 +283,10 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
+    SpaceSidebar,
+    SetSpaceSidebar {
+        items: Vec<SidebarItemView>,
+    },
 
     /// Accepting an invite is `JoinRoom`, declining it `LeaveRoom`.
     ///
@@ -675,6 +679,10 @@ pub enum CommandOk {
         next_batch: Option<String>,
     },
     RemoveFromSpace,
+    SpaceSidebar {
+        items: Vec<SidebarItemView>,
+    },
+    SetSpaceSidebar,
 
     RoomPreview {
         preview: RoomPreviewView,
@@ -893,6 +901,10 @@ pub enum CoreEvent {
     },
 
     NotificationSettingsChanged,
+
+    SpaceSidebarChanged {
+        items: Vec<SidebarItemView>,
+    },
 
     /// An incoming request arrives unsolicited. There is no other prompt.
     Verification {
@@ -1190,6 +1202,22 @@ pub struct SpaceChildEdge {
     pub origin_server_ts: u64,
     /// The parent marked this child as worth surfacing first.
     pub suggested: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, TS)]
+#[ts(export)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SidebarItemView {
+    Space {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    Folder {
+        id: String,
+        name: Option<String>,
+        #[ts(type = "string[]")]
+        content: Vec<OwnedRoomId>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

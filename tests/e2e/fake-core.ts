@@ -10,7 +10,8 @@ export type RoomCoreMode =
   | 'delayed_pagination'
   | 'endless_history'
   | 'delayed_snapshot'
-  | 'delayed_layout_diff';
+  | 'delayed_layout_diff'
+  | 'spaces';
 
 type WorkerMode = RoomCoreMode;
 
@@ -101,6 +102,32 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         event_id: null,
       },
     };
+    const alphaSpace = {
+      ...room,
+      room_id: '!alpha:example.test',
+      name: 'Alpha',
+      is_space: true,
+      encrypted: false,
+      unread: 0,
+      highlight: 0,
+      latest_event: null,
+    };
+    const betaSpace = { ...alphaSpace, room_id: '!beta:example.test', name: 'Beta' };
+    const gammaSpace = { ...alphaSpace, room_id: '!gamma:example.test', name: 'Gamma' };
+    const joinedRooms =
+      workerMode === 'spaces'
+        ? [room, secondRoom, invitedRoom, alphaSpace, betaSpace, gammaSpace]
+        : [room, secondRoom, invitedRoom];
+    const SIDEBAR_KEY = 'e2e-space-sidebar';
+    const readSidebar = (): unknown[] => {
+      try {
+        const stored: unknown = JSON.parse(sessionStorage.getItem(SIDEBAR_KEY) ?? '[]');
+        return Array.isArray(stored) ? stored : [];
+      } catch {
+        return [];
+      }
+    };
+
     const timelineItems = (roomName: string) =>
       Array.from({ length: 20 }, (_, index) => ({
         id: `${roomName.toLowerCase()}-${String(index)}`,
@@ -226,6 +253,23 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           });
           return;
         }
+        if (command === 'space_sidebar') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, items: readSidebar() } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'set_space_sidebar') {
+          const items = (request.command as { items?: unknown[] }).items ?? [];
+          sessionStorage.setItem(SIDEBAR_KEY, JSON.stringify(items));
+          window.setTimeout(() => {
+            this.onmessage?.({ data: { id: request.id, ok: { type: command } } } as MessageEvent);
+            this.emit({ type: 'space_sidebar_changed', items });
+          });
+          return;
+        }
         if (command === 'account_contacts' || command === 'ignored_users') {
           const ok =
             command === 'account_contacts'
@@ -251,7 +295,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                         ? {
                             type: 'subscribe_room_list',
                             subscription: 1,
-                            rooms: [room, secondRoom, invitedRoom],
+                            rooms: joinedRooms,
                           }
                         : command === 'subscribe_timeline'
                           ? (() => {

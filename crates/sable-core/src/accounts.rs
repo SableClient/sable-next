@@ -362,6 +362,7 @@ impl Core {
         self.watch_encryption(&client, generation);
         self.watch_notifications(&client, generation);
         self.watch_notification_settings(&client, generation);
+        self.watch_space_sidebar(&client, generation);
         self.watch_send_queue(&client);
         self.watch_search_index(&client);
         self.watch_ignored_users(&client);

@@ -37,7 +37,7 @@ use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::encryption_status;
 use crate::{Core, SubscriptionKind};
-use crate::{notifications, protocol, session, view};
+use crate::{notifications, protocol, session, spaces, view};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 
@@ -1317,6 +1317,20 @@ impl Core {
                     .map_err(|error| self.room_error("remove_from_space", error))?;
 
                 Ok(CommandOk::RemoveFromSpace)
+            }
+
+            Command::SpaceSidebar => Ok(CommandOk::SpaceSidebar {
+                items: spaces::sidebar(&self.client().await?)
+                    .await
+                    .map_err(|error| self.failed("space_sidebar", error))?,
+            }),
+
+            Command::SetSpaceSidebar { items } => {
+                spaces::set_sidebar(&self.client().await?, &items)
+                    .await
+                    .map_err(|error| self.failed("set_space_sidebar", error))?;
+
+                Ok(CommandOk::SetSpaceSidebar)
             }
 
             Command::RoomPreview { address, via } => self.room_preview(&address, &via).await,

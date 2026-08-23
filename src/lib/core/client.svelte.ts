@@ -14,6 +14,7 @@ import type { RoomTag } from '#src/generated/RoomTag';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
 import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { SidebarItemView } from '#src/generated/SidebarItemView';
 import type { SessionInfo } from '#src/generated/SessionInfo';
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 import type { SubscriptionId } from '#src/generated/SubscriptionId';
@@ -627,6 +628,15 @@ export class CoreClient {
       space_id: spaceId,
       room_id: roomId,
     });
+  }
+
+  async spaceSidebar(): Promise<SidebarItemView[]> {
+    const response = await this.ensureTransport().send({ type: 'space_sidebar' });
+    return response.items;
+  }
+
+  async setSpaceSidebar(items: readonly SidebarItemView[]): Promise<void> {
+    await this.ensureTransport().send({ type: 'set_space_sidebar', items: [...items] });
   }
 
   async sendMessage(
