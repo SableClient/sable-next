@@ -3,6 +3,11 @@
 # workspace root instead, so `cargo test export_bindings` writes to one place.
 TS_RS_EXPORT_DIR = { value = "src/generated", relative = true }
 
+# The SDK's unoptimised `dev` futures overflow libtest's 2 MiB thread stack, so
+# a timeline test aborts on SIGABRT instead of failing. Cargo exports this only
+# to processes it launches; no shipped binary sees it.
+RUST_MIN_STACK = "8388608"
+
 # getrandom 0.3 refuses wasm32-unknown-unknown unless told which backend to use;
 # the feature below is necessary but not sufficient without this flag.
 [target.wasm32-unknown-unknown]
