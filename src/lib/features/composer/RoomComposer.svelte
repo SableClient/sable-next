@@ -23,6 +23,7 @@
 
   import ComposerAttachments from './ComposerAttachments.svelte';
   import ComposerAutocomplete from './ComposerAutocomplete.svelte';
+  import type { GifResult } from '#lib/features/gif/providers.js';
   import ComposerBoard from './ComposerBoard.svelte';
   import ComposerContextBanner from './ComposerContextBanner.svelte';
   import ComposerDoor from './ComposerDoor.svelte';
@@ -61,6 +62,7 @@
     ) => Promise<void>;
     onSendAttachment: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
     onSendSticker?: (roomId: string, url: string, body: string) => Promise<void>;
+    onSendGif?: (roomId: string, gif: GifResult) => Promise<void>;
     onCreatePoll?: (
       roomId: string,
       question: string,
@@ -82,6 +84,7 @@
     onSend,
     onSendAttachment,
     onSendSticker,
+    onSendGif,
     onCreatePoll,
     onSendLocation,
     onTyping,
@@ -345,6 +348,17 @@
     editor.insert(composerSchema.text(emoji));
   }
 
+  async function pickGifFromBoard(gif: GifResult): Promise<void> {
+    if (!onSendGif) return;
+    try {
+      await onSendGif(roomId, gif);
+      error = null;
+    } catch (cause) {
+      console.debug('[sable composer] gif failed', cause);
+      error = $i18n.t(sendFailureKey(cause));
+    }
+  }
+
   async function pickFromBoard(image: PackImageView, usage: ImageUsageView): Promise<void> {
     if (usage === 'sticker') {
       if (!onSendSticker) return;
@@ -597,6 +611,7 @@
               {desktop}
               onPick={pickFromBoard}
               onPickUnicode={pickUnicodeFromBoard}
+              onPickGif={onSendGif ? pickGifFromBoard : undefined}
               onBeforeOpen={!desktop ? blurEditor : undefined}
             />
           </div>

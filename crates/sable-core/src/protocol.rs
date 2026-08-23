@@ -138,6 +138,23 @@ pub enum Command {
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
     },
+    SendGif {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        /// `mxc://` only; the core rejects anything else.
+        url: String,
+        body: String,
+        #[ts(type = "number | null")]
+        width: Option<u32>,
+        #[ts(type = "number | null")]
+        height: Option<u32>,
+        mimetype: String,
+        #[ts(type = "number | null")]
+        size: Option<u32>,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        in_reply_to: Option<OwnedEventId>,
+    },
     /// `edited` on the view flips once the server has the replacement.
     EditMessage {
         #[ts(type = "string")]
@@ -601,6 +618,7 @@ pub enum CommandOk {
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
     SendSticker,
+    SendGif,
     SendLocation,
     EditMessage,
     FetchEventDetails,

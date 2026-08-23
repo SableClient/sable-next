@@ -1,5 +1,11 @@
 import { asset } from '$app/paths';
 
+import {
+  gifProviderIds,
+  type GifProviderId,
+  type GifsConfig,
+} from '#lib/features/gif/providers.js';
+
 /** Key names follow v1's `config.json` so a deployment can carry its file over. */
 export type PushDetails = {
   pushNotifyUrl: string;
@@ -10,9 +16,18 @@ export type PushDetails = {
 
 export type RuntimeConfig = {
   push: PushDetails | null;
+  gifs: GifsConfig;
 };
 
-const EMPTY: RuntimeConfig = { push: null };
+const NO_GIFS: GifsConfig = {
+  provider: null,
+  proxyUrl: null,
+  klipyApiKey: null,
+  tenorApiKey: null,
+  giphyApiKey: null,
+};
+
+const EMPTY: RuntimeConfig = { push: null, gifs: NO_GIFS };
 
 function text(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -22,25 +37,45 @@ function text(value: unknown): string | null {
 
 /** The three values a subscription needs are read as one unit; see
     `hasCompleteOverride` for why a partial set is worse than none. */
-export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
-  if (typeof raw !== 'object' || raw === null) return EMPTY;
+function parsePush(raw: unknown): PushDetails | null {
+  if (typeof raw !== 'object' || raw === null) return null;
 
-  const details = (raw as { pushNotificationDetails?: unknown }).pushNotificationDetails;
-  if (typeof details !== 'object' || details === null) return EMPTY;
-
-  const source = details as Record<string, unknown>;
+  const source = raw as Record<string, unknown>;
   const pushNotifyUrl = text(source.pushNotifyUrl);
   const vapidPublicKey = text(source.vapidPublicKey);
   const webPushAppID = text(source.webPushAppID);
-  if (!pushNotifyUrl || !vapidPublicKey || !webPushAppID) return EMPTY;
+  if (!pushNotifyUrl || !vapidPublicKey || !webPushAppID) return null;
 
   return {
-    push: {
-      pushNotifyUrl,
-      vapidPublicKey,
-      webPushAppID,
-      nativePushAppID: text(source.nativePushAppID),
-    },
+    pushNotifyUrl,
+    vapidPublicKey,
+    webPushAppID,
+    nativePushAppID: text(source.nativePushAppID),
+  };
+}
+
+function parseGifs(raw: unknown): GifsConfig {
+  if (typeof raw !== 'object' || raw === null) return NO_GIFS;
+
+  const source = raw as Record<string, unknown>;
+  const named = text(source.provider);
+
+  return {
+    provider: gifProviderIds.includes(named as GifProviderId) ? (named as GifProviderId) : null,
+    proxyUrl: text(source.proxyUrl),
+    klipyApiKey: text(source.klipyApiKey),
+    tenorApiKey: text(source.tenorApiKey),
+    giphyApiKey: text(source.giphyApiKey),
+  };
+}
+
+export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
+  if (typeof raw !== 'object' || raw === null) return EMPTY;
+
+  const source = raw as Record<string, unknown>;
+  return {
+    push: parsePush(source.pushNotificationDetails),
+    gifs: parseGifs(source.gifs),
   };
 }
 

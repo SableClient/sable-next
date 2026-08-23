@@ -23,6 +23,8 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
+  import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MembersDrawer from './MembersDrawer.svelte';
   import MentionProfile from './MentionProfile.svelte';
@@ -359,6 +361,25 @@
     if (replyTo !== null) composerContext = null;
   }
 
+  async function sendGif(targetRoomId: string, gif: GifResult): Promise<void> {
+    const { gifs } = await runtimeConfig();
+    const proxied = proxiedGif(gif, gifs.proxyUrl);
+    if (!proxied) throw new Error('no GIF proxy route for this result');
+
+    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
+    await core.sendGif(
+      targetRoomId,
+      proxied.mxcUrl,
+      gifFilename(gif.title, proxied.mimetype),
+      gif.width || null,
+      gif.height || null,
+      proxied.mimetype,
+      gif.size > 0 && proxied.mimetype === gif.mimetype ? gif.size : null,
+      replyTo
+    );
+    if (replyTo !== null) composerContext = null;
+  }
+
   async function createPoll(
     targetRoomId: string,
     question: string,
@@ -517,6 +538,7 @@
           onSend={sendMessage}
           onSendAttachment={sendAttachment}
           onSendSticker={sendSticker}
+          onSendGif={sendGif}
           onCreatePoll={createPoll}
           onSendLocation={sendLocation}
           onTyping={setTyping}

@@ -38,6 +38,40 @@ test('a file a deployment broke leaves push unregistered without throwing', () =
   }
 });
 
+test('a gifs block is read on its own, so a broken push block does not hide it', () => {
+  const parsed = parseRuntimeConfig({
+    pushNotificationDetails: 'no',
+    gifs: { provider: 'giphy', proxyUrl: ' gifs.example ', giphyApiKey: 'key' },
+  });
+
+  expect(parsed.push).toBeNull();
+  expect(parsed.gifs).toEqual({
+    provider: 'giphy',
+    proxyUrl: 'gifs.example',
+    klipyApiKey: null,
+    tenorApiKey: null,
+    giphyApiKey: 'key',
+  });
+});
+
+test('a provider name the client does not know falls back to the built-in default', () => {
+  for (const provider of ['gfycat', 42, '', null]) {
+    expect(parseRuntimeConfig({ gifs: { provider } }).gifs.provider).toBeNull();
+  }
+});
+
+test('a file with no gifs block leaves every gif field unset', () => {
+  for (const raw of [null, {}, { gifs: 'no' }]) {
+    expect(parseRuntimeConfig(raw).gifs).toEqual({
+      provider: null,
+      proxyUrl: null,
+      klipyApiKey: null,
+      tenorApiKey: null,
+      giphyApiKey: null,
+    });
+  }
+});
+
 test('values are trimmed, so a stray newline does not reach the gateway check', () => {
   const parsed = parseRuntimeConfig({
     pushNotificationDetails: {

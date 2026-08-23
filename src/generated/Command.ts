@@ -23,7 +23,16 @@ in_reply_to: string | null, mentions: string[], mentions_room: boolean, } | { "t
 /**
  * `mxc://` only; the core rejects anything else.
  */
-url: string, body: string, in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, mentions: string[], mentions_room: boolean, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "send_location", room_id: string, body: string, geo_uri: string, in_reply_to: string | null, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
+url: string, body: string, in_reply_to: string | null, } | { "type": "send_gif", room_id: string, 
+/**
+ * `mxc://` only; the core rejects anything else.
+ */
+url: string, body: string, 
+/**
+ * Absent where the provider did not report them; the timeline then
+ * cannot reserve the box before the bytes arrive.
+ */
+width: number | null, height: number | null, mimetype: string, size: number | null, in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, mentions: string[], mentions_room: boolean, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "send_location", room_id: string, body: string, geo_uri: string, in_reply_to: string | null, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
 /**
  * Withholds the tally until the poll closes.
  */

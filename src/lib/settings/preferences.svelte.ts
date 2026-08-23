@@ -2,6 +2,7 @@ export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
+export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 
 export interface Preferences {
   layout: TimelineLayout;
@@ -29,6 +30,7 @@ export interface Preferences {
 
   mediaAutoLoad: boolean;
   autoplayGifs: boolean;
+  gifProvider: GifProviderChoice;
   urlPreviews: boolean;
 
   desktopNotifications: boolean;
@@ -69,6 +71,7 @@ const ENUMS = {
   messageSpacing: ['compact', 'cozy', 'roomy'],
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
+  gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -107,6 +110,7 @@ const DEFAULTS: Preferences = {
 
   mediaAutoLoad: true,
   autoplayGifs: true,
+  gifProvider: 'default',
   urlPreviews: false,
 
   desktopNotifications: false,

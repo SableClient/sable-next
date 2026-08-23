@@ -4,9 +4,17 @@
   import { Popover } from 'bits-ui';
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
+  import {
+    gifSearchAvailable,
+    type GifResult,
+    type GifsConfig,
+  } from '#lib/features/gif/providers.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
+  import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
 
   interface Props {
     roomId: string;
@@ -14,12 +22,38 @@
     disabled?: boolean;
     onPick: (image: PackImageView, usage: ImageUsageView) => void;
     onPickUnicode: (emoji: string) => void;
+    onPickGif?: (gif: GifResult) => void;
     onBeforeOpen?: () => void;
   }
 
-  let { roomId, desktop, disabled = false, onPick, onPickUnicode, onBeforeOpen }: Props = $props();
+  let {
+    roomId,
+    desktop,
+    disabled = false,
+    onPick,
+    onPickUnicode,
+    onPickGif,
+    onBeforeOpen,
+  }: Props = $props();
   let open = $state(false);
-  let tab = $state<ImageUsageView>('emoticon');
+  let tab = $state<BoardTab>('emoticon');
+  let config = $state.raw<GifsConfig | null>(null);
+
+  $effect(() => {
+    let cancelled = false;
+    void runtimeConfig().then((loaded) => {
+      if (!cancelled) config = loaded.gifs;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  let gifs = $derived(
+    onPickGif && config && gifSearchAvailable(config, preferences.gifProvider)
+      ? { config, providerSetting: preferences.gifProvider }
+      : null
+  );
 
   function pick(image: PackImageView, usage: ImageUsageView): void {
     open = false;
@@ -29,6 +63,11 @@
   function pickUnicode(emoji: string): void {
     open = false;
     onPickUnicode(emoji);
+  }
+
+  function pickGif(gif: GifResult): void {
+    open = false;
+    onPickGif?.(gif);
   }
 </script>
 
@@ -43,7 +82,15 @@
     </Popover.Trigger>
     <Popover.Portal>
       <Popover.Content class="composer-board" side="top" align="end" sideOffset={10}>
-        <EmoteBoard {roomId} bind:tab unicode onPick={pick} onPickUnicode={pickUnicode} />
+        <EmoteBoard
+          {roomId}
+          bind:tab
+          unicode
+          {gifs}
+          onPick={pick}
+          onPickUnicode={pickUnicode}
+          onPickGif={pickGif}
+        />
       </Popover.Content>
     </Popover.Portal>
   </Popover.Root>
@@ -70,8 +117,10 @@
       bind:tab
       variant="sheet"
       unicode
+      {gifs}
       onPick={pick}
       onPickUnicode={pickUnicode}
+      onPickGif={pickGif}
     />
   </BottomSheet>
 {/if}

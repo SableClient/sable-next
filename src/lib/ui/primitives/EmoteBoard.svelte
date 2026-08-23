@@ -3,11 +3,14 @@
   import type { ImageUsageView } from '#src/generated/ImageUsageView';
   import type { PackImageView } from '#src/generated/PackImageView';
   import { useCoreClient } from '#lib/core/context.js';
+  import GifGrid from '#lib/features/gif/GifGrid.svelte';
+  import type { GifProviderSetting, GifResult, GifsConfig } from '#lib/features/gif/providers.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
@@ -15,14 +18,16 @@
 
   interface Props {
     roomId: string;
-    tab?: ImageUsageView;
+    tab?: BoardTab;
     variant?: 'popover' | 'sheet';
     /** Reactions can be plain unicode, so the board offers both on one surface. */
     unicode?: boolean;
     /** A reaction key cannot be a sticker. */
     stickers?: boolean;
+    gifs?: { config: GifsConfig; providerSetting: GifProviderSetting } | null;
     onPick: (image: PackImageView, usage: ImageUsageView) => void;
     onPickUnicode?: (emoji: string) => void;
+    onPickGif?: (gif: GifResult) => void;
   }
 
   let {
@@ -31,8 +36,10 @@
     variant = 'popover',
     unicode = false,
     stickers = true,
+    gifs = null,
     onPick,
     onPickUnicode,
+    onPickGif,
   }: Props = $props();
   const core = useCoreClient();
 
@@ -68,14 +75,18 @@
     };
   });
 
+  let gifTab = $derived(tab === 'gif');
+
   let sections = $derived.by(() => {
+    if (gifTab) return [];
+    const usage = tab as ImageUsageView;
     const needle = query.trim().toLowerCase();
     return packs
       .map((pack) => ({
         pack,
         images: pack.images.filter(
           (image) =>
-            image.usage.includes(tab) &&
+            image.usage.includes(usage) &&
             (needle === '' || image.shortcode.toLowerCase().includes(needle))
         ),
       }))
@@ -203,7 +214,7 @@
 
   /** A reaction key is any string, so an unmatched query is still a valid one. */
   function submitQuery(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' || !onPickUnicode) return;
+    if (event.key !== 'Enter' || !onPickUnicode || gifTab) return;
     const text = query.trim();
     if (text === '') return;
     event.preventDefault();
@@ -215,13 +226,13 @@
   function pick(image: PackImageView): void {
     recent = [image.shortcode, ...recent.filter((code) => code !== image.shortcode)].slice(0, 32);
     writeRecent(recent);
-    onPick(image, tab);
+    onPick(image, tab as ImageUsageView);
   }
 </script>
 
 <div class={['board', { sheet: variant === 'sheet' }]}>
   <div class="board-head">
-    {#if stickers}
+    {#if stickers || gifs}
       <div class="tabs" role="group" aria-label={$i18n.t('composer.emotesAndStickers')}>
         <button
           type="button"
@@ -232,28 +243,50 @@
         >
           {$i18n.t('composer.emoticons')}
         </button>
-        <button
-          type="button"
-          aria-pressed={tab === 'sticker'}
-          onclick={() => {
-            tab = 'sticker';
-          }}
-        >
-          {$i18n.t('composer.stickers')}
-        </button>
+        {#if stickers}
+          <button
+            type="button"
+            aria-pressed={tab === 'sticker'}
+            onclick={() => {
+              tab = 'sticker';
+            }}
+          >
+            {$i18n.t('composer.stickers')}
+          </button>
+        {/if}
+        {#if gifs}
+          <button
+            type="button"
+            aria-pressed={gifTab}
+            onclick={() => {
+              tab = 'gif';
+            }}
+          >
+            {$i18n.t('composer.gifs')}
+          </button>
+        {/if}
       </div>
     {/if}
     <TextInput
       class="board-search"
       type="search"
       bind:value={query}
-      placeholder={$i18n.t('composer.searchPacks')}
-      aria-label={$i18n.t('composer.searchPacks')}
+      placeholder={gifTab ? $i18n.t('composer.searchGifs') : $i18n.t('composer.searchPacks')}
+      aria-label={gifTab ? $i18n.t('composer.searchGifs') : $i18n.t('composer.searchPacks')}
       onkeydown={submitQuery}
     />
   </div>
 
-  {#if loading}
+  {#if gifs && gifTab}
+    <GifGrid
+      config={gifs.config}
+      providerSetting={gifs.providerSetting}
+      {query}
+      onPick={(gif: GifResult) => {
+        onPickGif?.(gif);
+      }}
+    />
+  {:else if loading}
     <div class="board-note"><Spinner /></div>
   {:else if failed}
     <div class="board-note">{$i18n.t('composer.packsFailed')}</div>

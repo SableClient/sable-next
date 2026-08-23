@@ -662,6 +662,29 @@ export class CoreClient {
     });
   }
 
+  async sendGif(
+    roomId: string,
+    url: string,
+    body: string,
+    width: number | null,
+    height: number | null,
+    mimetype: string,
+    size: number | null = null,
+    inReplyTo: string | null = null
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'send_gif',
+      room_id: roomId,
+      url,
+      body,
+      width,
+      height,
+      mimetype,
+      size,
+      in_reply_to: inReplyTo,
+    });
+  }
+
   async sendLocation(
     roomId: string,
     body: string,

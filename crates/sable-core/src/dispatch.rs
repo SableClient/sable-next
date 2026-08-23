@@ -14,7 +14,7 @@ use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
-use matrix_sdk::ruma::events::room::message::Relation;
+use matrix_sdk::ruma::events::room::message::{ImageMessageEventContent, MessageType, Relation};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
@@ -274,6 +274,50 @@ impl Core {
                     .map_err(|error| self.failed("send_sticker", error))?;
 
                 Ok(CommandOk::SendSticker)
+            }
+
+            Command::SendGif {
+                room_id,
+                url,
+                body,
+                width,
+                height,
+                mimetype,
+                size,
+                in_reply_to,
+            } => {
+                let url = OwnedMxcUri::from(url);
+                if url.parts().is_err() {
+                    return Err(CommandErr::InvalidMedia);
+                }
+
+                let mut info = ImageInfo::new();
+                info.width = width.map(Into::into);
+                info.height = height.map(Into::into);
+                info.mimetype = Some(mimetype);
+                info.size = size.map(Into::into);
+
+                let timeline = self.timeline(&room_id).await?;
+                let content = RoomMessageEventContent::new(MessageType::Image(
+                    ImageMessageEventContent::plain(body, url).info(Box::new(info)),
+                ));
+
+                match in_reply_to {
+                    Some(event_id) => {
+                        timeline
+                            .send_reply(content.into(), event_id)
+                            .await
+                            .map_err(|error| self.failed("send_gif_reply", error))?;
+                    }
+                    None => {
+                        timeline
+                            .send(content.into())
+                            .await
+                            .map_err(|error| self.failed("send_gif", error))?;
+                    }
+                }
+
+                Ok(CommandOk::SendGif)
             }
 
             Command::EditMessage {
