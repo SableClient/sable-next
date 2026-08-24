@@ -1,3 +1,7 @@
+import type { BookmarkView } from '#src/generated/BookmarkView';
+import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
+import type { PersonaView } from '#src/generated/PersonaView';
 import type { CoreEvent } from '#src/generated/CoreEvent';
 import type { DeviceView } from '#src/generated/DeviceView';
 import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
@@ -714,7 +718,8 @@ export class CoreClient {
     body: string,
     inReplyTo: string | null = null,
     formatted: string | null = null,
-    mentions: OutgoingMentions = noMentions
+    mentions: OutgoingMentions = noMentions,
+    persona: PerMessageProfileView | null = null
   ): Promise<void> {
     await this.ensureTransport().send({
       type: 'send_message',
@@ -724,6 +729,7 @@ export class CoreClient {
       in_reply_to: inReplyTo,
       mentions: mentions.userIds,
       mentions_room: mentions.room,
+      persona,
     });
   }
 
@@ -785,7 +791,8 @@ export class CoreClient {
     eventId: string,
     body: string,
     formatted: string | null = null,
-    mentions: OutgoingMentions = noMentions
+    mentions: OutgoingMentions = noMentions,
+    persona: PerMessageProfileView | null = null
   ): Promise<void> {
     await this.ensureTransport().send({
       type: 'edit_message',
@@ -795,6 +802,7 @@ export class CoreClient {
       formatted,
       mentions: mentions.userIds,
       mentions_room: mentions.room,
+      persona,
     });
   }
 
@@ -813,6 +821,106 @@ export class CoreClient {
       room_id: roomId,
       event_id: eventId,
       reason,
+    });
+  }
+
+  async pinnedEvents(roomId: string): Promise<string[]> {
+    const response = await this.ensureTransport().send({
+      type: 'pinned_events',
+      room_id: roomId,
+    });
+    return response.event_ids;
+  }
+
+  async setPinned(roomId: string, eventId: string, pinned: boolean): Promise<string[]> {
+    const response = await this.ensureTransport().send({
+      type: 'set_pinned',
+      room_id: roomId,
+      event_id: eventId,
+      pinned,
+    });
+    return response.event_ids;
+  }
+
+  async reportMessage(
+    roomId: string,
+    eventId: string,
+    reason: string | null = null
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'report_message',
+      room_id: roomId,
+      event_id: eventId,
+      reason,
+    });
+  }
+
+  async eventSource(roomId: string, eventId: string): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'event_source',
+      room_id: roomId,
+      event_id: eventId,
+    });
+    return response.source;
+  }
+
+  async personas(): Promise<PersonaCatalogView> {
+    const response = await this.ensureTransport().send({ type: 'personas' });
+    return response.catalog;
+  }
+
+  async savePersona(
+    persona: PersonaView,
+    previousId: string | null = null
+  ): Promise<PersonaView[]> {
+    const response = await this.ensureTransport().send({
+      type: 'save_persona',
+      persona,
+      previous_id: previousId,
+    });
+    return response.personas;
+  }
+
+  async removePersona(id: string): Promise<PersonaView[]> {
+    const response = await this.ensureTransport().send({ type: 'remove_persona', id });
+    return response.personas;
+  }
+
+  async setPersonaSelection(
+    roomId: string | null,
+    personaId: string | null,
+    validUntil: number | null = null
+  ): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_persona_selection',
+      room_id: roomId,
+      persona_id: personaId,
+      valid_until: validUntil,
+    });
+  }
+
+  async bookmarks(): Promise<BookmarkView[]> {
+    const response = await this.ensureTransport().send({ type: 'bookmarks' });
+    return response.bookmarks;
+  }
+
+  async setBookmark(roomId: string, eventId: string, bookmarked: boolean): Promise<boolean> {
+    const response = await this.ensureTransport().send({
+      type: 'set_bookmark',
+      room_id: roomId,
+      event_id: eventId,
+      bookmarked,
+      now_ms: Date.now(),
+    });
+    return response.bookmarked;
+  }
+
+  async forwardMessage(roomId: string, eventId: string, toRoomId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'forward_message',
+      room_id: roomId,
+      event_id: eventId,
+      to_room_id: toRoomId,
     });
   }
 
@@ -1164,6 +1272,10 @@ export class CoreClient {
       user_id: userId,
       power_level: powerLevel,
     });
+  }
+
+  async uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+    return this.ensureTransport().uploadMedia(mime, bytes);
   }
 
   async uploadAvatar(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {

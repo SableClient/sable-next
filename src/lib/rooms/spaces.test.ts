@@ -35,7 +35,9 @@ test('does not mark a space unread for a muted child room', () => {
   const space = room({
     room_id: '!space:example.org',
     is_space: true,
-    space_children: [{ room_id: '!muted:example.org', order: null, origin_server_ts: 1 }],
+    space_children: [
+      { room_id: '!muted:example.org', order: null, origin_server_ts: 1, suggested: false },
+    ],
   });
   const muted = room({ room_id: '!muted:example.org', unread: 3 });
 

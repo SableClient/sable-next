@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
   import { DropdownMenu } from 'bits-ui';
 
   import IconContext from 'phosphor-svelte/lib/IconContext';
@@ -20,8 +19,9 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
-  import type { HierarchyRoom, HierarchySection } from './space-hierarchy';
-  import { lobbyAction } from './space-hierarchy';
+  import type { HierarchyRoom, HierarchyRoomView, HierarchySection } from './space-hierarchy';
+  import { lobbyAction, placeholderRows } from './space-hierarchy';
+  import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
   import type { DropEdge } from '#lib/ui/drag-list.js';
   import { initials } from './timeline-format';
 
@@ -33,11 +33,11 @@
     joining: ReadonlySet<string>;
     knocked: ReadonlySet<string>;
     canManage: boolean;
-    label: (child: SpaceHierarchyRoomView) => string;
+    label: (child: HierarchyRoomView) => string;
     onToggle: (key: string) => void;
-    onOpen: (child: SpaceHierarchyRoomView) => void;
-    onJoin: (child: SpaceHierarchyRoomView) => void;
-    onCopyLink: (child: SpaceHierarchyRoomView) => void;
+    onOpen: (child: HierarchyRoomView) => void;
+    onJoin: (child: HierarchyRoomView) => void;
+    onCopyLink: (child: HierarchyRoomView) => void;
     onRemove: (section: HierarchySection, entry: HierarchyRoom) => void;
     onReorder: (
       section: HierarchySection,
@@ -161,12 +161,16 @@
                   >{/if}
               </span>
               <span class="room-meta">
-                <span class="members"
-                  >{$i18n.t('room.lobbyMembers', { count: child.num_joined_members })}</span
-                >
-                {#if child.topic}<span class="divider" aria-hidden="true">|</span><span
-                    class="room-topic">{child.topic}</span
-                  >{/if}
+                {#if child.num_joined_members !== null}
+                  <span class="members"
+                    >{$i18n.t('room.lobbyMembers', { count: child.num_joined_members })}</span
+                  >
+                {/if}
+                {#if child.topic}
+                  {#if child.num_joined_members !== null}<span class="divider" aria-hidden="true"
+                      >|</span
+                    >{/if}<span class="room-topic">{child.topic}</span>
+                {/if}
               </span>
             </div>
             <div class="room-actions">
@@ -249,6 +253,12 @@
           </li>
         {/each}
       </ul>
+      {#if placeholderRows(section) > 0}
+        <LobbyRoomPlaceholder rows={placeholderRows(section)} divided={section.rooms.length > 0} />
+      {/if}
+      {#if section.failed}
+        <p class="section-failed">{$i18n.t('room.lobbyFailed')}</p>
+      {/if}
     </div>
   {/if}
 </div>
@@ -416,6 +426,13 @@
     flex: none;
     gap: var(--space-1);
     margin-left: auto;
+  }
+
+  .section-failed {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
   }
 
   :global(.room-menu-trigger) {

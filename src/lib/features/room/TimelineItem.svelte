@@ -26,6 +26,9 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import MessageQuickReactions from './MessageQuickReactions.svelte';
+  import MessageForwardDialog from './MessageForwardDialog.svelte';
+  import MessageReportDialog from './MessageReportDialog.svelte';
+  import MessageSourceDialog from './MessageSourceDialog.svelte';
   import ReactionSheet from './ReactionSheet.svelte';
   import { messageMenuRows } from './message-menu-items';
   import { openMessageMenu } from './message-menu-open.svelte.js';
@@ -241,13 +244,87 @@
               if (item.event_id) onCopyLink(item.event_id);
             }
           : undefined,
+      pinned,
+      bookmarked,
+      onPin: roomId && eventId ? () => void togglePin(eventId) : undefined,
+      onBookmark: roomId && eventId ? () => void toggleBookmark(eventId) : undefined,
+      onForward:
+        roomId && eventId && item.content.kind === 'message'
+          ? () => {
+              forwardOpen = true;
+            }
+          : undefined,
+      onViewSource: roomId && eventId ? () => void openSource(eventId) : undefined,
+      onReport:
+        roomId && eventId && !item.is_own
+          ? () => {
+              reportOpen = true;
+            }
+          : undefined,
     };
   });
+
+  async function togglePin(eventId: string): Promise<void> {
+    try {
+      const ids = await core.setPinned(roomId, eventId, !pinned);
+      pinned = ids.includes(eventId);
+    } catch (error) {
+      console.warn('[sable timeline] pin failed', error);
+    }
+  }
+
+  async function toggleBookmark(eventId: string): Promise<void> {
+    try {
+      bookmarked = await core.setBookmark(roomId, eventId, !bookmarked);
+    } catch (error) {
+      console.warn('[sable timeline] bookmark failed', error);
+    }
+  }
+
+  async function openSource(eventId: string): Promise<void> {
+    try {
+      source = await core.eventSource(roomId, eventId);
+      sourceOpen = true;
+    } catch (error) {
+      console.warn('[sable timeline] source unavailable', error);
+    }
+  }
+
+  function report(reason: string | null): void {
+    const eventId = item.event_id;
+    if (!eventId) return;
+    void core.reportMessage(roomId, eventId, reason).catch((error: unknown) => {
+      console.warn('[sable timeline] report failed', error);
+    });
+  }
+
+  function forward(toRoomId: string): void {
+    const eventId = item.event_id;
+    if (!eventId) return;
+    void core.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
+      console.warn('[sable timeline] forward failed', error);
+    });
+  }
 
   const LONG_PRESS_MS = 450;
   const LONG_PRESS_SLOP_PX = 10;
   let sheetOpen = $state(false);
   let emoteOpen = $state(false);
+  let sourceOpen = $state(false);
+  let reportOpen = $state(false);
+  let forwardOpen = $state(false);
+  let source = $state('');
+  let pinned = $state(false);
+  let bookmarked = $state(false);
+
+  $effect(() => {
+    const eventId = item.event_id;
+    if (!roomId || !eventId) return;
+    void core
+      .pinnedEvents(roomId)
+      .then((ids) => (pinned = ids.includes(eventId)))
+      .catch(() => undefined);
+  });
   let deleteOpen = $state(false);
   let reactionsOpen = $state(false);
   let reactionActive = $state(0);
@@ -406,6 +483,15 @@
       >
         {#if actionable}
           <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
+          {#if sourceOpen}
+            <MessageSourceDialog bind:open={sourceOpen} {source} />
+          {/if}
+          {#if reportOpen}
+            <MessageReportDialog bind:open={reportOpen} onReport={report} />
+          {/if}
+          {#if forwardOpen}
+            <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
+          {/if}
           {#if emoteOpen}
             <ReactionSheet
               bind:open={emoteOpen}

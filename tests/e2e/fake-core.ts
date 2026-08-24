@@ -107,6 +107,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       ...room,
       room_id: '!alpha:example.test',
       name: 'Alpha',
+      topic:
+        'A topic long enough to clamp: it introduces the space, lists the rules, thanks the moderators and links the map. It repeats itself at length so the hero has something to cut: the rules again, the moderators again, the map again, and a closing paragraph that keeps going well past the three lines the hero shows before it hands the rest to the dialog.',
       is_space: true,
       encrypted: false,
       unread: 0,
@@ -145,30 +147,40 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       suggested: false,
     });
 
+    const alphaChildren = [
+      childEdge('!nested:example.test', 1, 'a'),
+      childEdge('!late:example.test', 2, 'b'),
+      childEdge('!middle:example.test', 3, 'c'),
+      childEdge('!tail:example.test', 4, 'd'),
+      childEdge('!refused:example.test', 5, 'e'),
+    ];
+
     const hierarchyPages: Record<string, { rooms: unknown[]; next_batch: string | null }> = {
-      '': {
+      '!alpha:example.test|': {
         rooms: [
           hierarchyRoom('!alpha:example.test', 'Alpha', {
             is_space: true,
-            children: [
-              childEdge('!nested:example.test', 1, 'a'),
-              childEdge('!late:example.test', 2, 'b'),
-              childEdge('!middle:example.test', 3, 'c'),
-              childEdge('!tail:example.test', 4, 'd'),
-            ],
+            children: alphaChildren,
           }),
-          hierarchyRoom('!nested:example.test', 'Nested', {
-            is_space: true,
-            children: [childEdge('!deep:example.test', 1)],
-          }),
+          hierarchyRoom('!nested:example.test', 'Nested', { is_space: true }),
+          hierarchyRoom('!refused:example.test', 'Refused Space', { is_space: true }),
         ],
         next_batch: 'page-two',
       },
-      'page-two': {
+      '!alpha:example.test|page-two': {
         rooms: [
           hierarchyRoom('!late:example.test', 'Late Arrival'),
           hierarchyRoom('!middle:example.test', 'Middle Room'),
           hierarchyRoom('!tail:example.test', 'Tail Room'),
+        ],
+        next_batch: null,
+      },
+      '!nested:example.test|': {
+        rooms: [
+          hierarchyRoom('!nested:example.test', 'Nested', {
+            is_space: true,
+            children: [childEdge('!deep:example.test', 1)],
+          }),
           hierarchyRoom('!deep:example.test', 'Deep Room'),
         ],
         next_batch: null,
@@ -187,8 +199,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       sessionStorage.setItem(CHILD_ORDER_KEY, JSON.stringify(log));
     };
 
-    const hierarchyPage = (from: string) => {
-      const page = hierarchyPages[from] ?? { rooms: [], next_batch: null };
+    const hierarchyPage = (spaceId: string, from: string) => {
+      const page = hierarchyPages[`${spaceId}|${from}`] ?? { rooms: [], next_batch: null };
       return { type: 'space_hierarchy', rooms: page.rooms, next_batch: page.next_batch };
     };
 
@@ -407,6 +419,17 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           });
           return;
         }
+        if (command === 'personas') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: {
+                id: request.id,
+                ok: { type: command, catalog: { personas: [], account: null, rooms: {} } },
+              },
+            } as MessageEvent);
+          });
+          return;
+        }
         if (command === 'account_contacts' || command === 'ignored_users') {
           const ok =
             command === 'account_contacts'
@@ -418,9 +441,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           return;
         }
 
+        const refusedHierarchy =
+          command === 'space_hierarchy' &&
+          (request.command as { space_id?: string }).space_id === '!refused:example.test';
+
         const response =
-          workerMode === 'error' && command === 'restore'
-            ? { id: request.id, err: { code: 'unavailable' } }
+          (workerMode === 'error' && command === 'restore') || refusedHierarchy
+            ? { id: request.id, err: { code: 'failed' } }
             : {
                 id: request.id,
                 ok:
@@ -690,6 +717,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                               }
                                             : command === 'space_hierarchy'
                                               ? hierarchyPage(
+                                                  (request.command as { space_id?: string })
+                                                    .space_id ?? '',
                                                   (request.command as { from?: string | null })
                                                     .from ?? ''
                                                 )

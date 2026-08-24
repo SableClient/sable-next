@@ -34,7 +34,7 @@ function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary
 }
 
 function child(roomId: string) {
-  return { room_id: roomId, order: null, origin_server_ts: 0 };
+  return { room_id: roomId, order: null, origin_server_ts: 0, suggested: false };
 }
 
 test('a plain joined room lands under home', () => {

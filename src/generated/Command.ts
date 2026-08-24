@@ -5,6 +5,8 @@ import type { CreateRoomKind } from "./CreateRoomKind";
 import type { JoinRuleView } from "./JoinRuleView";
 import type { NotificationModeView } from "./NotificationModeView";
 import type { PaginationDirection } from "./PaginationDirection";
+import type { PerMessageProfileView } from "./PerMessageProfileView";
+import type { PersonaView } from "./PersonaView";
 import type { PusherView } from "./PusherView";
 import type { RoomTag } from "./RoomTag";
 import type { SearchFilter } from "./SearchFilter";
@@ -23,7 +25,7 @@ hidden_events: boolean, } | { "type": "unsubscribe", subscription: SubscriptionI
  * Replying inside a thread needs no extra field: the SDK infers the
  * thread from the replied-to event.
  */
-in_reply_to: string | null, mentions: string[], mentions_room: boolean, } | { "type": "send_sticker", room_id: string, 
+in_reply_to: string | null, mentions: string[], mentions_room: boolean, persona: PerMessageProfileView | null, } | { "type": "send_sticker", room_id: string, 
 /**
  * `mxc://` only; the core rejects anything else.
  */
@@ -31,7 +33,7 @@ url: string, body: string, in_reply_to: string | null, } | { "type": "send_gif",
 /**
  * `mxc://` only; the core rejects anything else.
  */
-url: string, body: string, width: number | null, height: number | null, mimetype: string, size: number | null, in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, mentions: string[], mentions_room: boolean, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "send_location", room_id: string, body: string, geo_uri: string, in_reply_to: string | null, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
+url: string, body: string, width: number | null, height: number | null, mimetype: string, size: number | null, in_reply_to: string | null, } | { "type": "edit_message", room_id: string, event_id: string, body: string, formatted: string | null, mentions: string[], mentions_room: boolean, persona: PerMessageProfileView | null, } | { "type": "fetch_event_details", room_id: string, event_id: string, } | { "type": "redact", room_id: string, event_id: string, reason: string | null, } | { "type": "pinned_events", room_id: string, } | { "type": "set_pinned", room_id: string, event_id: string, pinned: boolean, } | { "type": "report_message", room_id: string, event_id: string, reason: string | null, } | { "type": "event_source", room_id: string, event_id: string, } | { "type": "forward_message", room_id: string, event_id: string, to_room_id: string, } | { "type": "personas" } | { "type": "save_persona", persona: PersonaView, previous_id: string | null, } | { "type": "remove_persona", id: string, } | { "type": "set_persona_selection", room_id: string | null, persona_id: string | null, valid_until: number | null, } | { "type": "bookmarks" } | { "type": "set_bookmark", room_id: string, event_id: string, bookmarked: boolean, now_ms: number, } | { "type": "react", room_id: string, event_id: string, key: string, } | { "type": "send_location", room_id: string, body: string, geo_uri: string, in_reply_to: string | null, } | { "type": "create_poll", room_id: string, question: string, answers: Array<string>, 
 /**
  * Withholds the tally until the poll closes.
  */

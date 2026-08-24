@@ -24,6 +24,11 @@ export interface Preferences {
   formattingToolbar: boolean;
   richTextComposer: boolean;
 
+  personaPicker: boolean;
+  personaProxying: boolean;
+  personaLatching: boolean;
+  personaFallback: boolean;
+
   sendTypingNotifications: boolean;
   sendReadReceipts: boolean;
   sendPresence: boolean;
@@ -105,6 +110,11 @@ const DEFAULTS: Preferences = {
   enterForNewline: false,
   formattingToolbar: false,
   richTextComposer: true,
+
+  personaPicker: true,
+  personaProxying: false,
+  personaLatching: false,
+  personaFallback: true,
 
   sendTypingNotifications: true,
   sendReadReceipts: true,

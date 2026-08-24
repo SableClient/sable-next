@@ -12,6 +12,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
+  import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -27,6 +28,7 @@
   import ComposerBoard from './ComposerBoard.svelte';
   import ComposerContextBanner from './ComposerContextBanner.svelte';
   import ComposerDoor from './ComposerDoor.svelte';
+  import PersonaPicker from './PersonaPicker.svelte';
   import PollComposer from './PollComposer.svelte';
   import ComposerFormatting from './ComposerFormatting.svelte';
   import LocationComposer from './LocationComposer.svelte';
@@ -97,6 +99,7 @@
 
   const core = useCoreClient();
   const roomList = useRoomList();
+  const personas = usePersonaStore();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   const uid = $props.id();
   const hintId = `composer-hint-${uid}`;
@@ -133,6 +136,11 @@
   let desktop = $derived(appLayout.matches);
   let sending = $derived(inFlight > 0);
   let hasContent = $derived(!empty || staged.length > 0);
+  let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
+
+  $effect(() => {
+    if (preferences.personaPicker || preferences.personaProxying) void personas.load();
+  });
   let panelOpen = $derived(query !== null && dismissedAt !== query.start);
   let suggestions = $derived(suggestionsFor(query, members, emotes, roomList.rooms));
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
@@ -616,6 +624,9 @@
               onBeforeOpen={!desktop ? blurEditor : undefined}
             />
           </div>
+          {#if showPersonaPicker}
+            <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
+          {/if}
           {#if richText}
             <IconButton
               variant="ghost"

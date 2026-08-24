@@ -14,18 +14,27 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import {
+    applyChildOverrides,
     buildHierarchySections,
+    childEdges,
+    edgeSignature,
+    levelTargets,
     lobbyAction,
     lobbyPhase,
+    localHierarchyRooms,
+    mergeHierarchyRooms,
+    type ChildOrderOverride,
     type HierarchyRoom,
+    type HierarchyRoomView,
     type HierarchySection,
   } from './space-hierarchy';
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
   import { initials } from './timeline-format';
+  import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
   import SpaceLobbySection from './SpaceLobbySection.svelte';
 
   interface Props {
@@ -39,16 +48,23 @@
   const knocked = new SvelteSet<string>();
   const removed = new SvelteSet<string>();
   const closed = new SvelteSet<string>();
+  const loadedLevels = new SvelteSet<string>();
+  const pendingLevels = new SvelteSet<string>();
+  const failedLevels = new SvelteSet<string>();
 
-  let rooms = $state.raw<SpaceHierarchyRoomView[]>([]);
-  let nextBatch = $state<string | null>(null);
-  let loading = $state(false);
+  let fetched = $state.raw<SpaceHierarchyRoomView[]>([]);
+  let overrides = $state.raw<ChildOrderOverride[]>([]);
   let failed = $state(false);
+  let topicOpen = $state(false);
   let permissions = $state<RoomPermissionsView | null>(null);
 
-  const MAX_HIERARCHY_PAGES = 20;
+  const MAX_LEVEL_PAGES = 10;
 
-  let resume = { cancelled: false };
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- the enqueue effect probes it, and a reactive set would make that effect invalidate itself on every level it starts
+  let requested = new Set<string>();
+  let queue: string[] = [];
+  let drainingFor: number | null = null;
+  let generation = 0;
 
   let spaceId = $derived(space?.room_id ?? null);
   let canManage = $derived(permissions?.can_manage_children ?? false);
@@ -58,70 +74,110 @@
   let invitedIds = $derived(
     new Set(roomList.rooms.filter((room) => room.state === 'invited').map((room) => room.room_id))
   );
+  let base = $derived.by<HierarchyRoomView[]>(() => {
+    if (spaceId === null) return [];
+    return mergeHierarchyRooms(localHierarchyRooms(roomList.rooms, spaceId), fetched);
+  });
+  let merged = $derived(applyChildOverrides(base, overrides));
   let sections = $derived.by<HierarchySection[]>(() => {
     if (spaceId === null) return [];
-    return buildHierarchySections(rooms, spaceId)
+    return buildHierarchySections(merged, spaceId, {
+      loaded: loadedLevels,
+      failed: failedLevels,
+    })
       .map((section) => ({
         ...section,
         rooms: section.rooms.filter((entry) => !removed.has(entry.key)),
       }))
-      .filter((section) => section.rooms.length > 0);
+      .filter((section) => section.rooms.length > 0 || !section.loaded || section.failed);
   });
-  let phase = $derived(lobbyPhase(sections.length, loading, nextBatch !== null && !failed));
+  let phase = $derived(lobbyPhase(sections.length, spaceId === null || !loadedLevels.has(spaceId)));
 
   $effect(() => {
     const target = spaceId;
     if (!target) return;
 
-    resume.cancelled = true;
-    const load = { cancelled: false };
-    resume = load;
-    rooms = [];
-    nextBatch = null;
+    generation += 1;
+    requested = new Set();
+    queue = [];
+    drainingFor = null;
+    fetched = [];
+    overrides = [];
     failed = false;
+    loadedLevels.clear();
+    pendingLevels.clear();
+    failedLevels.clear();
     removed.clear();
     knocked.clear();
     closed.clear();
-
-    void loadAllPages(target, load);
-
-    return () => {
-      load.cancelled = true;
-    };
   });
 
-  async function loadAllPages(
-    target: string,
-    load: { cancelled: boolean },
-    startFrom: string | null = null,
-    known: readonly SpaceHierarchyRoomView[] = []
-  ): Promise<void> {
-    let from: string | null = startFrom;
-    let collected: SpaceHierarchyRoomView[] = [...known];
-    loading = true;
+  $effect(() => {
+    const target = spaceId;
+    if (target === null) return;
 
-    for (let page = 0; page < MAX_HIERARCHY_PAGES; page += 1) {
+    const mine = generation;
+    for (const levelId of levelTargets(sections, target, closed)) {
+      if (requested.has(levelId)) continue;
+
+      requested.add(levelId);
+      queue.push(levelId);
+      pendingLevels.add(levelId);
+    }
+
+    if (queue.length > 0 && drainingFor !== mine) {
+      drainingFor = mine;
+      void drain(mine);
+    }
+  });
+
+  async function drain(mine: number): Promise<void> {
+    try {
+      while (mine === generation) {
+        const target = queue.shift();
+        if (target === undefined) return;
+        await loadLevel(target, mine);
+      }
+    } finally {
+      if (drainingFor === mine) drainingFor = null;
+    }
+  }
+
+  async function loadLevel(target: string, mine: number): Promise<void> {
+    let from: string | null = null;
+
+    for (let page = 0; page < MAX_LEVEL_PAGES; page += 1) {
       try {
         const next = await core.spaceHierarchy(target, from);
-        if (load.cancelled) return;
+        if (mine !== generation) return;
 
-        collected = [...collected, ...next.rooms];
-        rooms = collected;
-        nextBatch = next.nextBatch;
-        failed = false;
+        fetched = [...fetched, ...next.rooms];
         from = next.nextBatch;
       } catch (error) {
-        if (load.cancelled) return;
-        console.warn('[sable lobby] hierarchy unavailable', error);
-        failed = true;
+        if (mine !== generation) return;
+        console.warn('[sable lobby] hierarchy unavailable', target, error);
+        if (target === spaceId) failed = true;
+        else failedLevels.add(target);
         break;
       }
 
       if (from === null) break;
     }
 
-    if (!load.cancelled) loading = false;
+    if (from !== null) console.warn('[sable lobby] level truncated', target);
+    if (mine !== generation) return;
+    pendingLevels.delete(target);
+    loadedLevels.add(target);
   }
+
+  $effect(() => {
+    if (overrides.length === 0) return;
+
+    const kept = overrides.filter(
+      (override) => edgeSignature(childEdges(base, override.parentId)) === override.baseline
+    );
+    if (kept.length !== overrides.length) overrides = kept;
+  });
 
   $effect(() => {
     const target = spaceId;
@@ -142,15 +198,7 @@
     };
   });
 
-  async function loadMore(): Promise<void> {
-    const target = spaceId;
-    if (!target || nextBatch === null || loading) return;
-
-    resume = { cancelled: false };
-    await loadAllPages(target, resume, nextBatch, rooms);
-  }
-
-  function open(child: SpaceHierarchyRoomView): void {
+  function open(child: HierarchyRoomView): void {
     const target = roomPathParamFromId(child.room_id);
     if (child.is_space) {
       void goto(resolve('/(app)/space/[spaceId]', { spaceId: target }));
@@ -165,11 +213,10 @@
     );
   }
 
-  async function join(child: SpaceHierarchyRoomView): Promise<void> {
+  async function join(child: HierarchyRoomView): Promise<void> {
     if (joining.has(child.room_id)) return;
     joining.add(child.room_id);
     try {
-      // The alias is likelier to resolve for a room our server has not seen.
       const address = child.canonical_alias ?? child.room_id;
       if (lobbyAction(child.join_rule, invitedIds.has(child.room_id)) === 'knock') {
         await core.knockRoom(address);
@@ -185,7 +232,6 @@
     }
   }
 
-  /** The section's own space owns the edge, so it is what the removal targets. */
   async function remove(section: HierarchySection, entry: HierarchyRoom): Promise<void> {
     const parentId = section.space?.room_id ?? spaceId;
     if (!parentId) return;
@@ -201,29 +247,26 @@
   async function applyReorder(section: HierarchySection, changes: Reorder[]): Promise<void> {
     if (changes.length === 0) return;
 
+    const parentId = section.parentId;
     const orders = new Map(changes.map((change) => [change.roomId, change.order]));
-    rooms = rooms.map((room) =>
-      room.room_id === section.parentId
-        ? {
-            ...room,
-            children: sortEdges(
-              room.children.map((edge) =>
-                orders.has(edge.room_id)
-                  ? { ...edge, order: orders.get(edge.room_id) ?? null }
-                  : edge
-              )
-            ),
-          }
-        : room
+    const children = sortEdges(
+      section.siblings.map((edge) =>
+        orders.has(edge.room_id) ? { ...edge, order: orders.get(edge.room_id) ?? null } : edge
+      )
     );
+    overrides = [
+      ...overrides.filter((override) => override.parentId !== parentId),
+      { parentId, children, baseline: edgeSignature(childEdges(base, parentId)) },
+    ];
 
     try {
       for (const change of changes) {
-        await core.setSpaceChildOrder(section.parentId, change.roomId, change.order);
+        await core.setSpaceChildOrder(parentId, change.roomId, change.order);
       }
     } catch (error) {
       console.warn('[sable lobby] reorder failed', error);
       failed = true;
+      overrides = overrides.filter((override) => override.parentId !== parentId);
     }
   }
 
@@ -253,7 +296,7 @@
     reorder(section, roomId, neighbour.room.room_id, delta < 0 ? 'above' : 'below');
   }
 
-  async function copyLink(child: SpaceHierarchyRoomView): Promise<void> {
+  async function copyLink(child: HierarchyRoomView): Promise<void> {
     try {
       const via = child.canonical_alias ? [] : await core.roomViaServers(child.room_id);
       await navigator.clipboard.writeText(matrixToUrl(child.canonical_alias ?? child.room_id, via));
@@ -267,7 +310,7 @@
     else closed.add(key);
   }
 
-  function label(child: SpaceHierarchyRoomView): string {
+  function label(child: HierarchyRoomView): string {
     return child.name ?? child.canonical_alias ?? child.room_id;
   }
 </script>
@@ -276,7 +319,17 @@
   <header class="hero">
     <Avatar src={space?.avatar_url ?? null} initials={initials(space?.name ?? '')} size="large" />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
-    {#if space?.topic}<p class="topic">{space.topic}</p>{/if}
+    {#if space?.topic}
+      <button
+        type="button"
+        class="topic"
+        onclick={() => {
+          topicOpen = true;
+        }}
+      >
+        <span class="topic-text">{space.topic}</span>
+      </button>
+    {/if}
   </header>
 
   {#if failed}
@@ -288,18 +341,8 @@
       <Spinner />
       <span>{$i18n.t('room.lobbyLoading')}</span>
     </p>
-    <div class="category">
-      <ul class="rooms">
-        {#each [0, 1, 2] as placeholder (placeholder)}
-          <li class="room">
-            <Skeleton class="room-avatar-skeleton" />
-            <div class="room-text">
-              <Skeleton style="height: 1rem; width: 30%" />
-              <Skeleton style="height: var(--font-size-small); width: 60%" />
-            </div>
-          </li>
-        {/each}
-      </ul>
+    <div class="placeholder">
+      <LobbyRoomPlaceholder rows={3} />
     </div>
   {:else if phase === 'empty'}
     <p class="empty">{$i18n.t('room.lobbyEmpty')}</p>
@@ -316,10 +359,10 @@
         {label}
         onToggle={toggle}
         onOpen={open}
-        onJoin={(child: SpaceHierarchyRoomView) => {
+        onJoin={(child: HierarchyRoomView) => {
           void join(child);
         }}
-        onCopyLink={(child: SpaceHierarchyRoomView) => {
+        onCopyLink={(child: HierarchyRoomView) => {
           void copyLink(child);
         }}
         onRemove={(section: HierarchySection, entry: HierarchyRoom) => {
@@ -329,21 +372,30 @@
         onMove={move}
       />
     {/each}
-  {/if}
 
-  {#if loading && sections.length > 0}
-    <p class="loading-note" role="status">
-      <Spinner small />
-      <span>{$i18n.t('room.lobbyLoadingMore')}</span>
-    </p>
-  {/if}
-
-  {#if nextBatch !== null}
-    <div class="more">
-      <Button {loading} onclick={loadMore}>{$i18n.t('room.lobbyMore')}</Button>
-    </div>
+    {#if pendingLevels.size > 0}
+      <p class="loading-note" role="status">
+        <Spinner small />
+        <span>{$i18n.t('room.lobbyLoadingMore')}</span>
+      </p>
+    {/if}
   {/if}
 </section>
+
+<DialogFrame bind:open={topicOpen} variant="verification" label={$i18n.t('room.lobbyTopicTitle')}>
+  <div class="topic-dialog">
+    <h2>{space?.name ?? $i18n.t('nav.space')}</h2>
+    <p class="topic-full">{space?.topic}</p>
+    <div class="topic-actions">
+      <Button
+        variant="ghost"
+        onclick={() => {
+          topicOpen = false;
+        }}>{$i18n.t('room.lobbyTopicClose')}</Button
+      >
+    </div>
+  </div>
+</DialogFrame>
 
 <style>
   .lobby {
@@ -365,9 +417,61 @@
   }
 
   .topic {
+    background: none;
+    border: 0;
     color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    display: block;
+    font: inherit;
     margin: var(--space-1) 0 0;
     max-width: 48ch;
+    padding: 0;
+    text-align: center;
+  }
+
+  .topic-text {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    white-space: pre-wrap;
+  }
+
+  .topic:hover {
+    text-decoration: underline;
+  }
+
+  .topic:focus-visible {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .topic-dialog {
+    display: grid;
+    gap: var(--space-2);
+    width: min(32rem, 100%);
+  }
+
+  .topic-dialog h2 {
+    font-size: var(--font-size-large);
+    line-height: 1.3;
+    margin: 0;
+  }
+
+  .topic-full {
+    color: var(--sable-surface-var-on-container);
+    line-height: 1.45;
+    margin: 0;
+    max-height: 60dvh;
+    overflow: auto;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+  }
+
+  .topic-actions {
+    display: flex;
+    justify-content: flex-end;
   }
 
   .loading-note {
@@ -379,13 +483,15 @@
     margin: 0;
   }
 
+  .placeholder {
+    background: var(--sable-bg-container);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
   .empty {
     color: var(--sable-surface-var-on-container);
     margin: 0;
-  }
-
-  .more {
-    display: flex;
-    justify-content: center;
   }
 </style>

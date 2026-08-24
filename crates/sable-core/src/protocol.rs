@@ -127,6 +127,8 @@ pub enum Command {
         mentions: Vec<OwnedUserId>,
         #[serde(default)]
         mentions_room: bool,
+        #[serde(default)]
+        persona: Option<PerMessageProfileView>,
     },
     SendSticker {
         #[ts(type = "string")]
@@ -168,6 +170,8 @@ pub enum Command {
         mentions: Vec<OwnedUserId>,
         #[serde(default)]
         mentions_room: bool,
+        #[serde(default)]
+        persona: Option<PerMessageProfileView>,
     },
     /// The filled-in details arrive as a timeline diff, not as the response.
     FetchEventDetails {
@@ -182,6 +186,64 @@ pub enum Command {
         #[ts(type = "string")]
         event_id: OwnedEventId,
         reason: Option<String>,
+    },
+    PinnedEvents {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    SetPinned {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+        pinned: bool,
+    },
+    ReportMessage {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+        reason: Option<String>,
+    },
+    EventSource {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+    },
+    ForwardMessage {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+        #[ts(type = "string")]
+        to_room_id: OwnedRoomId,
+    },
+    Personas,
+    SavePersona {
+        persona: PersonaView,
+        #[serde(default)]
+        previous_id: Option<String>,
+    },
+    RemovePersona {
+        id: String,
+    },
+    SetPersonaSelection {
+        #[ts(type = "string | null")]
+        room_id: Option<OwnedRoomId>,
+        persona_id: Option<String>,
+        #[ts(type = "number | null")]
+        valid_until: Option<u64>,
+    },
+    Bookmarks,
+    SetBookmark {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+        bookmarked: bool,
+        #[ts(type = "number")]
+        now_ms: u64,
     },
     React {
         #[ts(type = "string")]
@@ -660,6 +722,35 @@ pub enum CommandOk {
     EditMessage,
     FetchEventDetails,
     Redact,
+    PinnedEvents {
+        #[ts(type = "string[]")]
+        event_ids: Vec<OwnedEventId>,
+    },
+    SetPinned {
+        #[ts(type = "string[]")]
+        event_ids: Vec<OwnedEventId>,
+    },
+    ReportMessage,
+    EventSource {
+        source: String,
+    },
+    ForwardMessage,
+    Personas {
+        catalog: PersonaCatalogView,
+    },
+    SavePersona {
+        personas: Vec<PersonaView>,
+    },
+    RemovePersona {
+        personas: Vec<PersonaView>,
+    },
+    SetPersonaSelection,
+    Bookmarks {
+        bookmarks: Vec<BookmarkView>,
+    },
+    SetBookmark {
+        bookmarked: bool,
+    },
     React,
     CreatePoll,
     VotePoll,
@@ -1105,7 +1196,6 @@ pub struct RoomSummary {
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,
     /// Already sorted by `order`, then the child event's age.
-    #[ts(type = "Array<{ room_id: string, order: string | null, origin_server_ts: number }>")]
     pub space_children: Vec<SpaceChildEdge>,
     pub unread: u32,
     pub highlight: u32,
@@ -1382,12 +1472,13 @@ pub struct RoomPermissionsView {
 /// MSC4144 per-message profile, letting one account send under several
 /// identities. Read from the unstable `com.beeper.per_message_profile` key,
 /// falling back to the stable `m.per_message_profile` once servers emit it.
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct PerMessageProfileView {
     pub id: Option<String>,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    #[serde(default)]
     pub pronouns: Vec<PronounView>,
     /// Author-chosen, so it is arbitrary and not theme-aware. The UI has to
     /// hold it to a legibility floor against whatever surface is active.
@@ -1395,7 +1486,58 @@ pub struct PerMessageProfileView {
     pub color_on_dark: Option<String>,
     /// The sender prefixed the body with the profile name for clients that
     /// cannot read the profile.
+    #[serde(default)]
     pub has_fallback: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PersonaView {
+    pub id: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub pronouns: Vec<PronounView>,
+    pub color_on_light: Option<String>,
+    pub color_on_dark: Option<String>,
+    #[serde(default)]
+    pub triggers: Vec<PersonaTriggerView>,
+    pub pluralkit: Option<PluralkitImportView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PersonaTriggerView {
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
+    #[serde(default)]
+    pub keep_trigger: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PluralkitImportView {
+    pub id: String,
+    pub uuid: Option<String>,
+    pub avatar_url: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PersonaSelectionView {
+    pub persona_id: String,
+    #[ts(type = "number | null")]
+    pub valid_until: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct PersonaCatalogView {
+    pub personas: Vec<PersonaView>,
+    pub account: Option<PersonaSelectionView>,
+    #[ts(type = "Record<string, PersonaSelectionView>")]
+    pub rooms: std::collections::BTreeMap<String, PersonaSelectionView>,
 }
 
 /// The SDK loads the body lazily, so it is absent for an event we have never
@@ -1889,7 +2031,7 @@ pub struct StatusView {
     pub emoji: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct PronounView {
     pub summary: String,
@@ -1968,4 +2110,19 @@ pub enum SyncStatus {
     Syncing,
     Live,
     Error { message: String },
+}
+
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct BookmarkView {
+    pub bookmark_id: String,
+    pub room_id: String,
+    pub event_id: String,
+    pub room_name: Option<String>,
+    pub sender: Option<String>,
+    pub body_preview: Option<String>,
+    #[ts(type = "number")]
+    pub event_ts: u64,
+    #[ts(type = "number")]
+    pub bookmarked_ts: u64,
 }

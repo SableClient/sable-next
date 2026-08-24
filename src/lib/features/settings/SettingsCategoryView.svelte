@@ -22,6 +22,7 @@
 
   import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
   import PushGateway from '#lib/features/notifications/PushGateway.svelte';
+  import PersonaSettings from './PersonaSettings.svelte';
   import StateEventTool from './StateEventTool.svelte';
   import CustomThemes from './CustomThemes.svelte';
 
@@ -185,6 +186,10 @@
       </section>
     {/if}
 
+    {#if category.id === 'personas'}
+      <section class="settings-card personas-card"><PersonaSettings /></section>
+    {/if}
+
     {#if category.id === 'developer' && preferences.showHiddenEvents}
       <SettingsSection
         title={$i18n.t('settings.stateEventTitle')}
@@ -213,7 +218,8 @@
     overflow: hidden;
   }
 
-  .custom-themes-card {
+  .custom-themes-card,
+  .personas-card {
     padding: var(--space-3);
   }
 

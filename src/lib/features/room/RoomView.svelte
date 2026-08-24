@@ -6,8 +6,12 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
+  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import { usePersonaStore } from '#lib/personas/personas.svelte.js';
+  import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
   import { i18n } from '#lib/i18n.js';
   import { matrixToUrl, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
@@ -44,6 +48,7 @@
 
   let { roomId, eventId = null }: Props = $props();
   const core = useCoreClient();
+  const personas = usePersonaStore();
   const roomList = useRoomList();
   const timelineOwner = Symbol('room-view');
   const activeTimeline = activeRoomTimeline(core);
@@ -348,11 +353,55 @@
     if (body === '') return;
 
     if (pending?.kind === 'edit') {
-      await core.editMessage(targetRoomId, pending.eventId, body, formatted, mentions);
-    } else {
-      await core.sendMessage(targetRoomId, body, pending?.eventId ?? null, formatted, mentions);
+      const edited = timeline.items.find((entry) => entry.event_id === pending.eventId);
+      await core.editMessage(
+        targetRoomId,
+        pending.eventId,
+        body,
+        formatted,
+        mentions,
+        edited?.per_message_profile ?? null
+      );
+      composerContext = null;
+      return;
     }
+
+    const outgoing = personaFor(targetRoomId, body, formatted);
+    await core.sendMessage(
+      targetRoomId,
+      outgoing.body,
+      pending?.eventId ?? null,
+      outgoing.formatted,
+      mentions,
+      outgoing.persona
+    );
     composerContext = null;
+  }
+
+  function personaFor(
+    targetRoomId: string,
+    body: string,
+    formatted: string | null
+  ): { body: string; formatted: string | null; persona: PerMessageProfileView | null } {
+    const proxied = preferences.personaProxying ? resolveProxy(personas.personas, body) : undefined;
+    const persona = resolvePersona({
+      personas: personas.personas,
+      proxied: proxied?.persona,
+      room: personas.selectionFor(targetRoomId) ?? undefined,
+      account: personas.selectionFor(null) ?? undefined,
+      now: Date.now(),
+    });
+
+    if (!persona) return { body, formatted, persona: null };
+    if (proxied && preferences.personaLatching) {
+      void personas.select(targetRoomId, proxied.persona.id).catch(() => {});
+    }
+
+    return {
+      body: proxied?.body ?? body,
+      formatted: proxied ? null : formatted,
+      persona: projectPersona(persona, preferences.personaFallback),
+    };
   }
 
   async function sendAttachment(

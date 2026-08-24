@@ -113,7 +113,9 @@ test('home lists every joined room, including the children of joined spaces', as
       room_id: '!parent-space:example.org',
       name: 'Parent space',
       is_space: true,
-      space_children: [{ room_id: '!child:example.org', order: null, origin_server_ts: 1 }],
+      space_children: [
+        { room_id: '!child:example.org', order: null, origin_server_ts: 1, suggested: false },
+      ],
     }),
   ];
 
@@ -165,7 +167,9 @@ test('the unspaced section leaves out rooms a joined space claims', async () => 
       room_id: '!space:example.org',
       name: 'Space',
       is_space: true,
-      space_children: [{ room_id: '!claimed:example.org', order: null, origin_server_ts: 1 }],
+      space_children: [
+        { room_id: '!claimed:example.org', order: null, origin_server_ts: 1, suggested: false },
+      ],
     }),
   ];
 
@@ -186,7 +190,9 @@ test('a claim from a space that is not joined keeps the room in the unspaced sec
       name: 'Space',
       is_space: true,
       state: 'invited',
-      space_children: [{ room_id: '!claimed:example.org', order: null, origin_server_ts: 1 }],
+      space_children: [
+        { room_id: '!claimed:example.org', order: null, origin_server_ts: 1, suggested: false },
+      ],
     }),
   ];
 

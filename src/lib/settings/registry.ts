@@ -25,10 +25,12 @@ import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
+import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
+import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 
 import { presentsInApp } from '#lib/platform/notifications.js';
@@ -416,6 +418,43 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.notificationContentHint',
         type: 'boolean',
         gatedBy: 'desktopNotifications',
+      },
+    ],
+  },
+  {
+    id: 'personas',
+    name: 'personas.title',
+    description: 'personas.description',
+    icon: UserSwitchIcon,
+    items: [
+      {
+        key: 'personaPicker',
+        icon: UserSwitchIcon,
+        name: 'personas.picker',
+        description: 'personas.pickerHint',
+        type: 'boolean',
+      },
+      {
+        key: 'personaProxying',
+        icon: ChatTextIcon,
+        name: 'personas.proxying',
+        description: 'personas.proxyingHint',
+        type: 'boolean',
+      },
+      {
+        key: 'personaLatching',
+        icon: PushPinIcon,
+        name: 'personas.latching',
+        description: 'personas.latchingHint',
+        type: 'boolean',
+        gatedBy: 'personaProxying',
+      },
+      {
+        key: 'personaFallback',
+        icon: TextAaIcon,
+        name: 'personas.fallback',
+        description: 'personas.fallbackHint',
+        type: 'boolean',
       },
     ],
   },

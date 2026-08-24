@@ -2,13 +2,16 @@
 
 mod accounts;
 mod auth;
+mod bookmarks;
 mod calls;
 mod dispatch;
 mod errors;
 pub mod image_packs;
 pub mod matrix_html;
 mod media;
+mod messages;
 pub mod notifications;
+mod personas;
 pub mod polls;
 pub mod profiles;
 pub mod protocol;

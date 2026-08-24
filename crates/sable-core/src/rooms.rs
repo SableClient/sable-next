@@ -16,6 +16,7 @@ use crate::Core;
 use crate::view;
 
 const HIERARCHY_PAGE_SIZE: u32 = 100;
+const HIERARCHY_MAX_DEPTH: u32 = 1;
 
 impl Core {
     /// Without a `via` server the edge is ignored.
@@ -140,6 +141,7 @@ impl Core {
         let mut request = get_hierarchy::v1::Request::new(space_id.clone());
         request.from = from;
         request.limit = Some(UInt::from(HIERARCHY_PAGE_SIZE));
+        request.max_depth = Some(UInt::from(HIERARCHY_MAX_DEPTH));
 
         let response = client
             .send(request)

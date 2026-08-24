@@ -3,6 +3,7 @@ use std::sync::{Arc, atomic::Ordering};
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::room::edit::EditedContent;
+use matrix_sdk::room::reply::{EnforceThread, Reply as SdkReply};
 use matrix_sdk::room::{ParentSpace, Receipts};
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
@@ -14,7 +15,9 @@ use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
-use matrix_sdk::ruma::events::room::message::{ImageMessageEventContent, MessageType, Relation};
+use matrix_sdk::ruma::events::room::message::{
+    AddMentions, ImageMessageEventContent, MessageType, Relation,
+};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
@@ -228,9 +231,32 @@ impl Core {
                 in_reply_to,
                 mentions,
                 mentions_room,
+                persona,
             } => {
                 let timeline = self.timeline(&room_id).await?;
                 let content = message_content(body, formatted, mentions, mentions_room);
+
+                if let Some(persona) = persona {
+                    let room = self.room(&room_id).await?;
+                    let content = match in_reply_to {
+                        Some(event_id) => room
+                            .make_reply_event(
+                                content.into(),
+                                SdkReply {
+                                    event_id,
+                                    enforce_thread: EnforceThread::MaybeThreaded,
+                                    add_mentions: AddMentions::Yes,
+                                },
+                            )
+                            .await
+                            .map_err(|error| self.failed("send_reply", error))?,
+                        None => content,
+                    };
+
+                    self.send_with_persona(&room, &content.into(), &persona)
+                        .await?;
+                    return Ok(CommandOk::SendMessage);
+                }
 
                 match in_reply_to {
                     // `send_reply` fills the thread relation itself.
@@ -249,6 +275,31 @@ impl Core {
                 }
 
                 Ok(CommandOk::SendMessage)
+            }
+
+            Command::Personas => Ok(CommandOk::Personas {
+                catalog: self.personas().await?,
+            }),
+
+            Command::SavePersona {
+                persona,
+                previous_id,
+            } => Ok(CommandOk::SavePersona {
+                personas: self.save_persona(persona, previous_id).await?,
+            }),
+
+            Command::RemovePersona { id } => Ok(CommandOk::RemovePersona {
+                personas: self.remove_persona(&id).await?,
+            }),
+
+            Command::SetPersonaSelection {
+                room_id,
+                persona_id,
+                valid_until,
+            } => {
+                self.set_persona_selection(room_id, persona_id, valid_until)
+                    .await?;
+                Ok(CommandOk::SetPersonaSelection)
             }
 
             Command::SendSticker {
@@ -329,15 +380,26 @@ impl Core {
                 formatted,
                 mentions,
                 mentions_room,
+                persona,
             } => {
+                let edited = EditedContent::RoomMessage(
+                    message_content(body, formatted, mentions, mentions_room).into(),
+                );
+
+                if let Some(persona) = persona {
+                    let room = self.room(&room_id).await?;
+                    let content = room
+                        .make_edit_event(&event_id, edited)
+                        .await
+                        .map_err(|error| self.failed("edit_message", error))?;
+
+                    self.send_with_persona(&room, &content, &persona).await?;
+                    return Ok(CommandOk::EditMessage);
+                }
+
                 self.timeline(&room_id)
                     .await?
-                    .edit(
-                        &TimelineEventItemId::EventId(event_id),
-                        EditedContent::RoomMessage(
-                            message_content(body, formatted, mentions, mentions_room).into(),
-                        ),
-                    )
+                    .edit(&TimelineEventItemId::EventId(event_id), edited)
                     .await
                     .map_err(|error| self.failed("edit_message", error))?;
 
@@ -463,6 +525,56 @@ impl Core {
                     ignored,
                 })
             }
+
+            Command::PinnedEvents { room_id } => Ok(CommandOk::PinnedEvents {
+                event_ids: self.pinned_events(&room_id).await?,
+            }),
+
+            Command::SetPinned {
+                room_id,
+                event_id,
+                pinned,
+            } => Ok(CommandOk::SetPinned {
+                event_ids: self.set_pinned(&room_id, event_id, pinned).await?,
+            }),
+
+            Command::ReportMessage {
+                room_id,
+                event_id,
+                reason,
+            } => {
+                self.report_message(&room_id, event_id, reason).await?;
+                Ok(CommandOk::ReportMessage)
+            }
+
+            Command::EventSource { room_id, event_id } => Ok(CommandOk::EventSource {
+                source: self.event_source(&room_id, &event_id).await?,
+            }),
+
+            Command::ForwardMessage {
+                room_id,
+                event_id,
+                to_room_id,
+            } => {
+                self.forward_message(&room_id, &event_id, &to_room_id)
+                    .await?;
+                Ok(CommandOk::ForwardMessage)
+            }
+
+            Command::Bookmarks => Ok(CommandOk::Bookmarks {
+                bookmarks: self.bookmarks().await?,
+            }),
+
+            Command::SetBookmark {
+                room_id,
+                event_id,
+                bookmarked,
+                now_ms,
+            } => Ok(CommandOk::SetBookmark {
+                bookmarked: self
+                    .set_bookmark(&room_id, &event_id, bookmarked, now_ms)
+                    .await?,
+            }),
 
             Command::Redact {
                 room_id,

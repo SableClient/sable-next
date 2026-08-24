@@ -13,14 +13,21 @@
 </svelte:head>
 
 <main class="lobby-page">
-  <SpaceLobby {space} />
+  <div class="lobby-column">
+    <SpaceLobby {space} />
+  </div>
 </main>
 
 <style>
   .lobby-page {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .lobby-column {
     margin: 0 auto;
     max-width: 52rem;
-    overflow: auto;
     padding: var(--page-gutter);
     width: 100%;
   }

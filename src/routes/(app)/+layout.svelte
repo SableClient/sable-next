@@ -11,6 +11,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { provideRoomList, RoomList, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
+  import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { i18n } from '#lib/i18n.js';
@@ -36,6 +37,7 @@
   provideRoomList(roomList);
   const spaceSidebar = new SpaceSidebar();
   provideSpaceSidebar(spaceSidebar);
+  providePersonaStore(new PersonaStore(core));
   const notifications = new NotificationCenter();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 

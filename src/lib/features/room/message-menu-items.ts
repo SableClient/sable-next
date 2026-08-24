@@ -1,6 +1,12 @@
 import type { Component } from 'svelte';
 
+import BookmarkIcon from 'phosphor-svelte/lib/BookmarkSimpleIcon';
+import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
+import ForwardIcon from 'phosphor-svelte/lib/ShareFatIcon';
+import PinIcon from 'phosphor-svelte/lib/PushPinIcon';
+import ReportIcon from 'phosphor-svelte/lib/FlagIcon';
+import UnpinIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -19,6 +25,13 @@ export type MessageActions = {
   onDelete?: () => void;
   onCopyText?: () => void;
   onCopyLink?: () => void;
+  onPin?: () => void;
+  onBookmark?: () => void;
+  onForward?: () => void;
+  onReport?: () => void;
+  onViewSource?: () => void;
+  pinned?: boolean;
+  bookmarked?: boolean;
 };
 
 export type MessageMenuRow = {
@@ -69,6 +82,30 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       run: actions.onCopyLink,
     });
   }
+  if (actions.onPin) {
+    rows.push({
+      key: 'pin',
+      label: actions.pinned ? 'timeline.unpinMessage' : 'timeline.pinMessage',
+      icon: actions.pinned ? UnpinIcon : PinIcon,
+      run: actions.onPin,
+    });
+  }
+  if (actions.onBookmark) {
+    rows.push({
+      key: 'bookmark',
+      label: actions.bookmarked ? 'timeline.unbookmarkMessage' : 'timeline.bookmarkMessage',
+      icon: BookmarkIcon,
+      run: actions.onBookmark,
+    });
+  }
+  if (actions.onForward) {
+    rows.push({
+      key: 'forward',
+      label: 'timeline.forwardMessage',
+      icon: ForwardIcon,
+      run: actions.onForward,
+    });
+  }
   if (actions.onViewReactions) {
     rows.push({
       key: 'reactions',
@@ -83,6 +120,23 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.readReceipts',
       icon: ReceiptIcon,
       run: actions.onReadReceipts,
+    });
+  }
+  if (actions.onViewSource) {
+    rows.push({
+      key: 'source',
+      label: 'timeline.viewSource',
+      icon: CodeIcon,
+      run: actions.onViewSource,
+    });
+  }
+  if (actions.onReport) {
+    rows.push({
+      key: 'report',
+      label: 'timeline.reportMessage',
+      icon: ReportIcon,
+      run: actions.onReport,
+      separated: true,
     });
   }
   if (actions.onDelete) {

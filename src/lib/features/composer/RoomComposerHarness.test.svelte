@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { CoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
+  import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
   import { untrack, type ComponentProps } from 'svelte';
 
@@ -21,6 +22,7 @@
 
   provideCoreClient(untrack(() => core));
   provideRoomList(untrack(() => new RoomList(core)));
+  providePersonaStore(untrack(() => new PersonaStore(core)));
 
   function reply(): void {
     const nextContext = composer.context as ComposerContext | null;

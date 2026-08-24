@@ -3,6 +3,7 @@ import type { LatestEventView } from "./LatestEventView";
 import type { RoomJoinRuleView } from "./RoomJoinRuleView";
 import type { RoomStateView } from "./RoomStateView";
 import type { RoomTag } from "./RoomTag";
+import type { SpaceChildEdge } from "./SpaceChildEdge";
 
 export type RoomSummary = { room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_direct: boolean, join_rule: RoomJoinRuleView, 
 /**
@@ -29,4 +30,4 @@ call_participants: string[], has_space_parent: boolean, supports_knock: boolean,
 /**
  * Already sorted by `order`, then the child event's age.
  */
-space_children: Array<{ room_id: string, order: string | null, origin_server_ts: number }>, unread: number, highlight: number, latest_event: LatestEventView | null, };
+space_children: Array<SpaceChildEdge>, unread: number, highlight: number, latest_event: LatestEventView | null, };

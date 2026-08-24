@@ -27,6 +27,25 @@
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
 
+  let contextRoom = $state<RoomSummary | null>(null);
+  let contextParentSpaceId = $state<string | null>(null);
+  let contextAnchor = $state<HTMLElement | null>(null);
+  let contextOpen = $state(false);
+
+  function openContextMenu(
+    event: MouseEvent,
+    room: RoomSummary,
+    parentSpaceId: string | null
+  ): void {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    event.preventDefault();
+    contextRoom = room;
+    contextParentSpaceId = parentSpaceId;
+    contextAnchor = target;
+    contextOpen = true;
+  }
+
   interface Props {
     onNavigate?: (href: string) => void;
     width?: number;
@@ -432,6 +451,9 @@
               {@const live = room?.call_participants.length ?? 0}
               <div class="room-row-wrap">
                 <a
+                  oncontextmenu={(event) => {
+                    if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
+                  }}
                   class="room-row sable-selection-layer"
                   class:active={page.url.pathname === href}
                   {href}
@@ -504,6 +526,17 @@
     if (!open) leaveRoomId = null;
   }}
 />
+
+{#if contextRoom}
+  <RoomOptionsMenu
+    room={contextRoom}
+    parentSpaceId={contextParentSpaceId}
+    anchor={contextAnchor}
+    bind:open={contextOpen}
+    onSettings={openSettings}
+    onLeave={openLeave}
+  />
+{/if}
 
 <style>
   .room-nav {

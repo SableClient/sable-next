@@ -1,4 +1,8 @@
 <script lang="ts">
+  import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
+  import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
+
+  import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
   import { ContextMenu } from 'bits-ui';
   import type { RoomSummary } from '#src/generated/RoomSummary';
@@ -154,6 +158,25 @@
 
   function initial(name: string): string {
     return name.slice(0, 1).toUpperCase();
+  }
+
+  let contextSpace = $state<RoomSummary | null>(null);
+  let contextAnchor = $state<HTMLElement | null>(null);
+  let contextOpen = $state(false);
+  let settingsRoomId = $state<string | null>(null);
+  let leaveRoomId = $state<string | null>(null);
+
+  let settingsRoom = $derived(spaces.find((space) => space.room_id === settingsRoomId) ?? null);
+  let leaveRoom = $derived(spaces.find((space) => space.room_id === leaveRoomId) ?? null);
+
+  function openSpaceContextMenu(event: MouseEvent, roomId: string): void {
+    const space = spacesById.get(roomId);
+    const target = event.currentTarget;
+    if (space === undefined || !(target instanceof HTMLElement)) return;
+    event.preventDefault();
+    contextSpace = space;
+    contextAnchor = target;
+    contextOpen = true;
   }
 
   function spaceItem(roomId: string): RailItem | null {
@@ -340,7 +363,15 @@
   {#if item !== null}
     {@const ref = { kind: 'space', roomId, folderId } satisfies LayoutRef}
     {#if folderId === undefined}
-      {@render spaceSlotBody(item, ref)}
+      <div
+        class="rail-menu-anchor"
+        oncontextmenu={(event) => {
+          openSpaceContextMenu(event, roomId);
+        }}
+        role="presentation"
+      >
+        {@render spaceSlotBody(item, ref)}
+      </div>
     {:else}
       <ContextMenu.Root>
         <ContextMenu.Trigger>
@@ -522,6 +553,40 @@
     <li><div class="rail-pad">{@render railItem(createItem, false)}</div></li>
   </ul>
 </div>
+
+{#if contextSpace}
+  <RoomOptionsMenu
+    room={contextSpace}
+    anchor={contextAnchor}
+    bind:open={contextOpen}
+    onSettings={(room: RoomSummary) => {
+      settingsRoomId = room.room_id;
+    }}
+    onLeave={(room: RoomSummary) => {
+      leaveRoomId = room.room_id;
+    }}
+  />
+{/if}
+
+{#if settingsRoom}
+  <RoomSettingsDialog
+    open
+    room={settingsRoom}
+    onOpenChange={(next) => {
+      if (!next) settingsRoomId = null;
+    }}
+  />
+{/if}
+
+{#if leaveRoom}
+  <LeaveRoomDialog
+    open
+    room={leaveRoom}
+    onOpenChange={(next) => {
+      if (!next) leaveRoomId = null;
+    }}
+  />
+{/if}
 
 <style>
   .rail {

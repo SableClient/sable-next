@@ -28,11 +28,20 @@
   interface Props {
     room: RoomSummary;
     parentSpaceId?: string | null;
+    open?: boolean;
+    anchor?: HTMLElement | null;
     onSettings: (room: RoomSummary) => void;
     onLeave: (room: RoomSummary) => void;
   }
 
-  let { room, parentSpaceId = null, onSettings, onLeave }: Props = $props();
+  let {
+    room,
+    parentSpaceId = null,
+    open = $bindable(false),
+    anchor = null,
+    onSettings,
+    onLeave,
+  }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
 
@@ -162,16 +171,20 @@
 </script>
 
 <DropdownMenu.Root
+  bind:open
   onOpenChange={(open) => {
     if (!open) return;
     void readNotificationMode();
     readManageableSpaces();
   }}
 >
-  <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>
-    <DotsThreeIcon />
-  </DropdownMenu.Trigger>
+  {#if !anchor}
+    <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>
+      <DotsThreeIcon />
+    </DropdownMenu.Trigger>
+  {/if}
   <DropdownMenu.Content
+    customAnchor={anchor}
     class="sable-menu room-options-menu"
     side="bottom"
     align="end"
