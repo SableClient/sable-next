@@ -117,6 +117,12 @@
     footTrailing,
   }: Props = $props();
   let visibleItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
+  /* The paginate call's own answer, as well as the store's: that only settles to
+     `end` on a two-second timeout when a page moves no boundary. */
+  let historyExhausted = $state(false);
+  let noHistory = $derived(
+    visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
+  );
   let personas = $derived(personasByEventId(timeline.items));
   let personaOpen = $state(false);
 
@@ -563,6 +569,7 @@
       if (contentHeight >= node.clientHeight * TIMELINE_LAYOUT.initialFillViewports) return;
       initialFillPages += 1;
       const reachedStart = await onRequestHistory();
+      historyExhausted = reachedStart;
       // The last page has to settle too, or the handover finds `loading` and declines.
       if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
       await tick();
@@ -725,15 +732,19 @@
   });
 
   $effect(() => {
-    // Read up front so the landing re-runs for every page the fill prepends.
-    const hasItems = visibleItems.length > 0;
+    // Read up front, so the landing re-runs for every page the fill prepends.
+    /* eslint-disable-next-line @typescript-eslint/no-unused-expressions */
+    visibleItems.length;
     if (timeline.loading || !viewport) return;
 
     const controller = new AbortController();
     void (async () => {
       await tick();
       await new Promise(requestAnimationFrame);
-      if (controller.signal.aborted || !hasItems) return;
+      // An empty snapshot is an empty room, not one still loading: `loading` is
+      // false only once it has been applied. Bailing here left such a room
+      // settling for as long as it stayed open.
+      if (controller.signal.aborted) return;
       const focusedEventId = position.kind === 'focused' ? position.eventId : null;
       const focusIndex = focusedEventId
         ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
@@ -907,86 +918,88 @@
     </p>
   {/if}
 
-  <div class={['timeline-viewport', { initial: position.kind === 'settling' }]}>
-    <!-- A scrollable region has to be keyboard-operable. -->
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div
-      bind:this={viewport}
-      class="viewport"
-      aria-label={$i18n.t('timeline.label')}
-      tabindex="0"
-      onscroll={onScroll}
-      {@attach userScrollMarker}
-      {@attach keepPinnedThroughResize}
-      {@attach scrollLock(scrollLocked || personaOpen)}
-      role="log"
-    >
+  <div class="timeline-stage">
+    <div class={['timeline-viewport', { initial: position.kind === 'settling' }]}>
+      <!-- A scrollable region has to be keyboard-operable. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div
-        class={['items', `layout-${preferences.layout}`]}
-        style:height={String($virtualizer.getTotalSize()) + 'px'}
+        bind:this={viewport}
+        class="viewport"
+        aria-label={$i18n.t('timeline.label')}
+        tabindex="0"
+        onscroll={onScroll}
+        {@attach userScrollMarker}
+        {@attach keepPinnedThroughResize}
+        {@attach scrollLock(scrollLocked || personaOpen)}
+        role="log"
       >
-        {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
-          {@const item = visibleItems[virtualItem.index]}
-          {#if item}
-            {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
-            {@const groupStart = virtualItem.index > 0 && !collapsed}
-            <div
-              class={['item', { collapsed, 'group-start': groupStart }]}
-              data-event-id={item.event_id ?? undefined}
-              data-item-id={item.id}
-              data-index={virtualItem.index}
-              style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
-              {@attach measure}
-            >
-              <TimelineItem
-                {item}
-                {collapsed}
-                unreadCount={item.content.kind === 'read_marker'
-                  ? unreadCountAfter(visibleItems, virtualItem.index)
-                  : 0}
-                replyPersona={item.in_reply_to
-                  ? (personas.get(item.in_reply_to.event_id) ?? null)
-                  : null}
-                highlighted={focusEventId !== null && item.event_id === focusEventId}
-                {onMatrixLink}
-                {onCopyLink}
-                {onSenderProfile}
-                {onRetrySend}
-                {onCancelSend}
-                {currentUserId}
-                {onToggleReaction}
-                {onReply}
-                {onEdit}
-                {onDelete}
-                {canRedactOthers}
-                {members}
-                layout={preferences.layout}
-                {onJumpToEvent}
-                {onOpenMedia}
-                {onVotePoll}
-                {onEndPoll}
-                onPersonaOpenChange={setPersonaOpen}
-                {roomId}
-              />
-            </div>
-          {/if}
-        {/each}
+        <div
+          class={['items', `layout-${preferences.layout}`]}
+          style:height={String($virtualizer.getTotalSize()) + 'px'}
+        >
+          {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
+            {@const item = visibleItems[virtualItem.index]}
+            {#if item}
+              {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
+              {@const groupStart = virtualItem.index > 0 && !collapsed}
+              <div
+                class={['item', { collapsed, 'group-start': groupStart }]}
+                data-event-id={item.event_id ?? undefined}
+                data-item-id={item.id}
+                data-index={virtualItem.index}
+                style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
+                {@attach measure}
+              >
+                <TimelineItem
+                  {item}
+                  {collapsed}
+                  unreadCount={item.content.kind === 'read_marker'
+                    ? unreadCountAfter(visibleItems, virtualItem.index)
+                    : 0}
+                  replyPersona={item.in_reply_to
+                    ? (personas.get(item.in_reply_to.event_id) ?? null)
+                    : null}
+                  highlighted={focusEventId !== null && item.event_id === focusEventId}
+                  {onMatrixLink}
+                  {onCopyLink}
+                  {onSenderProfile}
+                  {onRetrySend}
+                  {onCancelSend}
+                  {currentUserId}
+                  {onToggleReaction}
+                  {onReply}
+                  {onEdit}
+                  {onDelete}
+                  {canRedactOthers}
+                  {members}
+                  layout={preferences.layout}
+                  {onJumpToEvent}
+                  {onOpenMedia}
+                  {onVotePoll}
+                  {onEndPoll}
+                  onPersonaOpenChange={setPersonaOpen}
+                  {roomId}
+                />
+              </div>
+            {/if}
+          {/each}
+        </div>
       </div>
     </div>
-  </div>
 
-  {#if position.kind === 'settling'}
-    <TimelineSkeleton />
-  {:else if visibleItems.length === 0}
-    <!-- A room can filter down to nothing; without this that is a blank void. -->
-    <EmptyState
-      class="timeline-empty"
-      title={timeline.items.length > 0
-        ? $i18n.t('timeline.allFiltered')
-        : $i18n.t('timeline.noMessages')}
-      description={timeline.items.length > 0 ? $i18n.t('timeline.allFilteredHint') : undefined}
-    />
-  {/if}
+    {#if position.kind === 'settling' && !noHistory}
+      <TimelineSkeleton />
+    {:else if visibleItems.length === 0}
+      <!-- A room can filter down to nothing; without this that is a blank void. -->
+      <EmptyState
+        class="timeline-empty"
+        title={timeline.items.length > 0
+          ? $i18n.t('timeline.allFiltered')
+          : $i18n.t('timeline.noMessages')}
+        description={timeline.items.length > 0 ? $i18n.t('timeline.allFilteredHint') : undefined}
+      />
+    {/if}
+  </div>
 
   {#if timeline.mode.kind === 'live' && position.kind === 'anchored' && visibleItems.length > 0}
     <Button
@@ -1039,17 +1052,25 @@
     }
   }
 
+  /* The overlays measure against the message area alone: a skeleton row over the
+     foot below sits lower than any message ever will. */
+  .timeline-stage {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+  }
+
   .timeline-viewport {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-height: 0;
-    opacity: 1;
-    transition: opacity var(--motion-normal) var(--motion-easing-standard);
   }
 
+  /* No fade back in: the skeleton is opaque and uncovers a laid-out viewport. */
   .timeline-viewport.initial {
-    opacity: 0;
     visibility: hidden;
   }
 
@@ -1088,12 +1109,6 @@
   .viewport:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: calc(-1 * var(--focus-ring-offset));
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .timeline-viewport {
-      transition: none;
-    }
   }
 
   .viewport::-webkit-scrollbar {

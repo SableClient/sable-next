@@ -10,6 +10,7 @@ export type RoomCoreMode =
   | 'delayed_pagination'
   | 'endless_history'
   | 'delayed_snapshot'
+  | 'empty_room'
   | 'delayed_layout_diff'
   | 'spaces';
 
@@ -467,22 +468,24 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                 type: 'subscribe_timeline',
                                 subscription,
                                 items:
-                                  workerMode === 'delayed_snapshot'
-                                    ? items.slice(-1)
-                                    : workerMode === 'delayed_history'
-                                      ? items.map((item, index) => ({
-                                          ...item,
-                                          content: {
-                                            ...item.content,
-                                            body: `Delayed history ${String(index)}`,
-                                            html: `Delayed history ${String(index)}`,
-                                          },
-                                        }))
-                                      : workerMode === 'delayed_pagination'
-                                        ? [timelineStart, ...items]
-                                        : workerMode === 'unread'
-                                          ? [...items.slice(0, 5), readMarker, ...items.slice(5)]
-                                          : items,
+                                  workerMode === 'empty_room'
+                                    ? []
+                                    : workerMode === 'delayed_snapshot'
+                                      ? items.slice(-1)
+                                      : workerMode === 'delayed_history'
+                                        ? items.map((item, index) => ({
+                                            ...item,
+                                            content: {
+                                              ...item.content,
+                                              body: `Delayed history ${String(index)}`,
+                                              html: `Delayed history ${String(index)}`,
+                                            },
+                                          }))
+                                        : workerMode === 'delayed_pagination'
+                                          ? [timelineStart, ...items]
+                                          : workerMode === 'unread'
+                                            ? [...items.slice(0, 5), readMarker, ...items.slice(5)]
+                                            : items,
                               };
                             })()
                           : command === 'room_members'
@@ -542,7 +545,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                       const reachedEnd =
                                         workerMode === 'endless_history'
                                           ? false
-                                          : workerMode === 'delayed_history' || state.page >= 2;
+                                          : workerMode === 'empty_room' ||
+                                            workerMode === 'delayed_history' ||
+                                            state.page >= 2;
                                       this.emit({
                                         type: 'timeline_pagination',
                                         subscription,
@@ -556,80 +561,82 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                             type: 'timeline_diff',
                                             subscription,
                                             diffs:
-                                              workerMode === 'endless_history'
-                                                ? Array.from({ length: 20 }, (_, index) => ({
-                                                    op: 'insert' as const,
-                                                    index: index + 1,
-                                                    value: {
-                                                      ...items[0],
-                                                      id: `endless-${String(state.page)}-${String(index)}`,
-                                                      event_id: `$endless-${String(state.page)}-${String(index)}:example.test`,
-                                                      timestamp:
-                                                        1_600_000_000_000 +
-                                                        state.page * 100 +
-                                                        index,
-                                                      content: {
-                                                        ...items[0].content,
-                                                        // Heights the estimator cannot predict: the
-                                                        // flat per-message guess is wrong in both
-                                                        // directions across this run.
-                                                        body: `Endless ${String(state.page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`,
-                                                        html: `Endless ${String(state.page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`,
-                                                      },
-                                                    },
-                                                  }))
-                                                : workerMode === 'delayed_history'
-                                                  ? // Distinct ids: reusing the snapshot's would emit
-                                                    // duplicate events, which no server does.
-                                                    items.slice(0, -1).map((value, index) => ({
+                                              workerMode === 'empty_room'
+                                                ? []
+                                                : workerMode === 'endless_history'
+                                                  ? Array.from({ length: 20 }, (_, index) => ({
                                                       op: 'insert' as const,
-                                                      index,
+                                                      index: index + 1,
                                                       value: {
-                                                        ...value,
-                                                        id: `delayed-older-${String(index)}`,
-                                                        event_id: `$delayed-older-${String(index)}:example.test`,
+                                                        ...items[0],
+                                                        id: `endless-${String(state.page)}-${String(index)}`,
+                                                        event_id: `$endless-${String(state.page)}-${String(index)}:example.test`,
+                                                        timestamp:
+                                                          1_600_000_000_000 +
+                                                          state.page * 100 +
+                                                          index,
                                                         content: {
-                                                          ...value.content,
-                                                          body: `Delayed older ${String(index)}`,
-                                                          html: `Delayed older ${String(index)}`,
+                                                          ...items[0].content,
+                                                          // Heights the estimator cannot predict: the
+                                                          // flat per-message guess is wrong in both
+                                                          // directions across this run.
+                                                          body: `Endless ${String(state.page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`,
+                                                          html: `Endless ${String(state.page)}-${String(index)} ${'wraps and wraps '.repeat((index % 5) * 4)}`,
                                                         },
                                                       },
                                                     }))
-                                                  : workerMode === 'delayed_pagination'
-                                                    ? Array.from({ length: 20 }, (_, index) => ({
+                                                  : workerMode === 'delayed_history'
+                                                    ? // Distinct ids: reusing the snapshot's would emit
+                                                      // duplicate events, which no server does.
+                                                      items.slice(0, -1).map((value, index) => ({
                                                         op: 'insert' as const,
-                                                        index: index + 1,
+                                                        index,
                                                         value: {
-                                                          ...items[0],
-                                                          id: `${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
-                                                          event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
-                                                          timestamp: 1_699_999_000_000 + index,
+                                                          ...value,
+                                                          id: `delayed-older-${String(index)}`,
+                                                          event_id: `$delayed-older-${String(index)}:example.test`,
                                                           content: {
-                                                            kind: 'message' as const,
-                                                            body: `${room.name} history ${String(state.page)} ${String(index)}`,
-                                                            html: `${room.name} history ${String(state.page)} ${String(index)}`,
-                                                            emote: false,
-                                                            edited: false,
+                                                            ...value.content,
+                                                            body: `Delayed older ${String(index)}`,
+                                                            html: `Delayed older ${String(index)}`,
                                                           },
                                                         },
                                                       }))
-                                                    : [
-                                                        {
-                                                          op: 'push_front',
+                                                    : workerMode === 'delayed_pagination'
+                                                      ? Array.from({ length: 20 }, (_, index) => ({
+                                                          op: 'insert' as const,
+                                                          index: index + 1,
                                                           value: {
                                                             ...items[0],
-                                                            id: `${room.name.toLowerCase()}-history-${String(state.page)}`,
-                                                            event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                            id: `${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
+                                                            event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}-${String(index)}`,
+                                                            timestamp: 1_699_999_000_000 + index,
                                                             content: {
-                                                              kind: 'message',
-                                                              body: `${room.name} history ${String(state.page)}`,
-                                                              html: `${room.name} history ${String(state.page)}`,
+                                                              kind: 'message' as const,
+                                                              body: `${room.name} history ${String(state.page)} ${String(index)}`,
+                                                              html: `${room.name} history ${String(state.page)} ${String(index)}`,
                                                               emote: false,
                                                               edited: false,
                                                             },
                                                           },
-                                                        },
-                                                      ],
+                                                        }))
+                                                      : [
+                                                          {
+                                                            op: 'push_front',
+                                                            value: {
+                                                              ...items[0],
+                                                              id: `${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                              event_id: `$${room.name.toLowerCase()}-history-${String(state.page)}`,
+                                                              content: {
+                                                                kind: 'message',
+                                                                body: `${room.name} history ${String(state.page)}`,
+                                                                html: `${room.name} history ${String(state.page)}`,
+                                                                emote: false,
+                                                                edited: false,
+                                                              },
+                                                            },
+                                                          },
+                                                        ],
                                           });
                                           this.emit({
                                             type: 'timeline_pagination',

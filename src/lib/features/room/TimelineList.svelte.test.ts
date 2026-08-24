@@ -14,6 +14,14 @@ import TimelineList from './TimelineList.svelte';
 let animationFrames: FrameRequestCallback[];
 
 beforeEach(() => {
+  // happy-dom ships no Web Animations API, and the skeleton fades out through it.
+  Element.prototype.animate = () =>
+    ({
+      cancel: () => {},
+      effect: null,
+      onfinish: null,
+      playState: 'finished',
+    }) as unknown as Animation;
   animationFrames = [];
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     animationFrames.push(callback);

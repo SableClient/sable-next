@@ -1,48 +1,68 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { innerHeight } from 'svelte/reactivity/window';
+  import { fade } from 'svelte/transition';
+  import type { TransitionConfig } from 'svelte/transition';
 
-  const REVEAL_DELAY = 150;
-  const rows = [
-    { id: 'sender-one', collapsed: false },
-    { id: 'reply-one', collapsed: true },
-    { id: 'reply-two', collapsed: true },
-    { id: 'sender-two', collapsed: false },
-  ] as const;
+  /* Held rather than delayed: a fast open would flash the rows for a few
+     milliseconds instead, which reads as a fade. */
+  const MIN_VISIBLE = 400;
+  const FADE_OUT = 200;
+  const ROW_HEIGHT = 40;
+  const shownAt = Date.now();
+  const WIDTHS = [62, 44, 71, 38, 55, 48, 66, 40, 58, 33];
+  const GROUPED = [false, true, true, false, true, false, false, true, true, false];
 
-  let visible = $state(false);
+  /* Counted off the window, not measured: the box is never taller, and a
+     measurement lands a frame late. The surplus clips off the top. */
+  let rows = $derived(
+    Array.from({ length: Math.ceil((innerHeight.current ?? 0) / ROW_HEIGHT) + 1 }, (_, index) => ({
+      id: index,
+      collapsed: GROUPED[index % GROUPED.length] ?? false,
+      width: `${String(WIDTHS[index % WIDTHS.length] ?? 50)}%`,
+    }))
+  );
 
-  $effect(() => {
-    const timer = setTimeout(() => {
-      visible = true;
-    }, REVEAL_DELAY);
-    return () => {
-      clearTimeout(timer);
-    };
-  });
+  function holdThenFade(node: Element): TransitionConfig {
+    return fade(node, {
+      delay: Math.max(0, MIN_VISIBLE - (Date.now() - shownAt)),
+      duration: prefersReducedMotion.current ? 0 : FADE_OUT,
+    });
+  }
 </script>
 
-{#if visible}
-  <div class="timeline-skeleton" aria-label={$i18n.t('timeline.loading')} role="status">
-    {#each rows as row (row.id)}
-      <div class={['timeline-skeleton-row', { collapsed: row.collapsed }]} aria-hidden="true">
-        {#if !row.collapsed}<Skeleton class="timeline-skeleton-avatar" />{/if}
-        <div class="timeline-skeleton-copy">
-          {#if !row.collapsed}
-            <div class="timeline-skeleton-header">
-              <Skeleton class="timeline-skeleton-sender" />
-              <Skeleton class="timeline-skeleton-time" />
-            </div>
-          {/if}
-          <Skeleton class="timeline-skeleton-body" />
-        </div>
+<!-- Opaque, above the settled viewport: fading out uncovers the messages. -->
+<div
+  class="timeline-skeleton"
+  aria-label={$i18n.t('timeline.loading')}
+  role="status"
+  out:holdThenFade
+>
+  {#each rows as row (row.id)}
+    <div
+      class={['timeline-skeleton-row', { collapsed: row.collapsed }]}
+      style:--skeleton-body-width={row.width}
+      aria-hidden="true"
+    >
+      {#if !row.collapsed}<Skeleton class="timeline-skeleton-avatar" />{/if}
+      <div class="timeline-skeleton-copy">
+        {#if !row.collapsed}
+          <div class="timeline-skeleton-header">
+            <Skeleton class="timeline-skeleton-sender" />
+            <Skeleton class="timeline-skeleton-time" />
+          </div>
+        {/if}
+        <Skeleton class="timeline-skeleton-body" />
       </div>
-    {/each}
-  </div>
-{/if}
+    </div>
+  {/each}
+</div>
 
 <style>
   .timeline-skeleton {
+    background: var(--sable-bg-container);
     display: flex;
     flex-direction: column;
     inset: 0;
@@ -56,6 +76,7 @@
 
   .timeline-skeleton-row {
     display: flex;
+    flex: 0 0 auto;
     gap: var(--timeline-row-gap);
     padding: var(--timeline-row-padding) 0;
   }
@@ -100,23 +121,6 @@
   :global(.sable-skeleton.timeline-skeleton-body) {
     height: 0.75rem;
     max-width: 28rem;
-    width: 58%;
-  }
-
-  .timeline-skeleton :global(.sable-skeleton) {
-    animation: none;
-    opacity: 0.65;
-  }
-
-  .timeline-skeleton-row:nth-child(2) :global(.timeline-skeleton-body) {
-    width: 42%;
-  }
-
-  .timeline-skeleton-row:nth-child(3) :global(.timeline-skeleton-body) {
-    width: 68%;
-  }
-
-  .timeline-skeleton-row:nth-child(4) :global(.timeline-skeleton-body) {
-    width: 48%;
+    width: var(--skeleton-body-width);
   }
 </style>

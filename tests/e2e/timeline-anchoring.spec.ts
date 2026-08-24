@@ -386,6 +386,20 @@ test('anchors after a delayed initial snapshot', async ({
   await expect(timeline.skeleton).toHaveCount(0);
 });
 
+test('shows the empty state rather than message rows in a room with no history', async ({
+  page,
+  app,
+  timeline,
+  installRoomCore,
+}) => {
+  await installRoomCore('empty_room');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await app.openRoom(ROOM_ID);
+
+  await expect(timeline.empty).toHaveText(/No messages yet/);
+  await expect(timeline.skeleton).toHaveCount(0);
+});
+
 test('stays at latest when a delayed diff changes an overflowing snapshot height', async ({
   page,
   app,

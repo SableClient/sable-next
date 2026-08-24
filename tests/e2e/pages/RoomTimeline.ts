@@ -6,6 +6,7 @@ export class RoomTimeline {
   readonly items: Locator;
   readonly initial: Locator;
   readonly skeleton: Locator;
+  readonly empty: Locator;
   readonly loading: Locator;
   readonly jumpToLatest: Locator;
   readonly image: Locator;
@@ -16,6 +17,7 @@ export class RoomTimeline {
     this.items = page.locator('.timeline-viewport .item');
     this.initial = page.locator('.timeline-viewport.initial');
     this.skeleton = page.locator('.timeline-skeleton');
+    this.empty = page.locator('.timeline-empty');
     this.loading = page.locator('.timeline-content > .loading');
     this.jumpToLatest = page.locator('.jump-to-latest');
     this.image = page.locator('.timeline-viewport .media-image');
