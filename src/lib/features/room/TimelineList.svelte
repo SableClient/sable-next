@@ -467,9 +467,9 @@
     refreshRollingAnchor();
   }
 
-  function refreshRollingAnchor(): void {
+  function refreshRollingAnchor(readingBack = false): void {
     if (anchorHolding || !viewport) return;
-    if (isNearLatest(viewport, nearLatestPx)) {
+    if (!readingBack && isNearLatest(viewport, nearLatestPx)) {
       anchor.release();
       return;
     }
@@ -800,7 +800,7 @@
     nearLatest = isNearLatest(viewport, nearLatestPx);
     const movedAway = viewport.scrollTop < previousScrollTop;
     previousScrollTop = viewport.scrollTop;
-    refreshRollingAnchor();
+    refreshRollingAnchor(movedAway && historyController.isScrollGestureActive);
     const next = nextPosition(position, {
       kind: 'user-scrolled',
       timelineMode: timeline.mode.kind,

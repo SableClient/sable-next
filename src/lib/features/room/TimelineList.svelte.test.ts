@@ -9,6 +9,14 @@ import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
 
+const core = vi.hoisted(() => ({
+  fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
+  userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
+}));
+
+vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
+
 import TimelineList from './TimelineList.svelte';
 
 let animationFrames: FrameRequestCallback[];
@@ -31,6 +39,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
   document.body.replaceChildren();
 });
 
@@ -82,6 +92,14 @@ function viewport(): HTMLDivElement {
     scrollHeight: { configurable: true, value: 100 },
   });
   return element;
+}
+
+function touch(element: HTMLElement, type: string, clientY: number): void {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperty(event, 'touches', {
+    value: { item: (index: number) => (index === 0 ? { clientY } : null) },
+  });
+  element.dispatchEvent(event);
 }
 
 function timelineViewport(): HTMLElement {
@@ -577,5 +595,50 @@ test('retries marking the latest event read after a failed request', async () =>
   await tick();
 
   expect(read).toHaveBeenCalledTimes(2);
+  await unmount(instance);
+});
+
+test('reading back inside the near-latest band leaves follow mode', async () => {
+  const rect = (): DOMRect =>
+    ({ top: 0, left: 0, right: 300, bottom: 100, width: 300, height: 100 }) as DOMRect;
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(rect);
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    value: 10,
+  });
+
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+  roomTimeline.mode = { kind: 'live' };
+  roomTimeline.backwardPagination = 'end';
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: () => Promise.resolve(false),
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  const element = viewport();
+  Object.defineProperties(element, {
+    scrollHeight: { configurable: true, value: 1_000 },
+    scrollTop: { configurable: true, writable: true, value: 900 },
+  });
+  await tick();
+  await runAnimationFrames();
+  expect(document.querySelectorAll('.item').length).toBeGreaterThan(0);
+
+  touch(element, 'touchstart', 100);
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  touch(element, 'touchmove', 140);
+  element.scrollTop = 870;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
   await unmount(instance);
 });
