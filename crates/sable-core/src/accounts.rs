@@ -366,7 +366,6 @@ impl Core {
         self.watch_space_sidebar(&client, generation);
         self.watch_send_queue(&client);
         self.watch_search_index(&client);
-        self.watch_search_crawl(&client);
         self.watch_ignored_users(&client);
 
         client

@@ -1,4 +1,5 @@
 mod crawl;
+mod persist;
 mod tokenize;
 
 pub(crate) use crawl::CrawlProgress;
@@ -21,6 +22,7 @@ use matrix_sdk::ruma::events::{
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId};
 use probly_search::{Index, score::bm25};
+use serde::{Deserialize, Serialize};
 
 use crate::Core;
 use crate::protocol::{SearchAttachment, SearchFilter, SearchOrder};
@@ -31,11 +33,13 @@ const EVENTS_PER_INGEST_YIELD: usize = 256;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MAX_INDEXED_MESSAGES: usize = 50_000;
+const PERSIST_INTERVAL: Duration = Duration::from_secs(20);
 
 type DocKey = u32;
 
 struct Body(String);
 
+#[derive(Clone, Serialize, Deserialize)]
 struct Document {
     event_id: OwnedEventId,
     body: String,
@@ -133,9 +137,11 @@ struct RoomIndex {
     documents: HashMap<DocKey, Document>,
     key_of: HashMap<OwnedEventId, DocKey>,
     classified: HashSet<OwnedEventId>,
+    evicted: HashSet<OwnedEventId>,
     by_age: BTreeSet<(u64, DocKey)>,
     next_key: DocKey,
     retired_keys: usize,
+    dirty: bool,
 }
 
 impl RoomIndex {
@@ -145,10 +151,29 @@ impl RoomIndex {
             documents: HashMap::new(),
             key_of: HashMap::new(),
             classified: HashSet::new(),
+            evicted: HashSet::new(),
             by_age: BTreeSet::new(),
             next_key: 0,
             retired_keys: 0,
+            dirty: false,
         }
+    }
+
+    fn restored(documents: Vec<Document>, classified: Vec<OwnedEventId>) -> Self {
+        let mut index = Self::new();
+        for document in documents {
+            index.upsert(document);
+        }
+        index.classified = classified.into_iter().collect();
+        index.dirty = false;
+        index
+    }
+
+    fn snapshot(&self) -> persist::StoredRoom {
+        persist::StoredRoom::new(
+            self.documents.values().map(Document::clone).collect(),
+            self.classified.iter().cloned().collect(),
+        )
     }
 
     fn len(&self) -> usize {
@@ -167,19 +192,22 @@ impl RoomIndex {
         let Some(document) = self.documents.remove(&key) else {
             return;
         };
+        self.dirty = true;
         self.by_age.remove(&(document.origin_server_ts, key));
         self.key_of.remove(&document.event_id);
+        self.classified.remove(&document.event_id);
+        self.evicted.insert(document.event_id.clone());
         self.index.remove_document(key);
         self.retired_keys = self.retired_keys.saturating_add(1);
         self.vacuum_if_due();
     }
 
     fn already_classified(&self, event_id: &EventId) -> bool {
-        self.classified.contains(event_id)
+        self.classified.contains(event_id) || self.evicted.contains(event_id)
     }
 
     fn mark_classified(&mut self, event_id: OwnedEventId) {
-        self.classified.insert(event_id);
+        self.dirty |= self.classified.insert(event_id);
     }
 
     fn indexed_body(&self, event_id: &OwnedEventId) -> Option<&String> {
@@ -192,6 +220,7 @@ impl RoomIndex {
             return;
         }
         self.retire(&document.event_id);
+        self.dirty = true;
 
         let key = self.take_unused_key();
         let body = Body(document.body);
@@ -217,6 +246,7 @@ impl RoomIndex {
         let Some(key) = self.key_of.remove(event_id) else {
             return;
         };
+        self.dirty = true;
         if let Some(document) = self.documents.remove(&key) {
             self.by_age.remove(&(document.origin_server_ts, key));
         }
@@ -273,6 +303,7 @@ impl RoomIndex {
 pub(crate) struct MessageIndex {
     rooms: HashMap<OwnedRoomId, RoomIndex>,
     capacity: usize,
+    unreadable: HashSet<OwnedRoomId>,
 }
 
 pub(crate) struct Hit {
@@ -311,11 +342,50 @@ impl MessageIndex {
         Self {
             rooms: HashMap::new(),
             capacity,
+            unreadable: HashSet::new(),
         }
     }
 
     pub(crate) fn forget_room(&mut self, room_id: &OwnedRoomId) {
         self.rooms.remove(room_id);
+    }
+
+    fn restore_room(
+        &mut self,
+        room_id: &OwnedRoomId,
+        documents: Vec<Document>,
+        classified: Vec<OwnedEventId>,
+    ) {
+        self.rooms
+            .insert(room_id.clone(), RoomIndex::restored(documents, classified));
+    }
+
+    fn mark_unreadable(&mut self, room_id: &OwnedRoomId) {
+        self.unreadable.insert(room_id.clone());
+    }
+
+    fn mark_dirty(&mut self, room_id: &OwnedRoomId) {
+        if let Some(index) = self.rooms.get_mut(room_id) {
+            index.dirty = true;
+        }
+    }
+
+    fn dirty_rooms(&self) -> Vec<OwnedRoomId> {
+        self.rooms
+            .iter()
+            .filter(|(room_id, index)| index.dirty && !self.unreadable.contains(*room_id))
+            .map(|(room_id, _)| room_id.clone())
+            .collect()
+    }
+
+    fn take_snapshot(&mut self, room_id: &OwnedRoomId) -> Option<persist::StoredRoom> {
+        let index = self.rooms.get_mut(room_id)?;
+        index.dirty = false;
+        Some(index.snapshot())
+    }
+
+    fn finish_restore(&mut self) {
+        self.trim_to_capacity();
     }
 
     pub(crate) fn documents(&self) -> usize {
@@ -403,10 +473,11 @@ impl MessageIndex {
         events: Vec<TimelineEvent>,
         cache: &RoomEventCache,
         rules: &RedactionRules,
-    ) {
+    ) -> usize {
         self.rooms
             .entry(room_id.clone())
             .or_insert_with(RoomIndex::new);
+        let mut fresh = 0;
 
         for (position, event) in events.into_iter().enumerate() {
             if position > 0 && position.is_multiple_of(EVENTS_PER_INGEST_YIELD) {
@@ -415,14 +486,19 @@ impl MessageIndex {
             }
 
             let Some(index) = self.rooms.get_mut(room_id) else {
-                return;
+                continue;
             };
 
             let Some(event_id) = event.event_id() else {
                 continue;
             };
 
-            if index.already_classified(event_id) || event.kind.is_utd() {
+            if index.already_classified(event_id) {
+                continue;
+            }
+            fresh += 1;
+
+            if event.kind.is_utd() {
                 continue;
             }
             index.mark_classified(event_id.to_owned());
@@ -463,6 +539,7 @@ impl MessageIndex {
         }
 
         self.trim_to_capacity();
+        fresh
     }
 }
 
@@ -575,6 +652,56 @@ async fn latest_body(cache: &RoomEventCache, event_id: &OwnedEventId) -> Option<
 }
 
 impl Core {
+    pub(crate) async fn restore_persisted_index(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        for room in client.joined_rooms() {
+            let room_id = room.room_id().to_owned();
+
+            match persist::load(client, &room_id).await {
+                persist::Loaded::Restored(documents, classified) => {
+                    self.search_index
+                        .lock()
+                        .await
+                        .restore_room(&room_id, documents, classified);
+                }
+                persist::Loaded::Absent => {}
+                persist::Loaded::Unreadable => {
+                    self.search_index.lock().await.mark_unreadable(&room_id);
+                }
+            }
+        }
+
+        self.search_index.lock().await.finish_restore();
+    }
+
+    pub(crate) fn watch_search_persist(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        let core = self.clone();
+        let client = client.clone();
+
+        self.track_session_task(
+            spawn(async move {
+                loop {
+                    matrix_sdk::sleep::sleep(PERSIST_INTERVAL).await;
+                    core.flush_search_index(&client).await;
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    pub(crate) async fn flush_search_index(&self, client: &matrix_sdk::Client) {
+        let dirty = self.search_index.lock().await.dirty_rooms();
+
+        for room_id in dirty {
+            let Some(stored) = self.search_index.lock().await.take_snapshot(&room_id) else {
+                continue;
+            };
+
+            if !persist::save(client, &room_id, &stored).await {
+                self.search_index.lock().await.mark_dirty(&room_id);
+            }
+        }
+    }
+
     pub(crate) async fn prime_persisted_rooms(self: &Arc<Self>, client: &matrix_sdk::Client) {
         for room in client.joined_rooms() {
             let room_id = room.room_id().to_owned();
@@ -597,6 +724,7 @@ impl Core {
 
     pub(crate) fn watch_ignored_users(self: &Arc<Self>, client: &matrix_sdk::Client) {
         let core = self.clone();
+        let client = client.clone();
         let mut changes = client.subscribe_to_ignore_user_list_changes();
 
         self.track_session_task(
@@ -604,6 +732,13 @@ impl Core {
                 while changes.next().await.is_some() {
                     *core.search_index.lock().await = MessageIndex::new();
                     core.search_crawl.lock().await.reset();
+
+                    for room in client.joined_rooms() {
+                        let room_id = room.room_id().to_owned();
+                        if !persist::forget(&client, &room_id).await {
+                            let _ = persist::forget(&client, &room_id).await;
+                        }
+                    }
                 }
             })
             .abort_on_drop(),
@@ -618,7 +753,11 @@ impl Core {
             spawn(async move {
                 let mut updates = client.event_cache().subscribe_to_room_generic_updates();
 
+                core.restore_persisted_index(&client).await;
                 core.prime_persisted_rooms(&client).await;
+
+                core.watch_search_crawl(&client);
+                core.watch_search_persist(&client);
 
                 loop {
                     let room_id = match updates.recv().await {
@@ -629,6 +768,7 @@ impl Core {
 
                     let Some(room) = client.get_room(&room_id) else {
                         core.search_index.lock().await.forget_room(&room_id);
+                        let _ = persist::forget(&client, &room_id).await;
                         continue;
                     };
 
@@ -1577,6 +1717,359 @@ mod tests {
         assert!(reached_start);
 
         drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_flushed_index_is_searchable_in_the_next_session() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!persisted:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    factory
+                        .text_msg("crawled archaeology")
+                        .event_id(event_id!("$crawled")),
+                ),
+            )
+            .await;
+
+        let (first, _first_events) = crate::Core::new(
+            "search-persist-first",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        first.prime_persisted_rooms(&client).await;
+        assert_eq!(
+            in_room(
+                &*first.search_index.lock().await,
+                &room_id,
+                "archaeology",
+                10,
+                0
+            )
+            .len(),
+            1
+        );
+        first.flush_search_index(&client).await;
+
+        let (second, _second_events) = crate::Core::new(
+            "search-persist-second",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        second.restore_persisted_index(&client).await;
+
+        let hits = in_room(
+            &*second.search_index.lock().await,
+            &room_id,
+            "archaeology",
+            10,
+            0,
+        );
+        assert_eq!(
+            hits.len(),
+            1,
+            "a restored session must find what was crawled"
+        );
+        assert_eq!(hits[0].event_id, event_id!("$crawled"));
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_restored_room_does_not_charge_the_crawl_budget_again() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!budget:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    factory
+                        .text_msg("crawled archaeology")
+                        .event_id(event_id!("$crawled")),
+                ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-budget",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+        core.flush_search_index(&client).await;
+
+        let (cache, _drop_handles) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+        let events = cache.events().await.expect("cached events");
+        let rules = room.clone_info().room_version_rules_or_default().redaction;
+
+        let virgin = MessageIndex::new()
+            .ingest(&room_id, events.clone(), &cache, &rules)
+            .await;
+        assert!(virgin > 0, "an unseen batch must cost the budget something");
+
+        let (restored, _restored_events) = crate::Core::new(
+            "search-budget-restored",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        restored.restore_persisted_index(&client).await;
+
+        let fresh = restored
+            .search_index
+            .lock()
+            .await
+            .ingest(&room_id, events, &cache, &rules)
+            .await;
+        assert_eq!(
+            fresh, 0,
+            "re-reading persisted events must not spend the crawl budget"
+        );
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_failed_room_reports_partial_not_complete() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!failed:localhost").to_owned();
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    EventFactory::new()
+                        .room(&room_id)
+                        .sender(user_id!("@erwan:localhost"))
+                        .text_msg("latest deploy")
+                        .event_id(event_id!("$latest")),
+                ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-coverage-partial",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+        core.search_crawl.lock().await.fail(room_id);
+
+        let coverage = core.search_coverage(&client).await;
+        assert_eq!(
+            coverage.state,
+            crate::protocol::SearchCoverageState::Partial,
+            "a room whose pagination errored must not be reported as fully indexed"
+        );
+        assert_eq!(coverage.rooms_failed, 1);
+        assert_eq!(coverage.rooms_pending, 0);
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_room_walked_to_its_start_reports_complete() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!walked:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous")
+                    .add_timeline_event(
+                        factory
+                            .text_msg("latest deploy")
+                            .event_id(event_id!("$latest")),
+                    ),
+            )
+            .await;
+
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default().events(vec![
+                factory
+                    .text_msg("older archaeology")
+                    .event_id(event_id!("$older")),
+            ]))
+            .mount()
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-coverage-complete",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+
+        let reached_start = core
+            .crawl_once(&client, &room_id)
+            .await
+            .expect("crawl one batch");
+        assert!(reached_start);
+        core.search_crawl.lock().await.settle(room_id);
+
+        let coverage = core.search_coverage(&client).await;
+        assert_eq!(
+            coverage.state,
+            crate::protocol::SearchCoverageState::Complete
+        );
+        assert_eq!(coverage.rooms_failed, 0);
+        assert_eq!(coverage.rooms_pending, 0);
+        assert_eq!(coverage.documents, 2);
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_spent_budget_reports_stopped_even_with_rooms_left() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!stopped:localhost").to_owned();
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous")
+                    .add_timeline_event(
+                        EventFactory::new()
+                            .room(&room_id)
+                            .sender(user_id!("@erwan:localhost"))
+                            .text_msg("latest deploy")
+                            .event_id(event_id!("$latest")),
+                    ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-coverage-stopped",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+        assert_eq!(
+            core.search_coverage(&client).await.state,
+            crate::protocol::SearchCoverageState::Indexing
+        );
+
+        core.search_crawl.lock().await.exhaust_budget_for_test();
+
+        let coverage = core.search_coverage(&client).await;
+        assert_eq!(
+            coverage.state,
+            crate::protocol::SearchCoverageState::Stopped,
+            "a spent budget outranks the rooms still queued"
+        );
+        assert_eq!(coverage.rooms_pending, 1);
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_the_crawl_serves_every_room_before_deepening_one() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let busy = room_id!("!busy:localhost").to_owned();
+        let quiet = room_id!("!quiet:localhost").to_owned();
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let busy_room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&busy)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("busy-previous")
+                    .add_timeline_event(
+                        EventFactory::new()
+                            .room(&busy)
+                            .sender(user_id!("@erwan:localhost"))
+                            .text_msg("newest deploy")
+                            .event_id(event_id!("$busy"))
+                            .server_ts(9_000),
+                    ),
+            )
+            .await;
+        let quiet_room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&quiet)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("quiet-previous")
+                    .add_timeline_event(
+                        EventFactory::new()
+                            .room(&quiet)
+                            .sender(user_id!("@erwan:localhost"))
+                            .text_msg("ancient deploy")
+                            .event_id(event_id!("$quiet"))
+                            .server_ts(1_000),
+                    ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-crawl-fairness",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.prime_persisted_rooms(&client).await;
+
+        assert_eq!(
+            core.next_room_to_crawl(&client).await.as_ref(),
+            Some(&busy),
+            "the first turn goes to the room with the newest message"
+        );
+
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default().events(vec![
+                EventFactory::new()
+                    .room(&busy)
+                    .sender(user_id!("@erwan:localhost"))
+                    .text_msg("older busy archaeology")
+                    .event_id(event_id!("$busy_older")),
+            ]))
+            .mount()
+            .await;
+        core.crawl_once(&client, &busy).await.expect("crawl busy");
+
+        assert_eq!(
+            core.next_room_to_crawl(&client).await.as_ref(),
+            Some(&quiet),
+            "the quiet room must get a turn before the busy one is deepened again"
+        );
+
+        drop(busy_room);
+        drop(quiet_room);
     }
 }
 

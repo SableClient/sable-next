@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SearchHitView } from '#src/generated/SearchHitView';
   import type { SearchOrder } from '#src/generated/SearchOrder';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -18,6 +18,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { MessageSearch } from './message-search.svelte.js';
   import { resolveRoomTarget, resolveUserTarget } from './resolve-targets';
+  import { coverageMessage } from './coverage';
   import { snippetAround } from './highlight';
   import ComposerAutocomplete from '../composer/ComposerAutocomplete.svelte';
   import type { Suggestion } from '../composer/autocomplete';
@@ -71,6 +72,14 @@
   let input = $state<HTMLInputElement>();
 
   let terms = $derived([...search.parsed.text.split(/\s+/), ...search.parsed.phrases]);
+
+  onMount(() => void core.refreshSearchCoverage());
+
+  let coverage = $derived(
+    coverageMessage(core.searchCoverage, core.searchCoverageUnavailable, (key, options) =>
+      $i18n.t(key, options)
+    )
+  );
 
   let status = $derived.by(() => {
     if (!search.runnable) return '';
@@ -352,6 +361,9 @@
       {:else if search.hits.length === 0}
         <div class="empty">
           <p>{$i18n.t('search.empty')}</p>
+          {#if coverage}
+            <p class="coverage">{coverage}</p>
+          {/if}
           <ul>
             {#each recoveries as recovery (recovery)}
               <li>{recovery}</li>
@@ -523,6 +535,12 @@
 
   .empty p {
     margin: 0;
+  }
+
+  .empty .coverage {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin-block-start: 0.25rem;
   }
 
   .announcement {

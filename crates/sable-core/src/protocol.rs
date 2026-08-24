@@ -335,8 +335,8 @@ pub enum Command {
     },
 
     EncryptionStatus,
+    SearchCoverage,
     Devices,
-    /// Verifies this device and unlocks existing history.
     RecoverIdentity {
         recovery_key: String,
     },
@@ -713,6 +713,9 @@ pub enum CommandOk {
     EncryptionStatus {
         status: EncryptionStatusView,
     },
+    SearchCoverage {
+        coverage: SearchCoverageView,
+    },
     Devices {
         devices: Vec<DeviceView>,
         account_management: bool,
@@ -908,6 +911,10 @@ pub enum CoreEvent {
         devices: Vec<DeviceView>,
     },
 
+    SearchCoverage {
+        coverage: SearchCoverageView,
+    },
+
     Notification {
         notification: NotificationView,
     },
@@ -982,7 +989,7 @@ pub enum SearchOrder {
     Recent,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchAttachment {
@@ -991,6 +998,28 @@ pub enum SearchAttachment {
     Audio,
     File,
     Link,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchCoverageState {
+    Indexing,
+    Complete,
+    Partial,
+    Stopped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct SearchCoverageView {
+    #[ts(type = "number")]
+    pub documents: usize,
+    #[ts(type = "number")]
+    pub rooms_pending: usize,
+    #[ts(type = "number")]
+    pub rooms_failed: usize,
+    pub state: SearchCoverageState,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, TS)]

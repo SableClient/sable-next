@@ -569,6 +569,10 @@ impl Core {
                 status: encryption_status(&self.client().await?).await,
             }),
 
+            Command::SearchCoverage => Ok(CommandOk::SearchCoverage {
+                coverage: self.search_coverage(&self.client().await?).await,
+            }),
+
             Command::Devices => {
                 let client = self.client().await?;
                 let account_management = client.oauth().full_session().is_some()

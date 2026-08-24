@@ -885,6 +885,14 @@
     "recoveryExclude": "Remove an -excluded term",
     "recoveryTerms": "Try fewer or different words",
     "activeFilters": "Active filters",
-    "removeFilter": "Remove {{filter}}"
+    "removeFilter": "Remove {{filter}}",
+    "coverageCount_one": "{{count}} message indexed so far.",
+    "coverageCount_other": "{{count}} messages indexed so far.",
+    "coverageIndexing": "Still reading older history.",
+    "coverageComplete": "Every room has been read back to its start.",
+    "coveragePartial_one": "{{count}} room could not be read and will be retried next time you sign in.",
+    "coveragePartial_other": "{{count}} rooms could not be read and will be retried next time you sign in.",
+    "coverageStopped": "Indexing stopped at this session's limit.",
+    "coverageUnknown": "We could not check how much history has been indexed, so these results may be incomplete."
   }
 }

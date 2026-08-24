@@ -1,6 +1,7 @@
 import type { CoreEvent } from '#src/generated/CoreEvent';
 import type { DeviceView } from '#src/generated/DeviceView';
 import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+import type { SearchCoverageView } from '#src/generated/SearchCoverageView';
 import type { AuthIntent } from '#src/generated/AuthIntent';
 import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
 import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
@@ -120,6 +121,8 @@ export class CoreClient {
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
+  searchCoverage = $state<SearchCoverageView | null>(null);
+  searchCoverageUnavailable = $state(false);
   /** Every device on this account, pushed on change. Absolute, not a diff. */
   deviceList = $state<DeviceView[]>([]);
   unresponsive = $state(false);
@@ -949,6 +952,26 @@ export class CoreClient {
     return response.status;
   }
 
+  async refreshSearchCoverage(attempts = 3): Promise<void> {
+    const generation = this.generation;
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        const response = await this.ensureTransport().send({ type: 'search_coverage' });
+        if (generation !== this.generation) return;
+        this.searchCoverage = response.coverage;
+        this.searchCoverageUnavailable = false;
+        return;
+      } catch (error) {
+        if (generation !== this.generation) return;
+        console.warn('[sable core] search coverage unavailable', error);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (generation === this.generation) this.searchCoverageUnavailable = true;
+  }
+
   async devices(): Promise<{ devices: DeviceView[]; accountManagement: boolean }> {
     const response = await this.ensureTransport().send({ type: 'devices' });
     return {
@@ -1182,6 +1205,8 @@ export class CoreClient {
     this.unresponsive = false;
     this.encryption = null;
     this.deviceList = [];
+    this.searchCoverage = null;
+    this.searchCoverageUnavailable = false;
   }
 
   /** Both events fire only on a change, so a session that starts unverified
@@ -1307,6 +1332,11 @@ export class CoreClient {
     }
     if (event.type === 'devices_changed') {
       this.deviceList = event.devices;
+      return;
+    }
+    if (event.type === 'search_coverage') {
+      this.searchCoverage = event.coverage;
+      this.searchCoverageUnavailable = false;
       return;
     }
     if (event.type !== 'session_ended') return;

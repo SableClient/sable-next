@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::cmp::Reverse;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,6 +8,7 @@ use matrix_sdk::ruma::OwnedRoomId;
 use tracing::warn;
 
 use crate::Core;
+use crate::protocol::{CoreEvent, SearchCoverageState, SearchCoverageView};
 
 const CRAWL_BATCH: u16 = 100;
 const CRAWL_PAUSE: Duration = Duration::from_secs(2);
@@ -18,6 +20,7 @@ pub(crate) struct CrawlProgress {
     reached_start: HashSet<OwnedRoomId>,
     failed: HashSet<OwnedRoomId>,
     ingesting: Option<OwnedRoomId>,
+    visits: HashMap<OwnedRoomId, usize>,
     events: usize,
 }
 
@@ -34,8 +37,25 @@ impl CrawlProgress {
         self.ingesting.as_ref() == Some(room_id)
     }
 
+    fn visit(&mut self, room_id: &OwnedRoomId) {
+        *self.visits.entry(room_id.clone()).or_default() += 1;
+    }
+
+    pub(super) fn settle(&mut self, room_id: OwnedRoomId) {
+        self.reached_start.insert(room_id);
+    }
+
+    pub(super) fn fail(&mut self, room_id: OwnedRoomId) {
+        self.failed.insert(room_id);
+    }
+
     pub(crate) fn reset(&mut self) {
         *self = Self::default();
+    }
+
+    #[cfg(test)]
+    pub(super) const fn exhaust_budget_for_test(&mut self) {
+        self.events = MAX_CRAWLED_EVENTS;
     }
 }
 
@@ -48,8 +68,15 @@ impl Core {
     }
 
     async fn crawl(self: Arc<Self>, client: &matrix_sdk::Client) {
+        let mut reported: Option<SearchCoverageView> = None;
+
         loop {
-            if self.search_crawl.lock().await.spent() || self.search_index.lock().await.is_full() {
+            self.report_coverage(client, &mut reported).await;
+
+            let spent = self.search_crawl.lock().await.spent();
+            let full = self.search_index.lock().await.is_full();
+
+            if spent || full {
                 matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
                 continue;
             }
@@ -60,13 +87,11 @@ impl Core {
             };
 
             match self.crawl_once(client, &room_id).await {
-                Ok(true) => {
-                    self.search_crawl.lock().await.reached_start.insert(room_id);
-                }
+                Ok(true) => self.search_crawl.lock().await.settle(room_id),
                 Ok(false) => {}
                 Err(error) => {
                     warn!(%room_id, "search crawl pagination failed: {error}");
-                    self.search_crawl.lock().await.failed.insert(room_id);
+                    self.search_crawl.lock().await.fail(room_id);
                 }
             }
 
@@ -74,7 +99,57 @@ impl Core {
         }
     }
 
-    async fn next_room_to_crawl(&self, client: &matrix_sdk::Client) -> Option<OwnedRoomId> {
+    async fn report_coverage(
+        &self,
+        client: &matrix_sdk::Client,
+        reported: &mut Option<SearchCoverageView>,
+    ) {
+        let coverage = self.search_coverage(client).await;
+        if reported.as_ref() == Some(&coverage) {
+            return;
+        }
+        *reported = Some(coverage);
+        self.emit(CoreEvent::SearchCoverage { coverage });
+    }
+
+    pub(crate) async fn search_coverage(&self, client: &matrix_sdk::Client) -> SearchCoverageView {
+        let index = self.search_index.lock().await;
+        let documents = index.documents();
+        let full = index.is_full();
+        drop(index);
+
+        let progress = self.search_crawl.lock().await;
+        let rooms_pending = client
+            .joined_rooms()
+            .into_iter()
+            .filter(|room| !progress.skips(&room.room_id().to_owned()))
+            .count();
+        let rooms_failed = progress.failed.len();
+        let stopped = full || progress.spent();
+        drop(progress);
+
+        let state = if stopped {
+            SearchCoverageState::Stopped
+        } else if rooms_pending > 0 {
+            SearchCoverageState::Indexing
+        } else if rooms_failed > 0 {
+            SearchCoverageState::Partial
+        } else {
+            SearchCoverageState::Complete
+        };
+
+        SearchCoverageView {
+            documents,
+            rooms_pending,
+            rooms_failed,
+            state,
+        }
+    }
+
+    pub(super) async fn next_room_to_crawl(
+        &self,
+        client: &matrix_sdk::Client,
+    ) -> Option<OwnedRoomId> {
         let newest = self.search_index.lock().await.newest_per_room();
         let progress = self.search_crawl.lock().await;
 
@@ -83,7 +158,12 @@ impl Core {
             .into_iter()
             .map(|room| room.room_id().to_owned())
             .filter(|room_id| !progress.skips(room_id))
-            .max_by_key(|room_id| newest.get(room_id).copied().flatten())
+            .min_by_key(|room_id| {
+                (
+                    progress.visits.get(room_id).copied().unwrap_or(0),
+                    Reverse(newest.get(room_id).copied().flatten()),
+                )
+            })
     }
 
     pub(super) async fn crawl_once(
@@ -98,24 +178,25 @@ impl Core {
         let (cache, _drop_handles) = client.event_cache().room(room_id).await?;
         let outcome = cache.pagination().run_backwards_once(CRAWL_BATCH).await?;
 
+        self.search_crawl.lock().await.visit(room_id);
+
         if !outcome.events.is_empty() {
             let rules = room.clone_info().room_version_rules_or_default().redaction;
             let mut events = outcome.events;
             events.reverse();
 
-            {
-                let mut progress = self.search_crawl.lock().await;
-                progress.events = progress.events.saturating_add(events.len());
-                progress.ingesting = Some(room_id.clone());
-            }
+            self.search_crawl.lock().await.ingesting = Some(room_id.clone());
 
-            self.search_index
+            let fresh = self
+                .search_index
                 .lock()
                 .await
                 .ingest(room_id, events, &cache, &rules)
                 .await;
 
-            self.search_crawl.lock().await.ingesting = None;
+            let mut progress = self.search_crawl.lock().await;
+            progress.ingesting = None;
+            progress.events = progress.events.saturating_add(fresh);
         }
 
         Ok(outcome.reached_start)
