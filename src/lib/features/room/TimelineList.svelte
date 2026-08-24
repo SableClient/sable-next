@@ -268,11 +268,9 @@
     estimateSize: (index) =>
       estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
     getItemKey: (index) => identityTracker.key(initialItems, index),
-    // `anchorTo` compensates the offset for a prepend during `setOptions`, before
-    // paint, which `holdAnchorThroughUpdate` cannot do from an effect.
     // `followOnAppend` only arms `reconcileScroll`, which forces the virtualiser's
     // own stale target back for five seconds.
-    anchorTo: 'end',
+    anchorTo: 'start',
     followOnAppend: false,
     scrollEndThreshold: 0,
     useScrollendEvent: true,
@@ -720,7 +718,7 @@
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
       getItemKey: (index) => identityTracker.key(items, index),
-      anchorTo: 'end',
+      anchorTo: 'start',
       followOnAppend: false,
       scrollEndThreshold: 0,
       useScrollendEvent: true,
