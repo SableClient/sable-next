@@ -167,6 +167,7 @@
     smoothTarget = target;
     setPosition({ kind: 'focused', eventId: target });
     focusAnchored = true;
+    recordScroll('focus:smooth', viewport?.scrollTop ?? -1);
     viewport?.scrollTo({ top: offset, behavior: 'smooth' });
   });
   let viewport = $state<HTMLDivElement | null>(null);
@@ -206,6 +207,11 @@
   }
   let measurementRevision = 0;
   let anchorCorrection: { by: string; delta: number; key: string | null } | null = null;
+  let selfWrite: { by: string; from: number; to: number; at: number } | null = null;
+  function recordScroll(by: string, from: number): void {
+    if (!timelineDebugEnabledForView) return;
+    selfWrite = { by, from, to: viewport?.scrollTop ?? -1, at: performance.now() };
+  }
   let anchorResidual: number | null = 0;
   let expectedSelfOffset: number | null = null;
   function recordSelfWrite(): void {
@@ -240,10 +246,12 @@
 
   // The virtualiser's helpers arm `reconcileScroll`, which forces the offset back
   // to its own target for five seconds.
-  function scrollToOffsetNow(offset: number): void {
+  function scrollToOffsetNow(offset: number, by: string): void {
     if (!viewport) return;
+    const from = viewport.scrollTop;
     viewport.scrollTop = offset;
     recordSelfWrite();
+    recordScroll(by, from);
   }
 
   function offsetOfIndex(index: number, align: 'start' | 'center' | 'end'): number | null {
@@ -266,7 +274,7 @@
     // own stale target back for five seconds.
     anchorTo: 'end',
     followOnAppend: false,
-    scrollEndThreshold: nearLatestPx,
+    scrollEndThreshold: 0,
     useScrollendEvent: true,
     overscan: 24,
     onChange: handleVirtualizerChange,
@@ -279,8 +287,11 @@
   get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
     const offset = instance.scrollOffset;
     if (offset === null || item.start >= offset) return false;
+    const remeasured = instance.itemSizeCache.has(item.key);
+    if (remeasured && (item.end > offset || instance.scrollDirection === 'backward')) return false;
     // `onScroll` abandons a held anchor for any offset it did not write itself.
     expectedSelfOffset = (viewport?.scrollTop ?? offset) + delta;
+    recordScroll('virtualizer:resize', viewport?.scrollTop ?? -1);
     return true;
   };
 
@@ -365,6 +376,7 @@
           maxAnchorResidual,
           anchorGuard: anchorHolding ? 'hold' : anchorRolling() ? 'rolling' : 'none',
           anchorCorrection,
+          selfWrite,
           firstVirtualIndex: virtualItems[0]?.index ?? null,
           lastVirtualIndex: virtualItems.at(-1)?.index ?? null,
           isScrolling: instance.isScrolling,
@@ -453,7 +465,7 @@
     if (!target || view.topOf(target.snapshot.key) !== null) return;
     const offset = offsetOfIndex(target.index, 'start');
     if (offset === null) return;
-    scrollToOffsetNow(Math.max(0, offset - target.snapshot.top));
+    scrollToOffsetNow(Math.max(0, offset - target.snapshot.top), 'bringAnchorIntoView');
     await new Promise(requestAnimationFrame);
   }
 
@@ -505,7 +517,7 @@
       commitDeferred = true;
       return;
     }
-    scrollToOffsetNow(node.scrollHeight);
+    scrollToOffsetNow(node.scrollHeight, 'commit');
     nearLatest = true;
   }
 
@@ -520,7 +532,7 @@
     if (index < 0) return;
     const offset = offsetOfIndex(index, 'start');
     if (offset === null) return;
-    scrollToOffsetNow(offset);
+    scrollToOffsetNow(offset, 'landOn');
     refreshRollingAnchor();
   }
 
@@ -710,7 +722,7 @@
       getItemKey: (index) => identityTracker.key(items, index),
       anchorTo: 'end',
       followOnAppend: false,
-      scrollEndThreshold: nearLatestPx,
+      scrollEndThreshold: 0,
       useScrollendEvent: true,
       overscan: 8,
       onChange: handleVirtualizerChange,
@@ -751,7 +763,7 @@
         : -1;
       if (focusIndex >= 0 && !focusAnchored) {
         const offset = offsetOfIndex(focusIndex, 'center');
-        if (offset !== null) scrollToOffsetNow(offset);
+        if (offset !== null) scrollToOffsetNow(offset, 'focus');
         focusAnchored = true;
       } else if (position.kind === 'settling') {
         const initialAnchorCancelled = (): boolean =>
@@ -872,6 +884,7 @@
   function jumpToLatest(): void {
     historyController.finishHistoryFill();
     setPosition({ kind: 'pinned' });
+    recordScroll('jumpToLatest', viewport?.scrollTop ?? -1);
     viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
     nearLatest = true;
   }

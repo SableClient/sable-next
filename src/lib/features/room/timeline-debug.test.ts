@@ -25,6 +25,7 @@ function sample(time: number, values: Partial<TimelineDebugSample> = {}): Timeli
     maxAnchorResidual: 0,
     anchorGuard: 'none',
     anchorCorrection: null,
+    selfWrite: null,
     firstVirtualIndex: null,
     lastVirtualIndex: null,
     isScrolling: false,

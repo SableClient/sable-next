@@ -21,6 +21,8 @@ export interface TimelineDebugSample {
   anchorGuard: 'hold' | 'rolling' | 'none';
   /** The last scroll the anchor wrote, so a jump in the trace names its author. */
   anchorCorrection: { by: string; delta: number; key: string | null } | null;
+  /** Every offset this view wrote, whichever call site wrote it. */
+  selfWrite: { by: string; from: number; to: number; at: number } | null;
   firstVirtualIndex: number | null;
   lastVirtualIndex: number | null;
   isScrolling: boolean;
