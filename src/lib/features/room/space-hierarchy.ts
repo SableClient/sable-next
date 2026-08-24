@@ -1,3 +1,4 @@
+import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 import type { RoomJoinRuleView } from '#src/generated/RoomJoinRuleView';
 
@@ -17,6 +18,8 @@ export type HierarchySection = {
   depth: number;
   key: string;
   rooms: HierarchyRoom[];
+  parentId: string;
+  siblings: SpaceChildEdge[];
 };
 
 export function lobbyAction(joinRule: RoomJoinRuleView, invited: boolean): 'join' | 'knock' | null {
@@ -69,7 +72,15 @@ export function buildHierarchySections(
     }
 
     if (ownRooms.length > 0) {
-      sections.push({ space, suggested, depth, key: ancestry.join('/'), rooms: ownRooms });
+      sections.push({
+        space,
+        suggested,
+        depth,
+        key: ancestry.join('/'),
+        rooms: ownRooms,
+        parentId: spaceId,
+        siblings: current.children,
+      });
     }
 
     for (const subspace of subspaces) {

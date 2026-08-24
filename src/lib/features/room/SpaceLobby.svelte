@@ -8,12 +8,14 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import type { DropEdge } from '#lib/ui/drag-list.js';
   import { matrixToUrl } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import {
     buildHierarchySections,
@@ -22,6 +24,7 @@
     type HierarchyRoom,
     type HierarchySection,
   } from './space-hierarchy';
+  import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
   import { initials } from './timeline-format';
   import SpaceLobbySection from './SpaceLobbySection.svelte';
 
@@ -195,6 +198,61 @@
     }
   }
 
+  async function applyReorder(section: HierarchySection, changes: Reorder[]): Promise<void> {
+    if (changes.length === 0) return;
+
+    const orders = new Map(changes.map((change) => [change.roomId, change.order]));
+    rooms = rooms.map((room) =>
+      room.room_id === section.parentId
+        ? {
+            ...room,
+            children: sortEdges(
+              room.children.map((edge) =>
+                orders.has(edge.room_id)
+                  ? { ...edge, order: orders.get(edge.room_id) ?? null }
+                  : edge
+              )
+            ),
+          }
+        : room
+    );
+
+    try {
+      for (const change of changes) {
+        await core.setSpaceChildOrder(section.parentId, change.roomId, change.order);
+      }
+    } catch (error) {
+      console.warn('[sable lobby] reorder failed', error);
+      failed = true;
+    }
+  }
+
+  function reorder(
+    section: HierarchySection,
+    source: string,
+    target: string,
+    position: DropEdge
+  ): void {
+    const siblings = section.siblings.map((edge) => ({
+      roomId: edge.room_id,
+      order: edge.order,
+    }));
+    const from = siblings.findIndex((sibling) => sibling.roomId === source);
+    const to = siblings.findIndex((sibling) => sibling.roomId === target);
+    if (from === -1 || to === -1) return;
+
+    void applyReorder(section, reorderChildren(siblings, source, dropIndex(from, to, position)));
+  }
+
+  function move(section: HierarchySection, roomId: string, delta: number): void {
+    const index = section.rooms.findIndex((entry) => entry.room.room_id === roomId);
+    const to = index + delta;
+    if (index === -1 || to < 0 || to >= section.rooms.length) return;
+
+    const neighbour = section.rooms[to];
+    reorder(section, roomId, neighbour.room.room_id, delta < 0 ? 'above' : 'below');
+  }
+
   async function copyLink(child: SpaceHierarchyRoomView): Promise<void> {
     try {
       const via = child.canonical_alias ? [] : await core.roomViaServers(child.room_id);
@@ -226,6 +284,10 @@
   {/if}
 
   {#if phase === 'loading'}
+    <p class="loading-note" role="status">
+      <Spinner />
+      <span>{$i18n.t('room.lobbyLoading')}</span>
+    </p>
     <div class="category">
       <ul class="rooms">
         {#each [0, 1, 2] as placeholder (placeholder)}
@@ -263,8 +325,17 @@
         onRemove={(section: HierarchySection, entry: HierarchyRoom) => {
           void remove(section, entry);
         }}
+        onReorder={reorder}
+        onMove={move}
       />
     {/each}
+  {/if}
+
+  {#if loading && sections.length > 0}
+    <p class="loading-note" role="status">
+      <Spinner small />
+      <span>{$i18n.t('room.lobbyLoadingMore')}</span>
+    </p>
   {/if}
 
   {#if nextBatch !== null}
@@ -297,6 +368,15 @@
     color: var(--sable-surface-var-on-container);
     margin: var(--space-1) 0 0;
     max-width: 48ch;
+  }
+
+  .loading-note {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-tight);
+    margin: 0;
   }
 
   .empty {

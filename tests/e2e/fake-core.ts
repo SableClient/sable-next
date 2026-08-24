@@ -137,10 +137,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       ...overrides,
     });
 
-    const childEdge = (roomId: string, order: number) => ({
+    const childEdge = (roomId: string, position: number, order: string | null = null) => ({
       room_id: roomId,
-      order: null,
-      origin_server_ts: order,
+      order,
+      origin_server_ts: position,
       suggested: false,
     });
 
@@ -149,7 +149,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         rooms: [
           hierarchyRoom('!alpha:example.test', 'Alpha', {
             is_space: true,
-            children: [childEdge('!nested:example.test', 1), childEdge('!late:example.test', 2)],
+            children: [
+              childEdge('!nested:example.test', 1, 'a'),
+              childEdge('!late:example.test', 2, 'b'),
+              childEdge('!middle:example.test', 3, 'c'),
+              childEdge('!tail:example.test', 4, 'd'),
+            ],
           }),
           hierarchyRoom('!nested:example.test', 'Nested', {
             is_space: true,
@@ -161,10 +166,24 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       'page-two': {
         rooms: [
           hierarchyRoom('!late:example.test', 'Late Arrival'),
+          hierarchyRoom('!middle:example.test', 'Middle Room'),
+          hierarchyRoom('!tail:example.test', 'Tail Room'),
           hierarchyRoom('!deep:example.test', 'Deep Room'),
         ],
         next_batch: null,
       },
+    };
+
+    const CHILD_ORDER_KEY = 'e2e-space-child-order';
+    const recordChildOrder = (command: Record<string, unknown>): void => {
+      const stored: unknown = JSON.parse(sessionStorage.getItem(CHILD_ORDER_KEY) ?? '[]');
+      const log = Array.isArray(stored) ? stored : [];
+      log.push({
+        space_id: command['space_id'],
+        room_id: command['room_id'],
+        order: command['order'],
+      });
+      sessionStorage.setItem(CHILD_ORDER_KEY, JSON.stringify(log));
     };
 
     const hierarchyPage = (from: string) => {
@@ -331,6 +350,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           window.setTimeout(() => {
             this.onmessage?.({
               data: { id: request.id, ok: { type: command, profile: named } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'set_space_child_order') {
+          recordChildOrder(request.command as unknown as Record<string, unknown>);
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command } },
             } as MessageEvent);
           });
           return;

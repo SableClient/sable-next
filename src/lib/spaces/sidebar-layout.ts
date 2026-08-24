@@ -1,3 +1,4 @@
+import type { DropInstruction } from '#lib/ui/drag-list.js';
 import type { SidebarItemView } from '#src/generated/SidebarItemView';
 
 export type SidebarItem = SidebarItemView;
@@ -7,7 +8,7 @@ export type LayoutRef =
   | { kind: 'space'; roomId: string; folderId?: string }
   | { kind: 'folder'; folderId: string };
 
-export type DropInstruction = 'above' | 'below' | 'into';
+export type { DropInstruction };
 
 export const FOLDER_NAME_MAX_LENGTH = 200;
 

@@ -17,12 +17,7 @@
     type SidebarItem,
   } from '#lib/spaces/sidebar-layout.js';
   import { saveSpacePath, savedSpacePaths, spaceNavigationHref } from './space-paths.js';
-  import {
-    railDraggable,
-    railDropTarget,
-    railMonitor,
-    type RailDropState,
-  } from './space-rail-dnd.js';
+  import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import ArrowLineUpIcon from 'phosphor-svelte/lib/ArrowLineUpIcon';
@@ -83,7 +78,7 @@
   }: Props = $props();
   let spacePaths = $state(savedSpacePaths());
   let dragged = $state<LayoutRef | null>(null);
-  let dropState = $state<RailDropState | null>(null);
+  let dropState = $state<DropState<LayoutRef> | null>(null);
 
   let items = $derived<readonly RailItem[]>([
     {
@@ -209,7 +204,7 @@
 
   function dropping(ref: LayoutRef, instruction: DropInstruction): boolean {
     return (
-      dropState !== null && dropState.instruction === instruction && refsEqual(dropState.ref, ref)
+      dropState !== null && dropState.instruction === instruction && refsEqual(dropState.item, ref)
     );
   }
 
@@ -218,11 +213,12 @@
   }
 
   const noAttachment = (): undefined => undefined;
+  const dragList = createDragList<LayoutRef>(refsEqual);
 
   function dragSource(ref: LayoutRef) {
     return mobile
       ? noAttachment
-      : railDraggable(ref, (next) => {
+      : dragList.draggable(ref, (next) => {
           dragged = next;
         });
   }
@@ -230,14 +226,18 @@
   function dropTarget(ref: LayoutRef, allowInto: boolean) {
     return mobile
       ? noAttachment
-      : railDropTarget(ref, allowInto, (next) => {
-          dropState = next;
+      : dragList.dropTarget(ref, {
+          allowInto,
+          onState: (next) => {
+            dropState = next;
+          },
+          onDrop: (source, target, instruction) => {
+            onReorder?.(source, target, instruction);
+          },
         });
   }
 
-  const monitor = railMonitor((source, target, instruction) => {
-    onReorder?.(source, target, instruction);
-  });
+  const monitor = dragList.autoScroll();
 
   afterNavigate(() => {
     if (mobile) return;

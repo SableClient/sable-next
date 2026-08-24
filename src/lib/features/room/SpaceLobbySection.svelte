@@ -1,8 +1,11 @@
 <script lang="ts">
   import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
   import { DropdownMenu } from 'bits-ui';
+  import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
+  import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import DotsSixVerticalIcon from 'phosphor-svelte/lib/DotsSixVerticalIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
@@ -12,8 +15,10 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import type { HierarchyRoom, HierarchySection } from './space-hierarchy';
   import { lobbyAction } from './space-hierarchy';
+  import type { DropEdge } from '#lib/ui/drag-list.js';
   import { initials } from './timeline-format';
 
   interface Props {
@@ -30,6 +35,13 @@
     onJoin: (child: SpaceHierarchyRoomView) => void;
     onCopyLink: (child: SpaceHierarchyRoomView) => void;
     onRemove: (section: HierarchySection, entry: HierarchyRoom) => void;
+    onReorder: (
+      section: HierarchySection,
+      source: string,
+      target: string,
+      position: DropEdge
+    ) => void;
+    onMove: (section: HierarchySection, roomId: string, delta: number) => void;
   }
 
   let {
@@ -46,7 +58,25 @@
     onJoin,
     onCopyLink,
     onRemove,
+    onReorder,
+    onMove,
   }: Props = $props();
+
+  let dragging = $state<string | null>(null);
+  let dropState = $state<DropState<string> | null>(null);
+  const dragList = createDragList<string>((left, right) => left === right);
+
+  function dropTarget(roomId: string) {
+    return dragList.dropTarget(roomId, {
+      onState: (next) => {
+        dropState = next;
+      },
+      onDrop: (source, target, instruction) => {
+        if (instruction === 'into') return;
+        onReorder(section, source, target, instruction);
+      },
+    });
+  }
 </script>
 
 <div class="section">
@@ -99,7 +129,23 @@
           {@const child = entry.room}
           {@const joined = joinedIds.has(child.room_id)}
           {@const action = lobbyAction(child.join_rule, invitedIds.has(child.room_id))}
-          <li class="room">
+          <li
+            class="room"
+            class:dragging={dragging === child.room_id}
+            class:drop-above={dropState?.item === child.room_id &&
+              dropState.instruction === 'above'}
+            class:drop-below={dropState?.item === child.room_id &&
+              dropState.instruction === 'below'}
+            {@attach canManage
+              ? dragList.draggable(child.room_id, (next) => {
+                  dragging = next;
+                })
+              : undefined}
+            {@attach canManage ? dropTarget(child.room_id) : undefined}
+          >
+            {#if canManage}
+              <span class="drag-handle" aria-hidden="true"><DotsSixVerticalIcon /></span>
+            {/if}
             <Avatar src={child.avatar_url} initials={initials(label(child))} size="small" />
             <div class="room-text">
               <span class="room-name">
@@ -169,6 +215,22 @@
                     <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
                   </DropdownMenu.Item>
                   {#if canManage}
+                    <DropdownMenu.Item
+                      class="room-options-item"
+                      onSelect={() => {
+                        onMove(section, child.room_id, -1);
+                      }}
+                    >
+                      <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="room-options-item"
+                      onSelect={() => {
+                        onMove(section, child.room_id, 1);
+                      }}
+                    >
+                      <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
+                    </DropdownMenu.Item>
                     <DropdownMenu.Item
                       class="room-options-item room-options-destructive"
                       onSelect={() => {
@@ -268,6 +330,27 @@
 
   .room + .room {
     border-top: var(--border-width) solid var(--sable-bg-container-line);
+  }
+
+  .room.dragging {
+    opacity: 0.4;
+  }
+
+  .room.drop-above {
+    box-shadow: inset 0 2px 0 0 var(--sable-primary-main);
+  }
+
+  .room.drop-below {
+    box-shadow: inset 0 -2px 0 0 var(--sable-primary-main);
+  }
+
+  .drag-handle {
+    align-items: center;
+    color: var(--sable-surface-var-on-container);
+    cursor: grab;
+    display: inline-flex;
+    flex: none;
+    margin-left: calc(-1 * var(--space-2));
   }
 
   .room:hover {

@@ -56,3 +56,82 @@ test('switching spaces does not leave the previous space rooms on screen', async
   await expect(page.locator('.room-name', { hasText: 'Late Arrival' })).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1, name: 'Beta' })).toBeVisible();
 });
+
+test('the keyboard move sends one order for the room that moved', async ({
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('spaces');
+  await page.goto(LOBBY);
+
+  const rooms = page.locator('.section .rooms').first().locator('.room-name');
+  await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/]);
+
+  await page
+    .locator('.room', { has: page.locator('.room-name', { hasText: 'Tail Room' }) })
+    .getByRole('button', { name: 'Room options' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Move up' }).click();
+
+  await expect(rooms).toHaveText([/Late Arrival/, /Tail Room/, /Middle Room/]);
+
+  const sent = await page.evaluate(
+    () =>
+      JSON.parse(sessionStorage.getItem('e2e-space-child-order') ?? '[]') as {
+        space_id: string;
+        room_id: string;
+        order: string | null;
+      }[]
+  );
+  expect(sent).toHaveLength(1);
+  expect(sent[0]?.room_id).toBe('!tail:example.test');
+  expect(sent[0]?.space_id).toBe('!alpha:example.test');
+  expect(typeof sent[0]?.order).toBe('string');
+});
+
+test('moving the first room up does nothing', async ({ page, installRoomCore }) => {
+  await installRoomCore('spaces');
+  await page.goto(LOBBY);
+
+  const rooms = page.locator('.section .rooms').first().locator('.room-name');
+  await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/]);
+
+  await page
+    .locator('.room', { has: page.locator('.room-name', { hasText: 'Late Arrival' }) })
+    .getByRole('button', { name: 'Room options' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Move up' }).click();
+
+  await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/]);
+  expect(await page.evaluate(() => sessionStorage.getItem('e2e-space-child-order'))).toBeNull();
+});
+
+test('a dragged room is dropped where the indicator showed', async ({ page, installRoomCore }) => {
+  await installRoomCore('spaces');
+  await page.goto(LOBBY);
+
+  const rooms = page.locator('.section .rooms').first().locator('.room-name');
+  await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/]);
+
+  const source = page.locator('.room', {
+    has: page.locator('.room-name', { hasText: 'Tail Room' }),
+  });
+  const target = page.locator('.room', {
+    has: page.locator('.room-name', { hasText: 'Late Arrival' }),
+  });
+
+  await source.dragTo(target, { targetPosition: { x: 20, y: 2 } });
+
+  await expect(rooms).toHaveText([/Tail Room/, /Late Arrival/, /Middle Room/]);
+});
+
+test('a room shows a drag handle when the account can manage the space', async ({
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('spaces');
+  await page.goto(LOBBY);
+
+  await expect(page.locator('.room-name', { hasText: 'Late Arrival' })).toBeVisible();
+  await expect(page.locator('.drag-handle').first()).toBeVisible();
+});
