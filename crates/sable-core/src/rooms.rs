@@ -1,6 +1,7 @@
 use matrix_sdk::config::RequestConfig;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::Room;
+use matrix_sdk::ruma::SpaceChildOrder;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
@@ -39,6 +40,47 @@ impl Core {
             .map_err(|error| self.failed("add_to_space", error))?;
 
         Ok(())
+    }
+
+    pub(crate) async fn set_space_child_order(
+        &self,
+        space_id: &OwnedRoomId,
+        room_id: &RoomId,
+        order: Option<String>,
+    ) -> Result<CommandOk, CommandErr> {
+        let space = self.room(space_id).await?;
+
+        let existing = space
+            .get_state_event_static_for_key::<SpaceChildEventContent, _>(room_id)
+            .await
+            .map_err(|error| self.failed("set_space_child_order: read", error))?
+            .ok_or(CommandErr::UnknownRoom)?
+            .deserialize()
+            .map_err(|error| self.failed("set_space_child_order: parse", error))?;
+
+        let SyncOrStrippedState::Sync(event) = existing else {
+            return Err(CommandErr::UnknownRoom);
+        };
+        let mut content = event
+            .as_original()
+            .ok_or(CommandErr::UnknownRoom)?
+            .content
+            .clone();
+
+        content.order = match order {
+            Some(order) => Some(
+                SpaceChildOrder::parse(order)
+                    .map_err(|error| self.failed("set_space_child_order: invalid order", error))?,
+            ),
+            None => None,
+        };
+
+        space
+            .send_state_event_for_key(room_id, content)
+            .await
+            .map_err(|error| self.room_error("set_space_child_order", error))?;
+
+        Ok(CommandOk::SetSpaceChildOrder)
     }
 
     pub(crate) async fn knock_room(

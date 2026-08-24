@@ -270,8 +270,13 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
-    /// The server's view of a space's children, so the lobby can list rooms this
-    /// account has never joined. One page; `next_batch` continues it.
+    SetSpaceChildOrder {
+        #[ts(type = "string")]
+        space_id: OwnedRoomId,
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        order: Option<String>,
+    },
     SpaceHierarchy {
         #[ts(type = "string")]
         space_id: OwnedRoomId,
@@ -681,6 +686,7 @@ pub enum CommandOk {
         next_batch: Option<String>,
     },
     RemoveFromSpace,
+    SetSpaceChildOrder,
     SpaceSidebar {
         items: Vec<SidebarItemView>,
     },
@@ -896,6 +902,10 @@ pub enum CoreEvent {
     /// Pushed on every change, so the UI never polls to notice it is verified.
     EncryptionStatus {
         status: EncryptionStatusView,
+    },
+
+    DevicesChanged {
+        devices: Vec<DeviceView>,
     },
 
     Notification {

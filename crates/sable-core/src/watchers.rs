@@ -165,6 +165,47 @@ impl Core {
         );
     }
 
+    pub(crate) fn watch_devices(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+        let core = self.clone();
+        let watched = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                let Ok(devices) = watched.encryption().devices_stream().await else {
+                    return;
+                };
+                pin_mut!(devices);
+                while devices.next().await.is_some() {
+                    core.emit_devices(generation, &watched).await;
+                }
+            })
+            .abort_on_drop(),
+        );
+
+        let core = self.clone();
+        let watched = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                let Ok(identities) = watched.encryption().user_identities_stream().await else {
+                    return;
+                };
+                pin_mut!(identities);
+                while identities.next().await.is_some() {
+                    core.emit_devices(generation, &watched).await;
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    async fn emit_devices(&self, generation: u64, client: &matrix_sdk::Client) {
+        self.emit_if_current(
+            generation,
+            CoreEvent::DevicesChanged {
+                devices: crate::verification::own_devices(client).await,
+            },
+        );
+    }
+
     pub(crate) fn watch_space_sidebar(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,

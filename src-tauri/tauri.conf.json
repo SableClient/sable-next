@@ -3,13 +3,6 @@
   "productName": "sable-next",
   "version": "0.1.0",
   "identifier": "moe.sable.next",
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/SableClient/sable-next/releases/latest/download/latest.json"
-      ]
-    }
-  },
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
@@ -34,6 +27,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -49,6 +43,12 @@
     }
   },
   "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/SableClient/sable-next/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc2QkU1MjdBNUY2RUY3MTkKUldRWjkyNWZlbEsrZHA5cUlvMG92V1V2OUVXNVVRb1ZUOHJrcXpXZ2VjL0tsamU0elF3eXF6N3YK"
+    },
     "deep-link": {
       "desktop": {
         "schemes": ["moe.sable.next", "sable"]

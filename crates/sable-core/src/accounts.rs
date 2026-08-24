@@ -360,6 +360,7 @@ impl Core {
 
         self.watch_session_changes(&client, generation);
         self.watch_encryption(&client, generation);
+        self.watch_devices(&client, generation);
         self.watch_notifications(&client, generation);
         self.watch_notification_settings(&client, generation);
         self.watch_space_sidebar(&client, generation);

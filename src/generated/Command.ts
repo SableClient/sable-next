@@ -55,7 +55,7 @@ encrypted: boolean, invite: string[],
 /**
  * Adds an `m.space.child` edge from this space.
  */
-parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "space_hierarchy", space_id: string, from: string | null, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "space_sidebar" } | { "type": "set_space_sidebar", items: Array<SidebarItemView>, } | { "type": "room_preview", 
+parent_space: string | null, } | { "type": "create_dm", user_id: string, } | { "type": "add_to_space", space_id: string, room_id: string, } | { "type": "set_space_child_order", space_id: string, room_id: string, order: string | null, } | { "type": "space_hierarchy", space_id: string, from: string | null, } | { "type": "remove_from_space", space_id: string, room_id: string, } | { "type": "space_sidebar" } | { "type": "set_space_sidebar", items: Array<SidebarItemView>, } | { "type": "room_preview", 
 /**
  * A room id or an alias, as `JoinRoom` takes.
  */

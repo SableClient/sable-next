@@ -37,7 +37,7 @@ use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::encryption_status;
 use crate::{Core, SubscriptionKind};
-use crate::{notifications, protocol, session, spaces, view};
+use crate::{notifications, session, spaces, view};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 
@@ -571,7 +571,6 @@ impl Core {
 
             Command::Devices => {
                 let client = self.client().await?;
-                let own_device_id = client.device_id().map(ToOwned::to_owned);
                 let account_management = client.oauth().full_session().is_some()
                     && client
                         .oauth()
@@ -581,23 +580,8 @@ impl Core {
                         .and_then(|metadata| metadata.account_management_uri)
                         .is_some();
 
-                let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
-                let devices = client
-                    .encryption()
-                    .get_user_devices(&user_id)
-                    .await
-                    .map_err(|error| self.failed("devices", error))?;
-
                 Ok(CommandOk::Devices {
-                    devices: devices
-                        .devices()
-                        .map(|device| protocol::DeviceView {
-                            is_own: Some(device.device_id()) == own_device_id.as_deref(),
-                            device_id: device.device_id().to_owned(),
-                            display_name: device.display_name().map(str::to_owned),
-                            is_verified: device.is_verified(),
-                        })
-                        .collect(),
+                    devices: crate::verification::own_devices(&client).await,
                     account_management,
                 })
             }
@@ -1302,6 +1286,12 @@ impl Core {
 
                 Ok(CommandOk::AddToSpace)
             }
+
+            Command::SetSpaceChildOrder {
+                space_id,
+                room_id,
+                order,
+            } => self.set_space_child_order(&space_id, &room_id, order).await,
 
             Command::SpaceHierarchy { space_id, from } => {
                 self.space_hierarchy(&space_id, from).await

@@ -47,6 +47,8 @@ export interface Preferences {
   /** Distinguishes a declined prompt from one that was never shown. */
   telemetryAsked: boolean;
 
+  autoUpdateCheck: boolean;
+
   showHiddenEvents: boolean;
   showNonStandardEvents: boolean;
 }
@@ -124,6 +126,8 @@ const DEFAULTS: Preferences = {
   errorReporting: false,
   sessionReplay: false,
   telemetryAsked: false,
+
+  autoUpdateCheck: true,
 
   showHiddenEvents: false,
   showNonStandardEvents: false,

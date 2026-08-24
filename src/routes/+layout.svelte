@@ -9,8 +9,11 @@
   import '../styles.css';
   import { createCoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
+  import BannerDock from '#lib/ui/BannerDock.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
+  import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
   import TelemetryConsentBanner from '#lib/ui/TelemetryConsentBanner.svelte';
+  import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -61,7 +64,11 @@
      nameless node to the tree. -->
 <IconContext values={{ 'aria-hidden': true }}>
   <CoreHealthBanner />
-  <TelemetryConsentBanner />
+  <BannerDock>
+    <TelemetryConsentBanner />
+    <UnverifiedDeviceBanner />
+    <DesktopUpdateBanner />
+  </BannerDock>
 
   <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
     {@render children()}

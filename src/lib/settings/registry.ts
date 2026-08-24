@@ -1,4 +1,5 @@
 import type { Component } from 'svelte';
+import ArrowCircleUpIcon from 'phosphor-svelte/lib/ArrowCircleUpIcon';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
 import BugIcon from 'phosphor-svelte/lib/BugIcon';
@@ -31,6 +32,7 @@ import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 
 import { presentsInApp } from '#lib/platform/notifications.js';
+import { supportsAutoUpdate } from '#lib/platform/updates.js';
 
 import type { FreeTextPreference, Preferences } from './preferences.svelte';
 
@@ -125,6 +127,26 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
         description: 'settings.sessionReplayHint',
         type: 'boolean',
         gatedBy: 'errorReporting',
+      },
+    ]
+  : [];
+
+const updatesCategories: SettingsCategory[] = supportsAutoUpdate()
+  ? [
+      {
+        id: 'updates',
+        name: 'settings.updatesTitle',
+        description: 'settings.updatesDescription',
+        icon: ArrowCircleUpIcon,
+        items: [
+          {
+            key: 'autoUpdateCheck',
+            icon: ArrowCircleUpIcon,
+            name: 'settings.autoUpdateCheck',
+            description: 'settings.autoUpdateCheckHint',
+            type: 'boolean',
+          },
+        ],
       },
     ]
   : [];
@@ -397,6 +419,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
     ],
   },
+  ...updatesCategories,
   {
     id: 'developer',
     name: 'settings.developerTitle',

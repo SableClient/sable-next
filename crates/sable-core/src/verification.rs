@@ -11,7 +11,7 @@ use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessa
 use matrix_sdk::ruma::{OwnedUserId, UserId};
 
 use crate::protocol::{
-    CommandErr, CoreEvent, EmojiView, EncryptionStatusView, RecoveryStateView,
+    CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, RecoveryStateView,
     VerificationStateView, VerificationView,
 };
 
@@ -256,6 +256,26 @@ const fn verification_phase(state: &VerificationView) -> &'static str {
         VerificationView::Done => "done",
         VerificationView::Cancelled { .. } => "cancelled",
     }
+}
+
+pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> {
+    let Some(user_id) = client.user_id() else {
+        return Vec::new();
+    };
+    let own_device_id = client.device_id();
+    let Ok(devices) = client.encryption().get_user_devices(user_id).await else {
+        return Vec::new();
+    };
+
+    devices
+        .devices()
+        .map(|device| DeviceView {
+            is_own: Some(device.device_id()) == own_device_id,
+            device_id: device.device_id().to_owned(),
+            display_name: device.display_name().map(str::to_owned),
+            is_verified: device.is_verified(),
+        })
+        .collect()
 }
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {

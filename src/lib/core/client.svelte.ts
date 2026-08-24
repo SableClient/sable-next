@@ -118,6 +118,10 @@ export class CoreClient {
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
   sync = $state<SyncStatus | null>(null);
+  /** This device's own verification and recovery state, pushed on change. */
+  encryption = $state<EncryptionStatusView | null>(null);
+  /** Every device on this account, pushed on change. Absolute, not a diff. */
+  deviceList = $state<DeviceView[]>([]);
   unresponsive = $state(false);
   accountRevision = $state(0);
 
@@ -684,8 +688,15 @@ export class CoreClient {
     });
   }
 
-  /** Empty until the account arranges the rail; the room list supplies the
-      order until then. */
+  async setSpaceChildOrder(spaceId: string, roomId: string, order: string | null): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_space_child_order',
+      space_id: spaceId,
+      room_id: roomId,
+      order,
+    });
+  }
+
   async spaceSidebar(): Promise<SidebarItemView[]> {
     const response = await this.ensureTransport().send({ type: 'space_sidebar' });
     return response.items;
@@ -1169,6 +1180,22 @@ export class CoreClient {
     this.sync = null;
     this.crashed = null;
     this.unresponsive = false;
+    this.encryption = null;
+    this.deviceList = [];
+  }
+
+  /** Both events fire only on a change, so a session that starts unverified
+      would otherwise report nothing. */
+  private async primeEncryptionStatus(): Promise<void> {
+    const generation = this.generation;
+    try {
+      const [status, devices] = await Promise.all([this.encryptionStatus(), this.devices()]);
+      if (generation !== this.generation) return;
+      this.encryption = status;
+      this.deviceList = devices.devices;
+    } catch (error) {
+      console.debug('[sable core] encryption status unavailable', error);
+    }
   }
 
   private replaceSession(session: CoreSession | null, broadcast = true): void {
@@ -1178,6 +1205,7 @@ export class CoreClient {
       this.resetCachedState();
     }
     this.session = session;
+    if (changed && session) void this.primeEncryptionStatus();
     if (changed && broadcast) this.accountChannel?.postMessage(null);
   }
 
@@ -1271,6 +1299,14 @@ export class CoreClient {
   private readonly handleEvent = (event: CoreEvent): void => {
     if (event.type === 'sync_status') {
       this.sync = event;
+      return;
+    }
+    if (event.type === 'encryption_status') {
+      this.encryption = event.status;
+      return;
+    }
+    if (event.type === 'devices_changed') {
+      this.deviceList = event.devices;
       return;
     }
     if (event.type !== 'session_ended') return;
