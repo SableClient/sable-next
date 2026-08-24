@@ -24,6 +24,7 @@
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
+  import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
@@ -46,6 +47,8 @@
     unreadSpaceIds?: ReadonlySet<string>;
     homeUnread?: number;
     homeHighlight?: boolean;
+    unspacedUnread?: number;
+    unspacedHighlight?: boolean;
     directRooms?: readonly RoomSummary[];
     directUnread?: number;
     mobile?: boolean;
@@ -64,6 +67,8 @@
     unreadSpaceIds = new Set(),
     homeUnread = 0,
     homeHighlight = false,
+    unspacedUnread = 0,
+    unspacedHighlight = false,
     directRooms = [],
     directUnread = 0,
     mobile = false,
@@ -88,6 +93,14 @@
       label: 'nav.home',
       unread: homeUnread > 0,
       unreadCount: homeHighlight ? homeUnread : undefined,
+    },
+    {
+      href: resolve('/(app)/rooms'),
+      activePrefix: '/rooms',
+      icon: HashIcon,
+      label: 'nav.unspaced',
+      unread: unspacedUnread > 0,
+      unreadCount: unspacedHighlight ? unspacedUnread : undefined,
     },
     {
       href: resolve('/(app)/search'),

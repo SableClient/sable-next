@@ -62,20 +62,23 @@
       spaces.map((space) => space.room_id)
     )
   );
-  let homeCounts = $derived(
-    unreadCounts(
-      roomList.rooms.filter(
-        (room) =>
-          room.state === 'joined' &&
-          !room.is_space &&
-          !room.is_direct &&
-          !claimedRoomIds.has(room.room_id) &&
-          !roomList.mutedRoomIds.has(room.room_id)
-      )
+  let homeRooms = $derived(
+    roomList.rooms.filter(
+      (room) =>
+        room.state === 'joined' &&
+        !room.is_space &&
+        !room.is_direct &&
+        !roomList.mutedRoomIds.has(room.room_id)
     )
   );
+  let homeCounts = $derived(unreadCounts(homeRooms));
   let homeUnread = $derived(homeCounts.highlight || homeCounts.unread);
   let homeHighlight = $derived(homeCounts.highlight > 0);
+  let unspacedCounts = $derived(
+    unreadCounts(homeRooms.filter((room) => !claimedRoomIds.has(room.room_id)))
+  );
+  let unspacedUnread = $derived(unspacedCounts.highlight || unspacedCounts.unread);
+  let unspacedHighlight = $derived(unspacedCounts.highlight > 0);
   let directRooms = $derived(
     roomList.rooms
       .filter(
@@ -212,6 +215,8 @@
           unreadSpaceIds={unreadSpaces}
           {homeUnread}
           {homeHighlight}
+          {unspacedUnread}
+          {unspacedHighlight}
           {directRooms}
           {directUnread}
           mobile
@@ -230,6 +235,8 @@
           unreadSpaceIds={unreadSpaces}
           {homeUnread}
           {homeHighlight}
+          {unspacedUnread}
+          {unspacedHighlight}
           {directRooms}
           {directUnread}
           {...railProps}

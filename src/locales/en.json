@@ -31,6 +31,8 @@
     "currentAccount": "Current",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
+    "unspaced": "Rooms outside spaces",
+    "unspacedEmpty": "Rooms that are not in a space will appear here.",
     "chats": "Chats",
     "chatsEmpty": "You do not have any direct messages yet.",
     "unreadMessages": "{{count}} unread messages",

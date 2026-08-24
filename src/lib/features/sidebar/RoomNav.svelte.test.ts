@@ -23,7 +23,13 @@ const coreStub = vi.hoisted(() => ({
 vi.mock('$app/state', () => ({ page: pageState }));
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
 vi.mock('$app/paths', () => ({
-  resolve: (path: string) => (path.startsWith('/') ? path : `/${path}`),
+  resolve: (path: string, params: Record<string, string> = {}) => {
+    const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
+      /\[([^\]]+)\]/g,
+      (_, key: string) => params[key] ?? key
+    );
+    return resolved.startsWith('/(app)') ? resolved.slice('/(app)'.length) : resolved;
+  },
 }));
 vi.mock('#lib/i18n.js', () => ({
   i18n: {
@@ -70,6 +76,10 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
   };
 }
 
+function latestAt(timestamp: number): RoomSummary['latest_event'] {
+  return { sender: null, body: 'hi', timestamp, sending: false, event_id: null };
+}
+
 function roomNames(): string[] {
   return Array.from(document.querySelectorAll('.room-row .room-name')).map(
     (node) => node.textContent
@@ -93,7 +103,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test('home lists joined rooms that are not direct, spaces, or space children', async () => {
+test('home lists every joined room, including the children of joined spaces', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
     makeRoom({ room_id: '!direct:example.org', name: 'Direct', is_direct: true }),
@@ -108,7 +118,29 @@ test('home lists joined rooms that are not direct, spaces, or space children', a
   ];
 
   const instance = await mountNav();
-  expect(roomNames()).toEqual(['Plain']);
+  expect(roomNames()).toEqual(['Plain', 'Child']);
+  await unmount(instance);
+});
+
+test('home orders rooms by their latest event', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(10) }),
+    makeRoom({ room_id: '!silent:example.org', name: 'Silent' }),
+    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+  ];
+
+  const instance = await mountNav();
+  expect(roomNames()).toEqual(['Busy', 'Quiet', 'Silent']);
+  await unmount(instance);
+});
+
+test('home links a room to its own section', async () => {
+  roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
+
+  const instance = await mountNav();
+  expect(document.querySelector('.room-row')?.getAttribute('href')).toBe(
+    '/home/!plain%3Aexample.org'
+  );
   await unmount(instance);
 });
 
@@ -124,8 +156,10 @@ test('home leaves out invited and knocked rooms', async () => {
   await unmount(instance);
 });
 
-test('a joined space claiming a room hides it from home', async () => {
+test('the unspaced section leaves out rooms a joined space claims', async () => {
+  pageState.url.pathname = '/rooms';
   roomsFixture.rooms = [
+    makeRoom({ room_id: '!loose:example.org', name: 'Loose' }),
     makeRoom({ room_id: '!claimed:example.org', name: 'Claimed' }),
     makeRoom({
       room_id: '!space:example.org',
@@ -136,11 +170,15 @@ test('a joined space claiming a room hides it from home', async () => {
   ];
 
   const instance = await mountNav();
-  expect(roomNames()).toEqual([]);
+  expect(roomNames()).toEqual(['Loose']);
+  expect(document.querySelector('.room-row')?.getAttribute('href')).toBe(
+    '/rooms/!loose%3Aexample.org'
+  );
   await unmount(instance);
 });
 
-test('a claim from a space that is not joined keeps the room in home', async () => {
+test('a claim from a space that is not joined keeps the room in the unspaced section', async () => {
+  pageState.url.pathname = '/rooms';
   roomsFixture.rooms = [
     makeRoom({ room_id: '!claimed:example.org', name: 'Claimed' }),
     makeRoom({

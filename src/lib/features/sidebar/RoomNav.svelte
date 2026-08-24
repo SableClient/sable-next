@@ -15,6 +15,7 @@
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
+  import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
@@ -40,6 +41,7 @@
   let spacePermissions = $state<RoomPermissionsView | null>(null);
 
   let directSection = $derived(page.url.pathname.startsWith('/direct'));
+  let unspacedSection = $derived(page.url.pathname.startsWith('/rooms'));
 
   let activeSpace = $derived(
     page.url.pathname.startsWith('/space')
@@ -110,14 +112,17 @@
 
   const newChatHref = resolve('direct');
   let listLabel = $derived(directSection ? $i18n.t('nav.chats') : $i18n.t('nav.rooms'));
-  let listEmpty = $derived(
-    directSection ? $i18n.t('nav.chatsEmpty') : $i18n.t('nav.roomsUnavailable')
-  );
+  let listEmpty = $derived.by(() => {
+    if (directSection) return $i18n.t('nav.chatsEmpty');
+    if (unspacedSection) return $i18n.t('nav.unspacedEmpty');
+    return $i18n.t('nav.roomsUnavailable');
+  });
 
   let title = $derived.by(() => {
     const { pathname } = page.url;
 
     if (directSection) return $i18n.t('nav.direct');
+    if (unspacedSection) return $i18n.t('nav.unspaced');
     if (pathname.startsWith('/space')) {
       const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
       return space?.name ?? $i18n.t('nav.space');
@@ -125,7 +130,11 @@
 
     return $i18n.t('nav.home');
   });
-  let TitleIcon = $derived(directSection ? ChatsIcon : HouseIcon);
+  let TitleIcon = $derived.by(() => {
+    if (directSection) return ChatsIcon;
+    if (unspacedSection) return HashIcon;
+    return HouseIcon;
+  });
   let spaceRootItems = $derived.by<RoomNavItem[]>(() => {
     if (!page.url.pathname.startsWith('/space')) return [];
 
@@ -141,18 +150,14 @@
     if (directSection) {
       return roomList.rooms
         .filter((room) => room.state === 'joined' && room.is_direct)
-        .map((room) => ({ room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id }));
+        .map(roomRow);
     }
 
     if (page.url.pathname.startsWith('/space')) {
       return spaceRootItems.filter(isRoom);
     }
 
-    const claimedByJoinedSpace = new Set(
-      roomList.rooms
-        .filter((space) => space.is_space && space.state === 'joined')
-        .flatMap((space) => space.space_children.map((child) => child.room_id))
-    );
+    const claimedByJoinedSpace = unspacedSection ? claimedRoomIds() : new Set<string>();
 
     return roomList.rooms
       .filter(
@@ -162,11 +167,28 @@
           !room.is_direct &&
           !claimedByJoinedSpace.has(room.room_id)
       )
-      .map((room) => ({ room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id }));
+      .map(roomRow)
+      .toSorted(byRecency);
   });
   let subspaces = $derived(spaceRootItems.filter((item) => item.kind === 'category'));
   let visibleSubspaces = $derived<RoomNavItem[]>(visibleItems(subspaces));
   let visibleRooms = $derived<RoomNavItem[]>([...(roomsClosed ? [] : rooms), ...visibleSubspaces]);
+
+  function roomRow(room: RoomSummary): RoomNavRow {
+    return { room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id };
+  }
+
+  function claimedRoomIds(): Set<string> {
+    return new Set(
+      roomList.rooms
+        .filter((space) => space.is_space && space.state === 'joined')
+        .flatMap((space) => space.space_children.map((child) => child.room_id))
+    );
+  }
+
+  function byRecency(left: RoomNavRow, right: RoomNavRow): number {
+    return (right.room?.latest_event?.timestamp ?? 0) - (left.room?.latest_event?.timestamp ?? 0);
+  }
 
   function spaceItems(
     space: RoomSummary,
@@ -225,6 +247,10 @@
         spaceId: parentSpace ? roomPathParam(parentSpace) : roomPathParamFromId(row.parentSpaceId),
         roomId: routeId,
       });
+    }
+
+    if (unspacedSection) {
+      return resolve('/(app)/rooms/[roomId]', { roomId: routeId });
     }
 
     return resolve('/(app)/home/[roomId]', { roomId: routeId });

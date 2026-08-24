@@ -88,6 +88,26 @@ test('badges home mentions and unread direct chats', async () => {
   await unmount(instance);
 });
 
+test('badges the unspaced section separately from home', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [],
+      homeUnread: 5,
+      homeHighlight: true,
+      unspacedUnread: 2,
+      unspacedHighlight: true,
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('a[href="/home"] .unread-count')?.textContent).toBe('5');
+  expect(document.querySelector('a[href="/rooms"] .unread-count')?.textContent).toBe('2');
+
+  await unmount(instance);
+});
+
 test('uses a dot for ordinary home unread messages', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,

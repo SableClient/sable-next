@@ -32,7 +32,7 @@
   /** Routes whose own index is the room list. Anywhere else the list would
       hide the page that was asked for behind an inert panel. Keyed on the path
       so room-list hydration cannot flash the sidebar over a room. */
-  const LIST_INDEX_PATHS = new Set(['/home', '/direct']);
+  const LIST_INDEX_PATHS = new Set(['/home', '/rooms', '/direct']);
   let pathname = $derived(page.url.pathname);
   let showMobileQuickTools = $derived(page.params.roomId === undefined);
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || /^\/space\/[^/]+$/.test(pathname));
