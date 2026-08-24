@@ -77,14 +77,43 @@ test('keeps the mobile quick tools visible on inbox', async ({ page, installRoom
   await expect(page.getByRole('button', { name: 'Account' }).last()).toBeVisible();
 });
 
-test('returns to the previous page when closing inbox', async ({ page, app, installRoomCore }) => {
+test('dismissing the inbox popover returns to the previous page', async ({
+  page,
+  app,
+  installRoomCore,
+}) => {
   await installRoomCore('ready');
   await app.openHome();
 
   await page.getByRole('link', { name: 'Inbox' }).first().click();
+  const inbox = page.getByRole('region', { name: 'Inbox' });
+  await expect(inbox).toBeVisible();
+  await expect(page).toHaveURL(/\/home$/);
+
+  await page.keyboard.press('Escape');
+
+  await expect(inbox).toBeHidden();
+  await expect(page).toHaveURL(/\/home$/);
+});
+
+test('closing the inbox sheet returns to the previous page', async ({
+  page,
+  app,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await app.openHome();
+  await page.getByRole('button', { name: 'Dismiss' }).click();
+
+  await page.getByRole('link', { name: 'Inbox' }).first().click();
+  const inbox = page.getByRole('region', { name: 'Inbox' });
+  await expect(inbox).toBeVisible();
   await expect(page).toHaveURL(/\/home$/);
 
   await page.getByRole('button', { name: 'Close' }).click();
+
+  await expect(inbox).toBeHidden();
   await expect(page).toHaveURL(/\/home$/);
 });
 

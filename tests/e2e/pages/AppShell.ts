@@ -3,6 +3,7 @@ import type { Locator, Page } from '@playwright/test';
 export class AppShell {
   readonly primaryNavigation: Locator;
   readonly quickTools: Locator;
+  readonly mobileQuickTools: Locator;
   readonly startupStatus: Locator;
   readonly startupHeading: Locator;
   readonly startupError: Locator;
@@ -18,6 +19,9 @@ export class AppShell {
   constructor(private readonly page: Page) {
     this.primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
     this.quickTools = page.getByRole('navigation', { name: 'Quick tools' });
+    this.mobileQuickTools = page
+      .locator('.navigation-panel')
+      .getByRole('navigation', { name: 'Quick tools' });
     // Scoped to the page: root-layout banners are live regions too.
     this.startupStatus = page.getByRole('main').getByRole('status');
     this.startupHeading = page.getByRole('heading', { name: 'Starting Sable' });

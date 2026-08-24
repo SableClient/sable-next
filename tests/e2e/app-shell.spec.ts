@@ -36,7 +36,7 @@ test('shows the authenticated app shell on mobile', async ({ page, app, signIn }
 
   await expect(app.primaryNavigation).toBeVisible();
   await expect(app.homeLink()).toHaveAttribute('aria-current', 'page');
-  await expect(app.quickTools).toBeVisible();
+  await expect(app.mobileQuickTools).toBeVisible();
 });
 
 test('persists the keyboard-adjusted room navigation width', async ({ page, app, signIn }) => {
@@ -94,14 +94,14 @@ test('opens a mobile room route without showing the room list first', async ({
   await app.openRoom(homeserver.timelineRoomId);
 
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
-  await expect(app.quickTools).not.toBeInViewport();
+  await expect(app.mobileQuickTools).not.toBeInViewport();
   await timeline.expectAtLatest(LATEST);
 });
 
 test('keeps mobile bottom navigation with the room list panel', async ({ page, app, signIn }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn();
-  await expect(app.quickTools).toBeInViewport();
+  await expect(app.mobileQuickTools).toBeInViewport();
 
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
   await app.openRoomFromList(TIMELINE_ROOM_NAME);
@@ -112,7 +112,7 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page, a
 
   await app.backToRooms.click();
 
-  await expect(app.quickTools).toBeInViewport();
+  await expect(app.mobileQuickTools).toBeInViewport();
 });
 
 test('back closes the mobile room list before leaving a room', async ({
