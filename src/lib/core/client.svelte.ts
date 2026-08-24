@@ -16,7 +16,6 @@ import type { NotificationModeView } from '#src/generated/NotificationModeView';
 import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
-import type { OpenIdTokenView } from '#src/generated/OpenIdTokenView';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
 import type { SearchFilter } from '#src/generated/SearchFilter';
 import type { SearchHitView } from '#src/generated/SearchHitView';
@@ -103,6 +102,13 @@ export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
 export type ActiveVerification = { flowId: string; state: VerificationView };
+export type CallGrant = {
+  session: number;
+  url: string;
+  jwt: string;
+  identity: string;
+  encryptMedia: boolean;
+};
 export type CreateRoomOptions = {
   name?: string | null;
   topic?: string | null;
@@ -487,20 +493,31 @@ export class CoreClient {
     return response.hits;
   }
 
-  async joinCall(
-    roomId: string,
-    livekitServiceUrl: string
-  ): Promise<{ session: number; openidToken: OpenIdTokenView }> {
+  async joinCall(roomId: string, livekitServiceUrl: string | null = null): Promise<CallGrant> {
     const response = await this.ensureTransport().send({
       type: 'join_call',
       room_id: roomId,
       livekit_service_url: livekitServiceUrl,
     });
-    return { session: response.session, openidToken: response.openid_token };
+    return {
+      session: response.session,
+      url: response.url,
+      jwt: response.jwt,
+      identity: response.identity,
+      encryptMedia: response.encrypt_media,
+    };
   }
 
   async leaveCall(session: number): Promise<void> {
     await this.ensureTransport().send({ type: 'leave_call', session });
+  }
+
+  async declineCall(roomId: string, notificationEventId: string): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'decline_call',
+      room_id: roomId,
+      notification_event_id: notificationEventId,
+    });
   }
 
   async imagePacks(roomId: string): Promise<ImagePackView[]> {

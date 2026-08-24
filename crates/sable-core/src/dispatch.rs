@@ -443,6 +443,11 @@ impl Core {
 
             Command::LeaveCall { session } => self.leave_call(session).await,
 
+            Command::DeclineCall {
+                room_id,
+                notification_event_id,
+            } => self.decline_call(room_id, notification_event_id).await,
+
             Command::RoomMembers { room_id } => {
                 let room = self.room(&room_id).await?;
                 let members = room

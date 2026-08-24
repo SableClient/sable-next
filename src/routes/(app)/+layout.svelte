@@ -9,7 +9,12 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import { provideRoomList, RoomList, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+  import {
+    findRoomByPathId,
+    provideRoomList,
+    RoomList,
+    roomPathParamFromId,
+  } from '#lib/rooms/room-list.svelte.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { goto } from '$app/navigation';
@@ -24,6 +29,10 @@
   import { registerNativePush } from '#lib/features/notifications/native-push.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { NotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
+  import IncomingCallDialog from '#lib/features/call/IncomingCallDialog.svelte';
+  import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
+  import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
+  import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
   import { rememberRoomNames } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
 
@@ -39,6 +48,59 @@
   provideSpaceSidebar(spaceSidebar);
   providePersonaStore(new PersonaStore(core));
   const notifications = new NotificationCenter();
+  const incomingCalls = new IncomingCalls(core);
+  const callSession = new CallSession(core);
+  provideCallSession(callSession);
+
+  let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
+  let callRoom = $derived(
+    callSession.roomId === null
+      ? undefined
+      : roomList.rooms.find((room) => room.room_id === callSession.roomId)
+  );
+  let showCallBar = $derived(callSession.active && callSession.roomId !== openRoomId);
+
+  let incoming = $derived(incomingCalls.calls.at(0) ?? null);
+  let incomingProfile = $state.raw<{ name: string; avatar: string | null } | null>(null);
+
+  $effect(() => {
+    const sender = incoming?.sender;
+    if (!sender) {
+      incomingProfile = null;
+      return;
+    }
+
+    let cancelled = false;
+    incomingProfile = { name: sender, avatar: null };
+    void core
+      .userProfile(sender)
+      .then((profile) => {
+        if (cancelled) return;
+        incomingProfile = {
+          name: profile.display_name ?? sender,
+          avatar: profile.avatar_url,
+        };
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  });
+  let incomingRoom = $derived(
+    incoming ? roomList.rooms.find((room) => room.room_id === incoming.roomId) : undefined
+  );
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    return incomingCalls.start();
+  });
+
+  function acceptIncoming(call: IncomingCall): void {
+    incomingCalls.accept(call);
+    void goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(call.roomId) }));
+    void callSession.join(call.roomId, { microphone: true, camera: false });
+  }
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
   $effect(() => {
@@ -152,6 +214,30 @@
     <AppShell>
       {@render children()}
     </AppShell>
+    {#if showCallBar}
+      <div class="call-dock">
+        <ActiveCallBar
+          session={callSession}
+          roomName={callRoom?.name ?? $i18n.t('call.title')}
+          onReturn={() => {
+            if (callSession.roomId === null) return;
+            void goto(
+              resolve('/(app)/home/[roomId]', {
+                roomId: roomPathParamFromId(callSession.roomId),
+              })
+            );
+          }}
+        />
+      </div>
+    {/if}
+    <IncomingCallDialog
+      call={incoming}
+      senderName={incomingProfile?.name ?? incoming?.sender ?? ''}
+      senderAvatar={incomingProfile?.avatar ?? null}
+      roomName={incomingRoom?.name ?? incoming?.roomId ?? ''}
+      onAccept={acceptIncoming}
+      onDecline={(call: IncomingCall) => void incomingCalls.decline(call)}
+    />
     {#if page.state.settings}
       <SettingsPanel shallow section={page.state.settings.section} />
     {/if}
@@ -219,5 +305,19 @@
 
   .app-status-card :global(.sable-button) {
     min-width: 8rem;
+  }
+
+  .call-dock {
+    display: flex;
+    inset-block-end: var(--space-400);
+    inset-inline: 0;
+    justify-content: center;
+    pointer-events: none;
+    position: fixed;
+    z-index: 5;
+  }
+
+  .call-dock > :global(*) {
+    pointer-events: auto;
   }
 </style>

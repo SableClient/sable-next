@@ -30,6 +30,9 @@
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import CallView from '#lib/features/call/CallView.svelte';
+  import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
+  import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
   import MembersDrawer from './MembersDrawer.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -54,6 +57,9 @@
   const activeTimeline = activeRoomTimeline(core);
   const timeline = activeTimeline.timeline;
   const memberLoader = new RoomMemberLoader();
+  const call = useCallSession();
+  let prescreenOpen = $state(false);
+  let prescreenMedia = $state<CallMedia>({ microphone: true, camera: false });
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
   let profileOpen = $state(false);
@@ -531,6 +537,21 @@
   function openMedia(eventId: string): void {
     mediaEventId = eventId;
   }
+
+  function openPrescreen(): void {
+    call.clearFailure();
+    prescreenMedia = { microphone: true, camera: resolvedRoom?.is_voice === false };
+    prescreenOpen = true;
+  }
+
+  async function joinCall(): Promise<void> {
+    if (!resolvedRoomId) return;
+    try {
+      await call.join(resolvedRoomId, prescreenMedia);
+    } finally {
+      prescreenOpen = false;
+    }
+  }
 </script>
 
 <main class="room-view" aria-label={$i18n.t('timeline.label')}>
@@ -541,12 +562,16 @@
       isVoice={resolvedRoom?.is_voice ?? false}
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
+      onCall={call.active ? null : openPrescreen}
       onBack={goBack}
       onMembers={toggleMembers}
       onSearch={openSearch}
       onSettings={() => (settingsOpen = true)}
       {initials}
     />
+    {#if call.roomId === resolvedRoomId && (call.active || call.failure)}
+      <CallView session={call} members={memberLoader.members} {initials} />
+    {/if}
     {#key resolvedRoomId}
       <TimelineList
         {timeline}
@@ -632,6 +657,16 @@
       />
     </DialogFrame>
   {/if}
+
+  <DialogFrame bind:open={prescreenOpen} variant="sheet" label={$i18n.t('call.prescreenTitle')}>
+    <CallDevicePreview
+      media={prescreenMedia}
+      joining={call.lifecycle === 'joining'}
+      onChange={(media: CallMedia) => (prescreenMedia = media)}
+      onJoin={() => void joinCall()}
+      onCancel={() => (prescreenOpen = false)}
+    />
+  </DialogFrame>
 
   <RoomSettingsDialog
     open={settingsOpen}

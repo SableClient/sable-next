@@ -68,6 +68,7 @@ tauri-plugin-android-fs = "=29.0.0"
 tauri-plugin-notifications = { version = "0.5.0-rc.11", git = "https://github.com/eleboucher/tauri-plugin-notifications.git", rev = "a98f23f2b11fe082b1a2bdd87b527133e775acbd", default-features = false, features = [
   "push-notifications",
 ] }
+tauri-plugin-livekit-mobile = { git = "https://github.com/SableClient/tauri-plugin-livekit-mobile.git", rev = "c6f0d02ab3da1174535bc1dc8e598a2e6873f977" }
 # Injects the --safe-area-inset-* custom properties: Android reports the system
 # bars to nobody, and `env()` there only covers a display cutout.
 tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }

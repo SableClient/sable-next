@@ -593,11 +593,16 @@ pub enum Command {
     JoinCall {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
-        livekit_service_url: String,
+        livekit_service_url: Option<String>,
     },
 
     LeaveCall {
         session: CallSessionId,
+    },
+    DeclineCall {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        notification_event_id: String,
     },
 }
 
@@ -682,9 +687,13 @@ pub enum CommandOk {
     },
     JoinCall {
         session: CallSessionId,
-        openid_token: OpenIdTokenView,
+        url: String,
+        jwt: String,
+        identity: String,
+        encrypt_media: bool,
     },
     LeaveCall,
+    DeclineCall,
     RoomPermissions(RoomPermissionsView),
     NotificationSettings(NotificationSettingsView),
     DefaultNotificationModes {
@@ -868,6 +877,7 @@ pub enum CommandErr {
     NotLoggedIn,
     UnknownSubscription,
     UnknownCall,
+    NoCallFocus,
     InvalidPaginationDirection,
     UnknownRoom,
     UnknownHomeserver,
@@ -1024,6 +1034,34 @@ pub enum CoreEvent {
         state: VerificationView,
     },
 
+    CallEncryptionKey {
+        session: CallSessionId,
+        identity: String,
+        key_index: u8,
+        key: String,
+        own: bool,
+    },
+
+    CallMembers {
+        session: CallSessionId,
+        members: Vec<CallMemberView>,
+    },
+
+    IncomingCall {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        notification_event_id: String,
+        #[ts(type = "string")]
+        sender: OwnedUserId,
+        ring: bool,
+        #[ts(type = "number")]
+        expires_at_ms: u64,
+    },
+
+    IncomingCallEnded {
+        notification_event_id: String,
+    },
+
     /// Never arrives on a homeserver with presence disabled.
     Presence {
         #[ts(type = "string")]
@@ -1141,11 +1179,11 @@ pub struct SearchFilter {
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
-pub struct OpenIdTokenView {
-    pub access_token: String,
-    pub matrix_server_name: String,
-    #[ts(type = "number")]
-    pub expires_in_ms: u64,
+pub struct CallMemberView {
+    #[ts(type = "string")]
+    pub user_id: OwnedUserId,
+    pub device_id: String,
+    pub identity: String,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

@@ -10,8 +10,10 @@ resolver = "3"
 matrix-sdk = { version = "0.18", default-features = false, features = [
   "e2e-encryption",
   "unstable-msc4274",
+  "experimental-send-custom-to-device",
 ] }
 matrix-sdk-ui = { version = "0.18", features = ["unstable-msc4274"] }
+matrix-sdk-base = { version = "0.18", default-features = false, features = ["e2e-encryption"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "fs"] }
@@ -21,6 +23,7 @@ url = "2"
 ts-rs = "12"
 [workspace.lints.rust]
 warnings = "deny"
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(ruma_unstable_exhaustive_types)'] }
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 

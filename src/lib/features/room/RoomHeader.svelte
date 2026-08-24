@@ -3,6 +3,7 @@
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+  import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import type { MemberView } from '#src/generated/MemberView';
@@ -22,6 +23,7 @@
     /** Set for a text room too, when a call is running in it. */
     callParticipants: readonly string[];
     members: readonly MemberView[];
+    onCall?: (() => void) | null;
     onBack: () => void;
     onMembers: () => void;
     onSearch: () => void;
@@ -35,6 +37,7 @@
     isVoice,
     callParticipants,
     members,
+    onCall = null,
     onBack,
     onMembers,
     onSearch,
@@ -91,6 +94,17 @@
         <span class="voice-count">{inVoice.length}</span>
       {/if}
     </span>
+  {/if}
+  {#if onCall}
+    <IconButton
+      class="call-button"
+      variant="ghost"
+      size="small"
+      label={inVoice.length > 0 ? $i18n.t('call.join') : $i18n.t('call.start')}
+      onclick={onCall}
+    >
+      <PhoneIcon />
+    </IconButton>
   {/if}
   <!-- Narrow viewports hide the label, leaving the icon as the only content. -->
   <Button

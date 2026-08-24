@@ -299,13 +299,13 @@ impl Core {
     }
 
     async fn take_session(&self) -> Option<Session> {
+        self.end_all_calls().await;
         self.session_tasks
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
         self.subscriptions.lock().await.clear();
         self.timelines.lock().await.clear();
-        self.call_sessions.lock().await.clear();
         *self.search_index.lock().await = search::MessageIndex::new();
         self.session.write().await.take()
     }
@@ -326,6 +326,7 @@ impl Core {
         // Event handlers do not spawn until sync starts, and are owned by the
         // client. Register them now so the first sync response cannot race us.
         self.watch_ephemeral(&client, generation);
+        self.watch_incoming_calls(&client, generation);
         self.watch_incoming_verifications(&client);
 
         self.install_session_callbacks(&client, &homeserver, &account_id, generation);

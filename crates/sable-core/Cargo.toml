@@ -7,6 +7,7 @@ license = "AGPL-3.0-only"
 [dependencies]
 matrix-sdk = { workspace = true }
 matrix-sdk-ui = { workspace = true }
+matrix-sdk-base = { workspace = true }
 mime = "0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -31,6 +32,8 @@ charabia = { version = "0.10", default-features = false, features = [
 rust-stemmers = "1.2"
 html-escape = "0.2"
 linkify = "0.11"
+base64 = "0.22"
+getrandom = "0.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }

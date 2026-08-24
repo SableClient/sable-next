@@ -81,6 +81,7 @@ struct CallSession {
     state_key: CallMemberStateKey,
     delay_id: Option<String>,
     _postpone: Option<Task>,
+    _handlers: Vec<matrix_sdk::event_handler::EventHandlerDropGuard>,
 }
 
 struct CachedTimeline {
