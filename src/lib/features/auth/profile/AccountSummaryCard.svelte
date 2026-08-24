@@ -49,11 +49,11 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     overflow-wrap: anywhere;
-    padding: 0.625rem 0.75rem;
+    padding: var(--space-250) var(--space-300);
   }
 
   .summary-actions {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 </style>

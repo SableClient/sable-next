@@ -74,14 +74,14 @@
     display: flex;
     justify-content: center;
     min-height: 100%;
-    padding: 2rem 1.5rem;
+    padding: var(--space-700) var(--space-600);
   }
 
   .permalink div {
     align-items: center;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-400);
   }
 
   .permalink p {

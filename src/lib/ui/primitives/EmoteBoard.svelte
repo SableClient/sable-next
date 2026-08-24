@@ -532,7 +532,7 @@
   .tabs {
     display: flex;
     flex: 0 0 auto;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
   }
 
   .tabs button {
@@ -542,7 +542,7 @@
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
     font-size: var(--font-size-small);
-    padding: 0.375rem 0.5rem;
+    padding: var(--space-150) var(--space-200);
   }
 
   .tabs button[aria-pressed='true'] {
@@ -568,10 +568,10 @@
     display: flex;
     flex: 0 0 3.25rem;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-100);
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--space-1) 0.375rem;
+    padding: var(--space-1) var(--space-150);
     scrollbar-width: none;
   }
 
@@ -591,7 +591,7 @@
     border-radius: var(--radius);
     cursor: pointer;
     display: flex;
-    padding: 0.125rem;
+    padding: var(--space-hairline);
   }
 
   .rail-pack:hover {
@@ -610,8 +610,8 @@
     display: flex;
     flex-wrap: wrap;
     font-size: var(--font-size-small);
-    gap: 0.375rem;
-    margin: 0.25rem 0;
+    gap: var(--space-150);
+    margin: var(--space-100) 0;
   }
 
   .section-origin,
@@ -623,7 +623,7 @@
   .grids ul {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: var(--space-100);
     list-style: none;
     margin: 0 0 var(--space-2);
     padding: 0;
@@ -639,7 +639,7 @@
     display: flex;
     height: 2.5rem;
     justify-content: center;
-    padding: 0.25rem;
+    padding: var(--space-100);
     width: 2.5rem;
   }
 
@@ -669,7 +669,7 @@
     font-size: var(--font-size-small);
     margin-bottom: var(--space-2);
     overflow: hidden;
-    padding: 0.375rem var(--space-1);
+    padding: var(--space-150) var(--space-1);
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -683,14 +683,14 @@
   /* Rows are real elements for the grid pattern, so the wrap is laid out here. */
   .grids .unicode .grid {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     margin-bottom: var(--space-2);
   }
 
   /* Column count must match emojiColumns, or the arrow keys walk another grid. */
   .grids .unicode .row {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
@@ -716,7 +716,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.375rem;
+    gap: var(--space-150);
     min-height: 2.25rem;
     padding: 0 var(--space-1);
   }

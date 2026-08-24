@@ -37,9 +37,9 @@
     border-radius: var(--radius);
     color: inherit;
     display: inline-flex;
-    gap: 0.5rem;
+    gap: var(--space-200);
     max-width: var(--timeline-media-max);
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-200) var(--space-300);
     text-decoration: none;
   }
 

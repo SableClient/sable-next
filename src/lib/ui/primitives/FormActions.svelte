@@ -15,6 +15,6 @@
 <style>
   .form-actions {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 </style>

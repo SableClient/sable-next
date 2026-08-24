@@ -19,7 +19,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.375rem;
+    gap: var(--space-150);
     line-height: 1.125rem;
     min-width: 0;
     overflow: hidden;
@@ -29,7 +29,7 @@
   .dots {
     display: inline-flex;
     flex: 0 0 auto;
-    gap: 0.1875rem;
+    gap: var(--space-hairline);
   }
 
   .dots i {

@@ -21,9 +21,9 @@
     color: var(--sable-sec-main);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.5rem;
+    gap: var(--space-200);
     justify-content: center;
-    margin: 1rem auto 0;
+    margin: var(--space-400) auto 0;
   }
 
   .auth-footer a {

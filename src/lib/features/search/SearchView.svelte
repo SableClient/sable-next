@@ -428,7 +428,7 @@
   .search-view {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 
   .field {
@@ -475,10 +475,10 @@
     color: var(--sable-sec-on-container);
     display: inline-flex;
     font-size: var(--font-size-small);
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     max-width: 100%;
     min-width: 0;
-    padding-inline: 0.5rem 0.125rem;
+    padding-inline: var(--space-200) var(--space-hairline);
   }
 
   .chip.negated {
@@ -508,7 +508,7 @@
     display: flex;
     flex: 0 0 auto;
     font-size: inherit;
-    padding: 0.125rem;
+    padding: var(--space-hairline);
   }
 
   .chip-remove:hover,
@@ -529,8 +529,8 @@
   .empty ul {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: 0.25rem 0 0;
-    padding-left: 1.25rem;
+    margin: var(--space-100) 0 0;
+    padding-left: var(--space-500);
   }
 
   .empty p {
@@ -540,7 +540,7 @@
   .empty .coverage {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin-block-start: 0.25rem;
+    margin-block-start: var(--space-100);
   }
 
   .announcement {
@@ -562,7 +562,7 @@
   .orders {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: var(--space-100);
   }
 
   .notice,
@@ -575,19 +575,19 @@
   .results {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-400);
   }
 
   .group h2 {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-100);
   }
 
   .hit-list {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-100);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -602,8 +602,8 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    gap: 0.5rem;
-    padding: 0.5rem;
+    gap: var(--space-150);
+    padding: var(--space-200);
     text-align: left;
     width: 100%;
   }
@@ -616,7 +616,7 @@
   .hit-text {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     min-width: 0;
   }
 
@@ -624,7 +624,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.375rem;
+    gap: var(--space-200);
   }
 
   .hit-sender {

@@ -735,7 +735,7 @@
   .composer-row {
     align-items: center;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-200);
     padding: var(--space-compact);
     width: 100%;
   }

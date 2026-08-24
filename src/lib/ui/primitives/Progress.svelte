@@ -15,17 +15,17 @@
 
 <style>
   :global(.sable-progress) {
-    background: var(--sable-surface-var-container);
-    block-size: var(--space-1);
-    border-radius: var(--radius-pill);
-    display: block;
+    background: var(--sable-primary-container);
+    block-size: var(--space-300);
+    border-radius: var(--radii-pill);
+    display: flex;
     overflow: hidden;
   }
 
   :global(.sable-progress-fill) {
     background: var(--sable-primary-main);
     block-size: 100%;
-    display: block;
+    display: inline-block;
   }
 
   @media (prefers-reduced-motion: no-preference) {

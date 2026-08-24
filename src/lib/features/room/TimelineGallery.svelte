@@ -52,12 +52,12 @@
 <style>
   .gallery {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     grid-template-columns: repeat(var(--gallery-columns), minmax(0, 1fr));
     max-width: var(--timeline-media-max);
   }
 
   .caption {
-    margin-block-start: 0.25rem;
+    margin-block-start: var(--space-100);
   }
 </style>

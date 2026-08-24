@@ -110,9 +110,9 @@
     border-radius: var(--radius);
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-150);
     max-width: var(--timeline-media-max);
-    padding: 0.75rem;
+    padding: var(--space-300);
   }
 
   .question {
@@ -124,13 +124,13 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-normal);
-    margin-inline-start: 0.375rem;
+    margin-inline-start: var(--space-150);
   }
 
   .answers {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -145,9 +145,9 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    gap: 0.5rem;
+    gap: var(--space-200);
     overflow: hidden;
-    padding: 0.5rem 0.625rem;
+    padding: var(--space-200) var(--space-250);
     position: relative;
     text-align: start;
     width: 100%;
@@ -198,13 +198,13 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.5rem;
+    gap: var(--space-200);
     margin: 0;
   }
 
   .hint::before {
     content: '·';
-    margin-inline-end: 0.5rem;
+    margin-inline-end: var(--space-200);
   }
 
   .end {
@@ -216,7 +216,7 @@
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
-    padding: 0.25rem 0.5rem;
+    padding: var(--space-100) var(--space-200);
   }
 
   .end:hover {

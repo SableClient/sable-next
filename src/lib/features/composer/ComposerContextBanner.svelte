@@ -39,9 +39,9 @@
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-1);
-    margin-inline: 0.375rem;
+    margin-inline: var(--space-150);
     min-width: 0;
-    padding: 0.375rem 0 0.3125rem;
+    padding: var(--space-150) 0 var(--space-150);
   }
 
   .context-kind {

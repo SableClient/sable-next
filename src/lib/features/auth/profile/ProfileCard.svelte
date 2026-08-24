@@ -129,13 +129,13 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     overflow-wrap: anywhere;
-    padding: 0.625rem 0.75rem;
+    padding: var(--space-250) var(--space-300);
   }
 
   .avatar-picker {
     align-items: center;
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-300);
     grid-template-columns: auto 1fr;
   }
 
@@ -158,7 +158,7 @@
 
   .more-options {
     border-top: var(--border-width) solid var(--sable-surface-container-line);
-    padding-top: 0.75rem;
+    padding-top: var(--space-300);
   }
 
   .more-options summary {
@@ -171,9 +171,9 @@
     color: var(--sable-sec-main);
     display: grid;
     font-size: var(--font-size-small);
-    gap: 0.5rem;
+    gap: var(--space-200);
     grid-template-columns: repeat(3, 1fr);
-    padding-top: 0.75rem;
+    padding-top: var(--space-300);
   }
 
   .more-options[open] .placeholder-list {
@@ -190,7 +190,7 @@
   .placeholder-list span {
     border: var(--border-width) dashed var(--sable-surface-container-line);
     border-radius: var(--radius);
-    padding: 0.625rem 0.5rem;
+    padding: var(--space-250) var(--space-200);
     text-align: center;
   }
 

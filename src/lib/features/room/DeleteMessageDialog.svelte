@@ -83,8 +83,8 @@
 
   .field {
     display: grid;
-    gap: 0.25rem;
-    margin-block-start: 0.25rem;
+    gap: var(--space-100);
+    margin-block-start: var(--space-100);
   }
 
   .actions {

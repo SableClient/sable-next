@@ -21,6 +21,10 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+  import IconContext from 'phosphor-svelte/lib/IconContext';
+
+  import '#lib/ui/primitives/menu.css';
+
   interface Props {
     room: RoomSummary;
     parentSpaceId?: string | null;
@@ -167,121 +171,137 @@
   <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>
     <DotsThreeIcon />
   </DropdownMenu.Trigger>
-  <DropdownMenu.Content class="room-options-menu" side="bottom" align="end" sideOffset={4}>
-    <DropdownMenu.Item
-      class="room-options-item"
-      onSelect={() => {
-        toggleTag('favourite', favourite);
-      }}
-    >
-      <StarIcon size={16} weight={favourite ? 'fill' : 'regular'} />
-      {$i18n.t('room.menuFavourite')}
-    </DropdownMenu.Item>
-    <DropdownMenu.Item
-      class="room-options-item"
-      onSelect={() => {
-        toggleTag('low_priority', lowPriority);
-      }}
-    >
-      <TrayIcon size={16} weight={lowPriority ? 'fill' : 'regular'} />
-      {$i18n.t('room.menuLowPriority')}
-    </DropdownMenu.Item>
-
-    {#if room.is_direct}
-      <DropdownMenu.Item class="room-options-item" onSelect={convertToGroup}>
-        <ChatCircleIcon size={16} />
-        {$i18n.t('room.menuConvertToGroup')}
-      </DropdownMenu.Item>
-    {/if}
-
-    <DropdownMenu.Separator class="room-options-separator" />
-
-    <DropdownMenu.Item class="room-options-item" onSelect={copyLink}>
-      <LinkIcon size={16} />
-      {$i18n.t('room.menuCopyLink')}
-    </DropdownMenu.Item>
-    <DropdownMenu.Item
-      class="room-options-item"
-      onSelect={() => {
-        onSettings(room);
-      }}
-    >
-      <GearIcon size={16} />
-      {$i18n.t('room.menuSettings')}
-    </DropdownMenu.Item>
-
-    {#if !room.is_space}
-      <DropdownMenu.Sub>
-        <DropdownMenu.SubTrigger class="room-options-item">
-          <BellIcon size={16} />
-          {$i18n.t('room.menuNotifications')}
-        </DropdownMenu.SubTrigger>
-        <DropdownMenu.SubContent class="room-options-menu" sideOffset={4}>
-          {#each notificationModes as option (option.mode ?? 'default')}
-            {@const selected = notificationMode === option.mode}
-            <DropdownMenu.Item
-              class="room-options-item"
-              aria-checked={selected}
-              onSelect={() => {
-                setNotificationMode(option.mode);
-              }}
-            >
-              <span class="mode-check" aria-hidden="true">{selected ? '\u2713' : ''}</span>
-              {$i18n.t(option.label, { mode: defaultLabel })}
-            </DropdownMenu.Item>
-          {/each}
-        </DropdownMenu.SubContent>
-      </DropdownMenu.Sub>
-    {/if}
-
-    {#if !room.is_space && offeredSpaces.length > 0}
-      <DropdownMenu.Sub>
-        <DropdownMenu.SubTrigger class="room-options-item">
-          <UsersThreeIcon size={16} />
-          {$i18n.t('room.menuAddToSpace')}
-        </DropdownMenu.SubTrigger>
-        <DropdownMenu.SubContent class="room-options-menu" sideOffset={4}>
-          {#each offeredSpaces as space (space.room_id)}
-            <DropdownMenu.Item
-              class="room-options-item"
-              onSelect={() => {
-                addToSpace(space.room_id);
-              }}
-            >
-              {space.name ?? space.room_id}
-            </DropdownMenu.Item>
-          {/each}
-        </DropdownMenu.SubContent>
-      </DropdownMenu.Sub>
-    {/if}
-
-    {#if !room.is_space && removableParent}
+  <DropdownMenu.Content
+    class="sable-menu room-options-menu"
+    side="bottom"
+    align="end"
+    sideOffset={4}
+  >
+    <IconContext values={{ 'aria-hidden': 'true' }}>
       <DropdownMenu.Item
-        class="room-options-item"
+        class="sable-menu-item"
         onSelect={() => {
-          removeFromSpace(removableParent.room_id);
+          toggleTag('favourite', favourite);
         }}
       >
-        <UsersThreeIcon size={16} />
-        {$i18n.t('room.menuRemoveFromSpace', {
-          space: removableParent.name ?? removableParent.room_id,
-        })}
+        <StarIcon weight={favourite ? 'fill' : 'regular'} />
+        {$i18n.t('room.menuFavourite')}
       </DropdownMenu.Item>
-    {/if}
+      <DropdownMenu.Item
+        class="sable-menu-item"
+        onSelect={() => {
+          toggleTag('low_priority', lowPriority);
+        }}
+      >
+        <TrayIcon weight={lowPriority ? 'fill' : 'regular'} />
+        {$i18n.t('room.menuLowPriority')}
+      </DropdownMenu.Item>
 
-    <DropdownMenu.Item
-      class="room-options-item room-options-destructive"
-      onSelect={() => {
-        onLeave(room);
-      }}
-    >
-      <SignOutIcon size={16} />
-      {room.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
-    </DropdownMenu.Item>
+      {#if room.is_direct}
+        <DropdownMenu.Item class="sable-menu-item" onSelect={convertToGroup}>
+          <ChatCircleIcon />
+          {$i18n.t('room.menuConvertToGroup')}
+        </DropdownMenu.Item>
+      {/if}
+
+      <DropdownMenu.Separator class="sable-menu-separator" />
+
+      <DropdownMenu.Item class="sable-menu-item" onSelect={copyLink}>
+        <LinkIcon />
+        {$i18n.t('room.menuCopyLink')}
+      </DropdownMenu.Item>
+      <DropdownMenu.Item
+        class="sable-menu-item"
+        onSelect={() => {
+          onSettings(room);
+        }}
+      >
+        <GearIcon />
+        {$i18n.t('room.menuSettings')}
+      </DropdownMenu.Item>
+
+      {#if !room.is_space}
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger class="sable-menu-item">
+            <BellIcon />
+            {$i18n.t('room.menuNotifications')}
+          </DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
+            <IconContext values={{ 'aria-hidden': 'true' }}>
+              {#each notificationModes as option (option.mode ?? 'default')}
+                {@const selected = notificationMode === option.mode}
+                <DropdownMenu.Item
+                  class="sable-menu-item"
+                  aria-checked={selected}
+                  onSelect={() => {
+                    setNotificationMode(option.mode);
+                  }}
+                >
+                  <span class="mode-check" aria-hidden="true">{selected ? '\u2713' : ''}</span>
+                  {$i18n.t(option.label, { mode: defaultLabel })}
+                </DropdownMenu.Item>
+              {/each}
+            </IconContext>
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+      {/if}
+
+      {#if !room.is_space && offeredSpaces.length > 0}
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger class="sable-menu-item">
+            <UsersThreeIcon />
+            {$i18n.t('room.menuAddToSpace')}
+          </DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
+            <IconContext values={{ 'aria-hidden': 'true' }}>
+              {#each offeredSpaces as space (space.room_id)}
+                <DropdownMenu.Item
+                  class="sable-menu-item"
+                  onSelect={() => {
+                    addToSpace(space.room_id);
+                  }}
+                >
+                  {space.name ?? space.room_id}
+                </DropdownMenu.Item>
+              {/each}
+            </IconContext>
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+      {/if}
+
+      {#if !room.is_space && removableParent}
+        <DropdownMenu.Item
+          class="sable-menu-item"
+          onSelect={() => {
+            removeFromSpace(removableParent.room_id);
+          }}
+        >
+          <UsersThreeIcon />
+          {$i18n.t('room.menuRemoveFromSpace', {
+            space: removableParent.name ?? removableParent.room_id,
+          })}
+        </DropdownMenu.Item>
+      {/if}
+
+      <DropdownMenu.Item
+        class="sable-menu-item sable-menu-item-destructive"
+        onSelect={() => {
+          onLeave(room);
+        }}
+      >
+        <SignOutIcon />
+        {room.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
+      </DropdownMenu.Item>
+    </IconContext>
   </DropdownMenu.Content>
 </DropdownMenu.Root>
 
 <style>
+  :global(.room-options-menu) {
+    --menu-min-width: 12rem;
+    --menu-max-height: 20rem;
+  }
+
   .mode-check {
     display: inline-block;
     text-align: center;
@@ -312,48 +332,5 @@
   :global(.room-options-trigger:focus-visible) {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
-  }
-
-  :global(.room-options-menu) {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
-    display: grid;
-    max-height: 20rem;
-    min-width: 12rem;
-    overflow: auto;
-    padding: 0.25rem;
-    z-index: var(--layer-menu);
-  }
-
-  :global(.room-options-item) {
-    align-items: center;
-    border-radius: var(--radius);
-    cursor: pointer;
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-1);
-    min-height: 2.25rem;
-    padding: 0 var(--space-1);
-  }
-
-  :global(.room-options-item[data-highlighted]) {
-    background: var(--sable-bg-container-hover);
-  }
-
-  :global(.room-options-separator) {
-    background: var(--sable-bg-container-line);
-    height: 1px;
-    margin: 0.25rem 0;
-  }
-
-  :global(.room-options-destructive svg) {
-    color: var(--sable-crit-main);
-  }
-
-  :global(.room-options-destructive[data-highlighted]) {
-    background: color-mix(in oklab, var(--sable-crit-main) 12%, var(--sable-bg-container));
-    color: var(--sable-crit-main);
   }
 </style>

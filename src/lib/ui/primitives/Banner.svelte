@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconContext from 'phosphor-svelte/lib/IconContext';
   import type { Component, Snippet } from 'svelte';
 
   export type BannerTone = 'neutral' | 'warning';
@@ -14,14 +15,16 @@
   let { icon: Icon, title, tone = 'neutral', body, actions }: Props = $props();
 </script>
 
-<aside class={['banner', `banner-${tone}`]} role="status" aria-label={title}>
-  <span class="icon"><Icon /></span>
+<div class={['banner', `banner-${tone}`]} role="status" aria-label={title}>
+  <span class="icon">
+    <IconContext values={{ 'aria-hidden': 'true' }}><Icon /></IconContext>
+  </span>
   <div class="copy">
     <p class="title">{title}</p>
     <div class="body">{@render body()}</div>
   </div>
   <div class="actions">{@render actions()}</div>
-</aside>
+</div>
 
 <style>
   .banner {

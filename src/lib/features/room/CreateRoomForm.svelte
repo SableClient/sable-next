@@ -330,7 +330,7 @@
 
   .invites {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     list-style: none;
     margin: var(--space-1) 0 0;
     padding: 0;
@@ -343,7 +343,7 @@
     display: flex;
     gap: var(--space-2);
     justify-content: space-between;
-    padding: 0.25rem 0.25rem 0.25rem var(--space-2);
+    padding: var(--space-100) var(--space-100) var(--space-100) var(--space-2);
   }
 
   .invites span {

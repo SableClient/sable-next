@@ -1,23 +1,32 @@
 .sable-button {
+  --button-height: var(--control-height-400);
+  --button-gap: var(--space-200);
+  --button-padding-inline: var(--control-padding-400);
+  --button-icon-size: var(--size-x200);
+
   align-items: center;
-  border: var(--border-width) solid transparent;
-  border-radius: var(--radius);
+  background: var(--button-container);
+  border: var(--border-width) solid var(--button-line);
+  border-radius: var(--radii-400);
   box-sizing: border-box;
+  color: var(--button-on-container);
   cursor: pointer;
   display: inline-flex;
   font: inherit;
-  font-weight: var(--font-weight-medium);
-  gap: var(--space-1);
+  font-weight: var(--font-weight-600);
+  gap: var(--button-gap);
   justify-content: center;
-  min-height: var(--control-height-medium);
-  padding: var(--space-1) var(--space-3);
+  max-width: 100%;
+  min-height: var(--button-height);
+  min-width: 0;
+  padding: 0 var(--button-padding-inline);
   text-decoration: none;
 }
 
 .sable-button > svg {
   flex: 0 0 auto;
-  height: var(--icon-size-small);
-  width: var(--icon-size-small);
+  height: var(--button-icon-size);
+  width: var(--button-icon-size);
 }
 
 .sable-button-block {
@@ -25,48 +34,54 @@
 }
 
 .sable-button-primary {
-  background: var(--sable-primary-container);
-  border-color: var(--sable-primary-container-line);
-  color: var(--sable-primary-on-container);
+  --button-container: var(--sable-primary-main);
+  --button-container-hover: var(--sable-primary-main-hover);
+  --button-container-active: var(--sable-primary-main-active);
+  --button-line: var(--sable-primary-main-line);
+  --button-on-container: var(--sable-primary-on-main);
 }
 
 .sable-button-secondary {
-  background: var(--sable-sec-container);
-  border-color: var(--sable-sec-container-line);
-  color: var(--sable-sec-on-container);
+  --button-container: var(--sable-sec-container);
+  --button-container-hover: var(--sable-sec-container-hover);
+  --button-container-active: var(--sable-sec-container-active);
+  --button-line: var(--sable-sec-container-line);
+  --button-on-container: var(--sable-sec-on-container);
 }
 
 .sable-button-ghost {
-  background: var(--sable-surface-container);
-  border-color: var(--sable-surface-container-line);
-  color: var(--sable-bg-on-container);
+  --button-container: var(--sable-surface-container);
+  --button-container-hover: var(--sable-surface-container-hover);
+  --button-container-active: var(--sable-surface-container-active);
+  --button-line: var(--sable-surface-container-line);
+  --button-on-container: var(--sable-bg-on-container);
 }
 
 .sable-button-danger {
-  background: var(--sable-crit-container);
-  border-color: var(--sable-crit-container-line);
-  color: var(--sable-crit-on-container);
+  --button-container: var(--sable-crit-main);
+  --button-container-hover: var(--sable-crit-main-hover);
+  --button-container-active: var(--sable-crit-main-active);
+  --button-line: var(--sable-crit-main-line);
+  --button-on-container: var(--sable-crit-on-main);
 }
 
 .sable-button-small {
-  min-height: var(--control-height-small);
-  padding: 0.375rem var(--space-2);
+  --button-height: var(--control-height-300);
+  --button-gap: var(--space-100);
+  --button-padding-inline: var(--control-padding-300);
 }
 
 .sable-button-large {
-  min-height: var(--control-height-large);
-  padding: 0.625rem var(--space-4);
-}
-
-.sable-button-large > svg {
-  height: var(--icon-size-medium);
-  width: var(--icon-size-medium);
+  --button-height: var(--control-height-500);
+  --button-gap: var(--space-300);
+  --button-padding-inline: var(--control-padding-500);
+  --button-icon-size: var(--size-x400);
 }
 
 .sable-button-icon {
-  min-height: var(--control-height-medium);
-  padding: 0;
-  width: var(--control-height-medium);
+  --button-padding-inline: 0;
+
+  width: var(--button-height);
 }
 
 .sable-button-loading {
@@ -78,99 +93,47 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-.sable-button:disabled {
-  cursor: default;
-  opacity: 0.65;
+.sable-button:disabled,
+.sable-button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 .sable-button[aria-disabled='true'] {
-  cursor: default;
-  opacity: 0.65;
   pointer-events: none;
 }
 
-.sable-button-primary:hover:not(:disabled) {
-  background: var(--sable-primary-container-hover);
+.sable-button:hover:not(:disabled, [aria-disabled='true']),
+.sable-button:focus-visible:not(:disabled, [aria-disabled='true']) {
+  background: var(--button-container-hover);
 }
 
-.sable-button-secondary:hover:not(:disabled) {
-  background: var(--sable-sec-container-hover);
-}
-
-.sable-button-ghost:hover:not(:disabled) {
-  background: var(--sable-surface-container-hover);
-}
-
-.sable-button-danger:hover:not(:disabled) {
-  background: var(--sable-crit-container-hover);
-}
-
-.sable-button-primary:active:not(:disabled) {
-  background: var(--sable-primary-container-active);
-  box-shadow: var(--shadow-inset);
-}
-
-.sable-button-secondary:active:not(:disabled) {
-  background: var(--sable-sec-container-active);
-  box-shadow: var(--shadow-inset);
-}
-
-.sable-button-ghost:active:not(:disabled) {
-  background: var(--sable-surface-container-active);
-  box-shadow: var(--shadow-inset);
-}
-
-.sable-button-danger:active:not(:disabled) {
-  background: var(--sable-crit-container-active);
-  box-shadow: var(--shadow-inset);
+.sable-button:active:not(:disabled, [aria-disabled='true']),
+.sable-button[aria-pressed='true'] {
+  background: var(--button-container-active);
 }
 
 .sable-icon-button {
-  padding: 0;
+  --button-icon-size: var(--size-x400);
+  --button-padding-inline: 0;
+
+  width: var(--button-height);
 }
 
 .sable-icon-button-small {
-  min-height: var(--control-height-small);
-  width: var(--control-height-small);
+  --button-height: var(--control-height-300);
+  --button-icon-size: var(--size-x200);
 }
 
 .sable-icon-button-large {
-  min-height: var(--control-height-large);
-  width: var(--control-height-large);
-}
-
-.sable-icon-button > svg {
-  height: var(--icon-size-medium);
-  width: var(--icon-size-medium);
-}
-
-.sable-icon-button-small > svg {
-  height: var(--icon-size-small);
-  width: var(--icon-size-small);
-}
-
-.sable-icon-button-large > svg {
-  height: var(--icon-size-large);
-  width: var(--icon-size-large);
+  --button-height: var(--control-height-500);
+  --button-icon-size: var(--size-x500);
 }
 
 .sable-icon-button.sable-button-ghost {
-  background: transparent;
-  border-color: transparent;
-}
-
-.sable-icon-button.sable-button-ghost:hover:not(:disabled) {
-  background: var(--sable-bg-container-hover);
-}
-
-.sable-icon-button.sable-button-ghost:active:not(:disabled) {
-  background: var(--sable-bg-container-active);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .sable-button {
-    transition:
-      background-color var(--motion-normal) var(--motion-easing-standard),
-      box-shadow var(--motion-normal) var(--motion-easing-standard);
-  }
+  --button-container: transparent;
+  --button-container-hover: var(--sable-bg-container-hover);
+  --button-container-active: var(--sable-bg-container-active);
+  --button-line: transparent;
+  --button-on-container: inherit;
 }

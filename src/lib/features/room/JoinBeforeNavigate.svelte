@@ -148,10 +148,10 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-300);
     justify-content: center;
     min-height: 100%;
-    padding: 2rem 1.5rem;
+    padding: var(--space-700) var(--space-600);
     text-align: center;
   }
 

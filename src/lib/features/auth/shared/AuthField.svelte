@@ -28,13 +28,13 @@
 <style>
   .auth-field {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
   }
 
   .auth-field-label {
     align-items: center;
     display: flex;
-    gap: 0.375rem;
+    gap: var(--space-150);
   }
 
   .auth-field-label h2 {

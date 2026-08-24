@@ -96,7 +96,7 @@
         <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
-        class="account-popover"
+        class="sable-menu account-popover"
         side={mode === 'compact' ? 'right' : 'top'}
         sideOffset={8}
       >

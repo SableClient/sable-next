@@ -1,56 +1,28 @@
 <script lang="ts">
-  import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
-  import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
-  import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
-  import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
-  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
-  import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
-  import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import { i18n } from '#lib/i18n.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import Button from '#lib/ui/primitives/Button.svelte';
+  import '#lib/ui/primitives/menu.css';
 
-  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
-  import { shortcodeFor } from '#lib/emoji/emoji.js';
+  import MessageQuickReactions from './MessageQuickReactions.svelte';
+  import { messageMenuRows, type MessageActions } from './message-menu-items';
 
-  interface Props {
+  type Props = MessageActions & {
     open?: boolean;
     preview?: string | null;
-    onReact?: (emoji: string) => void;
-    onViewReactions?: () => void;
-    onReadReceipts?: () => void;
-    onReply?: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-    onCopyText?: () => void;
-    onCopyLink?: () => void;
-  }
+  };
 
-  let {
-    open = $bindable(false),
-    preview = null,
-    onReact,
-    onViewReactions,
-    onReadReceipts,
-    onReply,
-    onEdit,
-    onDelete,
-    onCopyText,
-    onCopyLink,
-  }: Props = $props();
-  let quick = $derived(open ? readRecentReactions() : []);
+  let { open = $bindable(false), preview = null, ...actions }: Props = $props();
 
-  function run(action: (() => void) | undefined): void {
+  function run(action: () => void): void {
     open = false;
-    action?.();
+    action();
   }
 
   function react(emoji: string): void {
-    rememberReaction(emoji);
     open = false;
-    onReact?.(emoji);
+    actions.onReact?.(emoji);
   }
 </script>
 
@@ -61,160 +33,56 @@
 >
   {#if preview}
     <p class="sheet-source">{preview}</p>
+    <div class="sheet-line"></div>
   {/if}
-  {#if onReact}
-    <div class="quick-strip" role="group" aria-label={$i18n.t('timeline.addReaction')}>
-      {#each quick as emoji (emoji)}
-        <Button
-          variant="ghost"
-          size="icon"
-          class="quick-reaction"
-          aria-label={shortcodeFor(emoji) ?? emoji}
+  <IconContext values={{ 'aria-hidden': 'true' }}>
+    {#if actions.onReact}
+      <MessageQuickReactions count={8} onReact={react} />
+    {/if}
+    <div class="sheet-list">
+      {#each messageMenuRows(actions) as row (row.key)}
+        {@const RowIcon = row.icon}
+        {#if row.separated}<div class="sheet-line"></div>{/if}
+        <button
+          type="button"
+          class={[
+            'sable-menu-item sable-menu-item-trailing-icon',
+            row.destructive && 'sable-menu-item-destructive',
+          ]}
           onclick={() => {
-            react(emoji);
-          }}>{emoji}</Button
+            run(row.run);
+          }}
         >
+          <RowIcon />
+          <span>{$i18n.t(row.label)}</span>
+        </button>
       {/each}
     </div>
-  {/if}
-  <div class="sheet-list">
-    {#if onReply}
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onReply);
-        }}
-      >
-        <ReplyIcon />{$i18n.t('timeline.reply')}
-      </Button>
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onReply);
-        }}
-      >
-        <ThreadIcon />{$i18n.t('timeline.replyInThread')}
-      </Button>
-    {/if}
-    {#if onEdit}
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onEdit);
-        }}
-      >
-        <EditIcon />{$i18n.t('timeline.editMessage')}
-      </Button>
-    {/if}
-    {#if onCopyText}
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onCopyText);
-        }}
-      >
-        <CopyIcon />{$i18n.t('timeline.copyMessage')}
-      </Button>
-    {/if}
-    {#if onCopyLink}
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onCopyLink);
-        }}
-      >
-        <LinkIcon />{$i18n.t('timeline.copyLink')}
-      </Button>
-    {/if}
-    {#if onViewReactions}
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onViewReactions);
-        }}
-      >
-        <EmojiIcon />{$i18n.t('timeline.viewReactions')}
-      </Button>
-    {/if}
-    {#if onReadReceipts}
-      <Button
-        variant="ghost"
-        class="sheet-action"
-        onclick={() => {
-          run(onReadReceipts);
-        }}
-      >
-        <ReceiptIcon />{$i18n.t('timeline.readReceipts')}
-      </Button>
-    {/if}
-    {#if onDelete}
-      <Button
-        variant="ghost"
-        class="sheet-action danger"
-        onclick={() => {
-          run(onDelete);
-        }}
-      >
-        <TrashIcon />{$i18n.t('timeline.deleteMessage')}
-      </Button>
-    {/if}
-  </div>
+  </IconContext>
 </BottomSheet>
 
 <style>
-  .quick-strip {
-    display: grid;
-    gap: 2px;
-    grid-template-columns: repeat(auto-fit, minmax(2.25rem, 1fr));
-    padding: 0 var(--space-2) var(--space-2);
-  }
-
-  :global(.quick-reaction) {
-    background: var(--sable-surface-var-container);
-    border-color: transparent;
-    font-size: var(--font-size-large);
-    line-height: 1;
-  }
-
   .sheet-source {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0 0 var(--space-1);
+    font-size: var(--font-size-t300);
+    margin: 0 0 var(--space-200);
     overflow: hidden;
-    padding: 0 var(--space-3);
+    padding: 0 var(--space-400);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .sheet-line {
+    background: var(--sable-surface-container-line);
+    block-size: var(--border-width);
   }
 
   .sheet-list {
     display: grid;
   }
 
-  :global(.sheet-action) {
-    color: var(--sable-surface-on-container);
-    min-height: var(--control-height-large);
-    padding: 0 var(--space-3);
-    text-align: left;
-    width: 100%;
-  }
-
-  :global(.sheet-action:active:not(:disabled)) {
-    background: var(--sable-surface-container-active);
-  }
-
-  :global(.sheet-action.danger) {
-    color: var(--sable-crit-main);
-  }
-
-  .sheet-list :global(svg) {
-    flex: 0 0 auto;
-    height: var(--icon-size-medium);
-    width: var(--icon-size-medium);
+  .sheet-list :global(.sable-menu-item) {
+    --menu-item-padding: var(--space-400);
+    --menu-item-radius: var(--radii-300);
   }
 </style>

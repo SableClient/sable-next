@@ -17,63 +17,74 @@
 
 <style>
   :global(.sable-switch) {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius-pill);
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radii-pill);
+    box-shadow: inset 0 0 0 var(--border-width-400) currentcolor;
     box-sizing: border-box;
     cursor: pointer;
     display: inline-flex;
     flex: 0 0 auto;
-    height: 1.375rem;
-    padding: 2px;
+    height: 1.5rem;
+    opacity: var(--opacity-p300);
+    padding: 0;
     position: relative;
-    width: 2.375rem;
+    user-select: none;
+    width: 2.75rem;
   }
 
-  /* The control reads better at 22px than the 36px touch floor, so the tap
-     area is grown separately. */
   :global(.sable-switch::after) {
     content: '';
-    inset: -0.4375rem 0;
+    inset: calc((var(--target-hit) - 1.5rem) / -2) 0;
     position: absolute;
   }
 
   :global(.sable-switch[data-state='checked']) {
     background: var(--sable-primary-main);
-    border-color: var(--sable-primary-main);
+    box-shadow: none;
+    color: var(--sable-primary-on-main);
+    opacity: var(--opacity-p500);
   }
 
   :global(.sable-switch:focus-visible) {
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
-    outline: none;
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   :global(.sable-switch[data-disabled]) {
-    cursor: default;
-    opacity: 0.65;
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
   }
 
   :global(.sable-switch-thumb) {
-    background: var(--sable-surface-on-container);
-    border-radius: var(--radius-pill);
+    background: currentcolor;
+    border-radius: var(--radii-pill);
     display: block;
-    height: 1rem;
-    width: 1rem;
+    height: 0.875rem;
+    translate: 0.3125rem 0;
+    width: 0.875rem;
   }
 
   :global(.sable-switch[data-state='checked'] .sable-switch-thumb) {
-    translate: 1rem 0;
+    height: 1.125rem;
+    translate: 1.4375rem 0;
+    width: 1.125rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     :global(.sable-switch) {
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
-        border-color var(--motion-normal) var(--motion-easing-standard);
+        box-shadow var(--motion-normal) var(--motion-easing-standard),
+        opacity var(--motion-normal) var(--motion-easing-standard);
     }
 
     :global(.sable-switch-thumb) {
-      transition: translate var(--motion-normal) var(--motion-easing-standard);
+      transition:
+        translate var(--motion-normal) var(--motion-easing-standard),
+        height var(--motion-normal) var(--motion-easing-standard),
+        width var(--motion-normal) var(--motion-easing-standard);
     }
   }
 </style>

@@ -18,8 +18,7 @@
 
 <style>
   .text-area {
-    --form-control-padding-inline: var(--space-2);
-    --form-control-padding-inline-end: var(--space-2);
+    --form-control-padding-block: var(--space-200);
 
     min-height: 6rem;
     resize: vertical;

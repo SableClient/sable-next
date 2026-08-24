@@ -1,5 +1,5 @@
 <script lang="ts">
-  import './message-menu.css';
+  import '#lib/ui/primitives/menu.css';
   import { DropdownMenu } from 'bits-ui';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
   import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
@@ -53,6 +53,7 @@
       {roomId}
       onPick={onReact}
       onOpenChange={onPickerOpenChange}
+      triggerClass="sable-button sable-button-ghost sable-button-icon sable-icon-button sable-icon-button-small message-action-button"
     >
       <EmojiIcon />
     </ReactionPicker>
@@ -81,45 +82,58 @@
   {/if}
   {#if hasOverflow}
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger aria-label={$i18n.t('timeline.moreActions')}>
-        <MoreIcon />
+      <DropdownMenu.Trigger>
+        {#snippet child({ props })}
+          <IconButton
+            {...props}
+            size="small"
+            variant="ghost"
+            class="message-action-button"
+            label={$i18n.t('timeline.moreActions')}
+          >
+            <MoreIcon />
+          </IconButton>
+        {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          class="message-menu"
+          class="sable-menu"
           side="bottom"
           align="end"
           sideOffset={4}
           collisionPadding={8}
         >
           {#if onReply}
-            <DropdownMenu.Item onclick={onReply}
+            <DropdownMenu.Item class="sable-menu-item" onclick={onReply}
               >{$i18n.t('timeline.replyInThread')}</DropdownMenu.Item
             >
           {/if}
           {#if onCopyText}
-            <DropdownMenu.Item onclick={onCopyText}
+            <DropdownMenu.Item class="sable-menu-item" onclick={onCopyText}
               >{$i18n.t('timeline.copyMessage')}</DropdownMenu.Item
             >
           {/if}
           {#if onCopyLink}
-            <DropdownMenu.Item onclick={onCopyLink}
+            <DropdownMenu.Item class="sable-menu-item" onclick={onCopyLink}
               >{$i18n.t('timeline.copyLink')}</DropdownMenu.Item
             >
           {/if}
           {#if onViewReactions}
-            <DropdownMenu.Item onclick={onViewReactions}
+            <DropdownMenu.Item class="sable-menu-item" onclick={onViewReactions}
               >{$i18n.t('timeline.viewReactions')}</DropdownMenu.Item
             >
           {/if}
           {#if onReadReceipts}
-            <DropdownMenu.Item onclick={onReadReceipts}
+            <DropdownMenu.Item class="sable-menu-item" onclick={onReadReceipts}
               >{$i18n.t('timeline.readReceipts')}</DropdownMenu.Item
             >
           {/if}
           {#if onDelete}
-            <DropdownMenu.Separator class="message-menu-separator" />
-            <DropdownMenu.Item class="message-menu-danger" onclick={onDelete}>
+            <DropdownMenu.Separator class="sable-menu-separator" />
+            <DropdownMenu.Item
+              class="sable-menu-item sable-menu-item-destructive"
+              onclick={onDelete}
+            >
               {$i18n.t('timeline.deleteMessage')}
             </DropdownMenu.Item>
           {/if}
@@ -147,31 +161,17 @@
     z-index: 3;
   }
 
-  .message-actions :global(button) {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
+  .message-actions :global(.message-action-button) {
+    --button-height: 1.5rem;
+
     color: var(--sable-surface-var-on-container);
-    cursor: pointer;
-    display: flex;
-    height: 1.5rem;
-    justify-content: center;
-    padding: 0;
     position: relative;
-    width: var(--control-height-small);
   }
 
-  .message-actions :global(button::after) {
+  .message-actions :global(.message-action-button::after) {
     content: '';
-    inset: -0.375rem -1px;
+    inset: calc(var(--space-200) * -1) -1px;
     position: absolute;
-  }
-
-  .message-actions :global(button > svg) {
-    display: block;
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
   }
 
   .message-actions :global(button:focus-visible) {

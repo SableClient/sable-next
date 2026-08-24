@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Avatar } from 'bits-ui';
   import type { ClassValue } from 'svelte/elements';
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -25,71 +26,88 @@
   }: Props = $props();
 
   let accessibleLabel = $derived(alt ?? initials);
-  let failedSource = $state<string | null>(null);
-  let mediaFailed = $derived(failedSource === src);
+  let isMxc = $derived(src?.startsWith('mxc://') ?? false);
+  let loadingStatus = $state<Avatar.RootProps['loadingStatus']>('loading');
+
+  $effect(() => {
+    const next = src;
+    loadingStatus = next?.startsWith('mxc://') ? 'loaded' : 'loading';
+  });
 </script>
 
-<span
+<Avatar.Root
+  bind:loadingStatus
   class={['sable-avatar', `sable-avatar-${size}`, className]}
-  style:background={color}
+  style={color ? `background: ${color}` : undefined}
   aria-hidden={decorative ? 'true' : undefined}
   role={decorative ? undefined : 'img'}
   aria-label={decorative ? undefined : accessibleLabel}
 >
-  {#if src?.startsWith('mxc://') && !mediaFailed}
+  {#if isMxc && src}
     <MediaImage
-      class="avatar-image"
+      class="sable-avatar-image"
       source={src}
       alt=""
       width={96}
       height={96}
-      onfailed={() => (failedSource = src)}
+      onfailed={() => (loadingStatus = 'error')}
     />
-  {:else if src && !mediaFailed}
-    <img {src} alt="" onerror={() => (failedSource = src)} />
-  {:else}
-    <span>{initials}</span>
+  {:else if src}
+    <Avatar.Image {src} alt="" class="sable-avatar-image" />
   {/if}
-</span>
+  <Avatar.Fallback class="sable-avatar-fallback">{initials}</Avatar.Fallback>
+</Avatar.Root>
 
 <style>
   :global(.sable-avatar) {
-    --avatar-size: var(--avatar-size-medium);
+    --avatar-size: var(--avatar-size-400);
 
     align-items: center;
     background: transparent;
-    border-radius: var(--radius);
+    border-radius: var(--radii-400);
     color: var(--sable-primary-on-container);
     display: inline-flex;
     flex: 0 0 var(--avatar-size);
-    font-size: var(--font-size-medium);
-    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-h4);
+    font-weight: var(--font-weight-600);
     height: var(--avatar-size);
     justify-content: center;
     overflow: hidden;
+    position: relative;
+    user-select: none;
     vertical-align: middle;
     width: var(--avatar-size);
   }
 
   :global(.sable-avatar-small) {
-    --avatar-size: var(--avatar-size-small);
+    --avatar-size: var(--avatar-size-300);
+
+    font-size: var(--font-size-b400);
   }
 
   :global(.sable-avatar-large) {
-    --avatar-size: var(--avatar-size-large);
+    --avatar-size: var(--avatar-size-500);
 
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-h2);
   }
 
-  :global(.sable-avatar img) {
+  :global(.sable-avatar-image),
+  :global(.sable-avatar-fallback) {
+    border-radius: inherit;
     height: 100%;
+    inset: 0;
+    position: absolute;
+    width: 100%;
+  }
+
+  :global(.sable-avatar-image) {
     object-fit: cover;
     object-position: center;
-    width: 100%;
   }
 
-  :global(.sable-avatar .avatar-image) {
-    height: 100%;
-    width: 100%;
+  :global(.sable-avatar-fallback) {
+    align-items: center;
+    display: flex;
+    justify-content: center;
   }
 </style>

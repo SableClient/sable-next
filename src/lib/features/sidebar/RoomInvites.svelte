@@ -7,7 +7,7 @@
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   interface Props {
     collapsed?: boolean;
@@ -32,19 +32,7 @@
         {@const name = invite.name ?? invite.room_id}
         {@const busy = answers.isAnswering(invite.room_id)}
         <li>
-          <span class="invite-icon" aria-hidden="true">
-            {#if invite.avatar_url}
-              <MediaImage
-                source={invite.avatar_url}
-                alt=""
-                width={56}
-                height={56}
-                class="room-image"
-              />
-            {:else}
-              {initial(name)}
-            {/if}
-          </span>
+          <Avatar class="invite-icon" src={invite.avatar_url} initials={initial(name)} />
           <span class="invite-name" title={name}>{name}</span>
           <IconButton
             variant="ghost"
@@ -76,22 +64,22 @@
 
 <style>
   .invites {
-    padding: 0 0.5rem 0.5rem;
+    padding: 0 var(--space-200) var(--space-200);
   }
 
   h3 {
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     margin: 0;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-200);
     text-transform: uppercase;
   }
 
   ul {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     list-style: none;
-    margin: 0.25rem 0 0;
+    margin: var(--space-100) 0 0;
     padding: 0;
   }
 
@@ -102,25 +90,18 @@
     gap: var(--space-1);
     min-height: var(--control-height-medium);
     min-width: 0;
-    padding: 0 0.25rem 0 0.5rem;
+    padding: 0 var(--space-100) 0 var(--space-200);
   }
 
   li:hover {
     background: var(--sable-bg-container-hover);
   }
 
-  .invite-icon {
-    align-items: center;
+  :global(.sable-avatar.invite-icon) {
+    --avatar-size: 1.75rem;
+
     background: var(--sable-surface-var-container);
-    border-radius: var(--radius);
-    display: flex;
-    flex: 0 0 1.75rem;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: 1.75rem;
-    justify-content: center;
-    overflow: hidden;
-    width: 1.75rem;
+    font-size: var(--font-size-t300);
   }
 
   .invite-name {

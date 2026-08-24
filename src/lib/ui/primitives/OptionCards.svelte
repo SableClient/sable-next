@@ -1,4 +1,6 @@
 <script lang="ts" generics="Value extends string">
+  import { RadioGroup } from 'bits-ui';
+
   import type { OptionCard } from './option-card';
 
   interface Props {
@@ -11,103 +13,103 @@
   }
 
   let { label, options, value, disabled = false, onSelect }: Props = $props();
-  // Native radios bring the group's arrow keys and single tab stop with them.
-  const name = $props.id();
 </script>
 
-<div class="option-cards" role="radiogroup" aria-label={label}>
+<RadioGroup.Root
+  class="option-cards"
+  value={value ?? ''}
+  {disabled}
+  aria-label={label}
+  onValueChange={(next) => {
+    const picked = options.find((option) => option.value === next);
+    if (picked) onSelect(picked.value);
+  }}
+>
   {#each options as option (option.value)}
     {@const Icon = option.icon}
-    {@const selected = option.value === value}
-    <label class="option-card" class:selected>
-      <input
-        class="screen-reader-only"
-        type="radio"
-        {name}
-        value={option.value}
-        checked={selected}
-        disabled={disabled || option.disabled}
-        onchange={() => {
-          onSelect(option.value);
-        }}
-      />
+    <RadioGroup.Item
+      value={option.value}
+      disabled={disabled || option.disabled}
+      class={['option-card', { selected: option.value === value }]}
+    >
       {#if Icon}<span class="option-card-icon" aria-hidden="true"><Icon /></span>{/if}
       <span class="option-card-text">
         <span class="option-card-label">{option.label}</span>
         {#if option.hint}<span class="option-card-hint">{option.hint}</span>{/if}
       </span>
-    </label>
+    </RadioGroup.Item>
   {/each}
-</div>
+</RadioGroup.Root>
 
 <style>
-  .option-cards {
+  :global(.option-cards) {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
-  .option-card {
+  :global(.option-card) {
     align-items: center;
     background: var(--sable-surface-container);
     border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
+    border-radius: var(--radii-400);
     color: inherit;
     cursor: pointer;
     display: flex;
-    gap: var(--space-2);
-    padding: var(--space-2);
+    gap: var(--space-300);
+    padding: var(--space-300);
     position: relative;
+    text-align: left;
     width: 100%;
   }
 
-  .option-card:has(:focus-visible) {
+  :global(.option-card:focus-visible) {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
-  .option-card:has(:disabled) {
-    cursor: default;
-    opacity: 0.65;
+  :global(.option-card[data-disabled]) {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
   }
 
-  .option-card:hover:not(:has(:disabled)) {
+  :global(.option-card:hover:not([data-disabled])) {
     background: var(--sable-bg-container-hover);
   }
 
-  .option-card.selected {
+  :global(.option-card.selected) {
     background: var(--sable-primary-container);
     border-color: var(--sable-primary-main);
     color: var(--sable-primary-on-container);
   }
 
-  .option-card-icon {
+  :global(.option-card-icon) {
     align-items: center;
     display: inline-flex;
     flex: none;
   }
 
-  .option-card-icon :global(svg) {
-    height: var(--icon-size-large);
-    width: var(--icon-size-large);
+  :global(.option-card-icon svg) {
+    height: var(--size-x500);
+    width: var(--size-x500);
   }
 
-  .option-card-text {
+  :global(.option-card-text) {
     display: grid;
-    gap: calc(var(--space-1) / 2);
+    gap: var(--space-100);
     min-width: 0;
   }
 
-  .option-card-label {
-    font-weight: var(--font-weight-medium);
+  :global(.option-card-label) {
+    font-weight: var(--font-weight-600);
   }
 
-  .option-card-hint {
+  :global(.option-card-hint) {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
+    font-size: var(--font-size-t300);
+    line-height: var(--line-height-t300);
   }
 
-  .option-card.selected .option-card-hint {
+  :global(.option-card.selected .option-card-hint) {
     color: inherit;
   }
 </style>

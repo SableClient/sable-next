@@ -36,7 +36,7 @@
     align-items: center;
     display: flex;
     min-height: 100%;
-    padding: 2rem var(--page-gutter);
+    padding: var(--space-700) var(--page-gutter);
   }
 
   .empty-state-content {

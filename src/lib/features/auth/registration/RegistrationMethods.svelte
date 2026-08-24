@@ -189,19 +189,19 @@
 <style>
   .registration-methods {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-400);
     min-width: 0;
   }
 
   .method-slot {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-400);
     min-width: 0;
   }
 
   .actions {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 
   .muted {

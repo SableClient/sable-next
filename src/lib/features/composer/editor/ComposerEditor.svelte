@@ -83,7 +83,7 @@
   .editor :global(code) {
     background: var(--sable-surface-var-container);
     border-radius: calc(var(--radius) - 0.25rem);
-    padding: 0 0.1875rem;
+    padding: 0 var(--space-hairline);
   }
 
   .editor :global(pre) {
@@ -112,7 +112,7 @@
     background: var(--sable-primary-container);
     border-radius: var(--radius-pill);
     color: var(--sable-primary-on-container);
-    padding: 0 0.375rem;
+    padding: 0 var(--space-150);
   }
 
   /* ProseMirror's own class; the themed `.selected` below paints instead. */

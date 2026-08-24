@@ -331,7 +331,7 @@ test('offers a way out of a folder holding a single space', async () => {
   await tick();
   await tick();
 
-  const item = [...document.querySelectorAll<HTMLElement>('.space-menu-item')].find(
+  const item = [...document.querySelectorAll<HTMLElement>('.sable-menu-item')].find(
     (element) => element.textContent.trim() === 'nav.folderRemoveSpace'
   );
   expect(item).not.toBeUndefined();

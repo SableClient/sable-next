@@ -12,15 +12,11 @@
 }
 
 .account-popover {
-  background: var(--sable-bg-container);
-  border: var(--border-width) solid var(--sable-bg-container-line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-float);
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.375rem;
+  --menu-min-width: min(20rem, calc(100vw - 2rem));
+
+  gap: var(--space-100);
+  padding: var(--space-150);
   width: min(20rem, calc(100vw - 2rem));
-  z-index: 10;
 }
 
 .account-popover .account-profile-header {
@@ -29,52 +25,11 @@
   margin: -0.375rem -0.375rem 0;
 }
 
-.account-popover [role='menuitem'] {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: calc(var(--radius) - 0.125rem);
-  color: inherit;
-  cursor: pointer;
-  display: flex;
-  gap: var(--space-1);
-  overflow: hidden;
-  padding: 0.5rem 0.625rem;
-  text-align: left;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .account-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.account-separator {
-  background: var(--sable-bg-container-line);
-  height: 1px;
-  margin: 0.25rem;
-}
-
-.account-popover [role='menuitem']:hover,
-.account-popover [role='menuitem'][data-highlighted] {
-  background: var(--sable-bg-container-hover);
-}
-
-.account-popover [role='menuitem'][data-disabled] {
-  color: var(--sable-surface-var-on-container);
-  cursor: default;
-}
-
-.account-popover [role='menuitem'][data-disabled]:hover {
-  background: transparent;
-}
-
-.account-popover [role='menuitem'].account-logout {
-  color: var(--sable-crit-main);
 }
 
 .compact-tool,

@@ -130,7 +130,7 @@
     border-bottom: var(--border-width) solid var(--sable-surface-var-container);
     display: flex;
     flex: 0 0 auto;
-    gap: 0.625rem;
+    gap: var(--space-250);
     min-height: 3.75rem;
     padding: 0 var(--page-gutter);
   }
@@ -156,8 +156,8 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
-    gap: 0.25rem;
-    padding: 0.125rem 0.5rem;
+    gap: var(--space-100);
+    padding: var(--space-hairline) var(--space-200);
   }
 
   .voice-chip.live {
@@ -191,7 +191,7 @@
 
   :global(.back-button),
   :global(.members-button) {
-    gap: 0.375rem;
+    gap: var(--space-150);
   }
 
   :global(.back-button) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import { Collapsible, ContextMenu, Tooltip as BitsTooltip } from 'bits-ui';
   import { onDestroy } from 'svelte';
 
@@ -22,6 +23,13 @@
   import TimelinePoll from './TimelinePoll.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
+
+  import MessageQuickReactions from './MessageQuickReactions.svelte';
+  import ReactionSheet from './ReactionSheet.svelte';
+  import { messageMenuRows } from './message-menu-items';
+  import { openMessageMenu } from './message-menu-open.svelte.js';
+  import '#lib/ui/primitives/menu.css';
   import PersonaProfile from './PersonaProfile.svelte';
   import ReactionPicker from './ReactionPicker.svelte';
   import ReactionsDialog from './ReactionsDialog.svelte';
@@ -190,6 +198,11 @@
             onToggleReaction(eventId, emoji);
           }
         : undefined,
+      onAddReaction: onToggleReaction
+        ? () => {
+            emoteOpen = true;
+          }
+        : undefined,
       onViewReactions:
         item.reactions.length > 0
           ? () => {
@@ -234,6 +247,7 @@
   const LONG_PRESS_MS = 450;
   const LONG_PRESS_SLOP_PX = 10;
   let sheetOpen = $state(false);
+  let emoteOpen = $state(false);
   let deleteOpen = $state(false);
   let reactionsOpen = $state(false);
   let reactionActive = $state(0);
@@ -242,17 +256,24 @@
   let messageRow = $state<HTMLElement | null>(null);
   let pressTimer: ReturnType<typeof setTimeout> | undefined;
   let pressOrigin: { x: number; y: number } | null = null;
+  let touchInteraction = $state(false);
   let reactionPressTimer: ReturnType<typeof setTimeout> | undefined;
   let reactionPressOrigin: { x: number; y: number } | null = null;
   let reactionPressFired = false;
 
   function startPress(event: PointerEvent): void {
+    touchInteraction = event.pointerType !== 'mouse';
     if (event.pointerType === 'mouse' || !actionable) return;
     pressOrigin = { x: event.clientX, y: event.clientY };
     pressTimer = setTimeout(() => {
       sheetOpen = true;
       pressOrigin = null;
     }, LONG_PRESS_MS);
+  }
+
+  function suppressTouchContextMenu(event: MouseEvent): void {
+    if (!touchInteraction) return;
+    event.preventDefault();
   }
 
   function movePress(event: PointerEvent): void {
@@ -262,6 +283,10 @@
       Math.abs(event.clientY - pressOrigin.y) > LONG_PRESS_SLOP_PX;
     if (moved) endPress();
   }
+
+  $effect(() => {
+    if (sheetOpen) openMessageMenu.set(item.id, false);
+  });
 
   function endPress(): void {
     if (pressTimer) clearTimeout(pressTimer);
@@ -344,8 +369,15 @@
 </script>
 
 {#if isMessageRow(item.content)}
-  <ContextMenu.Root>
-    <ContextMenu.Trigger disabled={!actionable}>
+  <ContextMenu.Root
+    bind:open={
+      () => openMessageMenu.isOpen(item.id),
+      (open: boolean) => {
+        openMessageMenu.set(item.id, open);
+      }
+    }
+  >
+    <ContextMenu.Trigger disabled={!actionable || touchInteraction}>
       <article
         bind:this={messageRow}
         class={[
@@ -370,9 +402,19 @@
         onpointermove={movePress}
         onpointerup={endPress}
         onpointercancel={endPress}
+        oncontextmenu={suppressTouchContextMenu}
       >
         {#if actionable}
           <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
+          {#if emoteOpen}
+            <ReactionSheet
+              bind:open={emoteOpen}
+              {roomId}
+              onPick={(key: string) => {
+                onToggleReaction?.(item.event_id ?? '', key);
+              }}
+            />
+          {/if}
           {#if sheetOpen}
             <MessageActionSheet
               bind:open={sheetOpen}
@@ -468,7 +510,7 @@
                 </span>
               {/if}
               {#each persona?.pronouns ?? profile?.pronouns ?? [] as pronoun, index (index)}
-                <span class="pronouns" lang={pronoun.language ?? undefined}>{pronoun.summary}</span>
+                <PronounPill lang={pronoun.language ?? undefined}>{pronoun.summary}</PronounPill>
               {/each}
               {#if persona && item.sender}
                 {@const account = item.sender}
@@ -692,46 +734,29 @@
     </ContextMenu.Trigger>
     {#if actionable}
       <ContextMenu.Portal>
-        <ContextMenu.Content class="message-menu" loop collisionPadding={8}>
-          {#if actions.onReply}
-            <ContextMenu.Item onclick={actions.onReply}
-              >{$i18n.t('timeline.reply')}</ContextMenu.Item
-            >
-            <ContextMenu.Item onclick={actions.onReply}
-              >{$i18n.t('timeline.replyInThread')}</ContextMenu.Item
-            >
-          {/if}
-          {#if actions.onEdit}
-            <ContextMenu.Item onclick={actions.onEdit}
-              >{$i18n.t('timeline.editMessage')}</ContextMenu.Item
-            >
-          {/if}
-          {#if actions.onCopyText}
-            <ContextMenu.Item onclick={actions.onCopyText}
-              >{$i18n.t('timeline.copyMessage')}</ContextMenu.Item
-            >
-          {/if}
-          {#if actions.onCopyLink}
-            <ContextMenu.Item onclick={actions.onCopyLink}
-              >{$i18n.t('timeline.copyLink')}</ContextMenu.Item
-            >
-          {/if}
-          {#if actions.onViewReactions}
-            <ContextMenu.Item onclick={actions.onViewReactions}
-              >{$i18n.t('timeline.viewReactions')}</ContextMenu.Item
-            >
-          {/if}
-          {#if actions.onReadReceipts}
-            <ContextMenu.Item onclick={actions.onReadReceipts}
-              >{$i18n.t('timeline.readReceipts')}</ContextMenu.Item
-            >
-          {/if}
-          {#if actions.onDelete}
-            <ContextMenu.Separator class="message-menu-separator" />
-            <ContextMenu.Item class="message-menu-danger" onclick={actions.onDelete}
-              >{$i18n.t('timeline.deleteMessage')}</ContextMenu.Item
-            >
-          {/if}
+        <ContextMenu.Content class="sable-menu message-menu" loop collisionPadding={8}>
+          <IconContext values={{ 'aria-hidden': 'true' }}>
+            {#if actions.onReact}
+              {@const react = actions.onReact}
+              <MessageQuickReactions count={4} onReact={react} />
+            {/if}
+            {#each messageMenuRows(actions) as row (row.key)}
+              {@const RowIcon = row.icon}
+              {#if row.separated}
+                <ContextMenu.Separator class="sable-menu-separator" />
+              {/if}
+              <ContextMenu.Item
+                class={[
+                  'sable-menu-item sable-menu-item-trailing-icon',
+                  row.destructive && 'sable-menu-item-destructive',
+                ]}
+                onclick={row.run}
+              >
+                <RowIcon />
+                <span>{$i18n.t(row.label)}</span>
+              </ContextMenu.Item>
+            {/each}
+          </IconContext>
         </ContextMenu.Content>
       </ContextMenu.Portal>
     {/if}
@@ -805,7 +830,7 @@
   .message.mention-loud {
     border-inline-start: calc(var(--border-width) * 4) solid;
     border-radius: 0 var(--radius) var(--radius) 0;
-    padding-inline: 0.5rem;
+    padding-inline: var(--space-200);
   }
 
   /* The leading border carries the signal, so the fill stays quiet enough to
@@ -948,7 +973,7 @@
     align-items: baseline;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-200);
   }
 
   .sender {
@@ -1038,19 +1063,6 @@
     color: var(--pmp-ink);
   }
 
-  .pronouns {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    letter-spacing: 0.015em;
-    line-height: 1.35;
-    padding: 0 var(--space-1);
-    text-transform: lowercase;
-  }
-
   .via {
     align-items: center;
     background: var(--sable-surface-var-container);
@@ -1061,7 +1073,7 @@
     display: inline-flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-normal);
-    gap: 0.25rem;
+    gap: var(--space-100);
     letter-spacing: 0.01em;
     padding: 0 var(--space-1);
     position: relative;
@@ -1106,7 +1118,7 @@
   }
 
   .edited {
-    margin-inline-start: 0.25rem;
+    margin-inline-start: var(--space-100);
   }
 
   /* `m.notice` is usually a bot, and reads as an aside. */
@@ -1119,8 +1131,8 @@
     color: var(--sable-crit-main);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.5rem;
-    margin-top: 0.125rem;
+    gap: var(--space-200);
+    margin-top: var(--space-hairline);
   }
 
   .send-failure button {
@@ -1152,7 +1164,7 @@
     accent-color: var(--sable-primary-main);
     display: block;
     height: 0.25rem;
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
     width: min(100%, 16rem);
   }
 
@@ -1175,7 +1187,7 @@
   :global(.image) {
     border-radius: var(--radius);
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
     width: min(
       100%,
       var(--timeline-media-max),
@@ -1186,7 +1198,7 @@
   :global(.sticker) {
     border-radius: var(--radius);
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
     width: var(--timeline-sticker-width);
   }
 
@@ -1207,8 +1219,8 @@
     gap: var(--space-1);
     grid-template-columns: auto minmax(0, 1fr);
     line-height: 1.4;
-    margin-bottom: 0.25rem;
-    padding: 0.25rem var(--space-1);
+    margin-bottom: var(--space-100);
+    padding: var(--space-100) var(--space-1);
     text-align: start;
     width: 100%;
   }
@@ -1248,7 +1260,7 @@
     display: inline-flex;
     justify-content: center;
     min-height: 1.5rem;
-    padding: 2px 0.5rem;
+    padding: 2px var(--space-200);
   }
 
   .reaction {
@@ -1263,9 +1275,9 @@
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-medium);
-    gap: 0.25rem;
+    gap: var(--space-100);
     min-height: 1.5rem;
-    padding: 2px 0.5rem 2px 0.375rem;
+    padding: 2px var(--space-200) 2px var(--space-150);
     position: relative;
   }
 
@@ -1316,7 +1328,7 @@
     line-height: var(--line-height-body);
     max-width: min(15rem, calc(100vw - 2rem));
     overflow-wrap: anywhere;
-    padding: 0.5rem 0.625rem;
+    padding: var(--space-200) var(--space-250);
     white-space: normal;
     z-index: var(--layer-tooltip);
   }
@@ -1359,14 +1371,14 @@
   .reactions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-top: 0.375rem;
+    gap: var(--space-100);
+    margin-top: var(--space-150);
   }
 
   .separator {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    padding: 0.5rem;
+    padding: var(--space-200);
     text-align: center;
   }
 
@@ -1375,7 +1387,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.5rem;
+    gap: var(--space-200);
     line-height: 1.3;
     padding: 0;
   }
@@ -1383,7 +1395,7 @@
   .state-rail {
     border-top: var(--border-width) dashed var(--sable-surface-var-container-line);
     flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
-    margin-inline-start: 0.75rem;
+    margin-inline-start: var(--space-300);
   }
 
   .redacted-label {
@@ -1391,8 +1403,8 @@
     border: var(--border-width) dashed var(--sable-surface-var-container-line);
     border-radius: var(--radius-pill);
     display: inline-flex;
-    gap: 0.25rem;
-    padding: 0.125rem var(--space-1);
+    gap: var(--space-100);
+    padding: var(--space-hairline) var(--space-1);
   }
 
   .debug-event {
@@ -1402,13 +1414,13 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.5rem;
-    padding: 0.375rem 0;
+    gap: var(--space-200);
+    padding: var(--space-150) 0;
   }
 
   .debug-body {
     display: grid;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     min-width: 0;
   }
 
@@ -1429,7 +1441,7 @@
     background: var(--sable-bg-container);
     border-radius: var(--radius);
     font-size: var(--font-size-small);
-    margin: 0.25rem 0 0;
+    margin: var(--space-100) 0 0;
     max-height: 14rem;
     overflow: auto;
     padding: var(--space-1);
@@ -1438,7 +1450,7 @@
   .debug-event code {
     flex: 0 0 auto;
     font-family: var(--font-family-mono);
-    margin-inline-start: calc(var(--avatar-size-small) + 0.625rem);
+    margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
   }
 
   .undecryptable {
@@ -1447,9 +1459,9 @@
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin-inline-start: calc(var(--avatar-size-small) + 0.625rem);
+    margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
     max-width: 32rem;
-    padding: 0.375rem 0.5rem;
+    padding: var(--space-150) var(--space-200);
     width: fit-content;
   }
 
@@ -1458,8 +1470,8 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: 0.75rem;
-    padding: 0.75rem 0;
+    gap: var(--space-300);
+    padding: var(--space-300) 0;
     text-align: center;
   }
 
@@ -1476,7 +1488,7 @@
     border-radius: var(--radius-pill);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.06em;
-    padding: 0.125rem var(--space-2);
+    padding: var(--space-hairline) var(--space-2);
     text-transform: uppercase;
   }
 
@@ -1484,9 +1496,9 @@
   .read-marker {
     align-items: center;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-200);
     margin: 0;
-    padding: 0.25rem 0;
+    padding: var(--space-100) 0;
   }
 
   .read-marker::before {
@@ -1517,7 +1529,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
-    padding: 0.125rem 0.5rem;
+    padding: var(--space-hairline) var(--space-200);
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {
@@ -1605,6 +1617,6 @@
 
   .message.layout-bubble.own.collapsed {
     padding-left: 0;
-    padding-right: calc(var(--avatar-size-small) + 0.625rem);
+    padding-right: calc(var(--avatar-size-small) + var(--space-250));
   }
 </style>

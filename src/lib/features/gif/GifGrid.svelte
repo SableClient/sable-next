@@ -117,12 +117,12 @@
 
   .gif-grid h3 {
     font-size: var(--font-size-small);
-    margin: 0.25rem 0;
+    margin: var(--space-100) 0;
   }
 
   .gif-grid ul {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     grid-template-columns: repeat(2, minmax(0, 1fr));
     list-style: none;
     margin: 0;
@@ -166,7 +166,7 @@
     cursor: pointer;
     display: flex;
     justify-content: center;
-    padding: 0.25rem;
+    padding: var(--space-100);
     position: absolute;
     right: 0.25rem;
     top: 0.25rem;

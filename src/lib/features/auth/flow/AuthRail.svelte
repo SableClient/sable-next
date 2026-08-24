@@ -284,7 +284,8 @@
     margin-inline: auto;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
-    padding: 0.25rem max(0.25rem, calc((100% - var(--auth-card-width)) / 2)) 1rem;
+    padding: var(--space-100) max(var(--space-100), calc((100% - var(--auth-card-width)) / 2))
+      var(--space-400);
     pointer-events: none;
     position: relative;
     scroll-padding-inline: calc((100% - var(--auth-card-width)) / 2);

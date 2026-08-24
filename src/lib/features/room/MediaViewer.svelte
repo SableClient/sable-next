@@ -323,7 +323,8 @@
     display: flex;
     justify-content: space-between;
     min-width: 0;
-    padding: calc(0.5rem + var(--safe-top)) max(0.75rem, var(--safe-left)) 0.5rem;
+    padding: calc(var(--space-200) + var(--safe-top)) max(var(--space-300), var(--safe-left))
+      var(--space-200);
     position: relative;
     z-index: 1;
   }
@@ -331,7 +332,8 @@
   .bottom-bar {
     border-top: var(--border-width) solid var(--sable-surface-container-line);
     justify-content: center;
-    padding: 0.5rem max(0.75rem, var(--safe-left)) calc(0.5rem + var(--safe-bottom));
+    padding: var(--space-200) max(var(--space-300), var(--safe-left))
+      calc(var(--space-200) + var(--safe-bottom));
   }
 
   .heading,
@@ -339,7 +341,7 @@
   .zoom-controls {
     align-items: center;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-150);
     min-width: 0;
   }
 
@@ -349,7 +351,7 @@
 
   .heading div {
     display: grid;
-    gap: 0.1rem;
+    gap: var(--space-hairline);
     min-width: 0;
   }
 
@@ -370,7 +372,7 @@
 
   .actions {
     flex: none;
-    gap: 0.25rem;
+    gap: var(--space-100);
   }
 
   .desktop-control,
@@ -387,7 +389,7 @@
     color: var(--sable-primary-on-container);
     cursor: pointer;
     font: inherit;
-    padding: 0.6rem;
+    padding: var(--space-250);
   }
 
   .pixel-toggle.active {
@@ -415,7 +417,7 @@
     justify-content: center;
     min-height: 0;
     overflow: hidden;
-    padding: 0.5rem;
+    padding: var(--space-200);
     position: relative;
     touch-action: none;
   }
@@ -454,7 +456,7 @@
   .error {
     color: var(--sable-crit-on-container);
     display: grid;
-    gap: 0.4rem;
+    gap: var(--space-200);
     text-align: center;
   }
 
@@ -464,13 +466,15 @@
 
   @media (width >= 48rem) {
     .toolbar {
-      padding: calc(0.75rem + var(--safe-top)) max(1rem, var(--safe-left)) 0.75rem;
+      padding: calc(var(--space-300) + var(--safe-top)) max(var(--space-400), var(--safe-left))
+        var(--space-300);
     }
 
     .bottom-bar {
-      gap: 1rem;
+      gap: var(--space-400);
       justify-content: space-between;
-      padding: 0.75rem max(1rem, var(--safe-left)) calc(0.75rem + var(--safe-bottom));
+      padding: var(--space-300) max(var(--space-400), var(--safe-left))
+        calc(var(--space-300) + var(--safe-bottom));
     }
 
     .desktop-control,
@@ -484,7 +488,7 @@
     }
 
     .stage {
-      padding: 1rem;
+      padding: var(--space-400);
     }
 
     :global(.previous) {

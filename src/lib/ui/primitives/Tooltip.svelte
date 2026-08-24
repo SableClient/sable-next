@@ -58,7 +58,7 @@
     cursor: pointer;
     display: flex;
     justify-content: center;
-    padding: 0.125rem;
+    padding: var(--space-hairline);
   }
 
   .tooltip-trigger-icon:hover,
@@ -90,23 +90,23 @@
   }
 
   .tooltip-trigger:focus-visible {
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
-    outline: none;
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   :global(.sable-tooltip) {
-    animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
+    animation: tooltip-in var(--motion-fast) var(--motion-easing-emphasized) both;
+    background: var(--sable-surface-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radii-400);
+    box-shadow: var(--shadow-e200);
     box-sizing: border-box;
-    color: var(--sable-bg-on-container);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
+    color: var(--sable-surface-on-container);
+    font-size: var(--font-size-t300);
+    line-height: var(--line-height-t300);
     max-width: min(15rem, calc(100vw - 2rem));
     overflow-wrap: anywhere;
-    padding: 0.5rem 0.625rem;
+    padding: var(--space-200) var(--space-250);
     white-space: normal;
     z-index: var(--layer-tooltip);
   }

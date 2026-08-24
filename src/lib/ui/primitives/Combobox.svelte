@@ -3,6 +3,7 @@
   import { i18n } from '#lib/i18n.js';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import TextInput from './TextInput.svelte';
+  import './menu.css';
   import type { HTMLInputAttributes } from 'svelte/elements';
 
   /** Free text is a valid value, so the input always shows `value` itself.
@@ -108,11 +109,11 @@
       {#snippet child({ wrapperProps, props, open })}
         {#if open && filteredItems.length > 0}
           <div {...wrapperProps} class="combobox-positioner">
-            <div {...props} class="combobox-menu">
+            <div {...props} class="sable-menu combobox-menu">
               {#each filteredItems as item (item.value)}
                 <BitsCombobox.Item value={item.value} label={item.label} disabled={item.disabled}>
                   {#snippet child({ props })}
-                    <div {...props} class="combobox-option">
+                    <div {...props} class="sable-menu-item">
                       {item.label}
                     </div>
                   {/snippet}
@@ -179,29 +180,15 @@
     transform: rotate(180deg);
   }
 
-  .combobox-menu {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
-    overflow: hidden;
+  :global(.combobox-menu) {
+    --menu-min-width: var(--bits-combobox-anchor-width);
+
     width: var(--bits-combobox-anchor-width);
   }
 
   .combobox-positioner {
     position: relative;
     z-index: var(--layer-menu);
-  }
-
-  .combobox-option {
-    padding: 0.625rem 0.875rem;
-  }
-
-  .combobox-option[data-highlighted] {
-    background: var(--sable-surface-container-hover);
-  }
-
-  .combobox-option:active {
-    background: var(--sable-surface-container-active);
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -213,10 +200,6 @@
 
     :global(.combobox-icon) {
       transition: transform var(--motion-normal) var(--motion-easing-standard);
-    }
-
-    .combobox-option:active {
-      transition: background-color var(--motion-fast) var(--motion-easing-standard);
     }
   }
 </style>

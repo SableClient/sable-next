@@ -68,7 +68,7 @@
     inset: 0;
     justify-content: flex-end;
     overflow: hidden;
-    padding: 0 var(--page-gutter) 1rem;
+    padding: 0 var(--page-gutter) var(--space-400);
     pointer-events: none;
     position: absolute;
     z-index: 1;
@@ -89,7 +89,7 @@
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: var(--space-150);
     justify-content: center;
     min-width: 0;
   }
@@ -97,7 +97,7 @@
   .timeline-skeleton-header {
     align-items: center;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-200);
     height: 1rem;
   }
 

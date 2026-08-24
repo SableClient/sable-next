@@ -4,6 +4,7 @@
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import type { ClassValue } from 'svelte/elements';
   import './form-control.css';
+  import './menu.css';
 
   type Item = {
     value: string;
@@ -44,14 +45,14 @@
     <CaretDownIcon class="select-caret" aria-hidden="true" />
   </BitsSelect.Trigger>
   <BitsSelect.Portal>
-    <BitsSelect.Content sideOffset={4} class="select-content">
+    <BitsSelect.Content sideOffset={4} class="sable-menu select-content">
       <BitsSelect.Viewport>
         {#each items as item (item.value)}
           <BitsSelect.Item
             value={item.value}
             label={item.label}
             disabled={item.disabled}
-            class="select-item"
+            class="sable-menu-item"
           >
             {#snippet children({ selected })}
               <span>{item.label}</span>
@@ -83,35 +84,9 @@
   }
 
   :global(.select-content) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
-    max-height: min(20rem, var(--bits-select-content-available-height));
-    min-width: var(--bits-select-anchor-width);
-    overflow: auto;
-    padding: var(--space-1);
+    --menu-max-height: min(20rem, var(--bits-select-content-available-height));
+    --menu-min-width: var(--bits-select-anchor-width);
+
     width: var(--bits-select-anchor-width);
-    z-index: var(--layer-menu);
-  }
-
-  :global(.select-item) {
-    align-items: center;
-    border-radius: calc(var(--radius) - var(--border-width));
-    cursor: pointer;
-    display: flex;
-    gap: var(--space-2);
-    justify-content: space-between;
-    min-height: var(--control-height-medium);
-    padding: 0 var(--control-padding-inline);
-  }
-
-  :global(.select-item[data-highlighted]) {
-    background: var(--sable-surface-container-hover);
-  }
-
-  :global(.select-item[data-disabled]) {
-    cursor: default;
-    opacity: 0.65;
   }
 </style>

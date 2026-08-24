@@ -2,6 +2,8 @@
   import type { Snippet } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
 
+  import IconContext from 'phosphor-svelte/lib/IconContext';
+
   import Button from './Button.svelte';
   import type { ButtonProps, ButtonSize } from './button-types';
 
@@ -21,5 +23,7 @@
   aria-label={label}
   class={['sable-icon-button', `sable-icon-button-${size}`, className]}
 >
-  {@render children?.()}
+  <IconContext values={{ 'aria-hidden': 'true' }}>
+    {@render children?.()}
+  </IconContext>
 </Button>

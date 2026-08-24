@@ -54,12 +54,12 @@
   .staged {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem;
+    gap: var(--space-150);
     list-style: none;
     margin: 0;
     max-height: 7.5rem;
     overflow-y: auto;
-    padding: 0.5rem 0.5rem 0;
+    padding: var(--space-200) var(--space-200) 0;
   }
 
   .staged-item {
@@ -68,10 +68,10 @@
     border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     display: flex;
-    gap: 0.375rem;
+    gap: var(--space-150);
     max-width: 14rem;
     min-width: 0;
-    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+    padding: var(--space-100) var(--space-100) var(--space-100) var(--space-200);
   }
 
   .staged-icon {

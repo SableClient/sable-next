@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { Button as BitsButton } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import type { ClassValue, HTMLAnchorAttributes } from 'svelte/elements';
 
   import type { ButtonSize, ButtonVariant } from './button-types';
   import './button.css';
 
-  type Props = Omit<HTMLAnchorAttributes, 'class' | 'children' | 'href'> & {
+  type Props = Omit<HTMLAnchorAttributes, 'class' | 'children' | 'href' | 'type'> & {
     href: string;
     variant?: ButtonVariant;
     size?: ButtonSize;
@@ -24,7 +25,7 @@
   }: Props = $props();
 </script>
 
-<a
+<BitsButton.Root
   {...rest}
   class={[
     'sable-button',
@@ -35,4 +36,4 @@
   ]}
 >
   {@render children?.()}
-</a>
+</BitsButton.Root>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '#lib/ui/primitives/menu.css';
   import { DropdownMenu } from 'bits-ui';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
@@ -32,8 +33,14 @@
       <PlusIcon />
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
-      <DropdownMenu.Content class="composer-menu" side="top" align="start" sideOffset={8}>
+      <DropdownMenu.Content
+        class="sable-menu composer-menu"
+        side="top"
+        align="start"
+        sideOffset={8}
+      >
         <DropdownMenu.Item
+          class="sable-menu-item"
           onclick={() => {
             onPick(media);
           }}
@@ -42,6 +49,7 @@
           {$i18n.t('composer.photoOrVideo')}
         </DropdownMenu.Item>
         <DropdownMenu.Item
+          class="sable-menu-item"
           onclick={() => {
             onPick(any);
           }}
@@ -50,13 +58,13 @@
           {$i18n.t('composer.attachFile')}
         </DropdownMenu.Item>
         {#if onPoll}
-          <DropdownMenu.Item onclick={onPoll}>
+          <DropdownMenu.Item class="sable-menu-item" onclick={onPoll}>
             <ChartBarIcon />
             {$i18n.t('composer.poll')}
           </DropdownMenu.Item>
         {/if}
         {#if onLocation}
-          <DropdownMenu.Item onclick={onLocation}>
+          <DropdownMenu.Item class="sable-menu-item" onclick={onLocation}>
             <MapPinIcon />
             {$i18n.t('composer.location')}
           </DropdownMenu.Item>
@@ -217,28 +225,8 @@
     z-index: var(--layer-popover);
   }
 
-  :global(.composer-menu [role='menuitem']) {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: calc(var(--radius) - 0.125rem);
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    gap: var(--space-1);
-    padding: 0.5rem 0.625rem;
-    text-align: left;
-  }
-
-  :global(.composer-menu [role='menuitem']:hover),
-  :global(.composer-menu [role='menuitem'][data-highlighted]) {
-    background: var(--sable-bg-container-hover);
-  }
-
-  :global(.composer-menu [role='menuitem'] svg) {
+  :global(.composer-menu .sable-menu-item > svg) {
     color: var(--sable-surface-var-on-container);
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
   }
 
   @media (prefers-reduced-motion: no-preference) {

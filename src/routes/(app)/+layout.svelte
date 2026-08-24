@@ -182,7 +182,7 @@
     display: flex;
     justify-content: center;
     min-height: 100dvh;
-    padding: 2rem 1.5rem;
+    padding: var(--space-700) var(--space-600);
   }
 
   .app-status-card {
@@ -194,9 +194,9 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-400);
     max-width: 28rem;
-    padding: 2rem;
+    padding: var(--space-700);
     text-align: center;
     width: 100%;
   }

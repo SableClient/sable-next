@@ -196,7 +196,7 @@
     font-weight: var(--font-weight-bold);
     line-height: 1rem;
     min-width: 1rem;
-    padding: 0 0.1875rem;
+    padding: 0 var(--space-hairline);
     position: absolute;
     right: 0.125rem;
     text-align: center;
@@ -213,12 +213,12 @@
     flex: 0 0 4.625rem;
     justify-content: space-between;
     min-height: 4.625rem;
-    padding: 0 0.75rem;
+    padding: 0 var(--space-300);
   }
 
   .desktop-tool-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-200);
   }
 
   .compact-tools {
@@ -229,8 +229,8 @@
     display: flex;
     flex: 0 0 var(--navigation-rail-width);
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem 0 0.75rem;
+    gap: var(--space-200);
+    padding: var(--space-200) 0 var(--space-300);
     width: var(--navigation-rail-width);
   }
 
@@ -243,7 +243,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     min-height: 4.25rem;
-    padding: 0.25rem;
+    padding: var(--space-100);
     position: relative;
     width: 100%;
   }

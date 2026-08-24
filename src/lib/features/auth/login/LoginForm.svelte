@@ -247,9 +247,9 @@
     display: flex;
     flex-wrap: wrap;
     font-size: var(--font-size-small);
-    gap: 0.25rem;
+    gap: var(--space-100);
     justify-content: center;
-    padding-top: 0.5rem;
+    padding-top: var(--space-200);
     text-align: center;
   }
 
@@ -289,13 +289,13 @@
 
   .login-methods {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-400);
     min-width: 0;
   }
 
   .method-slot {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-400);
     min-width: 0;
   }
 
@@ -308,6 +308,6 @@
   }
 
   .sso-actions {
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 </style>

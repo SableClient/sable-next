@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '#lib/ui/primitives/menu.css';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -35,7 +36,7 @@
         <li role="presentation">
           <button
             type="button"
-            class="option"
+            class="sable-menu-item option"
             class:active={index === active}
             id={optionId(index)}
             role="option"
@@ -92,7 +93,7 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: 0.375rem 0.625rem;
+    padding: var(--space-150) var(--space-250);
   }
 
   .heading {
@@ -108,7 +109,7 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: 0.625rem;
+    padding: var(--space-250);
   }
 
   ul {
@@ -116,26 +117,11 @@
     margin: 0;
     max-height: 13rem;
     overflow-y: auto;
-    padding: 0.25rem;
+    padding: var(--space-100);
   }
 
-  .option {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: calc(var(--radius) - 0.125rem);
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    gap: var(--space-1);
-    padding: 0.3125rem 0.375rem;
-    text-align: left;
-    width: 100%;
-  }
-
-  .option:hover,
-  .option.active {
-    background: var(--sable-surface-container-hover);
+  :global(.option.active) {
+    background: var(--sable-bg-container-hover);
   }
 
   .text {
@@ -146,7 +132,7 @@
 
   .sigil {
     color: var(--sable-primary-main);
-    margin-right: 0.375rem;
+    margin-right: var(--space-150);
   }
 
   .key {
@@ -155,7 +141,7 @@
     color: var(--sable-surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
-    padding: 0 0.25rem;
+    padding: 0 var(--space-100);
   }
 
   .label,

@@ -34,9 +34,9 @@
     border-color: transparent;
     color: var(--sable-sec-main);
     font-size: var(--font-size-small);
-    gap: 0.5rem;
+    gap: var(--space-200);
     justify-content: center;
-    padding: 0.25rem;
+    padding: var(--space-100);
   }
 
   :global(.method-toggle:hover:not(:disabled)) {

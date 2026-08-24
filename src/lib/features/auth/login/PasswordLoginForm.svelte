@@ -83,11 +83,11 @@
 <style>
   .password-form {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 
   .submit-area {
     display: grid;
-    gap: 0.5rem;
+    gap: var(--space-200);
   }
 </style>

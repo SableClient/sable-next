@@ -349,7 +349,7 @@
     color: var(--sable-surface-on-container);
     display: flex;
     left: 50%;
-    padding: 0.5rem;
+    padding: var(--space-200);
     position: absolute;
     top: 50%;
     transform: translate(-50%, -50%);
@@ -367,10 +367,10 @@
     display: flex;
     flex-direction: column;
     font-size: var(--font-size-small);
-    gap: 0.25rem;
+    gap: var(--space-100);
     height: 100%;
     justify-content: center;
-    padding: 0.5rem;
+    padding: var(--space-200);
     text-align: center;
   }
 
@@ -398,6 +398,6 @@
   }
 
   :global(button.retry-media) {
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
   }
 </style>

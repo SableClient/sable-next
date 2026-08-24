@@ -162,7 +162,7 @@ test('a per-message profile takes the sender position and names the account behi
   await tick();
 
   expect(document.querySelector('header .sender')?.textContent.trim()).toBe('Kris');
-  expect(document.querySelector('header .pronouns')?.textContent).toBe('they/them');
+  expect(document.querySelector('header .sable-pronoun-pill')?.textContent).toBe('they/them');
   expect(document.querySelector('header .via')?.textContent).toContain('@alice:example.org');
   await unmount(instance);
 });
@@ -213,7 +213,7 @@ test('opens message actions on right click', async () => {
   message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   await tick();
 
-  expect(document.querySelector('.message-menu')?.textContent).toContain('Reply');
+  expect(document.querySelector('.sable-menu')?.textContent).toContain('Reply');
   await unmount(instance);
 });
 
@@ -296,7 +296,7 @@ test('shows every pronoun set from the sender account profile', async () => {
     props: { item: item(false), collapsed: false },
   });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .pronouns')).toHaveLength(2);
+    expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(2);
   });
   await unmount(instance);
 });
@@ -313,7 +313,36 @@ test('tolerates repeated pronoun summaries', async () => {
     props: { item: item(false), collapsed: false },
   });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .pronouns')).toHaveLength(2);
+    expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(2);
   });
   await unmount(instance);
+});
+
+test('a touch long press opens the sheet without also opening the context menu', async () => {
+  vi.useFakeTimers();
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false, onReply: vi.fn() },
+  });
+  await tick();
+
+  const article = document.querySelector('article.message');
+  expect(article).not.toBeNull();
+
+  article?.dispatchEvent(
+    new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true, clientX: 0, clientY: 0 })
+  );
+  await vi.advanceTimersByTimeAsync(1000);
+  await tick();
+
+  const native = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  article?.dispatchEvent(native);
+  await tick();
+
+  expect(native.defaultPrevented).toBe(true);
+  expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
+  expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
+
+  await unmount(instance);
+  vi.useRealTimers();
 });

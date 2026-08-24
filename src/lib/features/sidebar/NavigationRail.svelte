@@ -351,14 +351,14 @@
           {/snippet}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="space-menu">
+          <ContextMenu.Content class="sable-menu">
             <ContextMenu.Item
-              class="space-menu-item"
+              class="sable-menu-item"
               onSelect={() => {
                 onRemoveFromFolder?.(roomId, folderId);
               }}
             >
-              <ArrowLineUpIcon size={16} />
+              <ArrowLineUpIcon />
               {$i18n.t('nav.folderRemoveSpace')}
             </ContextMenu.Item>
           </ContextMenu.Content>
@@ -370,21 +370,21 @@
 
 {#snippet folderMenuItems(folder: SidebarFolder)}
   <ContextMenu.Item
-    class="space-menu-item"
+    class="sable-menu-item"
     onSelect={() => {
       onRenameFolder?.(folder);
     }}
   >
-    <PencilSimpleIcon size={16} />
+    <PencilSimpleIcon />
     {$i18n.t('nav.folderRename')}
   </ContextMenu.Item>
   <ContextMenu.Item
-    class="space-menu-item"
+    class="sable-menu-item"
     onSelect={() => {
       onUngroupFolder?.(folder.id);
     }}
   >
-    <FolderOpenIcon size={16} />
+    <FolderOpenIcon />
     {$i18n.t('nav.folderUngroup')}
   </ContextMenu.Item>
 {/snippet}
@@ -450,7 +450,7 @@
       {/snippet}
     </ContextMenu.Trigger>
     <ContextMenu.Portal>
-      <ContextMenu.Content class="space-menu">
+      <ContextMenu.Content class="sable-menu">
         {@render folderMenuItems(folder)}
       </ContextMenu.Content>
     </ContextMenu.Portal>
@@ -484,7 +484,7 @@
           {/snippet}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="space-menu">
+          <ContextMenu.Content class="sable-menu">
             {@render folderMenuItems(folder)}
           </ContextMenu.Content>
         </ContextMenu.Portal>
@@ -544,7 +544,7 @@
 
   .dynamic-rail-region {
     border-top: var(--border-width) solid var(--sable-bg-container-line);
-    margin: 0.25rem auto;
+    margin: var(--space-100) auto;
     width: 2rem;
   }
 
@@ -554,17 +554,17 @@
     flex-direction: column;
     list-style: none;
     margin: 0;
-    padding: 0.125rem 0;
+    padding: var(--space-hairline) 0;
   }
 
   .rail-pad,
   .rail-slot,
   .folder-open {
-    padding: 0.375rem 0;
+    padding: var(--space-150) 0;
   }
 
   .rail-bottom {
-    padding: 0.25rem 0 0.5rem;
+    padding: var(--space-100) 0 var(--space-200);
   }
 
   .rail-item {
@@ -640,7 +640,7 @@
     justify-content: center;
     line-height: 1;
     min-width: 1.125rem;
-    padding: 0 0.1875rem;
+    padding: 0 var(--space-hairline);
     position: absolute;
     right: -0.125rem;
     top: -0.125rem;
@@ -701,12 +701,12 @@
     background: var(--sable-bg-container-hover);
     border: 0;
     cursor: pointer;
-    padding: 0.1875rem;
+    padding: var(--space-hairline);
   }
 
   .folder-tiles {
     display: grid;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     grid-template-columns: repeat(2, 1fr);
     height: 100%;
     width: 100%;
@@ -731,11 +731,11 @@
     border-radius: var(--radius);
     display: flex;
     flex-direction: column;
-    padding: 0.25rem;
+    padding: var(--space-100);
   }
 
   .folder-card .rail-slot {
-    padding: 0.25rem 0;
+    padding: var(--space-100) 0;
   }
 
   .folder-card .rail-slot.nested :global(.rail-item) {
@@ -764,32 +764,6 @@
   .folder-collapse:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
-  }
-
-  :global(.space-menu) {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
-    display: grid;
-    min-width: 11rem;
-    padding: 0.25rem;
-    z-index: var(--layer-menu);
-  }
-
-  :global(.space-menu-item) {
-    align-items: center;
-    border-radius: var(--radius);
-    cursor: pointer;
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-1);
-    min-height: 2.25rem;
-    padding: 0 var(--space-1);
-  }
-
-  :global(.space-menu-item[data-highlighted]) {
-    background: var(--sable-bg-container-hover);
   }
 
   @media (prefers-reduced-motion: no-preference) {

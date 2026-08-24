@@ -257,7 +257,7 @@
 
   .profile-card-status-emoji {
     font-size: var(--font-size-medium);
-    margin-right: 0.375rem;
+    margin-right: var(--space-150);
   }
 
   .profile-card-identity {
@@ -283,25 +283,27 @@
   .profile-card-user-id {
     color: var(--profile-text-muted);
     font-size: var(--font-size-small);
-    margin-top: 0.125rem;
+    margin-top: var(--space-hairline);
     overflow-wrap: anywhere;
   }
 
   /* Items sit next to each other and wrap. Equal grid columns left a short fact
      like "she/her" stranded half a card away from the next one. */
+
   .profile-card-meta {
     color: var(--profile-text-muted);
     display: flex;
     flex-wrap: wrap;
-    font-size: var(--font-size-small);
-    gap: var(--space-1) var(--space-2);
-    line-height: var(--line-height-body);
-    margin-top: var(--space-2);
+    font-size: var(--font-size-t200);
+    gap: var(--space-200) var(--space-300);
+    line-height: var(--line-height-t200);
+    margin-top: var(--space-300);
+    opacity: var(--opacity-p400);
   }
 
   .profile-card-meta :global(svg) {
-    color: var(--sable-sec-main);
     flex: none;
+    opacity: var(--opacity-placeholder);
   }
 
   /* Same gutter as the identity text, and framed only with a bio to hold: a lone
@@ -330,7 +332,7 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: var(--space-100);
     margin-top: var(--space-2);
   }
 

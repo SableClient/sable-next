@@ -110,7 +110,7 @@
     align-items: center;
     display: flex;
     flex-direction: column;
-    padding: clamp(2rem, 7vw, 4.75rem) clamp(var(--space-4), 7vw, 5.5rem);
+    padding: clamp(var(--space-700), 7vw, 4.75rem) clamp(var(--space-4), 7vw, 5.5rem);
     text-align: center;
   }
 
@@ -122,7 +122,7 @@
   .hero h1 {
     font-size: var(--font-size-xlarge);
     line-height: var(--line-height-heading);
-    margin: 1rem 0 0;
+    margin: var(--space-400) 0 0;
   }
 
   .hero-actions {

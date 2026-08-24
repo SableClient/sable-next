@@ -64,7 +64,7 @@
   .profile-rooms {
     display: grid;
     font-size: var(--font-size-small);
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -92,7 +92,7 @@
 
   .profile-rooms-links {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     justify-items: start;
     margin-top: var(--space-1);
   }

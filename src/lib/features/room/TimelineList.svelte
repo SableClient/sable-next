@@ -1166,7 +1166,7 @@
   .unread-pinned {
     align-items: center;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-200);
     inset-inline: 0;
     margin: 0;
     padding: 0 var(--space-3);
@@ -1190,7 +1190,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
-    padding: 0.125rem 0.5rem;
+    padding: var(--space-hairline) var(--space-200);
   }
 
   .timeline-foot {
@@ -1212,11 +1212,8 @@
      variant's own background. */
   :global(button.jump-to-latest) {
     background-color: var(--sable-bg-container);
-    background-image: linear-gradient(
-      var(--sable-primary-container),
-      var(--sable-primary-container)
-    );
-    bottom: 1rem;
+    background-image: linear-gradient(var(--sable-primary-main), var(--sable-primary-main));
+    bottom: var(--space-400);
     box-shadow: var(--shadow-float);
     left: 50%;
     position: absolute;

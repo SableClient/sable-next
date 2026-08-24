@@ -88,7 +88,7 @@ test('decorative avatars stay out of the accessibility tree', () => {
   expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBeNull();
 });
 
-test('option cards are one native radio group', () => {
+test('option cards are one radio group with a single checked item', () => {
   const onSelect = vi.fn();
   mount(OptionCards, {
     target: document.body,
@@ -104,14 +104,19 @@ test('option cards are one native radio group', () => {
     },
   });
 
-  const radios = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
+  const radios = [...document.querySelectorAll<HTMLElement>('[role="radio"]')];
 
   expect(document.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe(
     'Visibility'
   );
-  expect(new Set(radios.map((radio) => radio.name)).size).toBe(1);
-  expect(radios[0].checked).toBe(true);
-  expect(radios[2].disabled).toBe(true);
+  expect(radios).toHaveLength(3);
+  expect(radios.map((radio) => radio.getAttribute('aria-checked'))).toEqual([
+    'true',
+    'false',
+    'false',
+  ]);
+  expect(radios[2].getAttribute('data-disabled')).not.toBeNull();
+  expect(radios.filter((radio) => radio.getAttribute('tabindex') !== '-1')).toHaveLength(1);
 
   radios[1].click();
 

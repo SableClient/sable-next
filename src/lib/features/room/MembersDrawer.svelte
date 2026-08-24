@@ -159,7 +159,7 @@
     display: flex;
     justify-content: space-between;
     min-height: 3.75rem;
-    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    padding: var(--space-200) var(--space-300) var(--space-200) var(--space-400);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -182,12 +182,12 @@
 
   .status {
     margin: 0;
-    padding: 0.75rem 1rem;
+    padding: var(--space-300) var(--space-400);
   }
 
   .search {
     background: var(--sable-bg-container);
-    padding: 0.75rem;
+    padding: var(--space-300);
     position: sticky;
     top: 3.75rem;
     z-index: 1;
@@ -199,7 +199,7 @@
     border-radius: var(--radius);
     color: inherit;
     min-height: 2.5rem;
-    padding: 0 0.75rem;
+    padding: 0 var(--space-300);
     width: 100%;
   }
 
@@ -209,7 +209,7 @@
     margin: 0;
     min-height: 0;
     overflow: auto;
-    padding: 0.25rem 0.5rem 0.5rem;
+    padding: var(--space-100) var(--space-200) var(--space-200);
   }
 
   li {
@@ -223,9 +223,9 @@
     color: inherit;
     cursor: pointer;
     display: flex;
-    gap: 0.625rem;
+    gap: var(--space-250);
     min-height: 3rem;
-    padding: 0 0.5rem;
+    padding: 0 var(--space-200);
     text-align: left;
     width: 100%;
   }

@@ -354,7 +354,7 @@
   .formatted-body :global(h6) {
     font-weight: var(--font-weight-bold);
     line-height: var(--line-height-body);
-    margin: 0.25rem 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .formatted-body :global(h1) {
@@ -383,7 +383,7 @@
   .formatted-body :global(ul),
   .formatted-body :global(ol) {
     margin: var(--space-1) 0;
-    padding-inline-start: 1.5rem;
+    padding-inline-start: var(--space-600);
   }
 
   .formatted-body :global(ol) {
@@ -436,7 +436,7 @@
     border-radius: 0.25rem;
     font-family: var(--font-family-mono);
     font-size: var(--inline-code-scale);
-    padding: 0 0.25rem;
+    padding: 0 var(--space-100);
   }
 
   .formatted-body :global(.code-block) {

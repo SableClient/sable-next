@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
   import { i18n } from '#lib/i18n.js';
@@ -31,7 +32,7 @@
 >
   {#snippet meta()}
     {#if pronouns}
-      <span class="pronouns">{pronouns}</span>
+      <PronounPill>{pronouns}</PronounPill>
     {/if}
   {/snippet}
   {#snippet actions()}
@@ -40,9 +41,3 @@
     </Button>
   {/snippet}
 </ProfileCard>
-
-<style>
-  .pronouns {
-    text-transform: lowercase;
-  }
-</style>

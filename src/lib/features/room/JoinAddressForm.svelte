@@ -92,7 +92,7 @@
 
   .examples ul {
     display: grid;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     margin: 0;
     padding-left: var(--space-4);
   }

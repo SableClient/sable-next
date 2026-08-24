@@ -263,40 +263,88 @@ html {
 /* Global CSS */
 
 :root {
-  /* Sable Next */
-  --radius: 0.5rem;
-  --radius-pill: 999px;
-  --space-1: 0.5rem;
-  --space-2: 0.75rem;
-  --space-3: 1rem;
-  --space-4: 1.25rem;
-  --space-compact: 0.25rem;
-  --space-tight: 0.375rem;
-  --space-relaxed-tight: 0.625rem;
-  --control-height-small: 2.25rem;
-  --control-height-medium: 2.75rem;
-  --control-height-large: 3rem;
+  --space-0: 0;
+  --space-100: 0.25rem;
+  --space-200: 0.5rem;
+  --space-300: 0.75rem;
+  --space-400: 1rem;
+  --space-500: 1.25rem;
+  --space-600: 1.5rem;
+  --space-700: 2rem;
+  --space-hairline: 0.125rem;
+  --space-150: 0.375rem;
+  --space-250: 0.625rem;
+  --space-compact: var(--space-100);
+  --space-tight: var(--space-150);
+  --space-relaxed-tight: var(--space-250);
+  --space-1: var(--space-200);
+  --space-2: var(--space-300);
+  --space-3: var(--space-400);
+  --space-4: var(--space-500);
+  --radii-0: 0;
+  --radii-300: 0.25rem;
+  --radii-400: 0.5rem;
+  --radii-500: 0.75rem;
+  --radii-round: 50%;
+  --radii-pill: 9999px;
+  --radius: var(--radii-400);
+  --radius-pill: var(--radii-pill);
+  --border-width-0: 0;
+  --border-width-300: 1px;
+  --border-width-400: 1.5px;
+  --border-width-500: 2px;
+  --border-width-600: 3px;
+  --border-width-700: 4px;
+  --border-width: var(--border-width-300);
+  --size-x-inherit: 1em;
+  --size-x50: 1rem;
+  --size-x100: 1.125rem;
+  --size-x200: 1.25rem;
+  --size-x300: 1.375rem;
+  --size-x400: 1.5rem;
+  --size-x500: 1.75rem;
+  --size-x600: 2.25rem;
+  --icon-size-small: var(--size-x200);
+  --icon-size-medium: var(--size-x400);
+  --icon-size-large: var(--size-x500);
+  --opacity-p500: 1;
+  --opacity-p400: 0.9;
+  --opacity-p300: 0.75;
+  --opacity-placeholder: 0.5;
+  --opacity-disabled: 0.38;
+  --shadow-e100: 0 1px 6px -2px var(--sable-shadow);
+  --shadow-e200: 0 1px 12px -3px var(--sable-shadow);
+  --shadow-e300: 0 2px 16px -4px var(--sable-shadow);
+  --shadow-e400: 0 4px 26px -6px var(--sable-shadow);
+  --shadow-inset: inset 0 1px 3px var(--sable-shadow);
+  --shadow-float: var(--shadow-e300);
+  --shadow-dialog: var(--shadow-e400);
+  --control-height-300: 2rem;
+  --control-height-400: 2.5rem;
+  --control-height-500: 3rem;
+  --control-height-small: var(--control-height-300);
+  --control-height-medium: var(--control-height-400);
+  --control-height-large: var(--control-height-500);
+  --control-padding-300: var(--space-300);
+  --control-padding-400: var(--space-400);
+  --control-padding-500: var(--space-500);
+  --avatar-size-200: 1.5rem;
+  --avatar-size-300: 2.25rem;
+  --avatar-size-400: 2.625rem;
+  --avatar-size-500: 3.625rem;
+  --avatar-size-small: var(--avatar-size-300);
+  --avatar-size-medium: var(--avatar-size-400);
+  --avatar-size-large: var(--avatar-size-500);
+  --focus-ring-width: var(--border-width-600);
+  --focus-ring-offset: 0;
   --target: 2.5rem;
   --target-hit: 2.5rem;
-  --control-padding-block: 0.625rem;
-  --control-padding-inline: 0.875rem;
-  --icon-size-small: 1.25rem;
-  --icon-size-medium: 1.5rem;
-  --icon-size-large: 1.75rem;
-  --avatar-size-small: 2.5rem;
-  --avatar-size-medium: 3rem;
-  --avatar-size-large: 4.5rem;
-  --border-width: 1px;
-  --focus-ring-width: calc(var(--border-width) * 2);
-  --focus-ring-offset: calc(var(--border-width) * 2);
   --motion-fast: 100ms;
   --motion-normal: 150ms;
   --motion-slow: 200ms;
   --motion-easing-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-inset: inset 0 1px 3px var(--sable-shadow);
-  --shadow-float: 0 0.25rem 0.75rem var(--sable-shadow);
-  --shadow-dialog: 0 1rem 3rem var(--sable-shadow);
+  --motion-easing-spinner: cubic-bezier(0.73, 0.32, 0.67, 0.86);
 
   /* Overlay layers, ascending. Same layer stacks by DOM order. */
   --layer-dialog: 100;
@@ -304,7 +352,7 @@ html {
   --layer-popover: 300;
   --layer-menu: 400;
   --layer-tooltip: 500;
-  --page-gutter: var(--space-2);
+  --page-gutter: var(--space-300);
   --navigation-rail-width: 4.125rem;
   --timeline-row-gap: var(--space-relaxed-tight);
   --timeline-row-padding: var(--space-compact);
@@ -315,23 +363,57 @@ html {
 
   /* Font families */
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
-
-  /* Font sizes */
-  --font-size-small: 0.875rem;
-  --font-size-body: 0.9375rem;
-  --font-size-medium: 1.125rem;
-  --font-size-large: 1.25rem;
-  --font-size-xlarge: 1.75rem;
-  --font-size-display: 2.25rem;
+  --font-size-d400: 2.8125rem;
+  --line-height-d400: 3.25rem;
+  --font-size-h1: 2.1875rem;
+  --line-height-h1: 2.5rem;
+  --font-size-h2: 1.5625rem;
+  --line-height-h2: 1.875rem;
+  --font-size-h3: 1.25rem;
+  --line-height-h3: 1.625rem;
+  --font-size-h4: 1.125rem;
+  --line-height-h4: 1.5rem;
+  --font-size-h5: 1rem;
+  --line-height-h5: 1.375rem;
+  --font-size-h6: 0.875rem;
+  --line-height-h6: 1.125rem;
+  --font-size-t500: 1.0625rem;
+  --line-height-t500: 1.5rem;
+  --font-size-t400: 0.9375rem;
+  --line-height-t400: 1.375rem;
+  --font-size-t300: 0.875rem;
+  --line-height-t300: 1.25rem;
+  --font-size-t200: 0.75rem;
+  --line-height-t200: 1.125rem;
+  --font-size-b500: 1rem;
+  --line-height-b500: 1.25rem;
+  --font-size-b400: 0.875rem;
+  --line-height-b400: 1.125rem;
+  --font-size-b300: 0.75rem;
+  --line-height-b300: 1rem;
+  --font-size-l400: 0.75rem;
+  --line-height-l400: 1rem;
+  --font-size-o400: 0.75rem;
+  --line-height-o400: 1rem;
+  --font-size-c400: 0.75rem;
+  --line-height-c400: 1rem;
+  --font-size-small: var(--font-size-t300);
+  --font-size-body: var(--font-size-t400);
+  --font-size-medium: var(--font-size-h4);
+  --font-size-large: var(--font-size-h3);
+  --font-size-xlarge: var(--font-size-h2);
+  --font-size-display: var(--font-size-h1);
 
   /* iOS zooms the viewport when a focused field renders text under 16px, so
      every text-entry surface floors its own size with this. */
   --font-size-input-min: 0px;
-
-  /* Font weights */
-  --font-weight-normal: 400;
-  --font-weight-medium: 600;
-  --font-weight-bold: 700;
+  --font-weight-400: 400;
+  --font-weight-500: 500;
+  --font-weight-600: 600;
+  --font-weight-700: 700;
+  --font-weight-normal: var(--font-weight-400);
+  --font-weight-medium: var(--font-weight-600);
+  --font-weight-bold: var(--font-weight-700);
 
   /* Line heights */
   --line-height-body: 1.5;
@@ -418,12 +500,13 @@ textarea {
 }
 
 ::placeholder {
-  color: var(--sable-sec-main);
-  opacity: 1;
+  color: inherit;
+  opacity: var(--opacity-placeholder);
 }
 
-:disabled {
-  cursor: default;
+:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
 }
 
 ::selection {
@@ -457,8 +540,17 @@ textarea {
 }
 
 button,
-a {
+a,
+input,
+label,
+[role='button'],
+[role='switch'] {
   -webkit-tap-highlight-color: transparent;
+}
+
+label[for],
+[role='switch'] {
+  user-select: none;
 }
 
 .sable-selection-layer {
@@ -500,6 +592,41 @@ a:not([class]) {
 
 a:not([class]):hover {
   color: var(--sable-primary-main-hover);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sable-button,
+  .sable-menu-item,
+  .option-card {
+    transition:
+      background-color var(--motion-normal) var(--motion-easing-standard),
+      translate var(--motion-fast) ease-in-out,
+      scale var(--motion-fast) ease-in-out;
+  }
+
+  .sable-button:hover:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
+  .sable-menu-item:hover:not(:disabled, [data-disabled], [data-no-button-motion]),
+  .option-card:hover:not([data-disabled], [data-no-button-motion]) {
+    translate: 0 -1px;
+  }
+
+  .sable-button:active:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
+  .sable-menu-item:active:not(:disabled, [data-disabled], [data-no-button-motion]),
+  .option-card:active:not([data-disabled], [data-no-button-motion]) {
+    scale: 0.96;
+  }
+
+  @media (hover: none) {
+    .sable-button:hover,
+    .sable-button:active,
+    .sable-menu-item:hover,
+    .sable-menu-item:active,
+    .option-card:hover,
+    .option-card:active {
+      scale: 1;
+      translate: none;
+    }
+  }
 }
 
 @media (width >= 42rem) {

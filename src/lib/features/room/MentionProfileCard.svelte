@@ -3,6 +3,7 @@
   import type { ProfileView } from '#src/generated/ProfileView';
   import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import { DropdownMenu } from 'bits-ui';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
@@ -260,21 +261,21 @@
 
 {#snippet metaRow()}
   {#if pronouns}
-    <span class="profile-meta-item"><UserIcon size={16} />{pronouns}</span>
+    <span class="profile-meta-item"><UserIcon />{pronouns}</span>
   {/if}
   {#if localTime}
     <span class="profile-meta-item">
-      <ClockIcon size={16} />
+      <ClockIcon />
       {localTime.time}
       <span class="profile-meta-aside">({localTime.timezone})</span>
     </span>
   {/if}
   {#if animalText}
-    <span class="profile-meta-item"><HeartIcon size={16} />{animalText}</span>
+    <span class="profile-meta-item"><HeartIcon />{animalText}</span>
   {/if}
   {#if roleLabel}
     <span class="profile-meta-item" class:profile-meta-elevated={elevated}>
-      <ShieldIcon size={16} />
+      <ShieldIcon />
       {roleLabel}
     </span>
   {/if}
@@ -286,18 +287,20 @@
       <ShareNetworkIcon size={14} />
       {$i18n.t('timeline.profileShare')}
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="profile-menu" side="bottom" align="start" sideOffset={4}>
-      <DropdownMenu.Item class="profile-menu-item" onSelect={copyUserId}>
-        {$i18n.t('timeline.profileCopyId')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item class="profile-menu-item" onSelect={copyProfileLink}>
-        {$i18n.t('timeline.profileCopyLink')}
-      </DropdownMenu.Item>
-      {#if canShareLink}
-        <DropdownMenu.Item class="profile-menu-item" onSelect={shareProfileLink}>
-          {$i18n.t('timeline.profileShareLink')}
+    <DropdownMenu.Content class="sable-menu" side="bottom" align="start" sideOffset={4}>
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        <DropdownMenu.Item class="sable-menu-item" onSelect={copyUserId}>
+          {$i18n.t('timeline.profileCopyId')}
         </DropdownMenu.Item>
-      {/if}
+        <DropdownMenu.Item class="sable-menu-item" onSelect={copyProfileLink}>
+          {$i18n.t('timeline.profileCopyLink')}
+        </DropdownMenu.Item>
+        {#if canShareLink}
+          <DropdownMenu.Item class="sable-menu-item" onSelect={shareProfileLink}>
+            {$i18n.t('timeline.profileShareLink')}
+          </DropdownMenu.Item>
+        {/if}
+      </IconContext>
     </DropdownMenu.Content>
   </DropdownMenu.Root>
   {#if sharedRooms.length > 0}
@@ -335,81 +338,88 @@
     >
       <DotsThreeIcon size={14} />
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="profile-menu" side="bottom" align="end" sideOffset={4}>
-      <DropdownMenu.Item class="profile-menu-item" onSelect={copyServer}>
-        <CopyIcon size={16} />
-        {$i18n.t('timeline.profileCopyServer')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item class="profile-menu-item" onSelect={openServer}>
-        <ArrowSquareOutIcon size={16} />
-        {$i18n.t('timeline.profileOpenServer')}
-      </DropdownMenu.Item>
-      {#if canInvite}
-        <DropdownMenu.Item
-          class="profile-menu-item"
-          onSelect={moderate(core.inviteUser.bind(core))}
-        >
-          <UserPlusIcon size={16} />
-          {$i18n.t('timeline.profileInvite')}
+    <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        <DropdownMenu.Item class="sable-menu-item" onSelect={copyServer}>
+          <CopyIcon />
+          {$i18n.t('timeline.profileCopyServer')}
         </DropdownMenu.Item>
-      {/if}
-      {#if canUnban}
-        <DropdownMenu.Item class="profile-menu-item" onSelect={moderate(core.unbanUser.bind(core))}>
-          <LockOpenIcon size={16} />
-          {$i18n.t('timeline.profileUnban')}
+        <DropdownMenu.Item class="sable-menu-item" onSelect={openServer}>
+          <ArrowSquareOutIcon />
+          {$i18n.t('timeline.profileOpenServer')}
         </DropdownMenu.Item>
-      {/if}
-      {#if canSetPower}
-        <DropdownMenu.Sub>
-          <DropdownMenu.SubTrigger class="profile-menu-item">
-            <ShieldIcon size={16} />
-            {$i18n.t('timeline.profileChangePower')}
-          </DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent class="profile-menu" sideOffset={4}>
-            {#each powerRoles as role (role.level)}
-              <DropdownMenu.Item
-                class="profile-menu-item"
-                onSelect={() => {
-                  setPowerLevel(role.level);
-                }}
-              >
-                <span class="profile-power-name">{role.label}</span>
-                <span class="profile-power-level">{role.level}</span>
-              </DropdownMenu.Item>
-            {/each}
-          </DropdownMenu.SubContent>
-        </DropdownMenu.Sub>
-      {/if}
-      {#if canKick}
-        <DropdownMenu.Item
-          class="profile-menu-item profile-menu-destructive"
-          onSelect={moderate(core.kickUser.bind(core))}
-        >
-          <SignOutIcon size={16} />
-          {$i18n.t('timeline.profileKick')}
-        </DropdownMenu.Item>
-      {/if}
-      {#if canBan}
-        <DropdownMenu.Item
-          class={['profile-menu-item profile-menu-destructive', canKick && 'profile-menu-grouped']}
-          onSelect={moderate(core.banUser.bind(core))}
-        >
-          <GavelIcon size={16} />
-          {$i18n.t('timeline.profileBan')}
-        </DropdownMenu.Item>
-      {/if}
-      {#if !isSelf}
-        <DropdownMenu.Item
-          class={[
-            'profile-menu-item profile-menu-destructive',
-            (canKick || canBan) && 'profile-menu-grouped',
-          ]}
-          onSelect={toggleIgnored}
-        >
-          <ProhibitIcon size={16} />
-          {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
-        </DropdownMenu.Item>
-      {/if}
+        {#if canInvite}
+          <DropdownMenu.Item
+            class="sable-menu-item"
+            onSelect={moderate(core.inviteUser.bind(core))}
+          >
+            <UserPlusIcon />
+            {$i18n.t('timeline.profileInvite')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if canUnban}
+          <DropdownMenu.Item class="sable-menu-item" onSelect={moderate(core.unbanUser.bind(core))}>
+            <LockOpenIcon />
+            {$i18n.t('timeline.profileUnban')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if canSetPower}
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger class="sable-menu-item">
+              <ShieldIcon />
+              {$i18n.t('timeline.profileChangePower')}
+            </DropdownMenu.SubTrigger>
+            <DropdownMenu.SubContent class="sable-menu" sideOffset={4}>
+              <IconContext values={{ 'aria-hidden': 'true' }}>
+                {#each powerRoles as role (role.level)}
+                  <DropdownMenu.Item
+                    class="sable-menu-item"
+                    onSelect={() => {
+                      setPowerLevel(role.level);
+                    }}
+                  >
+                    <span class="profile-power-name">{role.label}</span>
+                    <span class="profile-power-level">{role.level}</span>
+                  </DropdownMenu.Item>
+                {/each}
+              </IconContext>
+            </DropdownMenu.SubContent>
+          </DropdownMenu.Sub>
+        {/if}
+        {#if canKick}
+          <DropdownMenu.Item
+            class="sable-menu-item sable-menu-item-destructive profile-menu-destructive"
+            onSelect={moderate(core.kickUser.bind(core))}
+          >
+            <SignOutIcon />
+            {$i18n.t('timeline.profileKick')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if canBan}
+          <DropdownMenu.Item
+            class={[
+              'sable-menu-item sable-menu-item-destructive profile-menu-destructive',
+              canKick && 'profile-menu-grouped',
+            ]}
+            onSelect={moderate(core.banUser.bind(core))}
+          >
+            <GavelIcon />
+            {$i18n.t('timeline.profileBan')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if !isSelf}
+          <DropdownMenu.Item
+            class={[
+              'sable-menu-item sable-menu-item-destructive profile-menu-destructive',
+              (canKick || canBan) && 'profile-menu-grouped',
+            ]}
+            onSelect={toggleIgnored}
+          >
+            <ProhibitIcon />
+            {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
+          </DropdownMenu.Item>
+        {/if}
+      </IconContext>
     </DropdownMenu.Content>
   </DropdownMenu.Root>
 {/snippet}
@@ -462,7 +472,7 @@
       type="submit"
       disabled={sending || draft.trim() === ''}
     >
-      <PaperPlaneRightIcon size={16} />
+      <PaperPlaneRightIcon />
     </IconButton>
   </form>
   {#if sendFailed}
@@ -478,7 +488,7 @@
     }}
   >
     <summary>
-      <CaretRightIcon size={16} />
+      <CaretRightIcon />
       {miscOpen
         ? $i18n.t('timeline.profileHideMiscData', { count: extra.length })
         : $i18n.t('timeline.profileMiscData', { count: extra.length })}
@@ -518,14 +528,14 @@
   .profile-meta-item {
     align-items: start;
     display: inline-flex;
-    gap: 0.25rem;
+    gap: var(--space-100);
     max-width: 100%;
     min-width: 0;
     overflow-wrap: anywhere;
   }
 
   .profile-meta-item :global(svg) {
-    margin-top: 0.125rem;
+    margin-top: var(--space-hairline);
   }
 
   .profile-meta-aside {
@@ -552,7 +562,7 @@
     font: inherit;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
-    gap: 0.25rem;
+    gap: var(--space-100);
     justify-content: center;
     min-height: 2rem;
     padding: 0 var(--space-2);
@@ -584,33 +594,7 @@
 
   :global(.profile-action-overflow) {
     margin-left: auto;
-    padding: 0.125rem var(--space-1);
-  }
-
-  :global(.profile-menu) {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
-    display: grid;
-    min-width: 11rem;
-    padding: 0.25rem;
-    z-index: var(--layer-menu);
-  }
-
-  :global(.profile-menu-item) {
-    align-items: center;
-    border-radius: var(--radius);
-    cursor: pointer;
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-1);
-    min-height: 2.25rem;
-    padding: 0 var(--space-1);
-  }
-
-  :global(.profile-menu-item[data-highlighted]) {
-    background: var(--sable-bg-container-hover);
+    padding: var(--space-hairline) var(--space-1);
   }
 
   :global(.profile-power-name) {
@@ -625,22 +609,12 @@
 
   :global(.profile-menu-destructive) {
     border-top: var(--border-width) solid var(--sable-bg-container-line);
-    margin-top: 0.25rem;
-    min-height: var(--control-height-medium);
+    margin-top: var(--space-100);
   }
 
   :global(.profile-menu-grouped) {
     border-top: 0;
     margin-top: 0;
-  }
-
-  :global(.profile-menu-destructive svg) {
-    color: var(--sable-crit-main);
-  }
-
-  :global(.profile-menu-destructive[data-highlighted]) {
-    background: color-mix(in oklab, var(--sable-crit-main) 12%, var(--sable-bg-container));
-    color: var(--sable-crit-main);
   }
 
   .profile-composer {
@@ -720,7 +694,7 @@
 
   .profile-extra dl {
     display: grid;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     margin: 0;
     padding: 0 var(--space-2) var(--space-2);
   }

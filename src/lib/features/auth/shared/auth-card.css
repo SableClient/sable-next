@@ -3,18 +3,18 @@
   border: var(--border-width) solid var(--sable-surface-container-line);
   border-radius: var(--radius);
   display: grid;
-  gap: 1rem;
-  padding: 1.25rem;
+  gap: var(--space-400);
+  padding: var(--space-500);
 }
 
 .auth-page .auth-card-surface.login-form {
-  gap: 0.5rem;
-  padding-bottom: 1rem;
+  gap: var(--space-200);
+  padding-bottom: var(--space-400);
 }
 
 .auth-page .auth-card-surface.registration-card {
-  gap: 0.5rem;
-  padding-bottom: 1rem;
+  gap: var(--space-200);
+  padding-bottom: var(--space-400);
 }
 
 .auth-page .auth-card-surface > * {
@@ -24,7 +24,7 @@
 .auth-page .auth-card-heading {
   align-items: center;
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-300);
   justify-content: space-between;
 }
 
@@ -63,7 +63,7 @@
   cursor: pointer;
   font: inherit;
   font-size: var(--font-size-small);
-  padding: 0.25rem;
+  padding: var(--space-100);
   position: relative;
   text-decoration: underline;
   text-underline-offset: 0.15em;

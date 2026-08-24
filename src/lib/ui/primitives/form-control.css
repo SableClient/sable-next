@@ -1,45 +1,45 @@
 .form-control {
-  --form-control-background: var(--sable-surface-var-container);
-  --form-control-color: var(--sable-surface-on-container);
-  --form-control-padding-inline: var(--control-padding-inline);
+  --form-control-container: var(--sable-bg-container);
+  --form-control-line: var(--sable-bg-container-line);
+  --form-control-color: var(--sable-bg-on-container);
+  --form-control-ring: var(--border-width-400);
+  --form-control-padding-block: 0;
+  --form-control-padding-inline: var(--control-padding-300);
   --form-control-padding-inline-end: var(--form-control-padding-inline);
 
-  background: var(--form-control-background);
-  border: var(--border-width) solid var(--sable-surface-container-line);
-  border-radius: var(--radius);
+  background: var(--form-control-container);
+  border: 0;
+  border-radius: var(--radii-400);
+  box-shadow: inset 0 0 0 var(--form-control-ring) var(--form-control-line);
   box-sizing: border-box;
   color: var(--form-control-color);
   font: inherit;
-  font-size: max(var(--font-size-body), var(--font-size-input-min));
-  min-height: var(--control-height-medium);
-  padding: var(--control-padding-block) var(--form-control-padding-inline-end)
-    var(--control-padding-block) var(--form-control-padding-inline);
+  font-size: max(var(--font-size-t400), var(--font-size-input-min));
+  min-height: var(--control-height-400);
+  padding: var(--form-control-padding-block) var(--form-control-padding-inline-end)
+    var(--form-control-padding-block) var(--form-control-padding-inline);
 }
 
+.form-control:focus,
 .form-control:focus-visible {
-  border-color: var(--sable-primary-main);
-  box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+  --form-control-line: var(--sable-primary-main);
+  --form-control-ring: var(--border-width-600);
+
   outline: none;
 }
 
 .form-control[aria-invalid='true'],
 .form-control-error {
-  border-color: var(--sable-crit-main);
-}
-
-.form-control[aria-invalid='true']:focus-visible,
-.form-control-error:focus-visible {
-  border-color: var(--sable-crit-main);
-  box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+  --form-control-line: var(--sable-crit-main);
 }
 
 .form-control:disabled {
-  cursor: default;
-  opacity: 0.65;
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .form-control {
-    transition: border-color var(--motion-normal) ease;
+    transition: box-shadow var(--motion-normal) var(--motion-easing-standard);
   }
 }

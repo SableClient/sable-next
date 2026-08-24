@@ -1,0 +1,98 @@
+.sable-menu {
+  --menu-min-width: 11rem;
+  --menu-max-height: none;
+
+  background: var(--sable-bg-container);
+  border: var(--border-width) solid var(--sable-bg-container-line);
+  border-radius: var(--radii-400);
+  box-shadow: var(--shadow-e200);
+  display: grid;
+  max-height: var(--menu-max-height);
+  min-width: var(--menu-min-width);
+  overflow: auto;
+  padding: var(--space-100);
+  z-index: var(--layer-menu);
+}
+
+.sable-menu-item {
+  --menu-item-height: var(--control-height-300);
+  --menu-item-gap: var(--space-100);
+  --menu-item-padding: var(--control-padding-300);
+
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radii-400);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: var(--font-size-t300);
+  gap: var(--menu-item-gap);
+  justify-content: start;
+  line-height: var(--line-height-t300);
+  min-height: var(--menu-item-height);
+  padding: 0 var(--menu-item-padding);
+  text-align: left;
+  width: 100%;
+}
+
+.sable-menu-item-trailing-icon > svg {
+  order: 1;
+}
+
+.sable-menu-item-trailing-icon > :not(svg) {
+  flex-grow: 1;
+}
+
+.sable-menu-item-roomy {
+  --menu-item-height: var(--control-height-400);
+  --menu-item-gap: var(--space-200);
+  --menu-item-padding: var(--control-padding-400);
+}
+
+.sable-menu-item > svg {
+  flex: 0 0 auto;
+  height: var(--size-x200);
+  width: var(--size-x200);
+}
+
+.sable-menu-item:hover,
+.sable-menu-item:focus-visible,
+.sable-menu-item[data-highlighted] {
+  background: var(--sable-bg-container-hover);
+}
+
+.sable-menu-item:active,
+.sable-menu-item[aria-pressed='true'] {
+  background: var(--sable-bg-container-active);
+}
+
+.sable-menu-item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+.sable-menu-item[data-disabled],
+.sable-menu-item:disabled,
+.sable-menu-item[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.sable-menu-item-destructive {
+  color: var(--sable-crit-main);
+}
+
+.sable-menu-item-destructive:hover,
+.sable-menu-item-destructive[data-highlighted] {
+  background: var(--sable-crit-container);
+  color: var(--sable-crit-on-container);
+}
+
+.sable-menu-separator {
+  background: var(--sable-bg-container-line);
+  block-size: var(--border-width);
+  margin: var(--space-100) 0;
+}

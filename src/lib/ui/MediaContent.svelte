@@ -178,7 +178,7 @@
 
   .media-content {
     display: block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
     max-width: 100%;
     width: 100%;
   }
@@ -197,14 +197,14 @@
   .media-file {
     color: var(--sable-primary-main);
     display: inline-block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
     overflow-wrap: anywhere;
   }
 
   .media-error {
     color: var(--sable-crit-on-container);
     display: inline-block;
-    margin-top: 0.25rem;
+    margin-top: var(--space-100);
   }
 
   .retry-media {

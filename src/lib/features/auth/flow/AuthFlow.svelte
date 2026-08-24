@@ -639,8 +639,9 @@
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    padding: 2rem 1.5rem;
-    padding-block: calc(2rem + var(--safe-top)) calc(2rem + var(--safe-bottom));
+    padding: var(--space-700) var(--space-600);
+    padding-block: calc(var(--space-700) + var(--safe-top))
+      calc(var(--space-700) + var(--safe-bottom));
   }
 
   .auth-content {
@@ -661,7 +662,7 @@
   .bootstrap {
     align-items: center;
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-300);
     justify-content: center;
   }
 

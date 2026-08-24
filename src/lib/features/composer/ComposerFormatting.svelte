@@ -50,8 +50,8 @@
   .formatting {
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    gap: 0.125rem;
-    padding: 0.375rem 0.5rem;
+    gap: var(--space-hairline);
+    padding: var(--space-150) var(--space-200);
   }
 
   :global(.format-button) {

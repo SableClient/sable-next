@@ -207,7 +207,7 @@
     align-items: center;
     display: flex;
     flex: none;
-    padding-left: 0.125rem;
+    padding-left: var(--space-hairline);
   }
 
   .stack > * + * {
@@ -237,7 +237,7 @@
     justify-content: center;
     line-height: 1;
     min-width: 1.125rem;
-    padding: 0 0.1875rem;
+    padding: 0 var(--space-hairline);
   }
 
   :global(.read-receipts-popover) {

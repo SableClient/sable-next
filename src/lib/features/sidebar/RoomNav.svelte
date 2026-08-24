@@ -524,7 +524,7 @@
     flex: 0 0 2.875rem;
     justify-content: space-between;
     min-height: 2.875rem;
-    padding: 0 0.75rem 0 1rem;
+    padding: 0 var(--space-300) 0 var(--space-400);
   }
 
   h2,
@@ -542,8 +542,8 @@
 
   .room-nav-actions {
     display: grid;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem 0.5rem;
+    gap: var(--space-100);
+    padding: var(--space-100) var(--space-200) var(--space-200);
   }
 
   .room-nav-actions a {
@@ -558,7 +558,7 @@
     font-weight: var(--font-weight-medium);
     gap: var(--space-2);
     height: var(--control-height-medium);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-200);
     text-align: left;
     text-decoration: none;
   }
@@ -579,7 +579,7 @@
 
   .room-nav-actions.collapsed {
     justify-items: center;
-    padding: 0.25rem 0;
+    padding: var(--space-100) 0;
   }
 
   .room-nav-actions.collapsed a {
@@ -622,7 +622,7 @@
     font: inherit;
     gap: var(--space-2);
     height: var(--control-height-medium);
-    padding: 0 0.5rem;
+    padding: 0 var(--space-200);
     text-align: left;
     width: 100%;
   }
@@ -647,14 +647,14 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
-    padding: 0.5rem 1rem;
+    padding: var(--space-200) var(--space-400);
   }
 
   .room-list {
     display: grid;
-    gap: 0.25rem;
+    gap: var(--space-100);
     min-width: 0;
-    padding: 0 0.5rem 0.5rem;
+    padding: 0 var(--space-200) var(--space-200);
   }
 
   .room-row-wrap {
@@ -662,7 +662,7 @@
     border-radius: var(--radius);
     display: flex;
     min-width: 0;
-    padding-right: 0.25rem;
+    padding-right: var(--space-100);
   }
 
   .room-row-wrap:focus-within {
@@ -690,7 +690,7 @@
     gap: var(--space-2);
     min-height: var(--control-height-medium);
     min-width: 0;
-    padding: 0 0.5rem 0 calc(0.5rem + var(--room-depth) * 1rem);
+    padding: 0 var(--space-200) 0 calc(var(--space-200) + var(--room-depth) * var(--space-400));
     text-decoration: none;
   }
 
@@ -734,9 +734,9 @@
     font: inherit;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
-    gap: 0.25rem;
+    gap: var(--space-100);
     min-height: var(--control-height-medium);
-    padding: 0 0.5rem 0 calc(0.5rem + var(--room-depth) * 1rem);
+    padding: 0 var(--space-200) 0 calc(var(--space-200) + var(--room-depth) * var(--space-400));
     text-align: left;
     text-transform: uppercase;
     width: 100%;
@@ -785,7 +785,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     min-width: 1.25rem;
-    padding: 0.125rem 0.375rem;
+    padding: var(--space-hairline) var(--space-150);
   }
 
   .room-badge {
@@ -795,7 +795,7 @@
     font-weight: var(--font-weight-bold);
     margin-left: auto;
     min-width: 1.25rem;
-    padding: 0.125rem 0.375rem;
+    padding: var(--space-hairline) var(--space-150);
     text-align: center;
   }
 
@@ -806,7 +806,7 @@
 
   .room-list.collapsed {
     justify-items: center;
-    padding: 0 0 0.5rem;
+    padding: 0 0 var(--space-200);
   }
 
   .room-list.collapsed .room-row-wrap {

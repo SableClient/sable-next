@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
   import { DropdownMenu } from 'bits-ui';
+
+  import IconContext from 'phosphor-svelte/lib/IconContext';
+
+  import '#lib/ui/primitives/menu.css';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
@@ -108,15 +112,17 @@
         <DropdownMenu.Trigger class="room-menu-trigger" aria-label={$i18n.t('room.menuLabel')}>
           <DotsThreeVerticalIcon />
         </DropdownMenu.Trigger>
-        <DropdownMenu.Content class="room-options-menu" side="bottom" align="end" sideOffset={4}>
-          <DropdownMenu.Item
-            class="room-options-item"
-            onSelect={() => {
-              onCopyLink(sectionSpace);
-            }}
-          >
-            <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
-          </DropdownMenu.Item>
+        <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+          <IconContext values={{ 'aria-hidden': 'true' }}>
+            <DropdownMenu.Item
+              class="sable-menu-item"
+              onSelect={() => {
+                onCopyLink(sectionSpace);
+              }}
+            >
+              <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
+            </DropdownMenu.Item>
+          </IconContext>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
     {/if}
@@ -200,46 +206,43 @@
                 >
                   <DotsThreeVerticalIcon />
                 </DropdownMenu.Trigger>
-                <DropdownMenu.Content
-                  class="room-options-menu"
-                  side="bottom"
-                  align="end"
-                  sideOffset={4}
-                >
-                  <DropdownMenu.Item
-                    class="room-options-item"
-                    onSelect={() => {
-                      onCopyLink(child);
-                    }}
-                  >
-                    <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
-                  </DropdownMenu.Item>
-                  {#if canManage}
+                <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+                  <IconContext values={{ 'aria-hidden': 'true' }}>
                     <DropdownMenu.Item
-                      class="room-options-item"
+                      class="sable-menu-item"
                       onSelect={() => {
-                        onMove(section, child.room_id, -1);
+                        onCopyLink(child);
                       }}
                     >
-                      <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+                      <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
                     </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      class="room-options-item"
-                      onSelect={() => {
-                        onMove(section, child.room_id, 1);
-                      }}
-                    >
-                      <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      class="room-options-item room-options-destructive"
-                      onSelect={() => {
-                        onRemove(section, entry);
-                      }}
-                    >
-                      <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
-                    </DropdownMenu.Item>
-                  {/if}
+                    {#if canManage}
+                      <DropdownMenu.Item
+                        class="sable-menu-item"
+                        onSelect={() => {
+                          onMove(section, child.room_id, -1);
+                        }}
+                      >
+                        <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        class="sable-menu-item"
+                        onSelect={() => {
+                          onMove(section, child.room_id, 1);
+                        }}
+                      >
+                        <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        class="sable-menu-item sable-menu-item-destructive"
+                        onSelect={() => {
+                          onRemove(section, entry);
+                        }}
+                      >
+                        <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
+                      </DropdownMenu.Item>
+                    {/if}
+                  </IconContext>
                 </DropdownMenu.Content>
               </DropdownMenu.Root>
             </div>
@@ -360,7 +363,7 @@
   .room-text {
     display: grid;
     flex: 1;
-    gap: 0.125rem;
+    gap: var(--space-hairline);
     min-width: 0;
   }
 
@@ -404,7 +407,7 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
-    padding: 0 0.375rem;
+    padding: 0 var(--space-150);
   }
 
   .room-actions {

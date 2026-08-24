@@ -78,3 +78,4 @@ result
 .direnv
 ## auto-generated pre-commit config
 .pre-commit-config.yaml
+storybook-static

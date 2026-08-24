@@ -17,6 +17,6 @@
 <style>
   .login-method {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-400);
   }
 </style>

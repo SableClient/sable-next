@@ -19,12 +19,12 @@
 <style>
   .auth-heading {
     align-self: end;
-    margin-bottom: 1.25rem;
+    margin-bottom: var(--space-500);
     text-align: center;
   }
 
   .auth-heading h1 {
     font-size: var(--font-size-xlarge);
-    margin: 1rem 0 0;
+    margin: var(--space-400) 0 0;
   }
 </style>

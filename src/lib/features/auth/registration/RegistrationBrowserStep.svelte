@@ -137,13 +137,13 @@
   .email-form,
   .fallback-step {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-300);
   }
 
   .fallback-step {
     color: var(--sable-sec-main);
     justify-items: center;
-    padding: 1rem 0;
+    padding: var(--space-400) 0;
     text-align: center;
   }
 

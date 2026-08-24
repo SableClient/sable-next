@@ -83,7 +83,7 @@
   .tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: var(--space-100);
   }
 
   :global(.tab) {
@@ -96,8 +96,8 @@
     display: flex;
     font: inherit;
     font-size: var(--font-size-small);
-    gap: 0.25rem;
-    padding: 0.125rem 0.5rem;
+    gap: var(--space-100);
+    padding: var(--space-hairline) var(--space-200);
   }
 
   :global(.tab.active) {

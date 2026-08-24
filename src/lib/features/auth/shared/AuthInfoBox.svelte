@@ -26,7 +26,7 @@
     display: flex;
     gap: var(--space-1);
     min-height: var(--control-height-medium);
-    padding: var(--control-padding-block) var(--control-padding-inline);
+    padding: var(--space-300);
   }
 
   .auth-info-box-content {

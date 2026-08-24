@@ -19,7 +19,6 @@
 
   .text-input:autofill,
   .text-input:-webkit-autofill {
-    border-color: var(--sable-primary-container-line);
     -webkit-text-fill-color: var(--sable-bg-on-container);
   }
 

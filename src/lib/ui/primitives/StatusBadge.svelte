@@ -22,13 +22,18 @@
 
 <style>
   :global(.status-badge) {
+    align-items: center;
     border: var(--border-width) solid transparent;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radii-300);
     display: inline-flex;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.25;
-    padding: 0.2rem var(--space-tight);
+    flex-shrink: 0;
+    font-size: var(--font-size-l400);
+    font-weight: var(--font-weight-600);
+    justify-content: center;
+    line-height: var(--line-height-l400);
+    min-height: 1.25rem;
+    min-width: 1.25rem;
+    padding: 0 var(--space-200);
   }
 
   :global(.status-badge-neutral) {
