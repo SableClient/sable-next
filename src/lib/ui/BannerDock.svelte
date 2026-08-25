@@ -25,7 +25,6 @@
   }
 
   .dock > :global(*) {
-    pointer-events: auto;
     width: min(34rem, 100%);
   }
 </style>

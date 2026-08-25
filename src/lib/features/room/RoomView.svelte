@@ -214,7 +214,7 @@
   });
 
   $effect(() => {
-    const activeRoomId = roomId.startsWith('!') ? roomId : resolvedRoom?.room_id;
+    const activeRoomId = resolvedRoom?.room_id;
     if (!activeRoomId) return;
     const anchor = untrack(() => {
       // An event already in the loaded range is reached by scrolling, so only a

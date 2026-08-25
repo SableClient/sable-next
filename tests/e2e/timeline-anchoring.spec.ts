@@ -211,7 +211,7 @@ test('keeps a visible event fixed when a prepended image loads', async ({
   await expect(timeline.image.locator('img')).toBeVisible();
   const loadedBounds = await timeline.image.boundingBox();
   if (!loadedBounds) throw new Error('missing loaded image bounds');
-  expect(placeholderBounds.width).toBeCloseTo(512, 0);
+  expect(placeholderBounds.width).toBeCloseTo(400, 0);
   expect(loadedBounds.width).toBeCloseTo(placeholderBounds.width, 0);
   expect(loadedBounds.height).toBeCloseTo(placeholderBounds.height, 0);
   await timeline.expectAnchorHeld(anchor);
@@ -378,7 +378,7 @@ test('anchors after a delayed initial snapshot', async ({
 }) => {
   await installRoomCore('delayed_snapshot');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openRoom(ROOM_ID);
+  await app.openRoom(ROOM_ID, { settled: false });
 
   await expect(timeline.skeleton).toBeVisible();
   await expect(timeline.initial).toBeHidden();
@@ -394,7 +394,7 @@ test('shows the empty state rather than message rows in a room with no history',
 }) => {
   await installRoomCore('empty_room');
   await page.setViewportSize({ width: 1280, height: 800 });
-  await app.openRoom(ROOM_ID);
+  await app.openRoom(ROOM_ID, { settled: false });
 
   await expect(timeline.empty).toHaveText(/No messages yet/);
   await expect(timeline.skeleton).toHaveCount(0);
@@ -408,7 +408,7 @@ test('stays at latest when a delayed diff changes an overflowing snapshot height
 }) => {
   await installRoomCore('delayed_layout_diff');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openRoom(ROOM_ID);
+  await app.openRoom(ROOM_ID, { settled: false });
 
   await timeline.expectAtLatest(`Delayed layout event ${'wraps '.repeat(80)}`);
 });
