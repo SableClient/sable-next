@@ -326,6 +326,14 @@ pub fn strip_profile_fallback_html(
     display_name: Option<&str>,
     known: bool,
 ) -> String {
+    if let Some(name) = display_name.map(str::trim).filter(|name| !name.is_empty())
+        && let Some(body) = formatted
+            .trim_start()
+            .strip_prefix(&format!("&lt;{name}&gt; "))
+    {
+        return body.trim_start().to_owned();
+    }
+
     let Some((open_tag, text, rest)) = leading_strong(formatted) else {
         return formatted.to_owned();
     };
@@ -356,6 +364,7 @@ pub fn strip_profile_fallback_body(body: &str, display_name: Option<&str>, known
     if let Some(name) = name {
         return body
             .strip_prefix(&format!("{name}: "))
+            .or_else(|| body.strip_prefix(&format!("<{name}> ")))
             .map_or_else(|| body.to_owned(), ToOwned::to_owned);
     }
     if !known {

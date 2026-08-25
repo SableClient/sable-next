@@ -163,7 +163,21 @@ test('a per-message profile takes the sender position and names the account behi
 
   expect(document.querySelector('header .sender')?.textContent.trim()).toBe('Kris');
   expect(document.querySelector('header .sable-pronoun-pill')?.textContent).toBe('they/them');
-  expect(document.querySelector('header .via')?.textContent).toContain('@alice:example.org');
+  expect(document.querySelector('header .via')?.textContent).toContain('Alice');
+  expect(document.querySelector('header .via')?.textContent).not.toContain('@alice:example.org');
+  await unmount(instance);
+});
+
+test('without a persona the hover-only via keeps the account MXID', async () => {
+  const instance = mount(TimelineItem, {
+    target: document.body,
+    props: { item: item(false), collapsed: false },
+  });
+  await tick();
+
+  const via = document.querySelector('header .via');
+  expect(via?.className).toContain('via-hidden');
+  expect(via?.textContent).toContain('@alice:example.org');
   await unmount(instance);
 });
 

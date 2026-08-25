@@ -275,6 +275,7 @@
     // Read outside `untrack`: the toggle only takes effect by re-subscribing.
     const hiddenEvents = preferences.showHiddenEvents;
     void untrack(() => activeTimeline.start(timelineOwner, activeRoomId, anchor, hiddenEvents));
+    void untrack(() => loadMembers());
   });
 
   async function loadMembers(): Promise<void> {

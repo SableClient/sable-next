@@ -107,6 +107,7 @@
     onPersonaOpenChange,
   }: Props = $props();
   const core = useCoreClient();
+  let profile = $state<ProfileView | null>(null);
   function memberOf(userId: string | null | undefined): MemberView | undefined {
     if (!userId) return undefined;
     return members.find((member) => member.user_id === userId);
@@ -115,6 +116,7 @@
   let accountName = $derived(
     item.sender_name ??
       senderMember?.display_name ??
+      profile?.display_name ??
       item.sender ??
       $i18n.t('timeline.unknownSender')
   );
@@ -145,6 +147,7 @@
     if (!profile) return body;
     const name = profile.display_name?.trim();
     if (name && body.startsWith(`${name}: `)) return body.slice(name.length + 2);
+    if (name && body.startsWith(`<${name}> `)) return body.slice(name.length + 3);
     if (!profile.has_fallback) return body;
     const separator = body.indexOf(': ');
     return separator === -1 ? body : body.slice(separator + 2);
@@ -176,7 +179,6 @@
   let nameColor = $derived(
     item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
   );
-  let profile = $state<ProfileView | null>(null);
   let nameColorLight = $derived(
     personaTint?.color_on_light ?? profile?.name_color_light ?? profile?.name_color_dark ?? null
   );
@@ -188,7 +190,7 @@
   $effect(() => {
     const userId = item.sender;
     profile = null;
-    if (!userId || personaTint) return;
+    if (!userId) return;
 
     let current = true;
     void core.userProfile(userId).then(
@@ -613,12 +615,11 @@
               {/each}
               <div class="message-details">
                 {#if item.sender}
-                  {@const account = item.sender}
                   <button
                     class={!persona ? 'via via-hidden' : 'via'}
                     type="button"
                     aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
-                    onclick={openSenderProfile}>{account}</button
+                    onclick={openSenderProfile}>{persona ? accountName : item.sender}</button
                   >
                 {/if}
                 <time datetime={new Date(item.timestamp).toISOString()}

@@ -129,6 +129,7 @@ impl Core {
             None => self.live_timeline(&room_id, hidden_events).await?,
         };
         fill_sender_profiles(&room, &timeline);
+        let relays = Arc::new(room.service_members().unwrap_or_default());
 
         // The SDK replaces its explicit-room set wholesale. Register before
         // computing the union so concurrent live subscriptions see each other.
@@ -153,6 +154,7 @@ impl Core {
         let own_user_id = self.client().await?.user_id().map(ToOwned::to_owned);
         let core = self.clone();
         let stream_user_id = own_user_id.clone();
+        let stream_relays = relays.clone();
         let task = spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
@@ -162,7 +164,7 @@ impl Core {
                         .into_iter()
                         .map(|diff| {
                             view::map_diff(diff, |item| {
-                                view::timeline_item(item, stream_user_id.as_deref())
+                                view::timeline_item(item, stream_user_id.as_deref(), &stream_relays)
                             })
                         })
                         .collect(),
@@ -198,7 +200,7 @@ impl Core {
             subscription,
             items: items
                 .iter()
-                .map(|item| view::timeline_item(item, own_user_id.as_deref()))
+                .map(|item| view::timeline_item(item, own_user_id.as_deref(), &relays))
                 .collect(),
         })
     }

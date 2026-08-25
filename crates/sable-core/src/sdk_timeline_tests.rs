@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::{
@@ -9,7 +9,7 @@ use matrix_sdk::{
             relation::Reference,
             room::message::{LocationMessageEventContent, MessageType, RoomMessageEventContent},
         },
-        room_id,
+        room_id, user_id,
     },
     send_queue::RoomSendQueueUpdate,
     test_utils::mocks::{
@@ -642,7 +642,7 @@ async fn timeline_views(
             .items()
             .await
             .iter()
-            .map(|item| super::view::timeline_item(item, client.user_id()))
+            .map(|item| super::view::timeline_item(item, client.user_id(), &BTreeSet::new()))
             .collect(),
     )
 }
@@ -1149,4 +1149,65 @@ async fn an_unavailable_homeserver_is_retryable_rather_than_a_logged_failure() {
         matches!(error, CommandErr::Unavailable),
         "expected Unavailable, got {error:?}"
     );
+}
+
+#[tokio::test]
+async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!bridged:example.org");
+    let ghost = user_id!("@whatsapp_33612345678:example.org");
+    let factory = EventFactory::new().room(room_id).sender(ghost);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("salut").event_id(event_id!("$ghost"))),
+        )
+        .await;
+
+    let timeline = Arc::new(build_room_timeline(&room, None, false).await.unwrap());
+    let (_, mut stream) = timeline.subscribe().await;
+    assert_eq!(sender_names(&timeline).await, vec![None]);
+
+    server
+        .mock_get_members()
+        .ok(vec![
+            EventFactory::new()
+                .room(room_id)
+                .member(ghost)
+                .display_name("Marie")
+                .into_raw(),
+        ])
+        .mock_once()
+        .mount()
+        .await;
+
+    crate::timelines::fill_sender_profiles(&room, &timeline);
+
+    let named = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            stream.next().await.expect("open timeline stream");
+            if let [Some(name)] = sender_names(&timeline).await.as_slice() {
+                break name.clone();
+            }
+        }
+    })
+    .await
+    .expect("sender profile resolves once the members land");
+
+    assert_eq!(named, "Marie");
+}
+
+async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<Option<String>> {
+    timeline
+        .items()
+        .await
+        .iter()
+        .filter(|item| item.as_event().is_some())
+        .map(|item| crate::view::timeline_item(item, None, &BTreeSet::new()).sender_name)
+        .collect()
 }
