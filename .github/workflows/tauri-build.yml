@@ -237,6 +237,7 @@ jobs:
             runner: ubuntu-22.04-arm
     env:
       ARCH: ${{ matrix.arch }}
+      MISE_DISABLE_TOOLS: aqua:WebAssembly/binaryen,cargo:wasm-bindgen-cli
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
       # Read by src-tauri/build.rs, which bakes them into the binary.
