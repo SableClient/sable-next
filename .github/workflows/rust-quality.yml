@@ -104,14 +104,21 @@ jobs:
       - name: Install cargo-deny
         run: cargo install cargo-deny --version 0.20.2 --locked
 
+      # --all-features would turn on both desktop runtimes and download CEF,
+      # so the app crate is checked on its default runtime. The CEF build is
+      # covered by the Linux release job.
       - name: Run workspace Clippy
-        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+        run: |
+          cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings
+          cargo clippy --locked -p app --all-targets -- -D warnings
 
       - name: Run WASM-target Clippy
         run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
       - name: Run Rust tests
-        run: cargo test --locked --workspace --all-features
+        run: |
+          cargo test --locked --workspace --exclude app --all-features
+          cargo test --locked -p app
 
       - name: Check generated bindings are current
         run: git diff --exit-code src/generated
@@ -127,4 +134,6 @@ jobs:
       - name: Check Rust documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --locked --workspace --all-features --no-deps
+        run: |
+          cargo doc --locked --workspace --exclude app --all-features --no-deps
+          cargo doc --locked -p app --no-deps

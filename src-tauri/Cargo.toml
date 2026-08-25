@@ -23,7 +23,13 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tauri = { version = "2.11.3", features = [] }
+tauri = { version = "2.11.3", default-features = false, features = [
+  "common-controls-v6",
+  "compression",
+  "dbus",
+  "dynamic-acl",
+  "x11",
+] }
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-fs = "2.5.1"
@@ -73,6 +79,13 @@ tauri-plugin-livekit-mobile = { git = "https://github.com/SableClient/tauri-plug
 # bars to nobody, and `env()` there only covers a display cutout.
 tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }
 
+# `cef` is named here too so its build script unpacks the runtime into this
+# target directory, where scripts/cef/copy-libs.sh looks for it.
+[target."cfg(target_os = \"linux\")".dependencies]
+gtk = "0.18"
+tauri-runtime-cef = { git = "https://github.com/SableClient/tauri-runtime-cef", rev = "4e9d7a4fbdf8f246c06a141a87618d8557381c27", optional = true }
+cef = { version = "=150.2.1", optional = true }
+
 [target."cfg(target_os = \"ios\")".dependencies]
 block2 = "0.6"
 objc2 = "0.6"
@@ -87,6 +100,13 @@ objc2-photos = { version = "0.3.2", default-features = false, features = [
   "block2",
   "dispatch2",
 ] }
+
+# Exactly one must be on. The Linux release build passes
+# `--no-default-features --features cef`; everything else takes the default.
+[features]
+default = ["wry"]
+wry = ["tauri/wry"]
+cef = ["dep:tauri-runtime-cef", "dep:cef"]
 
 [lints]
 workspace = true

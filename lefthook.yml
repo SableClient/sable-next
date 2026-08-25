@@ -57,5 +57,7 @@ pre-push:
       group:
         piped: true
         jobs:
-          - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+          # --all-features would turn on both desktop runtimes and download CEF.
+          - run: cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings
+          - run: cargo clippy --locked -p app --all-targets -- -D warnings
           - run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings

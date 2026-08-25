@@ -135,13 +135,6 @@ jobs:
             tauri-args: ''
             version-args: --msi
             bundle-path: target/release/bundle
-          - name: Linux x86_64
-            runner: ubuntu-24.04
-            asset-platform: linux-x86_64
-            rust-targets: ''
-            tauri-args: ''
-            version-args: ''
-            bundle-path: target/release/bundle
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
@@ -165,23 +158,6 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: web-assets
-      - name: Install Linux Tauri dependencies
-        if: ${{ runner.os == 'Linux' }}
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            build-essential \
-            file \
-            libayatana-appindicator3-dev \
-            libgtk-3-dev \
-            librsvg2-dev \
-            libsoup-3.0-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            patchelf \
-            pkg-config
       - name: Set up app
         uses: ./.github/actions/setup
         with:
@@ -247,6 +223,110 @@ jobs:
             echo "Uploading $bundle"
             gh release upload "$TAG" "$bundle" --clobber
           done < bundles
+  linux:
+    name: Linux ${{ matrix.arch }} (CEF)
+    needs: [setup-release, build-web]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    env:
+      ARCH: ${{ matrix.arch }}
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && format('https://github.com/{0}/releases/download/nightly/latest.json', github.repository) || '' }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download web assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: web-assets
+      # tauri-runtime depends on webkit2gtk on Linux whatever the runtime, so
+      # the headers stay even though nothing renders through it. --as-needed
+      # keeps it out of the binary, hence no runtime dep in nfpm.yaml.
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            file \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libwebkit2gtk-4.1-dev \
+            pkg-config
+      - name: Set up app
+        uses: ./.github/actions/setup
+        with:
+          build: 'false'
+          install-mise-tools: 'false'
+      - name: Stamp release version into tauri.conf.json
+        run: |
+          args=''
+          [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
+          node .github/scripts/set-tauri-version.mjs "$VERSION" $args
+      # `tauri:cef build` stops at the binary; the bundler cannot carry the
+      # Chromium runtime, so cef:package assembles the packages around it.
+      - name: Build and package the CEF bundles
+        run: |
+          config_args=(--config src-tauri/tauri.ci.conf.json)
+          display_name='Sable Next'
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            config_args+=(--config src-tauri/tauri.nightly.conf.json)
+            display_name='Sable Next Nightly'
+          fi
+          pnpm tauri:cef build "${config_args[@]}"
+          mise run cef:package "$VERSION" "$display_name"
+      - name: Check the packages carry what they should
+        run: |
+          deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
+          dpkg-deb --contents "$deb" | grep -q 'etc/apparmor.d/sable-next$'
+          dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './postinst'
+          dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './prerm'
+          dpkg-deb --contents "$deb" | grep -q 'opt/sable-next/CEF-LICENSE.txt$'
+      - name: Sign the AppImage for the updater
+        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
+      - name: Attest Linux bundles
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            target/release/bundle/deb/sable-next-*.deb
+            target/release/bundle/rpm/sable-next-*.rpm
+            target/release/bundle/appimage/sable-next-*.AppImage
+      - name: Attach Linux bundles to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for bundle in "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" \
+                        "target/release/bundle/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm" \
+                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage" \
+                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage.sig"; do
+            [ -e "$bundle" ] || continue
+            echo "Uploading $bundle"
+            gh release upload "$TAG" "$bundle" --clobber
+          done
   android:
     name: Build Android
     needs: [setup-release, build-web]
@@ -542,7 +622,7 @@ jobs:
         run: gh release upload "$TAG" altstore-source.json --clobber
   finalize-nightly:
     name: Finalize nightly release
-    needs: [setup-release, desktop, android, ios, obtainium, altstore]
+    needs: [setup-release, desktop, linux, android, ios, obtainium, altstore]
     if: ${{ needs.setup-release.outputs.nightly == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -581,8 +661,8 @@ jobs:
               done
   updater-manifest:
     name: Publish updater manifest
-    needs: [setup-release, desktop, android, ios]
-    if: ${{ always() && needs.setup-release.result == 'success' && needs.desktop.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
+    needs: [setup-release, desktop, linux, android, ios]
+    if: ${{ always() && needs.setup-release.result == 'success' && needs.desktop.result == 'success' && needs.linux.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write

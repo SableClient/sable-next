@@ -4,6 +4,8 @@
 //! except to move bytes or to reach something only this process has: the push
 //! registration, the system browser, the crash reporter.
 
+#[cfg(all(feature = "cef", target_os = "linux"))]
+pub mod deep_link_ipc;
 #[cfg(target_os = "ios")]
 // Objective-C bindings expose PhotoKit calls as unsafe; keep that exception out
 // of the Rust-only application code.
@@ -25,6 +27,12 @@ use tauri::{
     AppHandle, Manager, State,
 };
 use tauri_plugin_opener::OpenerExt;
+
+/// CEF (Chromium) on Linux, wry everywhere else.
+#[cfg(all(feature = "cef", target_os = "linux"))]
+type BrowserEngine = tauri_runtime_cef::CefRuntime<tauri::EventLoopMessage>;
+#[cfg(not(all(feature = "cef", target_os = "linux")))]
+use tauri::Wry as BrowserEngine;
 
 struct AppState {
     core: Arc<Core>,
@@ -141,7 +149,7 @@ fn subscribe_events(state: State<'_, AppState>, channel: Channel<Vec<CoreEvent>>
 
 #[tauri::command]
 async fn register_push(
-    app: AppHandle,
+    app: AppHandle<BrowserEngine>,
     state: State<'_, AppState>,
     config: notifications::PushConfig,
 ) -> Result<(), CommandErr> {
@@ -151,7 +159,7 @@ async fn register_push(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
-fn open_auth_url(app: AppHandle, url: String) -> Result<(), CommandErr> {
+fn open_auth_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
     let parsed = tauri::Url::parse(&url).map_err(|_| CommandErr::Denied)?;
     if !matches!(parsed.scheme(), "http" | "https") {
         return Err(CommandErr::Denied);
@@ -179,7 +187,7 @@ pub fn run() {
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let _sentry_guard = sentry::init();
 
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::<BrowserEngine>::new();
 
     // Before every other plugin, as its docs require: it has to win the race
     // with a second process carrying the OIDC redirect.
@@ -215,6 +223,14 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notifications::init())
         .setup(|app| {
+            // GTK's X11 backend swaps out the X error handlers on the way in,
+            // so the runtime's have to go back on after it.
+            #[cfg(all(feature = "cef", target_os = "linux"))]
+            {
+                gtk::init()?;
+                tauri_runtime_cef::install_x_error_handlers();
+            }
+
             // Linux never registers schemes at install time, and a Windows dev
             // build skips the installer, so claim it at runtime.
             #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
@@ -222,6 +238,9 @@ pub fn run() {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 app.deep_link().register_all()?;
             }
+
+            #[cfg(all(feature = "cef", target_os = "linux"))]
+            deep_link_ipc::drain_pending_urls(app.handle());
 
             let data_dir = app.path().app_data_dir()?;
             // Android resolves that to the app data root, which the app

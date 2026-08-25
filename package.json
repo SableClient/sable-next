@@ -29,7 +29,8 @@
     "wasm:dev": "mise exec -- node scripts/build-wasm.mjs",
     "wasm:watch": "mise exec -- watchexec --restart --watch crates/sable-core --watch crates/sable-wasm -- pnpm wasm:dev",
     "ios:frameworks": "node scripts/download-ios-frameworks.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:cef": "node scripts/tauri.js cef"
   },
   "dependencies": {
     "@arborium/arborium": "^2.18.1",

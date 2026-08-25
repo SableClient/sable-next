@@ -1,0 +1,8 @@
+abi <abi/4.0>,
+include <tunables/global>
+
+# Chromium builds its sandbox out of unprivileged user namespaces, which Ubuntu
+# 24.04 restricts by default. The profile grants only that.
+profile sable-next /opt/sable-next/sable-next flags=(unconfined) {
+  userns,
+}
