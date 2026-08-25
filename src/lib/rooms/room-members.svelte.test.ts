@@ -10,6 +10,7 @@ function member(userId: string): MemberView {
     display_name: null,
     avatar_url: null,
     power_level: 0,
+    membership: 'join',
   };
 }
 

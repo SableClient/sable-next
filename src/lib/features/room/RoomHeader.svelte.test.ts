@@ -7,8 +7,20 @@ import RoomHeader from './RoomHeader.svelte';
 import { initials } from './timeline-format';
 
 const members = [
-  { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null, power_level: 0 },
-  { user_id: '@carol:example.org', display_name: 'Carol', avatar_url: null, power_level: 0 },
+  {
+    user_id: '@bob:example.org',
+    display_name: 'Bob',
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+  },
+  {
+    user_id: '@carol:example.org',
+    display_name: 'Carol',
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+  },
 ];
 
 function mountHeader(props: {
@@ -24,7 +36,6 @@ function mountHeader(props: {
       onBack: () => {},
       onMembers: () => {},
       onSearch: () => {},
-      onSettings: () => {},
       initials,
       ...props,
     },

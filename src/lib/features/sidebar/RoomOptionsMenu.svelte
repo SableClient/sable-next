@@ -11,11 +11,9 @@
   import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
-  import type { NotificationModeView } from '#src/generated/NotificationModeView';
-  import BellIcon from 'phosphor-svelte/lib/BellIcon';
+  import RoomNotificationSubmenu from '#lib/features/room/RoomNotificationSubmenu.svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { settingsChanges } from '#lib/features/notifications/notifications.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { matrixToUrl } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -66,10 +64,6 @@
     )
   );
 
-  // The space's own power levels govern the edge, so each candidate is asked.
-  // Rebuilt per run so a revoked space drops back out. Asked on open, like the
-  // notification mode below: an effect here would re-run on every room list
-  // diff, and this menu is mounted once per row.
   const manageable = new SvelteSet<string>();
   let manageableRun = 0;
 
@@ -98,6 +92,8 @@
     parentSpace !== null && manageable.has(parentSpace.room_id) ? parentSpace : null
   );
 
+  let opened = $state(false);
+
   function report(error: unknown): void {
     console.warn('[sable room] room action failed', error);
   }
@@ -124,42 +120,6 @@
     void core.removeFromSpace(spaceId, room.room_id).catch(report);
   }
 
-  let notificationMode = $state<NotificationModeView | null | undefined>();
-  let notificationDefault = $state<NotificationModeView | undefined>();
-  const notificationModes: readonly { mode: NotificationModeView | null; label: string }[] = [
-    { mode: null, label: 'room.notifyDefault' },
-    { mode: 'all', label: 'room.notifyAll' },
-    { mode: 'mentions', label: 'room.notifyMentions' },
-    { mode: 'mute', label: 'room.notifyMute' },
-  ];
-  const modeLabels: Record<NotificationModeView, string> = {
-    all: 'room.notifyAll',
-    mentions: 'room.notifyMentions',
-    mute: 'room.notifyMute',
-  };
-
-  let defaultLabel = $derived(notificationDefault ? $i18n.t(modeLabels[notificationDefault]) : '');
-
-  $effect(() => {
-    void settingsChanges.version;
-    if (notificationMode !== undefined) void readNotificationMode();
-  });
-
-  async function readNotificationMode(): Promise<void> {
-    try {
-      const settings = await core.notificationSettings(room.room_id);
-      notificationMode = settings.room;
-      notificationDefault = settings.default;
-    } catch (error) {
-      report(error);
-    }
-  }
-
-  function setNotificationMode(mode: NotificationModeView | null): void {
-    notificationMode = mode;
-    void core.setRoomNotificationMode(room.room_id, mode).catch(report);
-  }
-
   async function copyLink(): Promise<void> {
     try {
       const via = room.canonical_alias ? [] : await core.roomViaServers(room.room_id);
@@ -174,7 +134,7 @@
   bind:open
   onOpenChange={(open) => {
     if (!open) return;
-    void readNotificationMode();
+    opened = true;
     readManageableSpaces();
   }}
 >
@@ -234,29 +194,7 @@
       </DropdownMenu.Item>
 
       {#if !room.is_space}
-        <DropdownMenu.Sub>
-          <DropdownMenu.SubTrigger class="sable-menu-item">
-            <BellIcon />
-            {$i18n.t('room.menuNotifications')}
-          </DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
-            <IconContext values={{ 'aria-hidden': 'true' }}>
-              {#each notificationModes as option (option.mode ?? 'default')}
-                {@const selected = notificationMode === option.mode}
-                <DropdownMenu.Item
-                  class="sable-menu-item"
-                  aria-checked={selected}
-                  onSelect={() => {
-                    setNotificationMode(option.mode);
-                  }}
-                >
-                  <span class="mode-check" aria-hidden="true">{selected ? '\u2713' : ''}</span>
-                  {$i18n.t(option.label, { mode: defaultLabel })}
-                </DropdownMenu.Item>
-              {/each}
-            </IconContext>
-          </DropdownMenu.SubContent>
-        </DropdownMenu.Sub>
+        <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
       {/if}
 
       {#if !room.is_space && offeredSpaces.length > 0}
@@ -313,12 +251,6 @@
   :global(.room-options-menu) {
     --menu-min-width: 12rem;
     --menu-max-height: 20rem;
-  }
-
-  .mode-check {
-    display: inline-block;
-    text-align: center;
-    width: 1rem;
   }
 
   :global(.room-options-trigger) {

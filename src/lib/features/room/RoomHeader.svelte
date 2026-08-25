@@ -1,7 +1,7 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { i18n } from '#lib/i18n.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
-  import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
@@ -19,21 +19,24 @@
   interface Props {
     roomName: string;
     roomAvatar: string | null;
+    topic?: string | null;
     isVoice: boolean;
-    /** Set for a text room too, when a call is running in it. */
     callParticipants: readonly string[];
     members: readonly MemberView[];
     onCall?: (() => void) | null;
     onBack: () => void;
     onMembers: () => void;
     onSearch: () => void;
-    onSettings: () => void;
+    onTopic?: (() => void) | null;
     initials: (name: string) => string;
+    pins?: Snippet;
+    menu?: Snippet;
   }
 
   let {
     roomName,
     roomAvatar,
+    topic = null,
     isVoice,
     callParticipants,
     members,
@@ -41,8 +44,10 @@
     onBack,
     onMembers,
     onSearch,
-    onSettings,
+    onTopic = null,
     initials,
+    pins,
+    menu,
   }: Props = $props();
 
   let inVoice = $derived(
@@ -56,6 +61,7 @@
       ? $i18n.t('timeline.inVoiceNames', { names: inVoice.map((entry) => entry.name).join(', ') })
       : $i18n.t('nav.voiceRoom')
   );
+  let topicShown = $derived(topic !== null && topic.trim() !== '' && onTopic !== null);
 </script>
 
 <header class="room-header">
@@ -69,9 +75,13 @@
     <BackIcon />
   </IconButton>
   <Avatar class="room-avatar" src={roomAvatar} initials={initials(roomName)} size="small" />
-  <h1>{roomName}</h1>
+  <div class="room-identity" class:with-topic={topicShown}>
+    <h1>{roomName}</h1>
+    {#if topicShown}
+      <button class="room-topic" type="button" onclick={onTopic}>{topic}</button>
+    {/if}
+  </div>
   {#if isVoice || inVoice.length > 0}
-    <!-- One named graphic: the faces inside carry no name of their own. -->
     <span
       class="voice-chip"
       class:live={inVoice.length > 0}
@@ -95,46 +105,40 @@
       {/if}
     </span>
   {/if}
-  {#if onCall}
+  <div class="room-actions">
     <IconButton
-      class="call-button"
+      class="search-button"
       variant="ghost"
       size="small"
-      label={inVoice.length > 0 ? $i18n.t('call.join') : $i18n.t('call.start')}
-      onclick={onCall}
+      label={$i18n.t('search.open')}
+      onclick={onSearch}
     >
-      <PhoneIcon />
+      <MagnifyingGlassIcon />
     </IconButton>
-  {/if}
-  <!-- Narrow viewports hide the label, leaving the icon as the only content. -->
-  <Button
-    class="members-button"
-    variant="ghost"
-    size="small"
-    aria-label={$i18n.t('timeline.members')}
-    onclick={onMembers}
-  >
-    <UsersIcon />
-    <span>{$i18n.t('timeline.members')}</span>
-  </Button>
-  <IconButton
-    class="search-button"
-    variant="ghost"
-    size="small"
-    label={$i18n.t('search.open')}
-    onclick={onSearch}
-  >
-    <MagnifyingGlassIcon />
-  </IconButton>
-  <IconButton
-    class="settings-button"
-    variant="ghost"
-    size="small"
-    label={$i18n.t('room.settingsOpen')}
-    onclick={onSettings}
-  >
-    <GearIcon />
-  </IconButton>
+    {@render pins?.()}
+    {#if onCall}
+      <IconButton
+        class="call-button"
+        variant="ghost"
+        size="small"
+        label={inVoice.length > 0 ? $i18n.t('call.join') : $i18n.t('call.start')}
+        onclick={onCall}
+      >
+        <PhoneIcon />
+      </IconButton>
+    {/if}
+    <Button
+      class="members-button"
+      variant="ghost"
+      size="small"
+      aria-label={$i18n.t('timeline.members')}
+      onclick={onMembers}
+    >
+      <UsersIcon />
+      <span>{$i18n.t('timeline.members')}</span>
+    </Button>
+    {@render menu?.()}
+  </div>
 </header>
 
 <style>
@@ -149,6 +153,12 @@
     padding: 0 var(--page-gutter);
   }
 
+  .room-identity {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
   .room-header h1 {
     font-size: var(--font-size-large);
     line-height: var(--line-height-heading);
@@ -156,6 +166,43 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .room-identity.with-topic h1 {
+    font-size: var(--font-size-body);
+  }
+
+  .room-topic {
+    background: transparent;
+    border: 0;
+    color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-t200);
+    margin: 0;
+    overflow: hidden;
+    padding: 0;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .room-topic:hover {
+    color: var(--sable-bg-on-container);
+    text-decoration: underline;
+  }
+
+  .room-topic:focus-visible {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .room-actions {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: var(--space-hairline);
   }
 
   :global(.sable-avatar.room-avatar) {
@@ -217,13 +264,9 @@
     display: none;
   }
 
-  :global(.members-button) {
-    margin-left: auto;
-  }
-
   :global(.back-button svg),
   :global(.members-button svg),
-  :global(.settings-button svg) {
+  :global(.room-menu-button svg) {
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
   }

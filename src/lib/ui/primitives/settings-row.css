@@ -1,0 +1,61 @@
+.settings-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  min-height: calc(var(--control-height-medium) + var(--space-2));
+  padding: var(--space-2) var(--space-3);
+}
+
+.settings-row + .settings-row {
+  border-top: var(--border-width) solid var(--sable-surface-container-line);
+}
+
+.settings-row-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-row-name {
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.settings-row-copy p {
+  color: var(--sable-surface-var-on-container);
+  font-size: var(--font-size-small);
+  margin: calc(var(--space-1) / 2) 0 0;
+  max-width: 60ch;
+  overflow-wrap: anywhere;
+}
+
+.settings-row-control {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.settings-row-control .select {
+  min-width: 11rem;
+}
+
+.settings-form {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.settings-field {
+  display: grid;
+  gap: var(--space-1);
+}

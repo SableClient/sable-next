@@ -7,16 +7,17 @@ use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{ParentSpace, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
-use matrix_sdk::ruma::UInt;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
+use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
 use matrix_sdk::ruma::room::{JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType};
+use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_ui::{
@@ -41,10 +42,11 @@ use crate::matrix_html::{
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
-    MentionView, PerMessageProfileView, PollAnswerView, PollView, ReactionGroup, ReplyView,
-    RoomJoinRuleView, RoomPermissionsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag,
-    SearchHitView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView,
-    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
+    MembershipView, MentionView, PerMessageProfileView, PollAnswerView, PollView, ReactionGroup,
+    ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView,
+    RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView, SpaceChildEdge,
+    SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView, TimelineItemContentView,
+    TimelineItemView, UploadProgressView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -1109,6 +1111,17 @@ pub fn member_view(member: &RoomMember) -> MemberView {
         display_name: member.display_name().map(str::to_owned),
         avatar_url: member.avatar_url().map(ToString::to_string),
         power_level: clamp_power_level(member.power_level()),
+        membership: membership_view(member.membership()),
+    }
+}
+
+const fn membership_view(state: &MembershipState) -> MembershipView {
+    match state {
+        MembershipState::Join => MembershipView::Join,
+        MembershipState::Invite => MembershipView::Invite,
+        MembershipState::Knock => MembershipView::Knock,
+        MembershipState::Ban => MembershipView::Ban,
+        _ => MembershipView::Leave,
     }
 }
 
@@ -1207,6 +1220,38 @@ pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {
         sender: hit.sender,
         origin_server_ts: hit.origin_server_ts,
         score: hit.score,
+    }
+}
+
+fn clamp_int(level: Int) -> i32 {
+    i32::try_from(i64::from(level)).unwrap_or(if level.is_negative() {
+        i32::MIN
+    } else {
+        i32::MAX
+    })
+}
+
+#[must_use]
+pub fn room_power_levels(power_levels: &RoomPowerLevels) -> RoomPowerLevelsView {
+    RoomPowerLevelsView {
+        ban: clamp_int(power_levels.ban),
+        kick: clamp_int(power_levels.kick),
+        redact: clamp_int(power_levels.redact),
+        invite: clamp_int(power_levels.invite),
+        events_default: clamp_int(power_levels.events_default),
+        state_default: clamp_int(power_levels.state_default),
+        users_default: clamp_int(power_levels.users_default),
+        events: power_levels
+            .events
+            .iter()
+            .map(|(event_type, level)| (event_type.to_string(), clamp_int(*level)))
+            .collect(),
+        users: power_levels
+            .users
+            .iter()
+            .map(|(user_id, level)| (user_id.to_string(), clamp_int(*level)))
+            .collect(),
+        notifications_room: clamp_int(power_levels.notifications.room),
     }
 }
 

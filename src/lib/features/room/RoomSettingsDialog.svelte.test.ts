@@ -8,6 +8,10 @@ import type { RoomSummary } from '#src/generated/RoomSummary';
 
 const coreStub = vi.hoisted(() => ({
   roomPermissions: vi.fn(),
+  roomPowerLevels: vi.fn(),
+  roomStateEvent: vi.fn(),
+  roomAliases: vi.fn(),
+  roomDirectoryVisibility: vi.fn(),
 }));
 
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
@@ -66,6 +70,21 @@ async function render(
   hasSpaceParent = false
 ): Promise<ReturnType<typeof mount>> {
   coreStub.roomPermissions.mockResolvedValue(permissions(canChangeJoinRule));
+  coreStub.roomPowerLevels.mockResolvedValue({
+    ban: 50,
+    kick: 50,
+    redact: 50,
+    invite: 0,
+    events_default: 0,
+    state_default: 50,
+    users_default: 0,
+    events: {},
+    users: {},
+    notifications_room: 50,
+  });
+  coreStub.roomStateEvent.mockResolvedValue(null);
+  coreStub.roomAliases.mockResolvedValue([]);
+  coreStub.roomDirectoryVisibility.mockResolvedValue(false);
   const instance = mount(RoomSettingsDialog, {
     target: document.body,
     props: {

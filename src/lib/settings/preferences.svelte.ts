@@ -3,12 +3,14 @@ export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
+export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
 
 export interface Preferences {
   layout: TimelineLayout;
   messageSpacing: MessageSpacing;
   theme: ThemeMode;
   underlineLinks: boolean;
+  showRoomIcon: ShowRoomIcon;
 
   hour24Clock: boolean;
   dateFormat: DateFormat;
@@ -79,6 +81,7 @@ const ENUMS = {
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
+  showRoomIcon: ['always', 'collapsed', 'never'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -96,6 +99,7 @@ const DEFAULTS: Preferences = {
   messageSpacing: 'cozy',
   theme: 'system',
   underlineLinks: true,
+  showRoomIcon: 'always',
 
   hour24Clock: false,
   dateFormat: 'auto',

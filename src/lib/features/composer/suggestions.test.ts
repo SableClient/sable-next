@@ -7,7 +7,13 @@ import type { AutocompleteQuery } from './autocomplete';
 import { suggestionsFor } from './suggestions';
 
 function member(userId: string, displayName: string | null): MemberView {
-  return { user_id: userId, display_name: displayName, avatar_url: null, power_level: 0 };
+  return {
+    user_id: userId,
+    display_name: displayName,
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+  };
 }
 
 function emote(shortcode: string): PackImageView {
