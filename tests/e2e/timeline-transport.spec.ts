@@ -10,7 +10,7 @@ test('subscribes once when opening a room on mobile', async ({
   installRoomCore,
 }) => {
   await installRoomCore('ready');
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 390, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
 
@@ -85,7 +85,7 @@ test('prefetches history within the oldest timeline items', async ({
   installRoomCore,
 }) => {
   await installRoomCore('ready');
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
 
