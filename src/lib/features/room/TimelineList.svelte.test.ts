@@ -598,17 +598,26 @@ test('retries marking the latest event read after a failed request', async () =>
   await unmount(instance);
 });
 
-test('reading back inside the near-latest band leaves follow mode', async () => {
-  const rect = (): DOMRect =>
-    ({ top: 0, left: 0, right: 300, bottom: 100, width: 300, height: 100 }) as DOMRect;
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(rect);
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-    configurable: true,
-    value: 10,
-  });
+const ROW = 100;
+const VIEWPORT = 100;
 
-  const roomTimeline = timeline();
-  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+function layOutRows(): void {
+  const rect = (): DOMRect =>
+    ({ top: 0, left: 0, right: 300, bottom: ROW, width: 300, height: ROW }) as DOMRect;
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(rect);
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: ROW });
+}
+
+interface LiveTimeline {
+  instance: Record<string, unknown>;
+  element: HTMLDivElement;
+  end: number;
+  setScrollHeight: (height: number) => void;
+}
+
+/** Every row lays out at `ROW`, so the virtualiser and the stubbed box agree. */
+async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
+  layOutRows();
   roomTimeline.mode = { kind: 'live' };
   roomTimeline.backwardPagination = 'end';
   const instance = mount(TimelineList, {
@@ -620,25 +629,95 @@ test('reading back inside the near-latest band leaves follow mode', async () => 
       onRead: async () => {},
     },
   });
-
+  let scrollHeight = roomTimeline.items.length * ROW;
   const element = viewport();
   Object.defineProperties(element, {
-    scrollHeight: { configurable: true, value: 1_000 },
-    scrollTop: { configurable: true, writable: true, value: 900 },
+    scrollHeight: { configurable: true, get: () => scrollHeight },
+    scrollTop: { configurable: true, writable: true, value: 0 },
   });
   await tick();
   await runAnimationFrames();
+  // The virtualiser only learns an offset from a scroll event, and happy-dom's
+  // `scrollTop` setter dispatches none.
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+  await runAnimationFrames();
+  return {
+    instance,
+    element,
+    end: scrollHeight - VIEWPORT,
+    setScrollHeight: (next) => {
+      scrollHeight = next;
+    },
+  };
+}
+
+async function dragTo(element: HTMLDivElement, from: number, to: number): Promise<void> {
+  touch(element, 'touchstart', from < to ? 200 : 100);
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+  touch(element, 'touchmove', from < to ? 160 : 140);
+  element.scrollTop = to;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+}
+
+function anchored(): boolean {
+  return document.querySelector('.jump-to-latest') !== null;
+}
+
+function liveItems(count: number): TimelineItemView[] {
+  return Array.from({ length: count }, (_, index) => item(String(index)));
+}
+
+test('reading back inside the near-latest band leaves follow mode', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
   expect(document.querySelectorAll('.item').length).toBeGreaterThan(0);
+  expect(anchored()).toBe(false);
 
-  touch(element, 'touchstart', 100);
+  await dragTo(element, end, end - 30);
+
+  expect(anchored()).toBe(true);
+  await unmount(instance);
+});
+
+test('reading back past the band anchors', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+
+  expect(anchored()).toBe(true);
+  await unmount(instance);
+});
+
+test('scrolling back to the end restores follow mode', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+  expect(anchored()).toBe(true);
+
+  await dragTo(element, end - 900, end);
+
+  expect(anchored()).toBe(false);
+  await unmount(instance);
+});
+
+test('a wheel notch inside the band also leaves follow mode', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  element.dispatchEvent(new WheelEvent('wheel', { deltaY: -30 }));
+  element.scrollTop = end - 30;
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  touch(element, 'touchmove', 140);
-  element.scrollTop = 870;
-  element.dispatchEvent(new Event('scroll'));
-  await tick();
-
-  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+  expect(anchored()).toBe(true);
   await unmount(instance);
 });

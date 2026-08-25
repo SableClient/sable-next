@@ -17,7 +17,7 @@
     "test:e2e": "SABLE_WASM_OUTPUT=src/generated/wasm-e2e playwright test",
     "prepare": "svelte-kit sync || echo ''; mise exec -- lefthook install",
     "check:theme": "node scripts/check-theme-tokens.mjs",
-    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker/tsconfig.json",
+    "check": "svelte-kit sync && node scripts/check-theme-tokens.mjs && node scripts/check-timeline-scroll.mjs && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings && tsc -p src/service-worker/tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --watch",
     "lint": "eslint . --cache --cache-strategy content --max-warnings 0",
     "lint:fix": "eslint . --cache --cache-strategy content --fix",

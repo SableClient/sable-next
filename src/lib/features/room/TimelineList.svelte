@@ -208,9 +208,9 @@
   let measurementRevision = 0;
   let anchorCorrection: { by: string; delta: number; key: string | null } | null = null;
   let selfWrite: { by: string; from: number; to: number; at: number } | null = null;
-  function recordScroll(by: string, from: number): void {
+  function recordScroll(by: string, from: number, to?: number): void {
     if (!timelineDebugEnabledForView) return;
-    selfWrite = { by, from, to: viewport?.scrollTop ?? -1, at: performance.now() };
+    selfWrite = { by, from, to: to ?? viewport?.scrollTop ?? -1, at: performance.now() };
   }
   let anchorResidual: number | null = 0;
   let expectedSelfOffset: number | null = null;
@@ -285,11 +285,11 @@
   get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
     const offset = instance.scrollOffset;
     if (offset === null || item.start >= offset) return false;
-    const remeasured = instance.itemSizeCache.has(item.key);
-    if (remeasured && (item.end > offset || instance.scrollDirection === 'backward')) return false;
+    if (instance.itemSizeCache.has(item.key) && item.end > offset) return false;
     // `onScroll` abandons a held anchor for any offset it did not write itself.
-    expectedSelfOffset = (viewport?.scrollTop ?? offset) + delta;
-    recordScroll('virtualizer:resize', viewport?.scrollTop ?? -1);
+    const from = viewport?.scrollTop ?? offset;
+    expectedSelfOffset = from + delta;
+    recordScroll('virtualizer:resize', from, expectedSelfOffset);
     return true;
   };
 
