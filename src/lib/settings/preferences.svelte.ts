@@ -11,6 +11,10 @@ export interface Preferences {
   theme: ThemeMode;
   underlineLinks: boolean;
   showRoomIcon: ShowRoomIcon;
+  showRoomBanners: boolean;
+  showUnreadCounts: boolean;
+  badgeCountDMsOnly: boolean;
+  showPingCounts: boolean;
 
   hour24Clock: boolean;
   dateFormat: DateFormat;
@@ -100,6 +104,10 @@ const DEFAULTS: Preferences = {
   theme: 'system',
   underlineLinks: true,
   showRoomIcon: 'always',
+  showRoomBanners: true,
+  showUnreadCounts: false,
+  badgeCountDMsOnly: true,
+  showPingCounts: true,
 
   hour24Clock: false,
   dateFormat: 'auto',

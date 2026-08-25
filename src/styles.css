@@ -93,6 +93,10 @@ html {
   --sable-overlay: rgb(0 0 0 / 40%);
   --sable-picker-black: #000;
   --sable-picker-white: #fff;
+  --sable-media-scrim: rgb(0 0 0 / 60%);
+  --sable-media-scrim-clear: rgb(0 0 0 / 0%);
+  --sable-media-scrim-hover: rgb(255 255 255 / 20%);
+  --sable-media-on-scrim: #fff;
 }
 
 @media (prefers-color-scheme: dark) {

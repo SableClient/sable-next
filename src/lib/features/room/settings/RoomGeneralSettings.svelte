@@ -12,6 +12,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
@@ -22,6 +23,7 @@
   import '#lib/ui/primitives/settings-row.css';
 
   import { initials } from '../timeline-format';
+  import { bannerChanges, readRoomBanner, setRoomBanner } from '../room-banner.svelte.js';
   import RoomAddressSettings from './RoomAddressSettings.svelte';
   import RoomEncryptionSettings from './RoomEncryptionSettings.svelte';
   import RoomHistorySettings from './RoomHistorySettings.svelte';
@@ -45,6 +47,8 @@
   let saved = $state(false);
   let failed = $state(false);
   let avatarInput = $state<HTMLInputElement | null>(null);
+  let bannerInput = $state<HTMLInputElement | null>(null);
+  let banner = $state<string | null>(null);
 
   let roomId = $derived(room?.room_id ?? null);
   let topic = $derived(room?.topic ?? '');
@@ -141,6 +145,44 @@
       await core.setRoomAvatar(target, null);
     });
   }
+
+  $effect(() => {
+    const target = roomId;
+    void bannerChanges.version;
+    if (!target) {
+      banner = null;
+      return;
+    }
+
+    let current = true;
+    void readRoomBanner(core, target).then((next) => {
+      if (current) banner = next;
+    });
+    return () => {
+      current = false;
+    };
+  });
+
+  async function uploadBanner(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    const target = roomId;
+    if (!file || !target) return;
+
+    await run(async () => {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const uri = await core.uploadMedia(file.type || 'image/*', bytes);
+      await setRoomBanner(core, target, uri);
+    });
+  }
+
+  function removeBanner(): void {
+    const target = roomId;
+    if (!target) return;
+    void run(async () => {
+      await setRoomBanner(core, target, null);
+    });
+  }
 </script>
 
 <div class="section">
@@ -176,6 +218,36 @@
           tabindex="-1"
           aria-hidden="true"
           onchange={uploadAvatar}
+        />
+      </li>
+      <li class="settings-row">
+        {#if banner}
+          <MediaImage source={banner} alt="" width={160} height={90} class="banner-preview" />
+        {/if}
+        <div class="settings-row-copy">
+          <span class="settings-row-name">{$i18n.t('room.settingsBannerLabel')}</span>
+          <p>{$i18n.t('room.settingsBannerHint')}</p>
+        </div>
+        {#if canEditGeneral}
+          <div class="settings-row-control">
+            <Button size="small" disabled={saving} onclick={() => bannerInput?.click()}>
+              {$i18n.t('room.settingsBannerChange')}
+            </Button>
+            {#if banner}
+              <Button size="small" variant="ghost" disabled={saving} onclick={removeBanner}>
+                {$i18n.t('room.settingsBannerRemove')}
+              </Button>
+            {/if}
+          </div>
+        {/if}
+        <input
+          bind:this={bannerInput}
+          class="avatar-input"
+          type="file"
+          accept="image/*"
+          tabindex="-1"
+          aria-hidden="true"
+          onchange={uploadBanner}
         />
       </li>
     </ul>
@@ -331,6 +403,15 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
+  }
+
+  :global(.banner-preview) {
+    border-radius: var(--radius);
+    flex: none;
+    height: 2.5rem;
+    object-fit: cover;
+    overflow: hidden;
+    width: 4.5rem;
   }
 
   .avatar-input {
