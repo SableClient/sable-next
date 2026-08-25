@@ -598,20 +598,20 @@
               {#each persona?.pronouns ?? profile?.pronouns ?? [] as pronoun, index (index)}
                 <PronounPill lang={pronoun.language ?? undefined}>{pronoun.summary}</PronounPill>
               {/each}
-              {#if persona && item.sender}
-                {@const account = item.sender}
-                <button
-                  class="via"
-                  type="button"
-                  aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
-                  onclick={openSenderProfile}
+              <div class="message-details">
+                {#if item.sender}
+                  {@const account = item.sender}
+                  <button
+                    class={!persona ? 'via via-hidden' : 'via'}
+                    type="button"
+                    aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
+                    onclick={openSenderProfile}>{account}</button
+                  >
+                {/if}
+                <time datetime={new Date(item.timestamp).toISOString()}
+                  >{formatTime(item.timestamp)}</time
                 >
-                  {$i18n.t('timeline.via')}<strong>{account}</strong>
-                </button>
-              {/if}
-              <time datetime={new Date(item.timestamp).toISOString()}
-                >{formatTime(item.timestamp)}</time
-              >
+              </div>
             </header>
           {/if}
           {#if item.in_reply_to}
@@ -1042,6 +1042,11 @@
       opacity: 1;
       pointer-events: auto;
     }
+
+    .message:hover :global(.via-hidden) {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
 
   /* Only the hashed sender colours are `-main` fills; an own or persona avatar
@@ -1060,6 +1065,18 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-200);
+  }
+
+  .message header .message-details {
+    display: flex;
+    justify-content: end;
+    flex-grow: 1;
+    align-items: baseline;
+
+    &,
+    & > time {
+      font-size: var(--font-size-t200);
+    }
   }
 
   .sender {
@@ -1150,33 +1167,19 @@
   }
 
   .via {
-    align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: none;
+    border: none;
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
     cursor: pointer;
-    display: inline-flex;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-normal);
-    gap: var(--space-100);
     letter-spacing: 0.01em;
-    padding: 0 var(--space-1);
-    position: relative;
+  }
+
+  .via.via-hidden {
+    opacity: 0;
   }
 
   .via:hover {
     background: var(--sable-surface-var-container-hover);
-  }
-
-  .via::after {
-    content: '';
-    inset: -0.5rem -2px;
-    position: absolute;
-  }
-
-  .via strong {
-    font-weight: var(--font-weight-medium);
   }
 
   .emote {
@@ -1435,6 +1438,9 @@
 
     .via {
       transition: background-color var(--motion-fast) var(--motion-easing-standard);
+    }
+    .via-hidden {
+      transition: opacity var(--motion-fast) var(--motion-easing-standard);
     }
   }
 
