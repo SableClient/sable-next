@@ -39,7 +39,12 @@
       "debugApplicationIdSuffix": ".debug"
     },
     "iOS": {
-      "template": "src-tauri/ios-project.yml"
+      "template": "src-tauri/ios-project.yml",
+      "frameworks": [
+        "AudioToolbox",
+        "Frameworks/LiveKitWebRTC.xcframework",
+        "Frameworks/RustLiveKitUniFFI.xcframework"
+      ]
     }
   },
   "plugins": {

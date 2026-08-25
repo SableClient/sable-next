@@ -411,6 +411,8 @@ jobs:
           config_args=()
           [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
           pnpm tauri ios init --ci "${config_args[@]}"
+      - name: Download iOS frameworks
+        run: pnpm ios:frameworks
       - name: Add Rust target
         run: |
           # shellcheck disable=SC2086 # RUST_TARGETS is a space-separated list.
