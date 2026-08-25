@@ -76,6 +76,13 @@ rust {
     rootDirRel = "../../../../"
 }
 
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("com.google.crypto.tink:tink"))
+            .using(module("com.google.crypto.tink:tink-android:1.18.0"))
+    }
+}
+
 dependencies {
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
