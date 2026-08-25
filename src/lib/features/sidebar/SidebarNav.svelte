@@ -3,7 +3,7 @@
   import type { RoomSummary } from '#src/generated/RoomSummary';
   import { onMount } from 'svelte';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { unreadSpaceIds } from '#lib/rooms/spaces.js';
+  import { addUnread, spaceUnreadCounts, type UnreadCount } from '#lib/rooms/spaces.js';
   import {
     applyDrop,
     folderName,
@@ -55,7 +55,7 @@
         .flatMap((space) => space.space_children.map((child) => child.room_id))
     )
   );
-  let unreadSpaces = $derived(unreadSpaceIds(spaces, roomList.rooms, roomList.mutedRoomIds));
+  let spaceUnread = $derived(spaceUnreadCounts(spaces, roomList.rooms, roomList.mutedRoomIds));
   let entries = $derived(
     mergeSpaces(
       spaceSidebar.items,
@@ -71,14 +71,10 @@
         !roomList.mutedRoomIds.has(room.room_id)
     )
   );
-  let homeCounts = $derived(unreadCounts(homeRooms));
-  let homeUnread = $derived(homeCounts.highlight || homeCounts.unread);
-  let homeHighlight = $derived(homeCounts.highlight > 0);
-  let unspacedCounts = $derived(
+  let homeUnread = $derived(unreadCounts(homeRooms));
+  let unspacedUnread = $derived(
     unreadCounts(homeRooms.filter((room) => !claimedRoomIds.has(room.room_id)))
   );
-  let unspacedUnread = $derived(unspacedCounts.highlight || unspacedCounts.unread);
-  let unspacedHighlight = $derived(unspacedCounts.highlight > 0);
   let directRooms = $derived(
     roomList.rooms
       .filter(
@@ -93,7 +89,7 @@
       )
       .slice(0, 3)
   );
-  let directCounts = $derived(
+  let directUnread = $derived(
     unreadCounts(
       roomList.rooms.filter(
         (room) =>
@@ -104,14 +100,10 @@
       )
     )
   );
-  let directUnread = $derived(directCounts.highlight || directCounts.unread);
 
-  function unreadCounts(rooms: readonly RoomSummary[]) {
+  function unreadCounts(rooms: readonly RoomSummary[]): UnreadCount {
     return rooms.reduce(
-      (total, room) => ({
-        unread: total.unread + room.unread,
-        highlight: total.highlight + room.highlight,
-      }),
+      (total, room) => addUnread(total, { unread: room.unread, highlight: room.highlight }),
       { unread: 0, highlight: 0 }
     );
   }
@@ -212,11 +204,9 @@
       <div class="navigation-main">
         <NavigationRail
           {spaces}
-          unreadSpaceIds={unreadSpaces}
+          {spaceUnread}
           {homeUnread}
-          {homeHighlight}
           {unspacedUnread}
-          {unspacedHighlight}
           {directRooms}
           {directUnread}
           mobile
@@ -232,11 +222,9 @@
       <div class="desktop-navigation-main">
         <NavigationRail
           {spaces}
-          unreadSpaceIds={unreadSpaces}
+          {spaceUnread}
           {homeUnread}
-          {homeHighlight}
           {unspacedUnread}
-          {unspacedHighlight}
           {directRooms}
           {directUnread}
           {...railProps}

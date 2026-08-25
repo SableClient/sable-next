@@ -444,10 +444,9 @@
               {@const room = item.room}
               {@const name = room ? roomName(room) : item.roomId}
               {@const href = roomHref(item)}
-              {@const unread =
-                room && !roomList.mutedRoomIds.has(room.room_id)
-                  ? room.highlight || room.unread
-                  : 0}
+              {@const muted = !room || roomList.mutedRoomIds.has(room.room_id)}
+              {@const mentions = muted ? 0 : room.highlight}
+              {@const unread = muted ? 0 : room.unread}
               {@const live = room?.call_participants.length ?? 0}
               <div class="room-row-wrap">
                 <a
@@ -485,12 +484,18 @@
                         aria-label={$i18n.t('nav.voiceLive', { count: live })}>{live}</span
                       >
                     {/if}
-                    {#if unread > 0}
+                    {#if mentions > 0}
                       <span
-                        class:highlight={(room?.highlight ?? 0) > 0}
                         class="room-badge"
-                        aria-label={$i18n.t('nav.unreadMessages', { count: unread })}>{unread}</span
+                        aria-label={$i18n.t('nav.unreadMentions', { count: mentions })}
+                        >{mentions}</span
                       >
+                    {:else if unread > 0}
+                      <span
+                        class="room-dot"
+                        role="img"
+                        aria-label={$i18n.t('nav.unreadMessages', { count: unread })}
+                      ></span>
                     {/if}
                   {/if}
                 </a>
@@ -822,8 +827,9 @@
   }
 
   .room-badge {
-    background: var(--sable-surface-var-container);
+    background: var(--sable-primary-container);
     border-radius: var(--radius-pill);
+    color: var(--sable-primary-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     margin-left: auto;
@@ -832,9 +838,12 @@
     text-align: center;
   }
 
-  .room-badge.highlight {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+  .room-dot {
+    background: var(--sable-surface-on-container);
+    border-radius: 50%;
+    height: var(--space-100);
+    margin-left: auto;
+    width: var(--space-100);
   }
 
   .room-list.collapsed {

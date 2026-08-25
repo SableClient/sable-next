@@ -36,6 +36,7 @@
     "chats": "Chats",
     "chatsEmpty": "You do not have any direct messages yet.",
     "unreadMessages": "{{count}} unread messages",
+    "unreadMentions": "{{count}} mentions",
     "voiceRoom": "Voice room",
     "voiceLive": "{{count}} in voice",
     "moreOptions": "More options",

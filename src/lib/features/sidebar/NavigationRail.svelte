@@ -11,6 +11,7 @@
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
+  import { addUnread, type UnreadCount } from '#lib/rooms/spaces.js';
   import {
     folderName,
     mergeSpaces,
@@ -34,6 +35,8 @@
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
+  const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0 };
+
   type RailItem = {
     href: string;
     activePrefix: string;
@@ -42,19 +45,16 @@
     initial?: string;
     avatar?: string | null;
     navigateHref?: string;
-    unread?: boolean;
-    unreadCount?: number;
+    unread?: UnreadCount;
   };
 
   interface Props {
     spaces: readonly RoomSummary[];
-    unreadSpaceIds?: ReadonlySet<string>;
-    homeUnread?: number;
-    homeHighlight?: boolean;
-    unspacedUnread?: number;
-    unspacedHighlight?: boolean;
+    spaceUnread?: ReadonlyMap<string, UnreadCount>;
+    homeUnread?: UnreadCount;
+    unspacedUnread?: UnreadCount;
     directRooms?: readonly RoomSummary[];
-    directUnread?: number;
+    directUnread?: UnreadCount;
     mobile?: boolean;
     onNavigate?: (href: string) => void;
     layout?: readonly SidebarItem[];
@@ -68,13 +68,11 @@
 
   let {
     spaces,
-    unreadSpaceIds = new Set(),
-    homeUnread = 0,
-    homeHighlight = false,
-    unspacedUnread = 0,
-    unspacedHighlight = false,
+    spaceUnread = new Map(),
+    homeUnread = NO_UNREAD,
+    unspacedUnread = NO_UNREAD,
     directRooms = [],
-    directUnread = 0,
+    directUnread = NO_UNREAD,
     mobile = false,
     onNavigate,
     layout = [],
@@ -95,16 +93,14 @@
       activePrefix: '/home',
       icon: HouseIcon,
       label: 'nav.home',
-      unread: homeUnread > 0,
-      unreadCount: homeHighlight ? homeUnread : undefined,
+      unread: homeUnread,
     },
     {
       href: resolve('/(app)/rooms'),
       activePrefix: '/rooms',
       icon: HashIcon,
       label: 'nav.unspaced',
-      unread: unspacedUnread > 0,
-      unreadCount: unspacedHighlight ? unspacedUnread : undefined,
+      unread: unspacedUnread,
     },
     {
       href: resolve('/(app)/search'),
@@ -117,7 +113,7 @@
       activePrefix: '/direct',
       icon: ChatsIcon,
       label: 'nav.direct',
-      unreadCount: directUnread,
+      unread: directUnread,
     },
   ]);
 
@@ -132,7 +128,6 @@
     directRooms.map((room) => {
       const name = spaceName(room.name, room.room_id);
       const href = resolve('/(app)/direct/[roomId]', { roomId: roomPathParam(room) });
-      const unread = room.highlight || room.unread;
 
       return {
         href,
@@ -140,7 +135,7 @@
         initial: initial(name),
         avatar: room.avatar_url,
         label: name,
-        unreadCount: unread,
+        unread: { unread: room.unread, highlight: room.highlight },
       };
     })
   );
@@ -194,7 +189,7 @@
       initial: initial(name),
       avatar: space.avatar_url,
       label: name,
-      unread: unreadSpaceIds.has(space.room_id),
+      unread: spaceUnread.get(space.room_id),
     };
   }
 
@@ -208,8 +203,11 @@
     return folder.content.filter((roomId) => spacesById.has(roomId));
   }
 
-  function folderUnread(folder: SidebarFolder): boolean {
-    return folder.content.some((roomId) => unreadSpaceIds.has(roomId));
+  function folderUnread(folder: SidebarFolder): UnreadCount {
+    return folder.content.reduce(
+      (total, roomId) => addUnread(total, spaceUnread.get(roomId) ?? NO_UNREAD),
+      NO_UNREAD
+    );
   }
 
   function folderActive(folder: SidebarFolder): boolean {
@@ -297,17 +295,21 @@
      as a void expression in an expression position -->
 {#snippet nothing()}{/snippet}
 
+{#snippet unreadMark(count: UnreadCount | undefined)}
+  {#if count && count.highlight > 0}
+    <span class="unread-count" aria-hidden="true">{count.highlight}</span>
+  {:else if count && count.unread > 0}
+    <span class="unread-dot" aria-hidden="true"></span>
+  {/if}
+{/snippet}
+
 {#snippet itemBody(item: RailItem, active: boolean)}
   {#if item.icon}
     <span class="icon" aria-hidden="true"><item.icon weight={active ? 'fill' : 'regular'} /></span>
   {:else}
     <Avatar class="space-initial" src={item.avatar} initials={item.initial} size="small" />
   {/if}
-  {#if item.unreadCount}
-    <span class="unread-count" aria-hidden="true">{item.unreadCount}</span>
-  {:else if item.unread}
-    <span class="unread-dot" aria-hidden="true"></span>
-  {/if}
+  {@render unreadMark(item.unread)}
 {/snippet}
 
 {#snippet itemLink(item: RailItem, props: Record<string, unknown>, held: boolean)}
@@ -447,9 +449,7 @@
     }}
   >
     {@render folderTiles(folder)}
-    {#if folderUnread(folder)}
-      <span class="unread-dot" aria-hidden="true"></span>
-    {/if}
+    {@render unreadMark(folderUnread(folder))}
   </button>
 {/snippet}
 

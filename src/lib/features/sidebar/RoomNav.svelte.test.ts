@@ -239,6 +239,25 @@ test('does not show a badge for a muted room', async () => {
 
   const instance = await mountNav();
   expect(document.querySelector('.room-badge')).toBeNull();
+  expect(document.querySelector('.room-dot')).toBeNull();
+  await unmount(instance);
+});
+
+test('counts mentions in the badge and marks plain unread with a dot', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!mention:example.org', name: 'Mentioned', unread: 9, highlight: 2 }),
+    makeRoom({ room_id: '!plain:example.org', name: 'Plain', unread: 5 }),
+  ];
+
+  const instance = await mountNav();
+  const rows = Array.from(document.querySelectorAll('.room-row'));
+  const mentioned = rows.find((row) => row.textContent.includes('Mentioned'));
+  const plain = rows.find((row) => row.textContent.includes('Plain'));
+
+  expect(mentioned?.querySelector('.room-badge')?.textContent).toBe('2');
+  expect(mentioned?.querySelector('.room-dot')).toBeNull();
+  expect(plain?.querySelector('.room-badge')).toBeNull();
+  expect(plain?.querySelector('.room-dot')).not.toBeNull();
   await unmount(instance);
 });
 

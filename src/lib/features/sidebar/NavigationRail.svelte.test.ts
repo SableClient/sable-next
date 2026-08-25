@@ -78,7 +78,12 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
 test('badges home mentions and unread direct chats', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
-    props: { spaces: [], homeUnread: 2, homeHighlight: true, directUnread: 3, mobile: true },
+    props: {
+      spaces: [],
+      homeUnread: { unread: 4, highlight: 2 },
+      directUnread: { unread: 3, highlight: 3 },
+      mobile: true,
+    },
   });
   await tick();
 
@@ -93,10 +98,8 @@ test('badges the unspaced section separately from home', async () => {
     target: document.body,
     props: {
       spaces: [],
-      homeUnread: 5,
-      homeHighlight: true,
-      unspacedUnread: 2,
-      unspacedHighlight: true,
+      homeUnread: { unread: 9, highlight: 5 },
+      unspacedUnread: { unread: 4, highlight: 2 },
       mobile: true,
     },
   });
@@ -111,7 +114,7 @@ test('badges the unspaced section separately from home', async () => {
 test('uses a dot for ordinary home unread messages', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
-    props: { spaces: [], homeUnread: 2, mobile: true },
+    props: { spaces: [], homeUnread: { unread: 2, highlight: 0 }, mobile: true },
   });
   await tick();
 
@@ -154,7 +157,31 @@ test('shows unread direct rooms as individual avatars', async () => {
   const directLink = document.querySelector('a[href="/direct/!dm%3Aexample.org"]');
   expect(directLink?.getAttribute('aria-label')).toBe('Alice');
   expect(directLink?.querySelector('.space-initial')?.textContent.trim()).toBe('A');
-  expect(directLink?.querySelector('.unread-count')?.textContent).toBe('2');
+  expect(directLink?.querySelector('.unread-count')).toBeNull();
+  expect(directLink?.querySelector('.unread-dot')).not.toBeNull();
+
+  await unmount(instance);
+});
+
+test('badges a space with its mentions and dots one with only unread messages', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      spaceUnread: new Map([
+        ['!a:example.org', { unread: 7, highlight: 3 }],
+        ['!b:example.org', { unread: 4, highlight: 0 }],
+      ]),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  const alpha = document.querySelector('a[aria-label="Alpha"]');
+  const beta = document.querySelector('a[aria-label="Beta"]');
+  expect(alpha?.querySelector('.unread-count')?.textContent).toBe('3');
+  expect(beta?.querySelector('.unread-count')).toBeNull();
+  expect(beta?.querySelector('.unread-dot')).not.toBeNull();
 
   await unmount(instance);
 });
@@ -235,7 +262,7 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
       layout: [
         { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!b:example.org'] },
       ],
-      unreadSpaceIds: new Set(['!b:example.org']),
+      spaceUnread: new Map([['!b:example.org', { unread: 3, highlight: 0 }]]),
       openFolders: new Set<string>(),
       onToggleFolder: (folderId: string) => toggled.push(folderId),
       mobile: true,

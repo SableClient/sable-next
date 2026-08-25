@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-import { unreadSpaceIds } from './spaces';
+import { spaceUnreadCounts } from './spaces';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -41,5 +41,33 @@ test('does not mark a space unread for a muted child room', () => {
   });
   const muted = room({ room_id: '!muted:example.org', unread: 3 });
 
-  expect(unreadSpaceIds([space], [space, muted], new Set([muted.room_id]))).toEqual(new Set());
+  expect(spaceUnreadCounts([space], [space, muted], new Set([muted.room_id]))).toEqual(new Map());
+});
+
+test('sums the mentions of a space across its nested rooms, counting each room once', () => {
+  const root = room({
+    room_id: '!root:example.org',
+    is_space: true,
+    space_children: [
+      { room_id: '!sub:example.org', order: null, origin_server_ts: 1, suggested: false },
+      { room_id: '!shared:example.org', order: null, origin_server_ts: 1, suggested: false },
+    ],
+  });
+  const sub = room({
+    room_id: '!sub:example.org',
+    is_space: true,
+    space_children: [
+      { room_id: '!deep:example.org', order: null, origin_server_ts: 1, suggested: false },
+      { room_id: '!shared:example.org', order: null, origin_server_ts: 1, suggested: false },
+    ],
+  });
+  const deep = room({ room_id: '!deep:example.org', unread: 4, highlight: 1 });
+  const shared = room({ room_id: '!shared:example.org', unread: 2, highlight: 2 });
+
+  expect(spaceUnreadCounts([root, sub], [root, sub, deep, shared])).toEqual(
+    new Map([
+      ['!root:example.org', { unread: 6, highlight: 3 }],
+      ['!sub:example.org', { unread: 6, highlight: 3 }],
+    ])
+  );
 });

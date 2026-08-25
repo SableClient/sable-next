@@ -1,31 +1,45 @@
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-export function unreadSpaceIds(
+export type UnreadCount = { unread: number; highlight: number };
+
+export function spaceUnreadCounts(
   spaces: readonly RoomSummary[],
   rooms: readonly RoomSummary[],
   mutedRoomIds: ReadonlySet<string> = new Set()
-): Set<string> {
+): Map<string, UnreadCount> {
   const roomsById = new Map(
     rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
   );
 
-  function hasUnreadDescendant(spaceId: string, visited: Set<string>): boolean {
-    if (visited.has(spaceId)) return false;
+  function accumulate(spaceId: string, visited: Set<string>, total: UnreadCount): UnreadCount {
+    if (visited.has(spaceId)) return total;
     visited.add(spaceId);
     const space = roomsById.get(spaceId);
-    if (!space) return false;
+    if (!space) return total;
 
-    return space.space_children.some((child) => {
+    for (const child of space.space_children) {
       const room = roomsById.get(child.room_id);
-      if (!room) return false;
-      if (room.is_space) return hasUnreadDescendant(room.room_id, visited);
-      return !mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0);
-    });
+      if (!room) continue;
+      if (room.is_space) {
+        accumulate(room.room_id, visited, total);
+        continue;
+      }
+      if (visited.has(room.room_id) || mutedRoomIds.has(room.room_id)) continue;
+      visited.add(room.room_id);
+      total.unread += room.unread;
+      total.highlight += room.highlight;
+    }
+    return total;
   }
 
-  return new Set(
-    spaces
-      .filter((space) => hasUnreadDescendant(space.room_id, new Set()))
-      .map((space) => space.room_id)
-  );
+  const counts = new Map<string, UnreadCount>();
+  for (const space of spaces) {
+    const total = accumulate(space.room_id, new Set(), { unread: 0, highlight: 0 });
+    if (total.unread > 0 || total.highlight > 0) counts.set(space.room_id, total);
+  }
+  return counts;
+}
+
+export function addUnread(left: UnreadCount, right: UnreadCount): UnreadCount {
+  return { unread: left.unread + right.unread, highlight: left.highlight + right.highlight };
 }
