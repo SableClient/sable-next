@@ -3,7 +3,7 @@
   import type { RoomTag } from '#src/generated/RoomTag';
   import { DropdownMenu } from 'bits-ui';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
-  import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
+  import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
@@ -140,7 +140,7 @@
 >
   {#if !anchor}
     <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>
-      <DotsThreeIcon />
+      <DotsThreeVerticalIcon />
     </DropdownMenu.Trigger>
   {/if}
   <DropdownMenu.Content

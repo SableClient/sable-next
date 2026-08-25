@@ -11,6 +11,8 @@ import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
+
+type RoomNotificationModes = { room: NotificationModeView | null; fallback: NotificationModeView };
 const NOTIFICATION_MODE_LOAD_CONCURRENCY = 8;
 
 export function roomPathId(room: RoomSummary): string {
@@ -36,16 +38,22 @@ export function findRoomByPathId(
 export class RoomList {
   rooms = $state.raw<RoomSummary[]>([]);
   mutedRoomIds = $state.raw<ReadonlySet<string>>(new SvelteSet());
+  typingRoomIds = $state.raw<ReadonlySet<string>>(new SvelteSet());
 
   private subscription: SubscriptionId | null = null;
   private unsubscribeEvents: (() => void) | null = null;
   private unsubscribeNotificationSettings: (() => void) | null = null;
+  private unsubscribeTyping: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
-  private notificationModes = new SvelteMap<string, NotificationModeView>();
+  private notificationModes = new SvelteMap<string, RoomNotificationModes>();
   private loadingNotificationModes = new SvelteSet<string>();
 
   constructor(private readonly core: CoreClient) {}
+
+  notificationOverride(roomId: string): NotificationModeView | null {
+    return this.notificationModes.get(roomId)?.room ?? null;
+  }
 
   async start(): Promise<void> {
     if (this.subscription !== null) return;
@@ -66,12 +74,15 @@ export class RoomList {
     this.startPromise = null;
     this.rooms = [];
     this.mutedRoomIds = new SvelteSet();
+    this.typingRoomIds = new SvelteSet();
     this.notificationModes.clear();
     this.loadingNotificationModes.clear();
     this.unsubscribeEvents?.();
     this.unsubscribeEvents = null;
     this.unsubscribeNotificationSettings?.();
     this.unsubscribeNotificationSettings = null;
+    this.unsubscribeTyping?.();
+    this.unsubscribeTyping = null;
 
     const subscription = this.subscription;
     this.subscription = null;
@@ -110,6 +121,14 @@ export class RoomList {
       if (event.type === 'notification_settings_changed')
         void this.loadNotificationModes(this.rooms);
     });
+    this.unsubscribeTyping = this.core.subscribeEvents((event) => {
+      if (event.type !== 'typing') return;
+
+      const rooms = new SvelteSet(this.typingRoomIds);
+      if (event.user_ids.length > 0) rooms.add(event.room_id);
+      else rooms.delete(event.room_id);
+      this.typingRoomIds = rooms;
+    });
   }
 
   private setRooms(rooms: RoomSummary[]): void {
@@ -127,12 +146,15 @@ export class RoomList {
     const generation = this.generation;
     const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
     for (const room of pending) this.loadingNotificationModes.add(room.room_id);
-    const modes: { roomId: string; mode: NotificationModeView }[] = [];
+    const modes: { roomId: string; mode: RoomNotificationModes }[] = [];
     for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_LOAD_CONCURRENCY) {
       const results = await Promise.allSettled(
         pending.slice(index, index + NOTIFICATION_MODE_LOAD_CONCURRENCY).map(async (room) => {
           const settings = await this.core.notificationSettings(room.room_id);
-          return { roomId: room.room_id, mode: settings.room ?? settings.default };
+          return {
+            roomId: room.room_id,
+            mode: { room: settings.room, fallback: settings.default },
+          };
         })
       );
       for (const result of results) {
@@ -144,7 +166,9 @@ export class RoomList {
 
     for (const { roomId, mode } of modes) this.notificationModes.set(roomId, mode);
     this.mutedRoomIds = new SvelteSet(
-      [...this.notificationModes].filter(([, mode]) => mode === 'mute').map(([roomId]) => roomId)
+      [...this.notificationModes]
+        .filter(([, mode]) => (mode.room ?? mode.fallback) === 'mute')
+        .map(([roomId]) => roomId)
     );
   }
 }

@@ -13,10 +13,14 @@ const pageState = vi.hoisted(() => ({
 const roomsFixture = vi.hoisted(() => ({
   rooms: [] as RoomSummary[],
   mutedRoomIds: new Set<string>(),
+  typingRoomIds: new Set<string>(),
+  notificationOverride: () => null,
 }));
 
 const coreStub = vi.hoisted(() => ({
   roomPermissions: vi.fn(() => new Promise<never>(() => {})),
+  roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
+  fetchMedia: vi.fn(() => new Promise<never>(() => {})),
   session: null,
 }));
 
@@ -86,8 +90,8 @@ function roomNames(): string[] {
   );
 }
 
-async function mountNav() {
-  const instance = mount(RoomNav, { target: document.body });
+async function mountNav(props: Record<string, unknown> = {}) {
+  const instance = mount(RoomNav, { target: document.body, props });
   await tick();
   return instance;
 }
@@ -238,8 +242,7 @@ test('does not show a badge for a muted room', async () => {
   roomsFixture.mutedRoomIds = new Set(['!muted:example.org']);
 
   const instance = await mountNav();
-  expect(document.querySelector('.room-badge')).toBeNull();
-  expect(document.querySelector('.room-dot')).toBeNull();
+  expect(document.querySelector('.sable-unread-badge')).toBeNull();
   await unmount(instance);
 });
 
@@ -254,10 +257,50 @@ test('counts mentions in the badge and marks plain unread with a dot', async () 
   const mentioned = rows.find((row) => row.textContent.includes('Mentioned'));
   const plain = rows.find((row) => row.textContent.includes('Plain'));
 
-  expect(mentioned?.querySelector('.room-badge')?.textContent).toBe('2');
-  expect(mentioned?.querySelector('.room-dot')).toBeNull();
-  expect(plain?.querySelector('.room-badge')).toBeNull();
-  expect(plain?.querySelector('.room-dot')).not.toBeNull();
+  expect(mentioned?.querySelector('.sable-unread-badge-count')?.textContent).toBe('2');
+  expect(plain?.querySelector('.sable-unread-badge-count')).toBeNull();
+  expect(plain?.querySelector('.sable-unread-badge-dot')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('a space list header shows the space banner above it', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),
+  ];
+  pageState.url.pathname = '/space/!space:example.org';
+  pageState.params = { spaceId: '!space:example.org' };
+  coreStub.roomStateEvent.mockResolvedValue({ url: 'mxc://example.org/banner' });
+
+  const instance = await mountNav();
+  await tick();
+  await tick();
+
+  expect(coreStub.roomStateEvent).toHaveBeenCalledWith(
+    '!space:example.org',
+    'page.codeberg.everypizza.room.banner'
+  );
+  expect(document.querySelector('.room-banner')).not.toBeNull();
+  expect(document.querySelector('.room-nav-header')?.classList.contains('on-banner')).toBe(true);
+
+  coreStub.roomStateEvent.mockResolvedValue(null);
+  await unmount(instance);
+});
+
+test('a space list header wears the space avatar when collapsed', async () => {
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!space:example.org',
+      name: 'Design',
+      is_space: true,
+      join_rule: 'invite',
+    }),
+  ];
+  pageState.url.pathname = '/space/!space:example.org';
+  pageState.params = { spaceId: '!space:example.org' };
+
+  const instance = await mountNav({ collapsed: true });
+  const badge = document.querySelector('.room-nav-badge');
+  expect(badge?.querySelector('.sable-avatar')?.textContent.trim()).toBe('D');
   await unmount(instance);
 });
 
@@ -273,7 +316,7 @@ test('a voice room shows a speaker icon and the live count', async () => {
   ];
 
   const instance = await mountNav();
-  const icons = Array.from(document.querySelectorAll('.room-icon'));
+  const icons = Array.from(document.querySelectorAll('.room-list .room-icon'));
   expect(icons.every((icon) => icon.classList.contains('voice'))).toBe(true);
   expect(icons.every((icon) => icon.querySelector('svg') !== null)).toBe(true);
   expect(
@@ -292,7 +335,7 @@ test('an active call in a text room shows the live count without the voice icon'
   ];
 
   const instance = await mountNav();
-  expect(document.querySelector('.room-icon')?.classList.contains('voice')).toBe(false);
+  expect(document.querySelector('.room-list .room-icon')?.classList.contains('voice')).toBe(false);
   expect(document.querySelector('.voice-badge')?.textContent).toBe('1');
   await unmount(instance);
 });
