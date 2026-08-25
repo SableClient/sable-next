@@ -29,6 +29,15 @@ function run(command, args) {
   if (result.status !== 0) throw new Error(`${command} failed with status ${result.status}`);
 }
 
+function targetDirectory() {
+  const result = spawnSync('cargo', ['metadata', '--no-deps', '--format-version', '1'], {
+    encoding: 'utf8',
+  });
+
+  if (result.status !== 0) throw new Error('cargo metadata failed');
+  return JSON.parse(result.stdout).target_directory;
+}
+
 function lockOutput(output) {
   const lock = `${output}.lock`;
   const wait = new Int32Array(new SharedArrayBuffer(4));
@@ -70,7 +79,7 @@ if (!version || cli.status !== 0 || cli.stdout.trim() !== `wasm-bindgen ${versio
 
 run('cargo', cargoArgs);
 
-const wasm = `target/wasm32-unknown-unknown/${profile}/sable_wasm.wasm`;
+const wasm = `${targetDirectory()}/wasm32-unknown-unknown/${profile}/sable_wasm.wasm`;
 const output = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 const bindgenArgs = ['--target', 'web', '--out-dir', output, '--out-name', 'sable_wasm'];
 const unlockOutput = lockOutput(output);

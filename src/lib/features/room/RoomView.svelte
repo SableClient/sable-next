@@ -6,6 +6,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
+  import type { CallSupportView } from '#src/generated/CallSupportView';
   import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
@@ -33,16 +34,22 @@
   import CallView from '#lib/features/call/CallView.svelte';
   import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
+  import JumpToTimeDialog from './JumpToTimeDialog.svelte';
+  import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import MembersDrawer from './MembersDrawer.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
+  import RoomHeaderMenu from './RoomHeaderMenu.svelte';
+  import RoomInviteDialog from './RoomInviteDialog.svelte';
+  import RoomPinMenu from './RoomPinMenu.svelte';
+  import RoomTopicViewer from './RoomTopicViewer.svelte';
   import RoomReadReceipts from './RoomReadReceipts.svelte';
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
   import MediaViewer from './MediaViewer.svelte';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
-  import { initials } from './timeline-format';
+  import { initials, latestEventId } from './timeline-format';
 
   interface Props {
     roomId: string;
@@ -72,12 +79,17 @@
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
   let settingsOpen = $state(false);
+  let topicOpen = $state(false);
+  let inviteOpen = $state(false);
+  let jumpOpen = $state(false);
+  let leaveOpen = $state(false);
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- only the prefetch effect touches it, and a reactive set would make that effect invalidate itself
   const requestedDetails = new Set<string>();
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
+  let callSupport = $state<CallSupportView | null>(null);
 
   let mediaItems = $derived(
     timeline.items.flatMap((entry) => {
@@ -92,6 +104,40 @@
         },
       ];
     })
+  );
+  let callable = $derived(
+    !call.active && callSupport !== null && callSupport.has_focus && callSupport.can_join
+  );
+
+  $effect(() => {
+    const target = resolvedRoomId;
+    if (!target) return;
+
+    let current = true;
+    callSupport = null;
+    if (typeof RTCPeerConnection === 'undefined') return;
+
+    void core
+      .callSupport(target)
+      .then((next) => {
+        if (current) callSupport = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] call support unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  let pinRevision = $derived(
+    timeline.items.reduce(
+      (count, item) =>
+        item.content.kind === 'state_event' && item.content.change?.kind === 'pinned_events'
+          ? count + 1
+          : count,
+      0
+    )
   );
   let latestReadBy = $derived.by(() => {
     const userId = core.session?.user_id;
@@ -114,6 +160,7 @@
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
+  let roomTopic = $derived(resolvedRoom?.topic ?? null);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
   let typingLabel = $derived.by(() => {
@@ -214,7 +261,7 @@
   });
 
   $effect(() => {
-    const activeRoomId = roomId.startsWith('!') ? roomId : resolvedRoom?.room_id;
+    const activeRoomId = resolvedRoom?.room_id;
     if (!activeRoomId) return;
     const anchor = untrack(() => {
       // An event already in the loaded range is reached by scrolling, so only a
@@ -478,6 +525,14 @@
     await core.markRead(resolvedRoomId, eventId);
   }
 
+  function markRoomRead(): void {
+    const newest = latestEventId(timeline.items);
+    if (!newest) return;
+    void core.markRead(resolvedRoomId, newest).catch((error: unknown) => {
+      console.warn('[sable room] mark as read failed', error);
+    });
+  }
+
   function onRetrySend(transactionId: string): void {
     void core.retrySend(resolvedRoomId, transactionId);
   }
@@ -559,16 +614,40 @@
     <RoomHeader
       {roomName}
       {roomAvatar}
+      topic={roomTopic}
       isVoice={resolvedRoom?.is_voice ?? false}
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
-      onCall={call.active ? null : openPrescreen}
+      onCall={callable ? openPrescreen : null}
       onBack={goBack}
       onMembers={toggleMembers}
       onSearch={openSearch}
-      onSettings={() => (settingsOpen = true)}
+      onTopic={() => (topicOpen = true)}
       {initials}
-    />
+    >
+      {#snippet pins()}
+        <RoomPinMenu
+          roomId={resolvedRoomId}
+          revision={pinRevision}
+          members={memberLoader.members}
+          canPin={permissions?.can_change_settings ?? false}
+          onJump={jumpToEvent}
+        />
+      {/snippet}
+      {#snippet menu()}
+        <RoomHeaderMenu
+          room={resolvedRoom ?? null}
+          canInvite={permissions?.can_invite ?? false}
+          compact={!desktop}
+          onMarkRead={markRoomRead}
+          onInvite={() => (inviteOpen = true)}
+          onMembers={toggleMembers}
+          onSettings={() => (settingsOpen = true)}
+          onJumpToTime={() => (jumpOpen = true)}
+          onLeave={() => (leaveOpen = true)}
+        />
+      {/snippet}
+    </RoomHeader>
     {#if call.roomId === resolvedRoomId && (call.active || call.failure)}
       <CallView session={call} members={memberLoader.members} {initials} />
     {/if}
@@ -667,6 +746,41 @@
       onCancel={() => (prescreenOpen = false)}
     />
   </DialogFrame>
+
+  <RoomTopicViewer
+    open={topicOpen}
+    {roomName}
+    topic={roomTopic ?? ''}
+    onOpenChange={(open: boolean) => {
+      topicOpen = open;
+    }}
+  />
+
+  <RoomInviteDialog
+    open={inviteOpen}
+    room={resolvedRoom ?? null}
+    onOpenChange={(open: boolean) => {
+      inviteOpen = open;
+    }}
+  />
+
+  <JumpToTimeDialog
+    open={jumpOpen}
+    roomId={resolvedRoomId}
+    onOpenChange={(open: boolean) => {
+      jumpOpen = open;
+    }}
+    onJump={jumpToEvent}
+  />
+
+  <LeaveRoomDialog
+    open={leaveOpen}
+    room={resolvedRoom ?? null}
+    onOpenChange={(open: boolean) => {
+      leaveOpen = open;
+    }}
+    onLeft={goBack}
+  />
 
   <RoomSettingsDialog
     open={settingsOpen}

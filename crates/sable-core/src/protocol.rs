@@ -85,6 +85,8 @@ pub enum Command {
     RoomMembers {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
+        #[serde(default)]
+        memberships: Vec<MembershipView>,
     },
     RoomPermissions {
         #[ts(type = "string")]
@@ -197,6 +199,64 @@ pub enum Command {
         #[ts(type = "string")]
         event_id: OwnedEventId,
         pinned: bool,
+    },
+    RoomPowerLevels {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    RoomVersions,
+    RoomAliases {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    CreateRoomAlias {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        alias: String,
+    },
+    DeleteRoomAlias {
+        alias: String,
+    },
+    RoomDirectoryVisibility {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
+    SetRoomDirectoryVisibility {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        public: bool,
+    },
+    UpgradeRoom {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        new_version: String,
+        #[ts(type = "string[]")]
+        additional_creators: Vec<OwnedUserId>,
+    },
+    RoomStateEvent {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+        state_key: String,
+    },
+    TimestampToEvent {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[ts(type = "number")]
+        ts: u64,
+        direction: PaginationDirection,
+    },
+    RoomAccountData {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+    },
+    SetRoomAccountData {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+        #[ts(type = "unknown")]
+        content: serde_json::Value,
     },
     ReportMessage {
         #[ts(type = "string")]
@@ -596,6 +656,10 @@ pub enum Command {
         livekit_service_url: Option<String>,
     },
 
+    CallSupport {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
     LeaveCall {
         session: CallSessionId,
     },
@@ -692,6 +756,7 @@ pub enum CommandOk {
         identity: String,
         encrypt_media: bool,
     },
+    CallSupport(CallSupportView),
     LeaveCall,
     DeclineCall,
     RoomPermissions(RoomPermissionsView),
@@ -739,6 +804,35 @@ pub enum CommandOk {
         #[ts(type = "string[]")]
         event_ids: Vec<OwnedEventId>,
     },
+    RoomPowerLevels(RoomPowerLevelsView),
+    RoomVersions(RoomVersionsView),
+    RoomAliases {
+        #[ts(type = "string[]")]
+        aliases: Vec<String>,
+    },
+    CreateRoomAlias,
+    DeleteRoomAlias,
+    RoomDirectoryVisibility {
+        public: bool,
+    },
+    SetRoomDirectoryVisibility,
+    UpgradeRoom {
+        #[ts(type = "string")]
+        replacement_room: OwnedRoomId,
+    },
+    RoomStateEvent {
+        #[ts(type = "unknown | null")]
+        content: Option<serde_json::Value>,
+    },
+    TimestampToEvent {
+        #[ts(type = "string | null")]
+        event_id: Option<OwnedEventId>,
+    },
+    RoomAccountData {
+        #[ts(type = "unknown | null")]
+        content: Option<serde_json::Value>,
+    },
+    SetRoomAccountData,
     ReportMessage,
     EventSource {
         source: String,
@@ -1507,6 +1601,44 @@ pub struct RoomPermissionsView {
     pub can_manage_children: bool,
 }
 
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct RoomPowerLevelsView {
+    pub ban: i32,
+    pub kick: i32,
+    pub redact: i32,
+    pub invite: i32,
+    pub events_default: i32,
+    pub state_default: i32,
+    pub users_default: i32,
+    #[ts(type = "Record<string, number>")]
+    pub events: std::collections::BTreeMap<String, i32>,
+    #[ts(type = "Record<string, number>")]
+    pub users: std::collections::BTreeMap<String, i32>,
+    pub notifications_room: i32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+pub struct CallSupportView {
+    pub has_focus: bool,
+    pub can_join: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct RoomVersionsView {
+    pub default: String,
+    pub available: Vec<RoomVersionView>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct RoomVersionView {
+    pub id: String,
+    pub stable: bool,
+}
+
 /// MSC4144 per-message profile, letting one account send under several
 /// identities. Read from the unstable `com.beeper.per_message_profile` key,
 /// falling back to the stable `m.per_message_profile` once servers emit it.
@@ -1970,6 +2102,18 @@ pub struct MemberView {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub power_level: i32,
+    pub membership: MembershipView,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum MembershipView {
+    Join,
+    Invite,
+    Knock,
+    Leave,
+    Ban,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

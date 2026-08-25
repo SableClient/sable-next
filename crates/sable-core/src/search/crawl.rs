@@ -1,26 +1,30 @@
 use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::OwnedRoomId;
+use matrix_sdk::room::MessagesOptions;
+use matrix_sdk::ruma::{OwnedRoomId, UInt};
 use tracing::warn;
 
+use super::persist::{self, StoredCrawlRoom};
 use crate::Core;
 use crate::protocol::{CoreEvent, SearchCoverageState, SearchCoverageView};
 
 const CRAWL_BATCH: u16 = 100;
-const CRAWL_PAUSE: Duration = Duration::from_secs(2);
+const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const MAX_CRAWLED_EVENTS: usize = 20_000;
 
 #[derive(Default)]
 pub(crate) struct CrawlProgress {
     reached_start: HashSet<OwnedRoomId>,
+    exhausted: HashSet<OwnedRoomId>,
     failed: HashSet<OwnedRoomId>,
     ingesting: Option<OwnedRoomId>,
     visits: HashMap<OwnedRoomId, usize>,
+    tokens: HashMap<OwnedRoomId, Option<String>>,
     events: usize,
 }
 
@@ -41,8 +45,57 @@ impl CrawlProgress {
         *self.visits.entry(room_id.clone()).or_default() += 1;
     }
 
-    pub(super) fn settle(&mut self, room_id: OwnedRoomId) {
+    pub(super) fn settle(&mut self, room_id: OwnedRoomId, exhausted: bool) {
+        self.tokens.remove(&room_id);
+        if exhausted {
+            self.exhausted.insert(room_id.clone());
+        }
         self.reached_start.insert(room_id);
+    }
+
+    fn token(&self, room_id: &OwnedRoomId) -> Option<String> {
+        self.tokens.get(room_id).cloned().flatten()
+    }
+
+    fn advance(&mut self, room_id: &OwnedRoomId, token: Option<String>) {
+        self.tokens.insert(room_id.clone(), token);
+    }
+
+    pub(super) fn checkpoints(&self) -> BTreeMap<OwnedRoomId, StoredCrawlRoom> {
+        let mut rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom> = self
+            .tokens
+            .iter()
+            .map(|(room_id, token)| {
+                (
+                    room_id.clone(),
+                    StoredCrawlRoom {
+                        token: token.clone(),
+                        reached_start: false,
+                    },
+                )
+            })
+            .collect();
+        for room_id in &self.exhausted {
+            rooms.insert(
+                room_id.clone(),
+                StoredCrawlRoom {
+                    token: None,
+                    reached_start: true,
+                },
+            );
+        }
+        rooms
+    }
+
+    pub(super) fn restore(&mut self, rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom>) {
+        for (room_id, room) in rooms {
+            if room.reached_start {
+                self.exhausted.insert(room_id.clone());
+                self.reached_start.insert(room_id);
+            } else {
+                self.tokens.insert(room_id, room.token);
+            }
+        }
     }
 
     pub(super) fn fail(&mut self, room_id: OwnedRoomId) {
@@ -70,8 +123,16 @@ impl Core {
     async fn crawl(self: Arc<Self>, client: &matrix_sdk::Client) {
         let mut reported: Option<SearchCoverageView> = None;
 
+        let stored = persist::load_crawl(client).await;
+        self.search_crawl.lock().await.restore(stored.rooms);
+
         loop {
             self.report_coverage(client, &mut reported).await;
+
+            if self.foreground_paginations() > 0 {
+                matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
+                continue;
+            }
 
             let spent = self.search_crawl.lock().await.spent();
             let full = self.search_index.lock().await.is_full();
@@ -87,13 +148,21 @@ impl Core {
             };
 
             match self.crawl_once(client, &room_id).await {
-                Ok(true) => self.search_crawl.lock().await.settle(room_id),
-                Ok(false) => {}
+                Ok(outcome) if outcome.reached_start => {
+                    self.search_crawl
+                        .lock()
+                        .await
+                        .settle(room_id, outcome.exhausted);
+                }
+                Ok(_) => {}
                 Err(error) => {
                     warn!(%room_id, "search crawl pagination failed: {error}");
                     self.search_crawl.lock().await.fail(room_id);
                 }
             }
+
+            let checkpoints = self.search_crawl.lock().await.checkpoints();
+            persist::save_crawl(client, checkpoints).await;
 
             matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
         }
@@ -170,19 +239,34 @@ impl Core {
         &self,
         client: &matrix_sdk::Client,
         room_id: &OwnedRoomId,
-    ) -> matrix_sdk::Result<bool> {
+    ) -> matrix_sdk::Result<CrawlOutcome> {
         let Some(room) = client.get_room(room_id) else {
-            return Ok(true);
+            return Ok(CrawlOutcome {
+                reached_start: true,
+                exhausted: true,
+            });
         };
 
-        let (cache, _drop_handles) = client.event_cache().room(room_id).await?;
-        let outcome = cache.pagination().run_backwards_once(CRAWL_BATCH).await?;
+        let from = self.search_crawl.lock().await.token(room_id);
+
+        let mut options = MessagesOptions::backward().from(from.as_deref());
+        options.limit = UInt::from(CRAWL_BATCH);
+        let messages = room.messages(options).await?;
 
         self.search_crawl.lock().await.visit(room_id);
+        let outcome = CrawlOutcome {
+            reached_start: messages.end.is_none() || messages.chunk.is_empty(),
+            exhausted: messages.end.is_none(),
+        };
+        self.search_crawl
+            .lock()
+            .await
+            .advance(room_id, messages.end);
 
-        if !outcome.events.is_empty() {
+        if !messages.chunk.is_empty() {
+            let (cache, _drop_handles) = client.event_cache().room(room_id).await?;
             let rules = room.clone_info().room_version_rules_or_default().redaction;
-            let mut events = outcome.events;
+            let mut events = messages.chunk;
             events.reverse();
 
             self.search_crawl.lock().await.ingesting = Some(room_id.clone());
@@ -199,8 +283,13 @@ impl Core {
             progress.events = progress.events.saturating_add(fresh);
         }
 
-        Ok(outcome.reached_start)
+        Ok(outcome)
     }
+}
+
+pub(super) struct CrawlOutcome {
+    pub(super) reached_start: bool,
+    pub(super) exhausted: bool,
 }
 
 #[cfg(test)]

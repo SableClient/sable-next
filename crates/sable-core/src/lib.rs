@@ -73,6 +73,7 @@ pub struct Core {
     notification_content: AtomicBool,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
+    foreground_paginations: AtomicU32,
     call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
 }
 
@@ -82,6 +83,18 @@ struct CallSession {
     delay_id: Option<String>,
     _postpone: Option<Task>,
     _handlers: Vec<matrix_sdk::event_handler::EventHandlerDropGuard>,
+}
+
+pub(crate) struct ForegroundPagination {
+    core: Arc<Core>,
+}
+
+impl Drop for ForegroundPagination {
+    fn drop(&mut self) {
+        self.core
+            .foreground_paginations
+            .fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 struct CachedTimeline {
@@ -120,6 +133,7 @@ impl Core {
             events,
             notification_content: AtomicBool::new(false),
             next_subscription: AtomicU32::new(1),
+            foreground_paginations: AtomicU32::new(0),
             next_log_id: AtomicU64::new(1),
             next_timeline_access: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
@@ -164,6 +178,15 @@ impl Core {
         if self.session_generation.load(Ordering::SeqCst) == generation {
             self.emit(event);
         }
+    }
+
+    pub(crate) fn foreground_paginations(&self) -> u32 {
+        self.foreground_paginations.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn begin_foreground_pagination(self: &Arc<Self>) -> ForegroundPagination {
+        self.foreground_paginations.fetch_add(1, Ordering::Relaxed);
+        ForegroundPagination { core: self.clone() }
     }
 
     pub(crate) fn allocate_subscription(&self) -> SubscriptionId {

@@ -173,6 +173,9 @@
   let viewport = $state<HTMLDivElement | null>(null);
   let initialFillState: 'idle' | 'running' | 'done' = 'idle';
   let initialFillPages = 0;
+  let emptyRefillPages = 0;
+  let emptyRefillPending = false;
+  let hadVisibleItems = false;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
   let virtualizerViewportSize = 0;
@@ -568,11 +571,17 @@
 
   /** Pads out a snapshot too short to fill the viewport, while it is still hidden. */
   async function fillInitialHistory(): Promise<void> {
-    while (initialFillPages < TIMELINE_LAYOUT.initialFillMaxPages) {
+    while (initialFillPages < fillPageLimit()) {
       const node = currentViewport();
       if (node === null || !isSettling()) return;
       // `end` is the server reporting the start of the timeline.
-      if (timeline.backwardPagination !== 'idle') return;
+      if (timeline.backwardPagination === 'end') return;
+      if (timeline.backwardPagination === 'loading') {
+        if (initialFillPages > 0) return;
+        initialFillPages += 1;
+        if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
+        continue;
+      }
       // `scrollHeight` never reports less than the viewport, so it cannot tell a
       // half-full snapshot from an exactly-full one.
       const contentHeight = get(virtualizer).getTotalSize();
@@ -588,6 +597,46 @@
       commit();
       if (reachedStart) return;
     }
+  }
+
+  $effect(() => {
+    if (visibleItems.length > 0) {
+      hadVisibleItems = true;
+      emptyRefillPages = 0;
+      return;
+    }
+    if (hadVisibleItems) {
+      hadVisibleItems = false;
+      historyExhausted = false;
+      emptyRefillPages = 0;
+    }
+    if (
+      timeline.loading ||
+      viewport === null ||
+      position.kind === 'settling' ||
+      historyExhausted ||
+      timeline.backwardPagination !== 'idle' ||
+      initialFillState === 'running' ||
+      emptyRefillPending ||
+      initialFillPages + emptyRefillPages >= TIMELINE_LAYOUT.emptyFillMaxPages
+    ) {
+      return;
+    }
+    emptyRefillPages += 1;
+    emptyRefillPending = true;
+    void (async () => {
+      try {
+        historyExhausted = await onRequestHistory();
+      } finally {
+        emptyRefillPending = false;
+      }
+    })();
+  });
+
+  function fillPageLimit(): number {
+    return visibleItems.length === 0
+      ? TIMELINE_LAYOUT.emptyFillMaxPages
+      : TIMELINE_LAYOUT.initialFillMaxPages;
   }
 
   function startInitialHistoryFill(): void {

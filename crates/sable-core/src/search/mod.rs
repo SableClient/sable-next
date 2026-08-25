@@ -1647,6 +1647,96 @@ mod tests {
     }
 
     #[async_test]
+    async fn test_the_crawl_resumes_from_the_checkpoint_it_persisted() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!resume:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous")
+                    .add_timeline_event(factory.text_msg("latest").event_id(event_id!("$latest"))),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-resume",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default()
+                .end_token("page-two")
+                .events(vec![
+                    factory.text_msg("first page").event_id(event_id!("$one")),
+                ]))
+            .mock_once()
+            .mount()
+            .await;
+
+        let reached_start = core
+            .crawl_once(&client, &room_id)
+            .await
+            .expect("crawl one batch");
+        assert!(
+            !reached_start.reached_start,
+            "a room with a next token is not exhausted"
+        );
+
+        let checkpoints = core.search_crawl.lock().await.checkpoints();
+        assert_eq!(
+            checkpoints
+                .get(&room_id)
+                .and_then(|room| room.token.clone())
+                .as_deref(),
+            Some("page-two"),
+            "the next page's token is what a reload has to resume from"
+        );
+
+        // A fresh core, as after a reload: it must ask for the second page.
+        let (next, _next_events) = crate::Core::new(
+            "search-resume",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        next.search_crawl.lock().await.restore(checkpoints);
+
+        server
+            .mock_room_messages()
+            .match_from("page-two")
+            .ok(RoomMessagesResponseTemplate::default().events(vec![
+                factory.text_msg("second page").event_id(event_id!("$two")),
+            ]))
+            .mock_once()
+            .mount()
+            .await;
+
+        let reached_start = next
+            .crawl_once(&client, &room_id)
+            .await
+            .expect("crawl the resumed batch");
+        assert!(
+            reached_start.reached_start && reached_start.exhausted,
+            "no next token means the room is done"
+        );
+
+        let hits = in_room(&*next.search_index.lock().await, &room_id, "second", 10, 0);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].event_id, event_id!("$two"));
+
+        drop(room);
+    }
+
+    #[async_test]
     async fn test_the_crawler_deepens_a_room_and_records_reaching_its_start() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
@@ -1714,7 +1804,7 @@ mod tests {
         );
         assert_eq!(hits.len(), 1, "the crawler must index what it paginated");
         assert_eq!(hits[0].event_id, event_id!("$older"));
-        assert!(reached_start);
+        assert!(reached_start.reached_start);
 
         drop(room);
     }
@@ -1932,8 +2022,8 @@ mod tests {
             .crawl_once(&client, &room_id)
             .await
             .expect("crawl one batch");
-        assert!(reached_start);
-        core.search_crawl.lock().await.settle(room_id);
+        assert!(reached_start.reached_start);
+        core.search_crawl.lock().await.settle(room_id, true);
 
         let coverage = core.search_coverage(&client).await;
         assert_eq!(

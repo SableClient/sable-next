@@ -22,6 +22,11 @@
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import {
+    roomIconOverride,
+    showsRoomIcon,
+  } from '#lib/features/room/settings/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
 
   import RoomInvites from './RoomInvites.svelte';
@@ -71,6 +76,8 @@
   // The id, not the summary: a room list diff hands back a fresh object for the
   // same space, and the permission effect below would re-run on every one.
   let activeSpaceId = $derived(activeSpace?.room_id ?? null);
+  let iconMode = $derived(roomIconOverride(activeSpaceId) ?? preferences.showRoomIcon);
+  let showIcons = $derived(showsRoomIcon(iconMode, collapsed));
   // Outside a space anyone may create a room; inside one it also has to land as
   // a child, which the space's own power levels govern.
   let canCreateHere = $derived(
@@ -461,21 +468,23 @@
                   aria-label={collapsed ? name : undefined}
                   aria-current={page.url.pathname === href ? 'page' : undefined}
                 >
-                  <span class="room-icon" class:voice={room?.is_voice} aria-hidden="true">
-                    {#if room?.avatar_url}
-                      <MediaImage
-                        source={room.avatar_url}
-                        alt=""
-                        width={56}
-                        height={56}
-                        class="room-image"
-                      />
-                    {:else if room?.is_voice}
-                      <SpeakerHighIcon />
-                    {:else}
-                      {initial(name)}
-                    {/if}
-                  </span>
+                  {#if showIcons}
+                    <span class="room-icon" class:voice={room?.is_voice} aria-hidden="true">
+                      {#if room?.avatar_url}
+                        <MediaImage
+                          source={room.avatar_url}
+                          alt=""
+                          width={56}
+                          height={56}
+                          class="room-image"
+                        />
+                      {:else if room?.is_voice}
+                        <SpeakerHighIcon />
+                      {:else}
+                        {initial(name)}
+                      {/if}
+                    </span>
+                  {/if}
                   {#if !collapsed}
                     <span class="room-name">{name}</span>
                     {#if live > 0}

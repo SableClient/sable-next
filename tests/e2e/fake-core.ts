@@ -701,7 +701,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                           direct: 'all',
                                           group: 'mentions',
                                         }
-                                      : command === 'mark_read' || command === 'set_typing'
+                                      : command === 'mark_read' ||
+                                          command === 'set_typing' ||
+                                          command === 'set_room_account_data'
                                         ? { type: command }
                                         : command === 'unsubscribe'
                                           ? { type: 'unsubscribe' }
@@ -722,7 +724,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                   (request.command as { from?: string | null })
                                                     .from ?? ''
                                                 )
-                                              : { type: command },
+                                              : command === 'pinned_events' ||
+                                                  command === 'set_pinned'
+                                                ? { type: command, event_ids: [] }
+                                                : command === 'room_account_data'
+                                                  ? { type: command, content: null }
+                                                  : command === 'event_source'
+                                                    ? { type: command, source: '{}' }
+                                                    : { type: command },
               };
 
         window.setTimeout(

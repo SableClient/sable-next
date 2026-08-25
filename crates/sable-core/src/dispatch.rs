@@ -2,12 +2,22 @@ use std::sync::{Arc, atomic::Ordering};
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
+use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::room::reply::{EnforceThread, Reply as SdkReply};
 use matrix_sdk::room::{ParentSpace, Receipts};
+use matrix_sdk::ruma::RoomAliasId;
+use matrix_sdk::ruma::api::Direction;
+use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
+use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
+use matrix_sdk::ruma::api::client::discovery::get_capabilities;
 use matrix_sdk::ruma::api::client::room::Visibility;
+use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
+use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
+use matrix_sdk::ruma::api::client::room::upgrade_room;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
+use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::InitialStateEvent;
 use matrix_sdk::ruma::events::relation::{InReplyTo, Reply};
 use matrix_sdk::ruma::events::room::ImageInfo;
@@ -24,14 +34,18 @@ use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, events::Mentions,
-    events::room::member::MembershipState, events::room::message::RoomMessageEventContent,
+    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, UInt,
+    events::Mentions, events::room::member::MembershipState,
+    events::room::message::RoomMessageEventContent,
+};
+use matrix_sdk::ruma::{
+    RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
 };
 use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::protocol::{
-    Command, CommandErr, CommandOk, CreateRoomKind, JoinRuleView, MutualRoomView,
-    PaginationDirection, RoomTag,
+    Command, CommandErr, CommandOk, CreateRoomKind, JoinRuleView, MembershipView, MutualRoomView,
+    PaginationDirection, RoomTag, RoomVersionView, RoomVersionsView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -212,6 +226,7 @@ impl Core {
                 if matches!(direction, PaginationDirection::Forward) && !focused {
                     return Err(CommandErr::InvalidPaginationDirection);
                 }
+                let _foreground = self.begin_foreground_pagination();
                 let reached_end = match direction {
                     PaginationDirection::Backward => timeline.paginate_backwards(count).await,
                     PaginationDirection::Forward => timeline.paginate_forwards(count).await,
@@ -441,6 +456,8 @@ impl Core {
                 livekit_service_url,
             } => self.join_call(room_id, livekit_service_url).await,
 
+            Command::CallSupport { room_id } => self.call_support(room_id).await,
+
             Command::LeaveCall { session } => self.leave_call(session).await,
 
             Command::DeclineCall {
@@ -448,10 +465,13 @@ impl Core {
                 notification_event_id,
             } => self.decline_call(room_id, notification_event_id).await,
 
-            Command::RoomMembers { room_id } => {
+            Command::RoomMembers {
+                room_id,
+                memberships,
+            } => {
                 let room = self.room(&room_id).await?;
                 let members = room
-                    .members(RoomMemberships::JOIN)
+                    .members(membership_filter(&memberships))
                     .await
                     .map_err(|error| self.failed("room_members", error))?;
 
@@ -542,6 +562,216 @@ impl Core {
             } => Ok(CommandOk::SetPinned {
                 event_ids: self.set_pinned(&room_id, event_id, pinned).await?,
             }),
+
+            Command::RoomPowerLevels { room_id } => {
+                let power_levels = self.room(&room_id).await?.power_levels_or_default().await;
+
+                Ok(CommandOk::RoomPowerLevels(view::room_power_levels(
+                    &power_levels,
+                )))
+            }
+
+            Command::RoomVersions => {
+                let response = self
+                    .client()
+                    .await?
+                    .send(get_capabilities::v3::Request::new())
+                    .await
+                    .map_err(|error| self.failed("room_versions", error))?;
+
+                let versions = response.capabilities.room_versions;
+                Ok(CommandOk::RoomVersions(RoomVersionsView {
+                    default: versions.default.to_string(),
+                    available: versions
+                        .available
+                        .into_iter()
+                        .map(|(id, stability)| RoomVersionView {
+                            id: id.to_string(),
+                            stable: stability == RoomVersionStability::Stable,
+                        })
+                        .collect(),
+                }))
+            }
+
+            Command::UpgradeRoom {
+                room_id,
+                new_version,
+                additional_creators,
+            } => {
+                let mut request = upgrade_room::v3::Request::new(
+                    room_id,
+                    RoomVersionId::try_from(new_version)
+                        .map_err(|error| self.failed("upgrade_room", error))?,
+                );
+                request.additional_creators = additional_creators;
+
+                let response = self
+                    .client()
+                    .await?
+                    .send(request)
+                    .await
+                    .map_err(|error| self.room_error("upgrade_room", error.into()))?;
+
+                Ok(CommandOk::UpgradeRoom {
+                    replacement_room: response.replacement_room,
+                })
+            }
+
+            Command::RoomAliases { room_id } => {
+                let response = self
+                    .client()
+                    .await?
+                    .send(aliases::v3::Request::new(room_id))
+                    .await
+                    .map_err(|error| self.room_error("room_aliases", error.into()))?;
+
+                Ok(CommandOk::RoomAliases {
+                    aliases: response
+                        .aliases
+                        .into_iter()
+                        .map(|alias| alias.to_string())
+                        .collect(),
+                })
+            }
+
+            Command::CreateRoomAlias { room_id, alias } => {
+                let alias = RoomAliasId::parse(alias)
+                    .map_err(|error| self.failed("create_room_alias", error))?;
+
+                self.client()
+                    .await?
+                    .send(create_alias::v3::Request::new(alias, room_id))
+                    .await
+                    .map_err(|error| self.room_error("create_room_alias", error.into()))?;
+
+                Ok(CommandOk::CreateRoomAlias)
+            }
+
+            Command::DeleteRoomAlias { alias } => {
+                let alias = RoomAliasId::parse(alias)
+                    .map_err(|error| self.failed("delete_room_alias", error))?;
+
+                self.client()
+                    .await?
+                    .send(delete_alias::v3::Request::new(alias))
+                    .await
+                    .map_err(|error| self.room_error("delete_room_alias", error.into()))?;
+
+                Ok(CommandOk::DeleteRoomAlias)
+            }
+
+            Command::RoomDirectoryVisibility { room_id } => {
+                let response = self
+                    .client()
+                    .await?
+                    .send(get_room_visibility::v3::Request::new(room_id))
+                    .await
+                    .map_err(|error| self.room_error("room_directory_visibility", error.into()))?;
+
+                Ok(CommandOk::RoomDirectoryVisibility {
+                    public: response.visibility == Visibility::Public,
+                })
+            }
+
+            Command::SetRoomDirectoryVisibility { room_id, public } => {
+                let visibility = if public {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                };
+
+                self.client()
+                    .await?
+                    .send(set_room_visibility::v3::Request::new(room_id, visibility))
+                    .await
+                    .map_err(|error| {
+                        self.room_error("set_room_directory_visibility", error.into())
+                    })?;
+
+                Ok(CommandOk::SetRoomDirectoryVisibility)
+            }
+
+            Command::RoomStateEvent {
+                room_id,
+                event_type,
+                state_key,
+            } => {
+                let event = self
+                    .room(&room_id)
+                    .await?
+                    .get_state_event(event_type.into(), &state_key)
+                    .await
+                    .map_err(|error| self.room_error("room_state_event", error))?;
+
+                let content = event.and_then(|raw| {
+                    let field = match raw {
+                        RawAnySyncOrStrippedState::Sync(event) => event.get_field("content"),
+                        RawAnySyncOrStrippedState::Stripped(event) => event.get_field("content"),
+                    };
+                    field.ok().flatten()
+                });
+
+                Ok(CommandOk::RoomStateEvent { content })
+            }
+
+            Command::TimestampToEvent {
+                room_id,
+                ts,
+                direction,
+            } => {
+                let request = get_event_by_timestamp::v1::Request::new(
+                    room_id,
+                    MilliSecondsSinceUnixEpoch(UInt::new_saturating(ts)),
+                    match direction {
+                        PaginationDirection::Backward => Direction::Backward,
+                        PaginationDirection::Forward => Direction::Forward,
+                    },
+                );
+
+                let event_id = match self.client().await?.send(request).await {
+                    Ok(response) => Some(response.event_id),
+                    Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => {
+                        None
+                    }
+                    Err(error) => return Err(self.failed("timestamp_to_event", error)),
+                };
+
+                Ok(CommandOk::TimestampToEvent { event_id })
+            }
+
+            Command::RoomAccountData {
+                room_id,
+                event_type,
+            } => {
+                let event = self
+                    .room(&room_id)
+                    .await?
+                    .account_data(event_type.into())
+                    .await
+                    .map_err(|error| self.room_error("room_account_data", error))?;
+
+                let content = event
+                    .and_then(|raw| raw.get_field::<serde_json::Value>("content").ok().flatten());
+
+                Ok(CommandOk::RoomAccountData { content })
+            }
+
+            Command::SetRoomAccountData {
+                room_id,
+                event_type,
+                content,
+            } => {
+                let raw = Raw::new(&content)
+                    .map_err(|error| self.failed("set_room_account_data", error))?
+                    .cast_unchecked();
+                self.room(&room_id)
+                    .await?
+                    .set_account_data_raw(event_type.into(), raw)
+                    .await
+                    .map_err(|error| self.room_error("set_room_account_data", error))?;
+
+                Ok(CommandOk::SetRoomAccountData)
+            }
 
             Command::ReportMessage {
                 room_id,
@@ -1591,6 +1821,25 @@ fn message_content(
     let mut wanted = Mentions::with_user_ids(mentions);
     wanted.room = room;
     content.add_mentions(wanted)
+}
+
+fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
+    if memberships.is_empty() {
+        return RoomMemberships::JOIN;
+    }
+
+    memberships
+        .iter()
+        .fold(RoomMemberships::empty(), |filter, membership| {
+            filter
+                | match membership {
+                    MembershipView::Join => RoomMemberships::JOIN,
+                    MembershipView::Invite => RoomMemberships::INVITE,
+                    MembershipView::Knock => RoomMemberships::KNOCK,
+                    MembershipView::Leave => RoomMemberships::LEAVE,
+                    MembershipView::Ban => RoomMemberships::BAN,
+                }
+        })
 }
 
 #[cfg(test)]

@@ -197,6 +197,18 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'showRoomIcon',
+        icon: ImageIcon,
+        name: 'settings.showRoomIcon',
+        description: 'settings.showRoomIconHint',
+        type: 'select',
+        options: [
+          { value: 'always', label: 'settings.showRoomIconAlways' },
+          { value: 'collapsed', label: 'settings.showRoomIconCollapsed' },
+          { value: 'never', label: 'settings.showRoomIconNever' },
+        ],
+      },
+      {
         key: 'underlineLinks',
         icon: LinkIcon,
         name: 'settings.underlineLinks',

@@ -12,11 +12,15 @@ import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView
 import type { ImagePackView } from '#src/generated/ImagePackView';
 import type { JoinRuleView } from '#src/generated/JoinRuleView';
 import type { MemberView } from '#src/generated/MemberView';
+import type { MembershipView } from '#src/generated/MembershipView';
 import type { NotificationModeView } from '#src/generated/NotificationModeView';
 import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+import type { CallSupportView } from '#src/generated/CallSupportView';
+import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
+import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
 import type { SearchFilter } from '#src/generated/SearchFilter';
 import type { SearchHitView } from '#src/generated/SearchHitView';
 import type { SearchOrder } from '#src/generated/SearchOrder';
@@ -291,7 +295,9 @@ export class CoreClient {
   }
 
   async continueRegistration(): Promise<RegistrationResultView> {
-    const response = await this.ensureTransport().send({ type: 'continue_registration' });
+    const response = await this.ensureTransport().send({
+      type: 'continue_registration',
+    });
     const result = response.result;
     if (result.state === 'complete') {
       await this.refreshAccounts();
@@ -427,8 +433,13 @@ export class CoreClient {
     }
   }
 
-  async subscribeRoomList(): Promise<{ subscription: SubscriptionId; rooms: RoomSummary[] }> {
-    const response = await this.ensureTransport().send({ type: 'subscribe_room_list' });
+  async subscribeRoomList(): Promise<{
+    subscription: SubscriptionId;
+    rooms: RoomSummary[];
+  }> {
+    const response = await this.ensureTransport().send({
+      type: 'subscribe_room_list',
+    });
     return response;
   }
 
@@ -460,9 +471,81 @@ export class CoreClient {
     return { reached_end: response.reached_end };
   }
 
-  async roomMembers(roomId: string): Promise<MemberView[]> {
-    const response = await this.ensureTransport().send({ type: 'room_members', room_id: roomId });
+  async roomMembers(
+    roomId: string,
+    memberships: readonly MembershipView[] = []
+  ): Promise<MemberView[]> {
+    const response = await this.ensureTransport().send({
+      type: 'room_members',
+      room_id: roomId,
+      memberships: [...memberships],
+    });
     return response.members;
+  }
+
+  async callSupport(roomId: string): Promise<CallSupportView> {
+    const response = await this.ensureTransport().send({ type: 'call_support', room_id: roomId });
+    return response;
+  }
+
+  async roomAliases(roomId: string): Promise<string[]> {
+    const response = await this.ensureTransport().send({ type: 'room_aliases', room_id: roomId });
+    return response.aliases;
+  }
+
+  async createRoomAlias(roomId: string, alias: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'create_room_alias', room_id: roomId, alias });
+  }
+
+  async deleteRoomAlias(alias: string): Promise<void> {
+    await this.ensureTransport().send({ type: 'delete_room_alias', alias });
+  }
+
+  async roomDirectoryVisibility(roomId: string): Promise<boolean> {
+    const response = await this.ensureTransport().send({
+      type: 'room_directory_visibility',
+      room_id: roomId,
+    });
+    return response.public;
+  }
+
+  async setRoomDirectoryVisibility(roomId: string, isPublic: boolean): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_room_directory_visibility',
+      room_id: roomId,
+      public: isPublic,
+    });
+  }
+
+  async roomVersions(): Promise<RoomVersionsView> {
+    const response = await this.ensureTransport().send({
+      type: 'room_versions',
+    });
+    return response;
+  }
+
+  async upgradeRoom(
+    roomId: string,
+    newVersion: string,
+    additionalCreators: readonly string[] = []
+  ): Promise<string> {
+    const response = await this.ensureTransport().send({
+      type: 'upgrade_room',
+      room_id: roomId,
+      new_version: newVersion,
+      additional_creators: [...additionalCreators],
+    });
+    return response.replacement_room;
+  }
+
+  async roomStateEvent(roomId: string, eventType: string, stateKey = ''): Promise<unknown> {
+    const response = await this.ensureTransport().send({
+      type: 'room_state_event',
+      room_id: roomId,
+      event_type: eventType,
+      state_key: stateKey,
+    });
+    return response.content;
   }
 
   async roomPermissions(roomId: string): Promise<RoomPermissionsView> {
@@ -471,6 +554,46 @@ export class CoreClient {
       room_id: roomId,
     });
     return response;
+  }
+
+  async roomPowerLevels(roomId: string): Promise<RoomPowerLevelsView> {
+    const response = await this.ensureTransport().send({
+      type: 'room_power_levels',
+      room_id: roomId,
+    });
+    return response;
+  }
+
+  async timestampToEvent(
+    roomId: string,
+    ts: number,
+    direction: PaginationDirection = 'backward'
+  ): Promise<string | null> {
+    const response = await this.ensureTransport().send({
+      type: 'timestamp_to_event',
+      room_id: roomId,
+      ts,
+      direction,
+    });
+    return response.event_id;
+  }
+
+  async roomAccountData(roomId: string, eventType: string): Promise<unknown> {
+    const response = await this.ensureTransport().send({
+      type: 'room_account_data',
+      room_id: roomId,
+      event_type: eventType,
+    });
+    return response.content;
+  }
+
+  async setRoomAccountData(roomId: string, eventType: string, content: unknown): Promise<void> {
+    await this.ensureTransport().send({
+      type: 'set_room_account_data',
+      room_id: roomId,
+      event_type: eventType,
+      content,
+    });
   }
 
   async searchMessages(
@@ -521,7 +644,10 @@ export class CoreClient {
   }
 
   async imagePacks(roomId: string): Promise<ImagePackView[]> {
-    const response = await this.ensureTransport().send({ type: 'image_packs', room_id: roomId });
+    const response = await this.ensureTransport().send({
+      type: 'image_packs',
+      room_id: roomId,
+    });
     return response.packs;
   }
 
@@ -574,8 +700,15 @@ export class CoreClient {
       type: 'user_relations',
       user_id: userId,
     });
-    const relations = { mutualRooms: response.mutual_rooms, ignored: response.ignored };
-    this.relationsCache.set(userId, { accountId, fetchedAt: Date.now(), relations });
+    const relations = {
+      mutualRooms: response.mutual_rooms,
+      ignored: response.ignored,
+    };
+    this.relationsCache.set(userId, {
+      accountId,
+      fetchedAt: Date.now(),
+      relations,
+    });
     if (this.relationsCache.size > MAX_RELATIONS_CACHE_ENTRIES) {
       const oldest = this.relationsCache.keys().next().value;
       if (oldest !== undefined) this.relationsCache.delete(oldest);
@@ -593,7 +726,11 @@ export class CoreClient {
   }
 
   async inviteUser(roomId: string, userId: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'invite_user', room_id: roomId, user_id: userId });
+    await this.ensureTransport().send({
+      type: 'invite_user',
+      room_id: roomId,
+      user_id: userId,
+    });
   }
 
   async kickUser(roomId: string, userId: string): Promise<void> {
@@ -639,19 +776,30 @@ export class CoreClient {
 
   /** Always creates a room; it does not look for an existing DM with this user. */
   async createDm(userId: string): Promise<string> {
-    const response = await this.ensureTransport().send({ type: 'create_dm', user_id: userId });
+    const response = await this.ensureTransport().send({
+      type: 'create_dm',
+      user_id: userId,
+    });
     return response.room_id;
   }
 
   /** Works for a room this account has not joined. */
   async roomPreview(address: string, via: string[] = []): Promise<RoomPreviewView> {
-    const response = await this.ensureTransport().send({ type: 'room_preview', address, via });
+    const response = await this.ensureTransport().send({
+      type: 'room_preview',
+      address,
+      via,
+    });
     return response.preview;
   }
 
   /** `address` is a room id or an alias. Returns the resolved id. */
   async joinRoom(address: string, via: string[] = []): Promise<string> {
-    const response = await this.ensureTransport().send({ type: 'join_room', address, via });
+    const response = await this.ensureTransport().send({
+      type: 'join_room',
+      address,
+      via,
+    });
     return response.room_id;
   }
 
@@ -722,12 +870,17 @@ export class CoreClient {
   }
 
   async spaceSidebar(): Promise<SidebarItemView[]> {
-    const response = await this.ensureTransport().send({ type: 'space_sidebar' });
+    const response = await this.ensureTransport().send({
+      type: 'space_sidebar',
+    });
     return response.items;
   }
 
   async setSpaceSidebar(items: readonly SidebarItemView[]): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_space_sidebar', items: [...items] });
+    await this.ensureTransport().send({
+      type: 'set_space_sidebar',
+      items: [...items],
+    });
   }
 
   async sendMessage(
@@ -899,7 +1052,10 @@ export class CoreClient {
   }
 
   async removePersona(id: string): Promise<PersonaView[]> {
-    const response = await this.ensureTransport().send({ type: 'remove_persona', id });
+    const response = await this.ensureTransport().send({
+      type: 'remove_persona',
+      id,
+    });
     return response.personas;
   }
 
@@ -1024,7 +1180,11 @@ export class CoreClient {
   }
 
   async markRead(roomId: string, eventId: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'mark_read', room_id: roomId, event_id: eventId });
+    await this.ensureTransport().send({
+      type: 'mark_read',
+      room_id: roomId,
+      event_id: eventId,
+    });
   }
 
   async notificationSettings(roomId: string): Promise<NotificationSettingsView> {
@@ -1048,7 +1208,9 @@ export class CoreClient {
     direct: NotificationModeView;
     group: NotificationModeView;
   }> {
-    const response = await this.ensureTransport().send({ type: 'default_notification_modes' });
+    const response = await this.ensureTransport().send({
+      type: 'default_notification_modes',
+    });
     return { direct: response.direct, group: response.group };
   }
 
@@ -1065,15 +1227,24 @@ export class CoreClient {
   }
 
   async removePusher(pushkey: string, appId: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'remove_pusher', pushkey, app_id: appId });
+    await this.ensureTransport().send({
+      type: 'remove_pusher',
+      pushkey,
+      app_id: appId,
+    });
   }
 
   async setNotificationContent(visible: boolean): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_notification_content', visible });
+    await this.ensureTransport().send({
+      type: 'set_notification_content',
+      visible,
+    });
   }
 
   async encryptionStatus(): Promise<EncryptionStatusView> {
-    const response = await this.ensureTransport().send({ type: 'encryption_status' });
+    const response = await this.ensureTransport().send({
+      type: 'encryption_status',
+    });
     return response.status;
   }
 
@@ -1082,7 +1253,9 @@ export class CoreClient {
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const response = await this.ensureTransport().send({ type: 'search_coverage' });
+        const response = await this.ensureTransport().send({
+          type: 'search_coverage',
+        });
         if (generation !== this.generation) return;
         this.searchCoverage = response.coverage;
         this.searchCoverageUnavailable = false;
@@ -1097,7 +1270,10 @@ export class CoreClient {
     if (generation === this.generation) this.searchCoverageUnavailable = true;
   }
 
-  async devices(): Promise<{ devices: DeviceView[]; accountManagement: boolean }> {
+  async devices(): Promise<{
+    devices: DeviceView[];
+    accountManagement: boolean;
+  }> {
     const response = await this.ensureTransport().send({ type: 'devices' });
     return {
       devices: response.devices,
@@ -1106,7 +1282,10 @@ export class CoreClient {
   }
 
   async recoverIdentity(recoveryKey: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'recover_identity', recovery_key: recoveryKey });
+    await this.ensureTransport().send({
+      type: 'recover_identity',
+      recovery_key: recoveryKey,
+    });
   }
 
   async enableRecovery(): Promise<string> {
@@ -1136,7 +1315,10 @@ export class CoreClient {
   }
 
   async removeAccount(accountId: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'remove_account', account_id: accountId });
+    await this.ensureTransport().send({
+      type: 'remove_account',
+      account_id: accountId,
+    });
     await this.refreshAccounts();
   }
 
@@ -1204,7 +1386,11 @@ export class CoreClient {
   }
 
   async setTyping(roomId: string, typing: boolean): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_typing', room_id: roomId, typing });
+    await this.ensureTransport().send({
+      type: 'set_typing',
+      room_id: roomId,
+      typing,
+    });
   }
 
   async setDisplayName(name: string | null): Promise<void> {
@@ -1216,39 +1402,68 @@ export class CoreClient {
   }
 
   async setProfileField(field: string, value: unknown): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_profile_field', field, value });
+    await this.ensureTransport().send({
+      type: 'set_profile_field',
+      field,
+      value,
+    });
     this.profileCache.delete(this.session?.user_id ?? '');
   }
 
   async accountContacts(): Promise<string[]> {
-    const response = await this.ensureTransport().send({ type: 'account_contacts' });
+    const response = await this.ensureTransport().send({
+      type: 'account_contacts',
+    });
     return response.emails;
   }
 
   async ignoredUsers(): Promise<string[]> {
-    const response = await this.ensureTransport().send({ type: 'ignored_users' });
+    const response = await this.ensureTransport().send({
+      type: 'ignored_users',
+    });
     return response.users;
   }
 
   /** `m.direct` is client-owned; nothing else will correct it. */
   async setDirect(roomId: string, direct: boolean): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_direct', room_id: roomId, direct });
+    await this.ensureTransport().send({
+      type: 'set_direct',
+      room_id: roomId,
+      direct,
+    });
   }
 
   async setRoomTag(roomId: string, tag: RoomTag, set: boolean): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_room_tag', room_id: roomId, tag, set });
+    await this.ensureTransport().send({
+      type: 'set_room_tag',
+      room_id: roomId,
+      tag,
+      set,
+    });
   }
 
   async setRoomName(roomId: string, name: string | null): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_room_name', room_id: roomId, name });
+    await this.ensureTransport().send({
+      type: 'set_room_name',
+      room_id: roomId,
+      name,
+    });
   }
 
   async setRoomTopic(roomId: string, topic: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_room_topic', room_id: roomId, topic });
+    await this.ensureTransport().send({
+      type: 'set_room_topic',
+      room_id: roomId,
+      topic,
+    });
   }
 
   async setRoomAvatar(roomId: string, url: string | null): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_room_avatar', room_id: roomId, url });
+    await this.ensureTransport().send({
+      type: 'set_room_avatar',
+      room_id: roomId,
+      url,
+    });
   }
 
   async uploadRoomAvatar(
@@ -1262,7 +1477,11 @@ export class CoreClient {
   }
 
   async setRoomJoinRule(roomId: string, rule: JoinRuleView): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_room_join_rule', room_id: roomId, rule });
+    await this.ensureTransport().send({
+      type: 'set_room_join_rule',
+      room_id: roomId,
+      rule,
+    });
   }
 
   /** Escape hatch for unmodelled state; prefer a typed method where one exists. */
@@ -1476,7 +1695,9 @@ export class CoreClient {
   };
 
   private async refreshAccounts(): Promise<void> {
-    const response = await this.ensureTransport().send({ type: 'list_accounts' });
+    const response = await this.ensureTransport().send({
+      type: 'list_accounts',
+    });
     this.accounts = response.accounts;
   }
 

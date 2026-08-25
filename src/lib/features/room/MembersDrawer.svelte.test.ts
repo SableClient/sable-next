@@ -16,9 +16,27 @@ test('sorts members by power then name and opens their profile', async () => {
     props: {
       loading: false,
       members: [
-        { user_id: '@zoe:example.org', display_name: 'Zoe', avatar_url: null, power_level: 0 },
-        { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null, power_level: 100 },
-        { user_id: '@amy:example.org', display_name: 'Amy', avatar_url: null, power_level: 100 },
+        {
+          user_id: '@zoe:example.org',
+          display_name: 'Zoe',
+          avatar_url: null,
+          power_level: 0,
+          membership: 'join' as const,
+        },
+        {
+          user_id: '@bob:example.org',
+          display_name: 'Bob',
+          avatar_url: null,
+          power_level: 100,
+          membership: 'join' as const,
+        },
+        {
+          user_id: '@amy:example.org',
+          display_name: 'Amy',
+          avatar_url: null,
+          power_level: 100,
+          membership: 'join' as const,
+        },
       ],
       onClose: vi.fn(),
       onMemberProfile,

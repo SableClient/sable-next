@@ -11,6 +11,7 @@ export const TIMELINE_LAYOUT = {
   historyPrefetchItems: 25,
   historyFillMaxPages: 4,
   initialFillMaxPages: 4,
+  emptyFillMaxPages: 20,
   /* One screenful: the fill removes empty space, it does not prefetch. */
   initialFillViewports: 1,
   /* A lost diff must still reveal the timeline rather than leave it hidden. */

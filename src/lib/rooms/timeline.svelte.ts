@@ -106,7 +106,9 @@ export class RoomTimeline {
 
   async paginateBackward(count: number): Promise<boolean> {
     const subscription = this.subscription;
-    if (subscription === null || this.backwardPagination !== 'idle') return true;
+    if (subscription === null || this.backwardPagination !== 'idle') {
+      return this.backwardPagination === 'end';
+    }
 
     const session = this.session;
     this.clearBackwardPaginationSettleTimer();
@@ -235,6 +237,9 @@ export class RoomTimeline {
         const before = this.items;
         const items = applyDiffs(before, event.diffs);
         this.items = items;
+        if (before.length > 0 && items.length === 0 && this.backwardPagination === 'end') {
+          this.backwardPagination = 'idle';
+        }
         const firstEventId = items.find((item) => item.event_id)?.event_id ?? null;
         this.backwardPaginationBoundaryChanged ||=
           firstEventId !== this.backwardPaginationStartFirstEventId;

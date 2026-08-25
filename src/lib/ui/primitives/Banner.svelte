@@ -86,6 +86,7 @@
     flex: 0 0 auto;
     gap: var(--space-2);
     justify-content: flex-end;
+    pointer-events: auto;
     width: 100%;
   }
 

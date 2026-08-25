@@ -20,7 +20,13 @@ afterEach(() => {
 });
 
 const members: MemberView[] = [
-  { user_id: '@one:example.org', display_name: 'Member One', avatar_url: null, power_level: 0 },
+  {
+    user_id: '@one:example.org',
+    display_name: 'Member One',
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+  },
 ];
 
 const packs: ImagePackView[] = [

@@ -6,8 +6,20 @@ import { expect, test } from 'vitest';
 import RoomReadReceipts from './RoomReadReceipts.svelte';
 
 const members = [
-  { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null, power_level: 0 },
-  { user_id: '@carol:example.org', display_name: 'Carol', avatar_url: null, power_level: 0 },
+  {
+    user_id: '@bob:example.org',
+    display_name: 'Bob',
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+  },
+  {
+    user_id: '@carol:example.org',
+    display_name: 'Carol',
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+  },
 ];
 
 test('shows a face stack and opens the seen-by list', async () => {
@@ -52,6 +64,7 @@ test('caps the stack at three faces and keeps the row reserved when empty', asyn
         display_name: user_id,
         avatar_url: null,
         power_level: 0,
+        membership: 'join' as const,
       })),
       loading: false,
       onMemberProfile: () => {},

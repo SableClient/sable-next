@@ -29,6 +29,8 @@ test('sends a message with the send button', async ({ app, timeline, scratchRoom
   await app.openRoom(scratchRoom.roomId);
   await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
 
+  await expect(app.deviceBanner).toBeVisible();
+
   const body = `Composed with the button ${String(Date.now())}`;
   await expect(app.sendMessage).toBeDisabled();
   await app.composer.fill(body);
@@ -36,6 +38,7 @@ test('sends a message with the send button', async ({ app, timeline, scratchRoom
   await app.sendMessage.click();
 
   await timeline.expectMessageSettled(body);
+  await app.dismissDeviceBanner();
 });
 
 test('keeps a sent message after a reload', async ({
