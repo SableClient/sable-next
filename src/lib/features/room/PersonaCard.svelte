@@ -18,13 +18,14 @@
 
   let { profile, accountId, accountName, variant = 'popover', onOpenAccount }: Props = $props();
   let displayName = $derived(profile.display_name ?? accountName);
+  let accountLabel = $derived(displayName === accountName ? accountId : accountName);
   let pronouns = $derived(profile.pronouns.map((pronoun) => pronoun.summary).join(' · '));
 </script>
 
 <ProfileCard
   {displayName}
   {variant}
-  userId={accountId}
+  userId={accountLabel}
   avatarUrl={profile.avatar_url}
   color={senderColor(profile.id ?? displayName)}
   nameColorLight={profile.color_on_light}

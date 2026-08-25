@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::{
     OwnedEventId, OwnedRoomId,
     events::room::message::Relation,
@@ -102,10 +103,17 @@ impl Core {
     }
 }
 
-/// Mirrors the aggregation arms of the SDK's `TimelineAction::from_event`: it
-/// folds these into another event's item whatever the filter says, so letting
-/// them past would strand read receipts on rows that never exist. Kept honest
-/// by `hidden_events_admit_only_events_the_sdk_can_render`.
+pub(crate) fn fill_sender_profiles(room: &matrix_sdk::Room, timeline: &Arc<Timeline>) {
+    if room.are_members_synced() {
+        return;
+    }
+
+    let timeline = timeline.clone();
+    drop(spawn(async move {
+        timeline.fetch_members().await;
+    }));
+}
+
 fn is_aggregation(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
     let AnySyncTimelineEvent::MessageLike(message) = event else {
         return false;

@@ -11,7 +11,7 @@ use matrix_sdk_ui::room_list_service::filters::{
 
 use crate::protocol::{CommandErr, CommandOk, CoreEvent, SubscriptionId};
 
-use crate::timelines::build_room_timeline;
+use crate::timelines::{build_room_timeline, fill_sender_profiles};
 use crate::view;
 use crate::{Core, Subscription, SubscriptionKind};
 
@@ -119,14 +119,16 @@ impl Core {
     ) -> Result<CommandOk, CommandErr> {
         let subscription = self.allocate_subscription();
         let live_room_id = event_id.is_none().then(|| room_id.clone());
+        let room = self.room(&room_id).await?;
         let timeline = match event_id {
             Some(event_id) => Arc::new(
-                build_room_timeline(&self.room(&room_id).await?, Some(event_id), hidden_events)
+                build_room_timeline(&room, Some(event_id), hidden_events)
                     .await
                     .map_err(|error| self.failed("build focused timeline", error))?,
             ),
             None => self.live_timeline(&room_id, hidden_events).await?,
         };
+        fill_sender_profiles(&room, &timeline);
 
         // The SDK replaces its explicit-room set wholesale. Register before
         // computing the union so concurrent live subscriptions see each other.

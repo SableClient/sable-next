@@ -107,14 +107,27 @@
     onPersonaOpenChange,
   }: Props = $props();
   const core = useCoreClient();
-  let accountName = $derived(item.sender_name ?? item.sender ?? $i18n.t('timeline.unknownSender'));
+  function memberOf(userId: string | null | undefined): MemberView | undefined {
+    if (!userId) return undefined;
+    return members.find((member) => member.user_id === userId);
+  }
+  let senderMember = $derived(memberOf(item.sender));
+  let accountName = $derived(
+    item.sender_name ??
+      senderMember?.display_name ??
+      item.sender ??
+      $i18n.t('timeline.unknownSender')
+  );
   let persona = $derived(item.per_message_profile);
   let senderName = $derived(persona?.display_name ?? accountName);
-  let senderAvatar = $derived(persona?.avatar_url ?? item.sender_avatar);
+  let senderAvatar = $derived(
+    persona?.avatar_url ?? item.sender_avatar ?? senderMember?.avatar_url ?? null
+  );
   let personaTint = $derived(tinted(persona));
   let replyName = $derived(
     replyPersona?.display_name ??
       item.in_reply_to?.sender_name ??
+      memberOf(item.in_reply_to?.sender)?.display_name ??
       item.in_reply_to?.sender ??
       $i18n.t('timeline.unknownSender')
   );
