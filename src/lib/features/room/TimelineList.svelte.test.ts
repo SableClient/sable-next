@@ -814,3 +814,31 @@ test('asks for history again when the timeline is cleared mid-session', async ()
   expect(history.mock.calls.length).toBeGreaterThan(opening);
   await unmount(instance);
 });
+
+test('a cleared timeline is not held back by the start it reached before', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const history = vi.fn(() => Promise.resolve(true));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  const opening = history.mock.calls.length;
+  expect(opening).toBeGreaterThan(0);
+
+  roomTimeline.items = [];
+  await tick();
+  await runAnimationFrames();
+
+  expect(history.mock.calls.length).toBeGreaterThan(opening);
+  await unmount(instance);
+});

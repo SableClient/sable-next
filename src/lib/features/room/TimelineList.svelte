@@ -175,6 +175,7 @@
   let initialFillPages = 0;
   let emptyRefillPages = 0;
   let emptyRefillPending = false;
+  let hadVisibleItems = false;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
   let virtualizerViewportSize = 0;
@@ -600,8 +601,14 @@
 
   $effect(() => {
     if (visibleItems.length > 0) {
+      hadVisibleItems = true;
       emptyRefillPages = 0;
       return;
+    }
+    if (hadVisibleItems) {
+      hadVisibleItems = false;
+      historyExhausted = false;
+      emptyRefillPages = 0;
     }
     if (
       timeline.loading ||

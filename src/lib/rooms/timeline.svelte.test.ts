@@ -450,3 +450,17 @@ test('ignores events that precede the subscription snapshot', async () => {
 
   expect(timeline.backwardPagination).toBe('idle');
 });
+
+test('a cleared timeline drops the start it had reached', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  await timeline.start('!room:example.org');
+  await timeline.paginateBackward(25);
+  expect(timeline.backwardPagination).toBe('end');
+
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'clear' }] });
+
+  expect(timeline.items).toEqual([]);
+  expect(timeline.backwardPagination).toBe('idle');
+});
