@@ -28,14 +28,9 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       ref: ${{ steps.meta.outputs.ref }}
       nightly: ${{ steps.meta.outputs.nightly }}
-      started_at: ${{ steps.started.outputs.at }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      # Must precede every upload; finalize-nightly prunes against it.
-      - name: Record build start
-        id: started
-        run: echo "at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -623,41 +618,59 @@ jobs:
   finalize-nightly:
     name: Finalize nightly release
     needs: [setup-release, desktop, linux, android, ios, obtainium, altstore]
-    if: ${{ needs.setup-release.outputs.nightly == 'true' }}
+    # The prune only removes what this run replaced, so a failed platform
+    # cannot strand the release on the previous run's bundles.
+    if: ${{ always() && needs.setup-release.result == 'success' && needs.setup-release.outputs.nightly == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # What remains after stripping this run's version names the platform:
+      # `linux-x86_64.deb`, `android-universal.apk`.
+      - name: Collect the bundles this run produced
+        id: fresh
+        run: |
+          gh release view nightly --repo "$REPOSITORY" --json assets \
+            | jq -r --arg prefix "sable-next-$VERSION-" \
+                '.assets[].name | select(startswith($prefix)) | ltrimstr($prefix)' \
+            | sort -u > fresh
+          echo 'This run produced:'
+          cat fresh
+          if [ -s fresh ]; then echo 'any=true' >> "$GITHUB_OUTPUT"; fi
       - name: Update nightly tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          VERSION: ${{ needs.setup-release.outputs.version }}
+        if: ${{ steps.fresh.outputs.any == 'true' }}
         run: |
           gh api --method PATCH "repos/$REPOSITORY/git/refs/tags/nightly" \
             -f sha="$SHA" -F force=true
           gh release edit nightly --repo "$REPOSITORY" --prerelease --target "$SHA" --title 'Nightly (main)' \
             --notes "Rolling nightly build $VERSION from main at $SHA"
-      # Stamped bundle names never clobber, so they accumulate and Obtainium
-      # starts offering a stale APK. The .json manifests keep fixed names.
+      # Stamped names never clobber, so they accumulate and Obtainium starts
+      # offering a stale APK. The .json manifests clobber in place.
       - name: Remove superseded nightly assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STARTED_AT: ${{ needs.setup-release.outputs.started_at }}
         run: |
           gh release view nightly --repo "$REPOSITORY" --json assets \
-            | jq -r --arg cutoff "$STARTED_AT" \
-                '.assets[] | select(.updatedAt <= $cutoff and (.name | endswith(".json") | not)) | .name' \
+            | jq -r --arg prefix "sable-next-$VERSION-" \
+                '.assets[].name | select((startswith($prefix) or endswith(".json")) | not)' \
             | while read -r name; do
-                [ -n "$name" ] || continue
-                echo "Removing superseded nightly asset: $name"
-                gh release delete-asset nightly "$name" --repo "$REPOSITORY" --yes
+                while read -r suffix; do
+                  case "$name" in
+                    *-"$suffix")
+                      echo "Removing superseded nightly asset: $name"
+                      gh release delete-asset nightly "$name" --repo "$REPOSITORY" --yes
+                      break
+                      ;;
+                  esac
+                done < fresh
               done
   updater-manifest:
     name: Publish updater manifest
