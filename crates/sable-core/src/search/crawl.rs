@@ -6,6 +6,7 @@ use std::time::Duration;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::{OwnedRoomId, UInt};
+use matrix_sdk::{EncryptionState, Room};
 use tracing::warn;
 
 use super::persist::{self, StoredCrawlRoom};
@@ -25,6 +26,7 @@ pub(crate) struct CrawlProgress {
     ingesting: Option<OwnedRoomId>,
     visits: HashMap<OwnedRoomId, usize>,
     tokens: HashMap<OwnedRoomId, Option<String>>,
+    probed: HashSet<OwnedRoomId>,
     events: usize,
 }
 
@@ -219,20 +221,54 @@ impl Core {
         &self,
         client: &matrix_sdk::Client,
     ) -> Option<OwnedRoomId> {
+        let rooms = client.joined_rooms();
+        self.settle_one_encryption_state(&rooms).await;
+
         let newest = self.search_index.lock().await.newest_per_room();
         let progress = self.search_crawl.lock().await;
 
-        client
-            .joined_rooms()
+        let tiered = rooms.iter().all(|room| {
+            !room.encryption_state().is_unknown() || progress.probed.contains(room.room_id())
+        });
+
+        rooms
             .into_iter()
-            .map(|room| room.room_id().to_owned())
-            .filter(|room_id| !progress.skips(room_id))
-            .min_by_key(|room_id| {
+            .map(|room| (room.room_id().to_owned(), tiered && crawls_first(&room)))
+            .filter(|(room_id, _)| !progress.skips(room_id))
+            .min_by_key(|(room_id, first)| {
                 (
+                    !first,
                     progress.visits.get(room_id).copied().unwrap_or(0),
                     Reverse(newest.get(room_id).copied().flatten()),
                 )
             })
+            .map(|(room_id, _)| room_id)
+    }
+
+    async fn settle_one_encryption_state(&self, rooms: &[Room]) {
+        let unsettled = {
+            let progress = self.search_crawl.lock().await;
+            rooms
+                .iter()
+                .find(|room| {
+                    room.encryption_state().is_unknown()
+                        && !progress.probed.contains(room.room_id())
+                })
+                .cloned()
+        };
+        let Some(room) = unsettled else {
+            return;
+        };
+
+        self.search_crawl
+            .lock()
+            .await
+            .probed
+            .insert(room.room_id().to_owned());
+
+        if let Err(error) = room.request_encryption_state().await {
+            warn!(room_id = %room.room_id(), "could not settle a room's encryption state: {error}");
+        }
     }
 
     pub(super) async fn crawl_once(
@@ -292,11 +328,19 @@ pub(super) struct CrawlOutcome {
     pub(super) exhausted: bool,
 }
 
+fn crawls_first(room: &Room) -> bool {
+    !matches!(room.encryption_state(), EncryptionState::NotEncrypted)
+        || room.direct_targets_length() > 0
+}
+
 #[cfg(test)]
+#[allow(clippy::large_futures)]
 mod tests {
     use std::collections::HashSet;
 
-    use matrix_sdk::ruma::{OwnedRoomId, room_id};
+    use matrix_sdk::ruma::{OwnedRoomId, room_id, user_id};
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use matrix_sdk_test::{JoinedRoomBuilder, async_test, event_factory::EventFactory};
 
     use super::{CrawlProgress, MAX_CRAWLED_EVENTS};
 
@@ -340,5 +384,73 @@ mod tests {
         assert!(!progress.skips(&room()));
         assert!(!progress.spent());
         assert_eq!(progress.events, 0);
+    }
+
+    #[async_test]
+    async fn test_the_crawl_reaches_an_encrypted_room_before_one_the_server_can_search() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let sender = user_id!("@erwan:localhost");
+        let plain_id = room_id!("!plain:localhost").to_owned();
+        let secret_id = room_id!("!secret:localhost").to_owned();
+        server.mock_room_state_encryption().plain().mount().await;
+
+        let plain = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&plain_id).add_timeline_event(
+                    EventFactory::new()
+                        .room(&plain_id)
+                        .sender(sender)
+                        .text_msg("public deploy"),
+                ),
+            )
+            .await;
+        let secret = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&secret_id)
+                    .add_state_event(
+                        EventFactory::new()
+                            .room(&secret_id)
+                            .sender(sender)
+                            .room_encryption(),
+                    )
+                    .add_timeline_event(
+                        EventFactory::new()
+                            .room(&secret_id)
+                            .sender(sender)
+                            .text_msg("private deploy"),
+                    ),
+            )
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "search-crawl-priority",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+
+        {
+            let mut progress = core.search_crawl.lock().await;
+            progress.visit(&secret_id);
+            progress.visit(&secret_id);
+        }
+
+        assert_eq!(
+            core.next_room_to_crawl(&client).await.as_ref(),
+            Some(&secret_id),
+            "the crawl is the only thing that can ever search an encrypted room"
+        );
+
+        core.search_crawl.lock().await.settle(secret_id, true);
+        assert_eq!(
+            core.next_room_to_crawl(&client).await.as_ref(),
+            Some(&plain_id),
+            "a plain room is still crawled once the encrypted ones are done"
+        );
+
+        drop((plain, secret));
     }
 }

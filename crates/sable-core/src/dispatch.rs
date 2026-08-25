@@ -438,13 +438,15 @@ impl Core {
                 limit,
                 offset,
             } => {
-                let hits = self.search_index.lock().await.search(
-                    &query,
-                    &filter,
-                    order,
-                    (limit as usize).min(MAX_SEARCH_RESULTS),
-                    offset as usize,
-                );
+                let hits = self
+                    .search_messages(
+                        &query,
+                        &filter,
+                        order,
+                        (limit as usize).min(MAX_SEARCH_RESULTS),
+                        offset as usize,
+                    )
+                    .await;
 
                 Ok(CommandOk::SearchMessages {
                     hits: hits.into_iter().map(view::search_hit_view).collect(),

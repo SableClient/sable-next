@@ -1203,7 +1203,7 @@ pub struct SubscriptionId(pub u32);
 #[ts(export)]
 pub struct CallSessionId(pub u32);
 
-#[derive(Debug, Clone, Copy, Default, Deserialize, TS)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchOrder {
@@ -1245,7 +1245,7 @@ pub struct SearchCoverageView {
     pub state: SearchCoverageState,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, TS)]
 #[ts(export)]
 #[serde(default)]
 pub struct SearchFilter {

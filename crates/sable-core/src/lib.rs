@@ -73,6 +73,7 @@ pub struct Core {
     notification_content: AtomicBool,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
+    server_search: Mutex<search::ServerSearch>,
     foreground_paginations: AtomicU32,
     call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
 }
@@ -151,6 +152,7 @@ impl Core {
             timelines: Mutex::new(HashMap::new()),
             search_index: Mutex::new(search::MessageIndex::new()),
             search_crawl: Mutex::new(search::CrawlProgress::default()),
+            server_search: Mutex::new(search::ServerSearch::default()),
             call_sessions: Mutex::new(HashMap::new()),
         });
         (core, rx)
