@@ -43,11 +43,16 @@ targets:
       {{~#each ios-additional-targets}}
       - path: {{prefix-path this}}{{/each}}
       - path: LaunchScreen.storyboard
+      - path: ../../ios/PrivacyInfo.xcprivacy
+        buildPhase: resources
     info:
       path: {{app.name}}_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
+        UIBackgroundModes: [audio, voip]
+        NSMicrophoneUsageDescription: Sable uses your microphone for calls.
+        NSCameraUsageDescription: Sable uses your camera for video calls.
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -105,7 +110,9 @@ targets:
       - sdk: MetalKit.framework
       - sdk: QuartzCore.framework
       - sdk: Security.framework
-      - sdk: UIKit.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
+      - sdk: UIKit.framework
+      - sdk: CallKit.framework
+      - sdk: AVFoundation.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
     preBuildScripts:
