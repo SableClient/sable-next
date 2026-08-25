@@ -38,6 +38,13 @@
   width: 100%;
 }
 
+.sable-menu-check {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  width: var(--size-x200);
+}
+
 .sable-menu-item-trailing-icon > svg {
   order: 1;
 }

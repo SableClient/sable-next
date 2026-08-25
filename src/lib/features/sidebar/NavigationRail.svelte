@@ -4,7 +4,7 @@
 
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
-  import { ContextMenu } from 'bits-ui';
+  import { ContextMenu, DropdownMenu } from 'bits-ui';
   import type { RoomSummary } from '#src/generated/RoomSummary';
   import { resolve } from '$app/paths';
   import { afterNavigate } from '$app/navigation';
@@ -22,12 +22,17 @@
     type SidebarItem,
   } from '#lib/spaces/sidebar-layout.js';
   import { saveSpacePath, savedSpacePaths, spaceNavigationHref } from './space-paths.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
+  import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
+  import '#lib/ui/primitives/nav-tab.css';
   import ArrowLineUpIcon from 'phosphor-svelte/lib/ArrowLineUpIcon';
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
@@ -36,6 +41,8 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
   const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0 };
+
+  type RailSection = 'home' | 'direct';
 
   type RailItem = {
     href: string;
@@ -46,6 +53,9 @@
     avatar?: string | null;
     navigateHref?: string;
     unread?: UnreadCount;
+    dm?: boolean;
+    section?: RailSection;
+    badge?: boolean;
   };
 
   interface Props {
@@ -64,6 +74,7 @@
     onUngroupFolder?: (folderId: string) => void;
     onRemoveFromFolder?: (roomId: string, folderId: string) => void;
     onReorder?: (source: LayoutRef, target: LayoutRef, instruction: DropInstruction) => void;
+    onMarkSectionRead?: (section: RailSection) => void;
   }
 
   let {
@@ -82,6 +93,7 @@
     onUngroupFolder,
     onRemoveFromFolder,
     onReorder,
+    onMarkSectionRead,
   }: Props = $props();
   let spacePaths = $state(savedSpacePaths());
   let dragged = $state<LayoutRef | null>(null);
@@ -94,6 +106,8 @@
       icon: HouseIcon,
       label: 'nav.home',
       unread: homeUnread,
+      section: 'home',
+      badge: false,
     },
     {
       href: resolve('/(app)/rooms'),
@@ -114,6 +128,8 @@
       icon: ChatsIcon,
       label: 'nav.direct',
       unread: directUnread,
+      dm: true,
+      section: 'direct',
     },
   ]);
 
@@ -136,6 +152,7 @@
         avatar: room.avatar_url,
         label: name,
         unread: { unread: room.unread, highlight: room.highlight },
+        dm: true,
       };
     })
   );
@@ -154,6 +171,30 @@
   function initial(name: string): string {
     return name.slice(0, 1).toUpperCase();
   }
+
+  function outlined(item: RailItem): boolean {
+    return item.icon !== undefined || item.dm === true;
+  }
+
+  let displayAnchor = $state<HTMLElement | null>(null);
+  let displayOpen = $state(false);
+
+  function openDisplayMenu(event: MouseEvent): void {
+    const target = event.target;
+    const rail = event.currentTarget;
+    if (mobile || !(rail instanceof HTMLElement)) return;
+    if (target instanceof Element && target.closest('a, button, [role="button"]')) return;
+
+    event.preventDefault();
+    displayAnchor = rail;
+    displayOpen = true;
+  }
+
+  const displayToggles = [
+    { key: 'showUnreadCounts', label: 'settings.showUnreadCounts' },
+    { key: 'badgeCountDMsOnly', label: 'settings.badgeCountDMsOnly' },
+    { key: 'showPingCounts', label: 'settings.showPingCounts' },
+  ] as const;
 
   let contextSpace = $state<RoomSummary | null>(null);
   let contextAnchor = $state<HTMLElement | null>(null);
@@ -180,12 +221,13 @@
 
     const name = spaceName(space.name, space.room_id);
     const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(space) });
+    const lobby = resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(space) });
     const savedPath = spacePaths[space.room_id];
 
     return {
       href,
       activePrefix: href,
-      navigateHref: spaceNavigationHref(href, savedPath, mobile),
+      navigateHref: spaceNavigationHref(href, savedPath, mobile, lobby),
       initial: initial(name),
       avatar: space.avatar_url,
       label: name,
@@ -295,28 +337,27 @@
      as a void expression in an expression position -->
 {#snippet nothing()}{/snippet}
 
-{#snippet unreadMark(count: UnreadCount | undefined)}
-  {#if count && count.highlight > 0}
-    <span class="unread-count" aria-hidden="true">{count.highlight}</span>
-  {:else if count && count.unread > 0}
-    <span class="unread-dot" aria-hidden="true"></span>
-  {/if}
+{#snippet unreadMark(count: UnreadCount | undefined, dm: boolean)}
+  <UnreadBadge counts={count} {dm} aria-hidden="true" />
 {/snippet}
 
 {#snippet itemBody(item: RailItem, active: boolean)}
   {#if item.icon}
     <span class="icon" aria-hidden="true"><item.icon weight={active ? 'fill' : 'regular'} /></span>
   {:else}
-    <Avatar class="space-initial" src={item.avatar} initials={item.initial} size="small" />
+    <Avatar class="space-initial" src={item.avatar} initials={item.initial} />
   {/if}
-  {@render unreadMark(item.unread)}
+  {#if item.badge !== false}
+    {@render unreadMark(item.unread, item.dm ?? false)}
+  {/if}
 {/snippet}
 
 {#snippet itemLink(item: RailItem, props: Record<string, unknown>, held: boolean)}
   {@const active = isActive(item)}
   <a
     {...props}
-    class="rail-item sable-selection-layer"
+    class="rail-item sable-nav-tab sable-nav-tab-side sable-selection-layer"
+    class:sable-nav-tab-outlined={outlined(item)}
     class:space-item={Boolean(item.initial)}
     class:active
     href={item.navigateHref ?? item.href}
@@ -343,6 +384,32 @@
     {/snippet}
     <Tooltip {label} side="right" {trigger} />
   {/if}
+{/snippet}
+
+{#snippet sectionItem(item: RailItem, section: RailSection)}
+  <ContextMenu.Root>
+    <ContextMenu.Trigger>
+      {#snippet child({ props })}
+        <div {...props} class="rail-menu-anchor rail-section-anchor">
+          {@render railItem(item, false)}
+        </div>
+      {/snippet}
+    </ContextMenu.Trigger>
+    <ContextMenu.Portal>
+      <ContextMenu.Content class="sable-menu">
+        <ContextMenu.Item
+          class="sable-menu-item"
+          disabled={resolveUnreadBadge(item.unread, preferences, item.dm ?? false) === null}
+          onSelect={() => {
+            onMarkSectionRead?.(section);
+          }}
+        >
+          <ChecksIcon />
+          {$i18n.t('nav.markSectionRead')}
+        </ContextMenu.Item>
+      </ContextMenu.Content>
+    </ContextMenu.Portal>
+  </ContextMenu.Root>
 {/snippet}
 
 {#snippet spaceSlotBody(item: RailItem, ref: LayoutRef, folderId?: string)}
@@ -424,7 +491,7 @@
 
 {#snippet folderTiles(folder: SidebarFolder)}
   <span class="folder-tiles" aria-hidden="true">
-    {#each knownContent(folder).slice(0, 4) as roomId (roomId)}
+    {#each knownContent(folder) as roomId (roomId)}
       {@const space = spacesById.get(roomId)}
       <Avatar
         class="folder-tile"
@@ -440,7 +507,8 @@
   <button
     {...props}
     type="button"
-    class="rail-item folder-preview sable-selection-layer"
+    class="rail-item folder-preview sable-nav-tab sable-nav-tab-side sable-nav-tab-outlined
+    sable-selection-layer"
     class:active={folderActive(folder)}
     aria-expanded="false"
     aria-label={$i18n.t('nav.folderExpand', { name: folderLabel(folder) })}
@@ -449,7 +517,7 @@
     }}
   >
     {@render folderTiles(folder)}
-    {@render unreadMark(folderUnread(folder))}
+    {@render unreadMark(folderUnread(folder), false)}
   </button>
 {/snippet}
 
@@ -527,32 +595,69 @@
   </div>
 {/snippet}
 
-<div class="rail">
+<div class="rail" role="presentation" oncontextmenu={openDisplayMenu}>
   <div class="rail-scroll" {@attach mobile ? noAttachment : monitor}>
     <ul class="rail-stack">
       {#each [...items, ...directItems] as item (item.href)}
-        <li><div class="rail-pad">{@render railItem(item, false)}</div></li>
-      {/each}
-      {#each entries as entry (entry.kind === 'space' ? entry.room_id : entry.id)}
         <li>
-          {#if entry.kind === 'space'}
-            {@render spaceSlot(entry.room_id)}
-          {:else if knownContent(entry).length === 0}
-            {@render nothing()}
-          {:else if folderOpen(entry)}
-            {@render openFolder(entry)}
+          {#if item.section !== undefined}
+            {@render sectionItem(item, item.section)}
           {:else}
-            {@render closedFolder(entry)}
+            {@render railItem(item, false)}
           {/if}
         </li>
       {/each}
     </ul>
-    <div class="dynamic-rail-region" aria-hidden="true"></div>
+    {#if entries.length > 0}
+      <div class="rail-separator" role="separator"></div>
+      <ul class="rail-stack">
+        {#each entries as entry (entry.kind === 'space' ? entry.room_id : entry.id)}
+          <li>
+            {#if entry.kind === 'space'}
+              {@render spaceSlot(entry.room_id)}
+            {:else if knownContent(entry).length === 0}
+              {@render nothing()}
+            {:else if folderOpen(entry)}
+              {@render openFolder(entry)}
+            {:else}
+              {@render closedFolder(entry)}
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <ul class="rail-stack">
+      <li>{@render railItem(createItem, false)}</li>
+    </ul>
   </div>
-  <ul class="rail-stack rail-bottom">
-    <li><div class="rail-pad">{@render railItem(createItem, false)}</div></li>
-  </ul>
 </div>
+
+{#if !mobile}
+  <DropdownMenu.Root bind:open={displayOpen}>
+    <DropdownMenu.Content
+      customAnchor={displayAnchor}
+      class="sable-menu rail-display-menu"
+      side="right"
+      align="start"
+      aria-label={$i18n.t('nav.displayOptions')}
+    >
+      {#each displayToggles as toggle (toggle.key)}
+        {@const on = preferences[toggle.key]}
+        <DropdownMenu.Item
+          class="sable-menu-item"
+          closeOnSelect={false}
+          aria-checked={on}
+          onSelect={() => {
+            setPreference(toggle.key, !on);
+          }}
+        >
+          <span class="sable-menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+          {$i18n.t(toggle.label)}
+        </DropdownMenu.Item>
+      {/each}
+    </DropdownMenu.Content>
+  </DropdownMenu.Root>
+{/if}
 
 {#if contextSpace}
   <RoomOptionsMenu
@@ -607,118 +712,30 @@
     overflow: hidden auto;
   }
 
-  .dynamic-rail-region {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
-    margin: var(--space-100) auto;
-    width: 2rem;
+  .rail-separator {
+    background: var(--sable-bg-container-line);
+    block-size: var(--border-width);
+    margin: 0 auto;
+    width: 1.5rem;
   }
 
   .rail-stack {
     align-items: center;
     display: flex;
     flex-direction: column;
+    gap: var(--space-300);
     list-style: none;
     margin: 0;
-    padding: var(--space-hairline) 0;
-  }
-
-  .rail-pad,
-  .rail-slot,
-  .folder-open {
-    padding: var(--space-150) 0;
-  }
-
-  .rail-bottom {
-    padding: var(--space-100) 0 var(--space-200);
-  }
-
-  .rail-item {
-    align-items: center;
-    border-radius: var(--radius);
-    color: inherit;
-    display: flex;
-    height: 2.625rem;
-    justify-content: center;
-    position: relative;
-    text-decoration: none;
-    width: 2.625rem;
-  }
-
-  .rail-item::before {
-    background: currentcolor;
-    border-radius: 0 0.25rem 0.25rem 0;
-    content: '';
-    display: none;
-    height: 1rem;
-    left: -0.75rem;
-    position: absolute;
-    transform: translateX(-50%);
-    width: 3px;
-  }
-
-  .rail-item:hover::before {
-    display: block;
-  }
-
-  .rail-item.active::before {
-    display: block;
-    height: 1.5rem;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .rail-item:hover {
-      background: var(--sable-bg-container-hover);
-      transform: translateX(0.125rem);
-    }
-  }
-
-  .rail-item.active {
-    color: var(--sable-bg-on-container);
+    padding: var(--space-300) 0 var(--space-200);
   }
 
   .icon {
     display: flex;
   }
 
-  .unread-dot {
-    background: var(--sable-primary-main);
-    border: calc(var(--border-width) * 2) solid var(--sable-bg-container);
-    border-radius: 50%;
-    box-sizing: border-box;
-    height: 0.625rem;
-    position: absolute;
-    right: 0.125rem;
-    top: 0.125rem;
-    width: 0.625rem;
-  }
-
-  .unread-count {
-    align-items: center;
-    background: var(--sable-primary-main);
-    border: calc(var(--border-width) * 2) solid var(--sable-bg-container);
-    border-radius: var(--radius-pill);
-    box-sizing: border-box;
-    color: var(--sable-primary-on-main);
-    display: flex;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    justify-content: center;
-    line-height: 1;
-    min-width: 1.125rem;
-    padding: 0 var(--space-hairline);
-    position: absolute;
-    right: -0.125rem;
-    top: -0.125rem;
-  }
-
   .icon :global(svg) {
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
-  }
-
-  .rail-item:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
   }
 
   .rail-menu-anchor {
@@ -749,12 +766,20 @@
 
   .rail-slot.drop-above::after,
   .folder-open.drop-above::after {
-    top: -1px;
+    top: -0.5rem;
   }
 
   .rail-slot.drop-below::after,
   .folder-open.drop-below::after {
-    bottom: -1px;
+    bottom: -0.5rem;
+  }
+
+  .rail-slot.nested.drop-above::after {
+    top: -0.375rem;
+  }
+
+  .rail-slot.nested.drop-below::after {
+    bottom: -0.375rem;
   }
 
   .rail-slot.drop-into :global(.rail-item) {
@@ -763,27 +788,24 @@
   }
 
   .folder-preview {
-    background: var(--sable-bg-container-hover);
-    border: 0;
-    cursor: pointer;
-    padding: var(--space-hairline);
+    height: auto;
+    min-height: 2.625rem;
+    padding: var(--space-100);
   }
 
   .folder-tiles {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-hairline);
-    grid-template-columns: repeat(2, 1fr);
-    height: 100%;
+    place-content: center;
     width: 100%;
   }
 
   .folder-tiles :global(.folder-tile) {
-    border-radius: 0.25rem;
+    --avatar-size: 1rem;
+
+    border-radius: var(--radii-300);
     font-size: 0.5rem;
-    height: 100%;
-    min-height: 0;
-    min-width: 0;
-    width: 100%;
   }
 
   .folder-open {
@@ -792,14 +814,12 @@
 
   .folder-card {
     align-items: center;
-    background: var(--sable-bg-container-hover);
-    border-radius: var(--radius);
+    background: transparent;
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radii-500);
     display: flex;
     flex-direction: column;
-    padding: var(--space-100);
-  }
-
-  .folder-card .rail-slot {
+    gap: var(--space-200);
     padding: var(--space-100) 0;
   }
 
@@ -816,27 +836,18 @@
     color: inherit;
     cursor: pointer;
     display: flex;
-    height: 1.25rem;
+    height: 2.125rem;
     justify-content: center;
     padding: 0;
     width: 2.125rem;
   }
 
   .folder-collapse:hover {
-    background: var(--sable-bg-container);
+    background: var(--sable-bg-container-hover);
   }
 
   .folder-collapse:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .rail-item {
-      transition:
-        border-color var(--motion-normal) var(--motion-easing-standard),
-        color var(--motion-normal) var(--motion-easing-standard),
-        transform var(--motion-slow) cubic-bezier(0, 0.8, 0.67, 0.97);
-    }
   }
 </style>

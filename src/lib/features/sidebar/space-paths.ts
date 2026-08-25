@@ -36,10 +36,12 @@ export function saveSpacePath(spaceId: string, path: string): void {
 export function spaceNavigationHref(
   root: string,
   savedPath: string | undefined,
-  mobile: boolean
+  mobile: boolean,
+  fallback: string
 ): string {
-  if (mobile || !savedPath || (savedPath !== root && !savedPath.startsWith(`${root}/`))) {
-    return root;
+  if (mobile) return root;
+  if (!savedPath || (savedPath !== root && !savedPath.startsWith(`${root}/`))) {
+    return fallback;
   }
 
   return savedPath;

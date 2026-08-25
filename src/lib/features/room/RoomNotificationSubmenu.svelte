@@ -71,18 +71,10 @@
             select(option.mode);
           }}
         >
-          <span class="mode-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+          <span class="sable-menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
           {$i18n.t(option.label, { mode: defaultLabel })}
         </DropdownMenu.Item>
       {/each}
     </IconContext>
   </DropdownMenu.SubContent>
 </DropdownMenu.Sub>
-
-<style>
-  .mode-check {
-    display: inline-block;
-    text-align: center;
-    width: 1rem;
-  }
-</style>

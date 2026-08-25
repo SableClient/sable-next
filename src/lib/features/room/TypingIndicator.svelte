@@ -1,4 +1,6 @@
 <script lang="ts">
+  import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
+
   interface Props {
     label: string | null;
   }
@@ -8,7 +10,7 @@
 
 <div class="typing" aria-live="polite" role="status">
   {#if label}
-    <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <TypingDots />
     <span class="label">{label}</span>
   {/if}
 </div>
@@ -26,49 +28,8 @@
     white-space: nowrap;
   }
 
-  .dots {
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: var(--space-hairline);
-  }
-
-  .dots i {
-    background: var(--sable-primary-main);
-    border-radius: 50%;
-    height: 0.25rem;
-    width: 0.25rem;
-  }
-
   .label {
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .dots i {
-      animation: typing-dot 1.2s infinite ease-in-out;
-    }
-
-    .dots i:nth-child(2) {
-      animation-delay: 0.15s;
-    }
-
-    .dots i:nth-child(3) {
-      animation-delay: 0.3s;
-    }
-  }
-
-  @keyframes typing-dot {
-    0%,
-    60%,
-    100% {
-      opacity: 0.3;
-      transform: translateY(0);
-    }
-
-    30% {
-      opacity: 1;
-      transform: translateY(-0.1875rem);
-    }
   }
 </style>

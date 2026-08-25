@@ -75,7 +75,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
   };
 }
 
-test('badges home mentions and unread direct chats', async () => {
+test('badges unread direct chats but leaves home alone', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
     props: {
@@ -87,13 +87,15 @@ test('badges home mentions and unread direct chats', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .unread-count')?.textContent).toBe('2');
-  expect(document.querySelector('a[href="/direct"] .unread-count')?.textContent).toBe('3');
+  expect(document.querySelector('a[href="/home"] .sable-unread-badge')).toBeNull();
+  expect(document.querySelector('a[href="/direct"] .sable-unread-badge-count')?.textContent).toBe(
+    '3'
+  );
 
   await unmount(instance);
 });
 
-test('badges the unspaced section separately from home', async () => {
+test('badges the unspaced section, which home no longer repeats', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
     props: {
@@ -105,21 +107,23 @@ test('badges the unspaced section separately from home', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .unread-count')?.textContent).toBe('5');
-  expect(document.querySelector('a[href="/rooms"] .unread-count')?.textContent).toBe('2');
+  expect(document.querySelector('a[href="/home"] .sable-unread-badge')).toBeNull();
+  expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-count')?.textContent).toBe(
+    '2'
+  );
 
   await unmount(instance);
 });
 
-test('uses a dot for ordinary home unread messages', async () => {
+test('uses a dot for ordinary unread messages outside spaces', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
-    props: { spaces: [], homeUnread: { unread: 2, highlight: 0 }, mobile: true },
+    props: { spaces: [], unspacedUnread: { unread: 2, highlight: 0 }, mobile: true },
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .unread-dot')).not.toBeNull();
-  expect(document.querySelector('a[href="/home"] .unread-count')).toBeNull();
+  expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-dot')).not.toBeNull();
+  expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-count')).toBeNull();
 
   await unmount(instance);
 });
@@ -157,8 +161,8 @@ test('shows unread direct rooms as individual avatars', async () => {
   const directLink = document.querySelector('a[href="/direct/!dm%3Aexample.org"]');
   expect(directLink?.getAttribute('aria-label')).toBe('Alice');
   expect(directLink?.querySelector('.space-initial')?.textContent.trim()).toBe('A');
-  expect(directLink?.querySelector('.unread-count')).toBeNull();
-  expect(directLink?.querySelector('.unread-dot')).not.toBeNull();
+  expect(directLink?.querySelector('.sable-unread-badge-count')?.textContent).toBe('2');
+  expect(directLink?.querySelector('.sable-unread-badge-dot')).toBeNull();
 
   await unmount(instance);
 });
@@ -179,9 +183,94 @@ test('badges a space with its mentions and dots one with only unread messages', 
 
   const alpha = document.querySelector('a[aria-label="Alpha"]');
   const beta = document.querySelector('a[aria-label="Beta"]');
-  expect(alpha?.querySelector('.unread-count')?.textContent).toBe('3');
-  expect(beta?.querySelector('.unread-count')).toBeNull();
-  expect(beta?.querySelector('.unread-dot')).not.toBeNull();
+  expect(alpha?.querySelector('.sable-unread-badge-count')?.textContent).toBe('3');
+  expect(beta?.querySelector('.sable-unread-badge-count')).toBeNull();
+  expect(beta?.querySelector('.sable-unread-badge-dot')).not.toBeNull();
+
+  await unmount(instance);
+});
+
+test('outlines every tab but a space avatar', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [space('!a:example.org', 'Alpha')], mobile: true },
+  });
+  await tick();
+
+  expect(
+    document.querySelector('a[href="/home"]')?.classList.contains('sable-nav-tab-outlined')
+  ).toBe(true);
+  expect(
+    document.querySelector('a[aria-label="Alpha"]')?.classList.contains('sable-nav-tab-outlined')
+  ).toBe(false);
+
+  await unmount(instance);
+});
+
+test('opens a space on its lobby when there is nothing to restore', () => {
+  expect(
+    spaceNavigationHref(
+      '/space/!space%3Aexample.org',
+      undefined,
+      false,
+      '/space/!space%3Aexample.org/lobby'
+    )
+  ).toBe('/space/!space%3Aexample.org/lobby');
+  expect(
+    spaceNavigationHref(
+      '/space/!space%3Aexample.org',
+      '/home/!room%3Aexample.org',
+      false,
+      '/space/!space%3Aexample.org/lobby'
+    )
+  ).toBe('/space/!space%3Aexample.org/lobby');
+});
+
+test('separates the spaces from the tabs above them, only when there are any', async () => {
+  const empty = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [], mobile: true },
+  });
+  await tick();
+  expect(document.querySelector('.rail-separator')).toBeNull();
+  await unmount(empty);
+
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [space()], mobile: true },
+  });
+  await tick();
+  expect(document.querySelector('.rail-separator')).not.toBeNull();
+
+  await unmount(instance);
+});
+
+test('marks a whole section read from the tab that badges it', async () => {
+  const marked: string[] = [];
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [],
+      directUnread: { unread: 2, highlight: 0 },
+      onMarkSectionRead: (section: string) => marked.push(section),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  const anchor = document.querySelector('a[href="/direct"]')?.closest('.rail-section-anchor');
+  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+
+  const item = [...document.querySelectorAll<HTMLElement>('.sable-menu-item')].find(
+    (element) => element.textContent.trim() === 'nav.markSectionRead'
+  );
+  expect(item).not.toBeUndefined();
+  item?.click();
+  await tick();
+
+  expect(marked).toEqual(['direct']);
 
   await unmount(instance);
 });
@@ -191,12 +280,18 @@ test('restores a space to its last desktop route', () => {
     spaceNavigationHref(
       '/space/!space%3Aexample.org',
       '/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event',
-      false
+      false,
+      '/space/!space%3Aexample.org/lobby'
     )
   ).toBe('/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event');
   expect(
-    spaceNavigationHref('/space/!space%3Aexample.org', '/home/!room%3Aexample.org', false)
-  ).toBe('/space/!space%3Aexample.org');
+    spaceNavigationHref(
+      '/space/!space%3Aexample.org',
+      '/home/!room%3Aexample.org',
+      false,
+      '/space/!space%3Aexample.org/lobby'
+    )
+  ).toBe('/space/!space%3Aexample.org/lobby');
 });
 
 test('records the active desktop space route after navigation', async () => {
@@ -274,7 +369,7 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
   expect(folder?.getAttribute('aria-label')).toBe('nav.folderExpand:Alpha, Beta');
   expect(folder?.getAttribute('aria-expanded')).toBe('false');
   expect(folder?.querySelectorAll('.folder-tile')).toHaveLength(2);
-  expect(folder?.querySelector('.unread-dot')).not.toBeNull();
+  expect(folder?.querySelector('.sable-unread-badge-dot')).not.toBeNull();
   expect(document.querySelectorAll('.rail-slot a')).toHaveLength(0);
 
   folder?.click();
@@ -352,7 +447,7 @@ test('offers a way out of a folder holding a single space', async () => {
   });
   await tick();
 
-  const anchor = document.querySelector('.rail-menu-anchor');
+  const anchor = document.querySelector('.folder-open .rail-menu-anchor');
   expect(anchor).not.toBeNull();
   anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   await tick();

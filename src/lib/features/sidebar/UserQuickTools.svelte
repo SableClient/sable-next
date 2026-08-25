@@ -9,11 +9,13 @@
   import { countInvites, countNotifications } from '#lib/features/inbox/inbox.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import AccountSwitcher from './AccountSwitcher.svelte';
+  import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
 
   interface Props {
@@ -26,7 +28,7 @@
   const roomList = useRoomList();
 
   let inboxCount = $derived(countNotifications(roomList.rooms) + countInvites(roomList.rooms));
-  let badgeText = $derived(inboxCount > 99 ? '99+' : String(inboxCount));
+  let inboxCounts = $derived({ unread: 0, highlight: inboxCount });
 
   const mobileTools = [
     { href: '/home', icon: ChatsIcon, label: 'nav.messages' },
@@ -117,8 +119,8 @@
           <span class="mobile-icon" aria-hidden="true"
             ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
           >
-          {#if item.href === '/inbox' && inboxCount > 0}
-            <span class="tool-badge" aria-hidden="true">{badgeText}</span>
+          {#if item.href === '/inbox'}
+            <UnreadBadge counts={inboxCounts} aria-hidden="true" />
           {/if}
         </a>
       </div>
@@ -134,7 +136,8 @@
       {#snippet trigger({ props }: { props: Record<string, unknown> })}
         <a
           {...props}
-          class="quick-tool compact-tool sable-selection-layer"
+          class="quick-tool compact-tool sable-nav-tab sable-nav-tab-side sable-nav-tab-outlined
+          sable-selection-layer"
           class:active={toolActive}
           href={item.href}
           onclick={(event) => {
@@ -144,8 +147,8 @@
           aria-current={toolActive ? 'page' : undefined}
         >
           <span aria-hidden="true"><item.icon weight={toolActive ? 'fill' : 'regular'} /></span>
-          {#if item.href === '/inbox' && inboxCount > 0}
-            <span class="tool-badge" aria-hidden="true">{badgeText}</span>
+          {#if item.href === '/inbox'}
+            <UnreadBadge counts={inboxCounts} aria-hidden="true" />
           {/if}
         </a>
       {/snippet}
@@ -162,7 +165,8 @@
         {#snippet trigger({ props }: { props: Record<string, unknown> })}
           <a
             {...props}
-            class="quick-tool desktop-tool sable-selection-layer"
+            class="quick-tool desktop-tool sable-nav-tab sable-nav-tab-bottom
+            sable-nav-tab-outlined sable-selection-layer"
             class:active={toolActive}
             href={item.href}
             onclick={(event) => {
@@ -172,8 +176,8 @@
             aria-current={toolActive ? 'page' : undefined}
           >
             <span aria-hidden="true"><item.icon weight={toolActive ? 'fill' : 'regular'} /></span>
-            {#if item.href === '/inbox' && inboxCount > 0}
-              <span class="tool-badge" aria-hidden="true">{badgeText}</span>
+            {#if item.href === '/inbox'}
+              <UnreadBadge counts={inboxCounts} aria-hidden="true" />
             {/if}
           </a>
         {/snippet}
@@ -188,18 +192,9 @@
     position: relative;
   }
 
-  .tool-badge {
-    background: var(--sable-primary-main);
-    border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-main);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    line-height: 1rem;
-    min-width: 1rem;
-    padding: 0 var(--space-hairline);
+  .mobile-tool :global(.sable-unread-badge) {
     position: absolute;
     right: 0.125rem;
-    text-align: center;
     top: 0.125rem;
   }
 
@@ -218,7 +213,7 @@
 
   .desktop-tool-actions {
     display: flex;
-    gap: var(--space-200);
+    gap: var(--space-300);
   }
 
   .compact-tools {

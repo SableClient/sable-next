@@ -11,6 +11,7 @@
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
+  import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
 
   type Mode = 'mobile' | 'compact' | 'desktop';
@@ -88,9 +89,10 @@
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         {...props}
-        class="quick-tool sable-selection-layer {mode === 'compact'
-          ? 'compact-tool'
-          : 'desktop-tool'}"
+        class="quick-tool sable-nav-tab sable-nav-tab-outlined sable-selection-layer {mode ===
+        'compact'
+          ? 'compact-tool sable-nav-tab-side'
+          : 'desktop-tool sable-nav-tab-bottom'}"
         aria-label={$i18n.t('nav.switchAccount')}
       >
         <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
