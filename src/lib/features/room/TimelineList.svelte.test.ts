@@ -786,3 +786,31 @@ test('waits out a page in flight when the room opens', async () => {
   expect(history).toHaveBeenCalled();
   await unmount(instance);
 });
+
+test('asks for history again when the timeline is cleared mid-session', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const history = vi.fn(() => Promise.resolve(false));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  await runAnimationFrames();
+  const opening = history.mock.calls.length;
+
+  roomTimeline.items = [];
+  await tick();
+  await runAnimationFrames();
+
+  expect(history.mock.calls.length).toBeGreaterThan(opening);
+  await unmount(instance);
+});

@@ -173,6 +173,8 @@
   let viewport = $state<HTMLDivElement | null>(null);
   let initialFillState: 'idle' | 'running' | 'done' = 'idle';
   let initialFillPages = 0;
+  let emptyRefillPages = 0;
+  let emptyRefillPending = false;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
   let virtualizerViewportSize = 0;
@@ -595,6 +597,34 @@
       if (reachedStart) return;
     }
   }
+
+  $effect(() => {
+    if (visibleItems.length > 0) {
+      emptyRefillPages = 0;
+      return;
+    }
+    if (
+      timeline.loading ||
+      viewport === null ||
+      position.kind === 'settling' ||
+      historyExhausted ||
+      timeline.backwardPagination !== 'idle' ||
+      initialFillState === 'running' ||
+      emptyRefillPending ||
+      initialFillPages + emptyRefillPages >= TIMELINE_LAYOUT.emptyFillMaxPages
+    ) {
+      return;
+    }
+    emptyRefillPages += 1;
+    emptyRefillPending = true;
+    void (async () => {
+      try {
+        historyExhausted = await onRequestHistory();
+      } finally {
+        emptyRefillPending = false;
+      }
+    })();
+  });
 
   function fillPageLimit(): number {
     return visibleItems.length === 0
