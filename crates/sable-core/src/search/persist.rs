@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
@@ -108,5 +110,75 @@ pub(super) async fn forget(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -
             warn!(%room_id, "dropping the persisted search index failed: {error}");
             false
         }
+    }
+}
+
+const CRAWL_SCHEMA: u32 = 1;
+
+fn crawl_key() -> Vec<u8> {
+    b"sable.search.crawl".to_vec()
+}
+
+#[derive(Default, Serialize, Deserialize)]
+pub(super) struct StoredCrawl {
+    pub(super) version: u32,
+    pub(super) rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(super) struct StoredCrawlRoom {
+    pub(super) token: Option<String>,
+    pub(super) reached_start: bool,
+}
+
+pub(super) async fn load_crawl(client: &matrix_sdk::Client) -> StoredCrawl {
+    let bytes = match client.state_store().get_custom_value(&crawl_key()).await {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return StoredCrawl::default(),
+        Err(error) => {
+            warn!("reading the persisted crawl checkpoints failed: {error}");
+            return StoredCrawl::default();
+        }
+    };
+
+    match serde_json::from_slice::<StoredCrawl>(&bytes) {
+        Ok(stored) if stored.version == CRAWL_SCHEMA => stored,
+        Ok(stored) => {
+            info!(
+                found = stored.version,
+                expected = CRAWL_SCHEMA,
+                "discarding crawl checkpoints written by another schema"
+            );
+            StoredCrawl::default()
+        }
+        Err(error) => {
+            warn!("discarding crawl checkpoints that did not parse: {error}");
+            StoredCrawl::default()
+        }
+    }
+}
+
+pub(super) async fn save_crawl(
+    client: &matrix_sdk::Client,
+    rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom>,
+) {
+    let stored = StoredCrawl {
+        version: CRAWL_SCHEMA,
+        rooms,
+    };
+    let bytes = match serde_json::to_vec(&stored) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("serialising the crawl checkpoints failed: {error}");
+            return;
+        }
+    };
+
+    if let Err(error) = client
+        .state_store()
+        .set_custom_value_no_read(&crawl_key(), bytes)
+        .await
+    {
+        warn!("persisting the crawl checkpoints failed: {error}");
     }
 }

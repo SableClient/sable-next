@@ -212,6 +212,7 @@ impl Core {
                 if matches!(direction, PaginationDirection::Forward) && !focused {
                     return Err(CommandErr::InvalidPaginationDirection);
                 }
+                let _foreground = self.begin_foreground_pagination();
                 let reached_end = match direction {
                     PaginationDirection::Backward => timeline.paginate_backwards(count).await,
                     PaginationDirection::Forward => timeline.paginate_forwards(count).await,
