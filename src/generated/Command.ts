@@ -91,4 +91,4 @@ mode: NotificationModeView | null, } | { "type": "set_default_notification_mode"
  * The emoji differed. An attack signal the other side must be told
  * about. A plain cancel is not.
  */
-mismatch: boolean, } | { "type": "search_messages", query: string, filter: SearchFilter, order: SearchOrder, limit: number, offset: number, } | { "type": "join_call", room_id: string, livekit_service_url: string | null, } | { "type": "leave_call", session: CallSessionId, } | { "type": "decline_call", room_id: string, notification_event_id: string, };
+mismatch: boolean, } | { "type": "search_messages", query: string, filter: SearchFilter, order: SearchOrder, limit: number, offset: number, } | { "type": "join_call", room_id: string, livekit_service_url: string | null, } | { "type": "call_support", room_id: string, } | { "type": "leave_call", session: CallSessionId, } | { "type": "decline_call", room_id: string, notification_event_id: string, };

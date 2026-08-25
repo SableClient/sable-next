@@ -6,6 +6,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
+  import type { CallSupportView } from '#src/generated/CallSupportView';
   import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
@@ -88,6 +89,7 @@
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
+  let callSupport = $state<CallSupportView | null>(null);
 
   let mediaItems = $derived(
     timeline.items.flatMap((entry) => {
@@ -103,6 +105,31 @@
       ];
     })
   );
+  let callable = $derived(
+    !call.active && callSupport !== null && callSupport.has_focus && callSupport.can_join
+  );
+
+  $effect(() => {
+    const target = resolvedRoomId;
+    if (!target) return;
+
+    let current = true;
+    callSupport = null;
+    if (typeof RTCPeerConnection === 'undefined') return;
+
+    void core
+      .callSupport(target)
+      .then((next) => {
+        if (current) callSupport = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] call support unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
   let pinRevision = $derived(
     timeline.items.reduce(
       (count, item) =>
@@ -591,7 +618,7 @@
       isVoice={resolvedRoom?.is_voice ?? false}
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
-      onCall={call.active ? null : openPrescreen}
+      onCall={callable ? openPrescreen : null}
       onBack={goBack}
       onMembers={toggleMembers}
       onSearch={openSearch}

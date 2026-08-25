@@ -18,6 +18,7 @@ import type { NotificationSettingsView } from '#src/generated/NotificationSettin
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+import type { CallSupportView } from '#src/generated/CallSupportView';
 import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
 import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
 import type { SearchFilter } from '#src/generated/SearchFilter';
@@ -480,6 +481,11 @@ export class CoreClient {
       memberships: [...memberships],
     });
     return response.members;
+  }
+
+  async callSupport(roomId: string): Promise<CallSupportView> {
+    const response = await this.ensureTransport().send({ type: 'call_support', room_id: roomId });
+    return response;
   }
 
   async roomAliases(roomId: string): Promise<string[]> {

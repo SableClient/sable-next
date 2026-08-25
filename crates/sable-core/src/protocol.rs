@@ -656,6 +656,10 @@ pub enum Command {
         livekit_service_url: Option<String>,
     },
 
+    CallSupport {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+    },
     LeaveCall {
         session: CallSessionId,
     },
@@ -752,6 +756,7 @@ pub enum CommandOk {
         identity: String,
         encrypt_media: bool,
     },
+    CallSupport(CallSupportView),
     LeaveCall,
     DeclineCall,
     RoomPermissions(RoomPermissionsView),
@@ -1611,6 +1616,13 @@ pub struct RoomPowerLevelsView {
     #[ts(type = "Record<string, number>")]
     pub users: std::collections::BTreeMap<String, i32>,
     pub notifications_room: i32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+pub struct CallSupportView {
+    pub has_focus: bool,
+    pub can_join: bool,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

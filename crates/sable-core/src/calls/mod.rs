@@ -11,6 +11,7 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::{
     DelayParameters, delayed_state_event, update_delayed_event,
 };
+use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{
     ActiveFocus, ActiveLivekitFocus, Application, CallApplicationContent, CallMemberEventContent,
     CallMemberStateKey, CallScope, Focus, LivekitFocus,
@@ -20,7 +21,9 @@ use matrix_sdk::ruma::{DeviceId, EventId, OwnedDeviceId, OwnedRoomId, UserId};
 use matrix_sdk::{Client, Room};
 use tokio::sync::Mutex;
 
-use crate::protocol::{CallMemberView, CallSessionId, CommandErr, CommandOk, CoreEvent};
+use crate::protocol::{
+    CallMemberView, CallSessionId, CallSupportView, CommandErr, CommandOk, CoreEvent,
+};
 use crate::{CallSession, Core};
 
 use keys::{KeyDistributor, Rolled};
@@ -170,6 +173,27 @@ impl Core {
             identity: sfu::livekit_identity(&user_id, &device_id),
             encrypt_media,
         })
+    }
+
+    pub(crate) async fn call_support(&self, room_id: OwnedRoomId) -> Result<CommandOk, CommandErr> {
+        let room = self.room(&room_id).await?;
+        let user_id = room
+            .client()
+            .user_id()
+            .ok_or(CommandErr::NotLoggedIn)?
+            .to_owned();
+
+        let members = membership::active_members(&room).await;
+        let has_focus = self.resolve_focus(&members, None, &room).await.is_some();
+        let can_join = room
+            .power_levels_or_default()
+            .await
+            .user_can_send_state(&user_id, StateEventType::CallMember);
+
+        Ok(CommandOk::CallSupport(CallSupportView {
+            has_focus,
+            can_join,
+        }))
     }
 
     async fn resolve_focus(
