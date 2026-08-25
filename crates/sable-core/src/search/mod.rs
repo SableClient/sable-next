@@ -29,7 +29,7 @@ use crate::protocol::{SearchAttachment, SearchFilter, SearchOrder};
 
 const BODY_FIELD_COUNT: usize = 1;
 const BODY_FIELD_BOOST: [f64; BODY_FIELD_COUNT] = [1.0];
-const EVENTS_PER_INGEST_YIELD: usize = 256;
+const EVENTS_PER_INGEST_YIELD: usize = 16;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MAX_INDEXED_MESSAGES: usize = 50_000;

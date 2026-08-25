@@ -609,6 +609,7 @@
       hadVisibleItems = false;
       historyExhausted = false;
       emptyRefillPages = 0;
+      initialFillPages = 0;
     }
     if (
       timeline.loading ||
@@ -626,7 +627,8 @@
     emptyRefillPending = true;
     void (async () => {
       try {
-        historyExhausted = await onRequestHistory();
+        const reachedStart = await onRequestHistory();
+        historyExhausted = reachedStart && visibleItems.length > 0;
       } finally {
         emptyRefillPending = false;
       }

@@ -12,7 +12,7 @@ use super::persist::{self, StoredCrawlRoom};
 use crate::Core;
 use crate::protocol::{CoreEvent, SearchCoverageState, SearchCoverageView};
 
-const CRAWL_BATCH: u16 = 100;
+const CRAWL_BATCH: u16 = 25;
 const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const MAX_CRAWLED_EVENTS: usize = 20_000;

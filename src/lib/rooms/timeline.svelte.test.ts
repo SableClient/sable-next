@@ -464,3 +464,26 @@ test('a cleared timeline drops the start it had reached', async () => {
   expect(timeline.items).toEqual([]);
   expect(timeline.backwardPagination).toBe('idle');
 });
+
+test('a clear mid-pagination discards the answer that pagination brings back', async () => {
+  type PaginateResponse = { direction: 'backward'; reached_end: boolean };
+  const pending: { settle: (response: PaginateResponse) => void } = { settle: () => {} };
+  const core = new FakeCore();
+  core.paginate = () =>
+    new Promise((resolve) => {
+      pending.settle = resolve;
+    });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  await timeline.start('!room:example.org');
+  const pagination = timeline.paginateBackward(25);
+  expect(timeline.backwardPagination).toBe('loading');
+
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'clear' }] });
+  expect(timeline.backwardPagination).toBe('idle');
+
+  pending.settle({ direction: 'backward', reached_end: true });
+  await pagination;
+
+  expect(timeline.backwardPagination).toBe('idle');
+});

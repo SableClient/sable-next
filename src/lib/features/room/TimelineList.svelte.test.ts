@@ -842,3 +842,38 @@ test('a cleared timeline is not held back by the start it reached before', async
   expect(history.mock.calls.length).toBeGreaterThan(opening);
   await unmount(instance);
 });
+
+test('an empty timeline keeps asking when a page brings nothing but claims the start', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const history = vi.fn(() => Promise.resolve(true));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  roomTimeline.items = [];
+  await tick();
+  await runAnimationFrames();
+  await tick();
+  const afterClear = history.mock.calls.length;
+  expect(afterClear).toBeGreaterThan(0);
+
+  roomTimeline.backwardPagination = 'loading';
+  await tick();
+  roomTimeline.backwardPagination = 'idle';
+  await tick();
+  await runAnimationFrames();
+
+  expect(history.mock.calls.length).toBeGreaterThan(afterClear);
+  await unmount(instance);
+});

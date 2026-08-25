@@ -237,7 +237,12 @@ export class RoomTimeline {
         const before = this.items;
         const items = applyDiffs(before, event.diffs);
         this.items = items;
-        if (before.length > 0 && items.length === 0 && this.backwardPagination === 'end') {
+        if (before.length > 0 && items.length === 0) {
+          this.backwardPaginationPending = false;
+          this.backwardPaginationCompletion = null;
+          this.backwardPaginationStartFirstEventId = null;
+          this.backwardPaginationBoundaryChanged = false;
+          this.clearBackwardPaginationSettleTimer();
           this.backwardPagination = 'idle';
         }
         const firstEventId = items.find((item) => item.event_id)?.event_id ?? null;
