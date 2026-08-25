@@ -106,7 +106,9 @@ export class RoomTimeline {
 
   async paginateBackward(count: number): Promise<boolean> {
     const subscription = this.subscription;
-    if (subscription === null || this.backwardPagination !== 'idle') return true;
+    if (subscription === null || this.backwardPagination !== 'idle') {
+      return this.backwardPagination === 'end';
+    }
 
     const session = this.session;
     this.clearBackwardPaginationSettleTimer();

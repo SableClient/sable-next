@@ -568,11 +568,17 @@
 
   /** Pads out a snapshot too short to fill the viewport, while it is still hidden. */
   async function fillInitialHistory(): Promise<void> {
-    while (initialFillPages < TIMELINE_LAYOUT.initialFillMaxPages) {
+    while (initialFillPages < fillPageLimit()) {
       const node = currentViewport();
       if (node === null || !isSettling()) return;
       // `end` is the server reporting the start of the timeline.
-      if (timeline.backwardPagination !== 'idle') return;
+      if (timeline.backwardPagination === 'end') return;
+      if (timeline.backwardPagination === 'loading') {
+        if (initialFillPages > 0) return;
+        initialFillPages += 1;
+        if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
+        continue;
+      }
       // `scrollHeight` never reports less than the viewport, so it cannot tell a
       // half-full snapshot from an exactly-full one.
       const contentHeight = get(virtualizer).getTotalSize();
@@ -588,6 +594,12 @@
       commit();
       if (reachedStart) return;
     }
+  }
+
+  function fillPageLimit(): number {
+    return visibleItems.length === 0
+      ? TIMELINE_LAYOUT.emptyFillMaxPages
+      : TIMELINE_LAYOUT.initialFillMaxPages;
   }
 
   function startInitialHistoryFill(): void {

@@ -76,6 +76,18 @@ function item(id: string): TimelineItemView {
   };
 }
 
+function hiddenItem(id: string): TimelineItemView {
+  return {
+    ...item(id),
+    content: {
+      kind: 'profile_change',
+      user_id: '@alice:example.org',
+      display_name: { old: 'Alice', new: id },
+      avatar_changed: false,
+    },
+  };
+}
+
 async function runAnimationFrames(): Promise<void> {
   for (let index = 0; index < 10; index += 1) {
     await Promise.resolve();
@@ -719,5 +731,58 @@ test('a wheel notch inside the band also leaves follow mode', async () => {
   await tick();
 
   expect(anchored()).toBe(true);
+  await unmount(instance);
+});
+
+test('keeps filling past a window of events the settings hide', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [hiddenItem('renamed')];
+  const history = vi.fn(() => Promise.resolve(false));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  for (let round = 0; round < TIMELINE_LAYOUT.emptyFillMaxPages; round += 1) {
+    await runAnimationFrames();
+  }
+
+  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.emptyFillMaxPages);
+  await unmount(instance);
+});
+
+test('waits out a page in flight when the room opens', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  roomTimeline.backwardPagination = 'loading';
+  const history = vi.fn(() => Promise.resolve(false));
+  const instance = mount(TimelineList, {
+    target: document.body,
+    props: {
+      timeline: roomTimeline,
+      onRequestHistory: history,
+      onRequestFuture: async () => {},
+      onRead: async () => {},
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(history).not.toHaveBeenCalled();
+
+  roomTimeline.backwardPagination = 'idle';
+  await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval * 2));
+  await runAnimationFrames();
+
+  expect(history).toHaveBeenCalled();
   await unmount(instance);
 });
