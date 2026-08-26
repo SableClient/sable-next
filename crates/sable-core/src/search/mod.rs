@@ -13,7 +13,7 @@ use std::time::Duration;
 use linkify::LinkFinder;
 use matrix_sdk::RoomState;
 use matrix_sdk::deserialized_responses::TimelineEvent;
-use matrix_sdk::event_cache::RoomEventCache;
+use matrix_sdk::event_cache::{RoomEventCache, RoomEventCacheUpdate};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::{
@@ -38,6 +38,8 @@ const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MAX_INDEXED_MESSAGES: usize = 50_000;
 const PERSIST_INTERVAL: Duration = Duration::from_secs(20);
+const CHANGES_BEFORE_FLUSH: usize = 32;
+const TICKS_BEFORE_FLUSH: u32 = 15;
 
 type DocKey = u32;
 
@@ -166,6 +168,8 @@ struct RoomIndex {
     by_age: BTreeSet<(u64, DocKey)>,
     next_key: DocKey,
     retired_keys: usize,
+    changes: usize,
+    ticks_since_flush: u32,
     dirty: bool,
 }
 
@@ -182,6 +186,8 @@ impl RoomIndex {
             by_age: BTreeSet::new(),
             next_key: 0,
             retired_keys: 0,
+            changes: 0,
+            ticks_since_flush: 0,
             dirty: false,
         }
     }
@@ -220,6 +226,7 @@ impl RoomIndex {
             return;
         };
         self.dirty = true;
+        self.changes = self.changes.saturating_add(1);
         self.by_age.remove(&(document.origin_server_ts, key));
         self.key_of.remove(&document.event_id);
         self.classified.remove(&document.event_id);
@@ -249,6 +256,7 @@ impl RoomIndex {
         self.retire(&document.event_id);
         self.vacuum_if_due();
         self.dirty = true;
+        self.changes = self.changes.saturating_add(1);
 
         let key = self.take_unused_key();
         let folded = document.body.to_lowercase();
@@ -277,6 +285,7 @@ impl RoomIndex {
             return;
         };
         self.dirty = true;
+        self.changes = self.changes.saturating_add(1);
         if let Some(document) = self.documents.remove(&key) {
             self.by_age.remove(&(document.origin_server_ts, key));
         }
@@ -396,6 +405,7 @@ impl MessageIndex {
         }
     }
 
+    #[cfg(test)]
     fn dirty_rooms(&self) -> Vec<OwnedRoomId> {
         self.rooms
             .iter()
@@ -404,9 +414,28 @@ impl MessageIndex {
             .collect()
     }
 
+    fn rooms_due_to_flush(&mut self) -> Vec<OwnedRoomId> {
+        let mut due = Vec::new();
+        for (room_id, index) in &mut self.rooms {
+            if !index.dirty {
+                index.ticks_since_flush = 0;
+                continue;
+            }
+            index.ticks_since_flush = index.ticks_since_flush.saturating_add(1);
+            if index.changes >= CHANGES_BEFORE_FLUSH
+                || index.ticks_since_flush >= TICKS_BEFORE_FLUSH
+            {
+                due.push(room_id.clone());
+            }
+        }
+        due
+    }
+
     fn take_snapshot(&mut self, room_id: &OwnedRoomId) -> Option<persist::StoredRoom> {
         let index = self.rooms.get_mut(room_id)?;
         index.dirty = false;
+        index.changes = 0;
+        index.ticks_since_flush = 0;
         Some(index.snapshot())
     }
 
@@ -628,6 +657,24 @@ fn edited_or_own_event_id(original: &OriginalSyncRoomMessageEvent) -> OwnedEvent
     }
 }
 
+fn ingestable_events(
+    diffs: Vec<matrix_sdk_ui::eyeball_im::VectorDiff<TimelineEvent>>,
+) -> Vec<TimelineEvent> {
+    use matrix_sdk_ui::eyeball_im::VectorDiff as In;
+
+    diffs
+        .into_iter()
+        .flat_map(|diff| match diff {
+            In::Append { values } | In::Reset { values } => values.into_iter().collect(),
+            In::PushFront { value }
+            | In::PushBack { value }
+            | In::Insert { value, .. }
+            | In::Set { value, .. } => vec![value],
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
 fn indexable_body(body: &str) -> String {
     remove_plain_reply_fallback(body).to_owned()
 }
@@ -777,17 +824,26 @@ impl Core {
             spawn(async move {
                 loop {
                     matrix_sdk::sleep::sleep(PERSIST_INTERVAL).await;
-                    core.flush_search_index(&client).await;
+                    core.flush_due_search_index(&client).await;
                 }
             })
             .abort_on_drop(),
         );
     }
 
+    #[cfg(test)]
     pub(crate) async fn flush_search_index(&self, client: &matrix_sdk::Client) {
         let dirty = self.search_index.lock().await.dirty_rooms();
+        self.save_rooms(client, dirty).await;
+    }
 
-        for room_id in dirty {
+    async fn flush_due_search_index(&self, client: &matrix_sdk::Client) {
+        let due = self.search_index.lock().await.rooms_due_to_flush();
+        self.save_rooms(client, due).await;
+    }
+
+    async fn save_rooms(&self, client: &matrix_sdk::Client, rooms: Vec<OwnedRoomId>) {
+        for room_id in rooms {
             let Some(stored) = self.search_index.lock().await.take_snapshot(&room_id) else {
                 continue;
             };
@@ -856,6 +912,8 @@ impl Core {
                 core.watch_search_crawl(&client);
                 core.watch_search_persist(&client);
 
+                let mut subscribed: HashSet<OwnedRoomId> = HashSet::new();
+
                 loop {
                     let room_id = match updates.recv().await {
                         Ok(update) => update.room_id,
@@ -867,24 +925,65 @@ impl Core {
                         .get_room(&room_id)
                         .filter(|room| room.state() == RoomState::Joined)
                     else {
+                        subscribed.remove(&room_id);
                         core.search_index.lock().await.forget_room(&room_id);
                         let _ = persist::forget(&client, &room_id).await;
                         continue;
                     };
 
+                    if subscribed.insert(room_id) {
+                        core.watch_room_search_index(&client, room);
+                    }
+                }
+            })
+            .abort_on_drop(),
+        );
+    }
+
+    fn watch_room_search_index(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        room: matrix_sdk::Room,
+    ) {
+        let core = self.clone();
+        let client = client.clone();
+
+        self.track_session_task(
+            spawn(async move {
+                let room_id = room.room_id().to_owned();
+                let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await else {
+                    return;
+                };
+                let Ok((initial, mut updates)) = cache.subscribe().await else {
+                    return;
+                };
+                let rules = room.clone_info().room_version_rules_or_default().redaction;
+
+                core.search_index
+                    .lock()
+                    .await
+                    .ingest(&room_id, initial, &cache, &rules)
+                    .await;
+
+                loop {
+                    let update = match updates.recv().await {
+                        Ok(update) => update,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    };
+
+                    let RoomEventCacheUpdate::UpdateTimelineEvents(timeline) = update else {
+                        continue;
+                    };
                     if core.search_crawl.lock().await.is_ingesting(&room_id) {
                         continue;
                     }
 
-                    let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await
-                    else {
+                    let events = ingestable_events(timeline.diffs);
+                    if events.is_empty() {
                         continue;
-                    };
-                    let Ok(events) = cache.events().await else {
-                        continue;
-                    };
+                    }
 
-                    let rules = room.clone_info().room_version_rules_or_default().redaction;
                     core.search_index
                         .lock()
                         .await
