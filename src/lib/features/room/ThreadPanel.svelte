@@ -1,84 +1,68 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/MemberView';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
-  import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
+  import { Conversation } from './conversation.svelte.js';
   import TimelineList from './TimelineList.svelte';
 
   interface Props {
     roomId: string;
     rootEventId: string;
+    roomName?: string | null;
     members?: readonly MemberView[];
     readOnly?: boolean;
     canRedactOthers?: boolean;
     modal?: boolean;
     onClose: () => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onCopyLink?: (eventId: string) => void;
+    onOpenMedia?: (eventId: string) => void;
   }
 
   let {
     roomId,
     rootEventId,
+    roomName = null,
     members = [],
     readOnly = false,
     canRedactOthers = false,
     modal = false,
     onClose,
     onSenderProfile,
+    onCopyLink,
+    onOpenMedia,
   }: Props = $props();
 
   const core = useCoreClient();
+  const personas = usePersonaStore();
   const timeline = new RoomTimeline(core);
-  let replyTo = $state<string | null>(null);
+  const conversation = new Conversation({
+    core,
+    personas,
+    timeline,
+    roomId: () => roomId,
+    threadRoot: untrack(() => rootEventId),
+  });
 
   $effect(() => {
     void timeline.startThread(roomId, rootEventId);
   });
 
+  $effect(() => {
+    conversation.fetchMissingReplyDetails();
+  });
+
   onDestroy(() => {
     void timeline.stop();
   });
-
-  async function send(
-    _targetRoomId: string,
-    body: string,
-    formatted: string | null,
-    mentions: OutgoingMentions
-  ): Promise<void> {
-    if (body === '') return;
-
-    await core.commands.sendMessage(roomId, body, {
-      formatted,
-      mentions,
-      threadRoot: rootEventId,
-      inReplyTo: replyTo,
-    });
-    replyTo = null;
-  }
-
-  async function sendAttachment(
-    _targetRoomId: string,
-    file: File,
-    options: { caption?: string } = {}
-  ): Promise<void> {
-    await core.commands.sendAttachment(roomId, file, {
-      caption: options.caption,
-      threadRoot: rootEventId,
-      inReplyTo: replyTo,
-    });
-    replyTo = null;
-  }
-
-  function setTyping(_targetRoomId: string, typing: boolean): Promise<void> {
-    return core.commands.setTyping(roomId, typing);
-  }
 
   function requestHistory(): Promise<boolean> {
     return timeline.paginateBackward(25);
@@ -90,18 +74,6 @@
 
   function markRead(): Promise<void> {
     return Promise.resolve();
-  }
-
-  function onToggleReaction(eventId: string, key: string): void {
-    void core.commands.toggleReaction(roomId, eventId, key);
-  }
-
-  function onDelete(eventId: string, reason: string | null): void {
-    void core.commands.redact(roomId, eventId, reason);
-  }
-
-  function onEdit(eventId: string, body: string, html: string | null): void {
-    void core.commands.editMessage(roomId, eventId, body, { formatted: html });
   }
 </script>
 
@@ -124,24 +96,38 @@
     {members}
     {readOnly}
     {canRedactOthers}
+    {onSenderProfile}
+    {onCopyLink}
+    {onOpenMedia}
     onRequestHistory={requestHistory}
     onRequestFuture={requestFuture}
     onRead={markRead}
-    {onSenderProfile}
-    onReply={(eventId) => (replyTo = eventId)}
-    {onToggleReaction}
-    {onDelete}
-    {onEdit}
+    onReply={conversation.reply}
+    onEdit={conversation.edit}
+    onDelete={conversation.redact}
+    onToggleReaction={conversation.toggleReaction}
+    onVotePoll={conversation.votePoll}
+    onEndPoll={conversation.endPoll}
+    onRetrySend={conversation.retrySend}
+    onCancelSend={conversation.cancelSend}
     currentUserId={core.session?.user_id ?? null}
   />
 
   <div class="thread-composer">
     <RoomComposer
       {roomId}
-      onSend={send}
-      onSendAttachment={sendAttachment}
-      onTyping={setTyping}
+      {roomName}
       {readOnly}
+      onSend={conversation.sendMessage}
+      onSendAttachment={conversation.sendAttachment}
+      onSendSticker={conversation.sendSticker}
+      onSendGif={conversation.sendGif}
+      onCreatePoll={conversation.createPoll}
+      onSendLocation={conversation.sendLocation}
+      onTyping={conversation.setTyping}
+      context={conversation.context}
+      onCancelContext={conversation.clearContext}
+      onEditLast={conversation.editLast}
     />
   </div>
 </aside>

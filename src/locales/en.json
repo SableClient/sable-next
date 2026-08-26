@@ -1100,6 +1100,11 @@
     "pollCreate": "Create poll",
     "pollCancel": "Cancel",
     "slashUnknown": "There is no /{{name}} command. Start a message with // to send a literal slash.",
+    "slashFix": {
+      "denied": "This device would not share its location.",
+      "unavailable": "This device could not work out where it is.",
+      "unsupported": "This browser cannot share a location."
+    },
     "slash": {
       "me": {
         "description": "Send the message as an action",
@@ -1160,6 +1165,70 @@
       "topic": {
         "description": "Change this room's topic",
         "usage": "/topic <topic>"
+      },
+      "disinvite": {
+        "description": "Withdraw an invitation",
+        "usage": "/disinvite <@user:server> [@user:server...]"
+      },
+      "ignore": {
+        "description": "Hide everything from someone, on every device",
+        "usage": "/ignore <@user:server> [@user:server...]"
+      },
+      "unignore": {
+        "description": "Stop hiding someone",
+        "usage": "/unignore <@user:server> [@user:server...]"
+      },
+      "startdm": {
+        "description": "Open a direct message with someone",
+        "usage": "/startdm <@user:server> [@user:server...]"
+      },
+      "converttodm": {
+        "description": "Mark this room as a direct message",
+        "usage": "/converttodm"
+      },
+      "converttoroom": {
+        "description": "Mark this direct message as an ordinary room",
+        "usage": "/converttoroom"
+      },
+      "html": {
+        "description": "Send a message written as HTML",
+        "usage": "/html <span data-mx-color=\"#ff0000\">red</span>"
+      },
+      "rainbow": {
+        "description": "Send the message in rainbow colours",
+        "usage": "/rainbow <message>"
+      },
+      "rainbowme": {
+        "description": "Send an action in rainbow colours",
+        "usage": "/rainbowme <action>"
+      },
+      "location": {
+        "description": "Share a set of coordinates",
+        "usage": "/location <latitude> <longitude>"
+      },
+      "sharemylocation": {
+        "description": "Share where this device is",
+        "usage": "/sharemylocation"
+      },
+      "myroomnick": {
+        "description": "Change your display name in this room only",
+        "usage": "/myroomnick <name>"
+      },
+      "myroomavatar": {
+        "description": "Change your avatar in this room only",
+        "usage": "/myroomavatar mxc://…"
+      },
+      "addpmp": {
+        "description": "Add or update a per-message profile",
+        "usage": "/addpmp <id> [name=Name] [avatar=mxc://…]"
+      },
+      "delpmp": {
+        "description": "Delete a per-message profile",
+        "usage": "/delpmp <id>"
+      },
+      "usepmp": {
+        "description": "Send as a per-message profile in this room",
+        "usage": "/usepmp <id|reset> [expiry]"
       }
     }
   },

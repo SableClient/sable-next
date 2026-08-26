@@ -134,12 +134,8 @@ impl Core {
             ..AttachmentConfig::default()
         };
 
-        let timeline = match &thread_root {
-            Some(root) => self.thread_timeline(&room_id, root).await?,
-            None => self.timeline(&room_id).await?,
-        };
-
-        timeline
+        self.timeline_for(&room_id, thread_root.as_ref())
+            .await?
             .send_attachment(AttachmentSource::Data { bytes, filename }, mime, config)
             // Inline, a dropped connection loses the file. Queued, it retries.
             .use_send_queue()

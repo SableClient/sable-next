@@ -146,6 +146,9 @@ pub enum Command {
         #[serde(default)]
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     SendGif {
         #[ts(type = "string")]
@@ -163,6 +166,9 @@ pub enum Command {
         #[serde(default)]
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     /// `edited` on the view flips once the server has the replacement.
     EditMessage {
@@ -174,6 +180,9 @@ pub enum Command {
         formatted: Option<String>,
         #[serde(default)]
         kind: MessageKind,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
         #[serde(default)]
         #[ts(type = "string[]")]
         mentions: Vec<OwnedUserId>,
@@ -188,6 +197,9 @@ pub enum Command {
         room_id: OwnedRoomId,
         #[ts(type = "string")]
         event_id: OwnedEventId,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     Redact {
         #[ts(type = "string")]
@@ -195,6 +207,9 @@ pub enum Command {
         #[ts(type = "string")]
         event_id: OwnedEventId,
         reason: Option<String>,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     PinnedEvents {
         #[ts(type = "string")]
@@ -323,6 +338,9 @@ pub enum Command {
         #[ts(type = "string")]
         event_id: OwnedEventId,
         key: String,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     SendLocation {
         #[ts(type = "string")]
@@ -332,6 +350,9 @@ pub enum Command {
         #[serde(default)]
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     /// MSC3381.
     CreatePoll {
@@ -343,6 +364,9 @@ pub enum Command {
         undisclosed: bool,
         #[ts(type = "number")]
         max_selections: u32,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     /// Replaces any earlier vote by this account. An empty selection abstains.
     VotePoll {
@@ -353,6 +377,9 @@ pub enum Command {
         event_id: OwnedEventId,
         /// Answer ids, not their text.
         answers: Vec<String>,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     /// Irreversible.
     EndPoll {
@@ -360,6 +387,9 @@ pub enum Command {
         room_id: OwnedRoomId,
         #[ts(type = "string")]
         event_id: OwnedEventId,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     MarkRead {
         #[ts(type = "string")]
@@ -373,12 +403,18 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
         transaction_id: String,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
     /// A local echo is not on the server, so it cannot be redacted.
     CancelSend {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
         transaction_id: String,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
     },
 
     CreateRoom {

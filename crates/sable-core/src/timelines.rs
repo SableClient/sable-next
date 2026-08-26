@@ -105,6 +105,17 @@ impl Core {
 }
 
 impl Core {
+    pub(crate) async fn timeline_for(
+        &self,
+        room_id: &OwnedRoomId,
+        thread_root: Option<&OwnedEventId>,
+    ) -> Result<Arc<Timeline>, CommandErr> {
+        match thread_root {
+            Some(root) => self.thread_timeline(room_id, root).await,
+            None => self.timeline(room_id).await,
+        }
+    }
+
     #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
     pub(crate) async fn thread_timeline(
         &self,
@@ -209,7 +220,7 @@ pub(crate) async fn build_room_timeline(
 ) -> Result<Timeline, matrix_sdk_ui::timeline::Error> {
     let builder = room.timeline_builder().with_focus(match focus {
         TimelineFocusView::Live => TimelineFocus::Live {
-            hide_threaded_events: false,
+            hide_threaded_events: true,
         },
         TimelineFocusView::Event { event_id } => TimelineFocus::Event {
             target: event_id.clone(),
@@ -228,4 +239,45 @@ pub(crate) async fn build_room_timeline(
         builder
     };
     builder.build().await
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::ruma::event_id;
+
+    use super::TimelineFocusView;
+
+    #[test]
+    fn a_live_focus_is_what_an_absent_one_means() {
+        let parsed: TimelineFocusView = serde_json::from_str(r#"{"kind":"live"}"#).unwrap();
+
+        assert_eq!(parsed, TimelineFocusView::Live);
+        assert_eq!(TimelineFocusView::default(), TimelineFocusView::Live);
+    }
+
+    #[test]
+    fn a_thread_focus_carries_its_root() {
+        let parsed: TimelineFocusView =
+            serde_json::from_str(r#"{"kind":"thread","root_event_id":"$root"}"#).unwrap();
+
+        assert_eq!(
+            parsed,
+            TimelineFocusView::Thread {
+                root_event_id: event_id!("$root").to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn an_event_focus_carries_its_target() {
+        let parsed: TimelineFocusView =
+            serde_json::from_str(r#"{"kind":"event","event_id":"$target"}"#).unwrap();
+
+        assert_eq!(
+            parsed,
+            TimelineFocusView::Event {
+                event_id: event_id!("$target").to_owned(),
+            }
+        );
+    }
 }

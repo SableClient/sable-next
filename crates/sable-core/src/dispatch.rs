@@ -19,7 +19,7 @@ use matrix_sdk::ruma::api::client::room::upgrade_room;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::InitialStateEvent;
-use matrix_sdk::ruma::events::relation::{InReplyTo, Reply};
+use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
@@ -247,10 +247,7 @@ impl Core {
                 mentions_room,
                 persona,
             } => {
-                let timeline = match &thread_root {
-                    Some(root) => self.thread_timeline(&room_id, root).await?,
-                    None => self.timeline(&room_id).await?,
-                };
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = message_content(body, formatted, kind, mentions, mentions_room);
 
                 if let Some(persona) = persona {
@@ -318,19 +315,26 @@ impl Core {
                 url,
                 body,
                 in_reply_to,
+                thread_root,
             } => {
                 let url = OwnedMxcUri::from(url);
                 if url.parts().is_err() {
                     return Err(CommandErr::InvalidMedia);
                 }
 
-                let timeline = self.timeline(&room_id).await?;
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let mut content = StickerEventContent::new(body, ImageInfo::new(), url);
 
-                if let Some(event_id) = in_reply_to {
-                    content.relates_to =
-                        Some(Relation::Reply(Reply::new(InReplyTo::new(event_id))));
-                }
+                content.relates_to = match (thread_root, in_reply_to) {
+                    (Some(root), reply) => {
+                        let fallback = reply.unwrap_or_else(|| root.clone());
+                        Some(Relation::Thread(Thread::plain(root, fallback)))
+                    }
+                    (None, Some(event_id)) => {
+                        Some(Relation::Reply(Reply::new(InReplyTo::new(event_id))))
+                    }
+                    (None, None) => None,
+                };
 
                 timeline
                     .send(content.into())
@@ -349,6 +353,7 @@ impl Core {
                 mimetype,
                 size,
                 in_reply_to,
+                thread_root,
             } => {
                 let url = OwnedMxcUri::from(url);
                 if url.parts().is_err() {
@@ -361,7 +366,7 @@ impl Core {
                 info.mimetype = Some(mimetype);
                 info.size = size.map(Into::into);
 
-                let timeline = self.timeline(&room_id).await?;
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = RoomMessageEventContent::new(MessageType::Image(
                     ImageMessageEventContent::plain(body, url).info(Box::new(info)),
                 ));
@@ -390,6 +395,7 @@ impl Core {
                 body,
                 formatted,
                 kind,
+                thread_root,
                 mentions,
                 mentions_room,
                 persona,
@@ -409,7 +415,7 @@ impl Core {
                     return Ok(CommandOk::EditMessage);
                 }
 
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .edit(&TimelineEventItemId::EventId(event_id), edited)
                     .await
@@ -418,8 +424,12 @@ impl Core {
                 Ok(CommandOk::EditMessage)
             }
 
-            Command::FetchEventDetails { room_id, event_id } => {
-                self.timeline(&room_id)
+            Command::FetchEventDetails {
+                room_id,
+                event_id,
+                thread_root,
+            } => {
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .fetch_details_for_event(&event_id)
                     .await
@@ -820,8 +830,9 @@ impl Core {
                 room_id,
                 event_id,
                 reason,
+                thread_root,
             } => {
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .redact(&TimelineEventItemId::EventId(event_id), reason.as_deref())
                     .await
@@ -834,8 +845,9 @@ impl Core {
                 room_id,
                 event_id,
                 key,
+                thread_root,
             } => {
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
                     .await
@@ -849,12 +861,13 @@ impl Core {
                 body,
                 geo_uri,
                 in_reply_to,
+                thread_root,
             } => {
                 if view::geo_coordinates(&geo_uri).is_none() {
                     return Err(CommandErr::InvalidLocation);
                 }
 
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .send_location(body, geo_uri, None, None, None, in_reply_to)
                     .await
@@ -869,12 +882,13 @@ impl Core {
                 answers,
                 undisclosed,
                 max_selections,
+                thread_root,
             } => {
                 let content = crate::polls::start(&question, &answers, undisclosed, max_selections)
                     .ok_or(CommandErr::InvalidPoll)?;
                 let content = matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent::from(content);
 
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .send(content.into())
                     .await
@@ -887,12 +901,13 @@ impl Core {
                 room_id,
                 event_id,
                 answers,
+                thread_root,
             } => {
                 let content = matrix_sdk::ruma::events::poll::unstable_response::UnstablePollResponseEventContent::new(
                 answers, event_id,
             );
 
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .send(content.into())
                     .await
@@ -901,14 +916,18 @@ impl Core {
                 Ok(CommandOk::VotePoll)
             }
 
-            Command::EndPoll { room_id, event_id } => {
+            Command::EndPoll {
+                room_id,
+                event_id,
+                thread_root,
+            } => {
                 let content =
                     matrix_sdk::ruma::events::poll::unstable_end::UnstablePollEndEventContent::new(
                         "The poll has closed.",
                         event_id,
                     );
 
-                self.timeline(&room_id)
+                self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
                     .send(content.into())
                     .await
@@ -1793,10 +1812,11 @@ impl Core {
             Command::RetrySend {
                 room_id,
                 transaction_id,
+                thread_root,
             } => {
                 self.client().await?.send_queue().set_enabled(true).await;
 
-                self.local_echo(&room_id, &transaction_id)
+                self.local_echo(&room_id, &transaction_id, thread_root.as_ref())
                     .await?
                     .unwedge()
                     .await
@@ -1808,9 +1828,10 @@ impl Core {
             Command::CancelSend {
                 room_id,
                 transaction_id,
+                thread_root,
             } => {
                 let cancelled = self
-                    .local_echo(&room_id, &transaction_id)
+                    .local_echo(&room_id, &transaction_id, thread_root.as_ref())
                     .await?
                     .abort()
                     .await

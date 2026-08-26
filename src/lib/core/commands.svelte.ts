@@ -510,7 +510,8 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       url: string,
       body: string,
-      inReplyTo: string | null = null
+      inReplyTo: string | null = null,
+      threadRoot: string | null = null
     ): Promise<void> {
       await transport().send({
         type: 'send_sticker',
@@ -518,6 +519,7 @@ export function createCommands(transport: () => Transport) {
         url,
         body,
         in_reply_to: inReplyTo,
+        thread_root: threadRoot,
       });
     },
 
@@ -529,7 +531,8 @@ export function createCommands(transport: () => Transport) {
       height: number | null,
       mimetype: string,
       size: number | null = null,
-      inReplyTo: string | null = null
+      inReplyTo: string | null = null,
+      threadRoot: string | null = null
     ): Promise<void> {
       await transport().send({
         type: 'send_gif',
@@ -541,6 +544,7 @@ export function createCommands(transport: () => Transport) {
         mimetype,
         size,
         in_reply_to: inReplyTo,
+        thread_root: threadRoot,
       });
     },
 
@@ -548,7 +552,8 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       body: string,
       geoUri: string,
-      inReplyTo: string | null = null
+      inReplyTo: string | null = null,
+      threadRoot: string | null = null
     ): Promise<void> {
       await transport().send({
         type: 'send_location',
@@ -556,6 +561,7 @@ export function createCommands(transport: () => Transport) {
         body,
         geo_uri: geoUri,
         in_reply_to: inReplyTo,
+        thread_root: threadRoot,
       });
     },
 
@@ -573,25 +579,37 @@ export function createCommands(transport: () => Transport) {
         body,
         formatted: options.formatted ?? null,
         kind: options.kind ?? 'text',
+        thread_root: options.threadRoot ?? null,
         mentions: mentions.userIds,
         mentions_room: mentions.room,
         persona: $state.snapshot(options.persona ?? null),
       });
     },
 
-    async fetchEventDetails(roomId: string, eventId: string): Promise<void> {
+    async fetchEventDetails(
+      roomId: string,
+      eventId: string,
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'fetch_event_details',
         room_id: roomId,
         event_id: eventId,
+        thread_root: threadRoot,
       });
     },
 
-    async redact(roomId: string, eventId: string, reason: string | null = null): Promise<void> {
+    async redact(
+      roomId: string,
+      eventId: string,
+      reason: string | null = null,
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'redact',
         room_id: roomId,
         event_id: eventId,
+        thread_root: threadRoot,
         reason,
       });
     },
@@ -699,11 +717,17 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async toggleReaction(roomId: string, eventId: string, key: string): Promise<void> {
+    async toggleReaction(
+      roomId: string,
+      eventId: string,
+      key: string,
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'react',
         room_id: roomId,
         event_id: eventId,
+        thread_root: threadRoot,
         key,
       });
     },
@@ -713,7 +737,8 @@ export function createCommands(transport: () => Transport) {
       question: string,
       answers: readonly string[],
       undisclosed = false,
-      maxSelections = 1
+      maxSelections = 1,
+      threadRoot: string | null = null
     ): Promise<void> {
       await transport().send({
         type: 'create_poll',
@@ -722,39 +747,61 @@ export function createCommands(transport: () => Transport) {
         answers: [...answers],
         undisclosed,
         max_selections: maxSelections,
+        thread_root: threadRoot,
       });
     },
 
-    async votePoll(roomId: string, eventId: string, answers: readonly string[]): Promise<void> {
+    async votePoll(
+      roomId: string,
+      eventId: string,
+      answers: readonly string[],
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'vote_poll',
         room_id: roomId,
         event_id: eventId,
+        thread_root: threadRoot,
         answers: [...answers],
       });
     },
 
-    async endPoll(roomId: string, eventId: string): Promise<void> {
+    async endPoll(
+      roomId: string,
+      eventId: string,
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'end_poll',
         room_id: roomId,
         event_id: eventId,
+        thread_root: threadRoot,
       });
     },
 
-    async retrySend(roomId: string, transactionId: string): Promise<void> {
+    async retrySend(
+      roomId: string,
+      transactionId: string,
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'retry_send',
         room_id: roomId,
         transaction_id: transactionId,
+        thread_root: threadRoot,
       });
     },
 
-    async cancelSend(roomId: string, transactionId: string): Promise<void> {
+    async cancelSend(
+      roomId: string,
+      transactionId: string,
+      threadRoot: string | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'cancel_send',
         room_id: roomId,
         transaction_id: transactionId,
+        thread_root: threadRoot,
       });
     },
 
@@ -962,6 +1009,14 @@ export function createCommands(transport: () => Transport) {
         type: 'ignored_users',
       });
       return response.users;
+    },
+
+    async ignoreUser(userId: string): Promise<void> {
+      await transport().send({ type: 'ignore_user', user_id: userId });
+    },
+
+    async unignoreUser(userId: string): Promise<void> {
+      await transport().send({ type: 'unignore_user', user_id: userId });
     },
 
     async setDirect(roomId: string, direct: boolean): Promise<void> {

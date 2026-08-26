@@ -8,7 +8,7 @@ use matrix_sdk::ruma::directory::Filter;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{
-    OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt, events::SyncStateEvent,
+    OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt, events::SyncStateEvent,
 };
 use matrix_sdk::send_queue::SendHandle;
 
@@ -210,8 +210,9 @@ impl Core {
         &self,
         room_id: &OwnedRoomId,
         transaction_id: &str,
+        thread_root: Option<&OwnedEventId>,
     ) -> Result<SendHandle, CommandErr> {
-        self.timeline(room_id)
+        self.timeline_for(room_id, thread_root)
             .await?
             .items()
             .await

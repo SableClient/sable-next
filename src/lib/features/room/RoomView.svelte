@@ -15,6 +15,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
+  import { Conversation } from './conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
   import { i18n } from '#lib/i18n.js';
@@ -81,7 +82,12 @@
   let profileAnchor = $state<HTMLElement | null>(null);
   let profile = $state<ProfileView | null>(null);
   let profileFailed = $state(false);
-  let composerContext = $state<ComposerContext | null>(null);
+  const conversation = new Conversation({
+    core,
+    personas,
+    timeline,
+    roomId: () => resolvedRoomId,
+  });
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
   let settingsOpen = $state(false);
@@ -89,8 +95,6 @@
   let inviteOpen = $state(false);
   let jumpOpen = $state(false);
   let leaveOpen = $state(false);
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- only the prefetch effect touches it, and a reactive set would make that effect invalidate itself
-  const requestedDetails = new Set<string>();
   let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
@@ -214,7 +218,7 @@
     const activeRoomId = resolvedRoomId;
     memberLoader.reset();
     typingUserIds = [];
-    requestedDetails.clear();
+    conversation.forgetRequestedDetails();
     receiptsOpen = false;
     closeProfile();
 
@@ -249,19 +253,7 @@
   // The SDK loads a replied-to event lazily, so a reply preview stays blank
   // until it is asked for.
   $effect(() => {
-    const activeRoomId = resolvedRoomId;
-    for (const item of timeline.items) {
-      const reply = item.in_reply_to;
-      if (!reply || reply.body !== null) continue;
-      // Asked for by the id of the reply, not of the event it replies to.
-      const eventId = item.event_id;
-      if (eventId === null || requestedDetails.has(eventId)) continue;
-
-      requestedDetails.add(eventId);
-      void core.commands.fetchEventDetails(activeRoomId, eventId).catch((error: unknown) => {
-        console.debug('[sable room] reply details unavailable', error);
-      });
-    }
+    conversation.fetchMissingReplyDetails();
   });
 
   $effect(() => {
@@ -427,136 +419,6 @@
     void goto(resolve('home'));
   }
 
-  async function sendMessage(
-    targetRoomId: string,
-    body: string,
-    formatted: string | null = null,
-    mentions: OutgoingMentions = { userIds: [], room: false }
-  ): Promise<void> {
-    const pending = composerContext;
-    if (body === '') return;
-
-    if (pending?.kind === 'edit') {
-      const edited = timeline.items.find((entry) => entry.event_id === pending.eventId);
-      await core.commands.editMessage(targetRoomId, pending.eventId, body, {
-        formatted,
-        mentions,
-        kind: editedKind(edited),
-        persona: edited?.per_message_profile ?? null,
-      });
-      composerContext = null;
-      return;
-    }
-
-    const outcome = await runSlash(body, { roomId: targetRoomId, commands: core.commands });
-    if (outcome.kind === 'done') {
-      composerContext = null;
-      return;
-    }
-
-    const plain = outcome.msgtype !== 'text' || outcome.body !== body;
-    const outgoing = personaFor(targetRoomId, outcome.body, plain ? null : formatted);
-    await core.commands.sendMessage(targetRoomId, outgoing.body, {
-      inReplyTo: pending?.eventId ?? null,
-      formatted: outgoing.formatted,
-      mentions: plain ? { userIds: [], room: false } : mentions,
-      kind: outcome.msgtype,
-      persona: outgoing.persona,
-    });
-    composerContext = null;
-  }
-
-  function editedKind(edited: TimelineItemView | undefined): MessageKind {
-    const content = edited?.content;
-    if (content?.kind !== 'message') return 'text';
-    if (content.emote) return 'emote';
-    return content.notice ? 'notice' : 'text';
-  }
-
-  function personaFor(
-    targetRoomId: string,
-    body: string,
-    formatted: string | null
-  ): { body: string; formatted: string | null; persona: PerMessageProfileView | null } {
-    const proxied = preferences.personaProxying ? resolveProxy(personas.personas, body) : undefined;
-    const persona = resolvePersona({
-      personas: personas.personas,
-      proxied: proxied?.persona,
-      room: personas.selectionFor(targetRoomId) ?? undefined,
-      account: personas.selectionFor(null) ?? undefined,
-      now: Date.now(),
-    });
-
-    if (!persona) return { body, formatted, persona: null };
-    if (proxied && preferences.personaLatching) {
-      void personas.select(targetRoomId, proxied.persona.id).catch(() => {});
-    }
-
-    return {
-      body: proxied?.body ?? body,
-      formatted: proxied ? null : formatted,
-      persona: projectPersona(persona, preferences.personaFallback),
-    };
-  }
-
-  async function sendAttachment(
-    targetRoomId: string,
-    file: File,
-    options: { caption?: string } = {}
-  ): Promise<void> {
-    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.commands.sendAttachment(targetRoomId, file, {
-      caption: options.caption,
-      inReplyTo: replyTo,
-    });
-    if (replyTo !== null) composerContext = null;
-  }
-
-  async function sendSticker(targetRoomId: string, url: string, body: string): Promise<void> {
-    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.commands.sendSticker(targetRoomId, url, body, replyTo);
-    if (replyTo !== null) composerContext = null;
-  }
-
-  async function sendGif(targetRoomId: string, gif: GifResult): Promise<void> {
-    const { gifs } = await runtimeConfig();
-    const proxied = proxiedGif(gif, gifs.proxyUrl);
-    if (!proxied) throw new Error('no GIF proxy route for this result');
-
-    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.commands.sendGif(
-      targetRoomId,
-      proxied.mxcUrl,
-      gifFilename(gif.title, proxied.mimetype),
-      gif.width || null,
-      gif.height || null,
-      proxied.mimetype,
-      gif.size > 0 && proxied.mimetype === gif.mimetype ? gif.size : null,
-      replyTo
-    );
-    if (replyTo !== null) composerContext = null;
-  }
-
-  async function createPoll(
-    targetRoomId: string,
-    question: string,
-    answers: string[],
-    undisclosed: boolean
-  ): Promise<void> {
-    await core.commands.createPoll(targetRoomId, question, answers, undisclosed);
-  }
-
-  async function sendLocation(targetRoomId: string, body: string, geoUri: string): Promise<void> {
-    const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.commands.sendLocation(targetRoomId, body, geoUri, replyTo);
-    if (replyTo !== null) composerContext = null;
-  }
-
-  async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
-    if (!preferences.sendTypingNotifications) return;
-    await core.commands.setTyping(targetRoomId, typing);
-  }
-
   function requestHistory(): Promise<boolean> {
     return timeline.paginateBackward(25);
   }
@@ -577,62 +439,6 @@
       .catch((error: unknown) => {
         console.warn('[sable room] mark as read failed', error);
       });
-  }
-
-  function onRetrySend(transactionId: string): void {
-    void core.commands.retrySend(resolvedRoomId, transactionId);
-  }
-
-  function onCancelSend(transactionId: string): void {
-    void core.commands.cancelSend(resolvedRoomId, transactionId);
-  }
-
-  function onToggleReaction(eventId: string, key: string): void {
-    void core.commands.toggleReaction(resolvedRoomId, eventId, key);
-  }
-
-  function onVotePoll(eventId: string, answers: string[]): void {
-    void core.commands.votePoll(resolvedRoomId, eventId, answers);
-  }
-
-  function onEndPoll(eventId: string): void {
-    void core.commands.endPoll(resolvedRoomId, eventId);
-  }
-
-  function onDelete(eventId: string, reason: string | null): void {
-    void core.commands.redact(resolvedRoomId, eventId, reason);
-  }
-
-  function onReply(eventId: string): void {
-    const item = timeline.items.find((entry) => entry.event_id === eventId);
-    if (!item || (item.content.kind !== 'message' && item.content.kind !== 'image')) return;
-    composerContext = {
-      kind: 'reply',
-      eventId,
-      sender: item.sender_name ?? item.sender,
-      body: item.content.body,
-    };
-  }
-
-  function onEdit(eventId: string, body: string, html: string | null = null): void {
-    composerContext = { kind: 'edit', eventId, body, html };
-  }
-
-  function editLastOwnMessage(): void {
-    const userId = core.session?.user_id;
-    if (!userId) return;
-
-    for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
-      const item = timeline.items[index];
-      if (!item.event_id || item.sender !== userId) continue;
-      if (item.content.kind !== 'message') continue;
-      onEdit(item.event_id, item.content.body, item.content.html);
-      return;
-    }
-  }
-
-  function clearComposerContext(): void {
-    composerContext = null;
   }
 
   function openMedia(eventId: string): void {
@@ -706,19 +512,19 @@
         onMatrixLink={handleMatrixLink}
         onCopyLink={copyEventLink}
         onSenderProfile={openProfile}
-        {onRetrySend}
-        {onCancelSend}
-        {onToggleReaction}
-        {onDelete}
-        {onReply}
+        onRetrySend={conversation.retrySend}
+        onCancelSend={conversation.cancelSend}
+        onToggleReaction={conversation.toggleReaction}
+        onDelete={conversation.redact}
+        onReply={conversation.reply}
         onOpenThread={openThread}
-        {onEdit}
+        onEdit={conversation.edit}
         roomId={resolvedRoomId}
         members={memberLoader.members}
         onJumpToEvent={jumpToEvent}
         onOpenMedia={openMedia}
-        {onVotePoll}
-        {onEndPoll}
+        onVotePoll={conversation.votePoll}
+        onEndPoll={conversation.endPoll}
         readOnly={permissions ? !permissions.can_post : false}
         canRedactOthers={permissions?.can_redact_others ?? false}
         currentUserId={core.session?.user_id ?? null}
@@ -745,18 +551,18 @@
       {#key resolvedRoomId}
         <RoomComposer
           roomId={resolvedRoomId}
-          onSend={sendMessage}
-          onSendAttachment={sendAttachment}
-          onSendSticker={sendSticker}
-          onSendGif={sendGif}
-          onCreatePoll={createPoll}
-          onSendLocation={sendLocation}
-          onTyping={setTyping}
+          onSend={conversation.sendMessage}
+          onSendAttachment={conversation.sendAttachment}
+          onSendSticker={conversation.sendSticker}
+          onSendGif={conversation.sendGif}
+          onCreatePoll={conversation.createPoll}
+          onSendLocation={conversation.sendLocation}
+          onTyping={conversation.setTyping}
           {roomName}
           readOnly={permissions ? !permissions.can_post : false}
-          context={composerContext}
-          onCancelContext={clearComposerContext}
-          onEditLast={editLastOwnMessage}
+          context={conversation.context}
+          onCancelContext={conversation.clearContext}
+          onEditLast={conversation.editLast}
         />
       {/key}
     </div>
@@ -764,15 +570,20 @@
 
   {#if desktop}
     {#if threadRootId !== null}
-      <ThreadPanel
-        roomId={resolvedRoomId}
-        rootEventId={threadRootId}
-        members={memberLoader.members}
-        readOnly={permissions ? !permissions.can_post : false}
-        canRedactOthers={permissions?.can_redact_others ?? false}
-        onClose={closeThread}
-        onSenderProfile={openProfile}
-      />
+      {#key threadRootId}
+        <ThreadPanel
+          roomId={resolvedRoomId}
+          rootEventId={threadRootId}
+          {roomName}
+          members={memberLoader.members}
+          readOnly={permissions ? !permissions.can_post : false}
+          canRedactOthers={permissions?.can_redact_others ?? false}
+          onClose={closeThread}
+          onSenderProfile={openProfile}
+          onCopyLink={copyEventLink}
+          onOpenMedia={openMedia}
+        />
+      {/key}
     {/if}
     {#if desktopMembersOpen}
       <MembersDrawer
@@ -803,16 +614,21 @@
       variant="drawer"
     >
       {#if threadRootId !== null}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={threadRootId}
-          members={memberLoader.members}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          modal
-          onClose={closeThread}
-          onSenderProfile={openProfile}
-        />
+        {#key threadRootId}
+          <ThreadPanel
+            roomId={resolvedRoomId}
+            rootEventId={threadRootId}
+            {roomName}
+            members={memberLoader.members}
+            readOnly={permissions ? !permissions.can_post : false}
+            canRedactOthers={permissions?.can_redact_others ?? false}
+            modal
+            onClose={closeThread}
+            onSenderProfile={openProfile}
+            onCopyLink={copyEventLink}
+            onOpenMedia={openMedia}
+          />
+        {/key}
       {/if}
     </DialogFrame>
   {/if}
