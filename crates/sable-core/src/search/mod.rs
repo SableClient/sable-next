@@ -47,6 +47,8 @@ struct Body(String);
 struct Document {
     event_id: OwnedEventId,
     body: String,
+    #[serde(skip)]
+    folded: String,
     sender: OwnedUserId,
     origin_server_ts: u64,
     attachment: Option<SearchAttachment>,
@@ -62,7 +64,7 @@ impl Document {
         }
     }
 
-    fn matches(&self, filter: &SearchFilter) -> bool {
+    fn matches(&self, filter: &SearchFilter, terms: &FoldedTerms) -> bool {
         if !filter.senders.is_empty() && !filter.senders.contains(&self.sender) {
             return false;
         }
@@ -112,23 +114,40 @@ impl Document {
             return false;
         }
 
-        let folded = self.body.to_lowercase();
-        if !filter
+        if !terms
             .phrases
             .iter()
-            .all(|phrase| folded.contains(&phrase.to_lowercase()))
+            .all(|phrase| self.folded.contains(phrase))
         {
             return false;
         }
-        if filter
-            .exclude
-            .iter()
-            .any(|term| folded.contains(&term.to_lowercase()))
-        {
+        if terms.exclude.iter().any(|term| self.folded.contains(term)) {
             return false;
         }
 
         true
+    }
+}
+
+struct FoldedTerms {
+    phrases: Vec<String>,
+    exclude: Vec<String>,
+}
+
+impl FoldedTerms {
+    fn of(filter: &SearchFilter) -> Self {
+        Self {
+            phrases: filter
+                .phrases
+                .iter()
+                .map(|term| term.to_lowercase())
+                .collect(),
+            exclude: filter
+                .exclude
+                .iter()
+                .map(|term| term.to_lowercase())
+                .collect(),
+        }
     }
 }
 
@@ -231,6 +250,7 @@ impl RoomIndex {
         self.dirty = true;
 
         let key = self.take_unused_key();
+        let folded = document.body.to_lowercase();
         let body = Body(document.body);
         self.index
             .add_document(&[body_field], tokenize::tokenize, key, &body);
@@ -240,6 +260,7 @@ impl RoomIndex {
             key,
             Document {
                 body: body.0,
+                folded,
                 ..document
             },
         );
@@ -280,12 +301,13 @@ impl RoomIndex {
         room_id: &'index OwnedRoomId,
         query: &str,
         filter: &SearchFilter,
+        terms: &FoldedTerms,
     ) -> Vec<Ranked<'index>> {
         if query.is_empty() {
             return self
                 .documents
                 .values()
-                .filter(|document| document.matches(filter))
+                .filter(|document| document.matches(filter, terms))
                 .map(|document| Ranked::from_document(room_id, document, 0.0))
                 .collect();
         }
@@ -301,7 +323,7 @@ impl RoomIndex {
             .filter_map(|result| {
                 let document = self.documents.get(&result.key)?;
                 document
-                    .matches(filter)
+                    .matches(filter, terms)
                     .then(|| Ranked::from_document(room_id, document, result.score))
             })
             .collect()
@@ -444,6 +466,7 @@ impl MessageIndex {
         limit: usize,
         offset: usize,
     ) -> Vec<Hit> {
+        let terms = FoldedTerms::of(filter);
         let ranked = self
             .rooms
             .iter()
@@ -451,7 +474,7 @@ impl MessageIndex {
                 (filter.rooms.is_empty() || filter.rooms.iter().any(|wanted| wanted == *room_id))
                     && !filter.not_rooms.iter().any(|denied| denied == *room_id)
             })
-            .flat_map(|(room_id, index)| index.ranked(room_id, query, filter))
+            .flat_map(|(room_id, index)| index.ranked(room_id, query, filter, &terms))
             .collect();
 
         self.materialize(page_ranked(ranked, order, limit, offset))
@@ -540,6 +563,7 @@ impl MessageIndex {
                     index.upsert(Document {
                         event_id: target,
                         has_link: contains_link(&body),
+                        folded: String::new(),
                         body,
                         sender: original.sender.clone(),
                         origin_server_ts: original.origin_server_ts.get().into(),
@@ -941,6 +965,7 @@ mod tests {
             event_id: EventId::parse(format!("${seed}")).expect("event id"),
             has_link: super::contains_link(body),
             body: body.to_owned(),
+            folded: String::new(),
             sender: matrix_sdk::ruma::UserId::parse(sender).expect("user id"),
             origin_server_ts: ts,
             attachment,
@@ -2665,6 +2690,7 @@ mod stress {
     fn stress_document(seed: usize, body: String) -> super::Document {
         super::Document {
             event_id: event_id(seed),
+            folded: String::new(),
             body,
             sender: matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned(),
             origin_server_ts: 0,
