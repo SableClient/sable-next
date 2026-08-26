@@ -11,6 +11,7 @@
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
   import { i18n } from '#lib/i18n.js';
@@ -49,7 +50,7 @@
   import MediaViewer from './MediaViewer.svelte';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
-  import { initials, latestEventId } from './timeline-format';
+  import { latestEventId } from './timeline-format';
 
   interface Props {
     roomId: string;
@@ -117,7 +118,7 @@
     callSupport = null;
     if (typeof RTCPeerConnection === 'undefined') return;
 
-    void core
+    void core.commands
       .callSupport(target)
       .then((next) => {
         if (current) callSupport = next;
@@ -139,6 +140,15 @@
       0
     )
   );
+
+  const pinnedEvents = new PinnedEvents(core.commands);
+  providePinnedEvents(pinnedEvents);
+
+  $effect(() => {
+    void pinRevision;
+    const target = resolvedRoomId;
+    if (target) void pinnedEvents.load(target);
+  });
   let latestReadBy = $derived.by(() => {
     const userId = core.session?.user_id;
     for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
@@ -199,7 +209,7 @@
     const activeRoomId = resolvedRoomId;
     permissions = null;
     let current = true;
-    void core
+    void core.commands
       .roomPermissions(activeRoomId)
       .then((next) => {
         if (current) permissions = next;
@@ -228,7 +238,7 @@
       if (eventId === null || requestedDetails.has(eventId)) continue;
 
       requestedDetails.add(eventId);
-      void core.fetchEventDetails(activeRoomId, eventId).catch((error: unknown) => {
+      void core.commands.fetchEventDetails(activeRoomId, eventId).catch((error: unknown) => {
         console.debug('[sable room] reply details unavailable', error);
       });
     }
@@ -280,7 +290,7 @@
 
   async function loadMembers(): Promise<void> {
     const activeRoomId = resolvedRoomId;
-    await memberLoader.load(activeRoomId, (roomId) => core.roomMembers(roomId));
+    await memberLoader.load(activeRoomId, (roomId) => core.commands.roomMembers(roomId));
   }
 
   function toggleMembers(): void {
@@ -356,7 +366,7 @@
   async function writeEventLink(eventId: string): Promise<void> {
     try {
       const alias = resolvedRoom?.canonical_alias ?? null;
-      const via = alias ? [] : await core.roomViaServers(resolvedRoomId);
+      const via = alias ? [] : await core.commands.roomViaServers(resolvedRoomId);
       await navigator.clipboard.writeText(matrixToUrl(alias ?? resolvedRoomId, via, eventId));
     } catch (error) {
       console.debug('[sable room] copy link failed', error);
@@ -408,7 +418,7 @@
 
     if (pending?.kind === 'edit') {
       const edited = timeline.items.find((entry) => entry.event_id === pending.eventId);
-      await core.editMessage(
+      await core.commands.editMessage(
         targetRoomId,
         pending.eventId,
         body,
@@ -421,7 +431,7 @@
     }
 
     const outgoing = personaFor(targetRoomId, body, formatted);
-    await core.sendMessage(
+    await core.commands.sendMessage(
       targetRoomId,
       outgoing.body,
       pending?.eventId ?? null,
@@ -464,13 +474,16 @@
     options: { caption?: string } = {}
   ): Promise<void> {
     const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.sendAttachment(targetRoomId, file, { caption: options.caption, inReplyTo: replyTo });
+    await core.commands.sendAttachment(targetRoomId, file, {
+      caption: options.caption,
+      inReplyTo: replyTo,
+    });
     if (replyTo !== null) composerContext = null;
   }
 
   async function sendSticker(targetRoomId: string, url: string, body: string): Promise<void> {
     const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.sendSticker(targetRoomId, url, body, replyTo);
+    await core.commands.sendSticker(targetRoomId, url, body, replyTo);
     if (replyTo !== null) composerContext = null;
   }
 
@@ -480,7 +493,7 @@
     if (!proxied) throw new Error('no GIF proxy route for this result');
 
     const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.sendGif(
+    await core.commands.sendGif(
       targetRoomId,
       proxied.mxcUrl,
       gifFilename(gif.title, proxied.mimetype),
@@ -499,18 +512,18 @@
     answers: string[],
     undisclosed: boolean
   ): Promise<void> {
-    await core.createPoll(targetRoomId, question, answers, undisclosed);
+    await core.commands.createPoll(targetRoomId, question, answers, undisclosed);
   }
 
   async function sendLocation(targetRoomId: string, body: string, geoUri: string): Promise<void> {
     const replyTo = composerContext?.kind === 'reply' ? composerContext.eventId : null;
-    await core.sendLocation(targetRoomId, body, geoUri, replyTo);
+    await core.commands.sendLocation(targetRoomId, body, geoUri, replyTo);
     if (replyTo !== null) composerContext = null;
   }
 
   async function setTyping(targetRoomId: string, typing: boolean): Promise<void> {
     if (!preferences.sendTypingNotifications) return;
-    await core.setTyping(targetRoomId, typing);
+    await core.commands.setTyping(targetRoomId, typing);
   }
 
   function requestHistory(): Promise<boolean> {
@@ -523,39 +536,39 @@
 
   async function markRead(eventId: string): Promise<void> {
     if (!preferences.sendReadReceipts) return;
-    await core.markRead(resolvedRoomId, eventId);
+    await core.commands.markRead(resolvedRoomId, eventId);
   }
 
   function markRoomRead(): void {
     const newest = latestEventId(timeline.items);
     if (!newest) return;
-    void core.markRead(resolvedRoomId, newest).catch((error: unknown) => {
+    void core.commands.markRead(resolvedRoomId, newest).catch((error: unknown) => {
       console.warn('[sable room] mark as read failed', error);
     });
   }
 
   function onRetrySend(transactionId: string): void {
-    void core.retrySend(resolvedRoomId, transactionId);
+    void core.commands.retrySend(resolvedRoomId, transactionId);
   }
 
   function onCancelSend(transactionId: string): void {
-    void core.cancelSend(resolvedRoomId, transactionId);
+    void core.commands.cancelSend(resolvedRoomId, transactionId);
   }
 
   function onToggleReaction(eventId: string, key: string): void {
-    void core.toggleReaction(resolvedRoomId, eventId, key);
+    void core.commands.toggleReaction(resolvedRoomId, eventId, key);
   }
 
   function onVotePoll(eventId: string, answers: string[]): void {
-    void core.votePoll(resolvedRoomId, eventId, answers);
+    void core.commands.votePoll(resolvedRoomId, eventId, answers);
   }
 
   function onEndPoll(eventId: string): void {
-    void core.endPoll(resolvedRoomId, eventId);
+    void core.commands.endPoll(resolvedRoomId, eventId);
   }
 
   function onDelete(eventId: string, reason: string | null): void {
-    void core.redact(resolvedRoomId, eventId, reason);
+    void core.commands.redact(resolvedRoomId, eventId, reason);
   }
 
   function onReply(eventId: string): void {
@@ -624,7 +637,6 @@
       onMembers={toggleMembers}
       onSearch={openSearch}
       onTopic={() => (topicOpen = true)}
-      {initials}
     >
       {#snippet pins()}
         <RoomPinMenu
@@ -650,7 +662,7 @@
       {/snippet}
     </RoomHeader>
     {#if call.roomId === resolvedRoomId && (call.active || call.failure)}
-      <CallView session={call} members={memberLoader.members} {initials} />
+      <CallView session={call} members={memberLoader.members} />
     {/if}
     {#key resolvedRoomId}
       <TimelineList

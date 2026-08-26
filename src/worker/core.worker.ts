@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import init, { SableCore, setPanicHandler } from '#src/generated/wasm/sable_wasm.js';
-import { clearSession, loadSession, saveSession } from '#src/platform/sessionStorage';
+import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 
 declare const self: SharedWorkerGlobalScope;

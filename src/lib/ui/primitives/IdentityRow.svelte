@@ -20,7 +20,7 @@
   let {
     displayName,
     avatarUrl = null,
-    initials = displayName.slice(0, 1),
+    initials,
     color,
     size = 'small',
     class: className = '',
@@ -38,14 +38,14 @@
     aria-label={ariaLabel}
     {onclick}
   >
-    <Avatar src={avatarUrl} {initials} {color} {size} />
+    <Avatar src={avatarUrl} name={displayName} {initials} {color} {size} />
     <span class="identity-row-name name">{displayName}</span>
     {#if meta}<span class="identity-row-meta">{@render meta()}</span>{/if}
     {@render children?.()}
   </button>
 {:else}
   <div class={['identity-row', className]}>
-    <Avatar src={avatarUrl} {initials} {color} {size} />
+    <Avatar src={avatarUrl} name={displayName} {initials} {color} {size} />
     <span class="identity-row-name name">{displayName}</span>
     {#if meta}<span class="identity-row-meta">{@render meta()}</span>{/if}
     {@render children?.()}

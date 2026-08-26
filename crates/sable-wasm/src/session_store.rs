@@ -27,12 +27,14 @@ async fn call(function: &Function, argument: &JsValue) -> Result<JsValue, JsValu
 
 #[async_trait(?Send)]
 impl SessionStore for JsSessionStore {
-    async fn load(&self) -> Option<Vec<u8>> {
-        let value = call(&self.load, &JsValue::UNDEFINED).await.ok()?;
+    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        let value = call(&self.load, &JsValue::UNDEFINED)
+            .await
+            .map_err(|error| format!("{error:?}"))?;
         if value.is_null() || value.is_undefined() {
-            return None;
+            return Ok(None);
         }
-        Some(Uint8Array::new(&value).to_vec())
+        Ok(Some(Uint8Array::new(&value).to_vec()))
     }
 
     async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
@@ -77,10 +79,10 @@ mod tests {
         let store = store();
 
         store.save(vec![1, 2, 3]).await.expect("save");
-        assert_eq!(store.load().await, Some(vec![1, 2, 3]));
+        assert_eq!(store.load().await, Ok(Some(vec![1, 2, 3])));
 
         store.clear().await.expect("clear");
-        assert_eq!(store.load().await, None);
+        assert_eq!(store.load().await, Ok(None));
     }
 
     #[wasm_bindgen_test]
@@ -91,7 +93,7 @@ mod tests {
             Function::new_no_args("return 42;"),
         );
 
-        assert!(store.load().await.is_none());
+        store.load().await.unwrap_err();
         assert!(store.save(vec![1]).await.is_err());
         assert!(store.clear().await.is_err());
     }

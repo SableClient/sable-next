@@ -396,16 +396,24 @@ impl Core {
         Ok(())
     }
 
-    async fn persona_account_data(&self, event_type: GlobalAccountDataEventType) -> Option<Value> {
-        self.client()
-            .await
-            .ok()?
+    async fn persona_account_data(
+        &self,
+        event_type: GlobalAccountDataEventType,
+    ) -> Result<Option<Value>, CommandErr> {
+        let Some(raw) = self
+            .client()
+            .await?
             .account()
             .fetch_account_data(event_type)
             .await
-            .ok()
-            .flatten()
-            .and_then(|raw| raw.deserialize_as::<Value>().ok())
+            .map_err(|error| self.failed("personas: fetch_account_data", error))?
+        else {
+            return Ok(None);
+        };
+
+        raw.deserialize_as::<Value>()
+            .map(Some)
+            .map_err(|error| self.failed("personas: deserialize", error))
     }
 
     async fn put_persona_account_data(
@@ -429,7 +437,7 @@ impl Core {
     async fn load_personas(&self) -> Result<Vec<PersonaView>, CommandErr> {
         if let Some(content) = self
             .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V3))
-            .await
+            .await?
             && content.get("profiles").is_some()
         {
             return Ok(personas_from_catalog(&content));
@@ -437,7 +445,7 @@ impl Core {
 
         let Some(content) = self
             .persona_account_data(GlobalAccountDataEventType::from(CATALOG_V2))
-            .await
+            .await?
         else {
             return Ok(Vec::new());
         };
@@ -459,22 +467,24 @@ impl Core {
         .await
     }
 
-    async fn account_selection(&self) -> Option<PersonaSelectionView> {
-        self.persona_account_data(selection_event("globalassociation"))
+    async fn account_selection(&self) -> Result<Option<PersonaSelectionView>, CommandErr> {
+        Ok(self
+            .persona_account_data(selection_event("globalassociation"))
             .await?
-            .get("association")
-            .and_then(selection_from_json)
+            .as_ref()
+            .and_then(|content| content.get("association"))
+            .and_then(selection_from_json))
     }
 
-    async fn room_selections(&self) -> BTreeMap<String, PersonaSelectionView> {
+    async fn room_selections(&self) -> Result<BTreeMap<String, PersonaSelectionView>, CommandErr> {
         let Some(content) = self
             .persona_account_data(selection_event("roomassociation"))
-            .await
+            .await?
         else {
-            return BTreeMap::new();
+            return Ok(BTreeMap::new());
         };
 
-        content
+        Ok(content
             .get("associations")
             .and_then(Value::as_object)
             .map(|associations| {
@@ -485,14 +495,14 @@ impl Core {
                     })
                     .collect()
             })
-            .unwrap_or_default()
+            .unwrap_or_default())
     }
 
     pub(crate) async fn personas(&self) -> Result<PersonaCatalogView, CommandErr> {
         Ok(PersonaCatalogView {
             personas: self.load_personas().await?,
-            account: self.account_selection().await,
-            rooms: self.room_selections().await,
+            account: self.account_selection().await?,
+            rooms: self.room_selections().await?,
         })
     }
 
@@ -532,7 +542,7 @@ impl Core {
     }
 
     async fn repoint_selections(&self, from: &str, to: Option<&str>) -> Result<(), CommandErr> {
-        if let Some(account) = self.account_selection().await
+        if let Some(account) = self.account_selection().await?
             && account.persona_id == from
         {
             let content = to.map_or_else(
@@ -548,7 +558,7 @@ impl Core {
                 .await?;
         }
 
-        let mut rooms = self.room_selections().await;
+        let mut rooms = self.room_selections().await?;
         let affected: Vec<String> = rooms
             .iter()
             .filter(|(_, selection)| selection.persona_id == from)
@@ -611,7 +621,7 @@ impl Core {
                 .await;
         };
 
-        let mut rooms = self.room_selections().await;
+        let mut rooms = self.room_selections().await?;
         match selection {
             Some(selection) => {
                 rooms.insert(room_id.to_string(), selection);

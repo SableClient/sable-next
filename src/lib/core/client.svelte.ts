@@ -1,7 +1,3 @@
-import type { BookmarkView } from '#src/generated/BookmarkView';
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
-import type { PersonaView } from '#src/generated/PersonaView';
 import type { CoreEvent } from '#src/generated/CoreEvent';
 import type { DeviceView } from '#src/generated/DeviceView';
 import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
@@ -9,67 +5,26 @@ import type { SearchCoverageView } from '#src/generated/SearchCoverageView';
 import type { AuthIntent } from '#src/generated/AuthIntent';
 import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
 import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
-import type { ImagePackView } from '#src/generated/ImagePackView';
-import type { JoinRuleView } from '#src/generated/JoinRuleView';
-import type { MemberView } from '#src/generated/MemberView';
-import type { MembershipView } from '#src/generated/MembershipView';
-import type { NotificationModeView } from '#src/generated/NotificationModeView';
-import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
-import type { PusherView } from '#src/generated/PusherView';
-import type { RoomTag } from '#src/generated/RoomTag';
-import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-import type { CallSupportView } from '#src/generated/CallSupportView';
-import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
-import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
-import type { SearchFilter } from '#src/generated/SearchFilter';
-import type { SearchHitView } from '#src/generated/SearchHitView';
-import type { SearchOrder } from '#src/generated/SearchOrder';
-import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SidebarItemView } from '#src/generated/SidebarItemView';
 import type { SessionInfo } from '#src/generated/SessionInfo';
-import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
-import type { SubscriptionId } from '#src/generated/SubscriptionId';
 import type { SyncStatus } from '#src/generated/SyncStatus';
-import type { PaginationDirection } from '#src/generated/PaginationDirection';
 import type { MutualRoomView } from '#src/generated/MutualRoomView';
-import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
 import type { ProfileView } from '#src/generated/ProfileView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
 import type { VerificationView } from '#src/generated/VerificationView';
 
-import { maxAttachmentBytes } from './limits';
+import { createCommands } from './commands.svelte.js';
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
+import { on } from 'svelte/events';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
-export interface OutgoingMentions {
-  userIds: string[];
-  room: boolean;
-}
-
-const noMentions: OutgoingMentions = { userIds: [], room: false };
+export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
 
 const profileCacheFreshMs = 10 * 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
-const EMPTY_SEARCH_FILTER: SearchFilter = {
-  rooms: [],
-  senders: [],
-  mentions: [],
-  has: [],
-  not_rooms: [],
-  not_senders: [],
-  not_mentions: [],
-  not_has: [],
-  after_ts: null,
-  before_ts: null,
-  phrases: [],
-  exclude: [],
-};
 
 async function resolveHomeserverInPage(
   homeserver: string,
@@ -166,10 +121,16 @@ export class CoreClient {
   private readonly resolvedHomeservers = new Map<string, string>();
   /* eslint-enable svelte/prefer-svelte-reactivity */
 
-  constructor() {
-    this.accountChannel?.addEventListener('message', () => {
-      void this.syncAccountFromWorker();
-    });
+  private stopAccountChannel: (() => void) | null = null;
+
+  readonly commands = createCommands(() => this.ensureTransport());
+
+  constructor(private readonly openTransport: () => Transport = createTransport) {
+    if (this.accountChannel) {
+      this.stopAccountChannel = on(this.accountChannel, 'message', () => {
+        void this.syncAccountFromWorker();
+      });
+    }
   }
 
   async start(): Promise<void> {
@@ -309,26 +270,6 @@ export class CoreClient {
     return result;
   }
 
-  async requestRegistrationEmail(email: string): Promise<RegistrationResultView> {
-    const response = await this.ensureTransport().send({
-      type: 'request_registration_email',
-      email,
-    });
-    return response.result;
-  }
-
-  async submitRegistrationEmail(token: string): Promise<RegistrationResultView> {
-    const response = await this.ensureTransport().send({
-      type: 'submit_registration_email',
-      token,
-    });
-    return response.result;
-  }
-
-  async cancelRegistration(): Promise<void> {
-    await this.ensureTransport().send({ type: 'cancel_registration' });
-  }
-
   async startOidcLogin(
     homeserver: string,
     redirectUri: string,
@@ -433,224 +374,6 @@ export class CoreClient {
     }
   }
 
-  async subscribeRoomList(): Promise<{
-    subscription: SubscriptionId;
-    rooms: RoomSummary[];
-  }> {
-    const response = await this.ensureTransport().send({
-      type: 'subscribe_room_list',
-    });
-    return response;
-  }
-
-  async subscribeTimeline(
-    roomId: string,
-    eventId: string | null = null,
-    hiddenEvents = false
-  ): Promise<{ subscription: SubscriptionId; items: TimelineItemView[] }> {
-    const response = await this.ensureTransport().send({
-      type: 'subscribe_timeline',
-      room_id: roomId,
-      event_id: eventId,
-      hidden_events: hiddenEvents,
-    });
-    return response;
-  }
-
-  async paginate(
-    subscription: SubscriptionId,
-    direction: PaginationDirection,
-    count: number
-  ): Promise<{ reached_end: boolean }> {
-    const response = await this.ensureTransport().send({
-      type: 'paginate',
-      subscription,
-      direction,
-      count,
-    });
-    return { reached_end: response.reached_end };
-  }
-
-  async roomMembers(
-    roomId: string,
-    memberships: readonly MembershipView[] = []
-  ): Promise<MemberView[]> {
-    const response = await this.ensureTransport().send({
-      type: 'room_members',
-      room_id: roomId,
-      memberships: [...memberships],
-    });
-    return response.members;
-  }
-
-  async callSupport(roomId: string): Promise<CallSupportView> {
-    const response = await this.ensureTransport().send({ type: 'call_support', room_id: roomId });
-    return response;
-  }
-
-  async roomAliases(roomId: string): Promise<string[]> {
-    const response = await this.ensureTransport().send({ type: 'room_aliases', room_id: roomId });
-    return response.aliases;
-  }
-
-  async createRoomAlias(roomId: string, alias: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'create_room_alias', room_id: roomId, alias });
-  }
-
-  async deleteRoomAlias(alias: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'delete_room_alias', alias });
-  }
-
-  async roomDirectoryVisibility(roomId: string): Promise<boolean> {
-    const response = await this.ensureTransport().send({
-      type: 'room_directory_visibility',
-      room_id: roomId,
-    });
-    return response.public;
-  }
-
-  async setRoomDirectoryVisibility(roomId: string, isPublic: boolean): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_directory_visibility',
-      room_id: roomId,
-      public: isPublic,
-    });
-  }
-
-  async roomVersions(): Promise<RoomVersionsView> {
-    const response = await this.ensureTransport().send({
-      type: 'room_versions',
-    });
-    return response;
-  }
-
-  async upgradeRoom(
-    roomId: string,
-    newVersion: string,
-    additionalCreators: readonly string[] = []
-  ): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'upgrade_room',
-      room_id: roomId,
-      new_version: newVersion,
-      additional_creators: [...additionalCreators],
-    });
-    return response.replacement_room;
-  }
-
-  async roomStateEvent(roomId: string, eventType: string, stateKey = ''): Promise<unknown> {
-    const response = await this.ensureTransport().send({
-      type: 'room_state_event',
-      room_id: roomId,
-      event_type: eventType,
-      state_key: stateKey,
-    });
-    return response.content;
-  }
-
-  async roomPermissions(roomId: string): Promise<RoomPermissionsView> {
-    const response = await this.ensureTransport().send({
-      type: 'room_permissions',
-      room_id: roomId,
-    });
-    return response;
-  }
-
-  async roomPowerLevels(roomId: string): Promise<RoomPowerLevelsView> {
-    const response = await this.ensureTransport().send({
-      type: 'room_power_levels',
-      room_id: roomId,
-    });
-    return response;
-  }
-
-  async timestampToEvent(
-    roomId: string,
-    ts: number,
-    direction: PaginationDirection = 'backward'
-  ): Promise<string | null> {
-    const response = await this.ensureTransport().send({
-      type: 'timestamp_to_event',
-      room_id: roomId,
-      ts,
-      direction,
-    });
-    return response.event_id;
-  }
-
-  async roomAccountData(roomId: string, eventType: string): Promise<unknown> {
-    const response = await this.ensureTransport().send({
-      type: 'room_account_data',
-      room_id: roomId,
-      event_type: eventType,
-    });
-    return response.content;
-  }
-
-  async setRoomAccountData(roomId: string, eventType: string, content: unknown): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_account_data',
-      room_id: roomId,
-      event_type: eventType,
-      content,
-    });
-  }
-
-  async searchMessages(
-    query: string,
-    options: {
-      filter?: SearchFilter;
-      order?: SearchOrder;
-      limit?: number;
-      offset?: number;
-    } = {}
-  ): Promise<SearchHitView[]> {
-    const response = await this.ensureTransport().send({
-      type: 'search_messages',
-      query,
-      filter: options.filter ?? EMPTY_SEARCH_FILTER,
-      order: options.order ?? 'rank',
-      limit: options.limit ?? 30,
-      offset: options.offset ?? 0,
-    });
-    return response.hits;
-  }
-
-  async joinCall(roomId: string, livekitServiceUrl: string | null = null): Promise<CallGrant> {
-    const response = await this.ensureTransport().send({
-      type: 'join_call',
-      room_id: roomId,
-      livekit_service_url: livekitServiceUrl,
-    });
-    return {
-      session: response.session,
-      url: response.url,
-      jwt: response.jwt,
-      identity: response.identity,
-      encryptMedia: response.encrypt_media,
-    };
-  }
-
-  async leaveCall(session: number): Promise<void> {
-    await this.ensureTransport().send({ type: 'leave_call', session });
-  }
-
-  async declineCall(roomId: string, notificationEventId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'decline_call',
-      room_id: roomId,
-      notification_event_id: notificationEventId,
-    });
-  }
-
-  async imagePacks(roomId: string): Promise<ImagePackView[]> {
-    const response = await this.ensureTransport().send({
-      type: 'image_packs',
-      room_id: roomId,
-    });
-    return response.packs;
-  }
-
   async userProfile(userId: string): Promise<ProfileView> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.profileCache.get(userId);
@@ -725,529 +448,6 @@ export class CoreClient {
     this.relationsCache.delete(userId);
   }
 
-  async inviteUser(roomId: string, userId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'invite_user',
-      room_id: roomId,
-      user_id: userId,
-    });
-  }
-
-  async kickUser(roomId: string, userId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'kick_user',
-      room_id: roomId,
-      user_id: userId,
-      reason: null,
-    });
-  }
-
-  async banUser(roomId: string, userId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'ban_user',
-      room_id: roomId,
-      user_id: userId,
-      reason: null,
-    });
-  }
-
-  async unbanUser(roomId: string, userId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'unban_user',
-      room_id: roomId,
-      user_id: userId,
-      reason: null,
-    });
-  }
-
-  async createRoom(options: CreateRoomOptions): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'create_room',
-      name: options.name ?? null,
-      topic: options.topic ?? null,
-      kind: options.kind ?? 'text',
-      public: options.public ?? false,
-      encrypted: options.encrypted ?? true,
-      invite: options.invite ?? [],
-      parent_space: options.parentSpace ?? null,
-    });
-    return response.room_id;
-  }
-
-  /** Always creates a room; it does not look for an existing DM with this user. */
-  async createDm(userId: string): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'create_dm',
-      user_id: userId,
-    });
-    return response.room_id;
-  }
-
-  /** Works for a room this account has not joined. */
-  async roomPreview(address: string, via: string[] = []): Promise<RoomPreviewView> {
-    const response = await this.ensureTransport().send({
-      type: 'room_preview',
-      address,
-      via,
-    });
-    return response.preview;
-  }
-
-  /** `address` is a room id or an alias. Returns the resolved id. */
-  async joinRoom(address: string, via: string[] = []): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'join_room',
-      address,
-      via,
-    });
-    return response.room_id;
-  }
-
-  /** The only way into a `knock` room; `joinRoom` is refused on one. */
-  async knockRoom(address: string, via: string[] = [], reason?: string): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'knock_room',
-      address,
-      via,
-      reason: reason ?? null,
-    });
-    return response.room_id;
-  }
-
-  /** Empty for a room with a canonical alias, which routes on its own. */
-  async roomViaServers(roomId: string): Promise<string[]> {
-    const response = await this.ensureTransport().send({
-      type: 'room_via_servers',
-      room_id: roomId,
-    });
-    return response.servers;
-  }
-
-  /** Also how an invitation is declined. */
-  async leaveRoom(roomId: string): Promise<void> {
-    await this.ensureTransport().send({ type: 'leave_room', room_id: roomId });
-  }
-
-  async addToSpace(spaceId: string, roomId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'add_to_space',
-      space_id: spaceId,
-      room_id: roomId,
-    });
-  }
-
-  /**
-   * The server's own view, so it includes rooms this account has not joined. The
-   * root space is in `rooms`; walk its `children` to rebuild the tree.
-   */
-  async spaceHierarchy(
-    spaceId: string,
-    from: string | null = null
-  ): Promise<{ rooms: SpaceHierarchyRoomView[]; nextBatch: string | null }> {
-    const response = await this.ensureTransport().send({
-      type: 'space_hierarchy',
-      space_id: spaceId,
-      from,
-    });
-    return { rooms: response.rooms, nextBatch: response.next_batch };
-  }
-
-  async removeFromSpace(spaceId: string, roomId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'remove_from_space',
-      space_id: spaceId,
-      room_id: roomId,
-    });
-  }
-
-  async setSpaceChildOrder(spaceId: string, roomId: string, order: string | null): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_space_child_order',
-      space_id: spaceId,
-      room_id: roomId,
-      order,
-    });
-  }
-
-  async spaceSidebar(): Promise<SidebarItemView[]> {
-    const response = await this.ensureTransport().send({
-      type: 'space_sidebar',
-    });
-    return response.items;
-  }
-
-  async setSpaceSidebar(items: readonly SidebarItemView[]): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_space_sidebar',
-      items: [...items],
-    });
-  }
-
-  async sendMessage(
-    roomId: string,
-    body: string,
-    inReplyTo: string | null = null,
-    formatted: string | null = null,
-    mentions: OutgoingMentions = noMentions,
-    persona: PerMessageProfileView | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'send_message',
-      room_id: roomId,
-      body,
-      formatted,
-      in_reply_to: inReplyTo,
-      mentions: mentions.userIds,
-      mentions_room: mentions.room,
-      persona: $state.snapshot(persona),
-    });
-  }
-
-  async sendSticker(
-    roomId: string,
-    url: string,
-    body: string,
-    inReplyTo: string | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'send_sticker',
-      room_id: roomId,
-      url,
-      body,
-      in_reply_to: inReplyTo,
-    });
-  }
-
-  async sendGif(
-    roomId: string,
-    url: string,
-    body: string,
-    width: number | null,
-    height: number | null,
-    mimetype: string,
-    size: number | null = null,
-    inReplyTo: string | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'send_gif',
-      room_id: roomId,
-      url,
-      body,
-      width,
-      height,
-      mimetype,
-      size,
-      in_reply_to: inReplyTo,
-    });
-  }
-
-  async sendLocation(
-    roomId: string,
-    body: string,
-    geoUri: string,
-    inReplyTo: string | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'send_location',
-      room_id: roomId,
-      body,
-      geo_uri: geoUri,
-      in_reply_to: inReplyTo,
-    });
-  }
-
-  async editMessage(
-    roomId: string,
-    eventId: string,
-    body: string,
-    formatted: string | null = null,
-    mentions: OutgoingMentions = noMentions,
-    persona: PerMessageProfileView | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'edit_message',
-      room_id: roomId,
-      event_id: eventId,
-      body,
-      formatted,
-      mentions: mentions.userIds,
-      mentions_room: mentions.room,
-      persona: $state.snapshot(persona),
-    });
-  }
-
-  /** The filled-in details arrive on the timeline diff stream, not here. */
-  async fetchEventDetails(roomId: string, eventId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'fetch_event_details',
-      room_id: roomId,
-      event_id: eventId,
-    });
-  }
-
-  async redact(roomId: string, eventId: string, reason: string | null = null): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'redact',
-      room_id: roomId,
-      event_id: eventId,
-      reason,
-    });
-  }
-
-  async pinnedEvents(roomId: string): Promise<string[]> {
-    const response = await this.ensureTransport().send({
-      type: 'pinned_events',
-      room_id: roomId,
-    });
-    return response.event_ids;
-  }
-
-  async setPinned(roomId: string, eventId: string, pinned: boolean): Promise<string[]> {
-    const response = await this.ensureTransport().send({
-      type: 'set_pinned',
-      room_id: roomId,
-      event_id: eventId,
-      pinned,
-    });
-    return response.event_ids;
-  }
-
-  async reportMessage(
-    roomId: string,
-    eventId: string,
-    reason: string | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'report_message',
-      room_id: roomId,
-      event_id: eventId,
-      reason,
-    });
-  }
-
-  async eventSource(roomId: string, eventId: string): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'event_source',
-      room_id: roomId,
-      event_id: eventId,
-    });
-    return response.source;
-  }
-
-  async personas(): Promise<PersonaCatalogView> {
-    const response = await this.ensureTransport().send({ type: 'personas' });
-    return response.catalog;
-  }
-
-  async savePersona(
-    persona: PersonaView,
-    previousId: string | null = null
-  ): Promise<PersonaView[]> {
-    const response = await this.ensureTransport().send({
-      type: 'save_persona',
-      persona,
-      previous_id: previousId,
-    });
-    return response.personas;
-  }
-
-  async removePersona(id: string): Promise<PersonaView[]> {
-    const response = await this.ensureTransport().send({
-      type: 'remove_persona',
-      id,
-    });
-    return response.personas;
-  }
-
-  async setPersonaSelection(
-    roomId: string | null,
-    personaId: string | null,
-    validUntil: number | null = null
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_persona_selection',
-      room_id: roomId,
-      persona_id: personaId,
-      valid_until: validUntil,
-    });
-  }
-
-  async bookmarks(): Promise<BookmarkView[]> {
-    const response = await this.ensureTransport().send({ type: 'bookmarks' });
-    return response.bookmarks;
-  }
-
-  async setBookmark(roomId: string, eventId: string, bookmarked: boolean): Promise<boolean> {
-    const response = await this.ensureTransport().send({
-      type: 'set_bookmark',
-      room_id: roomId,
-      event_id: eventId,
-      bookmarked,
-      now_ms: Date.now(),
-    });
-    return response.bookmarked;
-  }
-
-  async forwardMessage(roomId: string, eventId: string, toRoomId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'forward_message',
-      room_id: roomId,
-      event_id: eventId,
-      to_room_id: toRoomId,
-    });
-  }
-
-  /** The core toggles, so sending the same key twice redacts the reaction. */
-  async toggleReaction(roomId: string, eventId: string, key: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'react',
-      room_id: roomId,
-      event_id: eventId,
-      key,
-    });
-  }
-
-  async createPoll(
-    roomId: string,
-    question: string,
-    answers: readonly string[],
-    undisclosed = false,
-    maxSelections = 1
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'create_poll',
-      room_id: roomId,
-      question,
-      answers: [...answers],
-      undisclosed,
-      max_selections: maxSelections,
-    });
-  }
-
-  /** Replaces any earlier vote; an empty selection abstains. */
-  async votePoll(roomId: string, eventId: string, answers: readonly string[]): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'vote_poll',
-      room_id: roomId,
-      event_id: eventId,
-      answers: [...answers],
-    });
-  }
-
-  async endPoll(roomId: string, eventId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'end_poll',
-      room_id: roomId,
-      event_id: eventId,
-    });
-  }
-
-  async retrySend(roomId: string, transactionId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'retry_send',
-      room_id: roomId,
-      transaction_id: transactionId,
-    });
-  }
-
-  async cancelSend(roomId: string, transactionId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'cancel_send',
-      room_id: roomId,
-      transaction_id: transactionId,
-    });
-  }
-
-  async sendAttachment(
-    roomId: string,
-    file: File,
-    options: { caption?: string | null; inReplyTo?: string | null } = {}
-  ): Promise<void> {
-    if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await this.ensureTransport().sendAttachment({
-      roomId,
-      filename: file.name,
-      mime: file.type || 'application/octet-stream',
-      bytes,
-      caption: options.caption ?? null,
-      inReplyTo: options.inReplyTo ?? null,
-    });
-  }
-
-  fetchMedia(source: string, width: number, height: number): Promise<Uint8Array<ArrayBuffer>> {
-    return this.ensureTransport().fetchMedia(source, width, height);
-  }
-
-  async markRead(roomId: string, eventId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'mark_read',
-      room_id: roomId,
-      event_id: eventId,
-    });
-  }
-
-  async notificationSettings(roomId: string): Promise<NotificationSettingsView> {
-    const response = await this.ensureTransport().send({
-      type: 'notification_settings',
-      room_id: roomId,
-    });
-    return response;
-  }
-
-  /** `null` drops the room's own rule so it follows the account default. */
-  async setRoomNotificationMode(roomId: string, mode: NotificationModeView | null): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_notification_mode',
-      room_id: roomId,
-      mode,
-    });
-  }
-
-  async defaultNotificationModes(): Promise<{
-    direct: NotificationModeView;
-    group: NotificationModeView;
-  }> {
-    const response = await this.ensureTransport().send({
-      type: 'default_notification_modes',
-    });
-    return { direct: response.direct, group: response.group };
-  }
-
-  async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_default_notification_mode',
-      direct,
-      mode,
-    });
-  }
-
-  async setPusher(pusher: PusherView): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_pusher', pusher });
-  }
-
-  async removePusher(pushkey: string, appId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'remove_pusher',
-      pushkey,
-      app_id: appId,
-    });
-  }
-
-  async setNotificationContent(visible: boolean): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_notification_content',
-      visible,
-    });
-  }
-
-  async encryptionStatus(): Promise<EncryptionStatusView> {
-    const response = await this.ensureTransport().send({
-      type: 'encryption_status',
-    });
-    return response.status;
-  }
-
   async refreshSearchCoverage(attempts = 3): Promise<void> {
     const generation = this.generation;
 
@@ -1268,40 +468,6 @@ export class CoreClient {
     }
 
     if (generation === this.generation) this.searchCoverageUnavailable = true;
-  }
-
-  async devices(): Promise<{
-    devices: DeviceView[];
-    accountManagement: boolean;
-  }> {
-    const response = await this.ensureTransport().send({ type: 'devices' });
-    return {
-      devices: response.devices,
-      accountManagement: response.account_management,
-    };
-  }
-
-  async recoverIdentity(recoveryKey: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'recover_identity',
-      recovery_key: recoveryKey,
-    });
-  }
-
-  async enableRecovery(): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'enable_recovery',
-      passphrase: null,
-    });
-    return response.recovery_key;
-  }
-
-  async resetRecoveryKey(): Promise<string> {
-    const response = await this.ensureTransport().send({
-      type: 'reset_recovery_key',
-      passphrase: null,
-    });
-    return response.recovery_key;
   }
 
   async switchAccount(accountId: string): Promise<void> {
@@ -1331,23 +497,6 @@ export class CoreClient {
     this.status = 'signed-out';
   }
 
-  async renameDevice(deviceId: string, displayName: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'rename_device',
-      device_id: deviceId,
-      display_name: displayName,
-    });
-  }
-
-  async deleteDevice(deviceId: string, password: string | null): Promise<string | null> {
-    const response = await this.ensureTransport().send({
-      type: 'delete_device',
-      device_id: deviceId,
-      password,
-    });
-    return response.management_url;
-  }
-
   async requestVerification(userId: string): Promise<string> {
     const response = await this.ensureTransport().send({
       type: 'request_verification',
@@ -1360,47 +509,6 @@ export class CoreClient {
     return response.flow_id;
   }
 
-  async acceptVerification(userId: string, flowId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'accept_verification',
-      user_id: userId,
-      flow_id: flowId,
-    });
-  }
-
-  async confirmVerification(userId: string, flowId: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'confirm_verification',
-      user_id: userId,
-      flow_id: flowId,
-    });
-  }
-
-  async cancelVerification(userId: string, flowId: string, mismatch = false): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'cancel_verification',
-      user_id: userId,
-      flow_id: flowId,
-      mismatch,
-    });
-  }
-
-  async setTyping(roomId: string, typing: boolean): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_typing',
-      room_id: roomId,
-      typing,
-    });
-  }
-
-  async setDisplayName(name: string | null): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_display_name', name });
-  }
-
-  async setAvatarUrl(url: string | null): Promise<void> {
-    await this.ensureTransport().send({ type: 'set_avatar_url', url });
-  }
-
   async setProfileField(field: string, value: unknown): Promise<void> {
     await this.ensureTransport().send({
       type: 'set_profile_field',
@@ -1410,118 +518,20 @@ export class CoreClient {
     this.profileCache.delete(this.session?.user_id ?? '');
   }
 
-  async accountContacts(): Promise<string[]> {
-    const response = await this.ensureTransport().send({
-      type: 'account_contacts',
-    });
-    return response.emails;
-  }
-
-  async ignoredUsers(): Promise<string[]> {
-    const response = await this.ensureTransport().send({
-      type: 'ignored_users',
-    });
-    return response.users;
-  }
-
-  /** `m.direct` is client-owned; nothing else will correct it. */
-  async setDirect(roomId: string, direct: boolean): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_direct',
-      room_id: roomId,
-      direct,
-    });
-  }
-
-  async setRoomTag(roomId: string, tag: RoomTag, set: boolean): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_tag',
-      room_id: roomId,
-      tag,
-      set,
-    });
-  }
-
-  async setRoomName(roomId: string, name: string | null): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_name',
-      room_id: roomId,
-      name,
-    });
-  }
-
-  async setRoomTopic(roomId: string, topic: string): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_topic',
-      room_id: roomId,
-      topic,
-    });
-  }
-
-  async setRoomAvatar(roomId: string, url: string | null): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_avatar',
-      room_id: roomId,
-      url,
-    });
-  }
-
   async uploadRoomAvatar(
     roomId: string,
     mime: string,
     bytes: Uint8Array<ArrayBuffer>
   ): Promise<string> {
     const uri = await this.ensureTransport().uploadMedia(mime, bytes);
-    await this.setRoomAvatar(roomId, uri);
+    await this.commands.setRoomAvatar(roomId, uri);
     return uri;
-  }
-
-  async setRoomJoinRule(roomId: string, rule: JoinRuleView): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_room_join_rule',
-      room_id: roomId,
-      rule,
-    });
-  }
-
-  /** Escape hatch for unmodelled state; prefer a typed method where one exists. */
-  async sendStateEvent(
-    roomId: string,
-    eventType: string,
-    stateKey: string,
-    content: unknown
-  ): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'send_state_event',
-      room_id: roomId,
-      event_type: eventType,
-      state_key: stateKey,
-      content,
-    });
-  }
-
-  /** Lowering your own cannot be undone: the level to raise it back is gone. */
-  async setUserPowerLevel(roomId: string, userId: string, powerLevel: number): Promise<void> {
-    await this.ensureTransport().send({
-      type: 'set_user_power_level',
-      room_id: roomId,
-      user_id: userId,
-      power_level: powerLevel,
-    });
-  }
-
-  async uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-    return this.ensureTransport().uploadMedia(mime, bytes);
   }
 
   async uploadAvatar(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
     const uri = await this.ensureTransport().uploadMedia(mime, bytes);
-    await this.setAvatarUrl(uri);
+    await this.commands.setAvatarUrl(uri);
     return uri;
-  }
-
-  async unsubscribe(subscription: SubscriptionId): Promise<void> {
-    await this.ensureTransport().send({ type: 'unsubscribe', subscription });
   }
 
   subscribeEvents(onEvent: (event: CoreEvent) => void): () => void {
@@ -1541,6 +551,8 @@ export class CoreClient {
     this.verification = null;
     this.resetCachedState();
     this.status = 'idle';
+    this.stopAccountChannel?.();
+    this.stopAccountChannel = null;
     this.accountChannel?.close();
   }
 
@@ -1562,7 +574,10 @@ export class CoreClient {
   private async primeEncryptionStatus(): Promise<void> {
     const generation = this.generation;
     try {
-      const [status, devices] = await Promise.all([this.encryptionStatus(), this.devices()]);
+      const [status, devices] = await Promise.all([
+        this.commands.encryptionStatus(),
+        this.commands.devices(),
+      ]);
       if (generation !== this.generation) return;
       this.encryption = status;
       this.deviceList = devices.devices;
@@ -1629,7 +644,7 @@ export class CoreClient {
   private ensureTransport(): Transport {
     if (this.transport) return this.transport;
 
-    const transport = createTransport();
+    const transport = this.openTransport();
     this.transport = transport;
     const unsubscribeEvents = transport.subscribe(this.handleEvent);
     const unsubscribeCrash = transport.subscribeCrash((message) => {
@@ -1670,28 +685,28 @@ export class CoreClient {
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {
-    if (event.type === 'sync_status') {
-      this.sync = event;
-      return;
+    switch (event.type) {
+      case 'sync_status':
+        this.sync = event;
+        return;
+      case 'encryption_status':
+        this.encryption = event.status;
+        return;
+      case 'devices_changed':
+        this.deviceList = event.devices;
+        return;
+      case 'search_coverage':
+        this.searchCoverage = event.coverage;
+        this.searchCoverageUnavailable = false;
+        return;
+      case 'session_ended':
+        this.replaceSession(null);
+        this.status = 'authenticating';
+        void this.restoreFallbackAccount();
+        return;
+      default:
+        return;
     }
-    if (event.type === 'encryption_status') {
-      this.encryption = event.status;
-      return;
-    }
-    if (event.type === 'devices_changed') {
-      this.deviceList = event.devices;
-      return;
-    }
-    if (event.type === 'search_coverage') {
-      this.searchCoverage = event.coverage;
-      this.searchCoverageUnavailable = false;
-      return;
-    }
-    if (event.type !== 'session_ended') return;
-
-    this.replaceSession(null);
-    this.status = 'authenticating';
-    void this.restoreFallbackAccount();
   };
 
   private async refreshAccounts(): Promise<void> {
@@ -1735,6 +750,6 @@ export class CoreClient {
   }
 }
 
-export function createCoreClient(): CoreClient {
-  return new CoreClient();
+export function createCoreClient(openTransport?: () => Transport): CoreClient {
+  return new CoreClient(openTransport);
 }

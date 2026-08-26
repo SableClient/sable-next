@@ -28,7 +28,7 @@
     void settingsChanges.version;
 
     let current = true;
-    void core
+    void core.commands
       .defaultNotificationModes()
       .then((modes) => {
         if (!current) return;
@@ -49,7 +49,7 @@
     if (isDirect) direct = mode;
     else group = mode;
 
-    void core.setDefaultNotificationMode(isDirect, mode).catch(() => {
+    void core.commands.setDefaultNotificationMode(isDirect, mode).catch(() => {
       failed = true;
     });
   }

@@ -54,11 +54,7 @@
             {#if suggestion.imageUrl}
               <MediaImage source={suggestion.imageUrl} alt="" width={24} height={24} />
             {:else}
-              <Avatar
-                size="small"
-                src={suggestion.avatarUrl}
-                initials={suggestion.label.slice(0, 1)}
-              />
+              <Avatar size="small" src={suggestion.avatarUrl} name={suggestion.label} />
             {/if}
             <span class="text">
               <span class="label">{suggestion.label}</span>

@@ -126,16 +126,23 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
   return count;
 }
 
-export function personasByEventId(
-  items: readonly TimelineItemView[]
-): Map<string, PerMessageProfileView> {
-  const personas = new Map<string, PerMessageProfileView>();
-  for (const item of items) {
-    if (item.event_id && item.per_message_profile) {
-      personas.set(item.event_id, item.per_message_profile);
+export type PersonaLookup = (eventId: string) => PerMessageProfileView | null;
+
+export function personaLookup(items: readonly TimelineItemView[]): PersonaLookup {
+  let personas: Map<string, PerMessageProfileView> | null = null;
+
+  return (eventId) => {
+    if (personas === null) {
+      personas = new Map();
+      for (const item of items) {
+        if (item.event_id && item.per_message_profile) {
+          personas.set(item.event_id, item.per_message_profile);
+        }
+      }
     }
-  }
-  return personas;
+
+    return personas.get(eventId) ?? null;
+  };
 }
 
 const senderColors = [
@@ -145,10 +152,6 @@ const senderColors = [
   'var(--sable-warn-main)',
   'var(--sable-crit-main)',
 ];
-
-export function initials(name: string): string {
-  return name.slice(0, 1).toLocaleUpperCase();
-}
 
 export function senderColor(sender: string | null): string {
   if (!sender) return senderColors[0];

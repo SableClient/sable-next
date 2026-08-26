@@ -25,6 +25,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import { toInitials } from '#lib/ui/primitives/initials.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
@@ -148,7 +149,7 @@
       return {
         href,
         activePrefix: href,
-        initial: initial(name),
+        initial: toInitials(name),
         avatar: room.avatar_url,
         label: name,
         unread: { unread: room.unread, highlight: room.highlight },
@@ -166,10 +167,6 @@
 
   function spaceName(name: string | null, roomId: string): string {
     return name ?? roomId;
-  }
-
-  function initial(name: string): string {
-    return name.slice(0, 1).toUpperCase();
   }
 
   function outlined(item: RailItem): boolean {
@@ -228,7 +225,7 @@
       href,
       activePrefix: href,
       navigateHref: spaceNavigationHref(href, savedPath, mobile, lobby),
-      initial: initial(name),
+      initial: toInitials(name),
       avatar: space.avatar_url,
       label: name,
       unread: spaceUnread.get(space.room_id),
@@ -496,7 +493,7 @@
       <Avatar
         class="folder-tile"
         src={space?.avatar_url}
-        initials={initial(spaceName(space?.name ?? null, roomId))}
+        name={spaceName(space?.name ?? null, roomId)}
         size="small"
       />
     {/each}

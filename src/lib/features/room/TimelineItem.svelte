@@ -1,6 +1,6 @@
 <script lang="ts">
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
-  import { Collapsible, ContextMenu, Tooltip as BitsTooltip } from 'bits-ui';
+  import { ContextMenu } from 'bits-ui';
   import { onDestroy } from 'svelte';
 
   import type { MemberView } from '#src/generated/MemberView';
@@ -9,15 +9,21 @@
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { LongPress } from './long-press.svelte.js';
+  import { findMember, isCaption, personaWithColor, stripReplyFallback } from './members.js';
+  import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import MediaContent from '#lib/ui/MediaContent.svelte';
-  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 
   import FormattedBody from './FormattedBody.svelte';
+  import MessageReactions from './MessageReactions.svelte';
+  import { usePinnedEvents } from './pinned-events.svelte.js';
+  import TimelineNotice from './TimelineNotice.svelte';
   import TimelineGallery from './TimelineGallery.svelte';
   import TimelineLocation from './TimelineLocation.svelte';
   import TimelinePoll from './TimelinePoll.svelte';
@@ -34,17 +40,13 @@
   import { openMessageMenu } from './message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
   import PersonaProfile from './PersonaProfile.svelte';
-  import ReactionPicker from './ReactionPicker.svelte';
   import ReactionsDialog from './ReactionsDialog.svelte';
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import type { MatrixLink } from './matrix-link';
-  import StateEventText from './StateEventText.svelte';
   import './avatar-button.css';
   import {
-    formatDate,
     formatTime,
-    initials,
     canRedact,
     isMessageRow,
     jumboEmojiLevel,
@@ -108,11 +110,7 @@
   }: Props = $props();
   const core = useCoreClient();
   let profile = $state<ProfileView | null>(null);
-  function memberOf(userId: string | null | undefined): MemberView | undefined {
-    if (!userId) return undefined;
-    return members.find((member) => member.user_id === userId);
-  }
-  let senderMember = $derived(memberOf(item.sender));
+  let senderMember = $derived(findMember(members, item.sender));
   let accountName = $derived(
     item.sender_name ??
       senderMember?.display_name ??
@@ -125,33 +123,16 @@
   let senderAvatar = $derived(
     persona?.avatar_url ?? item.sender_avatar ?? senderMember?.avatar_url ?? null
   );
-  let personaTint = $derived(tinted(persona));
+  let personaTint = $derived(personaWithColor(persona));
   let replyName = $derived(
     replyPersona?.display_name ??
       item.in_reply_to?.sender_name ??
-      memberOf(item.in_reply_to?.sender)?.display_name ??
+      findMember(members, item.in_reply_to?.sender)?.display_name ??
       item.in_reply_to?.sender ??
       $i18n.t('timeline.unknownSender')
   );
-  let replyBody = $derived(stripFallback(item.in_reply_to?.body ?? '', replyPersona));
+  let replyBody = $derived(stripReplyFallback(item.in_reply_to?.body ?? '', replyPersona));
 
-  function tinted(profile: PerMessageProfileView | null): PerMessageProfileView | null {
-    return profile && (profile.color_on_light ?? profile.color_on_dark) !== null ? profile : null;
-  }
-
-  function isCaption(body: string): boolean {
-    return !/^\S+\.[a-z0-9]{2,4}$/i.test(body);
-  }
-
-  function stripFallback(body: string, profile: PerMessageProfileView | null): string {
-    if (!profile) return body;
-    const name = profile.display_name?.trim();
-    if (name && body.startsWith(`${name}: `)) return body.slice(name.length + 2);
-    if (name && body.startsWith(`<${name}> `)) return body.slice(name.length + 3);
-    if (!profile.has_fallback) return body;
-    const separator = body.indexOf(': ');
-    return separator === -1 ? body : body.slice(separator + 2);
-  }
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
   let jumbo = $derived(
@@ -175,6 +156,12 @@
      Redaction is not. */
   let ownText = $derived(item.is_own && item.content.kind === 'message');
   let redactable = $derived(canRedact(item, canRedactOthers));
+  const swipe = new MessageSwipe({
+    enabled: () => actionable && actions.onReply !== undefined,
+    canEdit: () => actionable && actions.onEdit !== undefined,
+    onReply: () => actions.onReply?.(),
+    onEdit: () => actions.onEdit?.(),
+  });
   let avatarColor = $derived(personaTint || item.is_own ? undefined : senderColor(item.sender));
   let nameColor = $derived(
     item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
@@ -281,8 +268,7 @@
 
   async function togglePin(eventId: string): Promise<void> {
     try {
-      const ids = await core.setPinned(roomId, eventId, !pinned);
-      pinned = ids.includes(eventId);
+      await pinnedEvents.toggle(roomId, eventId);
     } catch (error) {
       console.warn('[sable timeline] pin failed', error);
     }
@@ -290,7 +276,7 @@
 
   async function toggleBookmark(eventId: string): Promise<void> {
     try {
-      bookmarked = await core.setBookmark(roomId, eventId, !bookmarked);
+      bookmarked = await core.commands.setBookmark(roomId, eventId, !bookmarked);
     } catch (error) {
       console.warn('[sable timeline] bookmark failed', error);
     }
@@ -298,7 +284,7 @@
 
   async function openSource(eventId: string): Promise<void> {
     try {
-      source = await core.eventSource(roomId, eventId);
+      source = await core.commands.eventSource(roomId, eventId);
       sourceOpen = true;
     } catch (error) {
       console.warn('[sable timeline] source unavailable', error);
@@ -308,7 +294,7 @@
   function report(reason: string | null): void {
     const eventId = item.event_id;
     if (!eventId) return;
-    void core.reportMessage(roomId, eventId, reason).catch((error: unknown) => {
+    void core.commands.reportMessage(roomId, eventId, reason).catch((error: unknown) => {
       console.warn('[sable timeline] report failed', error);
     });
   }
@@ -316,116 +302,43 @@
   function forward(toRoomId: string): void {
     const eventId = item.event_id;
     if (!eventId) return;
-    void core.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
+    void core.commands.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
       console.warn('[sable timeline] forward failed', error);
     });
   }
 
-  const LONG_PRESS_MS = 450;
-  const LONG_PRESS_SLOP_PX = 10;
   let sheetOpen = $state(false);
   let emoteOpen = $state(false);
   let sourceOpen = $state(false);
   let reportOpen = $state(false);
   let forwardOpen = $state(false);
   let source = $state('');
-  let pinned = $state(false);
+  const pinnedEvents = usePinnedEvents();
+  let pinned = $derived(pinnedEvents.has(item.event_id));
   let bookmarked = $state(false);
-
-  $effect(() => {
-    const eventId = item.event_id;
-    if (!roomId || !eventId) return;
-    void core
-      .pinnedEvents(roomId)
-      .then((ids) => (pinned = ids.includes(eventId)))
-      .catch(() => undefined);
-  });
   let deleteOpen = $state(false);
   let reactionsOpen = $state(false);
   let reactionActive = $state(0);
   let receiptsOpen = $state(false);
-  let peekOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
-  let pressTimer: ReturnType<typeof setTimeout> | undefined;
-  let pressOrigin: { x: number; y: number } | null = null;
-  let touchInteraction = $state(false);
-  let reactionPressTimer: ReturnType<typeof setTimeout> | undefined;
-  let reactionPressOrigin: { x: number; y: number } | null = null;
-  let reactionPressFired = false;
 
-  function startPress(event: PointerEvent): void {
-    touchInteraction = event.pointerType !== 'mouse';
-    if (event.pointerType === 'mouse' || !actionable) return;
-    pressOrigin = { x: event.clientX, y: event.clientY };
-    pressTimer = setTimeout(() => {
-      sheetOpen = true;
-      pressOrigin = null;
-    }, LONG_PRESS_MS);
-  }
+  const rowPress = new LongPress({
+    enabled: () => actionable,
+    onPress: () => (sheetOpen = true),
+  });
 
   function suppressTouchContextMenu(event: MouseEvent): void {
-    if (!touchInteraction) return;
+    if (!rowPress.touch) return;
     event.preventDefault();
-  }
-
-  function movePress(event: PointerEvent): void {
-    if (!pressOrigin) return;
-    const moved =
-      Math.abs(event.clientX - pressOrigin.x) > LONG_PRESS_SLOP_PX ||
-      Math.abs(event.clientY - pressOrigin.y) > LONG_PRESS_SLOP_PX;
-    if (moved) endPress();
   }
 
   $effect(() => {
     if (sheetOpen) openMessageMenu.set(item.id, false);
   });
 
-  function endPress(): void {
-    if (pressTimer) clearTimeout(pressTimer);
-    pressTimer = undefined;
-    pressOrigin = null;
-  }
-
-  function startReactionPress(event: PointerEvent, index: number): void {
-    if (event.pointerType === 'mouse') return;
-    event.stopPropagation();
-    reactionPressFired = false;
-    reactionPressOrigin = { x: event.clientX, y: event.clientY };
-    reactionPressTimer = setTimeout(() => {
-      reactionPressTimer = undefined;
-      reactionPressFired = true;
-      reactionActive = index;
-      reactionsOpen = true;
-    }, LONG_PRESS_MS);
-  }
-
-  function moveReactionPress(event: PointerEvent): void {
-    event.stopPropagation();
-    if (!reactionPressOrigin) return;
-    const moved =
-      Math.abs(event.clientX - reactionPressOrigin.x) > LONG_PRESS_SLOP_PX ||
-      Math.abs(event.clientY - reactionPressOrigin.y) > LONG_PRESS_SLOP_PX;
-    if (moved) endReactionPress();
-  }
-
-  function endReactionPress(event?: PointerEvent): void {
-    event?.stopPropagation();
-    if (reactionPressTimer) clearTimeout(reactionPressTimer);
-    reactionPressTimer = undefined;
-    reactionPressOrigin = null;
-  }
-
-  function openReactionDetails(event: MouseEvent, index: number): void {
-    event.preventDefault();
-    event.stopPropagation();
-    reactionActive = index;
-    reactionsOpen = true;
-  }
-
   // A virtualised row can unmount mid-press, so the pending timer has to go.
   onDestroy(() => {
-    if (pressTimer) clearTimeout(pressTimer);
-    if (reactionPressTimer) clearTimeout(reactionPressTimer);
+    rowPress.cancel();
   });
 
   async function copyText(): Promise<void> {
@@ -443,21 +356,6 @@
   function openAccountFromPersona(): void {
     if (item.sender && messageRow) onSenderProfile?.(item.sender, messageRow);
   }
-
-  function reactionTooltip(senders: readonly string[], key: string): string {
-    const names = senders.map(
-      (sender) => members.find((member) => member.user_id === sender)?.display_name ?? sender
-    );
-    const people =
-      names.length === 1
-        ? names[0]
-        : names.length === 2
-          ? `${names[0]} and ${names[1]}`
-          : names.length === 3
-            ? `${names[0]}, ${names[1]}, and ${names[2]}`
-            : `${names.slice(0, 3).join(', ')}, and ${String(names.length - 3)} others`;
-    return `${people} reacted with ${key}`;
-  }
 </script>
 
 {#if isMessageRow(item.content)}
@@ -469,7 +367,7 @@
       }
     }
   >
-    <ContextMenu.Trigger disabled={!actionable || touchInteraction}>
+    <ContextMenu.Trigger disabled={!actionable || rowPress.touch}>
       <article
         bind:this={messageRow}
         class={[
@@ -490,12 +388,30 @@
         style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
         style:--name-color-on-light={nameColorLight ?? undefined}
         style:--name-color-on-dark={nameColorDark ?? undefined}
-        onpointerdown={startPress}
-        onpointermove={movePress}
-        onpointerup={endPress}
-        onpointercancel={endPress}
+        style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
+        style:transition={swipe.dragging ? 'none' : undefined}
+        onpointerdown={rowPress.start}
+        onpointermove={rowPress.move}
+        onpointerup={rowPress.end}
+        onpointercancel={rowPress.end}
         oncontextmenu={suppressTouchContextMenu}
+        {@attach swipe.attach}
       >
+        {#if swipe.offset > 0}
+          <div
+            class="swipe-action"
+            class:armed={swipe.action !== 'none'}
+            aria-hidden="true"
+            style:width={`${String(swipe.offset)}px`}
+            style:transform={`translateX(${String(swipe.offset)}px)`}
+          >
+            {#if swipe.action === 'edit'}
+              <PencilSimpleIcon weight="bold" />
+            {:else}
+              <ReplyIcon weight="bold" />
+            {/if}
+          </div>
+        {/if}
         {#if actionable}
           <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
           {#if sourceOpen}
@@ -570,7 +486,7 @@
                 src={senderAvatar}
                 size="small"
                 color={senderAvatar ? undefined : avatarColor}
-                initials={initials(senderName)}
+                name={senderName}
               />
             </PersonaProfile>
           {:else if item.sender && onSenderProfile}
@@ -585,7 +501,7 @@
                 src={senderAvatar}
                 size="small"
                 color={senderAvatar ? undefined : avatarColor}
-                initials={initials(senderName)}
+                name={senderName}
               />
             </button>
           {:else}
@@ -594,7 +510,7 @@
               src={senderAvatar}
               size="small"
               color={senderAvatar ? undefined : avatarColor}
-              initials={initials(senderName)}
+              name={senderName}
             />
           {/if}
         {/if}
@@ -629,7 +545,7 @@
             </header>
           {/if}
           {#if item.in_reply_to}
-            {@const tint = tinted(replyPersona)}
+            {@const tint = personaWithColor(replyPersona)}
             {@const target = item.in_reply_to.event_id}
             <button
               class={['reply-preview', { persona: tint }]}
@@ -722,80 +638,20 @@
             />
           {/if}
           {#if item.reactions.length > 0}
-            {@const eventId = item.event_id}
-            <BitsTooltip.Provider delayDuration={400} skipDelayDuration={100}>
-              <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
-                {#each item.reactions as reaction, index (reaction.key)}
-                  {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
-                  {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
-                    <button
-                      {...props}
-                      class={['reaction', { mine }]}
-                      type="button"
-                      aria-pressed={mine}
-                      aria-label={$i18n.t('timeline.toggleReaction', {
-                        key: reaction.key,
-                        count: reaction.senders.length,
-                      })}
-                      disabled={eventId === null}
-                      onclick={() => {
-                        if (reactionPressFired) {
-                          reactionPressFired = false;
-                          return;
-                        }
-                        if (eventId) onToggleReaction?.(eventId, reaction.key);
-                      }}
-                      oncontextmenu={(event) => {
-                        openReactionDetails(event, index);
-                      }}
-                      onpointerdown={(event) => {
-                        startReactionPress(event, index);
-                      }}
-                      onpointermove={moveReactionPress}
-                      onpointerup={endReactionPress}
-                      onpointercancel={endReactionPress}
-                    >
-                      {#if reaction.key.startsWith('mxc://')}
-                        <MediaImage
-                          class="reaction-image"
-                          source={reaction.key}
-                          alt={reaction.key}
-                          width={64}
-                          height={64}
-                        />
-                      {:else}
-                        <em>{reaction.key}</em>
-                      {/if}
-                      {reaction.senders.length}
-                    </button>
-                  {/snippet}
-                  <BitsTooltip.Root>
-                    <BitsTooltip.Trigger child={reactionTrigger} />
-                    <BitsTooltip.Portal>
-                      <BitsTooltip.Content
-                        class="reaction-tooltip"
-                        side="top"
-                        align="center"
-                        sideOffset={8}
-                      >
-                        {reactionTooltip(reaction.senders, reaction.key)}
-                      </BitsTooltip.Content>
-                    </BitsTooltip.Portal>
-                  </BitsTooltip.Root>
-                {/each}
-                {#if actionable && actions.onReact}
-                  {@const react = actions.onReact}
-                  <ReactionPicker
-                    label={$i18n.t('timeline.addReaction')}
-                    triggerClass="add-reaction"
-                    {roomId}
-                    onPick={react}
-                  >
-                    <PlusIcon />
-                  </ReactionPicker>
-                {/if}
-              </div>
-            </BitsTooltip.Provider>
+            <MessageReactions
+              reactions={item.reactions}
+              eventId={item.event_id}
+              {currentUserId}
+              {members}
+              {roomId}
+              {actionable}
+              onReact={actions.onReact}
+              {onToggleReaction}
+              onViewReactions={(index: number) => {
+                reactionActive = index;
+                reactionsOpen = true;
+              }}
+            />
           {/if}
           {#if upload}
             <progress
@@ -861,55 +717,8 @@
       </ContextMenu.Portal>
     {/if}
   </ContextMenu.Root>
-{:else if item.content.kind === 'membership' || item.content.kind === 'profile_change' || (item.content.kind === 'state_event' && item.content.change !== null)}
-  <p class="state">
-    <span class="state-rail" aria-hidden="true"></span>
-    <StateEventText {item} {onSenderProfile} />
-  </p>
-{:else if item.content.kind === 'state_event' || item.content.kind === 'hidden_event'}
-  {@const raw = item.content.content}
-  <div class="debug-event">
-    <code>{item.content.event_type}</code>
-    <div class="debug-body">
-      <span><StateEventText {item} {onSenderProfile} /></span>
-      {#if raw !== null}
-        <Collapsible.Root bind:open={peekOpen}>
-          <Collapsible.Trigger class="debug-peek-trigger">
-            {peekOpen ? $i18n.t('timeline.hidePeek') : $i18n.t('timeline.showPeek')}
-          </Collapsible.Trigger>
-          <Collapsible.Content>
-            <pre class="debug-peek">{JSON.stringify(raw, null, 2)}</pre>
-          </Collapsible.Content>
-        </Collapsible.Root>
-      {/if}
-    </div>
-  </div>
-{:else if item.content.kind === 'unable_to_decrypt'}
-  <p class="undecryptable">
-    {$i18n.t('timeline.unableToDecrypt', { reason: item.content.reason })}
-  </p>
-{:else if item.content.kind === 'unsupported'}
-  <p class="state">
-    <span class="state-rail" aria-hidden="true"></span>
-    {$i18n.t('timeline.unsupported', { description: item.content.description })}
-  </p>
-{:else if item.content.kind === 'date_divider'}
-  <p class="date-divider"><span>{formatDate(item.content.timestamp)}</span></p>
-{:else if item.content.kind === 'timeline_start'}
-  <p class="separator">{$i18n.t('timeline.start')}</p>
-{:else if item.content.kind === 'read_marker'}
-  {#if unreadCount > 0}
-    <p class="unread">
-      <span>{$i18n.t('timeline.unreadCount', { count: unreadCount })}</span>
-    </p>
-  {:else}
-    <p class="read-marker"><span>{$i18n.t('timeline.readMarker')}</span></p>
-  {/if}
 {:else}
-  <p class="state redacted">
-    <span class="state-rail" aria-hidden="true"></span>
-    <span class="redacted-label">{$i18n.t('timeline.redacted')}</span>
-  </p>
+  <TimelineNotice {item} {unreadCount} {onSenderProfile} />
 {/if}
 
 <style>
@@ -919,6 +728,29 @@
     overflow-wrap: anywhere;
     padding: var(--timeline-row-padding) 0;
     position: relative;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .message {
+      transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+  }
+
+  .swipe-action {
+    align-items: center;
+    bottom: 0;
+    color: var(--sable-sec-main);
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+
+  .swipe-action.armed {
+    color: var(--sable-primary-main);
   }
 
   .message:focus-within :global(.message-actions) {
@@ -1082,15 +914,11 @@
   }
 
   .message header .message-details {
-    display: flex;
-    justify-content: end;
-    flex-grow: 1;
     align-items: baseline;
-
-    &,
-    & > time {
-      font-size: var(--font-size-t200);
-    }
+    display: flex;
+    flex-grow: 1;
+    font-size: var(--font-size-t200);
+    justify-content: end;
   }
 
   .sender {
@@ -1189,7 +1017,14 @@
   }
 
   .via.via-hidden {
-    opacity: 0;
+    display: none;
+  }
+
+  @media (width >= 48rem) {
+    .via.via-hidden {
+      display: revert;
+      opacity: 0;
+    }
   }
 
   .via:hover {
@@ -1217,10 +1052,10 @@
   time,
   .edited {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
   }
 
   .edited {
+    font-size: var(--font-size-small);
     margin-inline-start: var(--space-100);
   }
 
@@ -1272,13 +1107,7 @@
   }
 
   .body,
-  .reply-preview,
-  .separator,
-  .unread,
-  .date-divider,
-  .state,
-  .debug-event,
-  .undecryptable {
+  .reply-preview {
     margin: 0;
   }
 
@@ -1353,71 +1182,6 @@
   }
 
   /* bits-ui renders the trigger, so the row's scoped `.reaction` cannot reach it. */
-  .reactions :global(.add-reaction) {
-    align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
-    cursor: pointer;
-    display: inline-flex;
-    justify-content: center;
-    min-height: 1.5rem;
-    padding: 2px var(--space-200);
-  }
-
-  .reaction {
-    align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    font-size: var(--font-size-small);
-    font-variant-numeric: tabular-nums;
-    font-weight: var(--font-weight-medium);
-    gap: var(--space-100);
-    min-height: 1.5rem;
-    padding: 2px var(--space-200) 2px var(--space-150);
-    position: relative;
-  }
-
-  .reaction::after {
-    border-radius: inherit;
-    content: '';
-    inset: -0.375rem -2px;
-    position: absolute;
-  }
-
-  .reaction :global(.reaction-image) {
-    display: block;
-    height: 1.125rem;
-    object-fit: contain;
-    width: auto;
-  }
-
-  .reaction em {
-    font-size: var(--font-size-body);
-    font-style: normal;
-    line-height: 1;
-  }
-
-  .reaction.mine {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
-  }
-
-  .reaction:disabled {
-    cursor: default;
-  }
-
-  .reaction:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
 
   :global(.reaction-tooltip) {
     animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
@@ -1453,6 +1217,7 @@
     .via {
       transition: background-color var(--motion-fast) var(--motion-easing-standard);
     }
+
     .via-hidden {
       transition: opacity var(--motion-fast) var(--motion-easing-standard);
     }
@@ -1472,170 +1237,6 @@
     .reaction.mine:hover:not(:disabled) {
       background: var(--sable-primary-container-hover);
     }
-  }
-
-  .reactions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-100);
-    margin-top: var(--space-150);
-  }
-
-  .separator {
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    padding: var(--space-200);
-    text-align: center;
-  }
-
-  .state {
-    align-items: center;
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-200);
-    line-height: 1.3;
-    padding: 0;
-  }
-
-  .state-rail {
-    border-top: var(--border-width) dashed var(--sable-surface-var-container-line);
-    flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
-    margin-inline-start: var(--space-300);
-  }
-
-  .redacted-label {
-    align-items: center;
-    border: var(--border-width) dashed var(--sable-surface-var-container-line);
-    border-radius: var(--radius-pill);
-    display: inline-flex;
-    gap: var(--space-100);
-    padding: var(--space-hairline) var(--space-1);
-  }
-
-  .debug-event {
-    align-items: baseline;
-    background: var(--sable-surface-var-container);
-    border-block: var(--border-width) dashed var(--sable-surface-var-container-line);
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-200);
-    padding: var(--space-150) 0;
-  }
-
-  .debug-body {
-    display: grid;
-    gap: var(--space-hairline);
-    min-width: 0;
-  }
-
-  .debug-body :global(.debug-peek-trigger) {
-    background: none;
-    border: 0;
-    color: var(--sable-primary-main);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--font-size-small);
-    justify-self: start;
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .debug-peek {
-    background: var(--sable-bg-container);
-    border-radius: var(--radius);
-    font-size: var(--font-size-small);
-    margin: var(--space-100) 0 0;
-    max-height: 14rem;
-    overflow: auto;
-    padding: var(--space-1);
-  }
-
-  .debug-event code {
-    flex: 0 0 auto;
-    font-family: var(--font-family-mono);
-    margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
-  }
-
-  .undecryptable {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) dashed var(--sable-surface-var-container-line);
-    border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
-    max-width: 32rem;
-    padding: var(--space-150) var(--space-200);
-    width: fit-content;
-  }
-
-  .date-divider {
-    align-items: center;
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-300);
-    padding: var(--space-300) 0;
-    text-align: center;
-  }
-
-  .date-divider::before,
-  .date-divider::after {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
-    content: '';
-    flex: 1;
-  }
-
-  .date-divider span {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-radius: var(--radius-pill);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.06em;
-    padding: var(--space-hairline) var(--space-2);
-    text-transform: uppercase;
-  }
-
-  .unread,
-  .read-marker {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    margin: 0;
-    padding: var(--space-100) 0;
-  }
-
-  .read-marker::before {
-    border-top: var(--border-width) solid var(--sable-success-main);
-    content: '';
-    flex: 1;
-  }
-
-  .read-marker span {
-    color: var(--sable-success-main);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .unread::before {
-    border-top: calc(var(--border-width) * 2) solid var(--sable-primary-main-line);
-    content: '';
-    flex: 1;
-  }
-
-  .unread span {
-    background: var(--sable-primary-container);
-    border: var(--border-width) solid var(--sable-primary-container-line);
-    border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.04em;
-    padding: var(--space-hairline) var(--space-200);
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {

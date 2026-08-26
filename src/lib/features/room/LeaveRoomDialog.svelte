@@ -26,7 +26,7 @@
     leaving = true;
     failed = false;
     try {
-      await core.leaveRoom(target.room_id);
+      await core.commands.leaveRoom(target.room_id);
       onOpenChange(false);
       onLeft?.(target);
     } catch (error) {

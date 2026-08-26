@@ -62,9 +62,9 @@ export async function syncPushSubscription(
   if (!needsRegistering(marker, registered)) return;
 
   const abandoned = abandonedAppId(registered, settings.appId);
-  if (abandoned) await core.removePusher(keys.p256dh, abandoned).catch(() => undefined);
+  if (abandoned) await core.commands.removePusher(keys.p256dh, abandoned).catch(() => undefined);
 
-  await core.setPusher({
+  await core.commands.setPusher({
     pushkey: keys.p256dh,
     app_id: settings.appId,
     url: settings.gateway,
@@ -91,7 +91,7 @@ export async function dropPushSubscription(
   if (!subscription) return;
 
   const { keys } = subscription.toJSON();
-  if (keys?.p256dh) await core.removePusher(keys.p256dh, settings.appId);
+  if (keys?.p256dh) await core.commands.removePusher(keys.p256dh, settings.appId);
   await subscription.unsubscribe();
 }
 

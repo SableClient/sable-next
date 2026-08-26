@@ -47,13 +47,7 @@
   <p class="user-id">{userId}</p>
 
   <div class="avatar-picker">
-    <Avatar
-      class="avatar-preview"
-      src={avatarPreview}
-      alt=""
-      initials={displayName.slice(0, 1).toUpperCase() || '?'}
-      size="large"
-    />
+    <Avatar class="avatar-preview" src={avatarPreview} alt="" name={displayName} size="large" />
     <AuthField
       fieldId="profile-avatar"
       label={$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'auth.avatar')}

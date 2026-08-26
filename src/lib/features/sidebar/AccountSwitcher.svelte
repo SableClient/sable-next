@@ -24,9 +24,6 @@
   const core = useCoreClient();
   let switching = $state(false);
   let profile = $state<ProfileView | null>(null);
-  let initials = $derived(
-    core.session ? core.session.user_id.replace(/^#src/, '').charAt(0).toUpperCase() || '?' : '?'
-  );
   let activeProfile = $derived(profile?.user_id === core.session?.user_id ? profile : null);
   let displayName = $derived(activeProfile?.display_name ?? core.session?.user_id ?? '?');
   let avatarUrl = $derived(activeProfile?.avatar_url ?? null);
@@ -82,7 +79,7 @@
     aria-label={$i18n.t('nav.account')}
     onclick={openAccounts}
   >
-    <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
+    <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
   </button>
 {:else}
   {#snippet profileTrigger({ props }: { props: Record<string, unknown> })}
@@ -95,7 +92,7 @@
           : 'desktop-tool sable-nav-tab-bottom'}"
         aria-label={$i18n.t('nav.switchAccount')}
       >
-        <Avatar size="small" src={avatarUrl} {initials} alt={displayName} />
+        <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
         class="sable-menu account-popover"

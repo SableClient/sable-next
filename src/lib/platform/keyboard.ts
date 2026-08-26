@@ -1,3 +1,5 @@
+import { on } from 'svelte/events';
+
 function keyboardInset(viewport: VisualViewport): number {
   return Math.max(0, Math.round(window.innerHeight - (viewport.height + viewport.offsetTop)));
 }
@@ -23,13 +25,13 @@ export function trackKeyboardInset(): () => void {
   };
 
   write();
-  viewport.addEventListener('resize', schedule);
-  viewport.addEventListener('scroll', schedule);
+  const stopResize = on(viewport, 'resize', schedule);
+  const stopScroll = on(viewport, 'scroll', schedule);
 
   return () => {
     if (frame) cancelAnimationFrame(frame);
-    viewport.removeEventListener('resize', schedule);
-    viewport.removeEventListener('scroll', schedule);
+    stopResize();
+    stopScroll();
     document.documentElement.style.removeProperty('--keyboard-height');
   };
 }

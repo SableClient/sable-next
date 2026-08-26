@@ -3,10 +3,14 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => ({
-  fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
-  roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
-}));
+const core = vi.hoisted(() => {
+  const stub = {
+    fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
+    roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
+  };
+
+  return Object.assign(stub, { commands: stub });
+});
 
 const roomList = vi.hoisted(() => ({
   rooms: [] as { room_id: string; canonical_alias: string | null; name: string | null }[],

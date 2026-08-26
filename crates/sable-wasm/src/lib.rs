@@ -23,6 +23,28 @@ use wasm_bindgen::{JsValue, prelude::*};
 /// Most events a single crossing into JS carries.
 const EVENT_BATCH_LIMIT: usize = 256;
 
+fn encode_batch(batch: &[CoreEvent]) -> Option<String> {
+    match serde_json::to_string(batch) {
+        Ok(json) => return Some(json),
+        Err(error) => {
+            tracing::error!(
+                ?error,
+                "a core event batch did not serialize; dropping what fails"
+            );
+        }
+    }
+
+    let kept: Vec<&CoreEvent> = batch
+        .iter()
+        .filter(|event| serde_json::to_string(event).is_ok())
+        .collect();
+
+    if kept.is_empty() {
+        return None;
+    }
+    serde_json::to_string(&kept).ok()
+}
+
 /// The rejection payload must stay valid `CommandErr` JSON, so never
 /// interpolate a message into hand-written JSON.
 fn err_json(error: impl std::fmt::Display) -> String {
@@ -198,14 +220,13 @@ impl SableCore {
         wasm_bindgen_futures::spawn_local(async move {
             let mut batch = Vec::new();
             while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
-                let Ok(json) = serde_json::to_string(&batch) else {
-                    tracing::error!("failed to serialize a core event");
-                    break;
-                };
+                let encoded = encode_batch(&batch);
                 batch.clear();
+                let Some(json) = encoded else {
+                    continue;
+                };
                 if let Err(error) = on_event.call1(&JsValue::NULL, &JsValue::from_str(&json)) {
-                    tracing::error!(?error, "event callback threw, stopping the event stream");
-                    break;
+                    tracing::error!(?error, "the event callback threw; keeping the stream open");
                 }
             }
         });

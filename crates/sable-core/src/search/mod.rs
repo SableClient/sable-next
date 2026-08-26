@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use linkify::LinkFinder;
+use matrix_sdk::RoomState;
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::RoomEventCache;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
@@ -141,6 +142,8 @@ struct RoomIndex {
     key_of: HashMap<OwnedEventId, DocKey>,
     classified: HashSet<OwnedEventId>,
     evicted: HashSet<OwnedEventId>,
+    edited: HashSet<OwnedEventId>,
+    redacted: HashSet<OwnedEventId>,
     by_age: BTreeSet<(u64, DocKey)>,
     next_key: DocKey,
     retired_keys: usize,
@@ -155,6 +158,8 @@ impl RoomIndex {
             key_of: HashMap::new(),
             classified: HashSet::new(),
             evicted: HashSet::new(),
+            edited: HashSet::new(),
+            redacted: HashSet::new(),
             by_age: BTreeSet::new(),
             next_key: 0,
             retired_keys: 0,
@@ -517,9 +522,17 @@ impl MessageIndex {
                         continue;
                     };
                     let target = edited_or_own_event_id(original);
-                    let body = latest_body(cache, &target)
-                        .await
-                        .unwrap_or_else(|| indexable_body(original.content.body()));
+                    let edits_another = target != original.event_id;
+                    if !edits_another && index.edited.contains(&target) {
+                        continue;
+                    }
+                    let body = latest_body(cache, &target).await.unwrap_or_else(|| {
+                        replacement_body(original)
+                            .unwrap_or_else(|| indexable_body(original.content.body()))
+                    });
+                    if edits_another {
+                        index.edited.insert(target.clone());
+                    }
 
                     index.upsert(Document {
                         event_id: target,
@@ -594,6 +607,15 @@ fn edited_or_own_event_id(original: &OriginalSyncRoomMessageEvent) -> OwnedEvent
 
 fn indexable_body(body: &str) -> String {
     remove_plain_reply_fallback(body).to_owned()
+}
+
+fn replacement_body(original: &OriginalSyncRoomMessageEvent) -> Option<String> {
+    match &original.content.relates_to {
+        Some(Relation::Replacement(replacement)) => {
+            Some(indexable_body(replacement.new_content.msgtype.body()))
+        }
+        _ => None,
+    }
 }
 
 const fn attachment_of(msgtype: &MessageType) -> Option<SearchAttachment> {
@@ -684,10 +706,26 @@ impl Core {
             }
         }
 
+        let mut filter = filter.clone();
+        filter.not_senders.extend(self.ignored_senders().await);
+
         self.search_index
             .lock()
             .await
-            .search(query, filter, order, limit, offset)
+            .search(query, &filter, order, limit, offset)
+    }
+
+    async fn ignored_senders(&self) -> Vec<OwnedUserId> {
+        let Ok(client) = self.client().await else {
+            return Vec::new();
+        };
+
+        client
+            .subscribe_to_ignore_user_list_changes()
+            .get()
+            .iter()
+            .filter_map(|user_id| OwnedUserId::try_from(user_id.as_str()).ok())
+            .collect()
     }
 
     pub(crate) async fn restore_persisted_index(self: &Arc<Self>, client: &matrix_sdk::Client) {
@@ -805,7 +843,10 @@ impl Core {
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     };
 
-                    let Some(room) = client.get_room(&room_id) else {
+                    let Some(room) = client
+                        .get_room(&room_id)
+                        .filter(|room| room.state() == RoomState::Joined)
+                    else {
                         core.search_index.lock().await.forget_room(&room_id);
                         let _ = persist::forget(&client, &room_id).await;
                         continue;
@@ -1303,6 +1344,60 @@ mod tests {
 
         let hits = in_room(&index, &room_id, "rollback", 10, 0);
         assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].event_id, original_id);
+        assert_eq!(hits[0].body, "the rollback finished");
+
+        drop(room);
+    }
+
+    #[async_test]
+    async fn test_an_edit_crawled_before_its_original_keeps_the_new_body() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!crawl:localhost").to_owned();
+        let original_id = event_id!("$original");
+        let edit_id = event_id!("$edit");
+
+        let room = server.sync_joined_room(&client, &room_id).await;
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+
+        let (cache, _drop) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+
+        let crawled = vec![
+            factory
+                .text_msg("* the rollback finished")
+                .edit(
+                    original_id,
+                    RoomMessageEventContentWithoutRelation::text_plain("the rollback finished"),
+                )
+                .event_id(edit_id)
+                .into_event(),
+            factory
+                .text_msg("the deploy pipeline is broken")
+                .event_id(original_id)
+                .into_event(),
+        ];
+
+        let mut index = MessageIndex::new();
+        index
+            .ingest(&room_id, crawled, &cache, &RedactionRules::V11)
+            .await;
+
+        assert!(
+            in_room(&index, &room_id, "deploying", 10, 0).is_empty(),
+            "the pre-edit body must not win just because it was crawled last"
+        );
+
+        let hits = in_room(&index, &room_id, "rollback", 10, 0);
+        assert_eq!(hits.len(), 1, "{hits:?}", hits = hits.len());
         assert_eq!(hits[0].event_id, original_id);
         assert_eq!(hits[0].body, "the rollback finished");
 

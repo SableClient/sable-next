@@ -43,9 +43,12 @@ const packs: ImagePackView[] = [
 
 function core(): CoreClient {
   return {
-    roomMembers: () => Promise.resolve(members),
-    imagePacks: () => Promise.resolve(packs),
-    fetchMedia: () => Promise.resolve(new Uint8Array()),
+    commands: {
+      personas: () => Promise.resolve({ personas: [], selections: [] }),
+      roomMembers: () => Promise.resolve(members),
+      imagePacks: () => Promise.resolve(packs),
+      fetchMedia: () => Promise.resolve(new Uint8Array()),
+    },
   } as unknown as CoreClient;
 }
 
@@ -61,6 +64,7 @@ interface ComposerProps {
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
   readOnly?: boolean;
+  roomName?: string;
   registerReply?: (reply: () => void) => void;
   registerContext?: (set: (next: ComposerContext | null) => void) => void;
 }
@@ -146,6 +150,77 @@ test('stages any selected attachment, not only images, and sends it on submit', 
   await tick();
 
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {});
+  void unmount(instance);
+});
+
+function dragEvent(type: string, types: string[] = ['Files']): Event {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: { files: [], types } });
+  return event;
+}
+
+test('a file dragged anywhere over the window opens the drop overlay', async () => {
+  const instance = render({ roomId: '!room:example.org', roomName: 'Design' });
+
+  window.dispatchEvent(dragEvent('dragover'));
+  await tick();
+
+  const overlay = document.querySelector('.drop-overlay');
+  expect(overlay?.textContent).toContain('Design');
+
+  const leave = new Event('dragleave', { bubbles: true });
+  Object.defineProperty(leave, 'relatedTarget', { value: null });
+  window.dispatchEvent(leave);
+  await tick();
+
+  expect(document.querySelector('.drop-overlay')).toBeNull();
+  void unmount(instance);
+});
+
+test('dragging something that is not a file does not open the overlay', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+
+  window.dispatchEvent(dragEvent('dragover', ['text/plain']));
+  await tick();
+
+  expect(document.querySelector('.drop-overlay')).toBeNull();
+  void unmount(instance);
+});
+
+test('a read-only room shows no overlay and stages nothing', async () => {
+  const attachment = vi.fn(async () => {});
+  const instance = render({
+    roomId: '!room:example.org',
+    readOnly: true,
+    onSendAttachment: attachment,
+  });
+
+  window.dispatchEvent(dragEvent('dragover'));
+  await tick();
+  expect(document.querySelector('.drop-overlay')).toBeNull();
+
+  const drop = new Event('drop', { bubbles: true, cancelable: true });
+  const file = new File(['one'], 'one.png', { type: 'image/png' });
+  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file] } });
+  window.dispatchEvent(drop);
+  await tick();
+
+  expect(drop.defaultPrevented).toBe(false);
+  expect(stagedNames()).toEqual([]);
+  void unmount(instance);
+});
+
+test('a file dropped outside the composer is staged', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  const file = new File(['one'], 'one.png', { type: 'image/png' });
+  const drop = new Event('drop', { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file] } });
+
+  window.dispatchEvent(drop);
+  await tick();
+
+  expect(drop.defaultPrevented).toBe(true);
+  expect(stagedNames()).toEqual(['one.png']);
   void unmount(instance);
 });
 

@@ -37,7 +37,7 @@
 
     const current = ++run;
     published = null;
-    void core
+    void core.commands
       .roomDirectoryVisibility(target)
       .then((next) => {
         if (current === run) published = next;
@@ -55,7 +55,7 @@
     published = next;
     saving = true;
     try {
-      await core.setRoomDirectoryVisibility(target, next);
+      await core.commands.setRoomDirectoryVisibility(target, next);
     } catch (error) {
       console.warn('[sable room] directory visibility change failed', error);
       published = previous;

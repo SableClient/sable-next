@@ -53,12 +53,12 @@ export class ProfileController {
     this.error = null;
     try {
       const name = this.displayName.trim();
-      if (name) await this.options.core.setDisplayName(name);
+      if (name) await this.options.core.commands.setDisplayName(name);
       if (this.avatarFile) {
         const bytes = new Uint8Array(await this.avatarFile.arrayBuffer());
         await this.options.core.uploadAvatar(this.avatarFile.type || 'image/*', bytes);
       } else if (this.avatarCleared) {
-        await this.options.core.setAvatarUrl(null);
+        await this.options.core.commands.setAvatarUrl(null);
       }
       await this.finish();
     } catch {

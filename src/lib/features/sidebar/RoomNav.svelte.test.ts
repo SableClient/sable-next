@@ -17,12 +17,16 @@ const roomsFixture = vi.hoisted(() => ({
   notificationOverride: () => null,
 }));
 
-const coreStub = vi.hoisted(() => ({
-  roomPermissions: vi.fn(() => new Promise<never>(() => {})),
-  roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
-  fetchMedia: vi.fn(() => new Promise<never>(() => {})),
-  session: null,
-}));
+const coreStub = vi.hoisted(() => {
+  const stub = {
+    roomPermissions: vi.fn(() => new Promise<never>(() => {})),
+    roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
+    fetchMedia: vi.fn(() => new Promise<never>(() => {})),
+    session: null,
+  };
+
+  return Object.assign(stub, { commands: stub });
+});
 
 vi.mock('$app/state', () => ({ page: pageState }));
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));

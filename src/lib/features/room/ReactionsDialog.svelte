@@ -7,7 +7,8 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
 
-  import { initials, senderColor } from './timeline-format';
+  import { senderColor } from './timeline-format';
+  import { memberAvatar, memberName } from './members.js';
 
   interface Props {
     open?: boolean;
@@ -21,13 +22,8 @@
     reactions[Math.min(active, reactions.length - 1)]
   );
 
-  function name(userId: string): string {
-    return members.find((member) => member.user_id === userId)?.display_name ?? userId;
-  }
-
-  function avatar(userId: string): string | null {
-    return members.find((member) => member.user_id === userId)?.avatar_url ?? null;
-  }
+  const name = (userId: string): string => memberName(members, userId);
+  const avatar = (userId: string): string | null => memberAvatar(members, userId);
 </script>
 
 <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.viewReactions')}>
@@ -58,7 +54,6 @@
               displayName={name(sender)}
               avatarUrl={avatar(sender)}
               color={senderColor(sender)}
-              initials={initials(name(sender))}
             />
           </li>
         {/each}

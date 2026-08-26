@@ -59,7 +59,7 @@
     loading = true;
     failed = false;
     try {
-      const loaded = await core.imagePacks(target);
+      const loaded = await core.commands.imagePacks(target);
       if (current !== run) return;
       packs = loaded;
     } catch (error) {
@@ -93,7 +93,12 @@
     busy = true;
     failed = false;
     try {
-      await core.sendStateEvent(target, IMAGE_PACK_EVENT_TYPE, pack.id, packContent(pack, images));
+      await core.commands.sendStateEvent(
+        target,
+        IMAGE_PACK_EVENT_TYPE,
+        pack.id,
+        packContent(pack, images)
+      );
       await load();
     } catch (error) {
       console.warn('[sable room] pack change failed', error);
@@ -115,7 +120,7 @@
     busy = true;
     failed = false;
     try {
-      await core.sendStateEvent(target, IMAGE_PACK_EVENT_TYPE, stateKey || 'pack', {
+      await core.commands.sendStateEvent(target, IMAGE_PACK_EVENT_TYPE, stateKey || 'pack', {
         pack: { display_name: name },
         images: {},
       });
@@ -149,7 +154,7 @@
     failed = false;
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const url = await core.uploadMedia(file.type || 'image/*', bytes);
+      const url = await core.commands.uploadMedia(file.type || 'image/*', bytes);
       shortcodes = { ...shortcodes, [pack.id]: '' };
       busy = false;
       await write(pack, [

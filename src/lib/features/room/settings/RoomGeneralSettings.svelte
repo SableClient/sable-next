@@ -22,7 +22,6 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
-  import { initials } from '../timeline-format';
   import { bannerChanges, readRoomBanner, setRoomBanner } from '../room-banner.svelte.js';
   import RoomAddressSettings from './RoomAddressSettings.svelte';
   import RoomEncryptionSettings from './RoomEncryptionSettings.svelte';
@@ -104,11 +103,11 @@
     if (!target) return;
     await run(async () => {
       if (name !== (room?.name ?? '')) {
-        await core.setRoomName(target, name.trim() === '' ? null : name.trim());
+        await core.commands.setRoomName(target, name.trim() === '' ? null : name.trim());
       }
-      if (topicDraft !== topic) await core.setRoomTopic(target, topicDraft.trim());
+      if (topicDraft !== topic) await core.commands.setRoomTopic(target, topicDraft.trim());
       if (pendingRule !== null && pendingRule !== savedRule) {
-        await core.setRoomJoinRule(target, pendingRule);
+        await core.commands.setRoomJoinRule(target, pendingRule);
       }
     });
   }
@@ -122,7 +121,7 @@
     const target = roomId;
     if (!target) return;
     void run(async () => {
-      await core.setDirect(target, false);
+      await core.commands.setDirect(target, false);
     });
   }
 
@@ -142,7 +141,7 @@
     const target = roomId;
     if (!target) return;
     void run(async () => {
-      await core.setRoomAvatar(target, null);
+      await core.commands.setRoomAvatar(target, null);
     });
   }
 
@@ -171,7 +170,7 @@
 
     await run(async () => {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const uri = await core.uploadMedia(file.type || 'image/*', bytes);
+      const uri = await core.commands.uploadMedia(file.type || 'image/*', bytes);
       await setRoomBanner(core, target, uri);
     });
   }
@@ -193,7 +192,7 @@
   >
     <ul class="settings-rows">
       <li class="settings-row">
-        <Avatar src={room?.avatar_url ?? null} initials={initials(room?.name ?? '')} />
+        <Avatar src={room?.avatar_url ?? null} name={room?.name ?? ''} />
         <div class="settings-row-copy">
           <span class="settings-row-name">{$i18n.t('room.settingsAvatarLabel')}</span>
           <p>{$i18n.t('room.settingsAvatarHint')}</p>

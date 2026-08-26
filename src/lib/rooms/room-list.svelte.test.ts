@@ -26,9 +26,11 @@ test('limits concurrent notification-settings requests after room-list hydration
     subscribeEvents: vi.fn(() => {
       return () => {};
     }),
-    subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms })),
-    notificationSettings,
-    unsubscribe: vi.fn(() => Promise.resolve()),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms })),
+      notificationSettings,
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
 

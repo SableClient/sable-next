@@ -14,7 +14,7 @@
 
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import { syncNativeTelemetryConsent } from '#lib/observability/native-consent.js';
+  import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
   import { settingFocusId } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';

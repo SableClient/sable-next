@@ -4,10 +4,13 @@
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
+  import { toInitials } from './initials.js';
+
   type AvatarSize = 'small' | 'medium' | 'large';
   type Props = {
     src?: string | null;
     alt?: string;
+    name?: string | null;
     initials?: string;
     size?: AvatarSize;
     color?: string;
@@ -18,14 +21,16 @@
   let {
     src = null,
     alt,
-    initials = '?',
+    name,
+    initials,
     size = 'medium',
     color,
     decorative = alt === undefined,
     class: className = '',
   }: Props = $props();
 
-  let accessibleLabel = $derived(alt ?? initials);
+  let fallback = $derived(initials ?? toInitials(name));
+  let accessibleLabel = $derived(alt ?? name ?? fallback);
   let isMxc = $derived(src?.startsWith('mxc://') ?? false);
   let loadingStatus = $state<Avatar.RootProps['loadingStatus']>('loading');
 
@@ -55,7 +60,7 @@
   {:else if src}
     <Avatar.Image {src} alt="" class="sable-avatar-image" />
   {/if}
-  <Avatar.Fallback class="sable-avatar-fallback">{initials}</Avatar.Fallback>
+  <Avatar.Fallback class="sable-avatar-fallback">{fallback}</Avatar.Fallback>
 </Avatar.Root>
 
 <style>

@@ -18,8 +18,31 @@ export default mergeConfig(
           import.meta.url
         ).pathname,
       },
-      environment: 'node',
-      include: ['src/**/*.test.ts'],
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'node',
+            environment: 'node',
+            include: ['src/**/*.test.ts'],
+            exclude: [
+              'src/lib/features/room/TimelineReadReceipt.svelte.test.ts',
+              'src/lib/features/room/message-swipe.svelte.test.ts',
+            ],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'happy-dom',
+            environment: 'happy-dom',
+            include: [
+              'src/lib/features/room/TimelineReadReceipt.svelte.test.ts',
+              'src/lib/features/room/message-swipe.svelte.test.ts',
+            ],
+          },
+        },
+      ],
       setupFiles: ['./vitest-setup.ts'],
       coverage: {
         provider: 'v8',

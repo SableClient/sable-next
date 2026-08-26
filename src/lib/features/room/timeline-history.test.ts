@@ -114,6 +114,7 @@ describe('TimelineHistoryController', () => {
     const event = new Event('wheel');
     Object.defineProperty(event, 'deltaY', { value: -1 });
     const detach = controller.attach(node);
+    await vi.advanceTimersByTimeAsync(0);
 
     node.dispatchEvent(event);
     expect(requestHistory).toHaveBeenCalledTimes(1);

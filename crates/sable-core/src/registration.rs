@@ -191,7 +191,7 @@ impl Core {
             .session()
             .ok_or_else(|| self.failed("register", "no session after a successful registration"))?;
         let user_id = matrix.meta.user_id.clone();
-        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let mut generation = self.claim_session_generation();
         self.persist(
             &account_id,
             &store_id,
@@ -199,12 +199,13 @@ impl Core {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
             },
-            generation,
+            generation.value(),
         )
         .await?;
-        self.start_session(client, homeserver, account_id.clone(), generation)
+        self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        generation.commit();
         Ok(RegistrationResultView::Complete { user_id })
     }
 
@@ -453,19 +454,31 @@ impl Core {
             email.verified = true;
         }
 
+        let token_needs_fallback =
+            stage == "m.login.registration_token" && pending.registration_token.is_none();
+
         let used_fallback_acknowledgement = *acknowledge_fallback
-            && !matches!(
-                stage,
-                "m.login.dummy"
-                    | "m.login.registration_token"
-                    | "m.login.password"
-                    | "m.login.email.identity"
-            );
+            && (token_needs_fallback
+                || !matches!(
+                    stage,
+                    "m.login.dummy"
+                        | "m.login.registration_token"
+                        | "m.login.password"
+                        | "m.login.email.identity"
+                ));
         let auth = match stage {
             "m.login.dummy" => {
                 let mut dummy = matrix_sdk::ruma::api::client::uiaa::Dummy::new();
                 dummy.session = Some(pending.session.clone());
                 Some(AuthData::Dummy(dummy))
+            }
+            "m.login.registration_token" if token_needs_fallback => {
+                if *acknowledge_fallback {
+                    *acknowledge_fallback = false;
+                    Some(AuthData::fallback_acknowledgement(pending.session.clone()))
+                } else {
+                    None
+                }
             }
             "m.login.registration_token" => pending.registration_token.as_ref().map(|token| {
                 let mut registration_token =

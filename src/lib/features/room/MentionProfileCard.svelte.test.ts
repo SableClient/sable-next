@@ -5,14 +5,18 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ProfileView } from '#src/generated/ProfileView';
 
-const core = vi.hoisted(() => ({
-  fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
-  session: { user_id: '@me:example.org' },
-  createDm: vi.fn<() => Promise<string>>(),
-  userRelations: vi.fn<() => Promise<{ mutualRooms: never[]; ignored: boolean }>>(),
-  setUserIgnored: vi.fn<() => Promise<void>>(),
-  sendMessage: vi.fn<() => Promise<void>>(),
-}));
+const core = vi.hoisted(() => {
+  const stub = {
+    fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
+    session: { user_id: '@me:example.org' },
+    createDm: vi.fn<() => Promise<string>>(),
+    userRelations: vi.fn<() => Promise<{ mutualRooms: never[]; ignored: boolean }>>(),
+    setUserIgnored: vi.fn<() => Promise<void>>(),
+    sendMessage: vi.fn<() => Promise<void>>(),
+  };
+
+  return Object.assign(stub, { commands: stub });
+});
 
 vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,

@@ -53,7 +53,6 @@
     footer,
     composer,
   }: Props = $props();
-  let initials = $derived(displayName.slice(0, 1).toUpperCase() || '?');
   let banner = $derived(bannerUrl?.startsWith('mxc://') ? bannerUrl : null);
   let tinted = $derived(heroColor !== null && heroColor !== '');
   let nameColor = $derived(nameColorLight ?? nameColorDark);
@@ -95,7 +94,7 @@
       class="profile-card-avatar"
       size="large"
       src={avatarUrl}
-      {initials}
+      name={displayName}
       {color}
       alt={displayName}
     />

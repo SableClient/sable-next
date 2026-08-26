@@ -12,7 +12,7 @@
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
-  import { initials, senderColor } from './timeline-format';
+  import { senderColor } from './timeline-format';
 
   const MAX_FACES = 3;
 
@@ -85,7 +85,7 @@
             <Avatar
               class="receipt-face"
               src={reader.avatar}
-              initials={initials(reader.name)}
+              name={reader.name}
               color={senderColor(reader.userId)}
             />
           </span>

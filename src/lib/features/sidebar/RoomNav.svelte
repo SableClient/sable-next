@@ -323,10 +323,6 @@
 
   let bannerShown = $derived(banner !== null && !collapsed && preferences.showRoomBanners);
 
-  function initial(name: string): string {
-    return name.slice(0, 1).toUpperCase();
-  }
-
   function notificationChip(mode: NotificationModeView): { icon: Component; label: string } {
     if (mode === 'mute') return { icon: BellSlashIcon, label: 'room.notifyMute' };
     if (mode === 'mentions') return { icon: BellIcon, label: 'room.notifyMentions' };
@@ -378,7 +374,7 @@
 
     let current = true;
     spacePermissions = null;
-    void core
+    void core.commands
       .roomPermissions(spaceId)
       .then((next) => {
         if (current) spacePermissions = next;
@@ -408,7 +404,7 @@
       const eventId = room?.latest_event?.event_id;
       if (!room || !eventId || (room.unread === 0 && room.highlight === 0)) continue;
 
-      void core.markRead(room.room_id, eventId).catch((error: unknown) => {
+      void core.commands.markRead(room.room_id, eventId).catch((error: unknown) => {
         console.warn('[sable nav] mark as read failed', error);
       });
     }
@@ -442,7 +438,7 @@
           <DropdownMenu.Root>
             <DropdownMenu.Trigger class="room-nav-badge" aria-label={$i18n.t('nav.listOptions')}>
               {#if activeSpace}
-                <Avatar src={activeSpace.avatar_url} initials={initial(title)} size="small" />
+                <Avatar src={activeSpace.avatar_url} name={title} size="small" />
               {:else}
                 <TitleIcon />
               {/if}

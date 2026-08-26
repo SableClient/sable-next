@@ -11,6 +11,7 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::{
     DelayParameters, delayed_state_event, update_delayed_event,
 };
+use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{
     ActiveFocus, ActiveLivekitFocus, Application, CallApplicationContent, CallMemberEventContent,
@@ -32,6 +33,8 @@ use sfu::ProvisionError;
 
 const HANGUP_DELAY: Duration = Duration::from_secs(20);
 const HANGUP_POSTPONE_INTERVAL: Duration = Duration::from_secs(5);
+const HANGUP_RETRY_BACKOFF: Duration = Duration::from_secs(1);
+const HANGUP_RETRY_BUDGET: Duration = Duration::from_secs(12);
 const ADVERTISED_MEMBERSHIP_EXPIRY: Duration = Duration::from_hours(4);
 const USE_KEY_DELAY: Duration = Duration::from_secs(1);
 
@@ -567,6 +570,47 @@ impl Core {
         }
     }
 
+    async fn postpone_hangup(&self, delay_id: &str) -> bool {
+        let mut backoff = HANGUP_RETRY_BACKOFF;
+        let mut spent = Duration::ZERO;
+
+        loop {
+            let Ok(client) = self.client().await else {
+                return false;
+            };
+
+            let Err(error) = client
+                .send(update_delayed_event::unstable_v1::Request::new(
+                    delay_id.to_owned(),
+                    update_delayed_event::UpdateAction::Restart,
+                ))
+                .await
+            else {
+                return true;
+            };
+
+            if matches!(
+                error.client_api_error_kind(),
+                Some(ErrorKind::NotFound | ErrorKind::Forbidden)
+            ) {
+                tracing::warn!(?error, "the delayed hangup is gone, stopping");
+                return false;
+            }
+
+            if spent.saturating_add(backoff) >= HANGUP_RETRY_BUDGET {
+                tracing::warn!(
+                    ?error,
+                    "could not postpone the call hangup in time, stopping"
+                );
+                return false;
+            }
+
+            matrix_sdk::sleep::sleep(backoff).await;
+            spent = spent.saturating_add(backoff);
+            backoff = backoff.saturating_mul(2);
+        }
+    }
+
     fn spawn_postpone_loop(self: &Arc<Self>, delay_id: String) -> crate::Task {
         let core = self.clone();
 
@@ -574,18 +618,7 @@ impl Core {
             loop {
                 matrix_sdk::sleep::sleep(HANGUP_POSTPONE_INTERVAL).await;
 
-                let Ok(client) = core.client().await else {
-                    return;
-                };
-
-                if let Err(error) = client
-                    .send(update_delayed_event::unstable_v1::Request::new(
-                        delay_id.clone(),
-                        update_delayed_event::UpdateAction::Restart,
-                    ))
-                    .await
-                {
-                    tracing::warn!(?error, "could not postpone call hangup, stopping");
+                if !core.postpone_hangup(&delay_id).await {
                     return;
                 }
             }

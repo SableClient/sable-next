@@ -33,7 +33,7 @@
     type HierarchySection,
   } from './space-hierarchy';
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
-  import { initials } from './timeline-format';
+
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
   import SpaceLobbySection from './SpaceLobbySection.svelte';
 
@@ -148,7 +148,7 @@
 
     for (let page = 0; page < MAX_LEVEL_PAGES; page += 1) {
       try {
-        const next = await core.spaceHierarchy(target, from);
+        const next = await core.commands.spaceHierarchy(target, from);
         if (mine !== generation) return;
 
         fetched = [...fetched, ...next.rooms];
@@ -185,7 +185,7 @@
 
     let current = true;
     permissions = null;
-    void core
+    void core.commands
       .roomPermissions(target)
       .then((next) => {
         if (current) permissions = next;
@@ -219,11 +219,11 @@
     try {
       const address = child.canonical_alias ?? child.room_id;
       if (lobbyAction(child.join_rule, invitedIds.has(child.room_id)) === 'knock') {
-        await core.knockRoom(address);
+        await core.commands.knockRoom(address);
         knocked.add(child.room_id);
         return;
       }
-      await core.joinRoom(address);
+      await core.commands.joinRoom(address);
       open(child);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
@@ -237,7 +237,7 @@
     if (!parentId) return;
 
     try {
-      await core.removeFromSpace(parentId, entry.room.room_id);
+      await core.commands.removeFromSpace(parentId, entry.room.room_id);
       removed.add(entry.key);
     } catch (error) {
       console.warn('[sable lobby] remove failed', error);
@@ -261,7 +261,7 @@
 
     try {
       for (const change of changes) {
-        await core.setSpaceChildOrder(parentId, change.roomId, change.order);
+        await core.commands.setSpaceChildOrder(parentId, change.roomId, change.order);
       }
     } catch (error) {
       console.warn('[sable lobby] reorder failed', error);
@@ -298,7 +298,7 @@
 
   async function copyLink(child: HierarchyRoomView): Promise<void> {
     try {
-      const via = child.canonical_alias ? [] : await core.roomViaServers(child.room_id);
+      const via = child.canonical_alias ? [] : await core.commands.roomViaServers(child.room_id);
       await navigator.clipboard.writeText(matrixToUrl(child.canonical_alias ?? child.room_id, via));
     } catch (error) {
       console.debug('[sable lobby] clipboard unavailable', error);
@@ -317,7 +317,7 @@
 
 <section class="lobby" aria-label={$i18n.t('nav.lobby')}>
   <header class="hero">
-    <Avatar src={space?.avatar_url ?? null} initials={initials(space?.name ?? '')} size="large" />
+    <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if space?.topic}
       <button

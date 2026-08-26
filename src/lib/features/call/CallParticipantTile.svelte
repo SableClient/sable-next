@@ -18,10 +18,9 @@
     name: string;
     userId: string;
     avatar: string | null;
-    initials: (name: string) => string;
   }
 
-  let { participant, room, name, userId, avatar, initials }: Props = $props();
+  let { participant, room, name, userId, avatar }: Props = $props();
 
   let cameraOn = $derived(
     participant.camera !== undefined && !participant.camera.muted && participant.camera.subscribed
@@ -46,7 +45,7 @@
     <video class="video" autoplay muted playsinline {@attach attachVideo}></video>
   {:else}
     <div class="placeholder">
-      <Avatar src={avatar} initials={initials(name)} color={senderColor(userId)} size="large" />
+      <Avatar src={avatar} {name} color={senderColor(userId)} size="large" />
     </div>
   {/if}
 

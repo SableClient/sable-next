@@ -19,13 +19,13 @@ export class InviteActions {
 
   async accept(room: RoomSummary): Promise<void> {
     await this.answer(room, async () => {
-      const roomId = await this.core.joinRoom(room.room_id);
+      const roomId = await this.core.commands.joinRoom(room.room_id);
       await goto(roomHref(room, roomId));
     });
   }
 
   async decline(room: RoomSummary): Promise<void> {
-    await this.answer(room, () => this.core.leaveRoom(room.room_id));
+    await this.answer(room, () => this.core.commands.leaveRoom(room.room_id));
   }
 
   private async answer(room: RoomSummary, run: () => Promise<void>): Promise<void> {

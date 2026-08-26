@@ -63,11 +63,7 @@
             onChoose(persona);
           }}
         >
-          <Avatar
-            src={persona.avatar_url}
-            initials={persona.display_name.slice(0, 1)}
-            size="small"
-          />
+          <Avatar src={persona.avatar_url} name={persona.display_name} size="small" />
           <span class="persona-option-name">{persona.display_name}</span>
           {#if selected?.persona_id === persona.id}<CheckIcon />{/if}
         </button>

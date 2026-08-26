@@ -82,7 +82,7 @@
     submitting = true;
     failed = false;
     try {
-      const roomId = await core.createRoom({
+      const roomId = await core.commands.createRoom({
         name: name.trim(),
         topic: topic.trim() === '' ? null : topic.trim(),
         kind,

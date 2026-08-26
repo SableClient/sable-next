@@ -4,7 +4,6 @@ import { mount, tick, unmount } from 'svelte';
 import { expect, test } from 'vitest';
 
 import RoomHeader from './RoomHeader.svelte';
-import { initials } from './timeline-format';
 
 const members = [
   {
@@ -36,7 +35,6 @@ function mountHeader(props: {
       onBack: () => {},
       onMembers: () => {},
       onSearch: () => {},
-      initials,
       ...props,
     },
   });

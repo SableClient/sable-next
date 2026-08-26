@@ -20,14 +20,16 @@ function fakeCore(overrides: Partial<Record<string, unknown>> = {}) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    spaceSidebar: vi.fn(() => Promise.resolve<SidebarItem[]>([])),
-    setSpaceSidebar: vi.fn(() => Promise.resolve()),
-    ...overrides,
+    commands: {
+      spaceSidebar: vi.fn(() => Promise.resolve<SidebarItem[]>([])),
+      setSpaceSidebar: vi.fn(() => Promise.resolve()),
+      ...overrides,
+    },
   };
 
   return {
     core: core as unknown as CoreClient,
-    calls: core,
+    calls: core.commands,
     emit(event: CoreEvent) {
       for (const listener of listeners) listener(event);
     },

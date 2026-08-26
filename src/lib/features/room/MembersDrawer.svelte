@@ -9,7 +9,7 @@
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { initials, senderColor } from './timeline-format';
+  import { senderColor } from './timeline-format';
 
   interface Props {
     members: readonly MemberView[];
@@ -111,7 +111,6 @@
               class="member"
               displayName={memberName(member)}
               avatarUrl={member.avatar_url}
-              initials={initials(memberName(member))}
               color={senderColor(member.user_id)}
               ariaLabel={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
               onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {

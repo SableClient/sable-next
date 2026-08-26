@@ -329,7 +329,8 @@
     return () => {
       redirect.cleanup();
       profile.cleanup();
-      if (!redirect.isCallbackWindow) void core.cancelRegistration().catch(() => undefined);
+      if (!redirect.isCallbackWindow)
+        void core.commands.cancelRegistration().catch(() => undefined);
     };
   });
 

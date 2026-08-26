@@ -37,7 +37,7 @@
     enabling = true;
     failed = false;
     try {
-      await core.sendStateEvent(target, EVENT_TYPE, '', { algorithm: ALGORITHM });
+      await core.commands.sendStateEvent(target, EVENT_TYPE, '', { algorithm: ALGORITHM });
       confirming = false;
     } catch (error) {
       console.warn('[sable room] enabling encryption failed', error);

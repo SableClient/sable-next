@@ -16,7 +16,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { initials, senderColor } from '../timeline-format';
+  import { senderColor } from '../timeline-format';
 
   interface Props {
     room: RoomSummary | null;
@@ -85,7 +85,7 @@
     loading = true;
     failed = false;
     try {
-      const loaded = await core.roomMembers(target, [membership]);
+      const loaded = await core.commands.roomMembers(target, [membership]);
       if (current !== run) return;
       members = loaded;
     } catch (error) {
@@ -133,7 +133,7 @@
   function setPower(member: MemberView, level: number): void {
     const target = roomId;
     if (!target || level === member.power_level) return;
-    void act(member.user_id, () => core.setUserPowerLevel(target, member.user_id, level));
+    void act(member.user_id, () => core.commands.setUserPowerLevel(target, member.user_id, level));
   }
 </script>
 
@@ -182,7 +182,6 @@
               class="member"
               displayName={memberName(member)}
               avatarUrl={member.avatar_url}
-              initials={initials(memberName(member))}
               color={senderColor(member.user_id)}
             >
               {#snippet meta()}
@@ -199,7 +198,9 @@
                     onclick={() => {
                       const target = roomId;
                       if (target)
-                        void act(member.user_id, () => core.unbanUser(target, member.user_id));
+                        void act(member.user_id, () =>
+                          core.commands.unbanUser(target, member.user_id)
+                        );
                     }}
                   >
                     {$i18n.t('timeline.profileUnban')}
@@ -227,7 +228,9 @@
                     onclick={() => {
                       const target = roomId;
                       if (target)
-                        void act(member.user_id, () => core.kickUser(target, member.user_id));
+                        void act(member.user_id, () =>
+                          core.commands.kickUser(target, member.user_id)
+                        );
                     }}
                   >
                     {$i18n.t('timeline.profileKick')}
@@ -241,7 +244,9 @@
                     onclick={() => {
                       const target = roomId;
                       if (target)
-                        void act(member.user_id, () => core.banUser(target, member.user_id));
+                        void act(member.user_id, () =>
+                          core.commands.banUser(target, member.user_id)
+                        );
                     }}
                   >
                     {$i18n.t('timeline.profileBan')}

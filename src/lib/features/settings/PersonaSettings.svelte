@@ -79,7 +79,7 @@
       if (!response.ok) throw new Error(`avatar responded ${String(response.status)}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       const mime = response.headers.get('content-type') ?? 'image/*';
-      return { url: await core.uploadMedia(mime, bytes), failed: false };
+      return { url: await core.commands.uploadMedia(mime, bytes), failed: false };
     } catch (cause) {
       console.warn('[sable personas] fetching a PluralKit picture failed', cause);
       return { url: existing?.avatar_url ?? null, failed: true };
@@ -136,11 +136,7 @@
       <ul class="persona-list">
         {#each personas.personas as persona (persona.id)}
           <li>
-            <Avatar
-              src={persona.avatar_url}
-              initials={persona.display_name.slice(0, 1)}
-              size="small"
-            />
+            <Avatar src={persona.avatar_url} name={persona.display_name} size="small" />
             <div class="persona-copy">
               <span class="persona-name">{persona.display_name}</span>
               {#if persona.pronouns.length > 0}

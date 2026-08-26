@@ -69,11 +69,7 @@
       {#snippet child({ props })}
         <IconButton {...props} variant="ghost" size="small" {label}>
           {#if active}
-            <Avatar
-              src={active.avatar_url}
-              initials={active.display_name.slice(0, 1)}
-              size="small"
-            />
+            <Avatar src={active.avatar_url} name={active.display_name} size="small" />
           {:else}
             <UserSwitchIcon />
           {/if}
@@ -100,7 +96,7 @@
 {:else}
   <IconButton variant="ghost" size="small" {label} onclick={openSheet}>
     {#if active}
-      <Avatar src={active.avatar_url} initials={active.display_name.slice(0, 1)} size="small" />
+      <Avatar src={active.avatar_url} name={active.display_name} size="small" />
     {:else}
       <UserSwitchIcon />
     {/if}

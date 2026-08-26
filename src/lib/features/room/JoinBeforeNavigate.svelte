@@ -29,12 +29,6 @@
   let failedAction = $state<'join' | 'knock' | null>(null);
 
   let title = $derived(preview?.name ?? roomId);
-  let initials = $derived(
-    (preview?.name ?? roomId)
-      .replace(/^[!#@]/, '')
-      .slice(0, 1)
-      .toUpperCase()
-  );
 
   $effect(() => {
     const address = roomId;
@@ -42,7 +36,7 @@
     preview = null;
     failed = false;
 
-    core
+    core.commands
       .roomPreview(address, viaFor(address, via))
       .then((result) => {
         if (active) preview = result;
@@ -73,7 +67,7 @@
     busy = true;
     failedAction = null;
     try {
-      const joined = await core.joinRoom(address, routing);
+      const joined = await core.commands.joinRoom(address, routing);
       const target = roomSectionPath(roomList.rooms, joined, eventId);
       await goto(target, { replaceState: true });
     } catch (error) {
@@ -89,7 +83,7 @@
     busy = true;
     failedAction = null;
     try {
-      await core.knockRoom(address, routing);
+      await core.commands.knockRoom(address, routing);
       sentKnock = true;
     } catch (error) {
       console.warn('[sable room] knock failed', error);
@@ -106,7 +100,7 @@
   {:else if preview === null}
     <div role="status"><Spinner /></div>
   {:else}
-    <Avatar src={preview.avatar_url} {initials} size="large" />
+    <Avatar src={preview.avatar_url} name={title} size="large" />
     <h1 id="join-title">{title}</h1>
     {#if preview.canonical_alias}
       <p class="join-address">{preview.canonical_alias}</p>

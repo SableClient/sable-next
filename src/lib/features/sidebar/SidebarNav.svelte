@@ -111,7 +111,7 @@
       const eventId = room.latest_event?.event_id;
       if (!eventId || (room.unread === 0 && room.highlight === 0)) continue;
 
-      void core.markRead(room.room_id, eventId).catch((error: unknown) => {
+      void core.commands.markRead(room.room_id, eventId).catch((error: unknown) => {
         console.warn('[sable nav] mark as read failed', error);
       });
     }

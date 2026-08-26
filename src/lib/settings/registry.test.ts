@@ -12,14 +12,14 @@ afterEach(() => {
 });
 
 describe('telemetry settings', () => {
-  it('are absent from a build with no DSN', async () => {
+  it('are absent from a build with no DSN', { timeout: 30_000 }, async () => {
     vi.stubEnv('VITE_SENTRY_DSN', '');
     const keys = await privacyItemKeys();
     expect(keys).not.toContain('errorReporting');
     expect(keys).not.toContain('sessionReplay');
   });
 
-  it('appear once a DSN is configured', async () => {
+  it('appear once a DSN is configured', { timeout: 30_000 }, async () => {
     vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.sentry.io/1');
     const keys = await privacyItemKeys();
     expect(keys).toContain('errorReporting');

@@ -11,6 +11,7 @@ import {
   canRedact,
   isCollapsed,
   jumboEmojiLevel,
+  personaLookup,
   readReceiptEventId,
   visibleTimelineItems,
 } from './timeline-format';
@@ -307,4 +308,34 @@ test('leaves copy with no subject unlinked', () => {
       (k) => k
     )
   ).toBeNull();
+});
+
+test('the persona lookup resolves a reply target and reports a miss as null', () => {
+  const items = [
+    { event_id: '$a', per_message_profile: { display_name: 'Ghost' } },
+    { event_id: '$b', per_message_profile: null },
+  ] as unknown as TimelineItemView[];
+  const lookup = personaLookup(items);
+
+  expect(lookup('$a')?.display_name).toBe('Ghost');
+  expect(lookup('$b')).toBeNull();
+  expect(lookup('$missing')).toBeNull();
+});
+
+test('the persona lookup reads the items only when first asked', () => {
+  let reads = 0;
+  const items = new Proxy([{ event_id: '$a', per_message_profile: { display_name: 'Ghost' } }], {
+    get(target, property, receiver) {
+      if (property === Symbol.iterator) reads += 1;
+
+      return Reflect.get(target, property, receiver) as unknown;
+    },
+  }) as unknown as TimelineItemView[];
+
+  const lookup = personaLookup(items);
+  expect(reads).toBe(0);
+
+  lookup('$a');
+  lookup('$a');
+  expect(reads).toBe(1);
 });

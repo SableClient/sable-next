@@ -9,7 +9,7 @@ function harness() {
   const listeners = new Set<(event: CoreEvent) => void>();
   const declineCall = vi.fn(() => Promise.resolve());
   const client = {
-    declineCall,
+    commands: { declineCall },
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

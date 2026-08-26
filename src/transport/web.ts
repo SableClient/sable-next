@@ -7,6 +7,7 @@ import type { WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
+import { on } from 'svelte/events';
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
@@ -83,9 +84,10 @@ export function createWebTransport(): Transport {
 
     // Only the worker failing to load reaches here. Runtime failures inside it
     // are reported to its own global scope, so the worker forwards those itself.
-    nextWorker.addEventListener('error', (event) => {
-      console.error('[sable transport] shared worker error', event.message);
-      Sentry.captureException(new Error(`shared worker failed to start: ${event.message}`), {
+    on(nextWorker, 'error', (event) => {
+      const { message } = event as ErrorEvent;
+      console.error('[sable transport] shared worker error', message);
+      Sentry.captureException(new Error(`shared worker failed to start: ${message}`), {
         tags: { source: 'wasm-core' },
       });
     });

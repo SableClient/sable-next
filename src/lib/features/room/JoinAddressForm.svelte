@@ -28,7 +28,7 @@
 
     joining = true;
     try {
-      const roomId = await core.joinRoom(parsed.address, parsed.via);
+      const roomId = await core.commands.joinRoom(parsed.address, parsed.via);
       await goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(roomId) }));
     } catch (error) {
       console.warn('[sable room] join failed', error);

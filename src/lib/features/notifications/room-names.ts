@@ -36,7 +36,7 @@ function transact<T>(
   );
 }
 
-export async function rememberRoomNames(names: ReadonlyMap<string, string>): Promise<void> {
+export async function putRoomNames(names: ReadonlyMap<string, string>): Promise<void> {
   const database = await open();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readwrite');
@@ -56,5 +56,51 @@ export async function roomName(roomId: string): Promise<string | null> {
     return (await transact<unknown>('readonly', (store) => store.get(roomId))) as string | null;
   } catch {
     return null;
+  }
+}
+
+export type RoomNameSink = (names: ReadonlyMap<string, string>) => Promise<void>;
+
+const WRITE_DELAY_MS = 1000;
+
+export class RoomNameWriter {
+  readonly #written = new Map<string, string>();
+  readonly #pending = new Map<string, string>();
+  #timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(
+    private readonly write: RoomNameSink = putRoomNames,
+    private readonly delayMs: number = WRITE_DELAY_MS
+  ) {}
+
+  remember(names: ReadonlyMap<string, string>): void {
+    for (const [roomId, name] of names) {
+      if (this.#written.get(roomId) !== name) this.#pending.set(roomId, name);
+    }
+    if (this.#pending.size === 0 || this.#timer !== undefined) return;
+
+    this.#timer = setTimeout(() => void this.flush(), this.delayMs);
+  }
+
+  async flush(): Promise<void> {
+    clearTimeout(this.#timer);
+    this.#timer = undefined;
+    if (this.#pending.size === 0) return;
+
+    const batch = new Map(this.#pending);
+    this.#pending.clear();
+    try {
+      await this.write(batch);
+      for (const [roomId, name] of batch) this.#written.set(roomId, name);
+    } catch {
+      for (const [roomId, name] of batch) {
+        if (!this.#pending.has(roomId)) this.#pending.set(roomId, name);
+      }
+    }
+  }
+
+  dispose(): void {
+    clearTimeout(this.#timer);
+    this.#timer = undefined;
   }
 }

@@ -26,7 +26,6 @@
   let failed = $state(false);
 
   let name = $derived(profile?.display_name ?? userId);
-  let initials = $derived(name.replace(/^#src/, '').slice(0, 1).toUpperCase());
 
   $effect(() => {
     const wanted = userId;
@@ -57,7 +56,7 @@
     opening = true;
     failed = false;
     try {
-      const roomId = await core.createDm(userId);
+      const roomId = await core.commands.createDm(userId);
       const target = roomSectionPath(roomList.rooms, roomId);
       await goto(target, { replaceState: true });
     } catch (error) {
@@ -73,7 +72,7 @@
   {#if !loaded}
     <div role="status"><Spinner /></div>
   {:else}
-    <Avatar src={profile?.avatar_url} {initials} size="large" />
+    <Avatar src={profile?.avatar_url} {name} size="large" />
     <h1 id="user-link-title">{name}</h1>
     <p class="user-link-id">{userId}</p>
     {#if failed}

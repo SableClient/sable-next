@@ -48,7 +48,7 @@
     outcome = null;
     sent = false;
     try {
-      const existing = await core.roomStateEvent(target, type, stateKey);
+      const existing = await core.commands.roomStateEvent(target, type, stateKey);
       if (existing === null || existing === undefined) {
         outcome = 'missing';
         content = '{}';
@@ -86,7 +86,7 @@
     outcome = null;
     sent = false;
     try {
-      await core.sendStateEvent(target, eventType.trim(), stateKey, parsed);
+      await core.commands.sendStateEvent(target, eventType.trim(), stateKey, parsed);
       sent = true;
     } catch (error) {
       console.warn('[sable room] state event rejected', error);

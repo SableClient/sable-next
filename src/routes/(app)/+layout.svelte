@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { onDestroy, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { page } from '$app/state';
   import AppShell from '#lib/ui/AppShell.svelte';
@@ -33,7 +33,7 @@
   import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
   import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
-  import { rememberRoomNames } from '#lib/features/notifications/room-names.js';
+  import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
 
   interface Props {
@@ -142,7 +142,7 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
-    void core.setNotificationContent(preferences.notificationContent).catch(() => {});
+    void core.commands.setNotificationContent(preferences.notificationContent).catch(() => {});
   });
 
   // Not gated on `desktopNotifications`: the native shell alerts without the
@@ -183,6 +183,8 @@
     });
   });
 
+  const roomNames = new RoomNameWriter();
+
   $effect(() => {
     const names = new Map(
       roomList.rooms
@@ -191,7 +193,11 @@
     );
     if (names.size === 0) return;
 
-    void rememberRoomNames(names).catch(() => {});
+    roomNames.remember(names);
+  });
+
+  onDestroy(() => {
+    roomNames.dispose();
   });
 
   $effect(() => {

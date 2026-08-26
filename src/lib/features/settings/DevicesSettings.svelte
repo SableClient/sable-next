@@ -6,13 +6,17 @@
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
-  import { invoke, isTauri } from '@tauri-apps/api/core';
 
   import type { DeviceView } from '#src/generated/DeviceView';
   import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
   import { CoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';
+  import {
+    openExternalAuthUrl,
+    openExternalAuthWindow,
+    type ExternalAuthWindow,
+  } from '#lib/platform/external-auth.js';
   import { i18n, t } from '#lib/i18n.js';
   import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -72,8 +76,8 @@
     error = null;
     try {
       const [nextStatus, nextDevices] = await Promise.all([
-        core.encryptionStatus(),
-        core.devices(),
+        core.commands.encryptionStatus(),
+        core.commands.devices(),
       ]);
       if (cancelled) return;
       status = nextStatus;
@@ -113,7 +117,7 @@
 
   async function saveName(deviceId: string): Promise<void> {
     try {
-      await core.renameDevice(deviceId, displayName.trim());
+      await core.commands.renameDevice(deviceId, displayName.trim());
       cancelRename();
       await refresh();
     } catch (cause) {
@@ -121,19 +125,21 @@
     }
   }
 
-  async function removeDevice(deviceId: string, popup: Window | null = null): Promise<void> {
+  async function removeDevice(
+    deviceId: string,
+    authWindow: ExternalAuthWindow | null = null
+  ): Promise<void> {
     try {
-      const managementUrl = await core.deleteDevice(deviceId, password || null);
+      const managementUrl = await core.commands.deleteDevice(deviceId, password || null);
       cancelRemoval();
       if (managementUrl) {
-        if (isTauri()) await invoke('open_auth_url', { url: managementUrl });
-        else if (popup) popup.location.replace(managementUrl);
-        else window.open(managementUrl, '_blank', 'noopener');
+        if (authWindow) await authWindow.navigate(managementUrl);
+        else await openExternalAuthUrl(managementUrl);
       } else {
         await refresh();
       }
     } catch (cause) {
-      popup?.close();
+      authWindow?.close();
       error = messageFor(cause);
     }
   }
@@ -144,25 +150,21 @@
       return;
     }
 
-    const popup = isTauri()
-      ? null
-      : window.open(
-          'about:blank',
-          `sable-device-${crypto.randomUUID()}`,
-          'popup,width=520,height=720'
-        );
-    if (!isTauri() && !popup) {
+    const authWindow = openExternalAuthWindow(`sable-device-${crypto.randomUUID()}`);
+    if (!authWindow) {
       error = t('settings.actionFailed');
       return;
     }
-    void removeDevice(deviceId, popup);
+    void removeDevice(deviceId, authWindow);
   }
 
   async function manageRecovery(reset = false): Promise<void> {
     managingRecovery = true;
     error = null;
     try {
-      newRecoveryKey = reset ? await core.resetRecoveryKey() : await core.enableRecovery();
+      newRecoveryKey = reset
+        ? await core.commands.resetRecoveryKey()
+        : await core.commands.enableRecovery();
       await refresh();
     } catch (cause) {
       error = messageFor(cause);

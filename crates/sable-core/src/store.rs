@@ -6,7 +6,7 @@ use matrix_sdk::{SendOutsideWasm, SyncOutsideWasm};
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait SessionStore: SendOutsideWasm + SyncOutsideWasm + 'static {
-    async fn load(&self) -> Option<Vec<u8>>;
+    async fn load(&self) -> Result<Option<Vec<u8>>, String>;
     async fn save(&self, bytes: Vec<u8>) -> Result<(), String>;
     async fn clear(&self) -> Result<(), String>;
 }
@@ -28,8 +28,12 @@ impl FileSessionStore {
 #[cfg(not(target_family = "wasm"))]
 #[async_trait]
 impl SessionStore for FileSessionStore {
-    async fn load(&self) -> Option<Vec<u8>> {
-        tokio::fs::read(&self.path).await.ok()
+    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        match tokio::fs::read(&self.path).await {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.to_string()),
+        }
     }
 
     async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
@@ -64,11 +68,12 @@ pub struct MemorySessionStore {
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl SessionStore for MemorySessionStore {
-    async fn load(&self) -> Option<Vec<u8>> {
-        self.bytes
+    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        Ok(self
+            .bytes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
+            .clone())
     }
 
     async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
@@ -99,11 +104,11 @@ mod tests {
 
         store.save(b"first".to_vec()).await.unwrap();
         store.save(b"second".to_vec()).await.unwrap();
-        assert_eq!(store.load().await, Some(b"second".to_vec()));
+        assert_eq!(store.load().await, Ok(Some(b"second".to_vec())));
         assert!(!dir.join("session.tmp").exists());
 
         store.clear().await.unwrap();
-        assert_eq!(store.load().await, None);
+        assert_eq!(store.load().await, Ok(None));
 
         tokio::fs::remove_dir_all(&dir).await.unwrap();
     }

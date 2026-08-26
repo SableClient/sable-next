@@ -114,7 +114,7 @@ export class MessageSearch {
     const { text } = this.parsed;
 
     try {
-      const page = await this.#core.searchMessages(text, {
+      const page = await this.#core.commands.searchMessages(text, {
         filter: this.resolved.filter,
         order: this.order,
         limit: PAGE_SIZE,

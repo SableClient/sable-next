@@ -51,8 +51,8 @@
     const current = ++run;
     try {
       const [local, canonicalContent] = await Promise.all([
-        core.roomAliases(target).catch(() => [] as string[]),
-        core.roomStateEvent(target, CANONICAL_EVENT_TYPE),
+        core.commands.roomAliases(target).catch(() => [] as string[]),
+        core.commands.roomStateEvent(target, CANONICAL_EVENT_TYPE),
       ]);
       if (current !== run) return;
 
@@ -86,7 +86,7 @@
     busy = true;
     outcome = null;
     try {
-      await core.createRoomAlias(target, alias);
+      await core.commands.createRoomAlias(target, alias);
       draft = '';
       await load();
     } catch (error) {
@@ -104,7 +104,7 @@
     outcome = null;
     try {
       if (alias === canonical) await publish(null);
-      await core.deleteRoomAlias(alias);
+      await core.commands.deleteRoomAlias(alias);
       await load();
     } catch (error) {
       console.warn('[sable room] alias removal failed', error);
@@ -119,7 +119,7 @@
     if (!target) return;
 
     const alt = alternatives.filter((entry) => entry !== alias);
-    await core.sendStateEvent(target, CANONICAL_EVENT_TYPE, '', {
+    await core.commands.sendStateEvent(target, CANONICAL_EVENT_TYPE, '', {
       ...(alias === null ? {} : { alias }),
       ...(alt.length > 0 ? { alt_aliases: alt } : {}),
     });

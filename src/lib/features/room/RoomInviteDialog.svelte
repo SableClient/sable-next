@@ -57,7 +57,7 @@
     inviting = true;
     failed = false;
     try {
-      await core.inviteUser(target, candidate);
+      await core.commands.inviteUser(target, candidate);
       invited = candidate;
       draft = '';
     } catch (error) {
@@ -75,7 +75,7 @@
     converting = true;
     failed = false;
     try {
-      await core.setDirect(target, false);
+      await core.commands.setDirect(target, false);
       convertPrompt = false;
     } catch (error) {
       console.warn('[sable room] convert failed', error);

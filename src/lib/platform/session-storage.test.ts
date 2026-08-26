@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { resetWebSession } from './sessionStorage';
+import { resetWebSession } from './session-storage.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();

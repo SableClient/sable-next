@@ -26,7 +26,7 @@ export class PersonaStore {
   private async fetch(): Promise<void> {
     this.loading = true;
     try {
-      const catalog = await this.core.personas();
+      const catalog = await this.core.commands.personas();
       this.personas = catalog.personas;
       this.account = catalog.account;
       this.rooms = catalog.rooms;
@@ -42,12 +42,12 @@ export class PersonaStore {
   }
 
   async save(persona: PersonaView, previousId: string | null = null): Promise<void> {
-    this.personas = await this.core.savePersona(persona, previousId);
+    this.personas = await this.core.commands.savePersona(persona, previousId);
     if (previousId !== null && previousId !== persona.id) this.repoint(previousId, persona.id);
   }
 
   async remove(id: string): Promise<void> {
-    this.personas = await this.core.removePersona(id);
+    this.personas = await this.core.commands.removePersona(id);
     this.repoint(id, null);
   }
 
@@ -60,7 +60,7 @@ export class PersonaStore {
     personaId: string | null,
     validUntil: number | null = null
   ): Promise<void> {
-    await this.core.setPersonaSelection(roomId, personaId, validUntil);
+    await this.core.commands.setPersonaSelection(roomId, personaId, validUntil);
     const selection =
       personaId === null ? null : { persona_id: personaId, valid_until: validUntil };
 

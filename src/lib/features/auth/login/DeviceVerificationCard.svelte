@@ -31,7 +31,7 @@
     loading = true;
     error = null;
     try {
-      status = await core.encryptionStatus();
+      status = await core.commands.encryptionStatus();
     } catch (cause) {
       error = verificationErrorMessage(cause);
     } finally {
@@ -45,7 +45,7 @@
     if (key) {
       recovering = true;
       try {
-        await core.recoverIdentity(key);
+        await core.commands.recoverIdentity(key);
         recoveryKey = '';
         recovered = true;
       } catch (cause) {

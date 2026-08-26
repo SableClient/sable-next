@@ -120,7 +120,7 @@ export class RoomTimeline {
     this.backwardPagination = 'loading';
 
     try {
-      const response = await this.core.paginate(subscription, 'backward', count);
+      const response = await this.core.commands.paginate(subscription, 'backward', count);
       if (session === this.session && subscription === this.subscription) {
         const state = response.reached_end ? 'end' : 'idle';
         if (this.mode.kind === 'focused') {
@@ -166,7 +166,7 @@ export class RoomTimeline {
     const session = this.session;
     this.forwardPagination = 'loading';
     try {
-      const response = await this.core.paginate(subscription, 'forward', count);
+      const response = await this.core.commands.paginate(subscription, 'forward', count);
       if (session === this.session && subscription === this.subscription) {
         this.forwardPagination = response.reached_end ? 'end' : 'idle';
       }
@@ -209,7 +209,7 @@ export class RoomTimeline {
     if (subscription !== null) {
       this.hasPendingUnsubscribe = true;
       this.unsubscribePromise = this.unsubscribePromise
-        .then(() => this.core.unsubscribe(subscription))
+        .then(() => this.core.commands.unsubscribe(subscription))
         .catch(() => {})
         .finally(() => {
           this.hasPendingUnsubscribe = false;
@@ -263,7 +263,7 @@ export class RoomTimeline {
 
     let response;
     try {
-      response = await this.core.subscribeTimeline(roomId, eventId, hiddenEvents);
+      response = await this.core.commands.subscribeTimeline(roomId, eventId, hiddenEvents);
     } catch (error) {
       stopEvents();
       this.state = 'stopped';
@@ -271,7 +271,7 @@ export class RoomTimeline {
     }
 
     if (session !== this.session) {
-      this.core.unsubscribe(response.subscription).catch(() => {});
+      this.core.commands.unsubscribe(response.subscription).catch(() => {});
       stopEvents();
       return;
     }

@@ -6,7 +6,8 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
 
-  import { initials, senderColor } from './timeline-format';
+  import { senderColor } from './timeline-format';
+  import { memberAvatar, memberName } from './members.js';
 
   interface Props {
     open?: boolean;
@@ -16,13 +17,8 @@
 
   let { open = $bindable(false), readers, members }: Props = $props();
 
-  function name(userId: string): string {
-    return members.find((member) => member.user_id === userId)?.display_name ?? userId;
-  }
-
-  function avatar(userId: string): string | null {
-    return members.find((member) => member.user_id === userId)?.avatar_url ?? null;
-  }
+  const name = (userId: string): string => memberName(members, userId);
+  const avatar = (userId: string): string | null => memberAvatar(members, userId);
 </script>
 
 <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.readReceipts')}>
@@ -38,7 +34,6 @@
               displayName={name(reader)}
               avatarUrl={avatar(reader)}
               color={senderColor(reader)}
-              initials={initials(name(reader))}
             />
           </li>
         {/each}

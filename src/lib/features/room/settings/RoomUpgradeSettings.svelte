@@ -64,8 +64,8 @@
 
     const current = ++run;
     void Promise.all([
-      core.roomStateEvent(id, 'm.room.create'),
-      core.roomStateEvent(id, 'm.room.tombstone'),
+      core.commands.roomStateEvent(id, 'm.room.create'),
+      core.commands.roomStateEvent(id, 'm.room.tombstone'),
     ])
       .then(([create, tombstone]) => {
         if (current !== run) return;
@@ -91,7 +91,7 @@
 
     if (versions === null) {
       try {
-        versions = await core.roomVersions();
+        versions = await core.commands.roomVersions();
       } catch (error) {
         console.warn('[sable room] room versions unavailable', error);
         failed = true;
@@ -120,7 +120,7 @@
     upgrading = true;
     failed = false;
     try {
-      const next = await core.upgradeRoom(id, target, allowCreators ? creators : []);
+      const next = await core.commands.upgradeRoom(id, target, allowCreators ? creators : []);
       open = false;
       onClose();
       await goto(roomPath(next));

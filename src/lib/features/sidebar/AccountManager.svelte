@@ -43,10 +43,6 @@
     };
   });
 
-  function initials(userId: string): string {
-    return userId.replace(/^#src/, '').slice(0, 1).toUpperCase() || '?';
-  }
-
   async function switchAccount(accountId: string): Promise<void> {
     if (accountId === activeAccountId || switching) return;
 
@@ -123,7 +119,7 @@
           disabled={active || switching}
           onclick={() => void switchAccount(account.account_id)}
         >
-          <Avatar size="medium" initials={initials(account.user_id)} />
+          <Avatar size="medium" name={account.user_id} />
           <span class="account-identity">
             <strong>{account.user_id}</strong>
             <small>{active ? $i18n.t('nav.activeAccount') : account.device_id}</small>

@@ -22,7 +22,6 @@
     type RoomSettingsSectionId,
   } from './settings/room-settings-sections';
   import { canSendState } from './settings/permission-groups';
-  import { initials } from './timeline-format';
 
   interface Props {
     open: boolean;
@@ -68,7 +67,7 @@
     let current = true;
     permissions = null;
     levels = null;
-    void core
+    void core.commands
       .roomPermissions(target)
       .then((next) => {
         if (current) permissions = next;
@@ -76,7 +75,7 @@
       .catch((error: unknown) => {
         console.debug('[sable room] permissions unavailable', error);
       });
-    void core
+    void core.commands
       .roomPowerLevels(target)
       .then((next) => {
         if (current) levels = next;
@@ -112,7 +111,7 @@
 
 {#snippet header()}
   <div class="room-heading">
-    <Avatar src={room?.avatar_url ?? null} initials={initials(roomName)} size="small" />
+    <Avatar src={room?.avatar_url ?? null} name={roomName} size="small" />
     <span class="room-name">{roomName}</span>
   </div>
 {/snippet}

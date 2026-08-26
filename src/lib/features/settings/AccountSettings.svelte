@@ -26,9 +26,6 @@
   let error = $state<string | null>(null);
 
   let userId = $derived(core.session?.user_id ?? '');
-  let initials = $derived(
-    (displayName || userId).replace(/^#src/, '').slice(0, 1).toUpperCase() || '?'
-  );
   let avatarUrl = $derived(avatarPreview ?? profile?.avatar_url ?? null);
   let nameChanged = $derived(displayName !== (profile?.display_name ?? ''));
 
@@ -73,7 +70,7 @@
     savingName = true;
     error = null;
     try {
-      await core.setDisplayName(displayName.trim() || null);
+      await core.commands.setDisplayName(displayName.trim() || null);
       if (profile) profile = { ...profile, display_name: displayName.trim() || null };
     } catch {
       error = $i18n.t('settings.profileSaveFailed');
@@ -105,7 +102,7 @@
     savingAvatar = true;
     error = null;
     try {
-      await core.setAvatarUrl(null);
+      await core.commands.setAvatarUrl(null);
       profile = { ...profile, avatar_url: null };
     } catch {
       error = $i18n.t('settings.profileSaveFailed');
@@ -150,7 +147,7 @@
               section="banner"
             />{/if}
           <div class="avatar-row">
-            <Avatar src={avatarUrl} {initials} size="large" />
+            <Avatar src={avatarUrl} name={displayName || userId} size="large" />
             <div class="avatar-actions">
               <label class="file-button sable-button sable-button-secondary sable-button-small">
                 <input

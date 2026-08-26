@@ -12,7 +12,45 @@ use crate::search;
 use crate::session;
 use crate::watchers::sync_status;
 
+pub(crate) struct SessionGeneration<'core> {
+    core: &'core Core,
+    value: u64,
+    committed: bool,
+}
+
+impl SessionGeneration<'_> {
+    pub(crate) const fn value(&self) -> u64 {
+        self.value
+    }
+
+    pub(crate) const fn commit(&mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for SessionGeneration<'_> {
+    fn drop(&mut self) {
+        if self.committed {
+            return;
+        }
+        let _ = self.core.session_generation.compare_exchange(
+            self.value,
+            self.value.saturating_sub(1),
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
+    }
+}
+
 impl Core {
+    pub(crate) fn claim_session_generation(&self) -> SessionGeneration<'_> {
+        SessionGeneration {
+            core: self,
+            value: self.session_generation.fetch_add(1, Ordering::SeqCst) + 1,
+            committed: false,
+        }
+    }
+
     pub(crate) async fn restore(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
         let _restore = self.restore_lock.lock().await;
         if let Some(session) = self.active_session_info().await {
@@ -63,9 +101,15 @@ impl Core {
                 .map_err(|error| self.failed("restore_session: oauth", error))?,
         }
 
-        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
-        self.start_session(client, persisted.homeserver, account.account_id, generation)
-            .await?;
+        let mut generation = self.claim_session_generation();
+        self.start_session(
+            client,
+            persisted.homeserver,
+            account.account_id,
+            generation.value(),
+        )
+        .await?;
+        generation.commit();
 
         Ok(CommandOk::Restore {
             session: Some(info),
@@ -141,12 +185,18 @@ impl Core {
                 .map_err(|error| self.failed("switch account: restore_session: oauth", error))?,
         }
 
-        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let mut generation = self.claim_session_generation();
         self.pending_registration.lock().await.take();
         self.pending_login.lock().await.take();
-        self.start_session(client, persisted.homeserver, account.account_id, generation)
-            .await?;
+        self.start_session(
+            client,
+            persisted.homeserver,
+            account.account_id,
+            generation.value(),
+        )
+        .await?;
         self.set_active_account(&info.account_id).await?;
+        generation.commit();
         Ok(CommandOk::SwitchAccount { session: info })
     }
 
@@ -521,7 +571,12 @@ impl Core {
         }
 
         let core = self.clone();
+        let doomed = generation + 1;
         drop(spawn(async move {
+            let _swap = core.session_swap_lock.lock().await;
+            if core.session_generation.load(Ordering::SeqCst) != doomed {
+                return;
+            }
             let session = core.take_session().await;
             let account_id = session.as_ref().map(|session| session.account_id.clone());
             if let Some(session) = session {

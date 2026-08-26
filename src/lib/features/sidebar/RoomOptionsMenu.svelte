@@ -75,7 +75,7 @@
     const run = ++manageableRun;
     manageable.clear();
     for (const spaceId of candidates) {
-      void core
+      void core.commands
         .roomPermissions(spaceId)
         .then((permissions) => {
           if (run !== manageableRun || !permissions.can_manage_children) return;
@@ -101,7 +101,7 @@
   function toggleTag(tag: RoomTag, current: boolean): void {
     const next = !current;
     pendingTags.set(tag, next);
-    void core.setRoomTag(room.room_id, tag, next).catch((error: unknown) => {
+    void core.commands.setRoomTag(room.room_id, tag, next).catch((error: unknown) => {
       pendingTags.delete(tag);
       report(error);
     });
@@ -109,20 +109,20 @@
 
   /** One-directional, like v1: a DM becomes a group. */
   function convertToGroup(): void {
-    void core.setDirect(room.room_id, false).catch(report);
+    void core.commands.setDirect(room.room_id, false).catch(report);
   }
 
   function addToSpace(spaceId: string): void {
-    void core.addToSpace(spaceId, room.room_id).catch(report);
+    void core.commands.addToSpace(spaceId, room.room_id).catch(report);
   }
 
   function removeFromSpace(spaceId: string): void {
-    void core.removeFromSpace(spaceId, room.room_id).catch(report);
+    void core.commands.removeFromSpace(spaceId, room.room_id).catch(report);
   }
 
   async function copyLink(): Promise<void> {
     try {
-      const via = room.canonical_alias ? [] : await core.roomViaServers(room.room_id);
+      const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
       await navigator.clipboard.writeText(matrixToUrl(room.canonical_alias ?? room.room_id, via));
     } catch (error) {
       console.debug('[sable room] clipboard unavailable', error);

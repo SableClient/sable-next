@@ -96,7 +96,7 @@ export class CallSession {
     });
 
     try {
-      const grant = await this.#client.joinCall(roomId, serviceUrl);
+      const grant = await this.#client.commands.joinCall(roomId, serviceUrl);
       this.#session = grant.session;
 
       const supported = this.#deps.e2eeSupported ?? isCallE2eeSupported;
@@ -287,7 +287,7 @@ export class CallSession {
     const session = this.#session;
     if (session !== undefined) {
       try {
-        await this.#client.leaveCall(session);
+        await this.#client.commands.leaveCall(session);
       } catch {
         ignoreError();
       }

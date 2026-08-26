@@ -184,7 +184,7 @@ export class RegistrationController {
       );
       if (result.state === 'email' && this.registrationEmail.trim()) {
         await this.handleResult(
-          await this.options.core.requestRegistrationEmail(this.registrationEmail.trim())
+          await this.options.core.commands.requestRegistrationEmail(this.registrationEmail.trim())
         );
       } else {
         await this.handleResult(result);
@@ -229,7 +229,7 @@ export class RegistrationController {
     this.isRegistering = true;
     this.error = null;
     try {
-      this.result = await this.options.core.requestRegistrationEmail(address);
+      this.result = await this.options.core.commands.requestRegistrationEmail(address);
     } catch (value) {
       this.error = registrationError(value);
     } finally {
@@ -245,7 +245,7 @@ export class RegistrationController {
     this.isRegistering = true;
     this.error = null;
     try {
-      this.result = await this.options.core.submitRegistrationEmail(token);
+      this.result = await this.options.core.commands.submitRegistrationEmail(token);
     } catch (value) {
       this.error = registrationError(value);
     } finally {

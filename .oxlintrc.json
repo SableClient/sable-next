@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "build/**",
+    "coverage/**",
+    "dist/**",
+    "node_modules/**",
+    "playwright-report/**",
+    "src/generated/**",
+    "target/**",
+    "target-local/**",
+    "test-results/**",
+    "wasm/**",
+    ".svelte-kit/**"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
+    "no-new": "off",
+    "no-unmodified-loop-condition": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/prefer-add-event-listener": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    "unicorn/no-useless-spread": "off",
+    "unicorn/require-module-specifiers": "off",
+    "unicorn/require-post-message-target-origin": "off"
+  }
+}

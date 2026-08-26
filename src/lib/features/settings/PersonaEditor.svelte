@@ -54,7 +54,7 @@
     saving = true;
     error = null;
     try {
-      avatarUrl = await core.uploadMedia(
+      avatarUrl = await core.commands.uploadMedia(
         file.type || 'image/*',
         new Uint8Array(await file.arrayBuffer())
       );
@@ -120,7 +120,7 @@
     {#if error}<Alert variant="critical" aria-live="polite">{error}</Alert>{/if}
 
     <div class="identity">
-      <Avatar src={avatarUrl} initials={name.slice(0, 1) || '?'} size="large" />
+      <Avatar src={avatarUrl} {name} size="large" />
       <div class="identity-actions">
         <label class="file-button sable-button sable-button-secondary sable-button-small">
           <input type="file" accept="image/*" onchange={(event) => void pickAvatar(event)} />

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { SearchHitView } from '#src/generated/SearchHitView';
 
+import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { MessageSearch } from './message-search.svelte.js';
@@ -23,11 +24,11 @@ function hit(eventId: string): SearchHitView {
   };
 }
 
-function coreReturning(searchMessages: CoreClient['searchMessages']): {
+function coreReturning(searchMessages: CoreCommands['searchMessages']): {
   core: CoreClient;
-  searchMessages: CoreClient['searchMessages'];
+  searchMessages: CoreCommands['searchMessages'];
 } {
-  return { core: { searchMessages } as unknown as CoreClient, searchMessages };
+  return { core: { commands: { searchMessages } } as unknown as CoreClient, searchMessages };
 }
 
 beforeEach(() => {

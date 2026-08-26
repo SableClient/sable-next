@@ -7,7 +7,6 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import { senderColor } from '#lib/features/room/timeline-format.js';
-  import { initials } from '#lib/features/room/timeline-format.js';
 
   import type { IncomingCall } from './incoming-calls.svelte.js';
 
@@ -35,12 +34,7 @@
 >
   {#if call}
     <div class="incoming">
-      <Avatar
-        src={senderAvatar}
-        initials={initials(senderName)}
-        color={senderColor(call.sender)}
-        size="large"
-      />
+      <Avatar src={senderAvatar} name={senderName} color={senderColor(call.sender)} size="large" />
       <p class="who">{$i18n.t('call.incomingFrom', { name: senderName })}</p>
       <p class="where">{$i18n.t('call.incomingInRoom', { room: roomName })}</p>
 

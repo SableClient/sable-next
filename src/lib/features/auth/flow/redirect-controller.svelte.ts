@@ -1,4 +1,3 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
 import { on } from 'svelte/events';
 import {
   callbackChannelName,
@@ -10,6 +9,8 @@ import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
+import { deliversDeepLinks } from '#lib/platform/deep-links.js';
+import { openExternalAuthUrl } from '#lib/platform/external-auth.js';
 import { SvelteSet, SvelteURL } from 'svelte/reactivity';
 import {
   authenticationError,
@@ -68,8 +69,8 @@ export class RedirectController {
     this.registrationError = null;
     this.pendingIntent = intent;
     this.isLaunching = true;
-    const reservedPopup = isTauri() ? null : reserveRedirectPopup(intent);
-    if (!isTauri() && !reservedPopup) {
+    const reservedPopup = deliversDeepLinks() ? null : reserveRedirectPopup(intent);
+    if (!deliversDeepLinks() && !reservedPopup) {
       this.setError(intent, t('auth.allowPopups'));
       this.isLaunching = false;
       return;
@@ -97,8 +98,8 @@ export class RedirectController {
               id,
               intent
             );
-      if (isTauri()) {
-        await invoke('open_auth_url', { url: authorizationUrl });
+      if (deliversDeepLinks()) {
+        await openExternalAuthUrl(authorizationUrl);
       } else {
         if (!this.popup) return;
         const popup = this.popup;
@@ -165,15 +166,15 @@ export class RedirectController {
       this.registrationError = registrationError(value);
       return;
     }
-    this.popup = isTauri()
+    this.popup = deliversDeepLinks()
       ? null
       : window.open(
           fallback.fallback_url,
           `sable-register-stage-${crypto.randomUUID()}`,
           'popup,width=520,height=720'
         );
-    if (isTauri()) {
-      void invoke('open_auth_url', { url: fallback.fallback_url }).catch((value: unknown) => {
+    if (deliversDeepLinks()) {
+      void openExternalAuthUrl(fallback.fallback_url).catch((value: unknown) => {
         this.registrationError = registrationError(value);
       });
       return;
@@ -210,7 +211,7 @@ export class RedirectController {
   }
 
   private redirectUri(type: RedirectType): string {
-    const baseUrl = isTauri()
+    const baseUrl = deliversDeepLinks()
       ? tauriRedirectUri(type)
       : new SvelteURL(window.location.pathname, window.location.origin).toString();
     return createRedirectUri(type, baseUrl, crypto.randomUUID());

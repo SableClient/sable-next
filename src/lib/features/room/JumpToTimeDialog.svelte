@@ -56,7 +56,7 @@
     searching = true;
     outcome = null;
     try {
-      const eventId = await core.timestampToEvent(roomId, at, 'forward');
+      const eventId = await core.commands.timestampToEvent(roomId, at, 'forward');
       if (eventId === null) {
         outcome = 'missing';
         return;

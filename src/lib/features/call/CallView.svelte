@@ -15,10 +15,9 @@
   interface Props {
     session: CallSession;
     members: readonly MemberView[];
-    initials: (name: string) => string;
   }
 
-  let { session, members, initials }: Props = $props();
+  let { session, members }: Props = $props();
 
   let statusLabel = $derived(
     $i18n.t(
@@ -77,7 +76,6 @@
           name={profile.name}
           userId={profile.userId}
           avatar={profile.avatar}
-          {initials}
         />
       {/each}
     </ul>

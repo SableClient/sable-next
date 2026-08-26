@@ -3,9 +3,13 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => ({
-  createDm: vi.fn<() => Promise<string>>(),
-}));
+const core = vi.hoisted(() => {
+  const stub = {
+    createDm: vi.fn<() => Promise<string>>(),
+  };
+
+  return Object.assign(stub, { commands: stub });
+});
 
 const navigation = vi.hoisted(() => ({ goto: vi.fn<() => Promise<void>>() }));
 

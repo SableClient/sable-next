@@ -2,6 +2,7 @@ import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
 import { isScrolling, type Gesture } from './timeline-position';
+import { on } from 'svelte/events';
 
 interface TimelineHistoryControllerOptions {
   getBackwardPagination: () => BackwardPaginationState;
@@ -300,19 +301,23 @@ export class TimelineHistoryController {
   attach(node: HTMLDivElement): () => void {
     if (this.destroyed) return () => {};
     this.wheelUsesNativeScrollEnd = 'onscrollend' in node;
-    node.addEventListener('wheel', this.wheelHandler, { passive: true });
-    node.addEventListener('scrollend', this.wheelEndHandler);
-    node.addEventListener('touchstart', this.touchStartHandler, { passive: true });
-    node.addEventListener('touchmove', this.touchMoveHandler, { passive: true });
-    node.addEventListener('touchend', this.touchEndHandler);
-    node.addEventListener('touchcancel', this.touchEndHandler);
-    node.addEventListener('pointerdown', this.pointerStartHandler, { passive: true });
-    node.addEventListener('pointerup', this.pointerEndHandler, { passive: true });
-    node.addEventListener('pointercancel', this.pointerEndHandler, { passive: true });
-    node.addEventListener('keydown', this.keyHandler);
-    node.addEventListener('keyup', this.keyEndHandler);
+    const unsubscribers = [
+      on(node, 'wheel', this.wheelHandler, { passive: true }),
+      on(node, 'scrollend', this.wheelEndHandler),
+      on(node, 'touchstart', this.touchStartHandler, { passive: true }),
+      on(node, 'touchmove', this.touchMoveHandler, { passive: true }),
+      on(node, 'touchend', this.touchEndHandler),
+      on(node, 'touchcancel', this.touchEndHandler),
+      on(node, 'pointerdown', this.pointerStartHandler, { passive: true }),
+      on(node, 'pointerup', this.pointerEndHandler, { passive: true }),
+      on(node, 'pointercancel', this.pointerEndHandler, { passive: true }),
+      on(node, 'keydown', this.keyHandler),
+      on(node, 'keyup', this.keyEndHandler),
+    ];
+
     return () => {
-      this.detach(node);
+      this.destroy();
+      for (const unsubscribe of unsubscribers) unsubscribe();
     };
   }
 
@@ -430,20 +435,5 @@ export class TimelineHistoryController {
     if (this.historyFillTimer === null) return;
     clearTimeout(this.historyFillTimer);
     this.historyFillTimer = null;
-  }
-
-  private detach(node: HTMLDivElement): void {
-    this.destroy();
-    node.removeEventListener('wheel', this.wheelHandler);
-    node.removeEventListener('scrollend', this.wheelEndHandler);
-    node.removeEventListener('touchstart', this.touchStartHandler);
-    node.removeEventListener('touchmove', this.touchMoveHandler);
-    node.removeEventListener('touchend', this.touchEndHandler);
-    node.removeEventListener('touchcancel', this.touchEndHandler);
-    node.removeEventListener('pointerdown', this.pointerStartHandler);
-    node.removeEventListener('pointerup', this.pointerEndHandler);
-    node.removeEventListener('pointercancel', this.pointerEndHandler);
-    node.removeEventListener('keydown', this.keyHandler);
-    node.removeEventListener('keyup', this.keyEndHandler);
   }
 }

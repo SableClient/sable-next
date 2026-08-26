@@ -23,7 +23,6 @@
   import { lobbyAction, placeholderRows } from './space-hierarchy';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
   import type { DropEdge } from '#lib/ui/drag-list.js';
-  import { initials } from './timeline-format';
 
   interface Props {
     section: HierarchySection;
@@ -94,11 +93,7 @@
       }}
     >
       {#if section.space}
-        <Avatar
-          src={section.space.avatar_url}
-          initials={initials(label(section.space))}
-          size="small"
-        />
+        <Avatar src={section.space.avatar_url} name={label(section.space)} size="small" />
         <span class="section-name">{label(section.space)}</span>
         {#if section.suggested}<span class="badge">{$i18n.t('room.lobbySuggested')}</span>{/if}
       {:else}
@@ -152,7 +147,7 @@
             {#if canManage}
               <span class="drag-handle" aria-hidden="true"><DotsSixVerticalIcon /></span>
             {/if}
-            <Avatar src={child.avatar_url} initials={initials(label(child))} size="small" />
+            <Avatar src={child.avatar_url} name={label(child)} size="small" />
             <div class="room-text">
               <span class="room-name">
                 {label(child)}

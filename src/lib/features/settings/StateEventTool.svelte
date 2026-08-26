@@ -45,7 +45,7 @@
     error = null;
     sent = false;
     try {
-      await core.sendStateEvent(roomId, eventType.trim(), stateKey, parsed);
+      await core.commands.sendStateEvent(roomId, eventType.trim(), stateKey, parsed);
       sent = true;
     } catch (failure) {
       console.warn('[sable settings] state event rejected', failure);

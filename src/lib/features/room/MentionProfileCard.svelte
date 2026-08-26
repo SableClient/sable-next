@@ -226,7 +226,7 @@
   }
 
   function setPowerLevel(level: number): void {
-    void core.setUserPowerLevel(roomId, userId, level).catch((error: unknown) => {
+    void core.commands.setUserPowerLevel(roomId, userId, level).catch((error: unknown) => {
       console.warn('[sable profile] power level change failed', error);
     });
   }
@@ -248,8 +248,8 @@
     sending = true;
     sendFailed = false;
     try {
-      const roomId = await core.createDm(userId);
-      await core.sendMessage(roomId, body);
+      const roomId = await core.commands.createDm(userId);
+      await core.commands.sendMessage(roomId, body);
       draft = '';
     } catch {
       sendFailed = true;
@@ -349,16 +349,13 @@
           {$i18n.t('timeline.profileOpenServer')}
         </DropdownMenu.Item>
         {#if canInvite}
-          <DropdownMenu.Item
-            class="sable-menu-item"
-            onSelect={moderate(core.inviteUser.bind(core))}
-          >
+          <DropdownMenu.Item class="sable-menu-item" onSelect={moderate(core.commands.inviteUser)}>
             <UserPlusIcon />
             {$i18n.t('timeline.profileInvite')}
           </DropdownMenu.Item>
         {/if}
         {#if canUnban}
-          <DropdownMenu.Item class="sable-menu-item" onSelect={moderate(core.unbanUser.bind(core))}>
+          <DropdownMenu.Item class="sable-menu-item" onSelect={moderate(core.commands.unbanUser)}>
             <LockOpenIcon />
             {$i18n.t('timeline.profileUnban')}
           </DropdownMenu.Item>
@@ -389,7 +386,7 @@
         {#if canKick}
           <DropdownMenu.Item
             class="sable-menu-item sable-menu-item-destructive profile-menu-destructive"
-            onSelect={moderate(core.kickUser.bind(core))}
+            onSelect={moderate(core.commands.kickUser)}
           >
             <SignOutIcon />
             {$i18n.t('timeline.profileKick')}
@@ -401,7 +398,7 @@
               'sable-menu-item sable-menu-item-destructive profile-menu-destructive',
               canKick && 'profile-menu-grouped',
             ]}
-            onSelect={moderate(core.banUser.bind(core))}
+            onSelect={moderate(core.commands.banUser)}
           >
             <GavelIcon />
             {$i18n.t('timeline.profileBan')}

@@ -28,7 +28,6 @@
     onMembers: () => void;
     onSearch: () => void;
     onTopic?: (() => void) | null;
-    initials: (name: string) => string;
     pins?: Snippet;
     menu?: Snippet;
   }
@@ -45,7 +44,6 @@
     onMembers,
     onSearch,
     onTopic = null,
-    initials,
     pins,
     menu,
   }: Props = $props();
@@ -74,7 +72,7 @@
   >
     <BackIcon />
   </IconButton>
-  <Avatar class="room-avatar" src={roomAvatar} initials={initials(roomName)} size="small" />
+  <Avatar class="room-avatar" src={roomAvatar} name={roomName} size="small" />
   <div class="room-identity" class:with-topic={topicShown}>
     <h1>{roomName}</h1>
     {#if topicShown}
@@ -96,7 +94,7 @@
             <Avatar
               class="voice-face"
               src={participant.avatar}
-              initials={initials(participant.name)}
+              name={participant.name}
               color={senderColor(participant.userId)}
             />
           {/each}

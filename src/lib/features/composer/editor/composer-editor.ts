@@ -37,11 +37,11 @@ import {
 } from './formatting';
 import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
+import { hasAndroidCompositionQuirk } from '#lib/platform/input.js';
+
 import { queryKey, queryPlugin } from './query-plugin';
 import { composerSchema } from './schema';
 import { shortcodeInputRule } from './shortcodes';
-
-const isAndroid = (): boolean => /Android \d/.test(navigator.userAgent);
 
 const androidBackspaceKeyEvent = (): KeyboardEvent =>
   new KeyboardEvent('keydown', {
@@ -217,7 +217,7 @@ export class ComposerEditor {
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
             beforeinput: (view, event) => {
-              if (!isAndroid()) return false;
+              if (!hasAndroidCompositionQuirk()) return false;
               if (event.inputType === 'deleteContentBackward') {
                 handleAndroidDeleteBackward(view);
                 return true;

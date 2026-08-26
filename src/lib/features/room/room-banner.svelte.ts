@@ -17,7 +17,7 @@ export function bannerUrl(content: unknown): string | null {
 
 export async function readRoomBanner(core: CoreClient, roomId: string): Promise<string | null> {
   try {
-    return bannerUrl(await core.roomStateEvent(roomId, ROOM_BANNER_EVENT));
+    return bannerUrl(await core.commands.roomStateEvent(roomId, ROOM_BANNER_EVENT));
   } catch (error) {
     console.debug('[sable room] banner unavailable', error);
     return null;
@@ -29,6 +29,6 @@ export async function setRoomBanner(
   roomId: string,
   url: string | null
 ): Promise<void> {
-  await core.sendStateEvent(roomId, ROOM_BANNER_EVENT, '', { url: url ?? '' });
+  await core.commands.sendStateEvent(roomId, ROOM_BANNER_EVENT, '', { url: url ?? '' });
   bannerChanged();
 }

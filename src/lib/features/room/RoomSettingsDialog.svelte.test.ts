@@ -6,13 +6,17 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-const coreStub = vi.hoisted(() => ({
-  roomPermissions: vi.fn(),
-  roomPowerLevels: vi.fn(),
-  roomStateEvent: vi.fn(),
-  roomAliases: vi.fn(),
-  roomDirectoryVisibility: vi.fn(),
-}));
+const coreStub = vi.hoisted(() => {
+  const stub = {
+    roomPermissions: vi.fn(),
+    roomPowerLevels: vi.fn(),
+    roomStateEvent: vi.fn(),
+    roomAliases: vi.fn(),
+    roomDirectoryVisibility: vi.fn(),
+  };
+
+  return Object.assign(stub, { commands: stub });
+});
 
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
 vi.mock('#lib/i18n.js', () => ({

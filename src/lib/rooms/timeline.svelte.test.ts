@@ -77,6 +77,10 @@ class FakeCore {
   emit(event: CoreEvent) {
     for (const listener of this.listeners) listener(event);
   }
+
+  get commands(): this {
+    return this;
+  }
 }
 
 test('requests live context as part of its snapshot subscription', async () => {
@@ -367,6 +371,10 @@ class SwitchingCore {
 
   emit(event: CoreEvent) {
     for (const listener of this.listeners) listener(event);
+  }
+
+  get commands(): this {
+    return this;
   }
 }
 

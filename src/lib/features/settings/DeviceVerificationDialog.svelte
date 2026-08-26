@@ -18,7 +18,7 @@
   async function accept(): Promise<void> {
     if (!core.verification || !core.session?.user_id) return;
     try {
-      await core.acceptVerification(core.session.user_id, core.verification.flowId);
+      await core.commands.acceptVerification(core.session.user_id, core.verification.flowId);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
@@ -27,7 +27,7 @@
   async function confirm(): Promise<void> {
     if (!core.verification || !core.session?.user_id) return;
     try {
-      await core.confirmVerification(core.session.user_id, core.verification.flowId);
+      await core.commands.confirmVerification(core.session.user_id, core.verification.flowId);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
@@ -36,7 +36,11 @@
   async function cancel(mismatch = false): Promise<void> {
     if (!core.verification || !core.session?.user_id) return;
     try {
-      await core.cancelVerification(core.session.user_id, core.verification.flowId, mismatch);
+      await core.commands.cancelVerification(
+        core.session.user_id,
+        core.verification.flowId,
+        mismatch
+      );
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }

@@ -25,10 +25,6 @@
     onAddAccount,
   }: Props = $props();
 
-  function initials(userId: string): string {
-    return userId.replace(/^#src/, '').slice(0, 1).toUpperCase() || '?';
-  }
-
   let otherAccounts = $derived(
     accounts.filter((account) => account.account_id !== currentAccountId)
   );
@@ -42,7 +38,7 @@
       onSwitch(account.account_id);
     }}
   >
-    <Avatar size="small" initials={initials(account.user_id)} />
+    <Avatar size="small" name={account.user_id} />
     <span class="account-name">{account.user_id}</span>
   </DropdownMenu.Item>
 {/each}

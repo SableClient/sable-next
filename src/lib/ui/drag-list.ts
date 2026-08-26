@@ -1,9 +1,16 @@
 import type { Attachment } from 'svelte/attachments';
+import { on } from 'svelte/events';
 
 export type DropEdge = 'above' | 'below';
 export type DropInstruction = DropEdge | 'into';
 
 const INTO_BAND = 0.3;
+
+function listen(...unsubscribers: (() => void)[]): () => void {
+  return () => {
+    for (const unsubscribe of unsubscribers) unsubscribe();
+  };
+}
 
 const SCROLL_EDGE_PX = 48;
 const SCROLL_STEP_PX = 12;
@@ -57,13 +64,11 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
         };
 
         node.draggable = true;
-        node.addEventListener('dragstart', start);
-        node.addEventListener('dragend', end);
+        const stopListening = listen(on(node, 'dragstart', start), on(node, 'dragend', end));
 
         return () => {
           node.draggable = false;
-          node.removeEventListener('dragstart', start);
-          node.removeEventListener('dragend', end);
+          stopListening();
           if (dragged !== null && equals(dragged, item)) end();
         };
       };
@@ -106,17 +111,12 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           onDrop(source, item, instructionAt(event.clientY));
         };
 
-        node.addEventListener('dragenter', over);
-        node.addEventListener('dragover', over);
-        node.addEventListener('dragleave', leave);
-        node.addEventListener('drop', drop);
-
-        return () => {
-          node.removeEventListener('dragenter', over);
-          node.removeEventListener('dragover', over);
-          node.removeEventListener('dragleave', leave);
-          node.removeEventListener('drop', drop);
-        };
+        return listen(
+          on(node, 'dragenter', over),
+          on(node, 'dragover', over),
+          on(node, 'dragleave', leave),
+          on(node, 'drop', drop)
+        );
       };
     },
 
@@ -159,17 +159,16 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           stop();
         };
 
-        node.addEventListener('dragover', track, { capture: true });
-        node.addEventListener('dragleave', left, { capture: true });
-        node.addEventListener('drop', stop, { capture: true });
-        document.addEventListener('dragend', stop);
+        const stopListening = listen(
+          on(node, 'dragover', track, { capture: true }),
+          on(node, 'dragleave', left, { capture: true }),
+          on(node, 'drop', stop, { capture: true }),
+          on(document, 'dragend', stop)
+        );
 
         return () => {
           stop();
-          node.removeEventListener('dragover', track, { capture: true });
-          node.removeEventListener('dragleave', left, { capture: true });
-          node.removeEventListener('drop', stop, { capture: true });
-          document.removeEventListener('dragend', stop);
+          stopListening();
         };
       };
     },

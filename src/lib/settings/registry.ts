@@ -34,8 +34,10 @@ import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 
 import { presentsInApp } from '#lib/platform/notifications.js';
+import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
 
+import { setPreference } from './preferences.svelte';
 import type { FreeTextPreference, Preferences } from './preferences.svelte';
 
 export type BooleanPreference = {
@@ -64,6 +66,8 @@ interface BaseSetting {
   unavailable?: true;
   /** Left out entirely where the platform has nothing for it to switch. */
   supported?: () => boolean;
+  onChange?: (value: boolean) => void;
+  requiresReload?: true;
 }
 
 export interface BooleanSetting extends BaseSetting {
@@ -121,6 +125,11 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
         name: 'settings.errorReporting',
         description: 'settings.errorReportingHint',
         type: 'boolean',
+        requiresReload: true,
+        onChange: (value) => {
+          setPreference('telemetryAsked', true);
+          syncNativeTelemetryConsent(value);
+        },
       },
       {
         key: 'sessionReplay',
@@ -129,6 +138,10 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
         description: 'settings.sessionReplayHint',
         type: 'boolean',
         gatedBy: 'errorReporting',
+        requiresReload: true,
+        onChange: () => {
+          setPreference('telemetryAsked', true);
+        },
       },
     ]
   : [];

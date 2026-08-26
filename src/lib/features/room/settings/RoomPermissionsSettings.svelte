@@ -57,7 +57,7 @@
     loading = true;
     failed = false;
     try {
-      const loaded = await core.roomPowerLevels(target);
+      const loaded = await core.commands.roomPowerLevels(target);
       if (current !== run) return;
       levels = loaded;
     } catch (error) {
@@ -77,7 +77,7 @@
     saving = true;
     failed = false;
     try {
-      await core.sendStateEvent(target, 'm.room.power_levels', '', toEventContent(next));
+      await core.commands.sendStateEvent(target, 'm.room.power_levels', '', toEventContent(next));
       levels = next;
     } catch (error) {
       console.warn('[sable room] permission change failed', error);

@@ -3,7 +3,7 @@
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { formatDate, initials } from '#lib/features/room/timeline-format.js';
+  import { formatDate } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -36,7 +36,7 @@
         {@const busy = answers.isAnswering(invite.room_id)}
         <li class="card">
           <div class="head">
-            <Avatar src={invite.avatar_url} initials={initials(name)} size="large" />
+            <Avatar src={invite.avatar_url} {name} size="large" />
             <div class="identity">
               <p class="name">
                 <span class="name-text">{name}</span>

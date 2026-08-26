@@ -2,6 +2,8 @@
   import type { ImageUsageView } from '#src/generated/ImageUsageView';
   import type { MemberView } from '#src/generated/MemberView';
   import type { PackImageView } from '#src/generated/PackImageView';
+  import { Portal } from 'bits-ui';
+  import FileIcon from 'phosphor-svelte/lib/FileIcon';
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
@@ -126,6 +128,7 @@
   let richText = $derived(preferences.richTextComposer);
   let configuredRich = preferences.richTextComposer;
   let dragging = $state(false);
+  let dropTarget = $derived(roomName ?? $i18n.t('timeline.thisRoom'));
   let query = $state.raw<AutocompleteQuery | null>(null);
   let dismissedAt = $state<number | null>(null);
   let activeIndex = $state(0);
@@ -269,7 +272,7 @@
     if (loadedMembersFor === roomId) return;
     loadedMembersFor = roomId;
     try {
-      members = await core.roomMembers(roomId);
+      members = await core.commands.roomMembers(roomId);
     } catch {
       loadedMembersFor = null;
     }
@@ -279,7 +282,7 @@
     if (loadedEmotesFor === roomId) return;
     loadedEmotesFor = roomId;
     try {
-      emotes = (await core.imagePacks(roomId))
+      emotes = (await core.commands.imagePacks(roomId))
         .flatMap((pack) => pack.images)
         .filter((image) => image.usage.includes('emoticon'));
     } catch {
@@ -434,7 +437,7 @@
 
   function handleDrop(event: DragEvent): void {
     dragging = false;
-    if (event.defaultPrevented) return;
+    if (event.defaultPrevented || readOnly) return;
 
     const files = filesFrom(event.dataTransfer);
     if (files.length === 0) return;
@@ -443,15 +446,13 @@
   }
 
   function handleDragover(event: DragEvent): void {
-    if (!event.dataTransfer?.types.includes('Files')) return;
+    if (readOnly || !event.dataTransfer?.types.includes('Files')) return;
     event.preventDefault();
     dragging = true;
   }
 
   function handleDragleave(event: DragEvent): void {
-    if (event.currentTarget instanceof Node && event.relatedTarget instanceof Node) {
-      if (event.currentTarget.contains(event.relatedTarget)) return;
-    }
+    if (event.relatedTarget !== null) return;
     dragging = false;
   }
 
@@ -478,7 +479,7 @@
   async function attachVia(address: string): Promise<void> {
     if (!address.startsWith('!')) return;
     try {
-      editor.attachVia(address, await core.roomViaServers(address));
+      editor.attachVia(address, await core.commands.roomViaServers(address));
     } catch (error) {
       console.debug('[sable composer] via servers unavailable', error);
     }
@@ -527,6 +528,24 @@
   }
 </script>
 
+<svelte:window
+  ondragover={handleDragover}
+  ondragleave={handleDragleave}
+  ondrop={handleDrop}
+  ondragend={() => (dragging = false)}
+/>
+
+{#if dragging}
+  <Portal>
+    <div class="drop-overlay" aria-hidden="true">
+      <div class="drop-card">
+        <FileIcon size={40} weight="light" />
+        <p class="drop-title">{$i18n.t('timeline.dropFiles', { room: dropTarget })}</p>
+      </div>
+    </div>
+  </Portal>
+{/if}
+
 <div class="composer-stack">
   {#if readOnly}
     <div class="composer-shell">
@@ -538,14 +557,7 @@
     </div>
   {:else}
     <div class="composer-shell">
-      <div
-        class={['composer', { dragging }]}
-        role="group"
-        aria-label={$i18n.t('timeline.messagePlaceholder')}
-        ondrop={handleDrop}
-        ondragover={handleDragover}
-        ondragleave={handleDragleave}
-      >
+      <div class="composer" role="group" aria-label={$i18n.t('timeline.messagePlaceholder')}>
         {#if context}
           <ComposerContextBanner {context} onCancel={cancelContext} />
         {/if}
@@ -738,9 +750,39 @@
     box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
   }
 
-  .composer.dragging {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-main);
+  .drop-overlay {
+    align-items: center;
+    background: var(--sable-overlay);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: var(--space-400);
+    pointer-events: none;
+    position: fixed;
+    z-index: var(--layer-dialog);
+  }
+
+  .drop-card {
+    align-items: center;
+    background: var(--sable-bg-container);
+    border: var(--border-width) dashed var(--sable-primary-main);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-dialog);
+    color: var(--sable-primary-main);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-200);
+    max-width: min(28rem, 100%);
+    padding: var(--space-600) var(--space-500);
+    text-align: center;
+  }
+
+  .drop-title {
+    font-size: var(--font-size-h4);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-h4);
+    margin: 0;
+    overflow-wrap: anywhere;
   }
 
   .composer-row {

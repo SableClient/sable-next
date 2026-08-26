@@ -47,7 +47,7 @@
     recovering = true;
     error = null;
     try {
-      await core.recoverIdentity(key);
+      await core.commands.recoverIdentity(key);
       recoveryKey = '';
       await onRecovered?.();
     } catch (cause) {

@@ -23,7 +23,7 @@
     creating = true;
     error = null;
     try {
-      recoveryKey = await core.enableRecovery();
+      recoveryKey = await core.commands.enableRecovery();
     } catch {
       error = t('settings.actionFailed');
     } finally {

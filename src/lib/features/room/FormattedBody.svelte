@@ -157,7 +157,7 @@
     );
     const name =
       known?.name ??
-      (await core.roomPreview(link.roomId, splitVia(anchor.href).via).then(
+      (await core.commands.roomPreview(link.roomId, splitVia(anchor.href).via).then(
         (preview) => preview.name,
         () => null
       ));

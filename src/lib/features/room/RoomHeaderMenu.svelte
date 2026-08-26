@@ -52,7 +52,7 @@
   async function copyLink(): Promise<void> {
     if (!room) return;
     try {
-      const via = room.canonical_alias ? [] : await core.roomViaServers(room.room_id);
+      const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
       await navigator.clipboard.writeText(matrixToUrl(room.canonical_alias ?? room.room_id, via));
     } catch (error) {
       console.debug('[sable room] clipboard unavailable', error);

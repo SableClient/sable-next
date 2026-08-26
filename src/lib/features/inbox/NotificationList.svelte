@@ -6,7 +6,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { formatDate, formatTime, initials } from '#lib/features/room/timeline-format.js';
+  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
   import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -61,7 +61,7 @@
     if (marking.has(room.room_id)) return;
     marking.add(room.room_id);
     try {
-      await core.markRead(room.room_id, eventId);
+      await core.commands.markRead(room.room_id, eventId);
     } catch (error) {
       console.warn('[sable inbox] marking the room read failed', error);
     } finally {
@@ -102,7 +102,7 @@
         <li>
           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomHref resolves the route itself -->
           <a class="row" href={roomHref(room)}>
-            <Avatar src={room.avatar_url} initials={initials(name)} />
+            <Avatar src={room.avatar_url} {name} />
             <span class="body">
               <span class="head">
                 <span class="name">{name}</span>

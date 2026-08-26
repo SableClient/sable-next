@@ -1,6 +1,5 @@
 export interface AuthStage {
   route: string;
-  title: string;
   completed: boolean;
   accessibilityLabel: string;
 }

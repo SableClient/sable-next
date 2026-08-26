@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/sveltekit';
 import type { HandleClientError } from '@sveltejs/kit/hooks';
 
-import { syncNativeTelemetryConsent } from '#lib/observability/native-consent.js';
+import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { CoreError } from '#src/transport';

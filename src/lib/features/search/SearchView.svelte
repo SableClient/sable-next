@@ -14,7 +14,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import '#lib/ui/primitives/form-control.css';
 
-  import { formatDate, formatTime, initials, senderColor } from '../room/timeline-format';
+  import { formatDate, formatTime, senderColor } from '../room/timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { MessageSearch } from './message-search.svelte.js';
   import { resolveRoomTarget, resolveUserTarget } from './resolve-targets';
@@ -382,7 +382,7 @@
                   <button class="hit-row" type="button" onclick={() => void openHit(hit)}>
                     <Avatar
                       src={senders.identity(hit.sender).avatarUrl}
-                      initials={initials(senders.identity(hit.sender).displayName)}
+                      name={senders.identity(hit.sender).displayName}
                       color={senderColor(hit.sender)}
                       size="small"
                     />

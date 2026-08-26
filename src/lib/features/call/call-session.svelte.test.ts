@@ -58,8 +58,7 @@ function harness(options: { encryptMedia?: boolean; joinError?: Error } = {}): H
   const leaveCall = vi.fn(() => Promise.resolve());
 
   const client = {
-    joinCall,
-    leaveCall,
+    commands: { joinCall, leaveCall },
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -139,19 +138,21 @@ test('a key emitted during the join is not lost', async () => {
   const transport = harness({ encryptMedia: true }).transport;
 
   const client = {
-    joinCall: vi.fn(() => {
-      listeners.forEach((listener) => {
-        listener(ownKey());
-      });
-      return Promise.resolve({
-        session: 7,
-        url: 'wss://sfu.example.org',
-        jwt: 'jwt',
-        identity: '@erwan:example.org:LAPTOP',
-        encryptMedia: true,
-      });
-    }),
-    leaveCall: vi.fn(() => Promise.resolve()),
+    commands: {
+      joinCall: vi.fn(() => {
+        listeners.forEach((listener) => {
+          listener(ownKey());
+        });
+        return Promise.resolve({
+          session: 7,
+          url: 'wss://sfu.example.org',
+          jwt: 'jwt',
+          identity: '@erwan:example.org:LAPTOP',
+          encryptMedia: true,
+        });
+      }),
+      leaveCall: vi.fn(() => Promise.resolve()),
+    },
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -228,16 +229,18 @@ test('a key arriving while the transport is still being built is not lost', asyn
   const transport = harness({ encryptMedia: true }).transport;
 
   const client = {
-    joinCall: vi.fn(() =>
-      Promise.resolve({
-        session: 7,
-        url: 'wss://sfu.example.org',
-        jwt: 'jwt',
-        identity: '@erwan:example.org:LAPTOP',
-        encryptMedia: true,
-      })
-    ),
-    leaveCall: vi.fn(() => Promise.resolve()),
+    commands: {
+      joinCall: vi.fn(() =>
+        Promise.resolve({
+          session: 7,
+          url: 'wss://sfu.example.org',
+          jwt: 'jwt',
+          identity: '@erwan:example.org:LAPTOP',
+          encryptMedia: true,
+        })
+      ),
+      leaveCall: vi.fn(() => Promise.resolve()),
+    },
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -299,16 +302,18 @@ function livekitHarness() {
   } as unknown as CallTransport;
 
   const client = {
-    joinCall: vi.fn(() =>
-      Promise.resolve({
-        session: 7,
-        url: 'wss://sfu.example.org',
-        jwt: 'jwt',
-        identity: '@erwan:example.org:LAPTOP',
-        encryptMedia: true,
-      })
-    ),
-    leaveCall: vi.fn(() => Promise.resolve()),
+    commands: {
+      joinCall: vi.fn(() =>
+        Promise.resolve({
+          session: 7,
+          url: 'wss://sfu.example.org',
+          jwt: 'jwt',
+          identity: '@erwan:example.org:LAPTOP',
+          encryptMedia: true,
+        })
+      ),
+      leaveCall: vi.fn(() => Promise.resolve()),
+    },
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);

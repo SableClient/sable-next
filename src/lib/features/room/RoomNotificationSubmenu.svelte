@@ -39,7 +39,7 @@
 
   async function read(): Promise<void> {
     try {
-      const settings = await core.notificationSettings(roomId);
+      const settings = await core.commands.notificationSettings(roomId);
       mode = settings.room;
       fallback = settings.default;
     } catch (error) {
@@ -49,7 +49,7 @@
 
   function select(next: NotificationModeView | null): void {
     mode = next;
-    void core.setRoomNotificationMode(roomId, next).catch((error: unknown) => {
+    void core.commands.setRoomNotificationMode(roomId, next).catch((error: unknown) => {
       console.warn('[sable room] notification mode failed', error);
     });
   }

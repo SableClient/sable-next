@@ -7,7 +7,10 @@
 
 use std::{
     io::{BufRead, BufReader, Write},
-    os::unix::net::{UnixListener, UnixStream},
+    os::unix::{
+        fs::PermissionsExt,
+        net::{UnixListener, UnixStream},
+    },
     path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     time::Duration,
@@ -18,15 +21,18 @@ const SOCKET_NAME: &str = "moe.sable.next-deeplink.sock";
 const NEW_URL_EVENT: &str = "deep-link://new-url";
 const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 const READ_TIMEOUT: Duration = Duration::from_secs(3);
+const SOCKET_MODE: u32 = 0o600;
 
 fn is_deep_link(arg: &str) -> bool {
     SCHEMES.iter().any(|scheme| arg.starts_with(scheme))
 }
 
-fn socket_path() -> PathBuf {
-    std::env::var("XDG_RUNTIME_DIR")
-        .map_or_else(|_| std::env::temp_dir(), PathBuf::from)
-        .join(SOCKET_NAME)
+fn socket_path() -> Option<PathBuf> {
+    let directory = PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR")?);
+    if !directory.is_absolute() {
+        return None;
+    }
+    Some(directory.join(SOCKET_NAME))
 }
 
 fn deep_link_urls_in_args<I, S>(args: I) -> Vec<String>
@@ -57,7 +63,10 @@ pub fn try_forward_deep_links() -> ForwardResult {
         return ForwardResult::NoUrls;
     }
 
-    let Ok(mut stream) = UnixStream::connect(socket_path()) else {
+    let Some(path) = socket_path() else {
+        return ForwardResult::NoPrimary;
+    };
+    let Ok(mut stream) = UnixStream::connect(path) else {
         return ForwardResult::NoPrimary;
     };
     let _ = stream.set_write_timeout(Some(WRITE_TIMEOUT));
@@ -111,7 +120,10 @@ impl Drop for DeepLinkSocketGuard {
 /// neither is fatal.
 #[must_use]
 pub fn bind_and_listen() -> Option<DeepLinkSocketGuard> {
-    let path = socket_path();
+    let Some(path) = socket_path() else {
+        log::warn!("XDG_RUNTIME_DIR is unset; deep links will not be forwarded between processes");
+        return None;
+    };
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
         Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
@@ -126,6 +138,14 @@ pub fn bind_and_listen() -> Option<DeepLinkSocketGuard> {
             return None;
         }
     };
+
+    if let Err(error) =
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(SOCKET_MODE))
+    {
+        log::warn!("could not restrict {}: {error}", path.display());
+        let _ = std::fs::remove_file(&path);
+        return None;
+    }
 
     let guard = DeepLinkSocketGuard { path };
     if let Err(error) = std::thread::Builder::new()
@@ -155,8 +175,7 @@ fn handle_connection(stream: UnixStream) {
     }
 }
 
-/// Installs the handler and flushes what arrived before it. Call from `setup()`.
-pub fn drain_pending_urls<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+pub fn install_handler<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     use tauri::Emitter;
 
     let emitter = app.clone();
@@ -167,14 +186,14 @@ pub fn drain_pending_urls<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
             }
         }));
     }
+}
 
-    let pending = pending_queue()
+#[must_use]
+pub fn take_pending_urls() -> Vec<String> {
+    pending_queue()
         .lock()
         .map(|mut queue| std::mem::take(&mut *queue))
-        .unwrap_or_default();
-    for url in pending {
-        let _ = app.emit(NEW_URL_EVENT, vec![url]);
-    }
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

@@ -86,7 +86,7 @@ export class RoomList {
 
     const subscription = this.subscription;
     this.subscription = null;
-    if (subscription !== null) this.core.unsubscribe(subscription).catch(() => {});
+    if (subscription !== null) this.core.commands.unsubscribe(subscription).catch(() => {});
   }
 
   private async startSubscription(): Promise<void> {
@@ -102,14 +102,14 @@ export class RoomList {
 
     let response;
     try {
-      response = await this.core.subscribeRoomList();
+      response = await this.core.commands.subscribeRoomList();
     } catch (error) {
       buffered.stop();
       throw error;
     }
 
     if (generation !== this.generation) {
-      this.core.unsubscribe(response.subscription).catch(() => {});
+      this.core.commands.unsubscribe(response.subscription).catch(() => {});
       buffered.stop();
       return;
     }
@@ -150,7 +150,7 @@ export class RoomList {
     for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_LOAD_CONCURRENCY) {
       const results = await Promise.allSettled(
         pending.slice(index, index + NOTIFICATION_MODE_LOAD_CONCURRENCY).map(async (room) => {
-          const settings = await this.core.notificationSettings(room.room_id);
+          const settings = await this.core.commands.notificationSettings(room.room_id);
           return {
             roomId: room.room_id,
             mode: { room: settings.room, fallback: settings.default },

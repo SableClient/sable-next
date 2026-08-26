@@ -1,4 +1,4 @@
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::Arc;
 
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
 use matrix_sdk::ruma::api::client::session::get_login_types::v3::LoginType;
@@ -47,7 +47,7 @@ impl Core {
             .ok_or_else(|| self.failed("login", "no session after a successful login"))?;
 
         let user_id = matrix.meta.user_id.clone();
-        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let mut generation = self.claim_session_generation();
         self.persist(
             &account_id,
             &account_store_id,
@@ -55,7 +55,7 @@ impl Core {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
             },
-            generation,
+            generation.value(),
         )
         .await?;
         tracing::info!(
@@ -63,9 +63,10 @@ impl Core {
             homeserver,
             "session persisted; starting sync"
         );
-        self.start_session(client, homeserver, account_id.clone(), generation)
+        self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        generation.commit();
 
         tracing::info!(operation = "password_login", "login completed");
         Ok(CommandOk::Login { user_id })
@@ -263,7 +264,7 @@ impl Core {
             .ok_or_else(|| self.failed("complete_oidc_login", "no session after finish_login"))?;
 
         let user_id = full.user.meta.user_id.clone();
-        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let mut generation = self.claim_session_generation();
         self.persist(
             &account_id,
             &account_store_id,
@@ -271,12 +272,13 @@ impl Core {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::oauth(full),
             },
-            generation,
+            generation.value(),
         )
         .await?;
-        self.start_session(client, homeserver, account_id.clone(), generation)
+        self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        generation.commit();
 
         tracing::info!(operation = "oidc_login", "OAuth login completed");
         Ok(CommandOk::CompleteOidcLogin { user_id })
@@ -386,7 +388,7 @@ impl Core {
         })?;
         let user_id = matrix.meta.user_id.clone();
 
-        let generation = self.session_generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let mut generation = self.claim_session_generation();
         self.persist(
             &account_id,
             &account_store_id,
@@ -394,12 +396,13 @@ impl Core {
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
             },
-            generation,
+            generation.value(),
         )
         .await?;
-        self.start_session(client, homeserver, account_id.clone(), generation)
+        self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        generation.commit();
 
         tracing::info!(operation = "sso_login", "SSO login completed");
         Ok(CommandOk::CompleteSsoLogin { user_id })

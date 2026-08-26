@@ -48,7 +48,7 @@
     if (!target) return;
 
     const current = ++run;
-    void core
+    void core.commands
       .roomStateEvent(target, ABBREVIATIONS_EVENT_TYPE)
       .then((content) => {
         if (current === run) entries = readAbbreviations(content);
@@ -65,7 +65,7 @@
     busy = true;
     failed = false;
     try {
-      await core.sendStateEvent(target, ABBREVIATIONS_EVENT_TYPE, '', { entries: next });
+      await core.commands.sendStateEvent(target, ABBREVIATIONS_EVENT_TYPE, '', { entries: next });
       entries = [...next];
     } catch (error) {
       console.warn('[sable room] abbreviation save failed', error);

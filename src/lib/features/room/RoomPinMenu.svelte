@@ -18,8 +18,9 @@
     unreadPinCount,
     type PinReadMarker,
   } from './pin-marker';
-  import { formatTime, initials } from './timeline-format';
+  import { formatTime } from './timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import { memberAvatar, memberName } from './members.js';
 
   interface Props {
     roomId: string;
@@ -63,8 +64,8 @@
     const current = ++run;
     try {
       const [ids, stored] = await Promise.all([
-        core.pinnedEvents(target),
-        core.roomAccountData(target, PIN_MARKER_EVENT_TYPE),
+        core.commands.pinnedEvents(target),
+        core.commands.roomAccountData(target, PIN_MARKER_EVENT_TYPE),
       ]);
       if (current !== run) return;
 
@@ -96,7 +97,7 @@
     const current = ++run;
     loading = true;
     try {
-      const ids = await core.pinnedEvents(target);
+      const ids = await core.commands.pinnedEvents(target);
       if (current !== run) return;
       pinnedIds = ids;
 
@@ -113,7 +114,7 @@
 
   async function readEvent(target: string, eventId: string): Promise<PinnedEntry> {
     try {
-      const source: unknown = JSON.parse(await core.eventSource(target, eventId));
+      const source: unknown = JSON.parse(await core.commands.eventSource(target, eventId));
       if (typeof source !== 'object' || source === null) {
         return { eventId, sender: null, body: null, timestamp: null };
       }
@@ -147,25 +148,23 @@
     marker = next;
     currentHash = next.hash;
     try {
-      await core.setRoomAccountData(target, PIN_MARKER_EVENT_TYPE, next);
+      await core.commands.setRoomAccountData(target, PIN_MARKER_EVENT_TYPE, next);
     } catch (error) {
       console.debug('[sable room] pin marker not stored', error);
     }
   }
 
   function senderName(userId: string | null): string {
-    if (userId === null) return $i18n.t('timeline.unknownSender');
-    return members.find((member) => member.user_id === userId)?.display_name ?? userId;
+    return userId === null ? $i18n.t('timeline.unknownSender') : memberName(members, userId);
   }
 
   function senderAvatar(userId: string | null): string | null {
-    if (userId === null) return null;
-    return members.find((member) => member.user_id === userId)?.avatar_url ?? null;
+    return userId === null ? null : memberAvatar(members, userId);
   }
 
   async function unpin(eventId: string): Promise<void> {
     try {
-      pinnedIds = await core.setPinned(roomId, eventId, false);
+      pinnedIds = await core.commands.setPinned(roomId, eventId, false);
       entries = entries.filter((entry) => entry.eventId !== eventId);
     } catch (error) {
       console.warn('[sable room] unpin failed', error);
@@ -239,7 +238,7 @@
               >
                 <Avatar
                   src={senderAvatar(entry.sender)}
-                  initials={initials(senderName(entry.sender))}
+                  name={senderName(entry.sender)}
                   size="small"
                 />
                 <span class="pin-text">

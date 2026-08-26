@@ -17,7 +17,7 @@ const core = vi.hoisted(() => ({
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
 
-import TimelineList from './TimelineList.svelte';
+import TimelineListHarness from './TimelineListHarness.test.svelte';
 
 let animationFrames: FrameRequestCallback[];
 
@@ -124,13 +124,15 @@ test('fills a short live timeline until the server reports the timeline start', 
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 3));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -146,13 +148,15 @@ test('bounds the opening fill when the viewport never fills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -175,13 +179,15 @@ test('waits for a terminal page to settle before revealing the timeline', async 
       roomTimeline.backwardPagination = 'loading';
       return Promise.resolve(true);
     });
-    const instance = mount(TimelineList, {
+    const instance = mount(TimelineListHarness, {
       target: document.body,
       props: {
-        timeline: roomTimeline,
-        onRequestHistory: history,
-        onRequestFuture: async () => {},
-        onRead: async () => {},
+        list: {
+          timeline: roomTimeline,
+          onRequestHistory: history,
+          onRequestFuture: async () => {},
+          onRead: async () => {},
+        },
       },
     });
 
@@ -213,13 +219,15 @@ test('reveals the timeline when a page never settles', async () => {
       roomTimeline.backwardPagination = 'loading';
       return Promise.resolve(false);
     });
-    const instance = mount(TimelineList, {
+    const instance = mount(TimelineListHarness, {
       target: document.body,
       props: {
-        timeline: roomTimeline,
-        onRequestHistory: history,
-        onRequestFuture: async () => {},
-        onRead: async () => {},
+        list: {
+          timeline: roomTimeline,
+          onRequestHistory: history,
+          onRequestFuture: async () => {},
+          onRead: async () => {},
+        },
       },
     });
 
@@ -250,13 +258,15 @@ test('keeps the timeline hidden until the opening fill settles', async () => {
         };
       })
   );
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -278,13 +288,15 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -304,13 +316,15 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
 test('does not read a viewport removed during initial positioning', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: () => Promise.resolve(false),
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(false),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -325,13 +339,15 @@ test('does not leave follow mode for a virtualizer scroll correction', async () 
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   roomTimeline.backwardPagination = 'end';
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -357,13 +373,15 @@ test('requests one history page until the viewport leaves the top threshold', as
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   roomTimeline.mode = { kind: 'live' };
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -392,13 +410,15 @@ test('requests history from upward input when already at the top', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -423,13 +443,15 @@ test('requests history before an upward wheel gesture settles', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -457,13 +479,15 @@ test('a fresh upward input requests the next settled history page', async () => 
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -500,13 +524,15 @@ test('rate limits and bounds sparse history fill', async () => {
     const roomTimeline = timeline();
     roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
     const history = vi.fn(() => Promise.resolve(false));
-    const instance = mount(TimelineList, {
+    const instance = mount(TimelineListHarness, {
       target: document.body,
       props: {
-        timeline: roomTimeline,
-        onRequestHistory: history,
-        onRequestFuture: async () => {},
-        onRead: async () => {},
+        list: {
+          timeline: roomTimeline,
+          onRequestHistory: history,
+          onRequestFuture: async () => {},
+          onRead: async () => {},
+        },
       },
     });
 
@@ -546,13 +572,15 @@ test('cancels sparse history fill on downward input', async () => {
     const roomTimeline = timeline();
     roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
     const history = vi.fn(() => Promise.resolve(false));
-    const instance = mount(TimelineList, {
+    const instance = mount(TimelineListHarness, {
       target: document.body,
       props: {
-        timeline: roomTimeline,
-        onRequestHistory: history,
-        onRequestFuture: async () => {},
-        onRead: async () => {},
+        list: {
+          timeline: roomTimeline,
+          onRequestHistory: history,
+          onRequestFuture: async () => {},
+          onRead: async () => {},
+        },
       },
     });
 
@@ -579,6 +607,7 @@ test('cancels sparse history fill on downward input', async () => {
 });
 
 test('retries marking the latest event read after a failed request', async () => {
+  vi.useFakeTimers();
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   roomTimeline.backwardPagination = 'end';
@@ -586,28 +615,32 @@ test('retries marking the latest event read after a failed request', async () =>
     .fn<(_: string) => Promise<void>>()
     .mockRejectedValueOnce(new Error('temporary failure'))
     .mockResolvedValueOnce();
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: () => Promise.resolve(false),
-      onRequestFuture: async () => {},
-      onRead: read,
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(false),
+        onRequestFuture: async () => {},
+        onRead: read,
+      },
     },
   });
 
   viewport();
   await tick();
   await runAnimationFrames();
-  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(500);
   expect(read).toHaveBeenCalledTimes(1);
   await Promise.resolve();
 
   roomTimeline.items = [...roomTimeline.items];
   await tick();
+  await vi.advanceTimersByTimeAsync(500);
 
   expect(read).toHaveBeenCalledTimes(2);
   await unmount(instance);
+  vi.useRealTimers();
 });
 
 const ROW = 100;
@@ -632,13 +665,15 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   layOutRows();
   roomTimeline.mode = { kind: 'live' };
   roomTimeline.backwardPagination = 'end';
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: () => Promise.resolve(false),
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(false),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
   let scrollHeight = roomTimeline.items.length * ROW;
@@ -738,13 +773,15 @@ test('keeps filling past a window of events the settings hide', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [hiddenItem('renamed')];
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -763,13 +800,15 @@ test('waits out a page in flight when the room opens', async () => {
   roomTimeline.items = [item('latest')];
   roomTimeline.backwardPagination = 'loading';
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -791,13 +830,15 @@ test('asks for history again when the timeline is cleared mid-session', async ()
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -819,13 +860,15 @@ test('a cleared timeline is not held back by the start it reached before', async
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(true));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 
@@ -847,13 +890,15 @@ test('an empty timeline keeps asking when a page brings nothing but claims the s
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(true));
-  const instance = mount(TimelineList, {
+  const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
-      timeline: roomTimeline,
-      onRequestHistory: history,
-      onRequestFuture: async () => {},
-      onRead: async () => {},
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
     },
   });
 

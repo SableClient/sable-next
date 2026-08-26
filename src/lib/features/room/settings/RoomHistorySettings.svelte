@@ -36,7 +36,7 @@
     if (!target) return;
 
     const current = ++run;
-    void core
+    void core.commands
       .roomStateEvent(target, EVENT_TYPE)
       .then((content) => {
         if (current !== run) return;
@@ -62,7 +62,7 @@
     visibility = chosen;
     saving = true;
     try {
-      await core.sendStateEvent(target, EVENT_TYPE, '', { history_visibility: chosen });
+      await core.commands.sendStateEvent(target, EVENT_TYPE, '', { history_visibility: chosen });
     } catch (error) {
       console.warn('[sable room] history visibility change failed', error);
       visibility = previous;

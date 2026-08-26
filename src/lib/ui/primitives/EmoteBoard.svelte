@@ -11,6 +11,9 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
+  import { toInitials } from '#lib/ui/primitives/initials.js';
+  import { whenVisible } from '#lib/ui/when-visible.js';
+  import { SvelteSet } from 'svelte/reactivity';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
@@ -46,6 +49,7 @@
   const emojiColumns = 8;
 
   let packs = $state.raw<ImagePackView[]>([]);
+  const loadedPacks = new SvelteSet<string>();
   let loading = $state(true);
   let failed = $state(false);
   let recent = $state.raw<string[]>(readRecent());
@@ -58,7 +62,7 @@
     let cancelled = false;
     loading = true;
     failed = false;
-    void core.imagePacks(roomId).then(
+    void core.commands.imagePacks(roomId).then(
       (loaded) => {
         if (cancelled) return;
         packs = loaded;
@@ -315,7 +319,7 @@
                   <Avatar
                     size="small"
                     src={section.pack.avatar_url}
-                    initials={packName(section.pack).slice(0, 2)}
+                    initials={toInitials(packName(section.pack), 2)}
                   />
                 {:else}
                   <MediaImage
@@ -412,7 +416,14 @@
           </section>
         {/if}
         {#each searching ? [] : sections as section (sectionId(section.pack))}
-          <section id={sectionId(section.pack)}>
+          {@const id = sectionId(section.pack)}
+          <section
+            {id}
+            class="pack"
+            {@attach whenVisible(() => {
+              loadedPacks.add(id);
+            })}
+          >
             <h3>
               {packName(section.pack)}
               <span class="section-origin">{originLabels[section.pack.origin]}</span>
@@ -437,12 +448,14 @@
                       preview = { image, pack: section.pack };
                     }}
                   >
-                    <MediaImage
-                      source={image.url}
-                      alt={image.body ?? image.shortcode}
-                      width={32}
-                      height={32}
-                    />
+                    {#if loadedPacks.has(id)}
+                      <MediaImage
+                        source={image.url}
+                        alt={image.body ?? image.shortcode}
+                        width={32}
+                        height={32}
+                      />
+                    {/if}
                   </button>
                 </li>
               {/each}
@@ -509,6 +522,11 @@
 </div>
 
 <style>
+  .pack {
+    contain-intrinsic-size: auto 12rem;
+    content-visibility: auto;
+  }
+
   .board {
     display: flex;
     flex-direction: column;

@@ -205,7 +205,12 @@ impl Core {
             return Ok(accounts.clone());
         }
 
-        let Some(bytes) = self.sessions.load().await else {
+        let stored = self
+            .sessions
+            .load()
+            .await
+            .map_err(|error| self.failed("restore: read session file", error))?;
+        let Some(bytes) = stored else {
             let registry = AccountRegistry::empty();
             *accounts = Some(registry.clone());
             return Ok(registry);
@@ -276,8 +281,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for FailingClearSessionStore {
-        async fn load(&self) -> Option<Vec<u8>> {
-            None
+        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+            Ok(None)
         }
 
         async fn save(&self, _bytes: Vec<u8>) -> Result<(), String> {
@@ -295,8 +300,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SessionStore for TestSessionStore {
-        async fn load(&self) -> Option<Vec<u8>> {
-            self.bytes.lock().await.clone()
+        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+            Ok(self.bytes.lock().await.clone())
         }
 
         async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {

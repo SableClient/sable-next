@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
+import { on } from 'svelte/events';
 
 const TRANSPARENT = /^(transparent$|rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\))/;
 
@@ -90,12 +91,12 @@ export function startSystemBarSync(): () => void {
     attributes: true,
     attributeFilter: ['class', 'style'],
   });
-  window.addEventListener('resize', schedule);
+  const stopResize = on(window, 'resize', schedule);
 
   return () => {
     window.clearTimeout(timer);
     if (frame) cancelAnimationFrame(frame);
     observer.disconnect();
-    window.removeEventListener('resize', schedule);
+    stopResize();
   };
 }

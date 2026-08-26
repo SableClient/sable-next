@@ -53,7 +53,7 @@
               pick(room.room_id);
             }}
           >
-            <Avatar size="small" src={room.avatar_url} initials={(room.name ?? '?').slice(0, 1)} />
+            <Avatar size="small" src={room.avatar_url} name={room.name} />
             <span class="name">{room.name ?? room.room_id}</span>
           </button>
         </li>

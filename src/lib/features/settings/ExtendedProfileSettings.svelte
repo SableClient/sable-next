@@ -55,7 +55,7 @@
   $effect(() => {
     if (section !== 'account') return;
     let cancelled = false;
-    void Promise.all([core.accountContacts(), core.ignoredUsers()]).then(
+    void Promise.all([core.commands.accountContacts(), core.commands.ignoredUsers()]).then(
       ([nextEmails, nextIgnored]) => {
         if (cancelled) return;
         emails = nextEmails;

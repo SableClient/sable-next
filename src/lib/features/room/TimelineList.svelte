@@ -45,7 +45,7 @@
   import {
     isCollapsed,
     latestEventId,
-    personasByEventId,
+    personaLookup,
     unreadCountAfter,
     visibleTimelineItems,
   } from './timeline-format';
@@ -123,7 +123,7 @@
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
   );
-  let personas = $derived(personasByEventId(timeline.items));
+  let personas = $derived(personaLookup(timeline.items));
   let personaOpen = $state(false);
 
   // Reading down through unread history marks what has gone past the fold, not
@@ -141,12 +141,18 @@
 
   // Virtual rows are absolutely positioned, so the separator cannot be sticky
   // in flow; it is mirrored above once its own row has scrolled past the top.
-  let stuckUnreadCount = $derived.by(() => {
+  let readMarker = $derived.by(() => {
     const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
-    if (index === -1) return 0;
+
+    return index === -1 ? null : { index, unread: unreadCountAfter(visibleItems, index) };
+  });
+
+  let stuckUnreadCount = $derived.by(() => {
+    const marker = readMarker;
+    if (marker === null) return 0;
     const top = $virtualizer.getVirtualItemForOffset($virtualizer.scrollOffset ?? 0);
-    if (top === undefined || index >= top.index) return 0;
-    return unreadCountAfter(visibleItems, index);
+
+    return top === undefined || marker.index >= top.index ? 0 : marker.unread;
   });
 
   // The mount-time target belongs to the anchoring effect below, so it starts
@@ -794,8 +800,7 @@
 
   $effect(() => {
     // Read up front, so the landing re-runs for every page the fill prepends.
-    /* eslint-disable-next-line @typescript-eslint/no-unused-expressions */
-    visibleItems.length;
+    void visibleItems.length;
     if (timeline.loading || !viewport) return;
 
     const controller = new AbortController();
@@ -1018,9 +1023,7 @@
                   unreadCount={item.content.kind === 'read_marker'
                     ? unreadCountAfter(visibleItems, virtualItem.index)
                     : 0}
-                  replyPersona={item.in_reply_to
-                    ? (personas.get(item.in_reply_to.event_id) ?? null)
-                    : null}
+                  replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
                   {onCopyLink}

@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
+import oxlint from 'eslint-plugin-oxlint';
 import svelte from 'eslint-plugin-svelte';
 import tseslint from 'typescript-eslint';
 
@@ -100,4 +101,5 @@ export default defineConfig([
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
+  oxlint.configs['flat/recommended'],
 ]);
