@@ -120,6 +120,7 @@ impl Core {
         bookmarked: bool,
         now_ms: u64,
     ) -> Result<bool, CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
         let id = bookmark_id(room_id.as_str(), event_id.as_str());
         let mut ids = self.bookmark_ids().await;
         let held = ids.iter().any(|candidate| candidate == &id);

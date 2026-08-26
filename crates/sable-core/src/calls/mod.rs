@@ -4,6 +4,7 @@ mod notify;
 mod sfu;
 
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use matrix_sdk::event_handler::EventHandlerDropGuard;
@@ -90,6 +91,7 @@ impl Core {
         room_id: OwnedRoomId,
         livekit_service_url: Option<String>,
     ) -> Result<CommandOk, CommandErr> {
+        let generation = self.session_generation.load(Ordering::SeqCst);
         let room = self.room(&room_id).await?;
         let client = room.client();
         let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
@@ -112,6 +114,7 @@ impl Core {
         let membership = joined_membership(&room_id, device_id.clone(), service_url.clone());
 
         let delay_id = self.schedule_hangup(&room_id, &state_key).await;
+        let postpone = delay_id.clone().map(|id| self.spawn_postpone_loop(id));
 
         let membership_event_id = room
             .send_state_event_for_key(&state_key, membership)
@@ -147,12 +150,19 @@ impl Core {
 
         let mut handlers = vec![self.watch_call_memberships(
             &client,
+            generation,
             session,
             room_id.clone(),
             distributor.clone(),
         )];
         if encrypt_media {
-            handlers.push(self.watch_call_keys(&client, session, room_id.clone()));
+            handlers.push(self.watch_call_keys(&client, generation, session, room_id.clone()));
+        }
+
+        if self.session_generation.load(Ordering::SeqCst) != generation {
+            drop(postpone);
+            self.retract_membership(&room, &state_key, delay_id).await;
+            return Err(CommandErr::NotLoggedIn);
         }
 
         self.call_sessions.lock().await.insert(
@@ -160,13 +170,13 @@ impl Core {
             CallSession {
                 room_id,
                 state_key,
-                _postpone: delay_id.clone().map(|id| self.spawn_postpone_loop(id)),
+                _postpone: postpone,
                 delay_id,
                 _handlers: handlers,
             },
         );
 
-        self.refresh_call(session, &room, distributor.as_ref())
+        self.refresh_call(generation, session, &room, distributor.as_ref())
             .await;
 
         Ok(CommandOk::JoinCall {
@@ -355,15 +365,19 @@ impl Core {
 
     async fn refresh_call(
         self: &Arc<Self>,
+        generation: u64,
         session: CallSessionId,
         room: &Room,
         distributor: Option<&Arc<Mutex<KeyDistributor>>>,
     ) {
         let members = membership::active_members(room).await;
-        self.emit(CoreEvent::CallMembers {
-            session,
-            members: member_views(&members),
-        });
+        self.emit_if_current(
+            generation,
+            CoreEvent::CallMembers {
+                session,
+                members: member_views(&members),
+            },
+        );
 
         let Some(distributor) = distributor else {
             return;
@@ -403,6 +417,7 @@ impl Core {
     fn watch_call_memberships(
         self: &Arc<Self>,
         client: &Client,
+        generation: u64,
         session: CallSessionId,
         room_id: OwnedRoomId,
         distributor: Option<Arc<Mutex<KeyDistributor>>>,
@@ -417,7 +432,7 @@ impl Core {
                     if *room.room_id() != *room_id {
                         return;
                     }
-                    core.refresh_call(session, &room, distributor.as_ref())
+                    core.refresh_call(generation, session, &room, distributor.as_ref())
                         .await;
                 }
             },
@@ -428,6 +443,7 @@ impl Core {
     fn watch_call_keys(
         self: &Arc<Self>,
         client: &Client,
+        generation: u64,
         session: CallSessionId,
         room_id: OwnedRoomId,
     ) -> EventHandlerDropGuard {
@@ -473,13 +489,16 @@ impl Core {
                             return;
                         }
 
-                        core.emit(CoreEvent::CallEncryptionKey {
-                            session,
-                            identity: sfu::livekit_identity(&info.sender, device_id),
-                            key_index: event.content.keys.index,
-                            key: event.content.keys.key,
-                            own: false,
-                        });
+                        core.emit_if_current(
+                            generation,
+                            CoreEvent::CallEncryptionKey {
+                                session,
+                                identity: sfu::livekit_identity(&info.sender, device_id),
+                                key_index: event.content.keys.index,
+                                key: event.content.keys.key,
+                                own: false,
+                            },
+                        );
                     }
                 },
             );

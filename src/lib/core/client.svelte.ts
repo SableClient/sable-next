@@ -61,25 +61,6 @@ export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
 export type ActiveVerification = { flowId: string; state: VerificationView };
-export type CallGrant = {
-  session: number;
-  url: string;
-  jwt: string;
-  identity: string;
-  encryptMedia: boolean;
-};
-export type CreateRoomOptions = {
-  name?: string | null;
-  topic?: string | null;
-  kind?: CreateRoomKind;
-  /** Published in the directory, joinable by link. */
-  public?: boolean;
-  /** Ignored for a space or a public room. */
-  encrypted?: boolean;
-  invite?: string[];
-  /** Adds an `m.space.child` edge from this space. */
-  parentSpace?: string | null;
-};
 
 export class CoreClient {
   status = $state<CoreStatus>('idle');

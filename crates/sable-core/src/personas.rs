@@ -511,13 +511,12 @@ impl Core {
         persona: PersonaView,
         previous_id: Option<String>,
     ) -> Result<Vec<PersonaView>, CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
         let replaced = previous_id.unwrap_or_else(|| persona.id.clone());
         let mut personas = self.load_personas().await?;
 
-        match personas
-            .iter_mut()
-            .find(|existing| existing.id == replaced || existing.id == persona.id)
-        {
+        personas.retain(|existing| existing.id != persona.id || existing.id == replaced);
+        match personas.iter_mut().find(|existing| existing.id == replaced) {
             Some(existing) => *existing = persona.clone(),
             None => personas.push(persona.clone()),
         }
@@ -532,6 +531,7 @@ impl Core {
     }
 
     pub(crate) async fn remove_persona(&self, id: &str) -> Result<Vec<PersonaView>, CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
         let mut personas = self.load_personas().await?;
         personas.retain(|persona| persona.id != id);
 
@@ -606,6 +606,7 @@ impl Core {
         persona_id: Option<String>,
         valid_until: Option<u64>,
     ) -> Result<(), CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
         let selection = persona_id.map(|persona_id| PersonaSelectionView {
             persona_id,
             valid_until,

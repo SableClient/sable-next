@@ -233,51 +233,68 @@ pub async fn enrich_room_fields<S: BuildHasher>(
         _ => Vec::new(),
     };
 
-    for item in items {
-        let room_id = item.room_id();
+    let stale = items
+        .into_iter()
+        .filter(|item| !room_cache.contains_key(item.room_id()) || matches!(diff, In::Set { .. }));
 
-        // `Set` re-enriches when the summary changes, including re-parenting.
-        if room_cache.contains_key(room_id) && !matches!(diff, In::Set { .. }) {
-            continue;
-        }
-
-        let info = match client.get_room(room_id) {
-            Some(room) => {
-                let is_space = room.is_space();
-                let has_space_parent = has_space_parent(&room).await;
-                let (supports_knock, supports_restricted, supports_knock_restricted) =
-                    crate::rooms::join_rule_support(&room).await;
-                let canonical_alias = room.canonical_alias().map(|alias| alias.to_string());
-
-                let children = if is_space {
-                    space_children(&room).await
-                } else {
-                    Vec::new()
-                };
-
-                RoomInfo {
-                    is_space,
-                    has_space_parent,
-                    supports_knock,
-                    supports_restricted,
-                    supports_knock_restricted,
-                    canonical_alias,
-                    children,
-                    tags: room_tags(&room),
-                }
+    let lookups = stale.map(|item| {
+        let room_id = item.room_id().to_owned();
+        let room = client.get_room(&room_id);
+        async move {
+            match room {
+                Some(room) => (room_id, room_info(&room).await),
+                None => (room_id, RoomInfo::absent()),
             }
-            None => RoomInfo {
-                is_space: false,
-                has_space_parent: false,
-                supports_knock: false,
-                supports_restricted: false,
-                supports_knock_restricted: false,
-                canonical_alias: None,
-                children: Vec::new(),
-                tags: Vec::new(),
-            },
-        };
-        room_cache.insert(room_id.to_owned(), info);
+        }
+    });
+
+    for (room_id, info) in futures_util::future::join_all(lookups).await {
+        room_cache.insert(room_id, info);
+    }
+}
+
+impl RoomInfo {
+    const fn absent() -> Self {
+        Self {
+            is_space: false,
+            has_space_parent: false,
+            supports_knock: false,
+            supports_restricted: false,
+            supports_knock_restricted: false,
+            canonical_alias: None,
+            children: Vec::new(),
+            tags: Vec::new(),
+        }
+    }
+}
+
+async fn room_info(room: &Room) -> RoomInfo {
+    let is_space = room.is_space();
+    let children = async {
+        if is_space {
+            space_children(room).await
+        } else {
+            Vec::new()
+        }
+    };
+
+    let (has_space_parent, join_rules, children) = futures_util::future::join3(
+        has_space_parent(room),
+        crate::rooms::join_rule_support(room),
+        children,
+    )
+    .await;
+    let (supports_knock, supports_restricted, supports_knock_restricted) = join_rules;
+
+    RoomInfo {
+        is_space,
+        has_space_parent,
+        supports_knock,
+        supports_restricted,
+        supports_knock_restricted,
+        canonical_alias: room.canonical_alias().map(|alias| alias.to_string()),
+        children,
+        tags: room_tags(room),
     }
 }
 

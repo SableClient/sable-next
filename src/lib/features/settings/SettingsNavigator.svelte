@@ -4,24 +4,19 @@
   import type { Snippet } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
-  import LockIcon from 'phosphor-svelte/lib/LockKeyIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
-  import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
-  import {
-    SETTINGS_ACCOUNT_SECTION,
-    SETTINGS_DEVICES_SECTION,
-    settingsCategories,
-  } from '#lib/settings/registry.js';
+  import { settingsCategories } from '#lib/settings/registry.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { sectionsAfterCategories, sectionsBeforeCategories } from './sections.js';
   import { defaultSettingsSection } from './settings-navigation';
 
   interface Props {
@@ -36,13 +31,13 @@
   const core = useCoreClient();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   const sections = [
-    { id: SETTINGS_ACCOUNT_SECTION, label: 'settings.account', icon: UserCircleIcon },
+    ...sectionsBeforeCategories,
     ...settingsCategories.map((category) => ({
       id: category.id,
       label: category.name,
       icon: category.icon,
     })),
-    { id: SETTINGS_DEVICES_SECTION, label: 'settings.security', icon: LockIcon },
+    ...sectionsAfterCategories,
   ];
   let desktop = $derived(appLayout.matches);
   let openSection = $derived(section ?? (desktop ? defaultSettingsSection() : null));

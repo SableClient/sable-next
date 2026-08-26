@@ -50,6 +50,7 @@
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import { DropdownMenu } from 'bits-ui';
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
+  import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
 
   let contextRoom = $state<RoomSummary | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
@@ -157,30 +158,25 @@
   let roomsClosed = $state(false);
 
   const newChatHref = resolve('direct');
-  let listLabel = $derived(directSection ? $i18n.t('nav.chats') : $i18n.t('nav.rooms'));
-  let listEmpty = $derived.by(() => {
-    if (directSection) return $i18n.t('nav.chatsEmpty');
-    if (unspacedSection) return $i18n.t('nav.unspacedEmpty');
-    return $i18n.t('nav.roomsUnavailable');
-  });
+  const SECTION_ICONS: Record<NavSectionKind, Component> = {
+    direct: ChatsIcon,
+    unspaced: HashIcon,
+    space: HouseIcon,
+    home: HouseIcon,
+  };
 
+  let section = $derived(navSectionKind(page.url.pathname));
+  let labels = $derived(navSectionLabels(section));
+  let listLabel = $derived($i18n.t(labels.list));
+  let listEmpty = $derived($i18n.t(labels.empty));
   let title = $derived.by(() => {
-    const { pathname } = page.url;
+    if (section !== 'space') return $i18n.t(labels.title);
 
-    if (directSection) return $i18n.t('nav.direct');
-    if (unspacedSection) return $i18n.t('nav.unspaced');
-    if (pathname.startsWith('/space')) {
-      const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
-      return space?.name ?? $i18n.t('nav.space');
-    }
+    const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
 
-    return $i18n.t('nav.home');
+    return space?.name ?? $i18n.t(labels.title);
   });
-  let TitleIcon = $derived.by(() => {
-    if (directSection) return ChatsIcon;
-    if (unspacedSection) return HashIcon;
-    return HouseIcon;
-  });
+  let TitleIcon = $derived(SECTION_ICONS[section]);
   let spaceRootItems = $derived.by<RoomNavItem[]>(() => {
     if (!page.url.pathname.startsWith('/space')) return [];
 

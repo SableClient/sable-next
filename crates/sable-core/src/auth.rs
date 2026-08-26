@@ -66,6 +66,8 @@ impl Core {
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        self.pending_login.lock().await.take();
+        self.pending_registration.lock().await.take();
         generation.commit();
 
         tracing::info!(operation = "password_login", "login completed");
@@ -278,6 +280,8 @@ impl Core {
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        self.pending_login.lock().await.take();
+        self.pending_registration.lock().await.take();
         generation.commit();
 
         tracing::info!(operation = "oidc_login", "OAuth login completed");
@@ -402,6 +406,8 @@ impl Core {
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.set_active_account(&account_id).await?;
+        self.pending_login.lock().await.take();
+        self.pending_registration.lock().await.take();
         generation.commit();
 
         tracing::info!(operation = "sso_login", "SSO login completed");

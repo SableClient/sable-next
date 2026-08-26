@@ -10,23 +10,19 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { LongPress } from './long-press.svelte.js';
-  import { findMember, isCaption, personaWithColor, stripReplyFallback } from './members.js';
+  import { findMember, personaWithColor, stripReplyFallback } from './members.js';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import MediaImage from '#lib/ui/MediaImage.svelte';
-  import MediaContent from '#lib/ui/MediaContent.svelte';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 
   import FormattedBody from './FormattedBody.svelte';
+  import MessageBody from './MessageBody.svelte';
   import MessageReactions from './MessageReactions.svelte';
   import { usePinnedEvents } from './pinned-events.svelte.js';
   import TimelineNotice from './TimelineNotice.svelte';
-  import TimelineGallery from './TimelineGallery.svelte';
-  import TimelineLocation from './TimelineLocation.svelte';
-  import TimelinePoll from './TimelinePoll.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
   import IconContext from 'phosphor-svelte/lib/IconContext';
@@ -577,64 +573,14 @@
                 <span class="edited">{$i18n.t('timeline.edited')}</span>
               {/if}
             </div>
-          {:else if item.content.kind === 'sticker'}
-            <MediaImage
-              class="sticker"
-              source={item.content.source}
-              alt={item.content.body}
-              width={304}
-              height={304}
-              intrinsicWidth={item.content.width}
-              intrinsicHeight={item.content.height}
-              mime={item.content.mime}
-              retryable
-              onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
-            />
-          {:else if item.content.kind === 'image'}
-            <MediaImage
-              class="image"
-              source={item.content.source}
-              alt={item.content.body}
-              width={800}
-              height={600}
-              intrinsicWidth={item.content.width}
-              intrinsicHeight={item.content.height}
-              mime={item.content.mime}
-              retryable
-              onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
-            />
-            {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
-          {:else if item.content.kind === 'gallery'}
-            <TimelineGallery
-              items={item.content.items}
-              body={item.content.body}
-              html={item.content.html}
+          {:else}
+            <MessageBody
+              {item}
+              {canRedactOthers}
               {onMatrixLink}
-            />
-          {:else if item.content.kind === 'location'}
-            <TimelineLocation
-              body={item.content.body}
-              geoUri={item.content.geo_uri}
-              latitude={item.content.latitude}
-              longitude={item.content.longitude}
-            />
-          {:else if item.content.kind === 'poll'}
-            <TimelinePoll
-              poll={item.content.poll}
-              eventId={item.event_id}
-              canEnd={item.is_own || canRedactOthers}
-              onVote={onVotePoll}
-              onEnd={onEndPoll}
-            />
-          {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
-            <MediaContent
-              class="media"
-              source={item.content.source}
-              mime={item.content.mime}
-              body={item.content.body}
-              kind={item.content.kind}
-              width={item.content.kind === 'video' ? item.content.width : null}
-              height={item.content.kind === 'video' ? item.content.height : null}
+              {onOpenMedia}
+              {onVotePoll}
+              {onEndPoll}
             />
           {/if}
           {#if item.reactions.length > 0}
@@ -1106,38 +1052,6 @@
     width: min(100%, 16rem);
   }
 
-  .body,
-  .reply-preview {
-    margin: 0;
-  }
-
-  .body {
-    line-height: var(--line-height-body);
-    white-space: pre-wrap;
-  }
-
-  :global(.image) {
-    border-radius: var(--radius);
-    display: block;
-    margin-top: var(--space-100);
-    width: min(
-      100%,
-      var(--timeline-media-max),
-      calc(var(--timeline-media-max) * var(--media-ratio))
-    );
-  }
-
-  :global(.sticker) {
-    border-radius: var(--radius);
-    display: block;
-    margin-top: var(--space-100);
-    width: var(--timeline-sticker-width);
-  }
-
-  :global(.media) {
-    width: min(100%, var(--timeline-media-max));
-  }
-
   .reply-preview {
     align-items: center;
     background: transparent;
@@ -1151,6 +1065,7 @@
     gap: var(--space-1);
     grid-template-columns: auto minmax(0, 1fr);
     line-height: 1.4;
+    margin: 0;
     margin-bottom: var(--space-100);
     padding: var(--space-100) var(--space-1);
     text-align: start;
@@ -1208,12 +1123,6 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .reaction {
-      transition:
-        background-color var(--motion-normal) var(--motion-easing-standard),
-        border-color var(--motion-normal) var(--motion-easing-standard);
-    }
-
     .via {
       transition: background-color var(--motion-fast) var(--motion-easing-standard);
     }
@@ -1226,16 +1135,6 @@
   @media (prefers-reduced-motion: reduce) {
     :global(.reaction-tooltip) {
       animation: none;
-    }
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .reaction:hover:not(:disabled) {
-      background: var(--sable-surface-var-container-hover);
-    }
-
-    .reaction.mine:hover:not(:disabled) {
-      background: var(--sable-primary-container-hover);
     }
   }
 

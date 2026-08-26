@@ -247,6 +247,7 @@ impl RoomIndex {
             return;
         }
         self.retire(&document.event_id);
+        self.vacuum_if_due();
         self.dirty = true;
 
         let key = self.take_unused_key();
@@ -333,7 +334,6 @@ impl RoomIndex {
 pub(crate) struct MessageIndex {
     rooms: HashMap<OwnedRoomId, RoomIndex>,
     capacity: usize,
-    unreadable: HashSet<OwnedRoomId>,
 }
 
 #[derive(Clone)]
@@ -373,7 +373,6 @@ impl MessageIndex {
         Self {
             rooms: HashMap::new(),
             capacity,
-            unreadable: HashSet::new(),
         }
     }
 
@@ -391,10 +390,6 @@ impl MessageIndex {
             .insert(room_id.clone(), RoomIndex::restored(documents, classified));
     }
 
-    fn mark_unreadable(&mut self, room_id: &OwnedRoomId) {
-        self.unreadable.insert(room_id.clone());
-    }
-
     fn mark_dirty(&mut self, room_id: &OwnedRoomId) {
         if let Some(index) = self.rooms.get_mut(room_id) {
             index.dirty = true;
@@ -404,7 +399,7 @@ impl MessageIndex {
     fn dirty_rooms(&self) -> Vec<OwnedRoomId> {
         self.rooms
             .iter()
-            .filter(|(room_id, index)| index.dirty && !self.unreadable.contains(*room_id))
+            .filter(|(_, index)| index.dirty)
             .map(|(room_id, _)| room_id.clone())
             .collect()
     }
@@ -767,10 +762,7 @@ impl Core {
                         .await
                         .restore_room(&room_id, documents, classified);
                 }
-                persist::Loaded::Absent => {}
-                persist::Loaded::Unreadable => {
-                    self.search_index.lock().await.mark_unreadable(&room_id);
-                }
+                persist::Loaded::Absent | persist::Loaded::Unreadable => {}
             }
         }
 

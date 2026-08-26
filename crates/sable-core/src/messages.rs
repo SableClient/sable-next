@@ -26,6 +26,7 @@ impl Core {
         event_id: OwnedEventId,
         pinned: bool,
     ) -> Result<Vec<OwnedEventId>, CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
         let room = self.room(room_id).await?;
         let mut events = room.pinned_event_ids().unwrap_or_default();
 

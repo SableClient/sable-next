@@ -4,25 +4,21 @@ import { furthestReachableStage, stageIndexForPath, type AuthStage } from './sta
 const stages: readonly AuthStage[] = [
   {
     route: '/login',
-    title: 'Login',
     completed: true,
     accessibilityLabel: 'Login',
   },
   {
     route: '/register',
-    title: 'Register',
     completed: false,
     accessibilityLabel: 'Register',
   },
   {
     route: '/register/recovery',
-    title: 'Recovery',
     completed: false,
     accessibilityLabel: 'Recovery',
   },
   {
     route: '/register/profile',
-    title: 'Profile',
     completed: false,
     accessibilityLabel: 'Profile',
   },

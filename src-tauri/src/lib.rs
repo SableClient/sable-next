@@ -157,6 +157,12 @@ async fn register_push(
     notifications::register_push(&app, &core, config).await
 }
 
+#[cfg(all(feature = "cef", target_os = "linux"))]
+#[tauri::command]
+fn pending_deep_links() -> Vec<String> {
+    deep_link_ipc::take_pending_urls()
+}
+
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
 fn open_auth_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
@@ -171,6 +177,38 @@ fn open_auth_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), Comma
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+fn spawn_event_pump<R: tauri::Runtime>(
+    notifier: AppHandle<R>,
+    pushing: Arc<Core>,
+    mut events: tokio::sync::mpsc::UnboundedReceiver<CoreEvent>,
+    event_sink: Arc<EventSink>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let mut batch = Vec::new();
+        while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
+            let showing: Vec<_> = batch
+                .iter()
+                .filter_map(|event| match event {
+                    CoreEvent::Notification { notification } => Some(notification.clone()),
+                    _ => None,
+                })
+                .collect();
+            event_sink.send(std::mem::take(&mut batch));
+
+            if showing.is_empty() {
+                continue;
+            }
+            let notifier = notifier.clone();
+            let pushing = pushing.clone();
+            tauri::async_runtime::spawn(async move {
+                for notification in showing {
+                    notifications::show(&notifier, &pushing, &notification).await;
+                }
+            });
+        }
+    });
+}
+
 pub fn run() {
     // Two SDK sites log once per room per sync response, which on a phone costs
     // more than they are worth: heroes it cannot name, and the latest-event
@@ -240,35 +278,24 @@ pub fn run() {
             }
 
             #[cfg(all(feature = "cef", target_os = "linux"))]
-            deep_link_ipc::drain_pending_urls(app.handle());
+            deep_link_ipc::install_handler(app.handle());
 
             let data_dir = app.path().app_data_dir()?;
             // Android resolves that to the app data root, which the app
             // itself may not write to; only `files` under it.
             #[cfg(target_os = "android")]
             let data_dir = data_dir.join("files");
-            let (core, mut events) = Core::new(
+            let (core, events) = Core::new(
                 data_dir.to_string_lossy().into_owned(),
                 Box::new(sable_core::store::FileSessionStore::new(&data_dir)),
             );
             let event_sink = Arc::new(EventSink::default());
+            let pushing = core.clone();
             app.manage(AppState {
                 core,
                 event_sink: event_sink.clone(),
             });
-            let notifier = app.handle().clone();
-            let pushing = app.state::<AppState>().core.clone();
-            tauri::async_runtime::spawn(async move {
-                let mut batch = Vec::new();
-                while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
-                    for event in &batch {
-                        if let CoreEvent::Notification { notification } = event {
-                            notifications::show(&notifier, &pushing, notification).await;
-                        }
-                    }
-                    event_sink.send(std::mem::take(&mut batch));
-                }
-            });
+            spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
 
             #[cfg(target_os = "ios")]
             if let Some(window) = app.get_webview_window("main") {
@@ -284,6 +311,8 @@ pub fn run() {
             send_attachment,
             upload_media,
             open_auth_url,
+            #[cfg(all(feature = "cef", target_os = "linux"))]
+            pending_deep_links,
             register_push,
             sentry::set_native_sentry_enabled,
             #[cfg(target_os = "ios")]

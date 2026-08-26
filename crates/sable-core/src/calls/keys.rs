@@ -316,7 +316,7 @@ pub(crate) fn decode_key(encoded: &str) -> Option<Vec<u8>> {
         .decode(encoded)
         .or_else(|_| STANDARD_NO_PAD.decode(encoded))
         .ok()
-        .filter(|key| !key.is_empty())
+        .filter(|key| key.len() == KEY_BYTES)
 }
 
 pub(crate) fn now_ms() -> u64 {

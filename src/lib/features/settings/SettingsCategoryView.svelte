@@ -7,6 +7,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import { panelsFor } from './category-panels.js';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
@@ -14,17 +15,10 @@
 
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
   import { settingFocusId } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import type { Preferences } from '#lib/settings/preferences.svelte.js';
-
-  import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
-  import PushGateway from '#lib/features/notifications/PushGateway.svelte';
-  import PersonaSettings from './PersonaSettings.svelte';
-  import StateEventTool from './StateEventTool.svelte';
-  import CustomThemes from './CustomThemes.svelte';
 
   interface Props {
     category: SettingsCategory;
@@ -159,11 +153,8 @@
                   checked={preferences[key]}
                   onCheckedChange={(checked: boolean) => {
                     setPreference(key, checked);
-                    if (key === 'errorReporting' || key === 'sessionReplay') {
-                      setPreference('telemetryAsked', true);
-                      reloadPending = true;
-                    }
-                    if (key === 'errorReporting') syncNativeTelemetryConsent(checked);
+                    setting.onChange?.(checked);
+                    if (setting.requiresReload) reloadPending = true;
                   }}
                 />
               {/if}
@@ -173,32 +164,21 @@
       </ul>
     </section>
 
-    {#if category.id === 'appearance'}
-      <section class="settings-card custom-themes-card"><CustomThemes /></section>
-    {/if}
-
-    {#if category.id === 'notifications'}
-      <section class="settings-card">
-        <NotificationDefaults />
-      </section>
-      <section class="settings-card">
-        <PushGateway />
-      </section>
-    {/if}
-
-    {#if category.id === 'personas'}
-      <section class="settings-card personas-card"><PersonaSettings /></section>
-    {/if}
-
-    {#if category.id === 'developer' && preferences.showHiddenEvents}
-      <SettingsSection
-        title={$i18n.t('settings.stateEventTitle')}
-        headingId="settings-state-event"
-        class="state-event-section"
-      >
-        <StateEventTool />
-      </SettingsSection>
-    {/if}
+    {#each panelsFor(category.id) as panel (panel.component)}
+      {#if !panel.when || panel.when()}
+        {#if panel.title}
+          <SettingsSection
+            title={$i18n.t(panel.title)}
+            headingId={panel.headingId}
+            class={panel.class}
+          >
+            <panel.component />
+          </SettingsSection>
+        {:else}
+          <section class={['settings-card', panel.class]}><panel.component /></section>
+        {/if}
+      {/if}
+    {/each}
   </div>
 </AppPageShell>
 

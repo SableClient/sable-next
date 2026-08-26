@@ -2,4 +2,4 @@
   import RoutePlaceholder from '#lib/ui/RoutePlaceholder.svelte';
 </script>
 
-<RoutePlaceholder title="Reset password" />
+<RoutePlaceholder titleKey="auth.resetPasswordTitle" />

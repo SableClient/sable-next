@@ -36,27 +36,23 @@
   const stageRegistry = [
     {
       route: resolve('login'),
-      title: 'Sign in',
       completed: true,
-      accessibilityLabel: 'Sign in to Sable',
+      accessibilityLabel: 'auth.stageSignInLabel',
     },
     {
       route: resolve('register'),
-      title: 'Create account',
       completed: false,
-      accessibilityLabel: 'Create your Matrix account',
+      accessibilityLabel: 'auth.stageCreateAccountLabel',
     },
     {
       route: resolve('register/recovery'),
-      title: 'Recovery setup',
       completed: false,
-      accessibilityLabel: 'Set up account recovery',
+      accessibilityLabel: 'auth.stageRecoveryLabel',
     },
     {
       route: resolve('register/profile'),
-      title: 'Profile setup',
       completed: false,
-      accessibilityLabel: 'Choose your profile details',
+      accessibilityLabel: 'auth.stageProfileLabel',
     },
   ];
 
@@ -472,7 +468,7 @@
           <AuthStageCard
             active={carouselDisplayedStage === 0}
             before={carouselDisplayedStage > 0}
-            accessibilityLabel={stages[0].accessibilityLabel}
+            accessibilityLabel={$i18n.t(stages[0].accessibilityLabel)}
             onActivate={() => {
               activateCarouselStage(0);
             }}
@@ -490,7 +486,7 @@
               removing={!loginVerificationActive && retiringAfter === 0}
               accessibilityLabel={loginVerificationActive
                 ? $i18n.t('auth.verifyDevice')
-                : stages[1].accessibilityLabel}
+                : $i18n.t(stages[1].accessibilityLabel)}
               onActivate={() => {
                 activateCarouselStage(1);
               }}
@@ -579,7 +575,7 @@
               after={displayedStage < 2}
               entering={enteringStage === 2}
               removing={retiringAfter !== null && retiringAfter < 2}
-              accessibilityLabel={stages[2].accessibilityLabel}
+              accessibilityLabel={$i18n.t(stages[2].accessibilityLabel)}
               onActivate={() => {
                 activateStage(2);
               }}
@@ -601,7 +597,7 @@
               after={displayedStage < 3}
               entering={enteringStage === 3}
               removing={retiringAfter !== null && retiringAfter < 3}
-              accessibilityLabel={stages[3].accessibilityLabel}
+              accessibilityLabel={$i18n.t(stages[3].accessibilityLabel)}
               onActivate={() => {
                 activateStage(3);
               }}

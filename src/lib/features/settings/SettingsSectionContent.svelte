@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
-  import AccountSettings from './AccountSettings.svelte';
-  import DevicesSettings from './DevicesSettings.svelte';
+  import { findCategory, SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
+
   import SettingsCategoryView from './SettingsCategoryView.svelte';
+  import { findStandaloneSection } from './sections.js';
 
   interface Props {
     section: string | null;
@@ -10,12 +10,14 @@
 
   let { section }: Props = $props();
   let category = $derived(findCategory(section ?? undefined));
+  let standalone = $derived(
+    findStandaloneSection(section) ??
+      (category ? undefined : findStandaloneSection(SETTINGS_DEVICES_SECTION))
+  );
 </script>
 
-{#if section === SETTINGS_ACCOUNT_SECTION}
-  <AccountSettings />
+{#if standalone}
+  <standalone.component />
 {:else if category}
   <SettingsCategoryView {category} />
-{:else}
-  <DevicesSettings />
 {/if}

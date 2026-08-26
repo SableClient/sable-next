@@ -3,13 +3,14 @@
 
   import SpaceLobby from '#lib/features/room/SpaceLobby.svelte';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { i18n } from '#lib/i18n.js';
 
   const roomList = useRoomList();
   let space = $derived(findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null);
 </script>
 
 <svelte:head>
-  <title>{space?.name ?? 'Lobby'} - Sable</title>
+  <title>{space?.name ?? $i18n.t('nav.lobby')} - Sable</title>
 </svelte:head>
 
 <main class="lobby-page">
