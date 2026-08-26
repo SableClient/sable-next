@@ -28,7 +28,7 @@
   import ProfileCard from '../profile/ProfileCard.svelte';
   import { RedirectController } from './redirect-controller.svelte';
   import { homeserverFromAuthUrl, registrationTokenFromAuthUrl } from './auth-url';
-  import { DEFAULT_HOMESERVER } from '../shared/homeservers';
+  import { homeservers } from '../shared/homeservers.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   const core = useCoreClient();
@@ -58,7 +58,7 @@
 
   const flow = new AuthFlowController(
     core,
-    homeserverFromAuthUrl(page.url, page.route.id) ?? DEFAULT_HOMESERVER,
+    homeserverFromAuthUrl(page.url, page.route.id) ?? homeservers.default,
     registrationTokenFromAuthUrl(page.url)
   );
   let hasCompletedInitialHomeserverCheck = $state(false);
@@ -362,7 +362,7 @@
     const server = flow.homeserver.trim();
     const route =
       server &&
-      server !== DEFAULT_HOMESERVER &&
+      server !== homeservers.default &&
       !server.includes('/') &&
       !server.includes('?') &&
       !server.includes('#')

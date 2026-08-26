@@ -8,7 +8,7 @@
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
-  import { DEFAULT_HOMESERVER } from '../shared/homeservers';
+  import { homeservers } from '../shared/homeservers.svelte.js';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
   import RegistrationBrowserStep from './RegistrationBrowserStep.svelte';
   import RegistrationMethods from './RegistrationMethods.svelte';
@@ -102,7 +102,7 @@
           <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
           {$i18n.t('auth.registeringWith')}{' '}
           <Tooltip variant="inline" label={$i18n.t('auth.changeProviderHint')}>
-            {homeserver || DEFAULT_HOMESERVER}
+            {homeserver || homeservers.default}
           </Tooltip>
         </span>
       </AuthInfoBox>

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { parseRuntimeConfig } from './runtime-config';
+import { BUILT_IN_HOMESERVERS, parseRuntimeConfig } from './runtime-config';
 
 const details = {
   pushNotifyUrl: 'https://sygnal.example/_matrix/push/v1/notify',
@@ -81,4 +81,58 @@ test('values are trimmed, so a stray newline does not reach the gateway check', 
   });
 
   expect(parsed.push?.pushNotifyUrl).toBe('https://sygnal.example/_matrix/push/v1/notify');
+});
+
+test('the built-in homeserver list stands in for a config that names none', () => {
+  expect(parseRuntimeConfig({}).homeservers).toEqual(BUILT_IN_HOMESERVERS);
+  expect(parseRuntimeConfig({ homeserverList: [] }).homeservers).toEqual(BUILT_IN_HOMESERVERS);
+  expect(parseRuntimeConfig({ homeserverList: 'matrix.org' }).homeservers).toEqual(
+    BUILT_IN_HOMESERVERS
+  );
+});
+
+test('a listed set replaces the built-in one, first entry leading', () => {
+  const { homeservers } = parseRuntimeConfig({
+    homeserverList: ['one.example', 'two.example'],
+  });
+
+  expect(homeservers.list).toEqual(['one.example', 'two.example']);
+  expect(homeservers.default).toBe('one.example');
+});
+
+test('the default is chosen by index, as v1 wrote it', () => {
+  const { homeservers } = parseRuntimeConfig({
+    homeserverList: ['one.example', 'two.example'],
+    defaultHomeserver: 1,
+  });
+
+  expect(homeservers.default).toBe('two.example');
+});
+
+test('an index outside the list leaves the leading entry in place', () => {
+  for (const defaultHomeserver of [2, -1, 1.5, 'first']) {
+    const { homeservers } = parseRuntimeConfig({
+      homeserverList: ['one.example', 'two.example'],
+      defaultHomeserver,
+    });
+
+    expect(homeservers.default, `index ${String(defaultHomeserver)}`).toBe('one.example');
+  }
+});
+
+test('blank and repeated entries are dropped', () => {
+  const { homeservers } = parseRuntimeConfig({
+    homeserverList: ['one.example', '  ', 'one.example', 42, 'two.example'],
+  });
+
+  expect(homeservers.list).toEqual(['one.example', 'two.example']);
+});
+
+test('custom servers are allowed unless the config says otherwise', () => {
+  expect(parseRuntimeConfig({}).homeservers.allowCustom).toBe(true);
+  expect(parseRuntimeConfig({ allowCustomHomeservers: false }).homeservers.allowCustom).toBe(false);
+  expect(
+    parseRuntimeConfig({ homeserverList: ['one.example'], allowCustomHomeservers: false })
+      .homeservers.allowCustom
+  ).toBe(false);
 });

@@ -14,9 +14,16 @@ export type PushDetails = {
   nativePushAppID: string | null;
 };
 
+export type HomeserversConfig = {
+  list: string[];
+  default: string;
+  allowCustom: boolean;
+};
+
 export type RuntimeConfig = {
   push: PushDetails | null;
   gifs: GifsConfig;
+  homeservers: HomeserversConfig;
 };
 
 const NO_GIFS: GifsConfig = {
@@ -27,7 +34,17 @@ const NO_GIFS: GifsConfig = {
   giphyApiKey: null,
 };
 
-const EMPTY: RuntimeConfig = { push: null, gifs: NO_GIFS };
+export const BUILT_IN_HOMESERVERS: HomeserversConfig = {
+  list: ['matrix.org', 'mozilla.org', 'unredacted.org', 'sable.moe', 'kendama.moe'],
+  default: 'matrix.org',
+  allowCustom: true,
+};
+
+const EMPTY: RuntimeConfig = {
+  push: null,
+  gifs: NO_GIFS,
+  homeservers: BUILT_IN_HOMESERVERS,
+};
 
 function text(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -69,6 +86,23 @@ function parseGifs(raw: unknown): GifsConfig {
   };
 }
 
+function parseHomeservers(raw: unknown, allowCustom: unknown): HomeserversConfig {
+  const list = Array.isArray(raw)
+    ? [...new Set(raw.map(text).filter((server): server is string => server !== null))]
+    : [];
+  const custom = typeof allowCustom === 'boolean' ? allowCustom : BUILT_IN_HOMESERVERS.allowCustom;
+
+  if (list.length === 0) return { ...BUILT_IN_HOMESERVERS, allowCustom: custom };
+  return { list, default: list[0], allowCustom: custom };
+}
+
+function withDefaultAt(homeservers: HomeserversConfig, index: unknown): HomeserversConfig {
+  if (typeof index !== 'number' || !Number.isInteger(index)) return homeservers;
+  if (index < 0 || index >= homeservers.list.length) return homeservers;
+
+  return { ...homeservers, default: homeservers.list[index] };
+}
+
 export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   if (typeof raw !== 'object' || raw === null) return EMPTY;
 
@@ -76,6 +110,10 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   return {
     push: parsePush(source.pushNotificationDetails),
     gifs: parseGifs(source.gifs),
+    homeservers: withDefaultAt(
+      parseHomeservers(source.homeserverList, source.allowCustomHomeservers),
+      source.defaultHomeserver
+    ),
   };
 }
 

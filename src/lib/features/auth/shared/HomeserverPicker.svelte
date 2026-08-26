@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from 'svelte/elements';
   import Combobox from '#lib/ui/primitives/Combobox.svelte';
-  import { HOMESERVER_ITEMS } from './homeservers';
+  import Select from '#lib/ui/primitives/Select.svelte';
+  import { homeservers } from './homeservers.svelte.js';
 
   interface Props {
     id: string;
@@ -26,19 +27,31 @@
   }: Props = $props();
 </script>
 
-<Combobox
-  {id}
-  bind:value
-  items={HOMESERVER_ITEMS}
-  autocapitalize="off"
-  autocorrect="off"
-  autocomplete="url"
-  {disabled}
-  placeholder="matrix.org"
-  spellcheck={false}
-  {required}
-  {ariaInvalid}
-  {oninput}
-  {onblur}
-  {onvaluechange}
-/>
+{#if homeservers.allowCustom}
+  <Combobox
+    {id}
+    bind:value
+    items={homeservers.items}
+    autocapitalize="off"
+    autocorrect="off"
+    autocomplete="url"
+    {disabled}
+    placeholder={homeservers.default}
+    spellcheck={false}
+    {required}
+    {ariaInvalid}
+    {oninput}
+    {onblur}
+    {onvaluechange}
+  />
+{:else}
+  <Select
+    {id}
+    bind:value
+    items={homeservers.items}
+    {disabled}
+    {required}
+    placeholder={homeservers.default}
+    onValueChange={onvaluechange}
+  />
+{/if}
