@@ -20,7 +20,7 @@ export default defineConfig([
     '.svelte-kit/**',
   ]),
   js.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.strict,
   svelte.configs.recommended,
   {
     languageOptions: {
@@ -31,25 +31,15 @@ export default defineConfig([
     },
   },
   {
-    files: ['**/*.{ts,tsx,mts,cts}'],
-    languageOptions: {
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
-  {
     files: ['**/*.svelte'],
     languageOptions: {
       parserOptions: {
         extraFileExtensions: ['.svelte'],
         parser: tseslint.parser,
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
+      'no-undef': 'off',
       'svelte/no-unused-props': 'error',
       'svelte/no-unused-svelte-ignore': 'error',
       'svelte/no-useless-children-snippet': 'error',
@@ -72,10 +62,6 @@ export default defineConfig([
     files: ['**/*.svelte.ts'],
     languageOptions: {
       parser: tseslint.parser,
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
     },
   },
   {

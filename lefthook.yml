@@ -30,6 +30,10 @@ pre-commit:
           - run: pnpm exec stylelint --fix --max-warnings 0 {staged_files}
             stage_fixed: true
 
+    - name: type-aware
+      glob: '*.{ts,tsx,mts,cts,svelte}'
+      run: pnpm exec oxlint --type-aware {staged_files}
+
     - name: css
       glob: '*.css'
       run: pnpm exec stylelint --fix --max-warnings 0 {staged_files}
