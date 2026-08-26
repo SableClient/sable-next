@@ -141,8 +141,6 @@ impl Core {
     }
 }
 
-/// The SDK reads the variant that matches the mime type and drops the rest, so
-/// the split has to follow the same rule it applies when building the content.
 fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> AttachmentInfo {
     let size = UInt::try_from(size).ok();
     let width = view.width.map(UInt::from);
@@ -255,8 +253,6 @@ mod tests {
 
     #[test]
     fn anything_else_reports_only_its_size() {
-        // The SDK reads the variant matching the mime type, so a measurement
-        // that does not belong to the type has to be dropped here too.
         let info = attachment_info(&mime("application/pdf"), &view(Some(9), Some(9), None), 128);
 
         let AttachmentInfo::File(file) = info else {

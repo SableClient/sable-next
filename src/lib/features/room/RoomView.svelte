@@ -7,6 +7,8 @@
   import { page } from '$app/state';
 
   import type { CallSupportView } from '#src/generated/CallSupportView';
+  import type { MessageKind } from '#src/generated/MessageKind';
+  import type { TimelineItemView } from '#src/generated/TimelineItemView';
   import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
@@ -26,6 +28,7 @@
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import type { ComposerContext } from '#lib/features/composer/composer-context.js';
+  import { runSlash } from '#lib/features/composer/slash-commands.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -151,7 +154,6 @@
     if (target) void pinnedEvents.load(target);
   });
 
-  // Global account data, so the first room open is the only one that fetches.
   const bookmarks = useBookmarks();
   onMount(() => {
     void bookmarks.load();
@@ -425,28 +427,39 @@
 
     if (pending?.kind === 'edit') {
       const edited = timeline.items.find((entry) => entry.event_id === pending.eventId);
-      await core.commands.editMessage(
-        targetRoomId,
-        pending.eventId,
-        body,
+      await core.commands.editMessage(targetRoomId, pending.eventId, body, {
         formatted,
         mentions,
-        edited?.per_message_profile ?? null
-      );
+        kind: editedKind(edited),
+        persona: edited?.per_message_profile ?? null,
+      });
       composerContext = null;
       return;
     }
 
-    const outgoing = personaFor(targetRoomId, body, formatted);
-    await core.commands.sendMessage(
-      targetRoomId,
-      outgoing.body,
-      pending?.eventId ?? null,
-      outgoing.formatted,
-      mentions,
-      outgoing.persona
-    );
+    const outcome = await runSlash(body, { roomId: targetRoomId, commands: core.commands });
+    if (outcome.kind === 'done') {
+      composerContext = null;
+      return;
+    }
+
+    const plain = outcome.msgtype !== 'text' || outcome.body !== body;
+    const outgoing = personaFor(targetRoomId, outcome.body, plain ? null : formatted);
+    await core.commands.sendMessage(targetRoomId, outgoing.body, {
+      inReplyTo: pending?.eventId ?? null,
+      formatted: outgoing.formatted,
+      mentions: plain ? { userIds: [], room: false } : mentions,
+      kind: outcome.msgtype,
+      persona: outgoing.persona,
+    });
     composerContext = null;
+  }
+
+  function editedKind(edited: TimelineItemView | undefined): MessageKind {
+    const content = edited?.content;
+    if (content?.kind !== 'message') return 'text';
+    if (content.emote) return 'emote';
+    return content.notice ? 'notice' : 'text';
   }
 
   function personaFor(

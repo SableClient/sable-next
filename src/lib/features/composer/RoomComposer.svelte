@@ -50,7 +50,7 @@
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import { serializeComposer, serializePlain } from './editor/serialize';
-  import { sendFailureKey } from './send-failure';
+  import { sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import { suggestionsFor } from './suggestions';
 
@@ -314,6 +314,11 @@
     }, 4000);
   }
 
+  function failureText(cause: unknown): string {
+    const { key, values } = sendFailure(cause);
+    return $i18n.t(key, values);
+  }
+
   async function send(): Promise<void> {
     if (!hasContent || readOnly) return;
 
@@ -350,7 +355,7 @@
       console.debug('[sable composer] send failed', cause);
       if (doc && editor.isEmpty()) editor.setDoc(doc);
       staged = [...unsent, ...staged];
-      error = $i18n.t(sendFailureKey(cause));
+      error = failureText(cause);
     } finally {
       inFlight -= 1;
     }
@@ -367,7 +372,7 @@
       error = null;
     } catch (cause) {
       console.debug('[sable composer] gif failed', cause);
-      error = $i18n.t(sendFailureKey(cause));
+      error = failureText(cause);
     }
   }
 
@@ -379,7 +384,7 @@
         error = null;
       } catch (cause) {
         console.debug('[sable composer] sticker failed', cause);
-        error = $i18n.t(sendFailureKey(cause));
+        error = failureText(cause);
       }
       return;
     }
@@ -695,7 +700,7 @@
           error = null;
         } catch (cause) {
           console.debug('[sable composer] location failed', cause);
-          error = $i18n.t(sendFailureKey(cause));
+          error = failureText(cause);
         }
       });
     }}

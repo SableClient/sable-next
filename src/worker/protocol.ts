@@ -11,7 +11,6 @@ export type AttachmentRequest = {
   bytes: Uint8Array<ArrayBuffer>;
   caption: string | null;
   inReplyTo: string | null;
-  /** What the page measured about the media; null when it could not. */
   info: AttachmentInfoView | null;
 };
 

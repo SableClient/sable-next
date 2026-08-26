@@ -187,8 +187,6 @@ impl SableCore {
         in_reply_to: Option<String>,
         info: Option<String>,
     ) -> Result<(), String> {
-        // An unreadable measurement is not worth failing a send over: the
-        // attachment still arrives, just without dimensions.
         let info = info
             .as_deref()
             .and_then(|json| serde_json::from_str(json).ok());

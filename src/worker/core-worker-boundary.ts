@@ -14,7 +14,6 @@ export type WorkerCore = {
     bytes: Uint8Array<ArrayBuffer>,
     caption: string | null,
     inReplyTo: string | null,
-    /** JSON of an `AttachmentInfoView`, because the core parses it itself. */
     info: string | null
   ): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;

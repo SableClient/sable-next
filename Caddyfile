@@ -20,7 +20,5 @@
 	# Mounted over by a deployment, so an edit must not wait out a cache.
 	header /config.json Cache-Control "no-cache"
 
-	# Caddy's MIME table does not always carry .webmanifest, and a manifest
-	# served as octet-stream is ignored.
 	header /manifest.webmanifest Content-Type "application/manifest+json"
 }

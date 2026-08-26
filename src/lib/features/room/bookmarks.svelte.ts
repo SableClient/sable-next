@@ -10,16 +10,10 @@ function bookmarkKey(roomId: string, eventId: string): string {
   return `${roomId}|${eventId}`;
 }
 
-/**
- * Bookmarks live in global account data, so one fetch answers for every room
- * and every row in it. Reading them per item is not an option: the core walks
- * one account-data event per bookmark.
- */
 export class Bookmarks {
   readonly #keys = new SvelteSet<string>();
   #loaded = false;
   #inFlight: Promise<void> | null = null;
-  /** Bumped by every confirmed toggle, so a slower load cannot undo one. */
   #revision = 0;
 
   constructor(private readonly commands: BookmarkCommands) {}
@@ -49,8 +43,6 @@ export class Bookmarks {
     const revision = this.#revision;
     try {
       const bookmarks = await this.commands.bookmarks();
-      // A toggle landed while we were fetching, so the snapshot is already
-      // stale. Leaving `#loaded` false lets the next room open try again.
       if (revision !== this.#revision) return;
 
       this.#replace(bookmarks);

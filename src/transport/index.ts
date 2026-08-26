@@ -14,7 +14,6 @@ export type Attachment = {
   bytes: Uint8Array<ArrayBuffer>;
   caption?: string | null;
   inReplyTo?: string | null;
-  /** Measured by the page; omitted when the media could not be decoded. */
   info?: AttachmentInfoView | null;
 };
 

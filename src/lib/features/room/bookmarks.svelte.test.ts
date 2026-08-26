@@ -113,7 +113,6 @@ test('a slow load cannot undo a toggle that raced it', async () => {
 
   expect(store.has('!a:example.org', '$one')).toBe(true);
 
-  // The discarded snapshot left the store unloaded, so it tries once more.
   await store.load();
   expect(bookmarks).toHaveBeenCalledTimes(2);
 });

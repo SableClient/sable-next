@@ -115,8 +115,6 @@ async fn send_attachment(
             bytes.clone(),
             header("caption"),
             header("in-reply-to"),
-            // An unreadable measurement is not worth failing a send over: the
-            // attachment still arrives, just without dimensions.
             header("info").and_then(|json| serde_json::from_str(&json).ok()),
         )
         .await

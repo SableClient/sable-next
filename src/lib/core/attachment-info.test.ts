@@ -6,7 +6,6 @@ function file(mime: string): Blob {
   return new Blob([new Uint8Array([1, 2, 3])], { type: mime });
 }
 
-/** happy-dom decodes nothing, so the element has to be driven by hand. */
 function stubMediaElement(overrides: {
   videoWidth?: number;
   videoHeight?: number;
@@ -26,7 +25,6 @@ function stubMediaElement(overrides: {
     removeAttribute() {},
     load() {},
     set src(_value: string) {
-      // The browser fires this a tick after the source is set.
       queueMicrotask(() => this.listeners.get(overrides.fail ? 'error' : 'loadedmetadata')?.());
     },
   };

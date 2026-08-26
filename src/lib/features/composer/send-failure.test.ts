@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
-import { sendFailureKey } from './send-failure';
+import { sendFailure } from './send-failure';
+import { SlashError } from './slash-commands';
 
 class CoreErrorLike extends Error {
   constructor(readonly detail: { code: string }) {
@@ -14,7 +15,7 @@ test.each([
   ['invalid_media', 'composer.sendInvalidMedia'],
   ['unavailable', 'timeline.sendFailed'],
 ])('a %s failure reads as %s', (code, key) => {
-  expect(sendFailureKey(new CoreErrorLike({ code }))).toBe(key);
+  expect(sendFailure(new CoreErrorLike({ code }))).toEqual({ key });
 });
 
 test.each([
@@ -22,5 +23,11 @@ test.each([
   ['a thrown string', 'offline'],
   ['nothing', undefined],
 ])('%s falls back to the generic failure', (_name, cause) => {
-  expect(sendFailureKey(cause)).toBe('timeline.sendFailed');
+  expect(sendFailure(cause)).toEqual({ key: 'timeline.sendFailed' });
+});
+
+test('a slash command failure keeps its own wording', () => {
+  const failure = sendFailure(new SlashError('composer.slashUnknown', { name: 'nope' }));
+
+  expect(failure).toEqual({ key: 'composer.slashUnknown', values: { name: 'nope' } });
 });

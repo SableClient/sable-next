@@ -120,6 +120,8 @@ pub enum Command {
         room_id: OwnedRoomId,
         body: String,
         formatted: Option<String>,
+        #[serde(default)]
+        kind: MessageKind,
         /// Replying inside a thread needs no extra field: the SDK infers the
         /// thread from the replied-to event.
         #[ts(type = "string | null")]
@@ -167,6 +169,8 @@ pub enum Command {
         event_id: OwnedEventId,
         body: String,
         formatted: Option<String>,
+        #[serde(default)]
+        kind: MessageKind,
         #[serde(default)]
         #[ts(type = "string[]")]
         mentions: Vec<OwnedUserId>,
@@ -354,8 +358,6 @@ pub enum Command {
         room_id: OwnedRoomId,
         #[ts(type = "string")]
         event_id: OwnedEventId,
-        /// Clears the unread count without telling the room. The read marker
-        /// still moves, so a private reader is not a permanently unread one.
         #[serde(default)]
         private_receipt: bool,
     },
@@ -1643,11 +1645,16 @@ pub struct RoomVersionView {
     pub stable: bool,
 }
 
-/// What the sender measured about an outgoing attachment. Only the sender has
-/// the decoded media, so without this every receiving client lays the message
-/// out blind and reflows once the bytes arrive.
-///
-/// `size` and `mimetype` are filled in by the core, which already holds both.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageKind {
+    #[default]
+    Text,
+    Emote,
+    Notice,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, TS)]
 #[ts(export)]
 #[serde(default)]
@@ -1656,10 +1663,8 @@ pub struct AttachmentInfoView {
     pub width: Option<u32>,
     #[ts(type = "number | null")]
     pub height: Option<u32>,
-    /// Audio and video only.
     #[ts(type = "number | null")]
     pub duration_ms: Option<u32>,
-    /// A GIF or an animated WebP, which some clients present differently.
     pub animated: Option<bool>,
 }
 

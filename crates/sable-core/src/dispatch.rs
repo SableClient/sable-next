@@ -44,8 +44,8 @@ use matrix_sdk::ruma::{
 use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::protocol::{
-    Command, CommandErr, CommandOk, CreateRoomKind, JoinRuleView, MembershipView, MutualRoomView,
-    PaginationDirection, RoomTag, RoomVersionView, RoomVersionsView,
+    Command, CommandErr, CommandOk, CreateRoomKind, JoinRuleView, MembershipView, MessageKind,
+    MutualRoomView, PaginationDirection, RoomTag, RoomVersionView, RoomVersionsView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -243,13 +243,14 @@ impl Core {
                 room_id,
                 body,
                 formatted,
+                kind,
                 in_reply_to,
                 mentions,
                 mentions_room,
                 persona,
             } => {
                 let timeline = self.timeline(&room_id).await?;
-                let content = message_content(body, formatted, mentions, mentions_room);
+                let content = message_content(body, formatted, kind, mentions, mentions_room);
 
                 if let Some(persona) = persona {
                     let room = self.room(&room_id).await?;
@@ -393,12 +394,13 @@ impl Core {
                 event_id,
                 body,
                 formatted,
+                kind,
                 mentions,
                 mentions_room,
                 persona,
             } => {
                 let edited = EditedContent::RoomMessage(
-                    message_content(body, formatted, mentions, mentions_room).into(),
+                    message_content(body, formatted, kind, mentions, mentions_room).into(),
                 );
 
                 if let Some(persona) = persona {
@@ -1815,12 +1817,17 @@ impl Core {
 fn message_content(
     body: String,
     formatted: Option<String>,
+    kind: MessageKind,
     mentions: Vec<OwnedUserId>,
     room: bool,
 ) -> RoomMessageEventContent {
-    let content = match formatted {
-        Some(html) => RoomMessageEventContent::text_html(body, html),
-        None => RoomMessageEventContent::text_plain(body),
+    let content = match (kind, formatted) {
+        (MessageKind::Text, Some(html)) => RoomMessageEventContent::text_html(body, html),
+        (MessageKind::Text, None) => RoomMessageEventContent::text_plain(body),
+        (MessageKind::Emote, Some(html)) => RoomMessageEventContent::emote_html(body, html),
+        (MessageKind::Emote, None) => RoomMessageEventContent::emote_plain(body),
+        (MessageKind::Notice, Some(html)) => RoomMessageEventContent::notice_html(body, html),
+        (MessageKind::Notice, None) => RoomMessageEventContent::notice_plain(body),
     };
 
     if mentions.is_empty() && !room {
@@ -1854,12 +1861,19 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
 #[cfg(test)]
 mod tests {
     use super::message_content;
+    use crate::protocol::MessageKind;
     use crate::view;
     use matrix_sdk::ruma::owned_user_id;
 
     #[test]
     fn a_message_without_pills_carries_no_mentions() {
-        let content = message_content("hello".to_owned(), None, Vec::new(), false);
+        let content = message_content(
+            "hello".to_owned(),
+            None,
+            MessageKind::Text,
+            Vec::new(),
+            false,
+        );
 
         assert!(content.mentions.is_none());
     }
@@ -1869,6 +1883,7 @@ mod tests {
         let content = message_content(
             "hi One".to_owned(),
             None,
+            MessageKind::Text,
             vec![owned_user_id!("@one:example.org")],
             false,
         );
@@ -1890,8 +1905,37 @@ mod tests {
     }
 
     #[test]
+    fn each_kind_picks_its_msgtype() {
+        let kinds = [
+            (MessageKind::Text, "m.text"),
+            (MessageKind::Emote, "m.emote"),
+            (MessageKind::Notice, "m.notice"),
+        ];
+
+        for (kind, msgtype) in kinds {
+            let plain = message_content("waves".to_owned(), None, kind, Vec::new(), false);
+            let formatted = message_content(
+                "waves".to_owned(),
+                Some("<em>waves</em>".to_owned()),
+                kind,
+                Vec::new(),
+                false,
+            );
+
+            assert_eq!(plain.msgtype(), msgtype, "{kind:?} plain");
+            assert_eq!(formatted.msgtype(), msgtype, "{kind:?} formatted");
+        }
+    }
+
+    #[test]
     fn a_room_mention_needs_no_user_ids() {
-        let content = message_content("@room heads up".to_owned(), None, Vec::new(), true);
+        let content = message_content(
+            "@room heads up".to_owned(),
+            None,
+            MessageKind::Text,
+            Vec::new(),
+            true,
+        );
 
         let mentions = content.mentions.expect("mentions");
         assert!(mentions.user_ids.is_empty());

@@ -8,6 +8,7 @@ import type { ImagePackView } from '#src/generated/ImagePackView';
 import type { JoinRuleView } from '#src/generated/JoinRuleView';
 import type { MemberView } from '#src/generated/MemberView';
 import type { MembershipView } from '#src/generated/MembershipView';
+import type { MessageKind } from '#src/generated/MessageKind';
 import type { NotificationModeView } from '#src/generated/NotificationModeView';
 import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
 import type { PusherView } from '#src/generated/PusherView';
@@ -56,6 +57,16 @@ export interface OutgoingMentions {
 }
 
 const noMentions: OutgoingMentions = { userIds: [], room: false };
+
+export type SendMessageOptions = {
+  inReplyTo?: string | null;
+  formatted?: string | null;
+  mentions?: OutgoingMentions;
+  persona?: PerMessageProfileView | null;
+  kind?: MessageKind;
+};
+
+export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo'>;
 
 const EMPTY_SEARCH_FILTER: SearchFilter = {
   rooms: [],
@@ -320,30 +331,30 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async kickUser(roomId: string, userId: string): Promise<void> {
+    async kickUser(roomId: string, userId: string, reason: string | null = null): Promise<void> {
       await transport().send({
         type: 'kick_user',
         room_id: roomId,
         user_id: userId,
-        reason: null,
+        reason,
       });
     },
 
-    async banUser(roomId: string, userId: string): Promise<void> {
+    async banUser(roomId: string, userId: string, reason: string | null = null): Promise<void> {
       await transport().send({
         type: 'ban_user',
         room_id: roomId,
         user_id: userId,
-        reason: null,
+        reason,
       });
     },
 
-    async unbanUser(roomId: string, userId: string): Promise<void> {
+    async unbanUser(roomId: string, userId: string, reason: string | null = null): Promise<void> {
       await transport().send({
         type: 'unban_user',
         room_id: roomId,
         user_id: userId,
-        reason: null,
+        reason,
       });
     },
 
@@ -463,20 +474,19 @@ export function createCommands(transport: () => Transport) {
     async sendMessage(
       roomId: string,
       body: string,
-      inReplyTo: string | null = null,
-      formatted: string | null = null,
-      mentions: OutgoingMentions = noMentions,
-      persona: PerMessageProfileView | null = null
+      options: SendMessageOptions = {}
     ): Promise<void> {
+      const mentions = options.mentions ?? noMentions;
       await transport().send({
         type: 'send_message',
         room_id: roomId,
         body,
-        formatted,
-        in_reply_to: inReplyTo,
+        formatted: options.formatted ?? null,
+        kind: options.kind ?? 'text',
+        in_reply_to: options.inReplyTo ?? null,
         mentions: mentions.userIds,
         mentions_room: mentions.room,
-        persona: $state.snapshot(persona),
+        persona: $state.snapshot(options.persona ?? null),
       });
     },
 
@@ -537,19 +547,19 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       eventId: string,
       body: string,
-      formatted: string | null = null,
-      mentions: OutgoingMentions = noMentions,
-      persona: PerMessageProfileView | null = null
+      options: EditMessageOptions = {}
     ): Promise<void> {
+      const mentions = options.mentions ?? noMentions;
       await transport().send({
         type: 'edit_message',
         room_id: roomId,
         event_id: eventId,
         body,
-        formatted,
+        formatted: options.formatted ?? null,
+        kind: options.kind ?? 'text',
         mentions: mentions.userIds,
         mentions_room: mentions.room,
-        persona: $state.snapshot(persona),
+        persona: $state.snapshot(options.persona ?? null),
       });
     },
 
@@ -738,8 +748,6 @@ export function createCommands(transport: () => Transport) {
       options: { caption?: string | null; inReplyTo?: string | null } = {}
     ): Promise<void> {
       if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
-      // Measured before the bytes are detached, and only the page can do it:
-      // decoding media is what the browser is for.
       const info = await measureAttachment(file);
       const bytes = new Uint8Array(await file.arrayBuffer());
       await transport().sendAttachment({

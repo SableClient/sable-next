@@ -1,5 +1,9 @@
 import type { CommandErr } from '#src/generated/CommandErr';
 
+import { SlashError } from './slash-commands';
+
+export type SendFailure = { key: string; values?: Record<string, string> };
+
 function detailOf(cause: unknown): CommandErr | null {
   if (!(cause instanceof Error) || !('detail' in cause)) return null;
   const detail = (cause as { detail: unknown }).detail;
@@ -7,15 +11,17 @@ function detailOf(cause: unknown): CommandErr | null {
   return detail as CommandErr;
 }
 
-export function sendFailureKey(cause: unknown): string {
+export function sendFailure(cause: unknown): SendFailure {
+  if (cause instanceof SlashError) return { key: cause.key, values: cause.values };
+
   switch (detailOf(cause)?.code) {
     case 'denied':
-      return 'composer.sendDenied';
+      return { key: 'composer.sendDenied' };
     case 'rate_limited':
-      return 'composer.sendRateLimited';
+      return { key: 'composer.sendRateLimited' };
     case 'invalid_media':
-      return 'composer.sendInvalidMedia';
+      return { key: 'composer.sendInvalidMedia' };
     default:
-      return 'timeline.sendFailed';
+      return { key: 'timeline.sendFailed' };
   }
 }

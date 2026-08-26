@@ -194,11 +194,6 @@ function load(): Preferences {
 
 export const preferences = $state<Preferences>(load());
 
-/**
- * Matrix has no "do not mark read" receipt. Opting out of read receipts means
- * sending the private one, which clears our own unread count without telling
- * the room; suppressing the send outright would freeze the room unread forever.
- */
 export function readReceiptIsPrivate(): boolean {
   return !preferences.sendReadReceipts;
 }

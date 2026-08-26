@@ -1078,7 +1078,70 @@
     "pollAddAnswer": "Add answer",
     "pollUndisclosed": "Hide results until the poll closes",
     "pollCreate": "Create poll",
-    "pollCancel": "Cancel"
+    "pollCancel": "Cancel",
+    "slashUnknown": "There is no /{{name}} command. Start a message with // to send a literal slash.",
+    "slash": {
+      "me": {
+        "description": "Send the message as an action",
+        "usage": "/me <action>"
+      },
+      "notice": {
+        "description": "Send the message as a notice",
+        "usage": "/notice <message>"
+      },
+      "shrug": {
+        "description": "Append ¯\\_(ツ)_/¯ to the message",
+        "usage": "/shrug [message]"
+      },
+      "tableflip": {
+        "description": "Append (╯°□°）╯︵ ┻━┻ to the message",
+        "usage": "/tableflip [message]"
+      },
+      "unflip": {
+        "description": "Append ┬─┬ ノ( ゜-゜ノ) to the message",
+        "usage": "/unflip [message]"
+      },
+      "join": {
+        "description": "Join a room by address",
+        "usage": "/join <#room:server>"
+      },
+      "knock": {
+        "description": "Ask to join a room",
+        "usage": "/knock <#room:server> [reason]"
+      },
+      "leave": {
+        "description": "Leave this room",
+        "usage": "/leave"
+      },
+      "invite": {
+        "description": "Invite someone to this room",
+        "usage": "/invite <@user:server>"
+      },
+      "kick": {
+        "description": "Remove someone from this room",
+        "usage": "/kick <@user:server> [reason]"
+      },
+      "ban": {
+        "description": "Ban someone from this room",
+        "usage": "/ban <@user:server> [reason]"
+      },
+      "unban": {
+        "description": "Lift a ban on someone",
+        "usage": "/unban <@user:server> [reason]"
+      },
+      "nick": {
+        "description": "Change your display name everywhere",
+        "usage": "/nick <name>"
+      },
+      "roomname": {
+        "description": "Change this room's name",
+        "usage": "/roomname <name>"
+      },
+      "topic": {
+        "description": "Change this room's topic",
+        "usage": "/topic <topic>"
+      }
+    }
   },
   "search": {
     "title": "Search messages",
