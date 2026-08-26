@@ -12,6 +12,7 @@ import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
+import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
 export type MessageActions = {
@@ -20,6 +21,7 @@ export type MessageActions = {
   onViewReactions?: () => void;
   onReadReceipts?: () => void;
   onReply?: () => void;
+  onOpenThread?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onCopyText?: () => void;
@@ -55,6 +57,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   }
   if (actions.onReply) {
     rows.push({ key: 'reply', label: 'timeline.reply', icon: ReplyIcon, run: actions.onReply });
+  }
+  if (actions.onOpenThread) {
+    rows.push({
+      key: 'thread',
+      label: 'timeline.replyInThread',
+      icon: ThreadIcon,
+      run: actions.onOpenThread,
+    });
   }
   if (actions.onEdit) {
     rows.push({ key: 'edit', label: 'timeline.editMessage', icon: EditIcon, run: actions.onEdit });

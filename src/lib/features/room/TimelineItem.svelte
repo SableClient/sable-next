@@ -32,6 +32,7 @@
   import MessageReportDialog from './MessageReportDialog.svelte';
   import MessageSourceDialog from './MessageSourceDialog.svelte';
   import ReactionSheet from './ReactionSheet.svelte';
+  import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import { useBookmarks } from './bookmarks.svelte.js';
   import { messageMenuRows } from './message-menu-items';
   import { openMessageMenu } from './message-menu-open.svelte.js';
@@ -64,6 +65,7 @@
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
+    onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     onCopyLink?: (eventId: string) => void;
@@ -92,6 +94,7 @@
     currentUserId = null,
     onToggleReaction,
     onReply,
+    onOpenThread,
     onEdit,
     onDelete,
     onCopyLink,
@@ -237,6 +240,7 @@
           : () => {
               void copyText();
             },
+      onOpenThread: onOpenThread && threadTarget ? () => onOpenThread(threadTarget) : undefined,
       onCopyLink:
         onCopyLink && item.event_id
           ? () => {
@@ -310,6 +314,8 @@
   let reportOpen = $state(false);
   let forwardOpen = $state(false);
   let source = $state('');
+  let threadTarget = $derived(item.thread_root ?? item.event_id);
+  let threadSummary = $derived(item.thread_summary);
   const pinnedEvents = usePinnedEvents();
   const bookmarks = useBookmarks();
   let pinned = $derived(pinnedEvents.has(item.event_id));
@@ -585,6 +591,36 @@
               {onEndPoll}
             />
           {/if}
+          {#if threadSummary && onOpenThread && threadTarget}
+            {@const target = threadTarget}
+            <button
+              type="button"
+              class="thread-summary"
+              onclick={() => {
+                onOpenThread(target);
+              }}
+            >
+              <ThreadIcon size={14} aria-hidden="true" />
+              <span class="thread-count"
+                >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
+              >
+              {#if threadSummary.latest_body}
+                <span class="thread-latest">{threadSummary.latest_body}</span>
+              {/if}
+            </button>
+          {:else if item.thread_root && onOpenThread}
+            {@const target = item.thread_root}
+            <button
+              type="button"
+              class="thread-summary"
+              onclick={() => {
+                onOpenThread(target);
+              }}
+            >
+              <ThreadIcon size={14} aria-hidden="true" />
+              <span class="thread-count">{$i18n.t('timeline.thread')}</span>
+            </button>
+          {/if}
           {#if item.reactions.length > 0}
             <MessageReactions
               reactions={item.reactions}
@@ -670,6 +706,39 @@
 {/if}
 
 <style>
+  .thread-summary {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--sable-primary-main);
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: var(--font-size-small);
+    gap: var(--space-1);
+    margin-top: var(--space-hairline);
+    max-width: 100%;
+    padding: 0;
+    text-align: left;
+  }
+
+  .thread-count {
+    flex: none;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .thread-summary:hover .thread-count {
+    text-decoration: underline;
+  }
+
+  .thread-latest {
+    color: var(--sable-surface-var-on-container);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .message {
     display: flex;
     gap: var(--timeline-row-gap);

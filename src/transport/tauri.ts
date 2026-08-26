@@ -57,7 +57,7 @@ export function createTauriTransport(): Transport {
       }
     },
 
-    async sendAttachment({ roomId, filename, mime, bytes, caption, inReplyTo, info }) {
+    async sendAttachment({ roomId, filename, mime, bytes, caption, inReplyTo, info, threadRoot }) {
       await rawInvoke('send_attachment', bytes, {
         'room-id': roomId,
         filename,
@@ -65,6 +65,7 @@ export function createTauriTransport(): Transport {
         ...(caption ? { caption } : {}),
         ...(inReplyTo ? { 'in-reply-to': inReplyTo } : {}),
         ...(info ? { info: JSON.stringify(info) } : {}),
+        ...(threadRoot ? { 'thread-root': threadRoot } : {}),
       });
     },
 

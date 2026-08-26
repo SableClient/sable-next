@@ -15,6 +15,7 @@ export type Attachment = {
   caption?: string | null;
   inReplyTo?: string | null;
   info?: AttachmentInfoView | null;
+  threadRoot?: string | null;
 };
 
 export class CoreError extends Error {

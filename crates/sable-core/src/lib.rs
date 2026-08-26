@@ -36,8 +36,8 @@ use std::{
 };
 
 use matrix_sdk::executor::AbortOnDrop;
-use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use matrix_sdk_ui::timeline::Timeline;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use url::Url;
@@ -71,6 +71,7 @@ pub struct Core {
     room_subscription_lock: Mutex<()>,
     account_data_lock: Mutex<()>,
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
+    thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
     notification_content: AtomicBool,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
@@ -98,6 +99,8 @@ impl Drop for ForegroundPagination {
             .fetch_sub(1, Ordering::Relaxed);
     }
 }
+
+type ThreadKey = (OwnedRoomId, OwnedEventId);
 
 struct CachedTimeline {
     timeline: Arc<Timeline>,
@@ -152,6 +155,7 @@ impl Core {
             room_subscription_lock: Mutex::new(()),
             account_data_lock: Mutex::new(()),
             timelines: Mutex::new(HashMap::new()),
+            thread_timelines: Mutex::new(HashMap::new()),
             search_index: Mutex::new(search::MessageIndex::new()),
             search_crawl: Mutex::new(search::CrawlProgress::default()),
             server_search: Mutex::new(search::ServerSearch::default()),

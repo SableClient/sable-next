@@ -13,7 +13,7 @@ export type TimelineEvent =
   | { kind: 'content-measured'; delta: number }
   | {
       kind: 'user-scrolled';
-      timelineMode: 'live' | 'focused';
+      timelineMode: 'live' | 'focused' | 'thread';
       nearLatest: boolean;
       /** The offset moved back through the timeline. */
       movedAway: boolean;

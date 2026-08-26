@@ -66,8 +66,8 @@ pub enum Command {
     SubscribeTimeline {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
-        #[ts(type = "string | null")]
-        event_id: Option<OwnedEventId>,
+        #[serde(default)]
+        focus: TimelineFocusView,
         /// Relaxes the event filter so events the SDK would otherwise drop
         /// arrive as `HiddenEvent`. Baked into the timeline, so flipping it
         /// means re-subscribing.
@@ -122,6 +122,9 @@ pub enum Command {
         formatted: Option<String>,
         #[serde(default)]
         kind: MessageKind,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        thread_root: Option<OwnedEventId>,
         /// Replying inside a thread needs no extra field: the SDK infers the
         /// thread from the replied-to event.
         #[ts(type = "string | null")]
@@ -624,6 +627,8 @@ pub enum Command {
         user_id: OwnedUserId,
         reason: Option<String>,
     },
+    /// Our own user id self-verifies another session. Progress arrives as
+    /// `CoreEvent::Verification`.
     RequestVerification {
         #[ts(type = "string")]
         user_id: OwnedUserId,
@@ -1673,6 +1678,22 @@ pub struct RoomVersionsView {
 pub struct RoomVersionView {
     pub id: String,
     pub stable: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, TS)]
+#[ts(export)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TimelineFocusView {
+    #[default]
+    Live,
+    Event {
+        #[ts(type = "string")]
+        event_id: OwnedEventId,
+    },
+    Thread {
+        #[ts(type = "string")]
+        root_event_id: OwnedEventId,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, TS)]

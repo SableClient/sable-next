@@ -116,6 +116,7 @@ async fn send_attachment(
             header("caption"),
             header("in-reply-to"),
             header("info").and_then(|json| serde_json::from_str(&json).ok()),
+            header("thread-root"),
         )
         .await
 }

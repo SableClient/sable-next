@@ -186,13 +186,23 @@ impl SableCore {
         caption: Option<String>,
         in_reply_to: Option<String>,
         info: Option<String>,
+        thread_root: Option<String>,
     ) -> Result<(), String> {
         let info = info
             .as_deref()
             .and_then(|json| serde_json::from_str(json).ok());
 
         self.core
-            .send_attachment(room_id, filename, mime, bytes, caption, in_reply_to, info)
+            .send_attachment(
+                room_id,
+                filename,
+                mime,
+                bytes,
+                caption,
+                in_reply_to,
+                info,
+                thread_root,
+            )
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }

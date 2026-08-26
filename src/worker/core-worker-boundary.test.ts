@@ -59,7 +59,12 @@ test('sends the subscription snapshot before startup events buffered for its por
 
   await first.send({
     id: 1,
-    command: { type: 'subscribe_timeline', room_id: '!room', event_id: null, hidden_events: false },
+    command: {
+      type: 'subscribe_timeline',
+      room_id: '!room',
+      focus: { kind: 'live' as const },
+      hidden_events: false,
+    },
   });
 
   expect(first.messages).toEqual([
@@ -89,7 +94,12 @@ test('denies cross-port pagination and unsubscribe without calling the core', as
   boundary.connect(other);
   await owner.send({
     id: 1,
-    command: { type: 'subscribe_timeline', room_id: '!room', event_id: null, hidden_events: false },
+    command: {
+      type: 'subscribe_timeline',
+      room_id: '!room',
+      focus: { kind: 'live' as const },
+      hidden_events: false,
+    },
   });
 
   await other.send({
@@ -130,7 +140,7 @@ test('cleans up active and pending subscriptions when their ports close', async 
     command: {
       type: 'subscribe_timeline',
       room_id: '!active',
-      event_id: null,
+      focus: { kind: 'live' as const },
       hidden_events: false,
     },
   });
@@ -139,7 +149,7 @@ test('cleans up active and pending subscriptions when their ports close', async 
     command: {
       type: 'subscribe_timeline',
       room_id: '!pending',
-      event_id: null,
+      focus: { kind: 'live' as const },
       hidden_events: false,
     },
   });
@@ -152,8 +162,18 @@ test('cleans up active and pending subscriptions when their ports close', async 
   expect(
     commands.map((command) => JSON.parse(command) as { type: string; subscription?: number })
   ).toEqual([
-    { type: 'subscribe_timeline', room_id: '!active', event_id: null, hidden_events: false },
-    { type: 'subscribe_timeline', room_id: '!pending', event_id: null, hidden_events: false },
+    {
+      type: 'subscribe_timeline',
+      room_id: '!active',
+      focus: { kind: 'live' as const },
+      hidden_events: false,
+    },
+    {
+      type: 'subscribe_timeline',
+      room_id: '!pending',
+      focus: { kind: 'live' as const },
+      hidden_events: false,
+    },
     { type: 'unsubscribe', subscription: 7 },
     { type: 'unsubscribe', subscription: 8 },
   ]);

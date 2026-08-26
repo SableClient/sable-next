@@ -26,7 +26,7 @@ use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::message::{
-    AddMentions, ImageMessageEventContent, MessageType, Relation,
+    AddMentions, ImageMessageEventContent, MessageType, Relation, ReplyWithinThread,
 };
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
@@ -167,12 +167,9 @@ impl Core {
 
             Command::SubscribeTimeline {
                 room_id,
-                event_id,
+                focus,
                 hidden_events,
-            } => {
-                self.subscribe_timeline(room_id, event_id, hidden_events)
-                    .await
-            }
+            } => self.subscribe_timeline(room_id, focus, hidden_events).await,
 
             Command::Unsubscribe { subscription } => {
                 let _update = self.room_subscription_lock.lock().await;
@@ -244,26 +241,24 @@ impl Core {
                 body,
                 formatted,
                 kind,
+                thread_root,
                 in_reply_to,
                 mentions,
                 mentions_room,
                 persona,
             } => {
-                let timeline = self.timeline(&room_id).await?;
+                let timeline = match &thread_root {
+                    Some(root) => self.thread_timeline(&room_id, root).await?,
+                    None => self.timeline(&room_id).await?,
+                };
                 let content = message_content(body, formatted, kind, mentions, mentions_room);
 
                 if let Some(persona) = persona {
                     let room = self.room(&room_id).await?;
-                    let content = match in_reply_to {
-                        Some(event_id) => room
-                            .make_reply_event(
-                                content.into(),
-                                SdkReply {
-                                    event_id,
-                                    enforce_thread: EnforceThread::MaybeThreaded,
-                                    add_mentions: AddMentions::Yes,
-                                },
-                            )
+                    let reply = thread_reply(in_reply_to, thread_root.clone());
+                    let content = match reply {
+                        Some(reply) => room
+                            .make_reply_event(content.into(), reply)
                             .await
                             .map_err(|error| self.failed("send_reply", error))?,
                         None => content,
@@ -1825,6 +1820,24 @@ impl Core {
             }
         }
     }
+}
+
+fn thread_reply(
+    in_reply_to: Option<matrix_sdk::ruma::OwnedEventId>,
+    thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
+) -> Option<SdkReply> {
+    let (event_id, enforce_thread) = match (in_reply_to, thread_root) {
+        (Some(event_id), Some(_)) => (event_id, EnforceThread::Threaded(ReplyWithinThread::Yes)),
+        (Some(event_id), None) => (event_id, EnforceThread::MaybeThreaded),
+        (None, Some(root)) => (root, EnforceThread::Threaded(ReplyWithinThread::No)),
+        (None, None) => return None,
+    };
+
+    Some(SdkReply {
+        event_id,
+        enforce_thread,
+        add_mentions: AddMentions::Yes,
+    })
 }
 
 fn message_content(

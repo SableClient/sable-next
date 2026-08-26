@@ -1393,9 +1393,13 @@ mod tests {
             .mount()
             .await;
 
-        let timeline = crate::timelines::build_room_timeline(&room, None, false)
-            .await
-            .expect("timeline");
+        let timeline = crate::timelines::build_room_timeline(
+            &room,
+            &crate::protocol::TimelineFocusView::Live,
+            false,
+        )
+        .await
+        .expect("timeline");
         timeline.paginate_backwards(10).await.expect("paginate");
 
         let notified = tokio::time::timeout(Duration::from_secs(5), async {

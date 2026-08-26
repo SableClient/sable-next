@@ -14,11 +14,12 @@ use matrix_sdk_ui::timeline::{
     RoomExt, Timeline, TimelineEventFocusThreadMode, TimelineFocus, default_event_filter,
 };
 
-use crate::protocol::CommandErr;
+use crate::protocol::{CommandErr, TimelineFocusView};
 
-use crate::{CachedTimeline, Core, SubscriptionKind};
+use crate::{CachedTimeline, Core, SubscriptionKind, ThreadKey};
 
 const MAX_CACHED_INACTIVE_TIMELINES: usize = 4;
+const MAX_CACHED_THREAD_TIMELINES: usize = 4;
 
 impl Core {
     /// Cached: building one twice gives the UI two streams for one room. Takes
@@ -54,7 +55,7 @@ impl Core {
 
         let room = self.room(room_id).await?;
         let timeline = Arc::new(
-            build_room_timeline(&room, None, hidden_events)
+            build_room_timeline(&room, &TimelineFocusView::Live, hidden_events)
                 .await
                 .map_err(|error| self.failed("build timeline", error))?,
         );
@@ -100,6 +101,58 @@ impl Core {
                 Ok(timeline)
             }
         }
+    }
+}
+
+impl Core {
+    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
+    pub(crate) async fn thread_timeline(
+        &self,
+        room_id: &OwnedRoomId,
+        root_event_id: &OwnedEventId,
+    ) -> Result<Arc<Timeline>, CommandErr> {
+        let key: ThreadKey = (room_id.clone(), root_event_id.clone());
+        {
+            let mut threads = self.thread_timelines.lock().await;
+            if let Some(cached) = threads.get_mut(&key) {
+                cached.last_access = self.next_timeline_access();
+                return Ok(cached.timeline.clone());
+            }
+        }
+
+        let room = self.room(room_id).await?;
+        let focus = TimelineFocusView::Thread {
+            root_event_id: root_event_id.clone(),
+        };
+        let timeline = Arc::new(
+            build_room_timeline(&room, &focus, false)
+                .await
+                .map_err(|error| self.failed("build thread timeline", error))?,
+        );
+
+        let mut threads = self.thread_timelines.lock().await;
+        if let Some(cached) = threads.get_mut(&key) {
+            cached.last_access = self.next_timeline_access();
+            return Ok(cached.timeline.clone());
+        }
+
+        if threads.len() >= MAX_CACHED_THREAD_TIMELINES
+            && let Some(evicted) = threads
+                .iter()
+                .min_by_key(|(_, cached)| cached.last_access)
+                .map(|(id, _)| id.clone())
+        {
+            threads.remove(&evicted);
+        }
+        threads.insert(
+            key,
+            CachedTimeline {
+                timeline: timeline.clone(),
+                hidden_events: false,
+                last_access: self.next_timeline_access(),
+            },
+        );
+        Ok(timeline)
     }
 }
 
@@ -151,20 +204,24 @@ pub(crate) fn hidden_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVers
 
 pub(crate) async fn build_room_timeline(
     room: &matrix_sdk::Room,
-    event_id: Option<OwnedEventId>,
+    focus: &TimelineFocusView,
     hidden_events: bool,
 ) -> Result<Timeline, matrix_sdk_ui::timeline::Error> {
-    let builder = room.timeline_builder();
-    let builder = match event_id {
-        Some(event_id) => builder.with_focus(TimelineFocus::Event {
-            target: event_id,
+    let builder = room.timeline_builder().with_focus(match focus {
+        TimelineFocusView::Live => TimelineFocus::Live {
+            hide_threaded_events: false,
+        },
+        TimelineFocusView::Event { event_id } => TimelineFocus::Event {
+            target: event_id.clone(),
             num_context_events: 20,
             thread_mode: TimelineEventFocusThreadMode::Automatic {
                 hide_threaded_events: false,
             },
-        }),
-        None => builder,
-    };
+        },
+        TimelineFocusView::Thread { root_event_id } => TimelineFocus::Thread {
+            root_event_id: root_event_id.clone(),
+        },
+    });
     let builder = if hidden_events {
         builder.event_filter(hidden_event_filter)
     } else {

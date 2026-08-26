@@ -67,6 +67,7 @@
     currentUserId?: string | null;
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
+    onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     roomId?: string;
@@ -98,6 +99,7 @@
     currentUserId,
     onToggleReaction,
     onReply,
+    onOpenThread,
     onEdit,
     onDelete,
     roomId,
@@ -1033,6 +1035,7 @@
                   {currentUserId}
                   {onToggleReaction}
                   {onReply}
+                  {onOpenThread}
                   {onEdit}
                   {onDelete}
                   {canRedactOthers}

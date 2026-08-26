@@ -12,6 +12,7 @@ export type AttachmentRequest = {
   caption: string | null;
   inReplyTo: string | null;
   info: AttachmentInfoView | null;
+  threadRoot: string | null;
 };
 
 /** Page → worker. `id` correlates the reply; the worker never reorders. */

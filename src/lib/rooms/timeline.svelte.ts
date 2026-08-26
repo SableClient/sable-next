@@ -1,4 +1,5 @@
 import type { SubscriptionId } from '#src/generated/SubscriptionId';
+import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import { applyDiffs } from '#src/transport';
 
@@ -6,11 +7,34 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 export type BackwardPaginationState = 'idle' | 'loading' | 'end';
 export type ForwardPaginationState = 'idle' | 'loading' | 'end';
-export type TimelineMode = { kind: 'live' } | { kind: 'focused'; eventId: string };
+export type TimelineMode =
+  | { kind: 'live' }
+  | { kind: 'focused'; eventId: string }
+  | { kind: 'thread'; rootEventId: string };
 type SubscriptionState = 'pending' | 'active' | 'stopped';
 const PAGINATION_DIFF_SETTLE_TIMEOUT = 2_000;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
+
+function focusFor(mode: TimelineMode): TimelineFocusView {
+  switch (mode.kind) {
+    case 'live':
+      return { kind: 'live' };
+    case 'focused':
+      return { kind: 'event', event_id: mode.eventId };
+    case 'thread':
+      return { kind: 'thread', root_event_id: mode.rootEventId };
+  }
+}
+
+function sameMode(left: TimelineMode, right: TimelineMode): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === 'focused' && right.kind === 'focused') return left.eventId === right.eventId;
+  if (left.kind === 'thread' && right.kind === 'thread') {
+    return left.rootEventId === right.rootEventId;
+  }
+  return true;
+}
 
 export class ActiveRoomTimeline {
   readonly timeline: RoomTimeline;
@@ -28,6 +52,11 @@ export class ActiveRoomTimeline {
   ): Promise<void> {
     this.owner = owner;
     await this.timeline.start(roomId, eventId, hiddenEvents);
+  }
+
+  async startThread(owner: symbol, roomId: string, rootEventId: string): Promise<void> {
+    this.owner = owner;
+    await this.timeline.startThread(roomId, rootEventId);
   }
 
   stop(owner: symbol): Promise<void> {
@@ -55,7 +84,7 @@ export class RoomTimeline {
   mode = $state<TimelineMode>({ kind: 'live' });
 
   private subscription: SubscriptionId | null = null;
-  private target: { roomId: string; eventId: string | null; hiddenEvents: boolean } | null = null;
+  private target: { roomId: string; mode: TimelineMode; hiddenEvents: boolean } | null = null;
   private unsubscribeEvents: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private unsubscribePromise = Promise.resolve();
@@ -70,11 +99,23 @@ export class RoomTimeline {
   private backwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(private readonly core: CoreClient) {}
 
-  async start(roomId: string, eventId: string | null = null, hiddenEvents = false): Promise<void> {
-    const target = { roomId, eventId, hiddenEvents };
+  start(roomId: string, eventId: string | null = null, hiddenEvents = false): Promise<void> {
+    return this.open(
+      roomId,
+      eventId === null ? { kind: 'live' } : { kind: 'focused', eventId },
+      hiddenEvents
+    );
+  }
+
+  startThread(roomId: string, rootEventId: string): Promise<void> {
+    return this.open(roomId, { kind: 'thread', rootEventId }, false);
+  }
+
+  private async open(roomId: string, mode: TimelineMode, hiddenEvents: boolean): Promise<void> {
+    const target = { roomId, mode, hiddenEvents };
     if (
       this.target?.roomId === roomId &&
-      this.target.eventId === eventId &&
+      sameMode(this.target.mode, mode) &&
       this.target.hiddenEvents === hiddenEvents
     ) {
       if (this.subscription !== null) return;
@@ -88,10 +129,10 @@ export class RoomTimeline {
 
     const session = this.session;
     this.target = target;
-    this.mode = eventId === null ? { kind: 'live' } : { kind: 'focused', eventId };
+    this.mode = mode;
     this.loading = true;
     this.error = null;
-    const promise = this.startSubscription(roomId, eventId, hiddenEvents);
+    const promise = this.startSubscription(roomId, mode, hiddenEvents);
     this.startPromise = promise;
 
     try {
@@ -220,7 +261,7 @@ export class RoomTimeline {
 
   private async startSubscription(
     roomId: string,
-    eventId: string | null,
+    mode: TimelineMode,
     hiddenEvents: boolean
   ): Promise<void> {
     const session = this.session;
@@ -263,7 +304,7 @@ export class RoomTimeline {
 
     let response;
     try {
-      response = await this.core.commands.subscribeTimeline(roomId, eventId, hiddenEvents);
+      response = await this.core.commands.subscribeTimeline(roomId, focusFor(mode), hiddenEvents);
     } catch (error) {
       stopEvents();
       this.state = 'stopped';

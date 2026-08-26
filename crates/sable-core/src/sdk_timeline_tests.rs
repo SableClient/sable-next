@@ -26,7 +26,7 @@ use wiremock::{
 
 use super::{
     Core,
-    protocol::{Command, CommandErr, CommandOk, CoreEvent},
+    protocol::{Command, CommandErr, CommandOk, CoreEvent, TimelineFocusView},
     session::{self, Session},
     store::MemorySessionStore,
 };
@@ -101,7 +101,9 @@ async fn live_timeline_receives_sync_and_reconciles_a_limited_gap() {
                 .add_timeline_event(factory.text_msg("old").event_id(event_id!("$old"))),
         )
         .await;
-    let timeline = build_room_timeline(&room, None, false).await.unwrap();
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
     let (_, mut stream) = timeline.subscribe().await;
 
     server
@@ -139,7 +141,9 @@ async fn live_timeline_back_paginates_through_the_event_cache() {
                 .add_timeline_event(factory.text_msg("latest").event_id(event_id!("$latest"))),
         )
         .await;
-    let timeline = build_room_timeline(&room, None, false).await.unwrap();
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
 
     server
         .mock_room_messages()
@@ -185,7 +189,9 @@ async fn hidden_events_admit_only_events_the_sdk_can_render() {
                 ),
         )
         .await;
-    let timeline = build_room_timeline(&room, None, true).await.unwrap();
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, true)
+        .await
+        .unwrap();
 
     assert_eq!(event_ids(timeline.items().await), ["$target", "$done"]);
 }
@@ -271,9 +277,10 @@ async fn permalink_timeline_loads_and_contains_its_target() {
         .mount()
         .await;
 
-    let timeline = build_room_timeline(&room, Some(target.to_owned()), false)
-        .await
-        .unwrap();
+    let focus = TimelineFocusView::Event {
+        event_id: target.to_owned(),
+    };
+    let timeline = build_room_timeline(&room, &focus, false).await.unwrap();
     assert_eq!(event_ids(timeline.items().await), [target.as_str()]);
 }
 
@@ -304,7 +311,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     } = core
         .dispatch(Command::SubscribeTimeline {
             room_id: first_room_id.to_owned(),
-            event_id: None,
+            focus: TimelineFocusView::Live,
             hidden_events: false,
         })
         .await
@@ -318,7 +325,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     } = core
         .dispatch(Command::SubscribeTimeline {
             room_id: second_room_id.to_owned(),
-            event_id: None,
+            focus: TimelineFocusView::Live,
             hidden_events: false,
         })
         .await
@@ -368,7 +375,7 @@ async fn live_timeline_reports_its_back_pagination_status() {
     let CommandOk::SubscribeTimeline { subscription, .. } = core
         .dispatch(Command::SubscribeTimeline {
             room_id: room_id.to_owned(),
-            event_id: None,
+            focus: TimelineFocusView::Live,
             hidden_events: false,
         })
         .await
@@ -492,7 +499,9 @@ async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
 
     server.mock_room_state_encryption().plain().mount().await;
     let room = client.get_room(room_id).expect("subscribed room");
-    let timeline = build_room_timeline(&room, None, false).await.unwrap();
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .unwrap();
     let (_, mut timeline_stream) = timeline.subscribe().await;
 
     let second_response = Mock::given(method("POST"))
@@ -551,7 +560,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
 
     core.dispatch(Command::SubscribeTimeline {
         room_id: room_id.to_owned(),
-        event_id: None,
+        focus: TimelineFocusView::Live,
         hidden_events: false,
     })
     .await
@@ -635,7 +644,9 @@ async fn timeline_views(
     room: &matrix_sdk::Room,
     hidden_events: bool,
 ) -> Option<Vec<crate::protocol::TimelineItemView>> {
-    let timeline = build_room_timeline(room, None, hidden_events).await.ok()?;
+    let timeline = build_room_timeline(room, &TimelineFocusView::Live, hidden_events)
+        .await
+        .ok()?;
 
     Some(
         timeline
@@ -1169,7 +1180,11 @@ async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
         )
         .await;
 
-    let timeline = Arc::new(build_room_timeline(&room, None, false).await.unwrap());
+    let timeline = Arc::new(
+        build_room_timeline(&room, &TimelineFocusView::Live, false)
+            .await
+            .unwrap(),
+    );
     let (_, mut stream) = timeline.subscribe().await;
     assert_eq!(sender_names(&timeline).await, vec![None]);
 

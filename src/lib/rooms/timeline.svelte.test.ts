@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
@@ -32,15 +33,15 @@ class FakeCore {
   private readonly listeners = new Set<(event: CoreEvent) => void>();
   paginateCalls = 0;
   paginateSubscriptions: number[] = [];
-  subscribeCalls: Array<{ roomId: string; eventId: string | null }> = [];
+  subscribeCalls: Array<{ roomId: string; focus: TimelineFocusView }> = [];
 
   subscribeEvents(listener: (event: CoreEvent) => void) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  subscribeTimeline(roomId: string, eventId: string | null) {
-    this.subscribeCalls.push({ roomId, eventId });
+  subscribeTimeline(roomId: string, focus: TimelineFocusView) {
+    this.subscribeCalls.push({ roomId, focus });
     this.emit({
       type: 'timeline_diff',
       subscription: 1,
@@ -90,7 +91,7 @@ test('requests live context as part of its snapshot subscription', async () => {
   await timeline.start('!room:example.org');
 
   expect(core.paginateCalls).toBe(0);
-  expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', eventId: null }]);
+  expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', focus: { kind: 'live' } }]);
   expect(timeline.items.map((entry) => entry.id)).toEqual(['initial']);
 
   core.emit({
@@ -108,7 +109,9 @@ test('opens a permalink as a focused timeline without live pagination', async ()
 
   await timeline.start('!room:example.org', '$target');
 
-  expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', eventId: '$target' }]);
+  expect(core.subscribeCalls).toEqual([
+    { roomId: '!room:example.org', focus: { kind: 'event', event_id: '$target' } },
+  ]);
   expect(core.paginateCalls).toBe(0);
   expect(timeline.items.map((entry) => entry.id)).toEqual(['initial']);
   expect(timeline.mode).toEqual({ kind: 'focused', eventId: '$target' });
@@ -142,7 +145,7 @@ test('does not resubscribe when started again for the same room', async () => {
   await timeline.start('!room:example.org');
   await timeline.start('!room:example.org');
 
-  expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', eventId: null }]);
+  expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', focus: { kind: 'live' } }]);
   expect(core.paginateCalls).toBe(0);
 });
 
@@ -159,8 +162,8 @@ test('paginates the SDK timeline that owns the subscription', async () => {
 });
 
 class DelayedDiffCore extends FakeCore {
-  override subscribeTimeline(roomId: string, eventId: string | null) {
-    this.subscribeCalls.push({ roomId, eventId });
+  override subscribeTimeline(roomId: string, focus: TimelineFocusView) {
+    this.subscribeCalls.push({ roomId, focus });
     this.emit({
       type: 'timeline_pagination',
       subscription: 1,
@@ -412,13 +415,13 @@ test('waits for the previous unsubscribe before replacing a timeline subscriptio
 
   const next = timeline.start('!second:example.org');
   await Promise.resolve();
-  expect(core.subscribeCalls).toEqual([{ roomId: '!first:example.org', eventId: null }]);
+  expect(core.subscribeCalls).toEqual([{ roomId: '!first:example.org', focus: { kind: 'live' } }]);
 
   unsubscribe.resolve(undefined);
   await next;
   expect(core.subscribeCalls).toEqual([
-    { roomId: '!first:example.org', eventId: null },
-    { roomId: '!second:example.org', eventId: null },
+    { roomId: '!first:example.org', focus: { kind: 'live' } },
+    { roomId: '!second:example.org', focus: { kind: 'live' } },
   ]);
 });
 
@@ -494,4 +497,39 @@ test('a clear mid-pagination discards the answer that pagination brings back', a
   await pagination;
 
   expect(timeline.backwardPagination).toBe('idle');
+});
+
+test('a thread subscribes to its root and reports the mode', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  await timeline.startThread('!room:example.org', '$root');
+
+  expect(core.subscribeCalls).toEqual([
+    { roomId: '!room:example.org', focus: { kind: 'thread', root_event_id: '$root' } },
+  ]);
+  expect(timeline.mode).toEqual({ kind: 'thread', rootEventId: '$root' });
+});
+
+test('reopening the same thread does not resubscribe', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  await timeline.startThread('!room:example.org', '$root');
+  await timeline.startThread('!room:example.org', '$root');
+
+  expect(core.subscribeCalls).toHaveLength(1);
+});
+
+test('a different thread in the same room resubscribes', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  await timeline.startThread('!room:example.org', '$one');
+  await timeline.startThread('!room:example.org', '$two');
+
+  expect(core.subscribeCalls.map((call) => call.focus)).toEqual([
+    { kind: 'thread', root_event_id: '$one' },
+    { kind: 'thread', root_event_id: '$two' },
+  ]);
 });

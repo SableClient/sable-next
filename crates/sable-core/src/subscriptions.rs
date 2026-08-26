@@ -3,13 +3,13 @@ use std::{collections::HashMap, sync::Arc};
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::event_cache::PaginationStatus;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::OwnedRoomId;
 use matrix_sdk_ui::room_list_service::RoomListLoadingState;
 use matrix_sdk_ui::room_list_service::filters::{
     new_filter_all, new_filter_deduplicate_versions, new_filter_non_left,
 };
 
-use crate::protocol::{CommandErr, CommandOk, CoreEvent, SubscriptionId};
+use crate::protocol::{CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView};
 
 use crate::timelines::{build_room_timeline, fill_sender_profiles};
 use crate::view;
@@ -114,19 +114,24 @@ impl Core {
     pub(crate) async fn subscribe_timeline(
         self: &Arc<Self>,
         room_id: OwnedRoomId,
-        event_id: Option<OwnedEventId>,
+        focus: TimelineFocusView,
         hidden_events: bool,
     ) -> Result<CommandOk, CommandErr> {
         let subscription = self.allocate_subscription();
-        let live_room_id = event_id.is_none().then(|| room_id.clone());
+        let live_room_id = matches!(focus, TimelineFocusView::Live).then(|| room_id.clone());
         let room = self.room(&room_id).await?;
-        let timeline = match event_id {
-            Some(event_id) => Arc::new(
-                build_room_timeline(&room, Some(event_id), hidden_events)
+        let timeline = match &focus {
+            TimelineFocusView::Live => self.live_timeline(&room_id, hidden_events).await?,
+            // Shared with sends, so a reply's local echo lands on the timeline
+            // the subscriber is reading.
+            TimelineFocusView::Thread { root_event_id } => {
+                self.thread_timeline(&room_id, root_event_id).await?
+            }
+            TimelineFocusView::Event { .. } => Arc::new(
+                build_room_timeline(&room, &focus, hidden_events)
                     .await
                     .map_err(|error| self.failed("build focused timeline", error))?,
             ),
-            None => self.live_timeline(&room_id, hidden_events).await?,
         };
         fill_sender_profiles(&room, &timeline);
         let relays = Arc::new(room.service_members().unwrap_or_default());

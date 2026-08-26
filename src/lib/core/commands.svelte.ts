@@ -28,6 +28,7 @@ import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomVi
 import type { SubscriptionId } from '#src/generated/SubscriptionId';
 import type { PaginationDirection } from '#src/generated/PaginationDirection';
 import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
+import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
 import { measureAttachment } from './attachment-info';
@@ -61,6 +62,7 @@ const noMentions: OutgoingMentions = { userIds: [], room: false };
 
 export type SendMessageOptions = {
   inReplyTo?: string | null;
+  threadRoot?: string | null;
   formatted?: string | null;
   mentions?: OutgoingMentions;
   persona?: PerMessageProfileView | null;
@@ -118,13 +120,13 @@ export function createCommands(transport: () => Transport) {
 
     async subscribeTimeline(
       roomId: string,
-      eventId: string | null = null,
+      focus: TimelineFocusView = { kind: 'live' },
       hiddenEvents = false
     ): Promise<{ subscription: SubscriptionId; items: TimelineItemView[] }> {
       const response = await transport().send({
         type: 'subscribe_timeline',
         room_id: roomId,
-        event_id: eventId,
+        focus,
         hidden_events: hiddenEvents,
       });
       return response;
@@ -496,6 +498,7 @@ export function createCommands(transport: () => Transport) {
         body,
         formatted: options.formatted ?? null,
         kind: options.kind ?? 'text',
+        thread_root: options.threadRoot ?? null,
         in_reply_to: options.inReplyTo ?? null,
         mentions: mentions.userIds,
         mentions_room: mentions.room,
@@ -758,7 +761,11 @@ export function createCommands(transport: () => Transport) {
     async sendAttachment(
       roomId: string,
       file: File,
-      options: { caption?: string | null; inReplyTo?: string | null } = {}
+      options: {
+        caption?: string | null;
+        inReplyTo?: string | null;
+        threadRoot?: string | null;
+      } = {}
     ): Promise<void> {
       if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
       const info = await measureAttachment(file);
@@ -771,6 +778,7 @@ export function createCommands(transport: () => Transport) {
         caption: options.caption ?? null,
         inReplyTo: options.inReplyTo ?? null,
         info,
+        threadRoot: options.threadRoot ?? null,
       });
     },
 
