@@ -52,9 +52,21 @@ test('marks only rooms that are actually unread', () => {
   );
 
   expect(markRead.mock.calls).toEqual([
-    ['!unread', '$a'],
-    ['!highlighted', '$b'],
+    ['!unread', '$a', false],
+    ['!highlighted', '$b', false],
   ]);
+});
+
+test('a private reader still marks rooms read, just without telling them', () => {
+  const markRead = vi.fn(() => Promise.resolve());
+
+  markRoomsRead(
+    [room({ room_id: '!unread', unread: 1, latest_event: { event_id: '$a' } as never })],
+    { markRead },
+    true
+  );
+
+  expect(markRead.mock.calls).toEqual([['!unread', '$a', true]]);
 });
 
 test('a failed mark does not stop the rest', () => {

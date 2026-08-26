@@ -32,6 +32,7 @@
   import MessageReportDialog from './MessageReportDialog.svelte';
   import MessageSourceDialog from './MessageSourceDialog.svelte';
   import ReactionSheet from './ReactionSheet.svelte';
+  import { useBookmarks } from './bookmarks.svelte.js';
   import { messageMenuRows } from './message-menu-items';
   import { openMessageMenu } from './message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
@@ -272,7 +273,7 @@
 
   async function toggleBookmark(eventId: string): Promise<void> {
     try {
-      bookmarked = await core.commands.setBookmark(roomId, eventId, !bookmarked);
+      await bookmarks.toggle(roomId, eventId);
     } catch (error) {
       console.warn('[sable timeline] bookmark failed', error);
     }
@@ -310,8 +311,9 @@
   let forwardOpen = $state(false);
   let source = $state('');
   const pinnedEvents = usePinnedEvents();
+  const bookmarks = useBookmarks();
   let pinned = $derived(pinnedEvents.has(item.event_id));
-  let bookmarked = $state(false);
+  let bookmarked = $derived(bookmarks.has(roomId, item.event_id));
   let deleteOpen = $state(false);
   let reactionsOpen = $state(false);
   let reactionActive = $state(0);

@@ -46,7 +46,12 @@ event_id: string,
 /**
  * Answer ids, not their text.
  */
-answers: Array<string>, } | { "type": "end_poll", room_id: string, event_id: string, } | { "type": "mark_read", room_id: string, event_id: string, } | { "type": "retry_send", room_id: string, transaction_id: string, } | { "type": "cancel_send", room_id: string, transaction_id: string, } | { "type": "create_room", name: string | null, topic: string | null, kind: CreateRoomKind, 
+answers: Array<string>, } | { "type": "end_poll", room_id: string, event_id: string, } | { "type": "mark_read", room_id: string, event_id: string, 
+/**
+ * Clears the unread count without telling the room. The read marker
+ * still moves, so a private reader is not a permanently unread one.
+ */
+private_receipt: boolean, } | { "type": "retry_send", room_id: string, transaction_id: string, } | { "type": "cancel_send", room_id: string, transaction_id: string, } | { "type": "create_room", name: string | null, topic: string | null, kind: CreateRoomKind, 
 /**
  * Published in the directory, joinable by link.
  */

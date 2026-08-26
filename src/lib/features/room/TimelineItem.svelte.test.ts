@@ -11,6 +11,8 @@ const core = vi.hoisted(() => {
     userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
     pinnedEvents: vi.fn(() => Promise.resolve<string[]>([])),
     setPinned: vi.fn(() => Promise.resolve<string[]>([])),
+    bookmarks: vi.fn(() => Promise.resolve([])),
+    setBookmark: vi.fn(() => Promise.resolve(false)),
   };
 
   return Object.assign(stub, { commands: stub });

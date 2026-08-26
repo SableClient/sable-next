@@ -34,7 +34,7 @@
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import {
     roomIconOverride,
     showsRoomIcon,
@@ -392,7 +392,8 @@
   function markSectionRead(): void {
     markRoomsRead(
       rooms.map((item) => item.room),
-      core.commands
+      core.commands,
+      readReceiptIsPrivate()
     );
   }
 

@@ -1756,17 +1756,24 @@ impl Core {
                 Ok(CommandOk::InviteUser)
             }
 
-            Command::MarkRead { room_id, event_id } => {
+            Command::MarkRead {
+                room_id,
+                event_id,
+                private_receipt,
+            } => {
                 // The read marker line tracks `m.fully_read`, so a receipt alone
                 // would leave it where it was. The server drops either unless
                 // newer, so the UI may send freely.
+                let receipts = Receipts::new().fully_read_marker(event_id.clone());
+                let receipts = if private_receipt {
+                    receipts.private_read_receipt(event_id)
+                } else {
+                    receipts.public_read_receipt(event_id)
+                };
+
                 self.timeline(&room_id)
                     .await?
-                    .send_multiple_receipts(
-                        Receipts::new()
-                            .public_read_receipt(event_id.clone())
-                            .fully_read_marker(event_id),
-                    )
+                    .send_multiple_receipts(receipts)
                     .await
                     .map_err(|error| self.failed("mark_read", error))?;
 

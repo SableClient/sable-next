@@ -752,11 +752,12 @@ export function createCommands(transport: () => Transport) {
       return transport().fetchMedia(source, width, height);
     },
 
-    async markRead(roomId: string, eventId: string): Promise<void> {
+    async markRead(roomId: string, eventId: string, privateReceipt = false): Promise<void> {
       await transport().send({
         type: 'mark_read',
         room_id: roomId,
         event_id: eventId,
+        private_receipt: privateReceipt,
       });
     },
 

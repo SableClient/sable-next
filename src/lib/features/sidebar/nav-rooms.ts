@@ -11,13 +11,14 @@ export function claimedRoomIds(rooms: readonly RoomSummary[]): Set<string> {
 
 export function markRoomsRead(
   rooms: Iterable<RoomSummary | null | undefined>,
-  commands: Pick<CoreCommands, 'markRead'>
+  commands: Pick<CoreCommands, 'markRead'>,
+  privateReceipt = false
 ): void {
   for (const room of rooms) {
     const eventId = room?.latest_event?.event_id;
     if (!room || !eventId || (room.unread === 0 && room.highlight === 0)) continue;
 
-    void commands.markRead(room.room_id, eventId).catch((error: unknown) => {
+    void commands.markRead(room.room_id, eventId, privateReceipt).catch((error: unknown) => {
       console.warn('[sable nav] mark as read failed', error);
     });
   }

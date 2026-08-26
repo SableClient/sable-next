@@ -354,6 +354,10 @@ pub enum Command {
         room_id: OwnedRoomId,
         #[ts(type = "string")]
         event_id: OwnedEventId,
+        /// Clears the unread count without telling the room. The read marker
+        /// still moves, so a private reader is not a permanently unread one.
+        #[serde(default)]
+        private_receipt: bool,
     },
     RetrySend {
         #[ts(type = "string")]

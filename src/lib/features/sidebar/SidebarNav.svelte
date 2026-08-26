@@ -16,6 +16,7 @@
     type LayoutRef,
     type SidebarFolder,
   } from '#lib/spaces/sidebar-layout.js';
+  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import FolderRenameDialog from './FolderRenameDialog.svelte';
   import NavigationRail from './NavigationRail.svelte';
@@ -102,7 +103,11 @@
   }
 
   function markSectionRead(section: 'home' | 'direct'): void {
-    markRoomsRead(section === 'home' ? homeRooms : allDirectRooms, core.commands);
+    markRoomsRead(
+      section === 'home' ? homeRooms : allDirectRooms,
+      core.commands,
+      readReceiptIsPrivate()
+    );
   }
 
   onMount(() => {

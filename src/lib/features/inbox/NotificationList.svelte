@@ -9,6 +9,7 @@
   import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
   import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -61,7 +62,7 @@
     if (marking.has(room.room_id)) return;
     marking.add(room.room_id);
     try {
-      await core.commands.markRead(room.room_id, eventId);
+      await core.commands.markRead(room.room_id, eventId, readReceiptIsPrivate());
     } catch (error) {
       console.warn('[sable inbox] marking the room read failed', error);
     } finally {

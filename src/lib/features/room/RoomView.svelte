@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import type { ProfileView } from '#src/generated/ProfileView';
   import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import { goto } from '$app/navigation';
@@ -12,6 +12,7 @@
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
+  import { useBookmarks } from './bookmarks.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
   import { i18n } from '#lib/i18n.js';
@@ -31,7 +32,7 @@
 
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import CallView from '#lib/features/call/CallView.svelte';
   import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
@@ -148,6 +149,12 @@
     void pinRevision;
     const target = resolvedRoomId;
     if (target) void pinnedEvents.load(target);
+  });
+
+  // Global account data, so the first room open is the only one that fetches.
+  const bookmarks = useBookmarks();
+  onMount(() => {
+    void bookmarks.load();
   });
   let latestReadBy = $derived.by(() => {
     const userId = core.session?.user_id;
@@ -535,16 +542,17 @@
   }
 
   async function markRead(eventId: string): Promise<void> {
-    if (!preferences.sendReadReceipts) return;
-    await core.commands.markRead(resolvedRoomId, eventId);
+    await core.commands.markRead(resolvedRoomId, eventId, readReceiptIsPrivate());
   }
 
   function markRoomRead(): void {
     const newest = latestEventId(timeline.items);
     if (!newest) return;
-    void core.commands.markRead(resolvedRoomId, newest).catch((error: unknown) => {
-      console.warn('[sable room] mark as read failed', error);
-    });
+    void core.commands
+      .markRead(resolvedRoomId, newest, readReceiptIsPrivate())
+      .catch((error: unknown) => {
+        console.warn('[sable room] mark as read failed', error);
+      });
   }
 
   function onRetrySend(transactionId: string): void {

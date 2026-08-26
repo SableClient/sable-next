@@ -37,8 +37,7 @@
     onCopyLink,
   }: Props = $props();
   let hasOverflow = $derived(
-    onReply !== undefined ||
-      onCopyText !== undefined ||
+    onCopyText !== undefined ||
       onCopyLink !== undefined ||
       onViewReactions !== undefined ||
       onReadReceipts !== undefined ||
@@ -103,11 +102,6 @@
           sideOffset={4}
           collisionPadding={8}
         >
-          {#if onReply}
-            <DropdownMenu.Item class="sable-menu-item" onclick={onReply}
-              >{$i18n.t('timeline.replyInThread')}</DropdownMenu.Item
-            >
-          {/if}
           {#if onCopyText}
             <DropdownMenu.Item class="sable-menu-item" onclick={onCopyText}
               >{$i18n.t('timeline.copyMessage')}</DropdownMenu.Item
