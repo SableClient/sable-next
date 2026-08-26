@@ -478,10 +478,11 @@ export class CoreClient {
     this.status = 'signed-out';
   }
 
-  async requestVerification(userId: string): Promise<string> {
+  async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {
     const response = await this.ensureTransport().send({
       type: 'request_verification',
       user_id: userId,
+      device_id: deviceId,
     });
     this.verification = {
       flowId: response.flow_id,

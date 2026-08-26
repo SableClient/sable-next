@@ -1465,19 +1465,26 @@ impl Core {
                 Ok(CommandOk::UnbanUser)
             }
 
-            Command::RequestVerification { user_id } => {
-                let request = self
-                    .client()
-                    .await?
-                    .encryption()
-                    .get_user_identity(&user_id)
-                    .await
-                    .map_err(|error| self.failed("request_verification: identity", error))?
-                    // No cross-signing identity: keys not downloaded, or none set.
-                    .ok_or(CommandErr::Unavailable)?
-                    .request_verification()
-                    .await
-                    .map_err(|error| self.failed("request_verification", error))?;
+            Command::RequestVerification { user_id, device_id } => {
+                let encryption = self.client().await?.encryption();
+                let request = match device_id {
+                    Some(device_id) => encryption
+                        .get_device(&user_id, &device_id)
+                        .await
+                        .map_err(|error| self.failed("request_verification: device", error))?
+                        .ok_or(CommandErr::Unavailable)?
+                        .request_verification()
+                        .await
+                        .map_err(|error| self.failed("request_verification", error))?,
+                    None => encryption
+                        .get_user_identity(&user_id)
+                        .await
+                        .map_err(|error| self.failed("request_verification: identity", error))?
+                        .ok_or(CommandErr::Unavailable)?
+                        .request_verification()
+                        .await
+                        .map_err(|error| self.failed("request_verification", error))?,
+                };
 
                 let flow_id = request.flow_id().to_owned();
                 self.watch_verification(request);

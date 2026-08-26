@@ -42,6 +42,7 @@
   let newRecoveryKey = $state<string | null>(null);
   let deleting = $state<string | null>(null);
   let verificationOpen = $state(false);
+  let verifying = $state<string | null>(null);
   let linkCopied = $state(false);
   let currentDevice = $derived(devices.find((device) => device.is_own));
   let cancelled = false;
@@ -87,6 +88,20 @@
       if (!cancelled) error = messageFor(cause);
     } finally {
       if (!cancelled) loading = false;
+    }
+  }
+
+  async function verifyDevice(deviceId: string): Promise<void> {
+    if (verifying !== null) return;
+
+    verifying = deviceId;
+    error = null;
+    try {
+      await core.requestVerification(core.session?.user_id ?? '', deviceId);
+    } catch (cause) {
+      error = messageFor(cause);
+    } finally {
+      verifying = null;
     }
   }
 
@@ -345,6 +360,18 @@
                 </div>
                 {#if !device.is_own && editing !== device.device_id && deleting !== device.device_id}
                   <div class="device-actions">
+                    {#if !device.is_verified && status?.verification === 'verified'}
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        loading={verifying === device.device_id}
+                        onclick={() => {
+                          void verifyDevice(device.device_id);
+                        }}
+                      >
+                        {$i18n.t('settings.verifyDevice')}
+                      </Button>
+                    {/if}
                     <Button
                       variant="ghost"
                       size="small"

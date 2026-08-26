@@ -624,11 +624,12 @@ pub enum Command {
         user_id: OwnedUserId,
         reason: Option<String>,
     },
-    /// Our own user id self-verifies another session. Progress arrives as
-    /// `CoreEvent::Verification`.
     RequestVerification {
         #[ts(type = "string")]
         user_id: OwnedUserId,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        device_id: Option<OwnedDeviceId>,
     },
     /// Also transitions into SAS, so the emoji need no further round trip.
     AcceptVerification {
