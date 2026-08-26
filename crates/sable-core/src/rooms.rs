@@ -2,7 +2,9 @@ use matrix_sdk::config::RequestConfig;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::SpaceChildOrder;
+use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
+use matrix_sdk::ruma::directory::Filter;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{
@@ -17,6 +19,7 @@ use crate::view;
 
 const HIERARCHY_PAGE_SIZE: u32 = 100;
 const HIERARCHY_MAX_DEPTH: u32 = 1;
+const DIRECTORY_PAGE_SIZE: u32 = 30;
 
 impl Core {
     /// Without a `via` server the edge is ignored.
@@ -128,6 +131,42 @@ impl Core {
 
         Ok(CommandOk::RoomPreview {
             preview: view::room_preview_view(&preview),
+        })
+    }
+
+    pub(crate) async fn public_rooms(
+        &self,
+        server: Option<String>,
+        search: Option<String>,
+        since: Option<String>,
+    ) -> Result<CommandOk, CommandErr> {
+        let server = match server.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(name) => Some(ServerName::parse(name).map_err(|_| CommandErr::UnknownHomeserver)?),
+            None => None,
+        };
+
+        let mut filter = Filter::new();
+        filter.generic_search_term = search
+            .map(|term| term.trim().to_owned())
+            .filter(|term| !term.is_empty());
+
+        let mut request = get_public_rooms_filtered::v3::Request::new();
+        request.server = server;
+        request.filter = filter;
+        request.since = since;
+        request.limit = Some(UInt::from(DIRECTORY_PAGE_SIZE));
+
+        let response = self
+            .client()
+            .await?
+            .public_rooms_filtered(request)
+            .await
+            .map_err(|error| self.failed("public_rooms", error))?;
+
+        Ok(CommandOk::PublicRooms {
+            rooms: response.chunk.iter().map(view::public_room).collect(),
+            next_batch: response.next_batch,
+            total: response.total_room_count_estimate.map(u64::from),
         })
     }
 

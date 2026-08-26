@@ -7,6 +7,7 @@ use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{ParentSpace, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
+use matrix_sdk::ruma::directory::PublicRoomsChunk;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
 use matrix_sdk::ruma::events::room::MediaSource;
@@ -16,7 +17,9 @@ use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
-use matrix_sdk::ruma::room::{JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType};
+use matrix_sdk::ruma::room::{
+    JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
+};
 use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
@@ -42,11 +45,11 @@ use crate::matrix_html::{
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
-    MembershipView, MentionView, PerMessageProfileView, PollAnswerView, PollView, ReactionGroup,
-    ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView,
-    RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView, SpaceChildEdge,
-    SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView, TimelineItemContentView,
-    TimelineItemView, UploadProgressView, VectorDiff,
+    MembershipView, MentionView, PerMessageProfileView, PollAnswerView, PollView, PublicRoomView,
+    ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
+    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
+    SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
+    TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -313,6 +316,35 @@ async fn has_space_parent(room: &Room) -> bool {
     }
 
     false
+}
+
+#[must_use]
+pub fn public_room(chunk: &PublicRoomsChunk) -> PublicRoomView {
+    PublicRoomView {
+        room_id: chunk.room_id.clone(),
+        canonical_alias: chunk.canonical_alias.as_ref().map(ToString::to_string),
+        name: chunk.name.clone(),
+        topic: chunk.topic.clone(),
+        avatar_url: chunk.avatar_url.as_ref().map(ToString::to_string),
+        is_space: chunk.room_type == Some(RoomType::Space),
+        is_voice: chunk.room_type == Some(RoomType::Call),
+        num_joined_members: u32::try_from(chunk.num_joined_members).unwrap_or(u32::MAX),
+        join_rule: join_rule_kind_view(&chunk.join_rule),
+        guest_can_join: chunk.guest_can_join,
+        world_readable: chunk.world_readable,
+    }
+}
+
+const fn join_rule_kind_view(kind: &JoinRuleKind) -> RoomJoinRuleView {
+    match kind {
+        JoinRuleKind::Public => RoomJoinRuleView::Public,
+        JoinRuleKind::Invite => RoomJoinRuleView::Invite,
+        JoinRuleKind::Knock => RoomJoinRuleView::Knock,
+        JoinRuleKind::Restricted => RoomJoinRuleView::Restricted,
+        JoinRuleKind::KnockRestricted => RoomJoinRuleView::KnockRestricted,
+        JoinRuleKind::Private => RoomJoinRuleView::Private,
+        _ => RoomJoinRuleView::Unknown,
+    }
 }
 
 #[must_use]

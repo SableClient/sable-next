@@ -221,6 +221,11 @@ pub enum Command {
     DeleteRoomAlias {
         alias: String,
     },
+    PublicRooms {
+        server: Option<String>,
+        search: Option<String>,
+        since: Option<String>,
+    },
     RoomDirectoryVisibility {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -818,6 +823,12 @@ pub enum CommandOk {
     },
     CreateRoomAlias,
     DeleteRoomAlias,
+    PublicRooms {
+        rooms: Vec<PublicRoomView>,
+        next_batch: Option<String>,
+        #[ts(type = "number | null")]
+        total: Option<u64>,
+    },
     RoomDirectoryVisibility {
         public: bool,
     },
@@ -1487,6 +1498,24 @@ pub struct RoomPreviewView {
     pub join_rule: RoomJoinRuleView,
     /// `null` when this account has no membership in the room.
     pub state: Option<RoomStateView>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct PublicRoomView {
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    pub canonical_alias: Option<String>,
+    pub name: Option<String>,
+    pub topic: Option<String>,
+    pub avatar_url: Option<String>,
+    pub is_space: bool,
+    pub is_voice: bool,
+    pub num_joined_members: u32,
+    pub join_rule: RoomJoinRuleView,
+    pub guest_can_join: bool,
+    pub world_readable: bool,
 }
 
 /// One room in a space's hierarchy. The root space is included, so a caller can

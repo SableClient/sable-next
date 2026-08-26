@@ -664,6 +664,12 @@ impl Core {
                 Ok(CommandOk::DeleteRoomAlias)
             }
 
+            Command::PublicRooms {
+                server,
+                search,
+                since,
+            } => self.public_rooms(server, search, since).await,
+
             Command::RoomDirectoryVisibility { room_id } => {
                 let response = self
                     .client()

@@ -11,6 +11,7 @@ import type { MembershipView } from '#src/generated/MembershipView';
 import type { MessageKind } from '#src/generated/MessageKind';
 import type { NotificationModeView } from '#src/generated/NotificationModeView';
 import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
+import type { PublicRoomView } from '#src/generated/PublicRoomView';
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
@@ -171,6 +172,18 @@ export function createCommands(transport: () => Transport) {
 
     async deleteRoomAlias(alias: string): Promise<void> {
       await transport().send({ type: 'delete_room_alias', alias });
+    },
+
+    async publicRooms(
+      options: { server?: string | null; search?: string | null; since?: string | null } = {}
+    ): Promise<{ rooms: PublicRoomView[]; next_batch: string | null; total: number | null }> {
+      const response = await transport().send({
+        type: 'public_rooms',
+        server: options.server ?? null,
+        search: options.search ?? null,
+        since: options.since ?? null,
+      });
+      return response;
     },
 
     async roomDirectoryVisibility(roomId: string): Promise<boolean> {
