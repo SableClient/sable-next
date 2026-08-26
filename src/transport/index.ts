@@ -1,3 +1,4 @@
+import type { AttachmentInfoView } from '#src/generated/AttachmentInfoView';
 import type { Command } from '#src/generated/Command';
 import type { CommandOk } from '#src/generated/CommandOk';
 import type { CommandErr } from '#src/generated/CommandErr';
@@ -13,6 +14,8 @@ export type Attachment = {
   bytes: Uint8Array<ArrayBuffer>;
   caption?: string | null;
   inReplyTo?: string | null;
+  /** Measured by the page; omitted when the media could not be decoded. */
+  info?: AttachmentInfoView | null;
 };
 
 export class CoreError extends Error {

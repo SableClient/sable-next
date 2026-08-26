@@ -1643,6 +1643,26 @@ pub struct RoomVersionView {
     pub stable: bool,
 }
 
+/// What the sender measured about an outgoing attachment. Only the sender has
+/// the decoded media, so without this every receiving client lays the message
+/// out blind and reflows once the bytes arrive.
+///
+/// `size` and `mimetype` are filled in by the core, which already holds both.
+#[derive(Debug, Clone, Default, Deserialize, TS)]
+#[ts(export)]
+#[serde(default)]
+pub struct AttachmentInfoView {
+    #[ts(type = "number | null")]
+    pub width: Option<u32>,
+    #[ts(type = "number | null")]
+    pub height: Option<u32>,
+    /// Audio and video only.
+    #[ts(type = "number | null")]
+    pub duration_ms: Option<u32>,
+    /// A GIF or an animated WebP, which some clients present differently.
+    pub animated: Option<bool>,
+}
+
 /// MSC4144 per-message profile, letting one account send under several
 /// identities. Read from the unstable `com.beeper.per_message_profile` key,
 /// falling back to the stable `m.per_message_profile` once servers emit it.

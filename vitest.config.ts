@@ -28,6 +28,7 @@ export default mergeConfig(
             exclude: [
               'src/lib/features/room/TimelineReadReceipt.svelte.test.ts',
               'src/lib/features/room/message-swipe.svelte.test.ts',
+              'src/lib/core/attachment-info.test.ts',
             ],
           },
         },
@@ -39,6 +40,7 @@ export default mergeConfig(
             include: [
               'src/lib/features/room/TimelineReadReceipt.svelte.test.ts',
               'src/lib/features/room/message-swipe.svelte.test.ts',
+              'src/lib/core/attachment-info.test.ts',
             ],
           },
         },

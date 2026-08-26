@@ -13,7 +13,9 @@ export type WorkerCore = {
     mime: string,
     bytes: Uint8Array<ArrayBuffer>,
     caption: string | null,
-    inReplyTo: string | null
+    inReplyTo: string | null,
+    /** JSON of an `AttachmentInfoView`, because the core parses it itself. */
+    info: string | null
   ): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 };
@@ -111,8 +113,16 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
           return;
         }
         if ('attachment' in request) {
-          const { roomId, filename, mime, bytes, caption, inReplyTo } = request.attachment;
-          await instance.sendAttachment(roomId, filename, mime, bytes, caption, inReplyTo);
+          const { roomId, filename, mime, bytes, caption, inReplyTo, info } = request.attachment;
+          await instance.sendAttachment(
+            roomId,
+            filename,
+            mime,
+            bytes,
+            caption,
+            inReplyTo,
+            info === null ? null : JSON.stringify(info)
+          );
           port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;
         }

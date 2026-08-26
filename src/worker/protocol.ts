@@ -1,3 +1,4 @@
+import type { AttachmentInfoView } from '#src/generated/AttachmentInfoView';
 import type { Command } from '#src/generated/Command';
 import type { CommandErr } from '#src/generated/CommandErr';
 import type { CommandOk } from '#src/generated/CommandOk';
@@ -10,6 +11,8 @@ export type AttachmentRequest = {
   bytes: Uint8Array<ArrayBuffer>;
   caption: string | null;
   inReplyTo: string | null;
+  /** What the page measured about the media; null when it could not. */
+  info: AttachmentInfoView | null;
 };
 
 /** Page → worker. `id` correlates the reply; the worker never reorders. */

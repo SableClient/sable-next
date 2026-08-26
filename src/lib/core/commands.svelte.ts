@@ -28,6 +28,7 @@ import type { PaginationDirection } from '#src/generated/PaginationDirection';
 import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+import { measureAttachment } from './attachment-info';
 import { maxAttachmentBytes } from './limits';
 import type { Transport } from '../../transport';
 
@@ -737,6 +738,9 @@ export function createCommands(transport: () => Transport) {
       options: { caption?: string | null; inReplyTo?: string | null } = {}
     ): Promise<void> {
       if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      // Measured before the bytes are detached, and only the page can do it:
+      // decoding media is what the browser is for.
+      const info = await measureAttachment(file);
       const bytes = new Uint8Array(await file.arrayBuffer());
       await transport().sendAttachment({
         roomId,
@@ -745,6 +749,7 @@ export function createCommands(transport: () => Transport) {
         bytes,
         caption: options.caption ?? null,
         inReplyTo: options.inReplyTo ?? null,
+        info,
       });
     },
 

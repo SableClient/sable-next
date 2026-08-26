@@ -185,9 +185,16 @@ impl SableCore {
         bytes: Vec<u8>,
         caption: Option<String>,
         in_reply_to: Option<String>,
+        info: Option<String>,
     ) -> Result<(), String> {
+        // An unreadable measurement is not worth failing a send over: the
+        // attachment still arrives, just without dimensions.
+        let info = info
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok());
+
         self.core
-            .send_attachment(room_id, filename, mime, bytes, caption, in_reply_to)
+            .send_attachment(room_id, filename, mime, bytes, caption, in_reply_to, info)
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
