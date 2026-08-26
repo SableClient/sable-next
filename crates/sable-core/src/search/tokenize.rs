@@ -1,7 +1,14 @@
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
 use charabia::{Script, Token, TokenKind, Tokenize};
 use rust_stemmers::{Algorithm, Stemmer};
+
+static ENGLISH: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::English));
+static RUSSIAN: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Russian));
+static GREEK: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Greek));
+static ARABIC: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Arabic));
+static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Tamil));
 
 pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
     text.tokenize()
@@ -15,17 +22,17 @@ fn stem(token: &Token<'_>) -> String {
     let lemma = token.lemma();
     stemmer_for(token.script).map_or_else(
         || lemma.to_owned(),
-        |algorithm| Stemmer::create(algorithm).stem(lemma).into_owned(),
+        |stemmer| stemmer.stem(lemma).into_owned(),
     )
 }
 
-const fn stemmer_for(script: Script) -> Option<Algorithm> {
+fn stemmer_for(script: Script) -> Option<&'static Stemmer> {
     Some(match script {
-        Script::Latin => Algorithm::English,
-        Script::Cyrillic => Algorithm::Russian,
-        Script::Greek => Algorithm::Greek,
-        Script::Arabic => Algorithm::Arabic,
-        Script::Tamil => Algorithm::Tamil,
+        Script::Latin => &ENGLISH,
+        Script::Cyrillic => &RUSSIAN,
+        Script::Greek => &GREEK,
+        Script::Arabic => &ARABIC,
+        Script::Tamil => &TAMIL,
         _ => return None,
     })
 }
