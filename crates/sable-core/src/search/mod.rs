@@ -521,6 +521,9 @@ impl MessageIndex {
                     let Some(original) = message.as_original() else {
                         continue;
                     };
+                    if index.redacted.contains(event_id) {
+                        continue;
+                    }
                     let target = edited_or_own_event_id(original);
                     let edits_another = target != original.event_id;
                     if !edits_another && index.edited.contains(&target) {
@@ -547,6 +550,7 @@ impl MessageIndex {
 
                 AnySyncMessageLikeEvent::RoomRedaction(redaction) => {
                     if let Some(redacted) = redacted_event_id(&redaction, rules) {
+                        index.redacted.insert(redacted.clone());
                         index.remove(&redacted);
                     }
                 }
