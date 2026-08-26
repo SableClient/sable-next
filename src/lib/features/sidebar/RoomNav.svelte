@@ -49,6 +49,7 @@
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import { DropdownMenu } from 'bits-ui';
+  import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
 
   let contextRoom = $state<RoomSummary | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
@@ -202,7 +203,9 @@
       return spaceRootItems.filter(isRoom);
     }
 
-    const claimedByJoinedSpace = unspacedSection ? claimedRoomIds() : new Set<string>();
+    const claimedByJoinedSpace = unspacedSection
+      ? claimedRoomIds(roomList.rooms)
+      : new Set<string>();
 
     return roomList.rooms
       .filter(
@@ -221,14 +224,6 @@
 
   function roomRow(room: RoomSummary): RoomNavRow {
     return { room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id };
-  }
-
-  function claimedRoomIds(): Set<string> {
-    return new Set(
-      roomList.rooms
-        .filter((space) => space.is_space && space.state === 'joined')
-        .flatMap((space) => space.space_children.map((child) => child.room_id))
-    );
   }
 
   function byRecency(left: RoomNavRow, right: RoomNavRow): number {
@@ -399,15 +394,10 @@
   );
 
   function markSectionRead(): void {
-    for (const item of rooms) {
-      const room = item.room;
-      const eventId = room?.latest_event?.event_id;
-      if (!room || !eventId || (room.unread === 0 && room.highlight === 0)) continue;
-
-      void core.commands.markRead(room.room_id, eventId).catch((error: unknown) => {
-        console.warn('[sable nav] mark as read failed', error);
-      });
-    }
+    markRoomsRead(
+      rooms.map((item) => item.room),
+      core.commands
+    );
   }
 
   function openSettings(room: RoomSummary): void {

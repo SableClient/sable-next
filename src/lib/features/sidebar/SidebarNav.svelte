@@ -21,6 +21,7 @@
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
+  import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
 
   interface Props {
     mobile?: boolean;
@@ -50,13 +51,7 @@
 
     return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
-  let claimedRoomIds = $derived(
-    new Set(
-      roomList.rooms
-        .filter((room) => room.is_space && room.state === 'joined')
-        .flatMap((space) => space.space_children.map((child) => child.room_id))
-    )
-  );
+  let claimed = $derived(claimedRoomIds(roomList.rooms));
   let spaceUnread = $derived(spaceUnreadCounts(spaces, roomList.rooms, roomList.mutedRoomIds));
   let entries = $derived(
     mergeSpaces(
@@ -75,7 +70,7 @@
   );
   let homeUnread = $derived(unreadCounts(homeRooms));
   let unspacedUnread = $derived(
-    unreadCounts(homeRooms.filter((room) => !claimedRoomIds.has(room.room_id)))
+    unreadCounts(homeRooms.filter((room) => !claimed.has(room.room_id)))
   );
   let allDirectRooms = $derived(
     roomList.rooms.filter(
@@ -107,14 +102,7 @@
   }
 
   function markSectionRead(section: 'home' | 'direct'): void {
-    for (const room of section === 'home' ? homeRooms : allDirectRooms) {
-      const eventId = room.latest_event?.event_id;
-      if (!eventId || (room.unread === 0 && room.highlight === 0)) continue;
-
-      void core.commands.markRead(room.room_id, eventId).catch((error: unknown) => {
-        console.warn('[sable nav] mark as read failed', error);
-      });
-    }
+    markRoomsRead(section === 'home' ? homeRooms : allDirectRooms, core.commands);
   }
 
   onMount(() => {
