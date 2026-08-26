@@ -32,7 +32,7 @@ charabia = { version = "0.10", default-features = false, features = [
 rust-stemmers = "1.2"
 html-escape = "0.2"
 linkify = "0.11"
-base64 = "0.22"
+base64 = "0.23"
 getrandom = "0.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
