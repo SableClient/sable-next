@@ -405,7 +405,6 @@ impl MessageIndex {
         }
     }
 
-    #[cfg(test)]
     fn dirty_rooms(&self) -> Vec<OwnedRoomId> {
         self.rooms
             .iter()
@@ -831,7 +830,6 @@ impl Core {
         );
     }
 
-    #[cfg(test)]
     pub(crate) async fn flush_search_index(&self, client: &matrix_sdk::Client) {
         let dirty = self.search_index.lock().await.dirty_rooms();
         self.save_rooms(client, dirty).await;
@@ -2129,6 +2127,68 @@ mod tests {
         assert_eq!(hits[0].event_id, event_id!("$crawled"));
 
         drop(room);
+    }
+
+    #[test]
+    fn test_a_lightly_edited_room_waits_before_its_snapshot_is_rewritten() {
+        let room = matrix_sdk::ruma::RoomId::parse("!throttle:localhost").expect("room id");
+        let mut index = MessageIndex::new();
+        index
+            .rooms
+            .entry(room.clone())
+            .or_insert_with(super::RoomIndex::new)
+            .upsert(document(
+                "one",
+                "a single word",
+                "@erwan:localhost",
+                1,
+                None,
+                Vec::new(),
+            ));
+
+        assert_eq!(index.dirty_rooms(), vec![room.clone()]);
+
+        for tick in 1..super::TICKS_BEFORE_FLUSH {
+            assert!(
+                index.rooms_due_to_flush().is_empty(),
+                "one change must not rewrite the whole room on tick {tick}"
+            );
+        }
+        assert_eq!(
+            index.rooms_due_to_flush(),
+            vec![room.clone()],
+            "a lightly edited room must still be persisted eventually"
+        );
+
+        index.take_snapshot(&room);
+        assert!(index.rooms_due_to_flush().is_empty());
+    }
+
+    #[test]
+    fn test_a_busy_room_is_persisted_without_waiting_out_the_ticks() {
+        let room = matrix_sdk::ruma::RoomId::parse("!busy:localhost").expect("room id");
+        let mut index = MessageIndex::new();
+        let room_index = index
+            .rooms
+            .entry(room.clone())
+            .or_insert_with(super::RoomIndex::new);
+
+        for seed in 0..super::CHANGES_BEFORE_FLUSH {
+            room_index.upsert(document(
+                &format!("busy{seed}"),
+                &format!("message number {seed}"),
+                "@erwan:localhost",
+                seed as u64,
+                None,
+                Vec::new(),
+            ));
+        }
+
+        assert_eq!(
+            index.rooms_due_to_flush(),
+            vec![room],
+            "a room past the change threshold must not wait for the tick deadline"
+        );
     }
 
     #[async_test]

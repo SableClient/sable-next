@@ -350,6 +350,15 @@ impl Core {
 
     async fn take_session(&self) -> Option<Session> {
         self.end_all_calls().await;
+        let client = self
+            .session
+            .read()
+            .await
+            .as_ref()
+            .map(|session| session.client.clone());
+        if let Some(client) = client {
+            self.flush_search_index(&client).await;
+        }
         self.session_tasks
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
