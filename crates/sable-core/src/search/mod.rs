@@ -915,7 +915,19 @@ impl Core {
                 loop {
                     let room_id = match updates.recv().await {
                         Ok(update) => update.room_id,
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(missed)) => {
+                            warn!(
+                                missed,
+                                "missed room updates, resweeping for unwatched rooms"
+                            );
+                            for room in client.joined_rooms() {
+                                let room_id = room.room_id().to_owned();
+                                if subscribed.insert(room_id) {
+                                    core.watch_room_search_index(&client, room);
+                                }
+                            }
+                            continue;
+                        }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     };
 
@@ -964,21 +976,29 @@ impl Core {
                     .await;
 
                 loop {
-                    let update = match updates.recv().await {
-                        Ok(update) => update,
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    let events = match updates.recv().await {
+                        Ok(RoomEventCacheUpdate::UpdateTimelineEvents(timeline)) => {
+                            ingestable_events(timeline.diffs)
+                        }
+                        Ok(_) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(missed)) => {
+                            warn!(
+                                %room_id,
+                                missed,
+                                "the search index missed room updates, rebuilding from the cache"
+                            );
+                            match cache.events().await {
+                                Ok(events) => events,
+                                Err(error) => {
+                                    warn!(%room_id, "could not reread the event cache: {error}");
+                                    continue;
+                                }
+                            }
+                        }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     };
 
-                    let RoomEventCacheUpdate::UpdateTimelineEvents(timeline) = update else {
-                        continue;
-                    };
-                    if core.search_crawl.lock().await.is_ingesting(&room_id) {
-                        continue;
-                    }
-
-                    let events = ingestable_events(timeline.diffs);
-                    if events.is_empty() {
+                    if events.is_empty() || core.search_crawl.lock().await.is_ingesting(&room_id) {
                         continue;
                     }
 
