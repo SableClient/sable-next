@@ -184,7 +184,9 @@
     if (!space?.is_space) return [];
 
     const roomsById = new Map(
-      roomList.rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
+      roomList.rooms
+        .filter((room) => room.state === 'joined' && !room.is_tombstoned)
+        .map((room) => [room.room_id, room])
     );
     return spaceItems(space, roomsById, [space.room_id], space.room_id);
   });

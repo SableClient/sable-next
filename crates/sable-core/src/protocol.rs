@@ -1376,6 +1376,7 @@ pub struct RoomSummary {
     /// `null` until the state event loads, which is not the same as `false`.
     pub encrypted: Option<bool>,
     pub is_space: bool,
+    pub is_tombstoned: bool,
     /// An `m.room.create` with the MSC3417 call type.
     pub is_voice: bool,
     /// Members in the room's call, oldest first and one entry per user however

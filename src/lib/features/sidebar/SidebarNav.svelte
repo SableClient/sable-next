@@ -22,7 +22,7 @@
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
-  import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
+  import { claimedRoomIds, isActiveSpace, markRoomsRead } from './nav-rooms.js';
 
   interface Props {
     mobile?: boolean;
@@ -45,7 +45,7 @@
   let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
   let spaces = $derived.by(() => {
-    const joinedSpaces = roomList.rooms.filter((room) => room.is_space && room.state === 'joined');
+    const joinedSpaces = roomList.rooms.filter(isActiveSpace);
     const childSpaceIds = joinedSpaces.flatMap((space) =>
       space.space_children.map((child) => child.room_id)
     );

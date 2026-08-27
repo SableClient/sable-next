@@ -11,7 +11,12 @@ export function bannerChanged(): void {
 export function bannerUrl(content: unknown): string | null {
   if (typeof content !== 'object' || content === null) return null;
 
-  const { url } = content as { url?: unknown };
+  const value = content as { url?: unknown; content?: unknown };
+  const nested =
+    typeof value.content === 'object' && value.content !== null
+      ? (value.content as { url?: unknown })
+      : null;
+  const url = value.url ?? nested?.url;
   return typeof url === 'string' && url.startsWith('mxc://') ? url : null;
 }
 

@@ -56,6 +56,7 @@ use crate::protocol::{
 #[allow(clippy::struct_excessive_bools)]
 pub struct RoomInfo {
     pub is_space: bool,
+    pub is_tombstoned: bool,
     pub has_space_parent: bool,
     pub supports_knock: bool,
     pub supports_restricted: bool,
@@ -100,6 +101,7 @@ pub fn room_summary<S: BuildHasher>(
             RoomState::Banned => RoomStateView::Banned,
         },
         is_space: info.is_some_and(|i| i.is_space),
+        is_tombstoned: info.is_some_and(|i| i.is_tombstoned),
         is_voice: item.is_call(),
         call_participants: call_participants(item.active_room_call_participants()),
         has_space_parent: info.is_some_and(|i| i.has_space_parent),
@@ -260,6 +262,7 @@ impl RoomInfo {
     const fn absent() -> Self {
         Self {
             is_space: false,
+            is_tombstoned: false,
             has_space_parent: false,
             supports_knock: false,
             supports_restricted: false,
@@ -273,6 +276,10 @@ impl RoomInfo {
 
 async fn room_info(room: &Room) -> RoomInfo {
     let is_space = room.is_space();
+    let is_tombstoned = room
+        .get_state_event(StateEventType::RoomTombstone, "")
+        .await
+        .is_ok_and(|event| event.is_some());
     let children = async {
         if is_space {
             space_children(room).await
@@ -291,6 +298,7 @@ async fn room_info(room: &Room) -> RoomInfo {
 
     RoomInfo {
         is_space,
+        is_tombstoned,
         has_space_parent,
         supports_knock,
         supports_restricted,

@@ -190,6 +190,7 @@ function summary(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSumm
     state: 'joined',
     encrypted: null,
     is_space: false,
+    is_tombstoned: false,
     is_voice: false,
     call_participants: [],
     has_space_parent: false,

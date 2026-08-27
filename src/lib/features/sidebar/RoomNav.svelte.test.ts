@@ -70,6 +70,7 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     state: 'joined',
     encrypted: null,
     is_space: false,
+    is_tombstoned: false,
     is_voice: false,
     call_participants: [],
     has_space_parent: false,
@@ -273,7 +274,10 @@ test('a space list header shows the space banner above it', async () => {
   ];
   pageState.url.pathname = '/space/!space:example.org';
   pageState.params = { spaceId: '!space:example.org' };
-  coreStub.roomStateEvent.mockResolvedValue({ url: 'mxc://example.org/banner' });
+  coreStub.roomStateEvent.mockResolvedValue({
+    type: 'page.codeberg.everypizza.room.banner',
+    content: { url: 'mxc://example.org/banner' },
+  });
 
   const instance = await mountNav();
   await tick();

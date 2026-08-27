@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
+import { claimedRoomIds, isActiveSpace, markRoomsRead } from './nav-rooms.js';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -10,6 +10,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     is_space: false,
     is_direct: false,
     state: 'joined',
+    is_tombstoned: false,
     space_children: [],
     unread: 0,
     highlight: 0,
@@ -31,10 +32,21 @@ test('only joined spaces claim their children', () => {
       state: 'invited',
       space_children: [{ room_id: '!other' }] as RoomSummary['space_children'],
     }),
+    room({
+      room_id: '!tombstoned',
+      is_space: true,
+      is_tombstoned: true,
+      space_children: [{ room_id: '!replaced' }] as RoomSummary['space_children'],
+    }),
     room({ room_id: '!plain' }),
   ]);
 
   expect([...claimed]).toEqual(['!child']);
+});
+
+test('tombstoned spaces are not active sidebar spaces', () => {
+  expect(isActiveSpace(room({ is_space: true, state: 'joined', is_tombstoned: true }))).toBe(false);
+  expect(isActiveSpace(room({ is_space: true, state: 'joined', is_tombstoned: false }))).toBe(true);
 });
 
 test('marks only rooms that are actually unread', () => {

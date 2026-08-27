@@ -285,6 +285,52 @@ async fn permalink_timeline_loads_and_contains_its_target() {
 }
 
 #[tokio::test]
+async fn custom_room_state_reads_from_the_server_when_not_in_the_store() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!banner:example.org");
+    let event_type = "page.codeberg.everypizza.room.banner";
+
+    server.sync_joined_room(&client, room_id).await;
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room_id}/state/{event_type}/"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "type": event_type,
+            "content": { "url": "mxc://example.org/banner" }
+        })))
+        .mount(server.server())
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    let response = core
+        .dispatch(Command::RoomStateEvent {
+            room_id: room_id.to_owned(),
+            event_type: event_type.to_owned(),
+            state_key: String::new(),
+        })
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        response,
+        CommandOk::RoomStateEvent {
+            content: Some(content)
+        } if content == json!({"url": "mxc://example.org/banner"})
+    ));
+}
+
+#[tokio::test]
 async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

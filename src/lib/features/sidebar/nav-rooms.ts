@@ -4,9 +4,13 @@ import type { CoreCommands } from '#lib/core/commands.svelte.js';
 export function claimedRoomIds(rooms: readonly RoomSummary[]): Set<string> {
   return new Set(
     rooms
-      .filter((room) => room.is_space && room.state === 'joined')
+      .filter(isActiveSpace)
       .flatMap((space) => space.space_children.map((child) => child.room_id))
   );
+}
+
+export function isActiveSpace(room: RoomSummary): boolean {
+  return room.is_space && room.state === 'joined' && !room.is_tombstoned;
 }
 
 export function markRoomsRead(

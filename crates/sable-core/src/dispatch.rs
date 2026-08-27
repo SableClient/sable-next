@@ -16,6 +16,7 @@ use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
 use matrix_sdk::ruma::api::client::room::upgrade_room;
+use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::InitialStateEvent;
@@ -57,6 +58,19 @@ use crate::{Core, SubscriptionKind};
 use crate::{notifications, session, spaces, view};
 
 const MAX_SEARCH_RESULTS: usize = 200;
+
+fn state_event_content(raw: &str) -> Option<serde_json::Value> {
+    let value = serde_json::from_str::<serde_json::Value>(raw).ok()?;
+    let is_event = value
+        .as_object()
+        .is_some_and(|object| object.contains_key("type") || object.contains_key("event_id"));
+
+    if is_event {
+        value.get("content").cloned()
+    } else {
+        Some(value)
+    }
+}
 
 impl Core {
     /// Splitting this by command family needs a second match with an
@@ -711,12 +725,13 @@ impl Core {
                 event_type,
                 state_key,
             } => {
-                let event = self
-                    .room(&room_id)
-                    .await?
-                    .get_state_event(event_type.into(), &state_key)
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let event = room
+                    .get_state_event(event_type.clone().into(), &state_key)
                     .await
-                    .map_err(|error| self.room_error("room_state_event", error))?;
+                    .ok()
+                    .flatten();
 
                 let content = event.and_then(|raw| {
                     let field = match raw {
@@ -725,6 +740,28 @@ impl Core {
                     };
                     field.ok().flatten()
                 });
+
+                let content = match content {
+                    Some(content) => Some(content),
+                    None => match client
+                        .send(get_state_event_for_key::v3::Request::new(
+                            room_id,
+                            event_type.into(),
+                            state_key,
+                        ))
+                        .await
+                    {
+                        Ok(response) => state_event_content(response.event_or_content.get()),
+                        Err(error)
+                            if error.client_api_error_kind() == Some(&ErrorKind::NotFound) =>
+                        {
+                            None
+                        }
+                        Err(error) => {
+                            return Err(self.room_error("room_state_event", error.into()));
+                        }
+                    },
+                };
 
                 Ok(CommandOk::RoomStateEvent { content })
             }
@@ -1907,7 +1944,7 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
 
 #[cfg(test)]
 mod tests {
-    use super::message_content;
+    use super::{message_content, state_event_content};
     use crate::protocol::MessageKind;
     use crate::view;
     use matrix_sdk::ruma::owned_user_id;
@@ -1987,5 +2024,19 @@ mod tests {
         let mentions = content.mentions.expect("mentions");
         assert!(mentions.user_ids.is_empty());
         assert!(mentions.room);
+    }
+
+    #[test]
+    fn state_event_content_accepts_content_and_full_event_responses() {
+        assert_eq!(
+            state_event_content(r#"{"url":"mxc://example.org/banner"}"#),
+            Some(serde_json::json!({"url": "mxc://example.org/banner"}))
+        );
+        assert_eq!(
+            state_event_content(
+                r#"{"type":"page.codeberg.everypizza.room.banner","content":{"url":"mxc://example.org/banner"}}"#
+            ),
+            Some(serde_json::json!({"url": "mxc://example.org/banner"}))
+        );
     }
 }

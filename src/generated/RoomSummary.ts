@@ -17,7 +17,7 @@ state: RoomStateView,
 /**
  * `null` until the state event loads, which is not the same as `false`.
  */
-encrypted: boolean | null, is_space: boolean, 
+encrypted: boolean | null, is_space: boolean, is_tombstoned: boolean,
 /**
  * An `m.room.create` with the MSC3417 call type.
  */
