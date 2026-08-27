@@ -462,6 +462,8 @@
   }
 
   function nodeFor(sigil: string, suggestion: Suggestion): ProseMirrorNode {
+    if (sigil === '/') return composerSchema.text(suggestion.insert);
+
     if (sigil === '@') {
       return composerSchema.nodes.mention.create({
         userId: suggestion.id,
@@ -626,7 +628,9 @@
                   ? $i18n.t('composer.membersHeading', { query: query.query })
                   : query.sigil === '#'
                     ? $i18n.t('composer.roomsHeading', { query: query.query })
-                    : $i18n.t('composer.emotesHeading', { query: query.query })}
+                    : query.sigil === ':'
+                      ? $i18n.t('composer.emotesHeading', { query: query.query })
+                      : $i18n.t('composer.commandsHeading', { query: query.query })}
                 {suggestions}
                 {active}
                 onSelect={commit}

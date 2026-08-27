@@ -441,23 +441,25 @@
         {/if}
       </h2>
       {#if !collapsed}
-        {#if activeSpace && activeSpace.join_rule !== 'public'}
-          <span
-            class="title-lock"
-            role="img"
-            aria-label={$i18n.t(`room.joinRule.${activeSpace.join_rule}`)}
-          >
-            <LockSimpleIcon />
-          </span>
-        {/if}
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger class="room-nav-menu" aria-label={$i18n.t('nav.listOptions')}>
-            <DotsThreeVerticalIcon />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
-            {@render listMenuItems()}
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+        <div class="room-nav-header-actions">
+          {#if activeSpace && activeSpace.join_rule !== 'public'}
+            <span
+              class="title-lock"
+              role="img"
+              aria-label={$i18n.t(`room.joinRule.${activeSpace.join_rule}`)}
+            >
+              <LockSimpleIcon />
+            </span>
+          {/if}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger class="room-nav-menu" aria-label={$i18n.t('nav.listOptions')}>
+              <DotsThreeVerticalIcon />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+              {@render listMenuItems()}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </div>
       {/if}
     </header>
   </div>
@@ -755,6 +757,13 @@
   .room-nav-header.on-banner :global(.room-nav-menu[data-state='open']) {
     background: var(--sable-media-scrim-hover);
     color: inherit;
+  }
+
+  .room-nav-header-actions {
+    align-items: center;
+    display: flex;
+    flex: none;
+    gap: var(--space-100);
   }
 
   h2,

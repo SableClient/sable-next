@@ -20,6 +20,13 @@ test('a sigil opens a query at the start of the draft or after whitespace', () =
   });
 });
 
+test('a leading slash opens command autocomplete, but inline slashes do not', () => {
+  expect(activeQuery('/', 1)).toEqual({ sigil: '/', query: '', start: 0, end: 1 });
+  expect(activeQuery('/me', 3)).toEqual({ sigil: '/', query: 'me', start: 0, end: 3 });
+  expect(activeQuery('hello /me', 9)).toBeNull();
+  expect(activeQuery('//me', 4)).toBeNull();
+});
+
 test('a sigil glued to other text opens nothing', () => {
   expect(activeQuery('mail@example.org', 16)).toBeNull();
   expect(activeQuery('http://host', 11)).toBeNull();

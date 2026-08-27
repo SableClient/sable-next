@@ -1067,6 +1067,7 @@
     "membersHeading": "Members · \"{{query}}\"",
     "roomsHeading": "Rooms · \"{{query}}\"",
     "emotesHeading": "Emotes · \"{{query}}\"",
+    "commandsHeading": "Commands · \"{{query}}\"",
     "noSuggestions": "No matches",
     "autocompleteHint": "↑↓ move · Tab or Enter insert · Esc closes",
     "replyingTo": "Replying to {{name}}",

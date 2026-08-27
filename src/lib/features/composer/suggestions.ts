@@ -3,8 +3,10 @@ import type { PackImageView } from '#src/generated/PackImageView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
 import { searchReactionEmoji } from '#lib/emoji/emoji.js';
+import { t } from '#lib/i18n.js';
 
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
+import { descriptionKey, SLASH_COMMANDS } from './slash-commands';
 
 const limit = 8;
 
@@ -103,6 +105,21 @@ function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggest
     }));
 }
 
+function commandSuggestions(needle: string): Suggestion[] {
+  return SLASH_COMMANDS.filter((command) => command.name.includes(needle))
+    .sort((left, right) => {
+      const byPrefix = rank(left.name.startsWith(needle), right.name.startsWith(needle));
+      return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
+    })
+    .slice(0, limit)
+    .map((command) => ({
+      id: command.name,
+      insert: `/${command.name}`,
+      label: `/${command.name}`,
+      detail: t(descriptionKey(command)),
+    }));
+}
+
 export function suggestionsFor(
   query: AutocompleteQuery | null,
   members: readonly MemberView[],
@@ -112,6 +129,7 @@ export function suggestionsFor(
   if (!query) return [];
   const needle = query.query.toLowerCase();
 
+  if (query.sigil === '/') return commandSuggestions(needle);
   if (query.sigil === '@') return memberSuggestions(needle, members);
   if (query.sigil === '#') return roomSuggestions(needle, rooms);
   return emoteSuggestions(needle, emotes);

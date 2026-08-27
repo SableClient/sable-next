@@ -37,6 +37,10 @@ function roomQuery(text: string): AutocompleteQuery {
   return { sigil: '#', query: text, start: 0, end: text.length + 1 };
 }
 
+function commandQuery(text: string): AutocompleteQuery {
+  return { sigil: '/', query: text, start: 0, end: text.length + 1 };
+}
+
 function room(room_id: string, name: string, canonical_alias: string | null = null): RoomSummary {
   return { room_id, name, canonical_alias, avatar_url: null } as RoomSummary;
 }
@@ -107,6 +111,14 @@ test('no query means no suggestions', () => {
   expect(suggestionsFor(null, [member('@one:example.org', 'One')], [emote('wave')], [])).toEqual(
     []
   );
+});
+
+test('slash commands are filtered by their name', () => {
+  expect(suggestionsFor(commandQuery('me'), [], [], []).map((item) => item.id)).toEqual([
+    'me',
+    'rainbowme',
+    'roomname',
+  ]);
 });
 
 test('rooms match their name or alias and insert a # label', () => {

@@ -1,4 +1,4 @@
-export type AutocompleteSigil = '@' | '#' | ':';
+export type AutocompleteSigil = '@' | '#' | ':' | '/';
 
 export interface Suggestion {
   id: string;
@@ -20,6 +20,7 @@ export interface AutocompleteQuery {
 }
 
 const sigils: [AutocompleteSigil, number][] = [
+  ['/', 0],
   ['@', 1],
   ['#', 1],
   [':', 2],
@@ -36,6 +37,9 @@ export function activeQuery(draft: string, caret: number): AutocompleteQuery | n
   for (const [sigil, minQueryLength] of sigils) {
     const start = upToCaret.lastIndexOf(sigil);
     if (start === -1) continue;
+    if (sigil === '/' && (start !== 0 || !/^[a-z0-9]*$/i.test(upToCaret.slice(start + 1)))) {
+      continue;
+    }
 
     const before = start === 0 ? '' : upToCaret[start - 1];
     if (before !== '' && !/\s/.test(before)) continue;
