@@ -7,6 +7,13 @@ async function privacyItemKeys(): Promise<string[]> {
   return privacy?.items.map((item) => item.key) ?? [];
 }
 
+async function developerItemKeys(): Promise<string[]> {
+  vi.resetModules();
+  const { settingsCategories } = await import('./registry');
+  const developer = settingsCategories.find((category) => category.id === 'developer');
+  return developer?.items.map((item) => item.key) ?? [];
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
 });
@@ -24,5 +31,11 @@ describe('telemetry settings', () => {
     const keys = await privacyItemKeys();
     expect(keys).toContain('errorReporting');
     expect(keys).toContain('sessionReplay');
+  });
+});
+
+describe('developer settings', () => {
+  it('includes the v1 developer tools switch', async () => {
+    expect(await developerItemKeys()).toContain('developerTools');
   });
 });

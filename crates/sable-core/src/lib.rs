@@ -70,6 +70,7 @@ pub struct Core {
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscription_lock: Mutex<()>,
     account_data_lock: Mutex<()>,
+    account_data_types: Mutex<std::collections::BTreeSet<String>>,
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
     thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
     notification_content: AtomicBool,
@@ -154,6 +155,7 @@ impl Core {
             subscriptions: Mutex::new(HashMap::new()),
             room_subscription_lock: Mutex::new(()),
             account_data_lock: Mutex::new(()),
+            account_data_types: Mutex::new(std::collections::BTreeSet::new()),
             timelines: Mutex::new(HashMap::new()),
             thread_timelines: Mutex::new(HashMap::new()),
             search_index: Mutex::new(search::MessageIndex::new()),
@@ -256,6 +258,23 @@ impl Core {
             .ok_or(CommandErr::NotLoggedIn)?
             .client
             .clone())
+    }
+
+    pub(crate) async fn account_data_types(&self) -> Result<Vec<String>, CommandErr> {
+        Ok(self
+            .account_data_types
+            .lock()
+            .await
+            .iter()
+            .cloned()
+            .collect())
+    }
+
+    pub(crate) async fn remember_account_data_type(&self, event_type: impl Into<String>) {
+        self.account_data_types
+            .lock()
+            .await
+            .insert(event_type.into());
     }
 
     pub(crate) async fn sync_service(

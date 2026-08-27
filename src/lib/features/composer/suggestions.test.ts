@@ -121,6 +121,10 @@ test('slash commands are filtered by their name', () => {
   ]);
 });
 
+test('gif is available as a slash command', () => {
+  expect(suggestionsFor(commandQuery('gif'), [], [], []).map((item) => item.id)).toEqual(['gif']);
+});
+
 test('rooms match their name or alias and insert a # label', () => {
   const suggestions = suggestionsFor(
     roomQuery('gen'),

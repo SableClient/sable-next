@@ -870,6 +870,58 @@
     "updateBannerLater": "Later",
     "developerTitle": "Developer",
     "developerDescription": "Raw event controls, off unless you are debugging.",
+    "developerTools": "Enable developer tools",
+    "developerToolsHint": "Unlocks raw event commands and developer controls.",
+    "developerAccessTokenTitle": "Access token",
+    "developerAccessTokenDescription": "Copy the current Matrix access token to the clipboard.",
+    "developerAccessTokenCopy": "Copy token",
+    "developerAccessTokenCopied": "Copied",
+    "developerAccessTokenFailed": "The access token could not be copied.",
+    "developerSyncTitle": "Sync diagnostics",
+    "developerSyncState": "Sync state",
+    "developerSyncLive": "Live",
+    "developerSyncSyncing": "Syncing",
+    "developerSyncError": "Error",
+    "developerSyncOffline": "Offline",
+    "developerSyncCoreStatus": "Core status",
+    "developerSyncRooms": "Loaded rooms",
+    "developerSyncAccount": "Account",
+    "developerSyncRevision": "Account revision",
+    "developerSyncUnresponsive": "Core unresponsive",
+    "developerYes": "Yes",
+    "developerNo": "No",
+    "developerAccountDataTitle": "Account data",
+    "developerAccountDataDescription": "Inspect and edit the global account-data events stored for this account.",
+    "developerAccountDataAdd": "Add event",
+    "developerAccountDataEmpty": "No account-data events have been observed yet.",
+    "developerAccountDataType": "Event type",
+    "developerAccountDataContent": "Content",
+    "developerAccountDataInvalidJson": "Content must be a JSON object.",
+    "developerAccountDataFailed": "The account-data event could not be saved or loaded.",
+    "developerAccountDataSaved": "Account data saved.",
+    "developerAccountDataClose": "Close",
+    "developerAccountDataSave": "Save",
+    "developerLogsTitle": "Debug logs",
+    "developerLogsStatus": "Internal debug logging",
+    "developerLogsDescription": "Captures browser, transport, and WASM core activity in memory. Sensitive identifiers are scrubbed.",
+    "developerLogsEnable": "Enable debug logging",
+    "developerLogsLevel": "Log level",
+    "developerLogsCategory": "Log category",
+    "developerLogsClear": "Clear",
+    "developerLogsCopy": "Copy JSON",
+    "developerLogsExport": "Export JSON",
+    "developerLogsEmpty": "No logs match the current filters.",
+    "developerSentryTitle": "Error tracking and breadcrumbs",
+    "developerSentryConfigured": "Sentry configured",
+    "developerSentryConfiguredYes": "Configured",
+    "developerSentryConfiguredNo": "Not configured",
+    "developerSentryEnvironment": "Environment",
+    "developerSentryReporting": "Error reporting",
+    "developerSentryReplay": "Session replay",
+    "developerSentryActivity": "Buffered activity",
+    "developerSentryErrors": "errors",
+    "developerSentryWarnings": "warnings",
+    "developerSentryDescription": "Error-reporting consent remains controlled from Diagnostics & Privacy. These switches control which categories are retained as debug breadcrumbs.",
     "showHiddenEvents": "Show hidden events",
     "showHiddenEventsHint": "Reloads the open room so events the client normally drops come through. Unlocks the controls below.",
     "showNonStandardEvents": "Non-standard event types",
@@ -1101,12 +1153,37 @@
     "pollCreate": "Create poll",
     "pollCancel": "Cancel",
     "slashUnknown": "There is no /{{name}} command. Start a message with // to send a literal slash.",
+    "slashDeveloperOnly": "This command is available when developer controls are enabled.",
     "slashFix": {
       "denied": "This device would not share its location.",
       "unavailable": "This device could not work out where it is.",
       "unsupported": "This browser cannot share a location."
     },
     "slash": {
+      "gif": {
+        "description": "Search and send a GIF",
+        "usage": "/gif [search]"
+      },
+      "hug": {
+        "description": "Send a hug",
+        "usage": "/hug [@user:server]"
+      },
+      "cuddle": {
+        "description": "Send a cuddle",
+        "usage": "/cuddle [@user:server]"
+      },
+      "wave": {
+        "description": "Send a wave",
+        "usage": "/wave [@user:server]"
+      },
+      "poke": {
+        "description": "Send a poke",
+        "usage": "/poke [@user:server]"
+      },
+      "headpat": {
+        "description": "Send a headpat",
+        "usage": "/headpat [@user:server]"
+      },
       "me": {
         "description": "Send the message as an action",
         "usage": "/me <action>"
@@ -1191,6 +1268,14 @@
         "description": "Mark this direct message as an ordinary room",
         "usage": "/converttoroom"
       },
+      "acl": {
+        "description": "Manage this room's server access list",
+        "usage": "/acl [-a server] [-d server] [-ra server] [-rd server]"
+      },
+      "addwidget": {
+        "description": "Add a widget to this room",
+        "usage": "/addwidget <url> [name]"
+      },
       "html": {
         "description": "Send a message written as HTML",
         "usage": "/html <span data-mx-color=\"#ff0000\">red</span>"
@@ -1230,6 +1315,30 @@
       "usepmp": {
         "description": "Send as a per-message profile in this room",
         "usage": "/usepmp <id|reset> [expiry]"
+      },
+      "pmpproxy": {
+        "description": "Add a shorthand trigger to a per-message profile",
+        "usage": "/pmpproxy <id> <prefix>text<suffix>"
+      },
+      "rawmsg": {
+        "description": "Send a raw message event",
+        "usage": "/rawmsg <JSON object>"
+      },
+      "raw": {
+        "description": "Send a raw room or state event",
+        "usage": "/raw <type> <JSON object> [-s state key]"
+      },
+      "rawacc": {
+        "description": "Merge global account data",
+        "usage": "/rawacc <type> <JSON object>"
+      },
+      "delacc": {
+        "description": "Remove a key from global account data",
+        "usage": "/delacc <type> <key>"
+      },
+      "delete": {
+        "description": "Redact recent messages from selected users",
+        "usage": "/delete <@user:server> [-past 1d|2h|5m|30s] [-t event.type] [-r reason]"
       }
     }
   },

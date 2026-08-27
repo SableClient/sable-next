@@ -32,4 +32,5 @@ export type WorkerMessage =
   /** An `mxc:` URI from `uploadMedia`, or nothing from `sendAttachment`. */
   | { id: number; uri: string | null }
   | { event: CoreEvent }
+  | { log: string }
   | { panic: { message: string } };

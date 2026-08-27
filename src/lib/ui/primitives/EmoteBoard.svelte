@@ -22,6 +22,7 @@
   interface Props {
     roomId: string;
     tab?: BoardTab;
+    query?: string;
     variant?: 'popover' | 'sheet';
     /** Reactions can be plain unicode, so the board offers both on one surface. */
     unicode?: boolean;
@@ -35,7 +36,8 @@
 
   let {
     roomId,
-    tab = $bindable('emoticon'),
+    tab = $bindable<BoardTab>('emoticon'),
+    query = $bindable(''),
     variant = 'popover',
     unicode = false,
     stickers = true,
@@ -54,7 +56,6 @@
   let failed = $state(false);
   let recent = $state.raw<string[]>(readRecent());
   let recentReactions = $state.raw<string[]>(uniqueReactions());
-  let query = $state('');
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
   let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
 

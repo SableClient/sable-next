@@ -8,6 +8,7 @@ import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 import { on } from 'svelte/events';
+import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
@@ -104,6 +105,16 @@ export function createWebTransport(): Transport {
         return;
       }
 
+      if ('log' in data) {
+        const level = data.log.includes(' ERROR ')
+          ? 'error'
+          : data.log.includes(' WARN ')
+            ? 'warn'
+            : 'info';
+        recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', data.log.trim());
+        return;
+      }
+
       if ('panic' in data) {
         console.error('[sable transport] core panicked', data.panic.message);
         handleCrash(data.panic.message);
@@ -145,6 +156,7 @@ export function createWebTransport(): Transport {
       return new Promise<T>((resolve, reject) => {
         const request = body(id);
         const label = requestLabel(request);
+        if (label !== undefined) recordDebugLog('debug', 'network', 'transport', label);
         const timeout =
           label === 'login_flows'
             ? setTimeout(() => {

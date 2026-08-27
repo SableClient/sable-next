@@ -60,6 +60,7 @@ export interface Preferences {
 
   autoUpdateCheck: boolean;
 
+  developerTools: boolean;
   showHiddenEvents: boolean;
   showNonStandardEvents: boolean;
 }
@@ -151,6 +152,7 @@ const DEFAULTS: Preferences = {
 
   autoUpdateCheck: true,
 
+  developerTools: false,
   showHiddenEvents: false,
   showNonStandardEvents: false,
 };

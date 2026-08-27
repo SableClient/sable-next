@@ -7,6 +7,11 @@ import NotificationDefaults from '#lib/features/notifications/NotificationDefaul
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
 import PushGateway from '#lib/features/notifications/PushGateway.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
+import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
+import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
+import DeveloperDebugLogs from '#lib/features/settings/DeveloperDebugLogs.svelte';
+import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
+import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
 
 interface BasePanel {
   component: Component;
@@ -24,8 +29,38 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
   personas: [{ component: PersonaSettings, class: 'personas-card' }],
   developer: [
     {
+      component: DeveloperAccessToken,
+      when: () => preferences.developerTools,
+      title: 'settings.developerAccessTokenTitle',
+      headingId: 'developer-access-token',
+    },
+    {
+      component: DeveloperSyncDiagnostics,
+      when: () => preferences.developerTools,
+      title: 'settings.developerSyncTitle',
+      headingId: 'developer-sync-diagnostics',
+    },
+    {
+      component: DeveloperAccountData,
+      when: () => preferences.developerTools,
+      title: 'settings.developerAccountDataTitle',
+      headingId: 'developer-account-data',
+    },
+    {
+      component: DeveloperDebugLogs,
+      when: () => preferences.developerTools,
+      title: 'settings.developerLogsTitle',
+      headingId: 'developer-debug-logs',
+    },
+    {
+      component: DeveloperSentry,
+      when: () => preferences.developerTools,
+      title: 'settings.developerSentryTitle',
+      headingId: 'developer-sentry',
+    },
+    {
       component: StateEventTool,
-      when: () => preferences.showHiddenEvents,
+      when: () => preferences.developerTools,
       title: 'settings.stateEventTitle',
       headingId: 'settings-state-event',
       class: 'state-event-section',

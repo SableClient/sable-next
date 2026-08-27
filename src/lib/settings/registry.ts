@@ -519,11 +519,19 @@ export const settingsCategories: SettingsCategory[] = [
     icon: CodeIcon,
     items: [
       {
+        key: 'developerTools',
+        icon: CodeIcon,
+        name: 'settings.developerTools',
+        description: 'settings.developerToolsHint',
+        type: 'boolean',
+      },
+      {
         key: 'showHiddenEvents',
         icon: BugIcon,
         name: 'settings.showHiddenEvents',
         description: 'settings.showHiddenEventsHint',
         type: 'boolean',
+        gatedBy: 'developerTools',
       },
       {
         key: 'showNonStandardEvents',

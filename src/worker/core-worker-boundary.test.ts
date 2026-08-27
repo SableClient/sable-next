@@ -197,3 +197,16 @@ test('a panic reaches every port and later commands fail instead of hanging', as
     { id: 1, err: { code: 'failed', log_id: 'core panicked: index out of bounds' } },
   ]);
 });
+
+test('a WASM log reaches every connected port', () => {
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => Promise.resolve('{}'))));
+  const first = new FakePort();
+  const second = new FakePort();
+  boundary.connect(first);
+  boundary.connect(second);
+
+  boundary.handleLog('INFO sable_core: sync started');
+
+  expect(first.messages).toEqual([{ log: 'INFO sable_core: sync started' }]);
+  expect(second.messages).toEqual([{ log: 'INFO sable_core: sync started' }]);
+});

@@ -17,6 +17,7 @@ import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 import { on } from 'svelte/events';
+import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
@@ -667,6 +668,7 @@ export class CoreClient {
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {
+    recordDebugLog('debug', event.type === 'sync_status' ? 'sync' : 'general', 'core', event.type);
     switch (event.type) {
       case 'sync_status':
         this.sync = event;

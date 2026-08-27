@@ -5,6 +5,7 @@ mod session_store;
 
 use std::{
     cell::RefCell,
+    io::{self, Write},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -61,23 +62,57 @@ const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::l
 fn init_tracing(filter: &str) {
     use tracing_subscriber::{EnvFilter, prelude::*};
 
-    let layer = tracing_subscriber::fmt::layer()
+    let console_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)
         .without_time()
         .with_writer(tracing_web::MakeWebConsoleWriter::new());
+    let debug_layer = tracing_subscriber::fmt::layer()
+        .with_ansi(false)
+        .without_time()
+        .with_writer(MakeJsLogWriter);
 
     // A second call fails, so a reconnecting port must stay harmless.
     let _ = tracing_subscriber::registry()
-        .with(layer)
+        .with(console_layer)
+        .with(debug_layer)
         .with(EnvFilter::new(filter))
         .try_init();
 }
 
 thread_local! {
     static PANIC_NOTIFIER: RefCell<Option<Function>> = const { RefCell::new(None) };
+    static LOG_NOTIFIER: RefCell<Option<Function>> = const { RefCell::new(None) };
 }
 
 static PANIC_HOOK_CHAINED: AtomicBool = AtomicBool::new(false);
+
+struct JsLogWriter;
+
+impl Write for JsLogWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let message = String::from_utf8_lossy(bytes);
+        LOG_NOTIFIER.with_borrow(|slot| {
+            if let Some(notify) = slot.as_ref() {
+                let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&message));
+            }
+        });
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct MakeJsLogWriter;
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
+    type Writer = JsLogWriter;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        JsLogWriter
+    }
+}
 
 #[wasm_bindgen(js_name = setPanicHandler)]
 #[allow(clippy::needless_pass_by_value)] // wasm-bindgen maps the JS function boundary to an owned value
@@ -98,6 +133,12 @@ pub fn set_panic_handler(notify: Function) {
             }
         });
     }));
+}
+
+#[wasm_bindgen(js_name = setLogHandler)]
+#[allow(clippy::needless_pass_by_value)]
+pub fn set_log_handler(notify: Function) {
+    LOG_NOTIFIER.with_borrow_mut(|slot| *slot = Some(notify));
 }
 
 /// The web carrier, mirroring `src-tauri/src/lib.rs`. JSON both ways, so the

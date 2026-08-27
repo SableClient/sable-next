@@ -19,6 +19,9 @@
   interface Props {
     roomId: string;
     desktop: boolean;
+    open?: boolean;
+    tab?: BoardTab;
+    query?: string;
     disabled?: boolean;
     onPick: (image: PackImageView, usage: ImageUsageView) => void;
     onPickUnicode: (emoji: string) => void;
@@ -29,14 +32,15 @@
   let {
     roomId,
     desktop,
+    open = $bindable(false),
+    tab = $bindable<BoardTab>('emoticon'),
+    query = $bindable(''),
     disabled = false,
     onPick,
     onPickUnicode,
     onPickGif,
     onBeforeOpen,
   }: Props = $props();
-  let open = $state(false);
-  let tab = $state<BoardTab>('emoticon');
   let config = $state.raw<GifsConfig | null>(null);
 
   $effect(() => {
@@ -85,6 +89,7 @@
         <EmoteBoard
           {roomId}
           bind:tab
+          bind:query
           unicode
           {gifs}
           onPick={pick}

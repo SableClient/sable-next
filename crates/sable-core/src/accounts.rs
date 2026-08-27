@@ -365,6 +365,7 @@ impl Core {
             .clear();
         self.subscriptions.lock().await.clear();
         self.timelines.lock().await.clear();
+        self.account_data_types.lock().await.clear();
         *self.search_index.lock().await = search::MessageIndex::new();
         self.session.write().await.take()
     }
@@ -385,6 +386,7 @@ impl Core {
         // Event handlers do not spawn until sync starts, and are owned by the
         // client. Register them now so the first sync response cannot race us.
         self.watch_ephemeral(&client, generation);
+        self.watch_account_data(&client, generation);
         self.watch_incoming_calls(&client, generation);
         self.watch_incoming_verifications(&client);
 

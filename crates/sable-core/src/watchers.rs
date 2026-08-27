@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::events::AnyGlobalAccountDataEvent;
 use matrix_sdk::ruma::events::presence::PresenceEvent;
 use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
@@ -18,6 +19,29 @@ use crate::notifications;
 use crate::spaces::{self, SidebarSpacesEvent};
 
 impl Core {
+    pub(crate) fn watch_account_data(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        generation: u64,
+    ) {
+        client.add_event_handler({
+            let core = self.clone();
+            move |event: AnyGlobalAccountDataEvent| {
+                let core = core.clone();
+                async move {
+                    if core
+                        .session_generation
+                        .load(std::sync::atomic::Ordering::SeqCst)
+                        == generation
+                    {
+                        core.remember_account_data_type(event.event_type().to_string())
+                            .await;
+                    }
+                }
+            }
+        });
+    }
+
     pub(crate) fn watch_send_queue(self: &Arc<Self>, client: &matrix_sdk::Client) {
         let queue = client.send_queue();
         let mut errors = queue.subscribe_errors();

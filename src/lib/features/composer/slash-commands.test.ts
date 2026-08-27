@@ -32,6 +32,7 @@ function fakeCommands() {
     unignoreUser: vi.fn(() => Promise.resolve()),
     setDirect: vi.fn(() => Promise.resolve()),
     sendLocation: vi.fn(() => Promise.resolve()),
+    sendRawEvent: vi.fn(() => Promise.resolve()),
     roomStateEvent: vi.fn(() => Promise.resolve<unknown>({ membership: 'join' })),
     sendStateEvent: vi.fn(() => Promise.resolve()),
     personas: vi.fn(() =>
@@ -40,11 +41,22 @@ function fakeCommands() {
     savePersona: vi.fn(() => Promise.resolve<PersonaView[]>([])),
     removePersona: vi.fn(() => Promise.resolve<PersonaView[]>([])),
     setPersonaSelection: vi.fn(() => Promise.resolve()),
+    accountData: vi.fn(() => Promise.resolve<unknown>(null)),
+    setAccountData: vi.fn(() => Promise.resolve()),
+    bulkRedact: vi.fn<
+      (
+        roomId: string,
+        senders: string[],
+        afterTs: number,
+        eventTypes: string[],
+        reason: string | null
+      ) => Promise<number>
+    >(() => Promise.resolve(0)),
   };
 }
 
 function context(commands: ReturnType<typeof fakeCommands>): SlashContext {
-  return { roomId: '!room:example.org', userId: '@me:example.org', commands };
+  return { roomId: '!room:example.org', userId: '@me:example.org', developerTools: true, commands };
 }
 
 test('plain text is not a command', () => {
@@ -92,6 +104,115 @@ test('/me and /notice change the msgtype and nothing else', async () => {
     msgtype: 'notice',
     formatted: null,
   });
+});
+
+test('/gif returns a picker action instead of sending text', async () => {
+  await expect(runSlash('/gif cats', context(fakeCommands()))).resolves.toEqual({
+    kind: 'gifSearch',
+    query: 'cats',
+  });
+});
+
+test.each([
+  ['hug', 'im.fluffychat.cute_event', { cute_type: 'hug', body: '🤗' }],
+  ['cuddle', 'im.fluffychat.cute_event', { cute_type: 'cuddle', body: '😊' }],
+  ['wave', 'im.fluffychat.cute_event', { cute_type: 'wave', body: '👋' }],
+  ['poke', 'im.fluffychat.cute_event', { cute_type: 'poke', body: '🫵' }],
+] as const)('/%s sends a raw cute event', async (name, eventType, content) => {
+  const commands = fakeCommands();
+
+  await runSlash(`/${name} @someone:example.org`, context(commands));
+
+  expect(commands.sendRawEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'm.room.message',
+    expect.objectContaining({ ...content, 'm.mentions': { user_ids: ['@someone:example.org'] } })
+  );
+});
+
+test('/headpat sends a raw emote event', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/headpat @someone:example.org', context(commands));
+
+  expect(commands.sendRawEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'm.room.message',
+    expect.objectContaining({
+      msgtype: 'm.emote',
+      body: 'pats @someone:example.org',
+      'fyi.cisnt.headpat': true,
+    })
+  );
+});
+
+test('/rawmsg sends a raw message event', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/rawmsg {"msgtype":"m.text","body":"hello"}', context(commands));
+
+  expect(commands.sendRawEvent).toHaveBeenCalledWith('!room:example.org', 'm.room.message', {
+    msgtype: 'm.text',
+    body: 'hello',
+  });
+});
+
+test('/raw sends either a message or state event', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/raw m.room.test {"value":1}', context(commands));
+  await runSlash('/raw m.room.topic {"topic":"new"} -s key', context(commands));
+
+  expect(commands.sendRawEvent).toHaveBeenCalledWith('!room:example.org', 'm.room.test', {
+    value: 1,
+  });
+  expect(commands.sendStateEvent).toHaveBeenCalledWith('!room:example.org', 'm.room.topic', 'key', {
+    topic: 'new',
+  });
+});
+
+test('/rawacc merges and /delacc removes global account data', async () => {
+  const commands = fakeCommands();
+  commands.accountData.mockResolvedValue({ old: true, remove: true });
+
+  await runSlash('/rawacc com.example.data {"new":1}', context(commands));
+  await runSlash('/delacc com.example.data remove', context(commands));
+
+  expect(commands.setAccountData).toHaveBeenNthCalledWith(1, 'com.example.data', {
+    old: true,
+    remove: true,
+    new: 1,
+  });
+  expect(commands.setAccountData).toHaveBeenNthCalledWith(2, 'com.example.data', {
+    old: true,
+  });
+});
+
+test('developer slash commands require developer controls', async () => {
+  await expect(
+    runSlash('/rawmsg {}', { ...context(fakeCommands()), developerTools: false })
+  ).rejects.toMatchObject({
+    key: 'composer.slashDeveloperOnly',
+  });
+});
+
+test('/delete parses senders, age, event types, and reason', async () => {
+  const commands = fakeCommands();
+  const now = Date.now();
+
+  await runSlash(
+    '/delete @someone:example.org -past 5m -t m.room.message m.room.encrypted -r spam',
+    context(commands)
+  );
+
+  expect(commands.bulkRedact).toHaveBeenCalledWith(
+    '!room:example.org',
+    ['@someone:example.org'],
+    expect.any(Number),
+    ['m.room.message', 'm.room.encrypted'],
+    'spam'
+  );
+  expect(commands.bulkRedact.mock.calls[0]?.[2]).toBeGreaterThanOrEqual(now - 5 * 60 * 1000);
 });
 
 test('/me with nothing to say reports its usage', async () => {
@@ -252,6 +373,67 @@ test('/converttodm and /converttoroom flip the direct flag', async () => {
 
   await runSlash('/converttoroom', context(commands));
   expect(commands.setDirect).toHaveBeenLastCalledWith('!room:example.org', false);
+});
+
+test('/acl merges and removes server rules', async () => {
+  const commands = fakeCommands();
+  commands.roomStateEvent.mockResolvedValueOnce({
+    allow: ['good.example'],
+    deny: ['bad.example'],
+    allow_ip_literals: false,
+  });
+
+  await runSlash('/acl -a new.example -d worse.example -ra good.example', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'm.room.server_acl',
+    '',
+    { allow: ['new.example'], deny: ['bad.example', 'worse.example'], allow_ip_literals: false }
+  );
+});
+
+test('/addwidget sends a validated widget state event', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/addwidget https://widget.example/app Room Widget', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'im.vector.modular.widgets',
+    expect.any(String),
+    expect.objectContaining({
+      type: 'm.custom',
+      url: 'https://widget.example/app',
+      name: 'Room Widget',
+      creatorUserId: '@me:example.org',
+    })
+  );
+});
+
+test('/pmpproxy appends a persona trigger', async () => {
+  const commands = fakeCommands();
+  const persona = {
+    id: 'alt',
+    display_name: 'Alt',
+    avatar_url: null,
+    pronouns: [],
+    color_on_light: null,
+    color_on_dark: null,
+    triggers: [],
+    pluralkit: null,
+  } satisfies PersonaView;
+  commands.personas.mockResolvedValueOnce({ personas: [persona], account: null, rooms: {} });
+
+  await runSlash('/pmpproxy alt ✨:text', context(commands));
+
+  expect(commands.savePersona).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: 'alt',
+      triggers: [{ prefix: '✨:', suffix: null, keep_trigger: false }],
+    }),
+    'alt'
+  );
 });
 
 test('/html sends the markup and a stripped plain-text body', async () => {

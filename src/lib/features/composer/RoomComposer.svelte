@@ -12,6 +12,7 @@
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -49,6 +50,7 @@
   import type { FormatAction } from './editor/formatting';
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
+  import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import { serializeComposer, serializePlain } from './editor/serialize';
   import { sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
@@ -63,7 +65,7 @@
       body: string,
       formatted: string | null,
       mentions: OutgoingMentions
-    ) => Promise<void>;
+    ) => Promise<unknown>;
     onSendAttachment: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
     onSendSticker?: (roomId: string, url: string, body: string) => Promise<void>;
     onSendGif?: (roomId: string, gif: GifResult) => Promise<void>;
@@ -115,6 +117,20 @@
   let loadedMembersFor = $state<string | null>(null);
   let loadedEmotesFor = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
+  let boardOpen = $state(false);
+  let boardTab = $state<BoardTab>('emoticon');
+  let boardQuery = $state('');
+
+  function isGifSearchAction(value: unknown): value is ConversationSendResult {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'kind' in value &&
+      value.kind === 'gifSearch' &&
+      'query' in value &&
+      typeof value.query === 'string'
+    );
+  }
 
   let staged = $state<StagedFile[]>([]);
   let inFlight = $state(0);
@@ -348,7 +364,12 @@
         }
 
         if (captioned || message.body === '') return;
-        await onSend(roomId, message.body, message.formatted, message.mentions);
+        const action = await onSend(roomId, message.body, message.formatted, message.mentions);
+        if (isGifSearchAction(action)) {
+          boardTab = 'gif';
+          boardQuery = action.query;
+          boardOpen = true;
+        }
       });
       editor.clearHistory();
     } catch (cause) {
@@ -639,6 +660,9 @@
             <ComposerBoard
               {roomId}
               {desktop}
+              bind:open={boardOpen}
+              bind:tab={boardTab}
+              bind:query={boardQuery}
               onPick={pickFromBoard}
               onPickUnicode={pickUnicodeFromBoard}
               onPickGif={onSendGif ? pickGifFromBoard : undefined}

@@ -1,14 +1,90 @@
+use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::api::client::room::report_content;
 use matrix_sdk::ruma::events::room::pinned_events::RoomPinnedEventsEventContent;
 use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, AnySyncTimelineEvent};
 use matrix_sdk::ruma::room::JoinRule;
-use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, UInt};
 
 use crate::Core;
 use crate::personas::PER_MESSAGE_PROFILE;
 use crate::protocol::CommandErr;
 
 impl Core {
+    pub(crate) async fn bulk_redact(
+        &self,
+        room_id: &OwnedRoomId,
+        senders: &[String],
+        after_ts: u64,
+        event_types: &[String],
+        reason: Option<&str>,
+    ) -> Result<u32, CommandErr> {
+        let room = self.room(room_id).await?;
+        let mut from: Option<String> = None;
+        let mut redacted = 0;
+
+        loop {
+            let mut options = MessagesOptions::backward().from(from.as_deref());
+            options.limit = UInt::from(100u16);
+            let messages = room
+                .messages(options)
+                .await
+                .map_err(|error| self.failed("bulk_redact", error))?;
+            if messages.chunk.is_empty() {
+                break;
+            }
+
+            let mut older_than_cutoff = true;
+            for event in messages.chunk {
+                let Ok(raw) = serde_json::from_str::<serde_json::Value>(event.raw().json().get())
+                else {
+                    continue;
+                };
+                let ts = raw
+                    .get("origin_server_ts")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or_default();
+                if ts >= after_ts {
+                    older_than_cutoff = false;
+                }
+                if ts < after_ts
+                    || !senders.iter().any(|sender| {
+                        raw.get("sender").and_then(serde_json::Value::as_str) == Some(sender)
+                    })
+                    || (!event_types.is_empty()
+                        && !event_types.iter().any(|event_type| {
+                            raw.get("type").and_then(serde_json::Value::as_str) == Some(event_type)
+                        }))
+                    || raw
+                        .get("unsigned")
+                        .and_then(|unsigned| unsigned.get("redacted_because"))
+                        .is_some()
+                {
+                    continue;
+                }
+
+                let Some(event_id) = raw.get("event_id").and_then(serde_json::Value::as_str) else {
+                    continue;
+                };
+                let event_id =
+                    EventId::parse(event_id).map_err(|error| self.failed("bulk_redact", error))?;
+                room.redact(&event_id, reason, None)
+                    .await
+                    .map_err(|error| self.failed("bulk_redact", error))?;
+                redacted += 1;
+            }
+
+            if older_than_cutoff {
+                break;
+            }
+            let Some(next) = messages.end else {
+                break;
+            };
+            from = Some(next);
+        }
+
+        Ok(redacted)
+    }
+
     pub(crate) async fn pinned_events(
         &self,
         room_id: &OwnedRoomId,

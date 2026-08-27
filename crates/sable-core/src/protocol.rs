@@ -137,6 +137,13 @@ pub enum Command {
         #[serde(default)]
         persona: Option<PerMessageProfileView>,
     },
+    SendRawEvent {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+        #[ts(type = "unknown")]
+        content: serde_json::Value,
+    },
     SendSticker {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -211,6 +218,15 @@ pub enum Command {
         #[ts(type = "string | null")]
         thread_root: Option<OwnedEventId>,
     },
+    BulkRedact {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        senders: Vec<String>,
+        #[ts(type = "number")]
+        after_ts: u64,
+        event_types: Vec<String>,
+        reason: Option<String>,
+    },
     PinnedEvents {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -277,6 +293,16 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
         event_type: String,
+    },
+    AccountDataTypes,
+    AccessToken,
+    AccountData {
+        event_type: String,
+    },
+    SetAccountData {
+        event_type: String,
+        #[ts(type = "unknown")]
+        content: serde_json::Value,
     },
     SetRoomAccountData {
         #[ts(type = "string")]
@@ -843,12 +869,16 @@ pub enum CommandOk {
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
+    SendRawEvent,
     SendSticker,
     SendGif,
     SendLocation,
     EditMessage,
     FetchEventDetails,
     Redact,
+    BulkRedact {
+        redacted: u32,
+    },
     PinnedEvents {
         #[ts(type = "string[]")]
         event_ids: Vec<OwnedEventId>,
@@ -891,7 +921,18 @@ pub enum CommandOk {
         #[ts(type = "unknown | null")]
         content: Option<serde_json::Value>,
     },
+    AccountDataTypes {
+        event_types: Vec<String>,
+    },
+    AccessToken {
+        token: Option<String>,
+    },
     SetRoomAccountData,
+    AccountData {
+        #[ts(type = "unknown | null")]
+        content: Option<serde_json::Value>,
+    },
+    SetAccountData,
     ReportMessage,
     EventSource {
         source: String,

@@ -9,7 +9,9 @@ import { rainbowHtml } from './rainbow.js';
 
 export type SlashCommandApi = Pick<
   CoreCommands,
+  | 'accountData'
   | 'banUser'
+  | 'bulkRedact'
   | 'createDm'
   | 'ignoreUser'
   | 'inviteUser'
@@ -20,7 +22,9 @@ export type SlashCommandApi = Pick<
   | 'personas'
   | 'removePersona'
   | 'roomStateEvent'
+  | 'sendRawEvent'
   | 'savePersona'
+  | 'setAccountData'
   | 'sendLocation'
   | 'sendStateEvent'
   | 'setDirect'
@@ -35,11 +39,13 @@ export type SlashCommandApi = Pick<
 export type SlashContext = {
   roomId: string;
   userId: string | null;
+  developerTools?: boolean;
   commands: SlashCommandApi;
 };
 
 export type SlashOutcome =
   | { kind: 'message'; body: string; msgtype: MessageKind; formatted?: string | null }
+  | { kind: 'gifSearch'; query: string }
   | { kind: 'done' }
   | { kind: 'error'; key: string; values?: Record<string, string> };
 
@@ -224,7 +230,135 @@ function address(
   };
 }
 
+function flagValues(args: string): Map<string, string[]> {
+  const values = new Map<string, string[]>();
+  let flag: string | null = null;
+  for (const token of words(args)) {
+    if (token.startsWith('-') && token.length > 1) {
+      flag = token.slice(1);
+      values.set(flag, []);
+    } else if (flag !== null) {
+      values.get(flag)?.push(token);
+    }
+  }
+  return values;
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function developerOnly(context: SlashContext): SlashOutcome | null {
+  return context.developerTools === true
+    ? null
+    : { kind: 'error', key: 'composer.slashDeveloperOnly' };
+}
+
+function jsonObject(value: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function rawEventArgs(
+  args: string
+): { eventType: string; content: Record<string, unknown>; stateKey: string | null } | null {
+  const trimmed = args.trim();
+  const stateFlag = trimmed.match(/\s+-s\s+(\S+)\s*$/);
+  const payload = stateFlag ? trimmed.slice(0, stateFlag.index).trimEnd() : trimmed;
+  const split = payload.search(/\s/);
+  if (split < 1) return null;
+
+  const content = jsonObject(payload.slice(split + 1).trim());
+  if (content === null) return null;
+
+  return {
+    eventType: payload.slice(0, split),
+    content,
+    stateKey: stateFlag?.[1] ?? null,
+  };
+}
+
+function deleteArgs(args: string): {
+  senders: string[];
+  afterTs: number;
+  eventTypes: string[];
+  reason: string | null;
+} | null {
+  const match = args.match(/\s-(?=\w)/);
+  const targets = match ? args.slice(0, match.index).trim() : args.trim();
+  const flags = match ? flagValues(args.slice(match.index)) : new Map<string, string[]>();
+  const past = flags.get('past')?.[0];
+  const pastMatch = past?.match(/^(\d+(?:\.\d+)?)([dhms])$/);
+  if (!pastMatch) return null;
+
+  const value = Number(pastMatch[1]);
+  const units = { d: 24 * 60 * 60 * 1000, h: 60 * 60 * 1000, m: 60 * 1000, s: 1000 };
+  const afterTs = Date.now() - value * units[pastMatch[2] as keyof typeof units];
+  const senders = userIds(targets);
+  if (senders.length === 0 || !Number.isSafeInteger(afterTs)) return null;
+
+  return {
+    senders,
+    afterTs,
+    eventTypes: flags.get('t') ?? [],
+    reason: flags.get('r')?.join(' ') || null,
+  };
+}
+
+function cute(name: string, cuteType: string, body: string): SlashCommand {
+  return {
+    name,
+    run: async (args, { roomId, commands }) => {
+      const target = args.trim();
+      if (target !== '' && !USER_ID.test(target)) return usageError(name);
+
+      await commands.sendRawEvent(roomId, 'm.room.message', {
+        msgtype: 'im.fluffychat.cute_event',
+        'm.mentions': { user_ids: target === '' ? [] : [target] },
+        cute_type: cuteType,
+        body,
+      });
+      return { kind: 'done' };
+    },
+  };
+}
+
+function headpat(): SlashCommand {
+  return {
+    name: 'headpat',
+    run: async (args, { roomId, commands }) => {
+      const target = args.trim();
+      if (target !== '' && !USER_ID.test(target)) return usageError('headpat');
+
+      await commands.sendRawEvent(roomId, 'm.room.message', {
+        msgtype: 'm.emote',
+        'm.mentions': { user_ids: target === '' ? [] : [target] },
+        body: `pats ${target || 'you'}`,
+        'fyi.cisnt.headpat': true,
+      });
+      return { kind: 'done' };
+    },
+  };
+}
+
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
+  {
+    name: 'gif',
+    run: (args) => ({ kind: 'gifSearch', query: args.trim() }),
+  },
+  cute('hug', 'hug', '🤗'),
+  cute('cuddle', 'cuddle', '😊'),
+  cute('wave', 'wave', '👋'),
+  cute('poke', 'poke', '🫵'),
+  headpat(),
   speech('me', 'emote'),
   speech('notice', 'notice'),
   decorated('shrug', '¯\\_(ツ)_/¯'),
@@ -278,6 +412,66 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       if (args.trim() !== '') return usageError('converttoroom');
 
       await commands.setDirect(roomId, false);
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'acl',
+    run: async (args, { roomId, commands }) => {
+      const flags = flagValues(args);
+      const allow = flags.get('a') ?? [];
+      const deny = flags.get('d') ?? [];
+      const removeAllow = new Set(flags.get('ra') ?? []);
+      const removeDeny = new Set(flags.get('rd') ?? []);
+      if (
+        allow.length === 0 &&
+        deny.length === 0 &&
+        removeAllow.size === 0 &&
+        removeDeny.size === 0
+      ) {
+        return usageError('acl');
+      }
+
+      const current = objectValue(await commands.roomStateEvent(roomId, 'm.room.server_acl'));
+      const currentAllow = Array.isArray(current.allow)
+        ? current.allow.filter((entry): entry is string => typeof entry === 'string')
+        : [];
+      const currentDeny = Array.isArray(current.deny)
+        ? current.deny.filter((entry): entry is string => typeof entry === 'string')
+        : [];
+      const content = {
+        ...current,
+        allow: [...new Set([...currentAllow, ...allow])].filter((entry) => !removeAllow.has(entry)),
+        deny: [...new Set([...currentDeny, ...deny])].filter((entry) => !removeDeny.has(entry)),
+      };
+      await commands.sendStateEvent(roomId, 'm.room.server_acl', '', content);
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'addwidget',
+    run: async (args, { roomId, userId, commands }) => {
+      const parts = words(args);
+      if (parts.length === 0 || userId === null) return usageError('addwidget');
+      const [rawUrl, ...nameParts] = parts;
+
+      let url: URL;
+      try {
+        url = new URL(rawUrl);
+      } catch {
+        return usageError('addwidget');
+      }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return usageError('addwidget');
+
+      const name = nameParts.join(' ') || 'Widget';
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      await commands.sendStateEvent(roomId, 'im.vector.modular.widgets', id, {
+        type: 'm.custom',
+        url: url.toString(),
+        name,
+        id,
+        creatorUserId: userId,
+      });
       return { kind: 'done' };
     },
   },
@@ -391,6 +585,129 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       if (validUntil !== null && !Number.isFinite(validUntil)) return usageError('usepmp');
 
       await commands.setPersonaSelection(roomId, id, validUntil);
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'pmpproxy',
+    run: async (args, { commands }) => {
+      const parts = words(args);
+      if (parts.length !== 2) return usageError('pmpproxy');
+      const id = parts[0];
+      const proxy = parts[1];
+      const marker = proxy.indexOf('text');
+      if (marker < 0) return usageError('pmpproxy');
+
+      const persona = (await commands.personas()).personas.find((entry) => entry.id === id);
+      if (persona === undefined) return usageError('pmpproxy');
+
+      await commands.savePersona(
+        {
+          ...persona,
+          triggers: [
+            ...persona.triggers,
+            {
+              prefix: proxy.slice(0, marker) || null,
+              suffix: proxy.slice(marker + 'text'.length) || null,
+              keep_trigger: false,
+            },
+          ],
+        },
+        id
+      );
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'rawmsg',
+    run: async (args, context) => {
+      const denied = developerOnly(context);
+      if (denied) return denied;
+
+      const content = jsonObject(args.trim());
+      if (content === null) return usageError('rawmsg');
+
+      await context.commands.sendRawEvent(context.roomId, 'm.room.message', content);
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'raw',
+    run: async (args, context) => {
+      const denied = developerOnly(context);
+      if (denied) return denied;
+
+      const parsed = rawEventArgs(args);
+      if (parsed === null) return usageError('raw');
+
+      if (parsed.stateKey === null) {
+        await context.commands.sendRawEvent(context.roomId, parsed.eventType, parsed.content);
+      } else {
+        await context.commands.sendStateEvent(
+          context.roomId,
+          parsed.eventType,
+          parsed.stateKey,
+          parsed.content
+        );
+      }
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'rawacc',
+    run: async (args, context) => {
+      const denied = developerOnly(context);
+      if (denied) return denied;
+
+      const split = args.trim().search(/\s/);
+      if (split < 1) return usageError('rawacc');
+
+      const eventType = args.trim().slice(0, split);
+      const content = jsonObject(
+        args
+          .trim()
+          .slice(split + 1)
+          .trim()
+      );
+      if (content === null) return usageError('rawacc');
+
+      const existing = objectValue(await context.commands.accountData(eventType));
+      await context.commands.setAccountData(eventType, { ...existing, ...content });
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'delacc',
+    run: async (args, context) => {
+      const denied = developerOnly(context);
+      if (denied) return denied;
+
+      const parts = words(args);
+      if (parts.length !== 2) return usageError('delacc');
+
+      const [eventType, key] = parts;
+      const content = objectValue(await context.commands.accountData(eventType));
+      if (!(key in content)) return usageError('delacc');
+
+      const updated = { ...content };
+      Reflect.deleteProperty(updated, key);
+      await context.commands.setAccountData(eventType, updated);
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'delete',
+    run: async (args, context) => {
+      const parsed = deleteArgs(args);
+      if (parsed === null) return usageError('delete');
+
+      await context.commands.bulkRedact(
+        context.roomId,
+        parsed.senders,
+        parsed.afterTs,
+        parsed.eventTypes,
+        parsed.reason
+      );
       return { kind: 'done' };
     },
   },

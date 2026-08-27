@@ -299,6 +299,20 @@ impl Core {
                 Ok(CommandOk::SendMessage)
             }
 
+            Command::SendRawEvent {
+                room_id,
+                event_type,
+                content,
+            } => {
+                self.room(&room_id)
+                    .await?
+                    .send_raw(&event_type, content)
+                    .await
+                    .map_err(|error| self.failed("send_raw_event", error))?;
+
+                Ok(CommandOk::SendRawEvent)
+            }
+
             Command::Personas => Ok(CommandOk::Personas {
                 catalog: self.personas().await?,
             }),
@@ -808,6 +822,45 @@ impl Core {
                 Ok(CommandOk::RoomAccountData { content })
             }
 
+            Command::AccountDataTypes => Ok(CommandOk::AccountDataTypes {
+                event_types: self.account_data_types().await?,
+            }),
+
+            Command::AccessToken => Ok(CommandOk::AccessToken {
+                token: self.client().await?.access_token(),
+            }),
+
+            Command::AccountData { event_type } => {
+                self.remember_account_data_type(event_type.as_str()).await;
+                let event = self
+                    .client()
+                    .await?
+                    .account()
+                    .fetch_account_data(event_type.into())
+                    .await
+                    .map_err(|error| self.failed("account_data", error))?;
+                let content = event.and_then(|raw| raw.deserialize_as::<serde_json::Value>().ok());
+                Ok(CommandOk::AccountData { content })
+            }
+
+            Command::SetAccountData {
+                event_type,
+                content,
+            } => {
+                self.remember_account_data_type(event_type.as_str()).await;
+                let raw = Raw::new(&content)
+                    .map_err(|error| self.failed("set_account_data", error))?
+                    .cast_unchecked();
+                self.client()
+                    .await?
+                    .account()
+                    .set_account_data_raw(event_type.into(), raw)
+                    .await
+                    .map_err(|error| self.failed("set_account_data", error))?;
+
+                Ok(CommandOk::SetAccountData)
+            }
+
             Command::SetRoomAccountData {
                 room_id,
                 event_type,
@@ -876,6 +929,25 @@ impl Core {
                     .map_err(|error| self.failed("redact", error))?;
 
                 Ok(CommandOk::Redact)
+            }
+
+            Command::BulkRedact {
+                room_id,
+                senders,
+                after_ts,
+                event_types,
+                reason,
+            } => {
+                let redacted = self
+                    .bulk_redact(
+                        &room_id,
+                        &senders,
+                        after_ts,
+                        &event_types,
+                        reason.as_deref(),
+                    )
+                    .await?;
+                Ok(CommandOk::BulkRedact { redacted })
             }
 
             Command::React {

@@ -64,6 +64,10 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
     broadcast({ panic: { message } });
   }
 
+  function handleLog(message: string): void {
+    broadcast({ log: message });
+  }
+
   /** `json` is a `CoreEvent[]`: the core batches whatever had queued up. */
   function handleEvent(json: string): void {
     for (const event of JSON.parse(json) as CoreEvent[]) {
@@ -181,5 +185,5 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
     port.start();
   }
 
-  return { connect, handleEvent, handlePanic };
+  return { connect, handleEvent, handleLog, handlePanic };
 }

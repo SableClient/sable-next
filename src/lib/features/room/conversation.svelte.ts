@@ -14,6 +14,8 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 const NO_MENTIONS: OutgoingMentions = { userIds: [], room: false };
 
+export type ConversationSendResult = { kind: 'gifSearch'; query: string };
+
 export type ConversationDeps = {
   core: CoreClient;
   personas: PersonaStore;
@@ -50,7 +52,7 @@ export class Conversation {
     body: string,
     formatted: string | null = null,
     mentions: OutgoingMentions = NO_MENTIONS
-  ): Promise<void> => {
+  ): Promise<ConversationSendResult | undefined> => {
     const pending = this.context;
     if (body === '') return;
 
@@ -70,11 +72,16 @@ export class Conversation {
     const outcome = await runSlash(body, {
       roomId: targetRoomId,
       userId: this.#core.session?.user_id ?? null,
+      developerTools: preferences.developerTools,
       commands: this.#core.commands,
     });
     if (outcome.kind === 'done') {
       this.context = null;
       return;
+    }
+    if (outcome.kind === 'gifSearch') {
+      this.context = null;
+      return outcome;
     }
 
     const rewritten = outcome.body !== body;

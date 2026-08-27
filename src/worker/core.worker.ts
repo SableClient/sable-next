@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, { SableCore, setPanicHandler } from '#src/generated/wasm/sable_wasm.js';
+import init, { SableCore, setLogHandler, setPanicHandler } from '#src/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 
@@ -16,8 +16,6 @@ const core = init().then(() => {
     () => loadSession(),
     (bytes: Uint8Array) => saveSession(bytes),
     () => clearSession(),
-    // The page forwards `?log=` here, e.g. `?log=info,matrix_sdk::http_client=debug`
-    // to include the SDK's HTTP diagnostics in this SharedWorker's console.
     new URLSearchParams(self.location.search).get('log')
   );
 
@@ -47,6 +45,7 @@ self.addEventListener('unhandledrejection', (event) => {
 });
 
 void core.then((instance) => {
+  setLogHandler(boundary.handleLog);
   instance.subscribeEvents(boundary.handleEvent);
 });
 

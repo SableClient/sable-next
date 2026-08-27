@@ -274,6 +274,25 @@ export function createCommands(transport: () => Transport) {
       return response.content;
     },
 
+    async accountDataTypes(): Promise<string[]> {
+      const response = await transport().send({ type: 'account_data_types' });
+      return response.event_types;
+    },
+
+    async accessToken(): Promise<string | null> {
+      const response = await transport().send({ type: 'access_token' });
+      return response.token;
+    },
+
+    async accountData(eventType: string): Promise<unknown> {
+      const response = await transport().send({ type: 'account_data', event_type: eventType });
+      return response.content;
+    },
+
+    async setAccountData(eventType: string, content: unknown): Promise<void> {
+      await transport().send({ type: 'set_account_data', event_type: eventType, content });
+    },
+
     async setRoomAccountData(roomId: string, eventType: string, content: unknown): Promise<void> {
       await transport().send({
         type: 'set_room_account_data',
@@ -506,6 +525,15 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async sendRawEvent(roomId: string, eventType: string, content: unknown): Promise<void> {
+      await transport().send({
+        type: 'send_raw_event',
+        room_id: roomId,
+        event_type: eventType,
+        content,
+      });
+    },
+
     async sendSticker(
       roomId: string,
       url: string,
@@ -612,6 +640,24 @@ export function createCommands(transport: () => Transport) {
         thread_root: threadRoot,
         reason,
       });
+    },
+
+    async bulkRedact(
+      roomId: string,
+      senders: string[],
+      afterTs: number,
+      eventTypes: string[] = [],
+      reason: string | null = null
+    ): Promise<number> {
+      const response = await transport().send({
+        type: 'bulk_redact',
+        room_id: roomId,
+        senders,
+        after_ts: afterTs,
+        event_types: eventTypes,
+        reason,
+      });
+      return response.redacted;
     },
 
     async pinnedEvents(roomId: string): Promise<string[]> {
