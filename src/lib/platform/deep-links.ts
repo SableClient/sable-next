@@ -17,15 +17,19 @@ export async function subscribeDeepLinks(onUrls: (urls: string[]) => void): Prom
   }
 }
 
+async function invokedLinks(command: string): Promise<string[]> {
+  try {
+    return (await invoke<string[] | null>(command)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function currentDeepLinks(): Promise<string[]> {
   if (!deliversDeepLinks()) return [];
 
-  const urls: string[] = [];
-  try {
-    urls.push(...((await invoke<string[] | null>('plugin:deep-link|get_current')) ?? []));
-  } catch {}
-  try {
-    urls.push(...(await invoke<string[]>('pending_deep_links')));
-  } catch {}
-  return urls;
+  return [
+    ...(await invokedLinks('plugin:deep-link|get_current')),
+    ...(await invokedLinks('pending_deep_links')),
+  ];
 }

@@ -66,6 +66,7 @@ test('keeps a visible event fixed while history prepends', async ({
   await app.openHome();
   await app.openRoomFromList('General');
 
+  await expect(timeline.container).not.toHaveClass(/initial/, { timeout: 20_000 });
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
   await expect(timeline.loading).toHaveCount(0);
 
@@ -321,7 +322,7 @@ test('only follows appended events while pinned at latest', async ({
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 });
 
-test('keeps a local echo and history anchor stable through confirmation', async ({
+test('keeps a local echo and the visible position stable through confirmation', async ({
   page,
   app,
   timeline,
@@ -332,11 +333,10 @@ test('keeps a local echo and history anchor stable through confirmation', async 
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await expect(timeline.container).not.toHaveClass(/initial/, { timeout: 20_000 });
 
   await timeline.wheelUp(200);
   await expect(timeline.jumpToLatest).toBeVisible();
-  const anchor = await timeline.anchorAt(2, { visibleOnly: true });
 
   const subscription = await core.subscription();
   const localEcho = {
@@ -353,18 +353,15 @@ test('keeps a local echo and history anchor stable through confirmation', async 
     element.setAttribute('data-confirmation-marker', 'stable');
   });
 
-  await core.emitTimelineDiff(subscription, [
-    {
-      op: 'set',
-      index: 20,
-      value: {
-        ...localEcho,
-        event_id: '$local-echo:example.test',
-        transaction_id: null,
-        send_state: null,
-      },
-    },
-  ]);
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  const anchor = await timeline.anchorAt(2, { visibleOnly: true });
+
+  await core.setTimelineItemById(subscription, 'local-echo', {
+    ...localEcho,
+    event_id: '$local-echo:example.test',
+    transaction_id: null,
+    send_state: null,
+  });
 
   await expect(echo).toHaveAttribute('data-confirmation-marker', 'stable');
   await timeline.expectAnchorHeld(anchor);

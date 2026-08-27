@@ -209,6 +209,7 @@ export class TimelineHistoryController {
     if (this.destroyed) return;
     if (!this.wheelGestureActive) return;
     this.wheelGestureActive = false;
+    if (this.activeGesture === 'wheel') this.activeGesture = 'none';
     this.options.onGestureSettled();
     this.options.debugLog('gesture:settled', {
       queued: this.historyRequestQueued,

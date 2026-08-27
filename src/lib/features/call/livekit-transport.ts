@@ -70,7 +70,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   const room = (options.createRoom ?? ((config) => new LivekitRoom(config)))({
     adaptiveStream: true,
     dynacast: false,
-    ...(keyProvider && worker ? { e2ee: { keyProvider, worker } } : {}),
+    ...(keyProvider && worker ? { encryption: { keyProvider, worker } } : {}),
   });
 
   let state: CallTransportState = idleTransportState();

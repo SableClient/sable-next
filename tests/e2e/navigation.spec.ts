@@ -27,7 +27,7 @@ for (const { link, path } of RAIL_DESTINATIONS) {
 
 // aria-pressed on the panel toggle is which panel is showing.
 const MOBILE_DESTINATIONS = [
-  { path: '/explore', heading: 'Join with address' },
+  { path: '/explore', heading: 'Explore rooms' },
   { path: '/create-room', heading: 'Create a room' },
   { path: '/inbox', heading: 'Inbox' },
 ] as const;

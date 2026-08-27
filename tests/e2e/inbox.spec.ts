@@ -76,5 +76,5 @@ test('badges the inbox with what is waiting', async ({ page, app, installRoomCor
 
   // Two rooms named us once each, and one invitation is pending.
   await expect(page.getByRole('link', { name: 'Inbox, 3 waiting' }).first()).toBeVisible();
-  await expect(page.locator('a[href="/home"] .unread-count').first()).toHaveText('2');
+  await expect(page.locator('a[href="/rooms"] .sable-unread-badge-count').first()).toHaveText('2');
 });

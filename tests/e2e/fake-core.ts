@@ -731,7 +731,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                   ? { type: command, content: null }
                                                   : command === 'event_source'
                                                     ? { type: command, source: '{}' }
-                                                    : { type: command },
+                                                    : command === 'public_rooms'
+                                                      ? {
+                                                          type: command,
+                                                          rooms: [],
+                                                          next_batch: null,
+                                                          total: 0,
+                                                        }
+                                                      : { type: command },
               };
 
         window.setTimeout(

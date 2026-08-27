@@ -42,6 +42,27 @@ export class FakeCoreDriver {
     );
   }
 
+  async setTimelineItemById(
+    subscription: number,
+    itemId: string,
+    value: TimelineDiff
+  ): Promise<void> {
+    await this.page.evaluate(
+      ({ subscription, itemId, value }) => {
+        const index = document
+          .querySelector(`[data-item-id="${itemId}"]`)
+          ?.getAttribute('data-index');
+        if (index === null || index === undefined) throw new Error(`no rendered row for ${itemId}`);
+        window.__e2eEmitTimelineEvent({
+          type: 'timeline_diff',
+          subscription,
+          diffs: [{ op: 'set', index: Number(index), value }],
+        });
+      },
+      { subscription, itemId, value }
+    );
+  }
+
   async emitTyping(roomId: string, userIds: string[]): Promise<void> {
     await this.page.evaluate(
       ({ roomId, userIds }) => {

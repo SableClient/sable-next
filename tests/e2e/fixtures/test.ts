@@ -73,7 +73,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(new FakeCoreDriver(page));
   },
   // Playwright requires the destructuring pattern even with nothing to take.
-  // eslint-disable-next-line no-empty-pattern
+  // oxlint-disable-next-line no-empty-pattern
   homeserver: async ({}, use) => {
     const state = JSON.parse(await readFile(homeserverStatePath(), 'utf8')) as TimelineHomeserver;
     await use(state);

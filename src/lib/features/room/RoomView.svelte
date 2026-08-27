@@ -7,17 +7,12 @@
   import { page } from '$app/state';
 
   import type { CallSupportView } from '#src/generated/CallSupportView';
-  import type { MessageKind } from '#src/generated/MessageKind';
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
-  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 
-  import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
   import { Conversation } from './conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
-  import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
   import { i18n } from '#lib/i18n.js';
   import { matrixToUrl, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
@@ -28,14 +23,10 @@
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
-  import type { ComposerContext } from '#lib/features/composer/composer-context.js';
-  import { runSlash } from '#lib/features/composer/slash-commands.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
-  import { runtimeConfig } from '#lib/config/runtime-config.js';
-  import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import CallView from '#lib/features/call/CallView.svelte';
   import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
