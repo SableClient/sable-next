@@ -32,6 +32,28 @@ pub extern "system" fn Java_moe_sable_next_MainActivity_nativeInitSystemBars(
     });
 }
 
+#[no_mangle]
+#[expect(
+    unsafe_code,
+    reason = "the export symbol and the raw JNI pointers are fixed by the JNI ABI"
+)]
+pub extern "system" fn Java_moe_sable_next_MainActivity_nativeInitTls(
+    env: *mut jni021::sys::JNIEnv,
+    this: jni021::sys::jobject,
+) {
+    let Ok(mut env) = (unsafe { jni021::JNIEnv::from_raw(env) }) else {
+        return;
+    };
+    let context = unsafe { jni021::objects::JObject::from_raw(this) };
+
+    if let Err(error) = rustls_platform_verifier::android::init_with_env(&mut env, context) {
+        tracing::error!(
+            ?error,
+            "the Android certificate verifier could not be reached"
+        );
+    }
+}
+
 /// `light` asks for the icon treatment a light background needs: dark icons.
 #[tauri::command]
 pub fn set_status_bar_light(light: bool) -> Result<(), String> {

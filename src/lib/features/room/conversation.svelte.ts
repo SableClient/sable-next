@@ -30,7 +30,7 @@ export class Conversation {
   readonly #timeline: RoomTimeline;
   readonly #roomId: () => string;
   readonly #threadRoot: string | null;
-  /* eslint-disable-next-line svelte/prefer-svelte-reactivity -- only the prefetch effect touches it, and a reactive set would make that effect invalidate itself */
+  /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
   readonly #requestedDetails = new Set<string>();
 
   constructor({ core, personas, timeline, roomId, threadRoot = null }: ConversationDeps) {

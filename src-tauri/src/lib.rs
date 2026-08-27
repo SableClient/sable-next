@@ -178,7 +178,6 @@ fn open_auth_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), Comma
         .map_err(|_| CommandErr::Unavailable)
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn spawn_event_pump<R: tauri::Runtime>(
     notifier: AppHandle<R>,
     pushing: Arc<Core>,
@@ -211,6 +210,7 @@ fn spawn_event_pump<R: tauri::Runtime>(
     });
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Two SDK sites log once per room per sync response, which on a phone costs
     // more than they are worth: heroes it cannot name, and the latest-event

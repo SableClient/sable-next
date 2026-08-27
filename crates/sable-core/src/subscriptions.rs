@@ -122,8 +122,6 @@ impl Core {
         let room = self.room(&room_id).await?;
         let timeline = match &focus {
             TimelineFocusView::Live => self.live_timeline(&room_id, hidden_events).await?,
-            // Shared with sends, so a reply's local echo lands on the timeline
-            // the subscriber is reading.
             TimelineFocusView::Thread { root_event_id } => {
                 self.thread_timeline(&room_id, root_event_id).await?
             }

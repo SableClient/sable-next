@@ -81,6 +81,35 @@ rust {
     rootDirRel = "../../../../"
 }
 
+// rustls-platform-verifier ships its Kotlin half as a Maven repository inside
+// the crate, so the path has to be read back out of cargo metadata.
+fun rustlsPlatformVerifierMaven(): String {
+    val metadata = providers.exec {
+        commandLine(
+            "cargo", "metadata",
+            "--format-version", "1",
+            "--filter-platform", "aarch64-linux-android",
+            "--manifest-path", File(rootDir, "../../Cargo.toml").canonicalPath,
+        )
+    }.standardOutput.asText.get()
+
+    @Suppress("UNCHECKED_CAST")
+    val packages = (groovy.json.JsonSlurper().parseText(metadata) as Map<String, Any>)
+        .getValue("packages") as List<Map<String, Any>>
+    val manifest = packages
+        .first { it["name"] == "rustls-platform-verifier-android" }
+        .getValue("manifest_path") as String
+
+    return File(File(manifest).parentFile, "maven").path
+}
+
+repositories {
+    maven {
+        url = uri(rustlsPlatformVerifierMaven())
+        metadataSources.artifact()
+    }
+}
+
 configurations.all {
     resolutionStrategy.dependencySubstitution {
         substitute(module("com.google.crypto.tink:tink"))
@@ -89,6 +118,7 @@ configurations.all {
 }
 
 dependencies {
+    implementation("rustls:rustls-platform-verifier:latest.release")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
