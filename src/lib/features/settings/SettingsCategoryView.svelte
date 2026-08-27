@@ -8,13 +8,12 @@
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import { panelsFor } from './category-panels.js';
-  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import { settingFocusId } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -96,70 +95,51 @@
         {#each items as setting (setting.key)}
           {@const disabled = setting.unavailable === true || gated(setting)}
           {@const anchor = settingFocusId(setting.key)}
-          <li
+          <SettingsRow
             id={anchor}
             data-settings-focus={anchor}
-            class={[
-              'setting-row',
-              {
-                gated: setting.gatedBy !== undefined,
-                disabled,
-                highlighted: highlighted === anchor,
-              },
-            ]}
+            title={$i18n.t(setting.name)}
+            description={setting.description ? $i18n.t(setting.description) : undefined}
+            icon={setting.icon}
+            {disabled}
+            badge={setting.unavailable ? $i18n.t('settings.notAvailableYet') : undefined}
+            highlighted={highlighted === anchor}
+            wide={setting.type === 'select'}
+            class={setting.gatedBy !== undefined ? 'gated' : undefined}
+            titleAction={{
+              label: $i18n.t(copied === anchor ? 'settings.linkCopied' : 'settings.copyLink'),
+              icon: copied === anchor ? CheckIcon : LinkIcon,
+              onclick: () => void copyLink(anchor),
+            }}
           >
-            <span class="row-icon" aria-hidden="true"><setting.icon /></span>
-            <div class="row-copy">
-              <div class="row-name">
-                <span class="name">{$i18n.t(setting.name)}</span>
-                {#if setting.unavailable}
-                  <StatusBadge variant="neutral" label={$i18n.t('settings.notAvailableYet')} />
-                {/if}
-                <span class="row-share">
-                  <IconButton
-                    variant="ghost"
-                    size="small"
-                    label={$i18n.t(copied === anchor ? 'settings.linkCopied' : 'settings.copyLink')}
-                    onclick={() => void copyLink(anchor)}
-                  >
-                    {#if copied === anchor}<CheckIcon />{:else}<LinkIcon />{/if}
-                  </IconButton>
-                </span>
-              </div>
-              {#if setting.description}
-                <p>{$i18n.t(setting.description)}</p>
-              {/if}
-            </div>
-            <div class={['row-control', { wide: setting.type === 'select' }]}>
-              {#if setting.type === 'select'}
-                {@const key = setting.key}
-                <Select
-                  {disabled}
-                  aria-label={$i18n.t(setting.name)}
-                  value={preferences[key]}
-                  items={setting.options.map((option) => ({
-                    value: option.value,
-                    label: $i18n.t(option.label),
-                  }))}
-                  onValueChange={(value) => {
-                    setPreference(key, value as Preferences[typeof key]);
-                  }}
-                />
-              {:else}
-                {@const key = setting.key}
-                <Switch
-                  {disabled}
-                  label={$i18n.t(setting.name)}
-                  checked={preferences[key]}
-                  onCheckedChange={(checked: boolean) => {
-                    setPreference(key, checked);
-                    setting.onChange?.(checked);
-                    if (setting.requiresReload) reloadPending = true;
-                  }}
-                />
-              {/if}
-            </div>
-          </li>
+            {#if setting.type === 'select'}
+              {@const key = setting.key}
+              <Select
+                {disabled}
+                aria-label={$i18n.t(setting.name)}
+                value={preferences[key]}
+                items={setting.options.map((option) => ({
+                  value: option.value,
+                  label: $i18n.t(option.label),
+                }))}
+                onValueChange={(value) => {
+                  setPreference(key, value as Preferences[typeof key]);
+                }}
+              />
+            {:else}
+              {@const key = setting.key}
+              <Switch
+                {disabled}
+                label={$i18n.t(setting.name)}
+                checked={preferences[key]}
+                onCheckedChange={(checked: boolean) => {
+                  setPreference(key, checked);
+                  setting.onChange?.(checked);
+                  if (setting.requiresReload) reloadPending = true;
+                }}
+              />
+            {/if}
+          </SettingsRow>
         {/each}
       </ul>
     </section>
@@ -209,128 +189,7 @@
     padding: 0;
   }
 
-  .setting-row {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    min-height: calc(var(--control-height-medium) + var(--space-2));
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .setting-row + .setting-row {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
-  }
-
-  .row-icon {
-    align-items: center;
-    background: var(--sable-surface-container);
-    border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    flex: 0 0 auto;
-    height: var(--control-height-small);
-    justify-content: center;
-    width: var(--control-height-small);
-  }
-
-  .row-icon :global(svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
-  .row-copy {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .row-name {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  .name {
-    font-weight: var(--font-weight-medium);
-  }
-
-  .row-copy p {
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: calc(var(--space-1) / 2) 0 0;
-    max-width: 60ch;
-  }
-
-  .setting-row.disabled .row-icon,
-  .setting-row.disabled .row-copy {
-    opacity: 0.65;
-  }
-
-  .setting-row.highlighted {
-    background: var(--sable-primary-container);
-    box-shadow: inset 0.1875rem 0 0 var(--sable-primary-main);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .setting-row {
-      transition: background-color var(--motion-slow) var(--motion-easing-standard);
-    }
-  }
-
-  .row-share {
-    display: inline-flex;
-    flex: 0 0 auto;
-  }
-
-  .row-share :global(.sable-icon-button) {
-    height: var(--icon-size-large);
-    min-height: 0;
-    width: var(--icon-size-large);
-  }
-
-  .row-share :global(svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
-  .row-control {
-    align-items: center;
-    display: flex;
-    flex: 0 0 auto;
-    justify-content: flex-start;
-    padding-left: calc(var(--control-height-small) + var(--space-3));
-    width: 100%;
-  }
-
-  @media (hover: hover) {
-    .row-share {
-      opacity: 0;
-    }
-
-    .setting-row:hover .row-share,
-    .setting-row:focus-within .row-share {
-      opacity: 1;
-    }
-  }
-
-  .row-control.wide {
-    min-width: 11rem;
-  }
-
   :global(.state-event-section .settings-section-content) {
     padding: var(--space-3);
-  }
-
-  @media (width >= 42rem) {
-    .setting-row {
-      flex-wrap: nowrap;
-    }
-
-    .row-control {
-      justify-content: flex-end;
-      padding-left: 0;
-      width: auto;
-    }
   }
 </style>

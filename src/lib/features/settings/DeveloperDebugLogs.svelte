@@ -1,7 +1,9 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
+  import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import {
     clearDebugLogs,
@@ -52,17 +54,19 @@
 </script>
 
 <div class="logs">
-  <div class="status-line">
-    <div>
-      <strong>{$i18n.t('settings.developerLogsStatus')}</strong>
-      <p>{$i18n.t('settings.developerLogsDescription')}</p>
-    </div>
-    <Switch
-      label={$i18n.t('settings.developerLogsEnable')}
-      checked={debugLog.enabled}
-      onCheckedChange={setDebugLogging}
-    />
-  </div>
+  <ul class="settings">
+    <SettingsRow
+      title={$i18n.t('settings.developerLogsStatus')}
+      description={$i18n.t('settings.developerLogsDescription')}
+      icon={BugIcon}
+    >
+      <Switch
+        label={$i18n.t('settings.developerLogsEnable')}
+        checked={debugLog.enabled}
+        onCheckedChange={setDebugLogging}
+      />
+    </SettingsRow>
+  </ul>
 
   <div class="filters">
     <Select
@@ -123,7 +127,6 @@
     gap: var(--space-2);
   }
 
-  .status-line,
   .filters,
   .actions {
     align-items: center;
@@ -132,11 +135,6 @@
     gap: var(--space-2);
   }
 
-  .status-line {
-    justify-content: space-between;
-  }
-
-  strong,
   p {
     margin: 0;
   }
@@ -152,6 +150,12 @@
 
   .actions {
     justify-content: flex-end;
+  }
+
+  .settings {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
   .entries {

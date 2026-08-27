@@ -1,9 +1,11 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import DatabaseIcon from 'phosphor-svelte/lib/DatabaseIcon';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -91,12 +93,17 @@
 </script>
 
 <div class="account-data">
-  <div class="account-data-header">
-    <p>{$i18n.t('settings.developerAccountDataDescription')}</p>
-    <Button variant="secondary" size="small" onclick={() => void open(null)}>
-      {$i18n.t('settings.developerAccountDataAdd')}
-    </Button>
-  </div>
+  <ul class="settings">
+    <SettingsRow
+      title={$i18n.t('settings.developerAccountDataAdd')}
+      description={$i18n.t('settings.developerAccountDataDescription')}
+      icon={DatabaseIcon}
+    >
+      <Button variant="secondary" size="small" onclick={() => void open(null)}>
+        {$i18n.t('settings.developerAccountDataAdd')}
+      </Button>
+    </SettingsRow>
+  </ul>
 
   {#if types.length === 0}
     <p class="empty">{$i18n.t('settings.developerAccountDataEmpty')}</p>
@@ -170,20 +177,14 @@
     gap: var(--space-2);
   }
 
-  .account-data-header {
-    align-items: flex-start;
-    display: flex;
-    gap: var(--space-2);
-    justify-content: space-between;
-  }
-
-  p {
-    color: var(--sable-surface-var-on-container);
-    margin: 0;
-  }
-
   .empty {
     font-size: var(--font-size-small);
+  }
+
+  .settings {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
   .event-list {

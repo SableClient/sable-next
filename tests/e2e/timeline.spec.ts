@@ -32,14 +32,6 @@ test('loads a real room at latest and preserves the viewport while paginating', 
   await expect(timeline.loading).toHaveCount(0);
 
   await expect.poll(() => timeline.scrollableHeight(), { timeout: 15_000 }).toBeGreaterThan(300);
-  await timeline.wheelUp(200);
-  await expect(timeline.jumpToLatest).toBeVisible();
-  await timeline.dispatchWheel(1);
-  await timeline.scrollToAndNotify(0);
-
-  await expect.poll(() => timeline.visibleItems().count()).toBeGreaterThan(0);
-  const anchor = await timeline.fullyVisibleAnchor();
-
   const oldestRenderedMessage = async (): Promise<number> =>
     timeline.items.evaluateAll((items) => {
       const indexes = items.flatMap((item) => {
@@ -48,6 +40,17 @@ test('loads a real room at latest and preserves the viewport while paginating', 
       });
       return Math.min(...indexes);
     });
+  const initialOldestMessage = await oldestRenderedMessage();
+  await timeline.wheelUp(200);
+  await expect(timeline.jumpToLatest).toBeVisible();
+  await timeline.dispatchWheel(1);
+  await timeline.scrollToAndNotify(0);
+  await expect.poll(oldestRenderedMessage, { timeout: 15_000 }).toBeLessThan(initialOldestMessage);
+  await timeline.scrollToAndNotify(0);
+
+  await expect.poll(() => timeline.visibleItems().count()).toBeGreaterThan(0);
+  const anchor = await timeline.fullyVisibleAnchor();
+
   const beforeOldestMessage = await oldestRenderedMessage();
 
   await page.mouse.wheel(0, -200);

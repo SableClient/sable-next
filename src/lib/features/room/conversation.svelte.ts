@@ -2,6 +2,8 @@ import type { MessageKind } from '#src/generated/MessageKind';
 import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
@@ -82,6 +84,11 @@ export class Conversation {
     if (outcome.kind === 'gifSearch') {
       this.context = null;
       return outcome;
+    }
+    if (outcome.kind === 'bugReport') {
+      this.context = null;
+      void goto(resolve('bugreport'));
+      return;
     }
 
     const rewritten = outcome.body !== body;

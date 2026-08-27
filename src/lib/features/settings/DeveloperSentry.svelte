@@ -1,7 +1,12 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
+  import BugIcon from 'phosphor-svelte/lib/BugIcon';
+  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
+  import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
+  import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import {
     debugLog,
     setDebugCategoryEnabled,
@@ -27,99 +32,83 @@
 </script>
 
 <div class="sentry">
-  <div class="status-line">
-    <span>{$i18n.t('settings.developerSentryConfigured')}</span>
-    <StatusBadge
-      label={configured
-        ? $i18n.t('settings.developerSentryConfiguredYes')
-        : $i18n.t('settings.developerSentryConfiguredNo')}
-      variant={configured ? 'success' : 'warning'}
-    />
-  </div>
-  <dl>
-    <div>
-      <dt>{$i18n.t('settings.developerSentryEnvironment')}</dt>
-      <dd>{import.meta.env.MODE}</dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSentryReporting')}</dt>
-      <dd>
+  <ul class="settings">
+    <SettingsRow title={$i18n.t('settings.developerSentryConfigured')} icon={BugIcon}>
+      <StatusBadge
+        label={configured
+          ? $i18n.t('settings.developerSentryConfiguredYes')
+          : $i18n.t('settings.developerSentryConfiguredNo')}
+        variant={configured ? 'success' : 'warning'}
+      />
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSentryEnvironment')} icon={CodeIcon}>
+      <code>{import.meta.env.MODE}</code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSentryReporting')} icon={BugIcon}>
+      <code>
         {preferences.errorReporting
           ? $i18n.t('settings.developerYes')
           : $i18n.t('settings.developerNo')}
-      </dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSentryReplay')}</dt>
-      <dd>
+      </code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSentryReplay')} icon={FilmStripIcon}>
+      <code>
         {preferences.sessionReplay
           ? $i18n.t('settings.developerYes')
           : $i18n.t('settings.developerNo')}
-      </dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSentryActivity')}</dt>
-      <dd>
+      </code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSentryActivity')} icon={PulseIcon}>
+      <code>
         {errors}
         {$i18n.t('settings.developerSentryErrors')}, {warnings}
         {$i18n.t('settings.developerSentryWarnings')}
-      </dd>
-    </div>
-  </dl>
+      </code>
+    </SettingsRow>
+  </ul>
   <p>{$i18n.t('settings.developerSentryDescription')}</p>
-  <div class="categories">
+  <ul class="categories">
     {#each categories as category (category)}
-      <div class="category">
-        <span>{category}</span>
+      <SettingsRow title={`${category} breadcrumbs`} icon={BugIcon}>
         <Switch
           label={`${category} breadcrumbs`}
           checked={!debugLog.disabledCategories.has(category)}
           onCheckedChange={(enabled) => setDebugCategoryEnabled(category, enabled)}
         />
-      </div>
+      </SettingsRow>
     {/each}
-  </div>
+  </ul>
 </div>
 
 <style>
   .sentry,
-  dl,
+  .settings,
   .categories {
     display: grid;
     gap: var(--space-2);
   }
 
-  .status-line,
-  dl div,
-  .category {
-    align-items: center;
-    display: flex;
-    gap: var(--space-2);
-    justify-content: space-between;
-  }
-
-  dl {
+  .settings {
+    list-style: none;
     margin: 0;
+    padding: 0;
   }
 
-  dt,
-  dd,
-  p {
-    margin: 0;
-  }
-
-  dt,
   p {
     color: var(--sable-surface-var-on-container);
+    margin: 0;
   }
 
-  dd {
+  code {
     font-family: var(--font-family-mono);
     text-align: right;
   }
 
   .categories {
     border-top: var(--border-width) solid var(--sable-surface-container-line);
+    list-style: none;
+    margin: 0;
+    padding-left: 0;
     padding-top: var(--space-2);
   }
 </style>

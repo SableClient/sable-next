@@ -46,6 +46,7 @@ export type SlashContext = {
 export type SlashOutcome =
   | { kind: 'message'; body: string; msgtype: MessageKind; formatted?: string | null }
   | { kind: 'gifSearch'; query: string }
+  | { kind: 'bugReport' }
   | { kind: 'done' }
   | { kind: 'error'; key: string; values?: Record<string, string> };
 
@@ -350,6 +351,10 @@ function headpat(): SlashCommand {
 }
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
+  {
+    name: 'bugreport',
+    run: (args) => (args.trim() === '' ? { kind: 'bugReport' } : usageError('bugreport')),
+  },
   {
     name: 'gif',
     run: (args) => ({ kind: 'gifSearch', query: args.trim() }),

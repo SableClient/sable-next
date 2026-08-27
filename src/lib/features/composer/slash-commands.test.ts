@@ -64,6 +64,15 @@ test('plain text is not a command', () => {
   expect(parseSlash('and/or')).toEqual({ kind: 'none' });
 });
 
+test('/bugreport opens the report flow', async () => {
+  await expect(runSlash('/bugreport', context(fakeCommands()))).resolves.toEqual({
+    kind: 'bugReport',
+  });
+  await expect(runSlash('/bugreport details', context(fakeCommands()))).rejects.toMatchObject({
+    key: 'composer.slash.bugreport.usage',
+  });
+});
+
 test('a doubled slash escapes a message that starts with one', async () => {
   expect(parseSlash('//me is literal')).toEqual({ kind: 'literal', body: '/me is literal' });
 

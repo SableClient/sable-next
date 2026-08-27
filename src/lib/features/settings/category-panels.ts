@@ -31,8 +31,6 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     {
       component: DeveloperAccessToken,
       when: () => preferences.developerTools,
-      title: 'settings.developerAccessTokenTitle',
-      headingId: 'developer-access-token',
     },
     {
       component: DeveloperSyncDiagnostics,

@@ -1073,6 +1073,36 @@
     "coreUnresponsive": "Sable is not responding.",
     "syncFailed": "Sync failed: {{message}}"
   },
+  "bugReport": {
+    "eyebrow": "Feedback",
+    "titlePage": "Report a problem",
+    "descriptionPage": "Tell us what happened or suggest a change. Your report opens in the Sable issue tracker.",
+    "type": "Report type",
+    "bug": "Bug report",
+    "feature": "Feature request",
+    "title": "Title",
+    "titlePlaceholder": "Brief description",
+    "description": "Describe the bug",
+    "descriptionPlaceholder": "What went wrong?",
+    "reproduction": "Steps to reproduce (optional)",
+    "reproductionPlaceholder": "1. Go to...\n2. Click on...\n3. See error",
+    "expectedBehavior": "Expected behavior (optional)",
+    "platformInfo": "Platform information included automatically",
+    "problem": "Describe the problem",
+    "solution": "Describe the solution",
+    "alternatives": "Alternatives considered (optional)",
+    "context": "Additional context (optional)",
+    "searching": "Searching for similar issues...",
+    "similarIssues": "Similar open issues. Please check before submitting:",
+    "errorTracking": "Error tracking",
+    "sendToSentry": "Send an anonymous report to Sentry",
+    "includeDebugLogs": "Include the latest debug logs",
+    "openOnGitHub": "Also create a GitHub issue",
+    "submit": "Submit report",
+    "openOnGitHubAction": "Open on GitHub",
+    "cancel": "Cancel",
+    "submitFailed": "The report could not be submitted. Please try again."
+  },
   "composer": {
     "insert": "Insert",
     "photoOrVideo": "Photo or video",
@@ -1163,6 +1193,10 @@
       "gif": {
         "description": "Search and send a GIF",
         "usage": "/gif [search]"
+      },
+      "bugreport": {
+        "description": "Open the bug report form",
+        "usage": "/bugreport"
       },
       "hug": {
         "description": "Send a hug",

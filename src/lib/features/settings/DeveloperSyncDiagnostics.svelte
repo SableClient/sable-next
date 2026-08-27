@@ -2,7 +2,13 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
+  import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
+  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
+  import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
+  import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -22,34 +28,28 @@
 </script>
 
 <div class="diagnostics">
-  <div class="status-line">
-    <span>{$i18n.t('settings.developerSyncState')}</span>
-    <StatusBadge label={syncLabel} variant={badgeVariant} />
-  </div>
-  <dl>
-    <div>
-      <dt>{$i18n.t('settings.developerSyncCoreStatus')}</dt>
-      <dd>{core.status}</dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSyncRooms')}</dt>
-      <dd>{roomList.rooms.length}</dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSyncAccount')}</dt>
-      <dd>{core.session?.account_id ?? '-'}</dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSyncRevision')}</dt>
-      <dd>{core.accountRevision}</dd>
-    </div>
-    <div>
-      <dt>{$i18n.t('settings.developerSyncUnresponsive')}</dt>
-      <dd>
+  <ul class="settings">
+    <SettingsRow title={$i18n.t('settings.developerSyncState')} icon={PulseIcon}>
+      <StatusBadge label={syncLabel} variant={badgeVariant} />
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSyncCoreStatus')} icon={CodeIcon}>
+      <code>{core.status}</code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSyncRooms')} icon={ChatsCircleIcon}>
+      <code>{roomList.rooms.length}</code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSyncAccount')} icon={UserCircleIcon}>
+      <code>{core.session?.account_id ?? '-'}</code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSyncRevision')} icon={ArrowsOutLineVerticalIcon}>
+      <code>{core.accountRevision}</code>
+    </SettingsRow>
+    <SettingsRow title={$i18n.t('settings.developerSyncUnresponsive')} icon={PulseIcon}>
+      <code>
         {core.unresponsive ? $i18n.t('settings.developerYes') : $i18n.t('settings.developerNo')}
-      </dd>
-    </div>
-  </dl>
+      </code>
+    </SettingsRow>
+  </ul>
   {#if core.sync?.state === 'error'}
     <p class="error">{core.sync.message}</p>
   {/if}
@@ -64,30 +64,14 @@
     gap: var(--space-2);
   }
 
-  .status-line,
-  dl div {
-    align-items: center;
-    display: flex;
-    gap: var(--space-2);
-    justify-content: space-between;
-  }
-
-  dl {
+  .settings {
     display: grid;
-    gap: var(--space-1);
+    list-style: none;
     margin: 0;
+    padding: 0;
   }
 
-  dt,
-  dd {
-    margin: 0;
-  }
-
-  dt {
-    color: var(--sable-surface-var-on-container);
-  }
-
-  dd {
+  code {
     font-family: var(--font-family-mono);
     overflow-wrap: anywhere;
     text-align: right;

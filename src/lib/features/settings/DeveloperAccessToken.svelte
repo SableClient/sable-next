@@ -1,8 +1,10 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 
   const core = useCoreClient();
   let copied = $state(false);
@@ -25,9 +27,12 @@
   }
 </script>
 
-<div class="tool-stack">
-  <p>{$i18n.t('settings.developerAccessTokenDescription')}</p>
-  <div class="tool-actions">
+<ul class="settings">
+  <SettingsRow
+    title={$i18n.t('settings.developerAccessTokenTitle')}
+    description={$i18n.t('settings.developerAccessTokenDescription')}
+    icon={KeyIcon}
+  >
     <Button
       variant="secondary"
       size="small"
@@ -38,23 +43,14 @@
         copied ? 'settings.developerAccessTokenCopied' : 'settings.developerAccessTokenCopy'
       )}
     </Button>
-  </div>
-  {#if error}<Alert variant="critical">{$i18n.t('settings.developerAccessTokenFailed')}</Alert>{/if}
-</div>
+  </SettingsRow>
+</ul>
+{#if error}<Alert variant="critical">{$i18n.t('settings.developerAccessTokenFailed')}</Alert>{/if}
 
 <style>
-  .tool-stack {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  p {
-    color: var(--sable-surface-var-on-container);
+  .settings {
+    list-style: none;
     margin: 0;
-  }
-
-  .tool-actions {
-    display: flex;
-    justify-content: flex-end;
+    padding: 0;
   }
 </style>
