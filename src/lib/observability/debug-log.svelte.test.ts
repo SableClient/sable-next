@@ -28,14 +28,14 @@ test('does not recursively capture console output', async () => {
   expect(debugLog.entries[0]?.message).toBe('outer log');
 });
 
-test('caps console lines per microtask flush', async () => {
+test('keeps every line of a burst and never grows past the cap', async () => {
   const { debugLog, setDebugLogging } = await import('./debug-log.svelte.js');
   setDebugLogging(true);
-  for (let index = 0; index < 20; index += 1) console.error(`flood ${index}`);
-  await Promise.resolve();
+  for (let index = 0; index < 5000; index += 1) console.error(`flood ${index}`);
 
-  expect(debugLog.entries.filter((entry) => entry.namespace === 'console')).toHaveLength(6);
-  expect(debugLog.entries.some((entry) => entry.message === '+15 log entries dropped')).toBe(true);
+  expect(debugLog.entries.length).toBeGreaterThanOrEqual(1000);
+  expect(debugLog.entries.length).toBeLessThanOrEqual(1200);
+  expect(debugLog.entries.at(-1)?.message).toBe('flood 4999');
 });
 
 test('dedupes consecutive identical console lines', async () => {
@@ -47,4 +47,14 @@ test('dedupes consecutive identical console lines', async () => {
   await Promise.resolve();
 
   expect(debugLog.entries.filter((entry) => entry.message === 'spinning')).toHaveLength(1);
+});
+
+test('clearing lets an identical line be recorded again', async () => {
+  const { clearDebugLogs, debugLog, setDebugLogging } = await import('./debug-log.svelte.js');
+  setDebugLogging(true);
+  console.error('same line');
+  clearDebugLogs();
+  console.error('same line');
+
+  expect(debugLog.entries.filter((entry) => entry.message === 'same line')).toHaveLength(1);
 });

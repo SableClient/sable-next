@@ -1,5 +1,6 @@
+import { createSubscriber } from 'svelte/reactivity';
+
 import { sanitizePayload, scrubMatrixIds } from './scrubbers.js';
-import { SvelteDate, SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 export type DebugLogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type DebugLogCategory =
@@ -25,65 +26,15 @@ export type DebugLogEntry = {
 };
 
 const MAX_ENTRIES = 1000;
-const MAX_LOG_ENTRIES_PER_FLUSH = 5;
+const TRIM_SLACK = 200;
+const ENABLED_KEY = 'sable_internal_debug';
 const DISABLED_CATEGORIES_KEY = 'sable-debug-disabled-categories';
 const consoleMethods = ['error', 'warn', 'info', 'debug'] as const;
-const originalConsole = new SvelteMap<
-  (typeof consoleMethods)[number],
-  (...args: unknown[]) => void
->();
-let interceptingConsole = false;
-const captureListeners = new SvelteSet<(enabled: boolean) => void>();
-const pendingLogEntries: Omit<DebugLogEntry, 'id'>[] = [];
-let logFlushQueued = false;
-let droppedLogEntries = 0;
 
-function queueLogEntry(entry: Omit<DebugLogEntry, 'id'>): void {
-  const last = pendingLogEntries.at(-1) ?? debugLog.entries.at(-1);
-  if (
-    last &&
-    last.level === entry.level &&
-    last.namespace === entry.namespace &&
-    last.message === entry.message
-  ) {
-    return;
-  }
-  if (pendingLogEntries.length >= MAX_LOG_ENTRIES_PER_FLUSH) {
-    droppedLogEntries += 1;
-    return;
-  }
-  pendingLogEntries.push(entry);
-  if (logFlushQueued) return;
-  logFlushQueued = true;
-  queueMicrotask(() => {
-    logFlushQueued = false;
-    if (!debugLog.enabled || pendingLogEntries.length === 0) {
-      pendingLogEntries.length = 0;
-      droppedLogEntries = 0;
-      return;
-    }
-    const entries = pendingLogEntries.map((pending, index) => ({
-      id: debugLog.nextId + index,
-      ...pending,
-    }));
-    if (droppedLogEntries > 0) {
-      entries.push({
-        id: debugLog.nextId + entries.length,
-        timestamp: Date.now(),
-        level: 'debug',
-        category: 'general',
-        namespace: 'console',
-        message: `+${droppedLogEntries} log entries dropped`,
-      });
-      droppedLogEntries = 0;
-    }
-    debugLog.nextId += entries.length;
-    pendingLogEntries.length = 0;
-    debugLog.entries.push(...entries);
-    if (debugLog.entries.length > MAX_ENTRIES) {
-      debugLog.entries.splice(0, debugLog.entries.length - MAX_ENTRIES);
-    }
-  });
+type ConsoleMethod = (typeof consoleMethods)[number];
+
+function readEnabled(): boolean {
+  return typeof localStorage !== 'undefined' && localStorage.getItem(ENABLED_KEY) === '1';
 }
 
 function readDisabledCategories(): DebugLogCategory[] {
@@ -98,13 +49,69 @@ function readDisabledCategories(): DebugLogCategory[] {
   }
 }
 
-export const debugLog = $state({
-  enabled:
-    typeof localStorage !== 'undefined' && localStorage.getItem('sable_internal_debug') === '1',
-  entries: [] as DebugLogEntry[],
-  nextId: 1,
-  disabledCategories: new SvelteSet<DebugLogCategory>(readDisabledCategories()),
+const buffer: DebugLogEntry[] = [];
+/* eslint-disable svelte/prefer-svelte-reactivity */
+const disabledCategories = new Set<DebugLogCategory>(readDisabledCategories());
+const originalConsole = new Map<ConsoleMethod, (...args: unknown[]) => void>();
+const captureListeners = new Set<(enabled: boolean) => void>();
+/* eslint-enable svelte/prefer-svelte-reactivity */
+
+let enabled = readEnabled();
+let nextId = 1;
+let lastEntry: DebugLogEntry | null = null;
+let interceptingConsole = false;
+let notify: (() => void) | undefined;
+let notifyScheduled = false;
+
+const subscribe = createSubscriber((update) => {
+  notify = update;
+  return () => {
+    notify = undefined;
+    notifyScheduled = false;
+  };
 });
+
+function scheduleNotify(): void {
+  if (notify === undefined || notifyScheduled) return;
+  notifyScheduled = true;
+  const flush = (): void => {
+    notifyScheduled = false;
+    notify?.();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(flush);
+  else queueMicrotask(flush);
+}
+
+function append(entry: Omit<DebugLogEntry, 'id'>): void {
+  if (
+    lastEntry?.level === entry.level &&
+    lastEntry.namespace === entry.namespace &&
+    lastEntry.message === entry.message
+  ) {
+    return;
+  }
+  const stored: DebugLogEntry = { id: nextId, ...entry };
+  nextId += 1;
+  buffer.push(stored);
+  lastEntry = stored;
+  if (buffer.length > MAX_ENTRIES + TRIM_SLACK) buffer.splice(0, buffer.length - MAX_ENTRIES);
+  scheduleNotify();
+}
+
+export const debugLog = {
+  get enabled(): boolean {
+    subscribe();
+    return enabled;
+  },
+  get entries(): readonly DebugLogEntry[] {
+    subscribe();
+    return buffer;
+  },
+  get disabledCategories(): ReadonlySet<DebugLogCategory> {
+    subscribe();
+    return disabledCategories;
+  },
+};
 
 function formatConsoleArgs(args: unknown[]): string {
   return args
@@ -132,7 +139,7 @@ function interceptConsole(): void {
       }
 
       interceptingConsole = true;
-      queueLogEntry({
+      append({
         timestamp: Date.now(),
         level: method === 'error' ? 'error' : method === 'warn' ? 'warn' : method,
         category: method === 'error' ? 'error' : 'general',
@@ -153,32 +160,34 @@ function restoreConsole(): void {
   originalConsole.clear();
 }
 
-export function setDebugLogging(enabled: boolean): void {
-  debugLog.enabled = enabled;
-  if (enabled) interceptConsole();
+export function setDebugLogging(next: boolean): void {
+  enabled = next;
+  if (next) interceptConsole();
   else restoreConsole();
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('sable_internal_debug', enabled ? '1' : '0');
+    localStorage.setItem(ENABLED_KEY, next ? '1' : '0');
   }
-  for (const listener of captureListeners) listener(enabled);
+  notify?.();
+  for (const listener of captureListeners) listener(next);
 }
 
 export function onDebugLogCapture(listener: (enabled: boolean) => void): () => void {
   captureListeners.add(listener);
-  listener(debugLog.enabled);
+  listener(enabled);
   return () => {
     captureListeners.delete(listener);
   };
 }
 
-if (debugLog.enabled) interceptConsole();
+if (enabled) interceptConsole();
 
-export function setDebugCategoryEnabled(category: DebugLogCategory, enabled: boolean): void {
-  if (enabled) debugLog.disabledCategories.delete(category);
-  else debugLog.disabledCategories.add(category);
+export function setDebugCategoryEnabled(category: DebugLogCategory, next: boolean): void {
+  if (next) disabledCategories.delete(category);
+  else disabledCategories.add(category);
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(DISABLED_CATEGORIES_KEY, JSON.stringify([...debugLog.disabledCategories]));
+    localStorage.setItem(DISABLED_CATEGORIES_KEY, JSON.stringify([...disabledCategories]));
   }
+  notify?.();
 }
 
 export function recordDebugLog(
@@ -188,8 +197,8 @@ export function recordDebugLog(
   message: string,
   data?: unknown
 ): void {
-  if (!debugLog.enabled || debugLog.disabledCategories.has(category)) return;
-  queueLogEntry({
+  if (!enabled || disabledCategories.has(category)) return;
+  append({
     timestamp: Date.now(),
     level,
     category,
@@ -200,18 +209,19 @@ export function recordDebugLog(
 }
 
 export function clearDebugLogs(): void {
-  debugLog.entries.length = 0;
+  buffer.length = 0;
+  lastEntry = null;
+  notify?.();
 }
 
-export function exportDebugLogs(entries: readonly DebugLogEntry[] = debugLog.entries): string {
+export function exportDebugLogs(entries: readonly DebugLogEntry[] = buffer): string {
+  /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
+  const iso = (value?: number): string => new Date(value ?? Date.now()).toISOString();
   return JSON.stringify(
     {
-      exportedAt: new SvelteDate().toISOString(),
+      exportedAt: iso(),
       logsCount: entries.length,
-      logs: entries.map((entry) => ({
-        ...entry,
-        timestamp: new SvelteDate(entry.timestamp).toISOString(),
-      })),
+      logs: entries.map((entry) => ({ ...entry, timestamp: iso(entry.timestamp) })),
     },
     null,
     2
