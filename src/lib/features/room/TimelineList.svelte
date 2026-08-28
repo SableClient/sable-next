@@ -254,6 +254,11 @@
   }
   const anchor = new TimelineAnchor(anchorViewport);
   let nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * 16;
+  let atLatest = $state(true);
+
+  function refreshAtLatest(): void {
+    atLatest = viewport !== null && isNearLatest(viewport, ANCHOR_EPSILON);
+  }
 
   // The virtualiser's helpers arm `reconcileScroll`, which forces the offset back
   // to its own target for five seconds.
@@ -418,6 +423,7 @@
     const viewportSizeChanged = viewportSize !== virtualizerViewportSize;
     virtualizerTotalSize = totalSize;
     virtualizerViewportSize = viewportSize;
+    refreshAtLatest();
     if (contentSizeChanged) measurementRevision += 1;
     if (contentSizeChanged) correctRollingAnchor();
     // `settling` is driven by the landing loop below, which commits and measures
@@ -528,6 +534,7 @@
     }
     scrollToOffsetNow(node.scrollHeight, 'commit');
     nearLatest = true;
+    atLatest = true;
   }
 
   function unreadLandingKey(): string | null {
@@ -866,6 +873,7 @@
     // Holding an anchor against the user is worse than losing it.
     if (!wasSelfScroll && historyController.hasUserScrollPending) releaseAnchor();
     nearLatest = isNearLatest(viewport, nearLatestPx);
+    refreshAtLatest();
     const movedAway = viewport.scrollTop < previousScrollTop;
     previousScrollTop = viewport.scrollTop;
     refreshRollingAnchor(movedAway && historyController.isScrollGestureActive);
@@ -943,6 +951,7 @@
     recordScroll('jumpToLatest', viewport?.scrollTop ?? -1);
     viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
     nearLatest = true;
+    atLatest = true;
   }
 </script>
 
@@ -1069,7 +1078,7 @@
     {/if}
   </div>
 
-  {#if timeline.mode.kind === 'live' && position.kind === 'anchored' && visibleItems.length > 0}
+  {#if timeline.mode.kind === 'live' && position.kind === 'anchored' && !atLatest && visibleItems.length > 0}
     <Button
       type="button"
       class="jump-to-latest"

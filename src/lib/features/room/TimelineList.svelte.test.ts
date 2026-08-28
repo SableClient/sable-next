@@ -755,6 +755,23 @@ test('scrolling back to the end restores follow mode', async () => {
   await unmount(instance);
 });
 
+test('hides the jump control when a content shrink clamps an anchored reader to the end', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+  expect(anchored()).toBe(true);
+
+  setScrollHeight(1_000);
+  element.scrollTop = 900;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(anchored()).toBe(false);
+  await unmount(instance);
+});
+
 test('a wheel notch inside the band also leaves follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
