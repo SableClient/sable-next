@@ -20,7 +20,7 @@
   }: Props = $props();
 </script>
 
-<div class="auth-status-slot" aria-live="polite">
+<div class="auth-status-slot" class:multiline aria-live="polite">
   {#if loading && loadingMessage}
     <div class="auth-status-message auth-status-loading">
       <Spinner small />
@@ -43,8 +43,12 @@
   .auth-status-slot {
     align-items: center;
     display: flex;
-    height: calc(var(--font-size-small) * var(--line-height-body));
+    min-height: calc(var(--font-size-small) * var(--line-height-body));
     overflow: hidden;
+  }
+
+  .auth-status-slot.multiline {
+    min-height: calc(var(--font-size-small) * var(--line-height-body) * 2);
   }
 
   .auth-status-message {

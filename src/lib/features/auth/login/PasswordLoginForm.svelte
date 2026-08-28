@@ -69,7 +69,7 @@
     />
   </AuthField>
   <div class="submit-area">
-    <AuthStatusSlot id={errorId} message={error} />
+    <AuthStatusSlot id={errorId} message={error} multiline />
     <FormActions>
       <Button type="submit" disabled={isAuthenticating || isCheckingHomeserver} variant="primary">
         {#if isAuthenticating}<Spinner />{/if}{isAuthenticating
