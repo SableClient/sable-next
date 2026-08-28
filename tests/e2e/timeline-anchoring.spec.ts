@@ -100,7 +100,7 @@ test('falls back to a surviving visible anchor when the first row is replaced', 
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
 
   await timeline.wheelUp(200);
   await expect(timeline.jumpToLatest).toBeVisible();
@@ -132,7 +132,7 @@ test('anchors a large reset by surviving event identity', async ({
   await app.openHome();
   await app.openRoomFromList('General');
   await expect(timeline.message(LATEST)).toBeVisible();
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
 
   const subscription = await core.subscription();
   const initialHistory = historyItems({
@@ -354,7 +354,7 @@ test('keeps a local echo and the visible position stable through confirmation', 
   });
 
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
-  const anchor = await timeline.anchorAt(2, { visibleOnly: true });
+  const anchor = await timeline.fullyVisibleAnchor();
 
   await core.setTimelineItemById(subscription, 'local-echo', {
     ...localEcho,
@@ -426,7 +426,7 @@ test('anchors at latest after delayed initial history arrives', async ({
 
   await expect(timeline.message('Delayed history 0')).toBeVisible({ timeout: 2_000 });
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
 });
 
 test('anchors delayed history inserted after a stable date divider', async ({
@@ -440,7 +440,7 @@ test('anchors delayed history inserted after a stable date divider', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
 
   const anchor = timeline.itemByEventId('$general-0:example.test');
   await timeline.wheelUp(200);
@@ -467,7 +467,7 @@ test('anchors delayed history from a nonzero oldest-threshold offset', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
 
   await timeline.wheelUp(200);
   await expect(timeline.jumpToLatest).toBeVisible();
@@ -498,7 +498,7 @@ test('stays at the newest message when history lands in a room that fits', async
   await page.setViewportSize({ width: 1280, height: 1200 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => timeline.scrollableHeight()).toBe(0);
 
   await timeline.wheelUp(200);
@@ -528,7 +528,7 @@ test('opens at the first unread message rather than the newest', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
 
   await expect(timeline.message('General message 5')).toBeVisible();
   await expect(timeline.jumpToLatest).toBeVisible();
@@ -546,7 +546,7 @@ test('follows an appended event while a pointer rests on the timeline', async ({
   await page.setViewportSize({ width: 1280, height: 500 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => timeline.scrollableHeight()).toBeGreaterThan(100);
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
@@ -574,7 +574,7 @@ test('follows a sent message from a room opened on its first unread', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect(timeline.jumpToLatest).toBeVisible();
 
   const subscription = await core.subscription();
@@ -606,7 +606,7 @@ test('follows a sent message after a wheel that could not scroll', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   await timeline.wheelUp(-200);

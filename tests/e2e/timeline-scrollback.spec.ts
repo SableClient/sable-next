@@ -21,7 +21,7 @@ test.fixme('holds the anchor through a long scroll back', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
 
   for (let round = 0; round < PAGES; round += 1) {
@@ -86,7 +86,7 @@ test('holds the reader when a prepend regroups the row above them', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
 
   const before = await core.paginateCount();

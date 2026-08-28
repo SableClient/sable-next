@@ -48,6 +48,10 @@ export class RoomTimeline {
     return this.page.locator(`[data-index="${String(index)}"]`);
   }
 
+  async expectRevealed(): Promise<void> {
+    await expect(this.container).not.toHaveClass(/initial/);
+  }
+
   visibleItems(): Locator {
     return this.items.filter({ visible: true });
   }
@@ -200,10 +204,13 @@ export class RoomTimeline {
 
   async expectAnchorHeld(anchor: TimelineAnchor, { tolerance = 0.5 } = {}): Promise<void> {
     await expect
-      .poll(async () => {
-        const box = await this.itemById(anchor.itemId).boundingBox();
-        return box ? Math.abs(box.y - anchor.y) : Number.POSITIVE_INFINITY;
-      })
+      .poll(
+        async () => {
+          const box = await this.itemById(anchor.itemId).boundingBox();
+          return box ? Math.abs(box.y - anchor.y) : Number.POSITIVE_INFINITY;
+        },
+        { message: `anchor ${anchor.itemId} left ${String(anchor.y)}` }
+      )
       .toBeLessThanOrEqual(tolerance);
   }
 

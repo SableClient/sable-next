@@ -15,8 +15,9 @@ test('an edit above the viewport does not move the reader', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   // Away from the end, so this is the anchor's job, not follow-to-bottom.
   await timeline.wheelUp(200);
@@ -51,8 +52,9 @@ test('a deletion above the viewport does not move the reader', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   // Away from the end, so this is the anchor's job, not follow-to-bottom.
   await timeline.wheelUp(200);
@@ -78,8 +80,9 @@ test('history inserted above the viewport does not move the reader', async ({
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   // Away from the end, so this is the anchor's job, not follow-to-bottom.
   await timeline.wheelUp(200);
@@ -112,7 +115,7 @@ test('an image without dimensions takes the file shape without losing the newest
   await page.setViewportSize({ width: 1280, height: 900 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
 
   const subscription = await core.subscription();
@@ -144,4 +147,35 @@ test('an image without dimensions takes the file shape without losing the newest
 
   expect(loaded.width / loaded.height).toBeCloseTo(1000 / 400, 1);
   await timeline.expectAtLatest('General message 19');
+});
+
+test('an edited message keeps its marker on the body line', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await app.openHome();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+
+  const plain = timelineItem('marker-plain', 'Marker plain');
+  const edited = timelineItem('marker-edited', 'Marker edited');
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    { op: 'push_back', value: plain },
+    { op: 'push_back', value: { ...edited, content: { ...edited.content, edited: true } } },
+  ]);
+
+  await expect(timeline.itemById('marker-edited')).toBeVisible();
+  const [plainBox, editedBox] = await Promise.all([
+    timeline.itemById('marker-plain').boundingBox(),
+    timeline.itemById('marker-edited').boundingBox(),
+  ]);
+  if (!plainBox || !editedBox) throw new Error('missing marker row bounds');
+
+  expect(editedBox.height).toBeCloseTo(plainBox.height, 0);
 });

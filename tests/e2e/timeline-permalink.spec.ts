@@ -17,7 +17,7 @@ test('jumps to an event outside the loaded range', async ({
   await page.setViewportSize({ width: 1280, height: 900 });
   await app.openHome();
   await app.openRoomFromList('General');
-  await expect(timeline.initial).toHaveCount(0);
+  await timeline.expectRevealed();
   await expect.poll(() => core.subscribeCount()).toBe(1);
 
   const subscription = await core.subscription();

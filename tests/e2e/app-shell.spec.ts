@@ -252,9 +252,13 @@ test('preserves the visible history position when the mobile viewport resizes', 
   // History streams in after the first paint, so there is nothing to scroll
   // until the timeline overflows.
   await expect.poll(() => timeline.scrollableHeight(), { timeout: 15_000 }).toBeGreaterThan(300);
-  await timeline.wheelUp(300);
-  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(80);
-  const anchor = await timeline.anchorAt(0, { visibleOnly: true });
+  await expect
+    .poll(async () => {
+      await timeline.wheelUp(300);
+      return timeline.distanceFromBottom();
+    })
+    .toBeGreaterThan(80);
+  const anchor = await timeline.fullyVisibleAnchor();
 
   await page.setViewportSize({ width: 390, height: 320 });
 
