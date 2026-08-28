@@ -599,7 +599,12 @@
               <FormattedBody html={item.content.html} {onMatrixLink} />
             </div>
           {:else if item.content.kind === 'message'}
-            <div class={[jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`, { notice }]}>
+            <div
+              class={[
+                jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
+                { notice, 'has-edited': item.content.edited },
+              ]}
+            >
               <FormattedBody html={item.content.html} {onMatrixLink} />
               <!-- Trails the body, where the edit happened, not the header. -->
               {#if item.content.edited}
@@ -1088,6 +1093,10 @@
   }
 
   .emote :global(.formatted-body) {
+    display: inline;
+  }
+
+  .has-edited :global(.formatted-body) {
     display: inline;
   }
 
