@@ -923,6 +923,21 @@
     };
   }
 
+  function refreshAfterVisibilityChange(): void {
+    if (document.visibilityState !== 'visible') return;
+    requestAnimationFrame(() => {
+      if (document.visibilityState !== 'visible' || !viewport) return;
+      const instance = get(virtualizer);
+      instance.scrollRect = {
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      };
+      instance.measure();
+      refreshAtLatest();
+      if (position.kind === 'pinned') scheduleCommit();
+    });
+  }
+
   function setPersonaOpen(open: boolean): void {
     personaOpen = open;
   }
@@ -954,6 +969,8 @@
     atLatest = true;
   }
 </script>
+
+<svelte:window onvisibilitychange={refreshAfterVisibilityChange} />
 
 <TimelineReadReceipt {timeline} visibleEventId={readEventId} {onRead} />
 
