@@ -8,12 +8,16 @@
 
   import type { CallSupportView } from '#src/generated/CallSupportView';
 
+  import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
+
   import { useCoreClient } from '#lib/core/context.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
   import { Conversation } from './conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
+  import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { matrixToUrl, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
     findRoomByPathId,
@@ -26,6 +30,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import CallView from '#lib/features/call/CallView.svelte';
@@ -91,6 +96,12 @@
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
   let callSupport = $state<CallSupportView | null>(null);
+  let widgetsOpen = $state(false);
+  let widgets = $state.raw<RoomWidget[]>([]);
+
+  let ownMember = $derived(
+    memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
+  );
 
   let mediaItems = $derived(
     timeline.items.flatMap((entry) => {
@@ -246,6 +257,22 @@
   });
 
   $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    widgets = [];
+    let current = true;
+    void loadWidgets(activeRoomId)
+      .then((next) => {
+        if (current) widgets = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] widgets unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  $effect(() => {
     if (desktop && desktopMembersOpen) void loadMembers();
   });
 
@@ -314,6 +341,32 @@
   function closeMembers(): void {
     if (desktop) desktopMembersOpen = false;
     else membersOpen = false;
+  }
+
+  async function loadWidgets(activeRoomId: string): Promise<RoomWidget[]> {
+    const events = await core.commands.roomStateEvents(activeRoomId, 'im.vector.modular.widgets');
+    return events.flatMap((event) => {
+      const widget = parseRoomWidget(event.state_key, event.content);
+      return widget ? [widget] : [];
+    });
+  }
+
+  function toggleWidgets(): void {
+    widgetsOpen = !widgetsOpen;
+  }
+
+  function closeWidgets(): void {
+    widgetsOpen = false;
+  }
+
+  async function removeWidget(widgetId: string): Promise<void> {
+    const activeRoomId = resolvedRoomId;
+    try {
+      await core.commands.sendStateEvent(activeRoomId, 'im.vector.modular.widgets', widgetId, {});
+      widgets = await loadWidgets(activeRoomId);
+    } catch (error) {
+      console.warn('[sable room] remove widget failed', error);
+    }
   }
 
   function openSearch(): void {
@@ -489,6 +542,16 @@
         />
       {/snippet}
       {#snippet menu()}
+        {#if widgets.length > 0}
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('widgets.label')}
+            onclick={toggleWidgets}
+          >
+            <GridFourIcon />
+          </IconButton>
+        {/if}
         <RoomHeaderMenu
           room={resolvedRoom ?? null}
           canInvite={permissions?.can_invite ?? false}
@@ -596,6 +659,18 @@
         onMemberProfile={openProfile}
       />
     {/if}
+    {#if widgetsOpen}
+      <WidgetsPanel
+        roomId={resolvedRoomId}
+        {widgets}
+        userId={core.session?.user_id ?? ''}
+        displayName={ownMember?.display_name ?? core.session?.user_id ?? ''}
+        avatarUrl={ownMember?.avatar_url ?? ''}
+        canManage={permissions?.can_change_settings ?? false}
+        onClose={closeWidgets}
+        onRemove={removeWidget}
+      />
+    {/if}
   {:else}
     <DialogFrame bind:open={membersOpen} variant="drawer">
       <MembersDrawer
@@ -633,6 +708,28 @@
           />
         {/key}
       {/if}
+    </DialogFrame>
+  {/if}
+
+  {#if !desktop}
+    <DialogFrame
+      open={widgetsOpen}
+      onOpenChange={(open: boolean) => {
+        if (!open) closeWidgets();
+      }}
+      variant="drawer"
+    >
+      <WidgetsPanel
+        roomId={resolvedRoomId}
+        {widgets}
+        userId={core.session?.user_id ?? ''}
+        displayName={ownMember?.display_name ?? core.session?.user_id ?? ''}
+        avatarUrl={ownMember?.avatar_url ?? ''}
+        canManage={permissions?.can_change_settings ?? false}
+        modal
+        onClose={closeWidgets}
+        onRemove={removeWidget}
+      />
     </DialogFrame>
   {/if}
 

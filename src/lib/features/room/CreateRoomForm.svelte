@@ -10,7 +10,9 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import type { CreateJoinRuleView } from '#src/generated/CreateJoinRuleView';
   import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
+  import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
   import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -21,6 +23,10 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+
+  import { validateRoomAliasLocalpart, type RoomAliasLocalpartError } from './room-alias-localpart';
+
+  type PrivateJoinRule = Exclude<CreateJoinRuleView, 'public'>;
 
   interface Props {
     /** Preselects the parent space, so creating from inside a space stays there. */
@@ -41,6 +47,11 @@
   // it until the user picks something else.
   let parentChoice = $state<string | null>(null);
   let parentSpace = $derived(parentChoice ?? parentSpaceId ?? '');
+  let joinRuleChoice = $state<PrivateJoinRule>('invite');
+  let alias = $state('');
+  let roomVersionChoice = $state('');
+  let federate = $state(true);
+  let roomVersions = $state.raw<RoomVersionsView | null>(null);
   let inviteDraft = $state('');
   let invites = $state<string[]>([]);
   let inviteInvalid = $state(false);
@@ -50,7 +61,74 @@
   let spaces = $derived(roomList.rooms.filter((room) => room.is_space && room.state === 'joined'));
   // The core ignores `encrypted` for a space or a public room.
   let encryptable = $derived(kind !== 'space' && access === 'private');
-  let canSubmit = $derived(name.trim() !== '' && !submitting);
+  let parentSpaceSummary = $derived(spaces.find((space) => space.room_id === parentSpace) ?? null);
+  let knockSupported = $derived(roomList.rooms.some((room) => room.supports_knock));
+  let restrictedSupported = $derived(parentSpaceSummary?.supports_restricted ?? false);
+  let knockRestrictedSupported = $derived(parentSpaceSummary?.supports_knock_restricted ?? false);
+  let effectiveJoinRule: PrivateJoinRule = $derived.by(() => {
+    if (joinRuleChoice === 'knock' && !knockSupported) return 'invite';
+    if (joinRuleChoice === 'restricted' && !restrictedSupported) return 'invite';
+    if (joinRuleChoice === 'knock_restricted' && !knockRestrictedSupported) return 'invite';
+    return joinRuleChoice;
+  });
+  let joinRuleToSend: CreateJoinRuleView | null = $derived(
+    access === 'public' || effectiveJoinRule === 'invite' ? null : effectiveJoinRule
+  );
+  let aliasTrimmed = $derived(alias.trim());
+  let aliasError: RoomAliasLocalpartError | null = $derived(
+    access === 'public' && aliasTrimmed !== '' ? validateRoomAliasLocalpart(aliasTrimmed) : null
+  );
+  let aliasToSend = $derived(access === 'public' && aliasTrimmed !== '' ? aliasTrimmed : null);
+  let roomVersionToSend = $derived(roomVersionChoice === '' ? null : roomVersionChoice);
+  let versionItems = $derived([
+    {
+      value: '',
+      label: roomVersions
+        ? $i18n.t('room.createVersionDefault', { version: roomVersions.default })
+        : $i18n.t('room.createVersionDefaultUnknown'),
+    },
+    ...(roomVersions?.available ?? []).map((entry) => ({
+      value: entry.id,
+      label: entry.stable ? entry.id : $i18n.t('room.createVersionUnstable', { version: entry.id }),
+    })),
+  ]);
+  let canSubmit = $derived(name.trim() !== '' && aliasError === null && !submitting);
+
+  $effect(() => {
+    let cancelled = false;
+    core.commands
+      .roomVersions()
+      .then((result) => {
+        if (!cancelled) roomVersions = result;
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) console.warn('[sable room] room versions unavailable', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  function aliasErrorMessageKey(error: RoomAliasLocalpartError): string {
+    switch (error) {
+      case 'empty':
+        return 'room.createAliasInvalidEmpty';
+      case 'colon':
+        return 'room.createAliasInvalidColon';
+      case 'whitespace':
+        return 'room.createAliasInvalidWhitespace';
+      case 'control':
+        return 'room.createAliasInvalidControl';
+    }
+  }
+
+  function joinRuleHint(keyStem: string): string {
+    return parentSpaceSummary
+      ? $i18n.t(`room.${keyStem}Hint`, {
+          space: parentSpaceSummary.name ?? parentSpaceSummary.room_id,
+        })
+      : $i18n.t('room.createJoinRuleRequiresSpace');
+  }
 
   function addInvite(): void {
     const candidate = inviteDraft.trim();
@@ -91,6 +169,10 @@
         // A `$state` array is a Proxy, which postMessage cannot clone.
         invite: [...invites],
         parentSpace: parentSpace === '' ? null : parentSpace,
+        alias: aliasToSend,
+        roomVersion: roomVersionToSend,
+        joinRule: joinRuleToSend,
+        federate,
       });
       const target = roomPathParamFromId(roomId);
       if (kind === 'space') {
@@ -168,6 +250,23 @@
     />
   </div>
 
+  {#if spaces.length > 0}
+    <div class="field">
+      <Label for="create-room-parent">{$i18n.t('room.createParentLabel')}</Label>
+      <Select
+        id="create-room-parent"
+        value={parentSpace}
+        items={[
+          { value: '', label: $i18n.t('room.createParentNone') },
+          ...spaces.map((space) => ({ value: space.room_id, label: space.name ?? space.room_id })),
+        ]}
+        onValueChange={(value: string) => {
+          parentChoice = value;
+        }}
+      />
+    </div>
+  {/if}
+
   <div class="field">
     <span class="field-label">{$i18n.t('room.createAccessLabel')}</span>
     <OptionCards
@@ -193,6 +292,62 @@
     />
   </div>
 
+  {#if access === 'private'}
+    <div class="field">
+      <span class="field-label">{$i18n.t('room.createJoinRuleLabel')}</span>
+      <OptionCards
+        label={$i18n.t('room.createJoinRuleLabel')}
+        value={effectiveJoinRule}
+        onSelect={(next: PrivateJoinRule) => {
+          joinRuleChoice = next;
+        }}
+        options={[
+          {
+            value: 'invite',
+            label: $i18n.t('room.createJoinRuleInvite'),
+            hint: $i18n.t('room.createJoinRuleInviteHint'),
+          },
+          {
+            value: 'knock',
+            label: $i18n.t('room.createJoinRuleKnock'),
+            hint: $i18n.t('room.createJoinRuleKnockHint'),
+            disabled: !knockSupported,
+          },
+          {
+            value: 'restricted',
+            label: $i18n.t('room.createJoinRuleRestricted'),
+            hint: joinRuleHint('createJoinRuleRestricted'),
+            disabled: !restrictedSupported,
+          },
+          {
+            value: 'knock_restricted',
+            label: $i18n.t('room.createJoinRuleKnockRestricted'),
+            hint: joinRuleHint('createJoinRuleKnockRestricted'),
+            disabled: !knockRestrictedSupported,
+          },
+        ]}
+      />
+    </div>
+  {/if}
+
+  {#if access === 'public'}
+    <div class="field">
+      <Label for="create-room-alias">{$i18n.t('room.createAliasLabel')}</Label>
+      <TextInput
+        id="create-room-alias"
+        bind:value={alias}
+        autocomplete="off"
+        placeholder={$i18n.t('room.createAliasPlaceholder')}
+        aria-invalid={aliasError !== null}
+      />
+      {#if aliasError}
+        <p class="error">{$i18n.t(aliasErrorMessageKey(aliasError))}</p>
+      {:else}
+        <p class="hint">{$i18n.t('room.createAliasHint')}</p>
+      {/if}
+    </div>
+  {/if}
+
   <div class="row">
     <div class="row-text">
       <span class="field-label">{$i18n.t('room.createEncryptionLabel')}</span>
@@ -212,22 +367,36 @@
     />
   </div>
 
-  {#if spaces.length > 0}
-    <div class="field">
-      <Label for="create-room-parent">{$i18n.t('room.createParentLabel')}</Label>
-      <Select
-        id="create-room-parent"
-        value={parentSpace}
-        items={[
-          { value: '', label: $i18n.t('room.createParentNone') },
-          ...spaces.map((space) => ({ value: space.room_id, label: space.name ?? space.room_id })),
-        ]}
-        onValueChange={(value: string) => {
-          parentChoice = value;
-        }}
-      />
+  <details class="advanced">
+    <summary>{$i18n.t('room.createAdvancedLabel')}</summary>
+    <div class="advanced-content">
+      <div class="row">
+        <div class="row-text">
+          <span class="field-label">{$i18n.t('room.createFederationLabel')}</span>
+          <p class="hint">{$i18n.t('room.createFederationHint')}</p>
+        </div>
+        <Switch
+          checked={federate}
+          label={$i18n.t('room.createFederationLabel')}
+          onCheckedChange={(next: boolean) => {
+            federate = next;
+          }}
+        />
+      </div>
+
+      <div class="field">
+        <Label for="create-room-version">{$i18n.t('room.createVersionLabel')}</Label>
+        <Select
+          id="create-room-version"
+          value={roomVersionChoice}
+          items={versionItems}
+          onValueChange={(value: string) => {
+            roomVersionChoice = value;
+          }}
+        />
+      </div>
     </div>
-  {/if}
+  </details>
 
   <div class="field">
     <Label for="create-room-invite">{$i18n.t('room.createInviteLabel')}</Label>
@@ -308,6 +477,7 @@
   .row {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-3);
     justify-content: space-between;
   }
@@ -318,8 +488,30 @@
     min-width: 0;
   }
 
+  .advanced {
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radii-400);
+  }
+
+  .advanced summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    min-height: 2.75rem;
+    padding: var(--space-300);
+  }
+
+  .advanced-content {
+    display: grid;
+    gap: var(--space-4);
+    padding: 0 var(--space-300) var(--space-300);
+  }
+
   .invite-row {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
 

@@ -5,6 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import { type NotificationFilter, parseFilter } from './inbox';
+  import BookmarkList from './BookmarkList.svelte';
   import InviteList from './InviteList.svelte';
   import NotificationList from './NotificationList.svelte';
 
@@ -41,6 +42,7 @@
     <div class="inbox">
       <InviteList />
       <NotificationList {filter} onFilter={selectFilter} />
+      <BookmarkList />
     </div>
   </AppPageShell>
 {:else}

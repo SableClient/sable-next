@@ -2,10 +2,13 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
+  import { blurhashDataUrl } from '#lib/ui/blurhash.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+
+  const BLURHASH_POSTER_WIDTH = 32;
 
   interface Props {
     source: string;
@@ -15,6 +18,7 @@
     width?: number | null;
     height?: number | null;
     size?: number | null;
+    blurhash?: string | null;
     class?: string;
   }
 
@@ -26,6 +30,7 @@
     width = null,
     height = null,
     size = null,
+    blurhash = null,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -59,6 +64,20 @@
         ? '16 / 9'
         : undefined
   );
+  let posterUrl = $derived.by(() => {
+    if (blurhash === null) return undefined;
+    const ratio =
+      typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0
+        ? width / height
+        : 16 / 9;
+    const posterHeight = Math.max(1, Math.round(BLURHASH_POSTER_WIDTH / ratio));
+    try {
+      return blurhashDataUrl(blurhash, BLURHASH_POSTER_WIDTH, posterHeight) ?? undefined;
+    } catch (error) {
+      console.debug('[sable media] the blurhash poster could not be decoded', error);
+      return undefined;
+    }
+  });
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
@@ -146,6 +165,7 @@
         class="media-content media-video"
         controls
         src={url}
+        poster={posterUrl}
         width={width ?? undefined}
         height={height ?? undefined}
         style:aspect-ratio={aspectRatio}

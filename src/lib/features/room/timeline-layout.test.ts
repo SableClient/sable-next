@@ -52,8 +52,17 @@ function media(
             mime: null,
             width,
             height,
+            blurhash: null,
           }
-        : { kind, body: '', source: 'mxc://example.org/media', mime: null, width, height },
+        : {
+            kind,
+            body: '',
+            source: 'mxc://example.org/media',
+            mime: null,
+            width,
+            height,
+            blurhash: null,
+          },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -179,8 +188,9 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
     case 'message':
       return { kind, body: 'hi', html: 'hi', emote: false, notice: false, edited: false };
     case 'image':
-      return { kind, filename: null, ...media };
+      return { kind, filename: null, ...media, blurhash: null };
     case 'video':
+      return { kind, ...media, blurhash: null };
     case 'sticker':
       return { kind, ...media };
     case 'audio':
@@ -204,7 +214,7 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
         },
       };
     case 'redacted':
-      return { kind };
+      return { kind, reason: null };
     case 'unable_to_decrypt':
       return { kind, reason: 'undecryptable' };
     case 'membership':

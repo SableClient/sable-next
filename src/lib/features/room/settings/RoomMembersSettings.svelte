@@ -6,12 +6,14 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
+  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -27,6 +29,7 @@
 
   let { room, permissions }: Props = $props();
   const core = useCoreClient();
+  const presenceStore = usePresenceStore();
 
   const tabs: readonly { id: MembershipView; label: string }[] = [
     { id: 'join', label: 'room.membersJoined' },
@@ -218,6 +221,7 @@
     >
       <ul class="settings-rows">
         {#each shown as member (member.user_id)}
+          {@const presence = presenceStore.get(member.user_id)}
           <li class="settings-row">
             <IdentityRow
               class="member"
@@ -226,6 +230,14 @@
               color={senderColor(member.user_id)}
             >
               {#snippet meta()}
+                {#if presence}
+                  <span class="member-presence">
+                    <PresenceDot
+                      presence={presence.presence}
+                      label={$i18n.t(`presence.${presence.presence}`)}
+                    />
+                  </span>
+                {/if}
                 <span class="user-id">{member.user_id}</span>
               {/snippet}
             </IdentityRow>
@@ -386,6 +398,12 @@
   .user-id {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  .member-presence {
+    align-items: center;
+    display: inline-flex;
+    margin-right: var(--space-100);
   }
 
   .power {

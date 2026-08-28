@@ -1,8 +1,9 @@
+import { encodeBlurhash } from '#lib/ui/blurhash.js';
 import type { AttachmentInfoView } from '#src/generated/AttachmentInfoView';
 
 const MEASURE_TIMEOUT_MS = 5_000;
 
-type Size = { width: number; height: number };
+type Size = { width: number; height: number; blurhash: string | null };
 
 export async function measureAttachment(file: Blob): Promise<AttachmentInfoView | null> {
   const kind = file.type.split('/')[0];
@@ -15,7 +16,7 @@ export async function measureAttachment(file: Blob): Promise<AttachmentInfoView 
   if (kind === 'video' || kind === 'audio') {
     const metadata = await mediaMetadata(file, kind);
     if (metadata === null) return null;
-    return { ...metadata, animated: null };
+    return { ...metadata, animated: null, blurhash: null };
   }
 
   return null;
@@ -33,7 +34,13 @@ async function imageSize(file: Blob): Promise<Size | null> {
   try {
     const bitmap = await createImageBitmap(file);
     try {
-      return { width: bitmap.width, height: bitmap.height };
+      let blurhash: string | null = null;
+      try {
+        blurhash = encodeBlurhash(bitmap);
+      } catch (error) {
+        console.debug('[sable media] the blurhash could not be encoded', error);
+      }
+      return { width: bitmap.width, height: bitmap.height, blurhash };
     } finally {
       bitmap.close();
     }

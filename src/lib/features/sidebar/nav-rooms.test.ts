@@ -9,6 +9,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     room_id: '!r',
     is_space: false,
     is_direct: false,
+    direct_targets: [],
     state: 'joined',
     is_tombstoned: false,
     space_children: [],

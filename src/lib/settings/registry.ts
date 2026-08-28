@@ -392,7 +392,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.sendPresence',
         description: 'settings.sendPresenceHint',
         type: 'boolean',
-        unavailable: true,
       },
       ...telemetrySettings,
     ],

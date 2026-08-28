@@ -54,6 +54,9 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.canonical_alias ?? room.room_id),
   roomPathParamFromId: (roomId: string) => encodeURIComponent(roomId),
 }));
+vi.mock('#lib/rooms/presence.svelte.js', () => ({
+  usePresenceStore: () => ({ get: () => null }),
+}));
 
 import RoomNav from './RoomNav.svelte';
 
@@ -65,6 +68,7 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     topic: null,
     avatar_url: null,
     is_direct: false,
+    direct_targets: [],
     join_rule: 'invite',
     tags: [],
     state: 'joined',
@@ -218,6 +222,7 @@ test('direct page lists joined direct rooms only', async () => {
       room_id: '!invited-dm:example.org',
       name: 'Invited DM',
       is_direct: true,
+      direct_targets: [],
       state: 'invited',
     }),
     makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),

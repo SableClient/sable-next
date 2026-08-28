@@ -5,7 +5,7 @@ import type { RoomStateView } from "./RoomStateView";
 import type { RoomTag } from "./RoomTag";
 import type { SpaceChildEdge } from "./SpaceChildEdge";
 
-export type RoomSummary = { room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_direct: boolean, join_rule: RoomJoinRuleView, 
+export type RoomSummary = { room_id: string, canonical_alias: string | null, name: string | null, topic: string | null, avatar_url: string | null, is_direct: boolean, direct_targets: string[], join_rule: RoomJoinRuleView, 
 /**
  * Only the tags this client models; others are dropped.
  */

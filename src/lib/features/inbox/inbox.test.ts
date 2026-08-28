@@ -1,10 +1,12 @@
 import { expect, test } from 'vitest';
 
+import type { BookmarkView } from '#src/generated/BookmarkView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
 import {
   countInvites,
   countNotifications,
+  filteredBookmarks,
   inviter,
   notifications,
   parseFilter,
@@ -20,6 +22,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     topic: null,
     avatar_url: null,
     is_direct: false,
+    direct_targets: [],
     join_rule: 'invite',
     tags: [],
     state: 'joined',
@@ -130,4 +133,50 @@ test('the inviter comes from the invitation event', () => {
   expect(inviter(room({ state: 'invited' }))).toBeNull();
   expect(senderName('@ada:example.org')).toBe('ada');
   expect(senderName('ada')).toBe('ada');
+});
+
+function bookmark(overrides: Partial<BookmarkView>): BookmarkView {
+  return {
+    bookmark_id: 'bmk_one',
+    room_id: '!room:example.org',
+    event_id: '$one',
+    room_name: null,
+    sender: null,
+    body_preview: null,
+    event_ts: 0,
+    bookmarked_ts: 0,
+    ...overrides,
+  };
+}
+
+test('bookmarks are ordered newest-saved first', () => {
+  const bookmarks = [
+    bookmark({ bookmark_id: 'bmk_old', bookmarked_ts: 10 }),
+    bookmark({ bookmark_id: 'bmk_new', bookmarked_ts: 20 }),
+  ];
+
+  expect(filteredBookmarks(bookmarks, '').map((each) => each.bookmark_id)).toEqual([
+    'bmk_new',
+    'bmk_old',
+  ]);
+});
+
+test('a bookmark search matches the room, the sender or the preview', () => {
+  const bookmarks = [
+    bookmark({ bookmark_id: 'bmk_room', room_name: 'Kittens' }),
+    bookmark({ bookmark_id: 'bmk_sender', sender: '@ada:example.org' }),
+    bookmark({ bookmark_id: 'bmk_preview', body_preview: 'deploy the release' }),
+    bookmark({ bookmark_id: 'bmk_none' }),
+  ];
+
+  expect(filteredBookmarks(bookmarks, 'kitt').map((each) => each.bookmark_id)).toEqual([
+    'bmk_room',
+  ]);
+  expect(filteredBookmarks(bookmarks, 'ada').map((each) => each.bookmark_id)).toEqual([
+    'bmk_sender',
+  ]);
+  expect(filteredBookmarks(bookmarks, 'deploy').map((each) => each.bookmark_id)).toEqual([
+    'bmk_preview',
+  ]);
+  expect(filteredBookmarks(bookmarks, '').map((each) => each.bookmark_id)).toHaveLength(4);
 });

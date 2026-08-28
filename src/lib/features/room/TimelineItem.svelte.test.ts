@@ -67,6 +67,7 @@ function imageItem(): TimelineItemView {
       mime: 'image/png',
       width: 800,
       height: 600,
+      blurhash: null,
     },
   };
 }
@@ -311,7 +312,7 @@ test('long pressing a reaction opens its people list without toggling it', async
 
 test('renders a redacted row and a worded state change without throwing', async () => {
   for (const content of [
-    { kind: 'redacted' } as const,
+    { kind: 'redacted', reason: null } as const,
     {
       kind: 'state_event',
       event_type: 'm.room.topic',

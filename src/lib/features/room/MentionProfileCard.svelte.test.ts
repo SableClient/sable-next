@@ -28,6 +28,13 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
 }));
 
+vi.mock('#lib/rooms/presence.svelte.js', async () => {
+  const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(
+    '#lib/rooms/presence.svelte.js'
+  );
+  return { ...actual, usePresenceStore: () => ({ get: () => null }) };
+});
+
 import MentionProfileCard from './MentionProfileCard.svelte';
 
 const emptyProfile: ProfileView = {

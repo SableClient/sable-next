@@ -33,6 +33,7 @@ const imageItem: MediaItem = {
   mime: 'image/png',
   width: 1600,
   height: 900,
+  blurhash: null,
   eventId: '$image',
   sender: 'Alice',
 };
@@ -44,6 +45,7 @@ const videoItem: MediaItem = {
   mime: 'video/mp4',
   width: 640,
   height: 360,
+  blurhash: null,
   eventId: '$video',
   sender: 'Alice',
 };

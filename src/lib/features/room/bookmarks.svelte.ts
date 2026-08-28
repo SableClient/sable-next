@@ -12,11 +12,16 @@ function bookmarkKey(roomId: string, eventId: string): string {
 
 export class Bookmarks {
   readonly #keys = new SvelteSet<string>();
+  #entries = $state.raw<BookmarkView[]>([]);
   #loaded = false;
   #inFlight: Promise<void> | null = null;
   #revision = 0;
 
   constructor(private readonly commands: BookmarkCommands) {}
+
+  get entries(): readonly BookmarkView[] {
+    return this.#entries;
+  }
 
   has(roomId: string, eventId: string | null | undefined): boolean {
     return (
@@ -35,8 +40,15 @@ export class Bookmarks {
     const bookmarked = await this.commands.setBookmark(roomId, eventId, !this.#keys.has(key));
 
     this.#revision += 1;
-    if (bookmarked) this.#keys.add(key);
-    else this.#keys.delete(key);
+    if (bookmarked) {
+      this.#keys.add(key);
+      this.#loaded = false;
+    } else {
+      this.#keys.delete(key);
+      this.#entries = this.#entries.filter(
+        (entry) => bookmarkKey(entry.room_id, entry.event_id) !== key
+      );
+    }
   }
 
   async #fetch(): Promise<void> {
@@ -59,6 +71,7 @@ export class Bookmarks {
     for (const bookmark of bookmarks) {
       this.#keys.add(bookmarkKey(bookmark.room_id, bookmark.event_id));
     }
+    this.#entries = [...bookmarks];
   }
 }
 

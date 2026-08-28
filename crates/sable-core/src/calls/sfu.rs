@@ -41,7 +41,7 @@ pub(crate) struct Provisioned {
 }
 
 fn http_client() -> Option<matrix_sdk::reqwest::Client> {
-    let builder = matrix_sdk::reqwest::Client::builder();
+    let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
     #[cfg(not(target_family = "wasm"))]
     let builder = builder.timeout(PROVISION_TIMEOUT);
     builder.build().ok()

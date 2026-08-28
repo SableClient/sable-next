@@ -185,6 +185,7 @@ function summary(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSumm
     topic: null,
     avatar_url: null,
     is_direct: false,
+    direct_targets: [],
     join_rule: 'public',
     tags: [],
     state: 'joined',

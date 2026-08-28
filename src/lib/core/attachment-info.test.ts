@@ -55,7 +55,27 @@ test('an image reports the decoded dimensions', async () => {
     height: 720,
     duration_ms: null,
     animated: false,
+    blurhash: null,
   });
+});
+
+test('a decodable image gets a blurhash', async () => {
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(() => Promise.resolve({ width: 8, height: 8, close: () => {} }))
+  );
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: () => {},
+    getImageData: (_x: number, _y: number, width: number, height: number) => ({
+      data: new Uint8ClampedArray(width * height * 4).fill(128),
+      width,
+      height,
+    }),
+  } as unknown as CanvasRenderingContext2D);
+
+  const result = await measureAttachment(file('image/png'));
+  expect(typeof result?.blurhash).toBe('string');
+  expect(result?.blurhash).not.toBeNull();
 });
 
 test('a GIF is animated, and a WebP is left undecided', async () => {
@@ -85,6 +105,7 @@ test('a video reports dimensions and a duration in milliseconds', async () => {
     height: 1080,
     duration_ms: 12_340,
     animated: null,
+    blurhash: null,
   });
 });
 
@@ -102,6 +123,7 @@ test('audio reports a duration and no dimensions', async () => {
     height: null,
     duration_ms: 5000,
     animated: null,
+    blurhash: null,
   });
 });
 

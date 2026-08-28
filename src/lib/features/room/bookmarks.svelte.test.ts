@@ -117,6 +117,47 @@ test('a slow load cannot undo a toggle that raced it', async () => {
   expect(bookmarks).toHaveBeenCalledTimes(2);
 });
 
+test('load exposes the fetched bookmarks in full', async () => {
+  const one = bookmark('!a:example.org', '$one');
+  const store = new Bookmarks(fakeCore(vi.fn(() => Promise.resolve([one]))));
+
+  await store.load();
+
+  expect(store.entries).toEqual([one]);
+});
+
+test('removing a bookmark drops it from entries immediately', async () => {
+  const one = bookmark('!a:example.org', '$one');
+  const setBookmark = vi.fn(() => Promise.resolve(false));
+  const store = new Bookmarks(
+    fakeCore(
+      vi.fn(() => Promise.resolve([one])),
+      setBookmark
+    )
+  );
+
+  await store.load();
+  await store.toggle('!a:example.org', '$one');
+
+  expect(store.entries).toEqual([]);
+});
+
+test('adding a bookmark invalidates the list so the next load refetches it', async () => {
+  const bookmarks = vi
+    .fn()
+    .mockImplementationOnce(() => Promise.resolve([]))
+    .mockImplementationOnce(() => Promise.resolve([bookmark('!a:example.org', '$one')]));
+  const setBookmark = vi.fn(() => Promise.resolve(true));
+  const store = new Bookmarks(fakeCore(bookmarks, setBookmark));
+
+  await store.load();
+  await store.toggle('!a:example.org', '$one');
+  await store.load();
+
+  expect(bookmarks).toHaveBeenCalledTimes(2);
+  expect(store.entries).toEqual([bookmark('!a:example.org', '$one')]);
+});
+
 test('a failed load is retried on the next call', async () => {
   const bookmarks = vi
     .fn()

@@ -39,6 +39,10 @@ getrandom = "0.4"
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tokio = { workspace = true }
 
+[target.'cfg(target_os = "android")'.dependencies]
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
+webpki-roots = "1"
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 matrix-sdk = { workspace = true, features = ["indexeddb", "js"] }
 matrix-sdk-ui = { workspace = true, features = ["js"] }

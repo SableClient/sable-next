@@ -151,13 +151,14 @@ fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> Attac
     let width = view.width.map(UInt::from);
     let height = view.height.map(UInt::from);
     let duration = view.duration_ms.map(|ms| Duration::from_millis(ms.into()));
+    let blurhash = view.blurhash.clone();
 
     match mime.type_() {
         mime::IMAGE => AttachmentInfo::Image(BaseImageInfo {
             width,
             height,
             size,
-            blurhash: None,
+            blurhash,
             is_animated: view.animated,
         }),
         mime::VIDEO => AttachmentInfo::Video(BaseVideoInfo {
@@ -165,7 +166,7 @@ fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> Attac
             width,
             height,
             size,
-            blurhash: None,
+            blurhash,
         }),
         mime::AUDIO => AttachmentInfo::Audio(BaseAudioInfo {
             duration,
@@ -198,6 +199,7 @@ mod tests {
             height,
             duration_ms,
             animated: None,
+            blurhash: None,
         }
     }
 

@@ -12,6 +12,7 @@ import type { MembershipView } from '#src/generated/MembershipView';
 import type { MessageKind } from '#src/generated/MessageKind';
 import type { NotificationModeView } from '#src/generated/NotificationModeView';
 import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
+import type { PresenceView } from '#src/generated/PresenceView';
 import type { PublicRoomView } from '#src/generated/PublicRoomView';
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
@@ -23,12 +24,14 @@ import type { SearchFilter } from '#src/generated/SearchFilter';
 import type { SearchHitView } from '#src/generated/SearchHitView';
 import type { SearchOrder } from '#src/generated/SearchOrder';
 import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
+import type { RoomStateEventView } from '#src/generated/RoomStateEventView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 import type { SidebarItemView } from '#src/generated/SidebarItemView';
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
 import type { SubscriptionId } from '#src/generated/SubscriptionId';
 import type { PaginationDirection } from '#src/generated/PaginationDirection';
 import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
+import type { CreateJoinRuleView } from '#src/generated/CreateJoinRuleView';
 import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
@@ -52,6 +55,10 @@ export type CreateRoomOptions = {
   encrypted?: boolean;
   invite?: string[];
   parentSpace?: string | null;
+  alias?: string | null;
+  roomVersion?: string | null;
+  joinRule?: CreateJoinRuleView | null;
+  federate?: boolean;
 };
 
 export interface OutgoingMentions {
@@ -254,6 +261,15 @@ export function createCommands(transport: () => Transport) {
       return response.content;
     },
 
+    async roomStateEvents(roomId: string, eventType: string): Promise<RoomStateEventView[]> {
+      const response = await transport().send({
+        type: 'room_state_events',
+        room_id: roomId,
+        event_type: eventType,
+      });
+      return response.events;
+    },
+
     async roomPermissions(roomId: string): Promise<RoomPermissionsView> {
       const response = await transport().send({
         type: 'room_permissions',
@@ -421,6 +437,10 @@ export function createCommands(transport: () => Transport) {
         encrypted: options.encrypted ?? true,
         invite: options.invite ?? [],
         parent_space: options.parentSpace ?? null,
+        alias: options.alias ?? null,
+        room_version: options.roomVersion ?? null,
+        join_rule: options.joinRule ?? null,
+        federate: options.federate ?? true,
       });
       return response.room_id;
     },
@@ -961,6 +981,14 @@ export function createCommands(transport: () => Transport) {
       await transport().send({
         type: 'set_notification_content',
         visible,
+      });
+    },
+
+    async setPresence(presence: PresenceView, statusMessage: string | null): Promise<void> {
+      await transport().send({
+        type: 'set_presence',
+        presence,
+        status_message: statusMessage,
       });
     },
 

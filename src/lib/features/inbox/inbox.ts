@@ -1,3 +1,4 @@
+import type { BookmarkView } from '#src/generated/BookmarkView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
 export type NotificationFilter = 'all' | 'mentions' | 'direct';
@@ -52,4 +53,23 @@ export function inviter(room: RoomSummary): string | null {
 
 export function senderName(userId: string): string {
   return userId.startsWith('@') ? (userId.slice(1).split(':')[0] ?? userId) : userId;
+}
+
+function matchesBookmarkQuery(bookmark: BookmarkView, needle: string): boolean {
+  if (needle === '') return true;
+  return (
+    (bookmark.room_name?.toLowerCase().includes(needle) ?? false) ||
+    (bookmark.sender !== null && senderName(bookmark.sender).toLowerCase().includes(needle)) ||
+    (bookmark.body_preview?.toLowerCase().includes(needle) ?? false)
+  );
+}
+
+export function filteredBookmarks(
+  bookmarks: readonly BookmarkView[],
+  query: string
+): BookmarkView[] {
+  const needle = query.trim().toLowerCase();
+  return bookmarks
+    .filter((bookmark) => matchesBookmarkQuery(bookmark, needle))
+    .sort((left, right) => right.bookmarked_ts - left.bookmarked_ts);
 }

@@ -286,6 +286,11 @@ pub enum Command {
         event_type: String,
         state_key: String,
     },
+    RoomStateEvents {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+    },
     TimestampToEvent {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -460,6 +465,10 @@ pub enum Command {
         /// Adds an `m.space.child` edge from this space.
         #[ts(type = "string | null")]
         parent_space: Option<OwnedRoomId>,
+        alias: Option<String>,
+        room_version: Option<String>,
+        join_rule: Option<CreateJoinRuleView>,
+        federate: bool,
     },
     /// Reuses an existing DM with this user if there is one.
     CreateDm {
@@ -620,6 +629,10 @@ pub enum Command {
     /// Mirrors the reader's choice so a native shell can apply it too.
     SetNotificationContent {
         visible: bool,
+    },
+    SetPresence {
+        presence: PresenceView,
+        status_message: Option<String>,
     },
     SetRoomNotificationMode {
         #[ts(type = "string")]
@@ -921,6 +934,9 @@ pub enum CommandOk {
         #[ts(type = "unknown | null")]
         content: Option<serde_json::Value>,
     },
+    RoomStateEvents {
+        events: Vec<RoomStateEventView>,
+    },
     TimestampToEvent {
         #[ts(type = "string | null")]
         event_id: Option<OwnedEventId>,
@@ -1044,6 +1060,7 @@ pub enum CommandOk {
     SetPusher,
     RemovePusher,
     SetNotificationContent,
+    SetPresence,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
 
@@ -1145,6 +1162,17 @@ pub enum CreateRoomKind {
     Text,
     Space,
     Voice,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum CreateJoinRuleView {
+    Public,
+    Invite,
+    Knock,
+    Restricted,
+    KnockRestricted,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -1275,7 +1303,7 @@ pub enum CoreEvent {
     },
 }
 
-#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum PresenceView {
@@ -1417,6 +1445,8 @@ pub struct RoomSummary {
     pub topic: Option<String>,
     pub avatar_url: Option<String>,
     pub is_direct: bool,
+    #[ts(type = "string[]")]
+    pub direct_targets: Vec<OwnedUserId>,
     pub join_rule: RoomJoinRuleView,
     /// Only the tags this client models; others are dropped.
     pub tags: Vec<RoomTag>,
@@ -1709,6 +1739,14 @@ pub enum MentionView {
 /// What this account may do in one room, resolved from `m.room.power_levels`.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
+pub struct RoomStateEventView {
+    pub state_key: String,
+    #[ts(type = "unknown")]
+    pub content: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
 // Each field is an independent capability, not a state machine.
 #[allow(clippy::struct_excessive_bools)]
 pub struct RoomPermissionsView {
@@ -1816,6 +1854,7 @@ pub struct AttachmentInfoView {
     #[ts(type = "number | null")]
     pub duration_ms: Option<u32>,
     pub animated: Option<bool>,
+    pub blurhash: Option<String>,
 }
 
 /// MSC4144 per-message profile, letting one account send under several
@@ -1962,6 +2001,7 @@ pub enum TimelineItemContentView {
         width: Option<u64>,
         #[ts(type = "number | null")]
         height: Option<u64>,
+        blurhash: Option<String>,
     },
     Video {
         body: String,
@@ -1971,6 +2011,7 @@ pub enum TimelineItemContentView {
         width: Option<u64>,
         #[ts(type = "number | null")]
         height: Option<u64>,
+        blurhash: Option<String>,
     },
     Audio {
         body: String,
@@ -2015,7 +2056,9 @@ pub enum TimelineItemContentView {
     Poll {
         poll: PollView,
     },
-    Redacted,
+    Redacted {
+        reason: Option<String>,
+    },
     UnableToDecrypt {
         reason: String,
     },

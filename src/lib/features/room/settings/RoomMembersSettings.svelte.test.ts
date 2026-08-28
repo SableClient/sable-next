@@ -23,6 +23,10 @@ vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 
+vi.mock('#lib/rooms/presence.svelte.js', () => ({
+  usePresenceStore: () => ({ get: () => null }),
+}));
+
 import RoomMembersSettings from './RoomMembersSettings.svelte';
 
 const alice: MemberView = {

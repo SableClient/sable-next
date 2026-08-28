@@ -17,7 +17,7 @@ html: string,
 /**
  * `m.emote`, which reads as an action by the sender rather than speech.
  */
-emote: boolean, notice: boolean, edited: boolean, } | { "kind": "image", body: string, source: string, filename: string | null, mime: string | null, width: number | null, height: number | null, } | { "kind": "video", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "audio", body: string, source: string, mime: string | null, } | { "kind": "file", body: string, source: string, mime: string | null, size: number | null, } | { "kind": "sticker", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "location", body: string, geo_uri: string, latitude: number | null, longitude: number | null, } | { "kind": "gallery", 
+emote: boolean, notice: boolean, edited: boolean, } | { "kind": "image", body: string, source: string, filename: string | null, mime: string | null, width: number | null, height: number | null, blurhash: string | null, } | { "kind": "video", body: string, source: string, mime: string | null, width: number | null, height: number | null, blurhash: string | null, } | { "kind": "audio", body: string, source: string, mime: string | null, } | { "kind": "file", body: string, source: string, mime: string | null, size: number | null, } | { "kind": "sticker", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "location", body: string, geo_uri: string, latitude: number | null, longitude: number | null, } | { "kind": "gallery", 
 /**
  * The caption shared by the whole set.
  */
@@ -25,7 +25,7 @@ body: string,
 /**
  * Sanitised display HTML, safe to inject as-is.
  */
-html: string, items: Array<GalleryItemView>, } | { "kind": "poll", poll: PollView, } | { "kind": "redacted" } | { "kind": "unable_to_decrypt", reason: string, } | { "kind": "membership", user_id: string, change: MembershipChangeView, 
+html: string, items: Array<GalleryItemView>, } | { "kind": "poll", poll: PollView, } | { "kind": "redacted", reason: string | null, } | { "kind": "unable_to_decrypt", reason: string, } | { "kind": "membership", user_id: string, change: MembershipChangeView, 
 /**
  * The member's name at the time, so the copy does not have to fall
  * back to a raw user id.

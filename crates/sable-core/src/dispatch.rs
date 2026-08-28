@@ -11,6 +11,7 @@ use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
+use matrix_sdk::ruma::api::client::presence::set_presence;
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
@@ -32,11 +33,12 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
+use matrix_sdk::ruma::presence::PresenceState;
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, UInt,
+    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomId, RoomOrAliasId, ServerName, UInt,
     events::Mentions, events::room::MediaSource, events::room::member::MembershipState,
     events::room::message::RoomMessageEventContent,
 };
@@ -46,9 +48,9 @@ use matrix_sdk::ruma::{
 use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::protocol::{
-    Command, CommandErr, CommandOk, CreateRoomKind, HomeserverSoftwareView, JoinRuleView,
-    MembershipView, MessageKind, MutualRoomView, PaginationDirection, RoomTag, RoomVersionView,
-    RoomVersionsView,
+    Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
+    JoinRuleView, MembershipView, MessageKind, MutualRoomView, PaginationDirection, PresenceView,
+    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -60,6 +62,43 @@ use crate::{Core, SubscriptionKind};
 use crate::{notifications, session, spaces, view};
 
 const MAX_SEARCH_RESULTS: usize = 200;
+
+fn join_rule_content(
+    rule: Option<CreateJoinRuleView>,
+    parent_space: Option<&RoomId>,
+) -> Option<serde_json::Value> {
+    let allow = |kind: &str| {
+        parent_space.map(|space| {
+            serde_json::json!({
+                "type": "m.room.join_rules",
+                "state_key": "",
+                "content": {
+                    "join_rule": kind,
+                    "allow": [{ "type": "m.room_membership", "room_id": space }],
+                },
+            })
+        })
+    };
+    let plain = |kind: &str| {
+        serde_json::json!({
+            "type": "m.room.join_rules",
+            "state_key": "",
+            "content": { "join_rule": kind },
+        })
+    };
+
+    match rule? {
+        CreateJoinRuleView::Public => Some(plain("public")),
+        CreateJoinRuleView::Invite => Some(plain("invite")),
+        CreateJoinRuleView::Knock => Some(plain("knock")),
+        CreateJoinRuleView::Restricted => {
+            Some(allow("restricted").unwrap_or_else(|| plain("invite")))
+        }
+        CreateJoinRuleView::KnockRestricted => {
+            Some(allow("knock_restricted").unwrap_or_else(|| plain("invite")))
+        }
+    }
+}
 
 fn state_event_content(raw: &str) -> Option<serde_json::Value> {
     let value = serde_json::from_str::<serde_json::Value>(raw).ok()?;
@@ -756,6 +795,40 @@ impl Core {
                 Ok(CommandOk::SetRoomDirectoryVisibility)
             }
 
+            Command::RoomStateEvents {
+                room_id,
+                event_type,
+            } => {
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let stored = room
+                    .get_state_events(event_type.into())
+                    .await
+                    .map_err(|error| self.room_error("room_state_events", error))?;
+
+                let events = stored
+                    .iter()
+                    .filter_map(|raw| {
+                        let (state_key, content) = match raw {
+                            RawAnySyncOrStrippedState::Sync(event) => (
+                                event.get_field::<String>("state_key"),
+                                event.get_field::<serde_json::Value>("content"),
+                            ),
+                            RawAnySyncOrStrippedState::Stripped(event) => (
+                                event.get_field::<String>("state_key"),
+                                event.get_field::<serde_json::Value>("content"),
+                            ),
+                        };
+                        Some(RoomStateEventView {
+                            state_key: state_key.ok().flatten()?,
+                            content: content.ok().flatten()?,
+                        })
+                    })
+                    .collect();
+
+                Ok(CommandOk::RoomStateEvents { events })
+            }
+
             Command::RoomStateEvent {
                 room_id,
                 event_type,
@@ -1364,6 +1437,29 @@ impl Core {
                 Ok(CommandOk::SetNotificationContent)
             }
 
+            Command::SetPresence {
+                presence,
+                status_message,
+            } => {
+                let client = self.client().await?;
+                let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
+                let mut request = set_presence::v3::Request::new(
+                    user_id,
+                    match presence {
+                        PresenceView::Online => PresenceState::Online,
+                        PresenceView::Offline => PresenceState::Offline,
+                        PresenceView::Unavailable => PresenceState::Unavailable,
+                    },
+                );
+                request.status_msg = status_message;
+                client
+                    .send(request)
+                    .await
+                    .map_err(|error| self.failed("set_presence", error))?;
+
+                Ok(CommandOk::SetPresence)
+            }
+
             Command::SetRoomNotificationMode { room_id, mode } => {
                 let room = self.room(&room_id).await?;
                 notifications::set_room_mode(&room, mode)
@@ -1692,12 +1788,21 @@ impl Core {
                 encrypted,
                 invite,
                 parent_space,
+                alias,
+                room_version,
+                join_rule,
+                federate,
             } => {
                 let client = self.client().await?;
                 let mut request = create_room::v3::Request::new();
                 request.name = name;
                 request.topic = topic;
                 request.invite = invite;
+                request.room_alias_name = alias;
+                request.room_version = room_version
+                    .map(RoomVersionId::try_from)
+                    .transpose()
+                    .map_err(|error| self.failed("create_room: room version", error))?;
                 request.visibility = if public {
                     Visibility::Public
                 } else {
@@ -1709,16 +1814,26 @@ impl Core {
                     RoomPreset::PrivateChat
                 });
 
-                if let Some(room_type) = match kind {
+                let room_type = match kind {
                     CreateRoomKind::Text => None,
                     CreateRoomKind::Space => Some(RoomType::Space),
                     CreateRoomKind::Voice => Some(RoomType::Call),
-                } {
+                };
+                if room_type.is_some() || !federate {
                     let mut creation = RoomCreateEventContent::new_v11();
-                    creation.room_type = Some(room_type);
+                    creation.room_type = room_type;
+                    creation.federate = federate;
                     request.creation_content = Some(
                         Raw::new(&creation)
-                            .map_err(|error| self.failed("create_room: room type", error))?
+                            .map_err(|error| self.failed("create_room: creation content", error))?
+                            .cast_unchecked(),
+                    );
+                }
+
+                if let Some(rule) = join_rule_content(join_rule, parent_space.as_deref()) {
+                    request.initial_state.push(
+                        Raw::new(&rule)
+                            .map_err(|error| self.failed("create_room: join rule", error))?
                             .cast_unchecked(),
                     );
                 }
@@ -2069,7 +2184,53 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
 #[cfg(test)]
 mod tests {
     use super::{edit_content, message_content, state_event_content};
-    use crate::protocol::{EditImageView, MessageKind};
+    use matrix_sdk::ruma::RoomId;
+
+    use crate::protocol::{CreateJoinRuleView, EditImageView, MessageKind};
+
+    #[test]
+    fn a_restricted_room_without_a_space_falls_back_to_invite() {
+        let rule = |kind, space: Option<&str>| {
+            super::join_rule_content(
+                Some(kind),
+                space.map(|id| <&RoomId>::try_from(id).expect("a room id")),
+            )
+            .expect("a rule")["content"]["join_rule"]
+                .as_str()
+                .expect("a string")
+                .to_owned()
+        };
+
+        assert_eq!(rule(CreateJoinRuleView::Restricted, None), "invite");
+        assert_eq!(rule(CreateJoinRuleView::KnockRestricted, None), "invite");
+        assert_eq!(
+            rule(CreateJoinRuleView::Restricted, Some("!s:example.org")),
+            "restricted"
+        );
+        assert_eq!(rule(CreateJoinRuleView::Knock, None), "knock");
+        assert_eq!(rule(CreateJoinRuleView::Public, None), "public");
+    }
+
+    #[test]
+    fn a_restricted_room_allows_the_parent_space() {
+        let content = super::join_rule_content(
+            Some(CreateJoinRuleView::Restricted),
+            Some(<&RoomId>::try_from("!space:example.org").expect("a room id")),
+        )
+        .expect("a rule");
+
+        assert_eq!(
+            content["content"]["allow"][0]["room_id"],
+            "!space:example.org"
+        );
+        assert_eq!(content["content"]["allow"][0]["type"], "m.room_membership");
+    }
+
+    #[test]
+    fn no_join_rule_leaves_the_preset_alone() {
+        assert!(super::join_rule_content(None, None).is_none());
+    }
+
     use crate::view;
     use matrix_sdk::ruma::owned_user_id;
 

@@ -65,7 +65,11 @@
 {:else}
   <p class="state redacted">
     <span class="state-rail" aria-hidden="true"></span>
-    <span class="redacted-label">{$i18n.t('timeline.redacted')}</span>
+    <span class="redacted-label">
+      {item.content.kind === 'redacted' && item.content.reason
+        ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
+        : $i18n.t('timeline.redacted')}
+    </span>
   </p>
 {/if}
 

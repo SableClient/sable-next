@@ -27,11 +27,13 @@
   import type { MutualRoomView } from '#src/generated/MutualRoomView';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -62,7 +64,27 @@
     variant = 'popover',
   }: Props = $props();
   const core = useCoreClient();
+  const presenceStore = usePresenceStore();
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
+  let presence = $derived(presenceStore.get(userId));
+  let presenceLabel = $derived(presence ? $i18n.t(`presence.${presence.presence}`) : null);
+  let lastSeenText = $derived.by(() => {
+    if (!presence || presence.presence !== 'offline') return null;
+    const ms = lastSeenMs(presence, Date.now());
+    if (ms === null) return null;
+
+    const bucket = lastSeenBucket(ms);
+    switch (bucket.kind) {
+      case 'now':
+        return $i18n.t('presence.lastSeenNow');
+      case 'minutes':
+        return $i18n.t('presence.lastSeenMinutes', { count: bucket.count });
+      case 'hours':
+        return $i18n.t('presence.lastSeenHours', { count: bucket.count });
+      case 'days':
+        return $i18n.t('presence.lastSeenDays', { count: bucket.count });
+    }
+  });
 
   let displayName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
   let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
@@ -151,7 +173,9 @@
   let sharedSpaces = $derived(mutualRooms.filter((room) => room.is_space));
   let sharedList = $derived(shared === 'spaces' ? sharedSpaces : sharedRooms);
   let sharedExpanded = $state(false);
-  let hasMeta = $derived(Boolean(pronouns || localTime || animalText || roleLabel));
+  let hasMeta = $derived(
+    Boolean(pronouns || localTime || animalText || roleLabel || presenceLabel)
+  );
 
   $effect(() => {
     const target = userId;
@@ -300,6 +324,12 @@
 </script>
 
 {#snippet metaRow()}
+  {#if presenceLabel}
+    <span class="profile-meta-item">
+      <PresenceDot presence={presence?.presence ?? 'offline'} label={presenceLabel} />
+      {presence?.statusMessage || lastSeenText || presenceLabel}
+    </span>
+  {/if}
   {#if pronouns}
     <span class="profile-meta-item"><UserIcon />{pronouns}</span>
   {/if}

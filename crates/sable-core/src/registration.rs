@@ -789,7 +789,7 @@ impl Core {
             self.restore_pending_registration(pending).await;
             return Err(CommandErr::EmailVerificationFailed);
         };
-        let builder = matrix_sdk::reqwest::Client::builder();
+        let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
         #[cfg(not(target_family = "wasm"))]
         let builder = builder
             .redirect(matrix_sdk::reqwest::redirect::Policy::none())

@@ -19,6 +19,7 @@
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/features/room/bookmarks.svelte.js';
+  import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { i18n } from '#lib/i18n.js';
@@ -51,6 +52,8 @@
   providePersonaStore(new PersonaStore(core));
   const bookmarks = new Bookmarks(core.commands);
   provideBookmarks(bookmarks);
+  const presence = new PresenceStore();
+  providePresenceStore(presence);
   const notifications = new NotificationCenter();
   const incomingCalls = new IncomingCalls(core);
   const callSession = new CallSession(core);
@@ -150,6 +153,15 @@
     void core.commands.setNotificationContent(preferences.notificationContent).catch(() => {});
   });
 
+  $effect(() => {
+    void core.accountRevision;
+    if (core.status !== 'ready') return;
+
+    void core.commands
+      .setPresence(preferences.sendPresence ? 'online' : 'offline', null)
+      .catch(() => {});
+  });
+
   // Not gated on `desktopNotifications`: the native shell alerts without the
   // webview, and that switch only governs the in-app ones.
   $effect(() => {
@@ -212,10 +224,12 @@
     void roomList.start();
     void spaceSidebar.start(core);
     notifications.start(core);
+    presence.start(core);
     return () => {
       roomList.stop();
       spaceSidebar.stop();
       notifications.stop();
+      presence.stop();
     };
   });
 </script>

@@ -67,10 +67,6 @@ tauri-plugin-notifications = { version = "0.5.0-rc.11", git = "https://github.co
 # The system bar icon contrast is only reachable through the Activity's window.
 [target."cfg(target_os = \"android\")".dependencies]
 jni = "0.22"
-# rustls-platform-verifier is on jni 0.21, so its init takes types the 0.22 above
-# cannot produce. The raw JNI pointers are the same either way.
-jni021 = { package = "jni", version = "0.21", default-features = false }
-rustls-platform-verifier = "0.6"
 tauri-plugin-android-fs = "=29.0.0"
 
 # Push drags in Firebase and APNs, which only these two builds should carry.

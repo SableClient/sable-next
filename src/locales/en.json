@@ -73,7 +73,14 @@
     "markRead": "Mark {{room}} as read",
     "invitedBy": "Invited by {{name}}",
     "inviteEncrypted": "Encrypted",
-    "inviteSpace": "Space"
+    "inviteSpace": "Space",
+    "bookmarks": "Bookmarks",
+    "bookmarksEmpty": "Star a message to save it here.",
+    "bookmarksSearchLabel": "Search bookmarks",
+    "bookmarksSearchPlaceholder": "Search bookmarks",
+    "bookmarksNoResults": "No bookmarks match \"{{query}}\".",
+    "bookmarkPreviewEmpty": "No preview available",
+    "removeBookmark": "Remove bookmark in {{room}}"
   },
   "room": {
     "createTitle": "Create a room",
@@ -100,6 +107,30 @@
     "createEncryptionUnavailable": "Public rooms and spaces are never encrypted.",
     "createParentLabel": "Add to space",
     "createParentNone": "No space",
+    "createJoinRuleLabel": "Who can join",
+    "createJoinRuleInvite": "Invite only",
+    "createJoinRuleInviteHint": "Only people you invite can join.",
+    "createJoinRuleKnock": "Ask to join",
+    "createJoinRuleKnockHint": "Anyone can request to join; a member decides.",
+    "createJoinRuleRestricted": "Space members",
+    "createJoinRuleRestrictedHint": "Anyone in {{space}} can join without an invite.",
+    "createJoinRuleKnockRestricted": "Space members, others ask to join",
+    "createJoinRuleKnockRestrictedHint": "Anyone in {{space}} can join; others can request to join.",
+    "createJoinRuleRequiresSpace": "Add this room to a space above to offer this.",
+    "createAliasLabel": "Address",
+    "createAliasPlaceholder": "general",
+    "createAliasHint": "Published on this server as an address people can join by.",
+    "createAliasInvalidEmpty": "Enter an address, or leave it blank.",
+    "createAliasInvalidColon": "An address cannot contain \":\".",
+    "createAliasInvalidWhitespace": "An address cannot contain spaces.",
+    "createAliasInvalidControl": "An address contains characters that are not allowed.",
+    "createAdvancedLabel": "Advanced options",
+    "createFederationLabel": "Allow other servers",
+    "createFederationHint": "Turn off to keep this room on this homeserver only.",
+    "createVersionLabel": "Room version",
+    "createVersionDefault": "Server default ({{version}})",
+    "createVersionDefaultUnknown": "Server default",
+    "createVersionUnstable": "{{version}} (unstable)",
     "createInviteLabel": "Invite people",
     "createInvitePlaceholder": "@someone:server",
     "createInviteAdd": "Add",
@@ -693,7 +724,8 @@
     "withReason": "{{text}} — {{reason}}",
     "profileKickConfirm": "Remove {{name}} from the room?",
     "profileBanConfirm": "Ban {{name}} from the room?",
-    "profileModerationFailed": "That action could not be completed."
+    "profileModerationFailed": "That action could not be completed.",
+    "redactedWithReason": "Message deleted — {{reason}}"
   },
   "auth": {
     "welcome": "Welcome to Sable",
@@ -1630,5 +1662,24 @@
     "camera": "Camera",
     "screenShare": "Share screen",
     "returnTo": "Return to {{room}}"
+  },
+  "presence": {
+    "online": "Online",
+    "offline": "Offline",
+    "unavailable": "Away",
+    "lastSeenNow": "Last seen just now",
+    "lastSeenMinutes_one": "Last seen {{count}} minute ago",
+    "lastSeenMinutes_other": "Last seen {{count}} minutes ago",
+    "lastSeenHours_one": "Last seen {{count}} hour ago",
+    "lastSeenHours_other": "Last seen {{count}} hours ago",
+    "lastSeenDays_one": "Last seen {{count}} day ago",
+    "lastSeenDays_other": "Last seen {{count}} days ago"
+  },
+  "widgets": {
+    "label": "Widgets",
+    "title": "Widgets",
+    "close": "Close widgets",
+    "empty": "This room has no widgets.",
+    "remove": "Remove {{name}}"
   }
 }

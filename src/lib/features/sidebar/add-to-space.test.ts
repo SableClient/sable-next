@@ -17,6 +17,7 @@ function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary
     topic: null,
     avatar_url: null,
     is_direct: false,
+    direct_targets: [],
     join_rule: 'invite',
     tags: [],
     state: 'joined',

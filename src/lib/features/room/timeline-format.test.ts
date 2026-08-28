@@ -105,7 +105,7 @@ test('honours each toggle independently', () => {
   expect(shown.map((entry) => entry.content.kind)).toEqual(['profile_change', 'state_event']);
 });
 
-const removed = item({ kind: 'redacted' });
+const removed = item({ kind: 'redacted', reason: null });
 
 test('keeps tombstones out unless the preference asks for them', () => {
   expect(visibleTimelineItems([removed, message], defaults)).toEqual([message]);
@@ -300,6 +300,7 @@ test('anything you sent is yours to redact, not only your text', () => {
     mime: null,
     width: 8,
     height: 8,
+    blurhash: null,
   } as const;
 
   expect(canRedact(own(message.content), false)).toBe(true);
@@ -312,7 +313,7 @@ test('anything you sent is yours to redact, not only your text', () => {
 });
 
 test('a room whose every event is redacted is not blank at the shipped default', () => {
-  const deleted = item({ kind: 'redacted' }, 'gone');
+  const deleted = item({ kind: 'redacted', reason: null }, 'gone');
 
   // A room can be all-redacted — delete every poll in it and this is what is
   // left — and hiding those rows left nothing on screen at all.

@@ -86,6 +86,11 @@ pub fn room_summary<S: BuildHasher>(
         topic: item.topic(),
         avatar_url: item.avatar_url().map(|url| url.to_string()),
         is_direct: !item.direct_targets().is_empty(),
+        direct_targets: item
+            .direct_targets()
+            .into_iter()
+            .filter_map(|target| OwnedUserId::try_from(target.as_str()).ok())
+            .collect(),
         join_rule: join_rule_view(item.join_rule().as_ref()),
         tags: info.map(|i| i.tags.clone()).unwrap_or_default(),
         encrypted: match item.encryption_state() {
@@ -730,6 +735,17 @@ struct RawFields {
 #[derive(serde::Deserialize)]
 struct RawUnsigned {
     prev_content: Option<serde_json::Value>,
+    redacted_because: Option<RawRedaction>,
+}
+
+#[derive(serde::Deserialize)]
+struct RawRedaction {
+    content: Option<RawRedactionContent>,
+}
+
+#[derive(serde::Deserialize)]
+struct RawRedactionContent {
+    reason: Option<String>,
 }
 
 impl RawFields {
@@ -747,6 +763,19 @@ impl RawFields {
     /// type the SDK has no typed content for.
     fn prev_content(&self) -> Option<&serde_json::Value> {
         self.unsigned.as_ref()?.prev_content.as_ref()
+    }
+
+    fn redaction_reason(&self) -> Option<String> {
+        self.unsigned
+            .as_ref()?
+            .redacted_because
+            .as_ref()?
+            .content
+            .as_ref()?
+            .reason
+            .as_deref()
+            .filter(|reason| !reason.trim().is_empty())
+            .map(ToOwned::to_owned)
     }
 }
 
@@ -1058,6 +1087,7 @@ fn message_content(
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
+            blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
         },
         MessageType::Video(video) => TimelineItemContentView::Video {
             body: video.body.clone(),
@@ -1065,6 +1095,7 @@ fn message_content(
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
+            blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
         },
         MessageType::Audio(audio) => TimelineItemContentView::Audio {
             body: audio.body.clone(),
@@ -1114,7 +1145,9 @@ fn content(
     match content {
         TimelineItemContent::MsgLike(msg) => match &msg.kind {
             MsgLikeKind::Message(message) => message_content(message, profile),
-            MsgLikeKind::Redacted => TimelineItemContentView::Redacted,
+            MsgLikeKind::Redacted => TimelineItemContentView::Redacted {
+                reason: raw.redaction_reason(),
+            },
             MsgLikeKind::UnableToDecrypt(_) => TimelineItemContentView::UnableToDecrypt {
                 reason: "undecryptable".to_owned(),
             },

@@ -312,6 +312,8 @@ pub async fn discovery_client(homeserver: &str) -> Result<Client, matrix_sdk::Cl
 }
 
 fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
+    let builder = crate::tls::apply_sdk(builder);
+
     if let Ok(url) = Url::parse(homeserver)
         && url.scheme() == "http"
         && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))

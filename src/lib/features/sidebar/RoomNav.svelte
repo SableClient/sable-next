@@ -30,7 +30,9 @@
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
@@ -80,6 +82,13 @@
   let { onNavigate, width, collapsed = false }: Props = $props();
   const roomList = useRoomList();
   const core = useCoreClient();
+  const presenceStore = usePresenceStore();
+
+  function dmPeerId(room: RoomSummary): string | null {
+    if (room.direct_targets.length === 0) return null;
+    const own = core.session?.user_id;
+    return room.direct_targets.find((target) => target !== own) ?? room.direct_targets[0];
+  }
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
   let spacePermissions = $state<RoomPermissionsView | null>(null);
@@ -596,6 +605,8 @@
                 roomList.typingRoomIds.has(room.room_id) &&
                 mentions === 0 &&
                 unread === 0}
+              {@const peerId = room?.is_direct ? dmPeerId(room) : null}
+              {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
               <div class="room-row-wrap">
                 <a
                   oncontextmenu={(event) => {
@@ -611,23 +622,32 @@
                   aria-current={page.url.pathname === href ? 'page' : undefined}
                 >
                   {#if showIcons}
-                    <span
-                      class="room-icon"
-                      class:glyph={!room?.avatar_url}
-                      class:voice={room?.is_voice}
-                      aria-hidden="true"
-                    >
-                      {#if room?.avatar_url}
-                        <MediaImage
-                          source={room.avatar_url}
-                          alt=""
-                          width={56}
-                          height={56}
-                          class="room-image"
+                    <span class="room-avatar">
+                      <span
+                        class="room-icon"
+                        class:glyph={!room?.avatar_url}
+                        class:voice={room?.is_voice}
+                        aria-hidden="true"
+                      >
+                        {#if room?.avatar_url}
+                          <MediaImage
+                            source={room.avatar_url}
+                            alt=""
+                            width={56}
+                            height={56}
+                            class="room-image"
+                          />
+                        {:else}
+                          {@const Glyph = roomGlyph(room)}
+                          <Glyph />
+                        {/if}
+                      </span>
+                      {#if peerPresence && peerPresence.presence !== 'offline'}
+                        <PresenceDot
+                          presence={peerPresence.presence}
+                          label={$i18n.t(`presence.${peerPresence.presence}`)}
+                          class="room-presence"
                         />
-                      {:else}
-                        {@const Glyph = roomGlyph(room)}
-                        <Glyph />
                       {/if}
                     </span>
                   {/if}
@@ -1024,6 +1044,12 @@
     font-weight: var(--font-weight-600);
   }
 
+  .room-avatar {
+    display: inline-flex;
+    flex: none;
+    position: relative;
+  }
+
   .room-icon {
     align-items: center;
     border-radius: var(--radius);
@@ -1033,6 +1059,12 @@
     justify-content: center;
     overflow: hidden;
     width: 1.5rem;
+  }
+
+  :global(.room-avatar .room-presence) {
+    bottom: -0.125rem;
+    position: absolute;
+    right: -0.125rem;
   }
 
   .room-icon.glyph {

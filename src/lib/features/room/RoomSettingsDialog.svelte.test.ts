@@ -37,6 +37,7 @@ const room: RoomSummary = {
   topic: null,
   avatar_url: null,
   is_direct: false,
+  direct_targets: [],
   join_rule: 'restricted',
   tags: [],
   state: 'joined',

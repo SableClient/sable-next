@@ -46,6 +46,7 @@
     intrinsicWidth={item.content.width}
     intrinsicHeight={item.content.height}
     mime={item.content.mime}
+    blurhash={item.content.blurhash}
     retryable
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
   />
@@ -82,6 +83,7 @@
     width={item.content.kind === 'video' ? item.content.width : null}
     height={item.content.kind === 'video' ? item.content.height : null}
     size={item.content.kind === 'file' ? item.content.size : null}
+    blurhash={item.content.kind === 'video' ? item.content.blurhash : null}
   />
 {/if}
 

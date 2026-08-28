@@ -2,6 +2,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { decodeBlurhashPixels } from '#lib/ui/blurhash.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import {
     cachedMediaUrl,
@@ -14,6 +15,8 @@
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
+  const BLURHASH_DECODE_WIDTH = 32;
+
   interface Props {
     source: string;
     alt: string;
@@ -22,6 +25,7 @@
     intrinsicWidth?: number | null;
     intrinsicHeight?: number | null;
     mime?: string | null;
+    blurhash?: string | null;
     class?: string;
     onclick?: () => void;
     onfailed?: () => void;
@@ -36,6 +40,7 @@
     intrinsicWidth = null,
     intrinsicHeight = null,
     mime = null,
+    blurhash = null,
     class: className = '',
     onclick,
     onfailed,
@@ -60,6 +65,8 @@
   let paintedCanvas: HTMLCanvasElement | undefined;
   let paintedIndex = -1;
   let fileRatio = $state<number | null>(null);
+  let blurhashCanvas = $state<HTMLCanvasElement>();
+  let imageLoaded = $state(false);
   let animatedGif = $derived(mime === 'image/gif');
   let manualGif = $derived(animatedGif && !preferences.autoplayGifs);
   let steppedGif = $derived(gifFrames !== null);
@@ -79,6 +86,12 @@
      is a thumbnail whose shape need not match. The decoded shape covers an event
      carrying none, and is known before the `<img>` mounts. */
   let aspectRatio = $derived(eventRatio ?? fileRatio ?? width / height);
+  let blurhashDecodeHeight = $derived(Math.max(1, Math.round(BLURHASH_DECODE_WIDTH / aspectRatio)));
+  let blurhashPixels = $derived(
+    blurhash === null
+      ? null
+      : decodeBlurhashPixels(blurhash, BLURHASH_DECODE_WIDTH, blurhashDecodeHeight)
+  );
   let unavailableLabel = $derived(
     alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
   );
@@ -118,6 +131,7 @@
       fileRatio = mediaAspectRatio(core, source);
       gifPreviewReady = false;
       gifPlaying = false;
+      imageLoaded = false;
       url = cached;
       return release;
     }
@@ -127,6 +141,7 @@
     fileRatio = null;
     gifPreviewReady = false;
     gifPlaying = false;
+    imageLoaded = false;
     const load = retry ? retryMediaUrl : loadMediaUrl;
     void load(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
@@ -202,6 +217,19 @@
     void paintFrame(playback, gifFrameIndex);
   });
 
+  $effect(() => {
+    const canvas = blurhashCanvas;
+    const pixels = blurhashPixels;
+    if (!canvas || !pixels) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    canvas.width = BLURHASH_DECODE_WIDTH;
+    canvas.height = blurhashDecodeHeight;
+    const image = context.createImageData(canvas.width, canvas.height);
+    image.data.set(pixels);
+    context.putImageData(image, 0, 0);
+  });
+
   async function paintFrame(playback: GifPlayback, index: number): Promise<void> {
     const frame = await playback.frame(index);
     if (!frame) return;
@@ -263,6 +291,13 @@
 </script>
 
 {#snippet content()}
+  {#if blurhash && !manualGif && !failed}
+    <canvas
+      bind:this={blurhashCanvas}
+      class={['media-image-blurhash', { loaded: imageLoaded }]}
+      aria-hidden="true"
+    ></canvas>
+  {/if}
   {#if url && manualGif}
     <canvas
       bind:this={gifPreview}
@@ -284,7 +319,14 @@
       <span class="play-gif" aria-hidden="true"><PlayIcon /></span>
     {/if}
   {:else if url}
-    <img class="media-image-content" src={url} {alt} {width} {height} />
+    <img
+      class="media-image-content"
+      src={url}
+      {alt}
+      {width}
+      {height}
+      onload={() => (imageLoaded = true)}
+    />
   {:else if failed}
     <span class="media-image-unavailable">
       <ImageBrokenIcon />
@@ -332,6 +374,20 @@
     height: 100%;
     object-fit: cover;
     width: 100%;
+  }
+
+  .media-image-blurhash {
+    height: 100%;
+    inset: 0;
+    opacity: 1;
+    position: absolute;
+    transition: opacity var(--motion-fast) var(--motion-easing-standard);
+    width: 100%;
+  }
+
+  .media-image-blurhash.loaded {
+    opacity: 0;
+    pointer-events: none;
   }
 
   .gif-preview,
