@@ -398,6 +398,10 @@ jobs:
           mv "$nightly_source_dir/buildSrc" "$build_src_dir/src/main/java/$nightly_package_dir"
           sed -i 's/moe\.sable\.next/moe.sable.next.nightly/g' \
             "$app_dir/build.gradle.kts" "$app_dir/src/main/AndroidManifest.xml"
+          sed -i \
+            -e 's/Java_moe_sable_next_MainActivity/Java_moe_sable_next_nightly_MainActivity/g' \
+            -e 's#moe/sable/next/MainActivity#moe/sable/next/nightly/MainActivity#g' \
+            src-tauri/src/mobile.rs
       - name: Set up Android signing
         if: ${{ env.ANDROID_KEY_BASE64 != '' }}
         run: |
