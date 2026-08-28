@@ -7,6 +7,7 @@ use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{ParentSpace, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
+use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::directory::PublicRoomsChunk;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
@@ -247,7 +248,7 @@ pub async fn enrich_room_fields<S: BuildHasher>(
         let room = client.get_room(&room_id);
         async move {
             match room {
-                Some(room) => (room_id, room_info(&room).await),
+                Some(room) => (room_id, room_info(client, &room).await),
                 None => (room_id, RoomInfo::absent()),
             }
         }
@@ -274,12 +275,9 @@ impl RoomInfo {
     }
 }
 
-async fn room_info(room: &Room) -> RoomInfo {
+async fn room_info(client: &Client, room: &Room) -> RoomInfo {
     let is_space = room.is_space();
-    let is_tombstoned = room
-        .get_state_event(StateEventType::RoomTombstone, "")
-        .await
-        .is_ok_and(|event| event.is_some());
+    let is_tombstoned = is_tombstoned(client, room, is_space).await;
     let children = async {
         if is_space {
             space_children(room).await
@@ -307,6 +305,28 @@ async fn room_info(room: &Room) -> RoomInfo {
         children,
         tags: room_tags(room),
     }
+}
+
+async fn is_tombstoned(client: &Client, room: &Room, is_space: bool) -> bool {
+    if room
+        .get_state_event(StateEventType::RoomTombstone, "")
+        .await
+        .is_ok_and(|event| event.is_some())
+    {
+        return true;
+    }
+    if !is_space {
+        return false;
+    }
+
+    client
+        .send(get_state_event_for_key::v3::Request::new(
+            room.room_id().to_owned(),
+            StateEventType::RoomTombstone.to_string().into(),
+            String::new(),
+        ))
+        .await
+        .is_ok()
 }
 
 async fn has_space_parent(room: &Room) -> bool {
