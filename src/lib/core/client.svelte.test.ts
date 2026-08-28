@@ -122,6 +122,42 @@ test('core events from the transport reach client state', async () => {
   expect(core.deviceList).toEqual([]);
 });
 
+test('a cancellation for an unknown verification flow does not open the verification dialog', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  const unsubscribe = core.subscribeEvents(() => {});
+
+  fake.emit({
+    type: 'verification',
+    user_id: session.user_id,
+    flow_id: 'stale-flow',
+    state: { phase: 'cancelled', reason: 'm.user' },
+  });
+
+  expect(core.verification).toBeNull();
+
+  fake.emit({
+    type: 'verification',
+    user_id: session.user_id,
+    flow_id: 'active-flow',
+    state: { phase: 'requested', is_self: true, initiated_by_us: false },
+  });
+  fake.emit({
+    type: 'verification',
+    user_id: session.user_id,
+    flow_id: 'active-flow',
+    state: { phase: 'cancelled', reason: 'm.user' },
+  });
+
+  expect(core.verification).toEqual({
+    flowId: 'active-flow',
+    state: { phase: 'cancelled', reason: 'm.user' },
+  });
+  unsubscribe();
+});
+
 test('a session ending clears the session and looks for a fallback account', async () => {
   const fake = fakeTransport({
     restore: { session },

@@ -520,7 +520,10 @@ export class CoreClient {
   subscribeEvents(onEvent: (event: CoreEvent) => void): () => void {
     return this.ensureTransport().subscribe((event) => {
       if (event.type === 'verification' && event.user_id === this.session?.user_id) {
-        this.verification = { flowId: event.flow_id, state: event.state };
+        const isTerminal = event.state.phase === 'done' || event.state.phase === 'cancelled';
+        if (!isTerminal || this.verification?.flowId === event.flow_id) {
+          this.verification = { flowId: event.flow_id, state: event.state };
+        }
       }
       onEvent(event);
     });
