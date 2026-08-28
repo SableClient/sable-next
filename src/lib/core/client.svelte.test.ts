@@ -29,6 +29,7 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     },
     subscribeCrash: () => () => {},
     subscribeStall: () => () => {},
+    setDebugLogs: vi.fn(),
     close,
     fetchMedia: vi.fn(),
     sendAttachment: vi.fn(),

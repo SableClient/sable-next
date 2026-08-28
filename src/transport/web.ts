@@ -34,6 +34,7 @@ export function createWebTransport(): Transport {
   const overdue = new Set<number>();
   let nextId = 1;
   let worker: SharedWorker | null = null;
+  let debugLogs = false;
   let closed = false;
 
   const stallAfterMs = 20_000;
@@ -105,13 +106,15 @@ export function createWebTransport(): Transport {
         return;
       }
 
-      if ('log' in data) {
-        const level = data.log.includes(' ERROR ')
-          ? 'error'
-          : data.log.includes(' WARN ')
-            ? 'warn'
-            : 'info';
-        recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', data.log.trim());
+      if ('logs' in data) {
+        for (const line of data.logs) {
+          const level = line.includes(' ERROR ')
+            ? 'error'
+            : line.includes(' WARN ')
+              ? 'warn'
+              : 'info';
+          recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', line.trim());
+        }
         return;
       }
 
@@ -140,6 +143,7 @@ export function createWebTransport(): Transport {
     };
 
     nextWorker.port.start();
+    if (debugLogs) nextWorker.port.postMessage({ debugLogs: true });
     worker = nextWorker;
     return nextWorker;
   }
@@ -234,6 +238,11 @@ export function createWebTransport(): Transport {
 
       // The worker only answers `uri: null` to `attachment`, which has no URI.
       return uri ?? '';
+    },
+
+    setDebugLogs(enabled) {
+      debugLogs = enabled;
+      worker?.port.postMessage({ debugLogs: enabled });
     },
 
     subscribe(onEvent) {

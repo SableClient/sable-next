@@ -85,22 +85,37 @@ thread_local! {
 }
 
 static PANIC_HOOK_CHAINED: AtomicBool = AtomicBool::new(false);
+static LOG_CAPTURE: AtomicBool = AtomicBool::new(false);
+static LOG_NOTIFYING: AtomicBool = AtomicBool::new(false);
 
-struct JsLogWriter;
+struct JsLogWriter {
+    capturing: bool,
+    line: String,
+}
 
 impl Write for JsLogWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let message = String::from_utf8_lossy(bytes);
-        LOG_NOTIFIER.with_borrow(|slot| {
-            if let Some(notify) = slot.as_ref() {
-                let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&message));
-            }
-        });
+        if self.capturing {
+            self.line.push_str(&String::from_utf8_lossy(bytes));
+        }
         Ok(bytes.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+impl Drop for JsLogWriter {
+    fn drop(&mut self) {
+        if !self.capturing || self.line.is_empty() || LOG_NOTIFYING.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        let notify = LOG_NOTIFIER.with_borrow(|slot| slot.clone());
+        if let Some(notify) = notify {
+            let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&self.line));
+        }
+        LOG_NOTIFYING.store(false, Ordering::Relaxed);
     }
 }
 
@@ -110,7 +125,10 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
     type Writer = JsLogWriter;
 
     fn make_writer(&'a self) -> Self::Writer {
-        JsLogWriter
+        JsLogWriter {
+            capturing: LOG_CAPTURE.load(Ordering::Relaxed),
+            line: String::new(),
+        }
     }
 }
 
@@ -139,6 +157,11 @@ pub fn set_panic_handler(notify: Function) {
 #[allow(clippy::needless_pass_by_value)]
 pub fn set_log_handler(notify: Function) {
     LOG_NOTIFIER.with_borrow_mut(|slot| *slot = Some(notify));
+}
+
+#[wasm_bindgen(js_name = setLogCapture)]
+pub fn set_log_capture(enabled: bool) {
+    LOG_CAPTURE.store(enabled, Ordering::Relaxed);
 }
 
 /// The web carrier, mirroring `src-tauri/src/lib.rs`. JSON both ways, so the

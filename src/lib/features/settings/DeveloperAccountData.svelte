@@ -177,6 +177,10 @@
     gap: var(--space-2);
   }
 
+  .account-data > :not(.settings) {
+    margin-inline: var(--space-3);
+  }
+
   .empty {
     font-size: var(--font-size-small);
   }

@@ -73,6 +73,8 @@ export function createTauriTransport(): Transport {
       return rawInvoke<string>('upload_media', bytes, { mime });
     },
 
+    setDebugLogs() {},
+
     subscribe(onEvent) {
       listeners.add(onEvent);
       return () => listeners.delete(onEvent);

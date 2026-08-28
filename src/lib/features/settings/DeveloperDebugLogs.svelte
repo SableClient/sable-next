@@ -127,6 +127,10 @@
     gap: var(--space-2);
   }
 
+  .logs > :not(.settings) {
+    margin-inline: var(--space-3);
+  }
+
   .filters,
   .actions {
     align-items: center;

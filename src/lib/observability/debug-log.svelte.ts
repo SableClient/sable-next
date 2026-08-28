@@ -25,12 +25,66 @@ export type DebugLogEntry = {
 };
 
 const MAX_ENTRIES = 1000;
+const MAX_LOG_ENTRIES_PER_FLUSH = 5;
 const DISABLED_CATEGORIES_KEY = 'sable-debug-disabled-categories';
 const consoleMethods = ['error', 'warn', 'info', 'debug'] as const;
 const originalConsole = new SvelteMap<
   (typeof consoleMethods)[number],
   (...args: unknown[]) => void
 >();
+let interceptingConsole = false;
+const captureListeners = new SvelteSet<(enabled: boolean) => void>();
+const pendingLogEntries: Omit<DebugLogEntry, 'id'>[] = [];
+let logFlushQueued = false;
+let droppedLogEntries = 0;
+
+function queueLogEntry(entry: Omit<DebugLogEntry, 'id'>): void {
+  const last = pendingLogEntries.at(-1) ?? debugLog.entries.at(-1);
+  if (
+    last &&
+    last.level === entry.level &&
+    last.namespace === entry.namespace &&
+    last.message === entry.message
+  ) {
+    return;
+  }
+  if (pendingLogEntries.length >= MAX_LOG_ENTRIES_PER_FLUSH) {
+    droppedLogEntries += 1;
+    return;
+  }
+  pendingLogEntries.push(entry);
+  if (logFlushQueued) return;
+  logFlushQueued = true;
+  queueMicrotask(() => {
+    logFlushQueued = false;
+    if (!debugLog.enabled || pendingLogEntries.length === 0) {
+      pendingLogEntries.length = 0;
+      droppedLogEntries = 0;
+      return;
+    }
+    const entries = pendingLogEntries.map((pending, index) => ({
+      id: debugLog.nextId + index,
+      ...pending,
+    }));
+    if (droppedLogEntries > 0) {
+      entries.push({
+        id: debugLog.nextId + entries.length,
+        timestamp: Date.now(),
+        level: 'debug',
+        category: 'general',
+        namespace: 'console',
+        message: `+${droppedLogEntries} log entries dropped`,
+      });
+      droppedLogEntries = 0;
+    }
+    debugLog.nextId += entries.length;
+    pendingLogEntries.length = 0;
+    debugLog.entries.push(...entries);
+    if (debugLog.entries.length > MAX_ENTRIES) {
+      debugLog.entries.splice(0, debugLog.entries.length - MAX_ENTRIES);
+    }
+  });
+}
 
 function readDisabledCategories(): DebugLogCategory[] {
   if (typeof localStorage === 'undefined') return [];
@@ -72,13 +126,21 @@ function interceptConsole(): void {
     const original = console[method].bind(console);
     originalConsole.set(method, original);
     console[method] = (...args: unknown[]) => {
-      recordDebugLog(
-        method === 'error' ? 'error' : method === 'warn' ? 'warn' : method,
-        method === 'error' ? 'error' : 'general',
-        'console',
-        formatConsoleArgs(args)
-      );
+      if (interceptingConsole) {
+        original(...args);
+        return;
+      }
+
+      interceptingConsole = true;
+      queueLogEntry({
+        timestamp: Date.now(),
+        level: method === 'error' ? 'error' : method === 'warn' ? 'warn' : method,
+        category: method === 'error' ? 'error' : 'general',
+        namespace: 'console',
+        message: scrubMatrixIds(formatConsoleArgs(args)),
+      });
       original(...args);
+      interceptingConsole = false;
     };
   }
 }
@@ -98,6 +160,15 @@ export function setDebugLogging(enabled: boolean): void {
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('sable_internal_debug', enabled ? '1' : '0');
   }
+  for (const listener of captureListeners) listener(enabled);
+}
+
+export function onDebugLogCapture(listener: (enabled: boolean) => void): () => void {
+  captureListeners.add(listener);
+  listener(debugLog.enabled);
+  return () => {
+    captureListeners.delete(listener);
+  };
 }
 
 if (debugLog.enabled) interceptConsole();
@@ -118,8 +189,7 @@ export function recordDebugLog(
   data?: unknown
 ): void {
   if (!debugLog.enabled || debugLog.disabledCategories.has(category)) return;
-  debugLog.entries.push({
-    id: debugLog.nextId++,
+  queueLogEntry({
     timestamp: Date.now(),
     level,
     category,
@@ -127,7 +197,6 @@ export function recordDebugLog(
     message: scrubMatrixIds(message),
     ...(data === undefined ? {} : { data: sanitizePayload(data) }),
   });
-  if (debugLog.entries.length > MAX_ENTRIES) debugLog.entries.shift();
 }
 
 export function clearDebugLogs(): void {

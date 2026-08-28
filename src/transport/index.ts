@@ -39,6 +39,8 @@ export interface Transport {
   /** Resolves with the `mxc:` URI, which the avatar commands take. */
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 
+  setDebugLogs(enabled: boolean): void;
+
   subscribe(onEvent: (event: CoreEvent) => void): () => void;
 
   subscribeCrash(onCrash: (message: string) => void): () => void;

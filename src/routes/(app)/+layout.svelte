@@ -107,9 +107,10 @@
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
   $effect(() => {
-    if (core.status === 'signed-out') {
+    const login = resolve('login');
+    if (core.status === 'signed-out' && !page.url.pathname.startsWith(login)) {
       clearDrafts();
-      void goto(resolve('login'), { replaceState: true });
+      void goto(login, { replace: true });
     }
   });
 

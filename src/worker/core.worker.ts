@@ -1,6 +1,11 @@
 /// <reference lib="webworker" />
 
-import init, { SableCore, setLogHandler, setPanicHandler } from '#src/generated/wasm/sable_wasm.js';
+import init, {
+  SableCore,
+  setLogCapture,
+  setLogHandler,
+  setPanicHandler,
+} from '#src/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
 
@@ -22,7 +27,17 @@ const core = init().then(() => {
   return instance;
 });
 
-const boundary = createCoreWorkerBoundary(core);
+const boundary = createCoreWorkerBoundary(
+  core,
+  (enabled) => {
+    void core.then(() => {
+      setLogCapture(enabled);
+    });
+  },
+  () => {
+    self.close();
+  }
+);
 
 // A trap unwinds only the call that hit it, so the sync loop and the SDK's
 // timers keep re-entering a module whose allocator and borrows were left

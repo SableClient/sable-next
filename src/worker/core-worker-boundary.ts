@@ -4,6 +4,9 @@ import type { CoreEvent } from '#src/generated/CoreEvent';
 import type { WorkerMessage, WorkerRequest } from './protocol';
 import { TimelineEventRouter } from './timeline-event-router';
 
+const logFlushMs = 250;
+const logBufferLimit = 500;
+
 export type WorkerCore = {
   submitCommand(command: string): Promise<string>;
   fetchMedia(source: string, width: number, height: number): Promise<Uint8Array>;
@@ -28,10 +31,17 @@ export type WorkerPort = {
 };
 
 /** Owns page ports and enforces timeline subscription ownership at the worker boundary. */
-export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
+export function createCoreWorkerBoundary(
+  core: Promise<WorkerCore>,
+  setLogCapture: (enabled: boolean) => void = () => {},
+  terminate: () => void = () => {}
+) {
   const ports = new Set<WorkerPort>();
   const timelineEvents = new TimelineEventRouter<WorkerPort>();
   let panic: string | null = null;
+  let logs: string[] = [];
+  let droppedLogs = 0;
+  let flushLogsTimer: ReturnType<typeof setTimeout> | undefined;
 
   function closePort(port: WorkerPort): void {
     ports.delete(port);
@@ -64,8 +74,29 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
     broadcast({ panic: { message } });
   }
 
-  function handleLog(message: string): void {
-    broadcast({ log: message });
+  function flushLogs(): void {
+    if (flushLogsTimer !== undefined) clearTimeout(flushLogsTimer);
+    flushLogsTimer = undefined;
+    const batch = logs;
+    logs = [];
+    if (batch.length === 0) return;
+    const dropped = droppedLogs;
+    droppedLogs = 0;
+    broadcast({
+      logs: dropped === 0 ? batch : [...batch, `+${dropped} core log lines dropped`],
+    });
+  }
+
+  function handleLog(text: string): void {
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      if (logs.length >= logBufferLimit) {
+        droppedLogs += 1;
+        continue;
+      }
+      logs.push(line.trimEnd());
+    }
+    flushLogsTimer ??= setTimeout(flushLogs, logFlushMs);
   }
 
   /** `json` is a `CoreEvent[]`: the core batches whatever had queued up. */
@@ -93,6 +124,20 @@ export function createCoreWorkerBoundary(core: Promise<WorkerCore>) {
     port.onmessage = async ({ data: request }) => {
       if ('disconnect' in request) {
         closePort(port);
+        return;
+      }
+      if ('shutdown' in request) {
+        terminate();
+        return;
+      }
+      if ('debugLogs' in request) {
+        setLogCapture(request.debugLogs);
+        if (!request.debugLogs) {
+          if (flushLogsTimer !== undefined) clearTimeout(flushLogsTimer);
+          flushLogsTimer = undefined;
+          logs = [];
+          droppedLogs = 0;
+        }
         return;
       }
       const { id } = request;

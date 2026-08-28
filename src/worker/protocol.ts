@@ -19,6 +19,8 @@ export type AttachmentRequest = {
 export type WorkerRequest =
   | { id: number; command: Command }
   | { disconnect: true }
+  | { shutdown: true }
+  | { debugLogs: boolean }
   | { id: number; media: { source: string; width: number; height: number } }
   | { id: number; attachment: AttachmentRequest }
   | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } };
@@ -32,5 +34,5 @@ export type WorkerMessage =
   /** An `mxc:` URI from `uploadMedia`, or nothing from `sendAttachment`. */
   | { id: number; uri: string | null }
   | { event: CoreEvent }
-  | { log: string }
+  | { logs: string[] }
   | { panic: { message: string } };

@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { createCoreWorkerBoundary, type WorkerCore, type WorkerPort } from './core-worker-boundary';
 import type { WorkerMessage, WorkerRequest } from './protocol';
@@ -198,15 +198,82 @@ test('a panic reaches every port and later commands fail instead of hanging', as
   ]);
 });
 
-test('a WASM log reaches every connected port', () => {
-  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => Promise.resolve('{}'))));
+test('WASM logs are batched to every connected port', () => {
+  const setLogCapture = vi.fn();
+  vi.useFakeTimers();
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(fakeCore(() => Promise.resolve('{}'))),
+    setLogCapture
+  );
   const first = new FakePort();
   const second = new FakePort();
   boundary.connect(first);
   boundary.connect(second);
 
-  boundary.handleLog('INFO sable_core: sync started');
+  boundary.handleLog('INFO sable_core: sync started\n');
+  boundary.handleLog('INFO sable_core: sync caught up\n');
+  const firstBatch = first.messages;
+  expect(second.messages).toEqual([]);
+  vi.advanceTimersByTime(250);
 
-  expect(first.messages).toEqual([{ log: 'INFO sable_core: sync started' }]);
-  expect(second.messages).toEqual([{ log: 'INFO sable_core: sync started' }]);
+  expect(firstBatch).toEqual([
+    { logs: ['INFO sable_core: sync started', 'INFO sable_core: sync caught up'] },
+  ]);
+  expect(second.messages).toEqual(firstBatch);
+  vi.useRealTimers();
+});
+
+test('overflowing the log buffer drops and reports the excess', () => {
+  const setLogCapture = vi.fn();
+  vi.useFakeTimers();
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(fakeCore(() => Promise.resolve('{}'))),
+    setLogCapture
+  );
+  const port = new FakePort();
+  boundary.connect(port);
+
+  for (let index = 0; index < 502; index += 1) boundary.handleLog(`line ${index}`);
+  vi.advanceTimersByTime(250);
+
+  expect(port.messages).toHaveLength(1);
+  const batch = (port.messages[0] as { logs: string[] }).logs;
+  expect(batch).toHaveLength(501);
+  expect(batch[500]).toBe('+2 core log lines dropped');
+  vi.useRealTimers();
+});
+
+test('a shutdown request terminates the worker without answering', () => {
+  const terminate = vi.fn();
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(fakeCore(() => Promise.resolve('{}'))),
+    undefined,
+    terminate
+  );
+  const port = new FakePort();
+  boundary.connect(port);
+
+  port.onmessage?.({ data: { shutdown: true } } as MessageEvent<WorkerRequest>);
+
+  expect(terminate).toHaveBeenCalledTimes(1);
+  expect(port.messages).toEqual([]);
+});
+
+test('a debugLogs request toggles WASM capture and clears buffered logs', () => {
+  const setLogCapture = vi.fn();
+  vi.useFakeTimers();
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(fakeCore(() => Promise.resolve('{}'))),
+    setLogCapture
+  );
+  const port = new FakePort();
+  boundary.connect(port);
+
+  boundary.handleLog('INFO sable_core: sync started');
+  port.onmessage?.({ data: { debugLogs: false } } as MessageEvent<WorkerRequest>);
+  vi.advanceTimersByTime(250);
+
+  expect(setLogCapture).toHaveBeenCalledWith(false);
+  expect(port.messages).toEqual([]);
+  vi.useRealTimers();
 });

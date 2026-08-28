@@ -17,7 +17,7 @@ import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 import { on } from 'svelte/events';
-import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
+import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
@@ -642,10 +642,14 @@ export class CoreClient {
     const unsubscribeStall = transport.subscribeStall((stalled) => {
       this.unresponsive = stalled;
     });
+    const stopLogCapture = onDebugLogCapture((enabled) => {
+      transport.setDebugLogs(enabled);
+    });
     this.unsubscribeTransport = () => {
       unsubscribeEvents();
       unsubscribeCrash();
       unsubscribeStall();
+      stopLogCapture();
     };
     return transport;
   }
