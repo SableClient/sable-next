@@ -744,6 +744,16 @@
     color: var(--sable-bg-on-container);
   }
 
+  .preview :global(.preview-image) {
+    flex: 0 0 1.75rem;
+    height: 1.75rem;
+    width: 1.75rem;
+  }
+
+  .preview :global(.preview-image .media-image-content) {
+    object-fit: contain;
+  }
+
   .preview-pack,
   .preview-hint {
     overflow: hidden;
