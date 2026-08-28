@@ -42,7 +42,18 @@ function media(
     sender_name: 'Alice',
     sender_avatar: null,
     timestamp: 0,
-    content: { kind, body: '', source: 'mxc://example.org/media', mime: null, width, height },
+    content:
+      kind === 'image'
+        ? {
+            kind,
+            body: '',
+            source: 'mxc://example.org/media',
+            filename: null,
+            mime: null,
+            width,
+            height,
+          }
+        : { kind, body: '', source: 'mxc://example.org/media', mime: null, width, height },
     in_reply_to: null,
     thread_root: null,
     thread_summary: null,
@@ -168,6 +179,7 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
     case 'message':
       return { kind, body: 'hi', html: 'hi', emote: false, notice: false, edited: false };
     case 'image':
+      return { kind, filename: null, ...media };
     case 'video':
     case 'sticker':
       return { kind, ...media };

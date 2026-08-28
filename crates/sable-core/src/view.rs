@@ -1023,6 +1023,7 @@ fn message_content(
         MessageType::Image(image) => TimelineItemContentView::Image {
             body: image.body.clone(),
             source: media_source(&image.source),
+            filename: image.filename.clone(),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),

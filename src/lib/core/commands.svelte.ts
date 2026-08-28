@@ -69,7 +69,17 @@ export type SendMessageOptions = {
   kind?: MessageKind;
 };
 
-export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo'>;
+export type EditImage = {
+  source: string;
+  filename: string | null;
+  mime: string | null;
+  width: number | null;
+  height: number | null;
+};
+
+export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo'> & {
+  image?: EditImage | null;
+};
 
 const EMPTY_SEARCH_FILTER: SearchFilter = {
   rooms: [],
@@ -607,6 +617,7 @@ export function createCommands(transport: () => Transport) {
         body,
         formatted: options.formatted ?? null,
         kind: options.kind ?? 'text',
+        image: options.image ?? null,
         thread_root: options.threadRoot ?? null,
         mentions: mentions.userIds,
         mentions_room: mentions.room,

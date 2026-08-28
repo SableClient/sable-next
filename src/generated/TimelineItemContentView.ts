@@ -17,7 +17,7 @@ html: string,
 /**
  * `m.emote`, which reads as an action by the sender rather than speech.
  */
-emote: boolean, notice: boolean, edited: boolean, } | { "kind": "image", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "video", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "audio", body: string, source: string, mime: string | null, } | { "kind": "file", body: string, source: string, mime: string | null, } | { "kind": "sticker", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "location", body: string, geo_uri: string, latitude: number | null, longitude: number | null, } | { "kind": "gallery", 
+emote: boolean, notice: boolean, edited: boolean, } | { "kind": "image", body: string, source: string, filename: string | null, mime: string | null, width: number | null, height: number | null, } | { "kind": "video", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "audio", body: string, source: string, mime: string | null, } | { "kind": "file", body: string, source: string, mime: string | null, } | { "kind": "sticker", body: string, source: string, mime: string | null, width: number | null, height: number | null, } | { "kind": "location", body: string, geo_uri: string, latitude: number | null, longitude: number | null, } | { "kind": "gallery", 
 /**
  * The caption shared by the whole set.
  */

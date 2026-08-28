@@ -66,7 +66,18 @@
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
     onOpenThread?: (rootEventId: string) => void;
-    onEdit?: (eventId: string, body: string, html: string | null) => void;
+    onEdit?: (
+      eventId: string,
+      body: string,
+      html: string | null,
+      image?: {
+        source: string;
+        filename: string | null;
+        mime: string | null;
+        width: number | null;
+        height: number | null;
+      }
+    ) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     onCopyLink?: (eventId: string) => void;
     canRedactOthers?: boolean;
@@ -152,9 +163,9 @@
   );
 
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
-  /* Editing needs a body to put back in the composer, so it is text-only.
-     Redaction is not. */
-  let ownText = $derived(item.is_own && item.content.kind === 'message');
+  let editable = $derived(
+    item.is_own && (item.content.kind === 'message' || item.content.kind === 'image')
+  );
   let redactable = $derived(canRedact(item, canRedactOthers));
   const swipe = new MessageSwipe({
     enabled: () => actionable && actions.onReply !== undefined,
@@ -195,7 +206,8 @@
 
   let actions = $derived.by(() => {
     const eventId = item.event_id ?? '';
-    const body = item.content.kind === 'message' ? item.content.body : null;
+    const body =
+      item.content.kind === 'message' || item.content.kind === 'image' ? item.content.body : null;
     const html = item.content.kind === 'message' ? item.content.html : null;
     return {
       onReact: onToggleReaction
@@ -223,9 +235,22 @@
           }
         : undefined,
       onEdit:
-        ownText && onEdit && body !== null
+        editable && onEdit && body !== null
           ? () => {
-              onEdit(eventId, body, html);
+              onEdit(
+                eventId,
+                body,
+                html,
+                item.content.kind === 'image'
+                  ? {
+                      source: item.content.source,
+                      filename: item.content.filename,
+                      mime: item.content.mime,
+                      width: item.content.width,
+                      height: item.content.height,
+                    }
+                  : undefined
+              );
             }
           : undefined,
       onDelete:

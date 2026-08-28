@@ -6,6 +6,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
+import type { EditImage } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
@@ -64,6 +65,7 @@ export class Conversation {
         formatted,
         mentions,
         kind: editedKind(edited),
+        image: pending.image,
         threadRoot: this.#threadRoot,
         persona: edited?.per_message_profile ?? null,
       });
@@ -219,8 +221,13 @@ export class Conversation {
     };
   };
 
-  readonly edit = (eventId: string, body: string, html: string | null = null): void => {
-    this.context = { kind: 'edit', eventId, body, html };
+  readonly edit = (
+    eventId: string,
+    body: string,
+    html: string | null = null,
+    image: EditImage | null = null
+  ): void => {
+    this.context = { kind: 'edit', eventId, body, html, image };
   };
 
   readonly editLast = (): void => {

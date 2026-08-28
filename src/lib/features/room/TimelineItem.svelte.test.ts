@@ -63,6 +63,7 @@ function imageItem(): TimelineItemView {
       kind: 'image',
       body: 'photo.png',
       source: 'mxc://example.org/photo',
+      filename: 'photo.png',
       mime: 'image/png',
       width: 800,
       height: 600,
@@ -92,6 +93,32 @@ test('keeps the sender header for an ordinary message', async () => {
 
   expect(document.querySelector('header .sender')?.textContent).toBe('Alice');
   expect(document.querySelector('.emote')).toBeNull();
+  await unmount(instance);
+});
+
+test('edits an own image caption without dropping its media details', async () => {
+  const onEdit = vi.fn();
+  core.fetchMedia.mockResolvedValue(new Uint8Array());
+  const image = {
+    ...imageItem(),
+    is_own: true,
+    content: { ...imageItem().content, body: 'caption' },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core: core.commands, item: { item: image, collapsed: false, onEdit } },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('.message-actions button')?.click();
+
+  expect(onEdit).toHaveBeenCalledWith('$item', 'caption', null, {
+    source: 'mxc://example.org/photo',
+    filename: 'photo.png',
+    mime: 'image/png',
+    width: 800,
+    height: 600,
+  });
   await unmount(instance);
 });
 

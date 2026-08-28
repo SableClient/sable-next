@@ -187,6 +187,9 @@ pub enum Command {
         formatted: Option<String>,
         #[serde(default)]
         kind: MessageKind,
+        /// Present when editing an image caption, so the replacement retains its media.
+        #[serde(default)]
+        image: Option<EditImageView>,
         #[serde(default)]
         #[ts(type = "string | null")]
         thread_root: Option<OwnedEventId>,
@@ -1784,6 +1787,18 @@ pub enum MessageKind {
     Notice,
 }
 
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct EditImageView {
+    pub source: String,
+    pub filename: Option<String>,
+    pub mime: Option<String>,
+    #[ts(type = "number | null")]
+    pub width: Option<u64>,
+    #[ts(type = "number | null")]
+    pub height: Option<u64>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize, TS)]
 #[ts(export)]
 #[serde(default)]
@@ -1935,6 +1950,7 @@ pub enum TimelineItemContentView {
     Image {
         body: String,
         source: String,
+        filename: Option<String>,
         mime: Option<String>,
         #[ts(type = "number | null")]
         width: Option<u64>,

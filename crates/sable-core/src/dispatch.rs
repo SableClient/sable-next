@@ -36,7 +36,7 @@ use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomOrAliasId, ServerName, UInt,
-    events::Mentions, events::room::member::MembershipState,
+    events::Mentions, events::room::MediaSource, events::room::member::MembershipState,
     events::room::message::RoomMessageEventContent,
 };
 use matrix_sdk::ruma::{
@@ -423,13 +423,14 @@ impl Core {
                 body,
                 formatted,
                 kind,
+                image,
                 thread_root,
                 mentions,
                 mentions_room,
                 persona,
             } => {
                 let edited = EditedContent::RoomMessage(
-                    message_content(body, formatted, kind, mentions, mentions_room).into(),
+                    edit_content(body, formatted, kind, image, mentions, mentions_room)?.into(),
                 );
 
                 if let Some(persona) = persona {
@@ -1995,6 +1996,36 @@ fn message_content(
     content.add_mentions(wanted)
 }
 
+fn edit_content(
+    body: String,
+    formatted: Option<String>,
+    kind: MessageKind,
+    image: Option<crate::protocol::EditImageView>,
+    mentions: Vec<OwnedUserId>,
+    room: bool,
+) -> Result<RoomMessageEventContent, CommandErr> {
+    let Some(image) = image else {
+        return Ok(message_content(body, formatted, kind, mentions, room));
+    };
+
+    let source = serde_json::from_str(&image.source)
+        .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(image.source)));
+    if let MediaSource::Plain(uri) = &source
+        && uri.parts().is_err()
+    {
+        return Err(CommandErr::InvalidMedia);
+    }
+
+    let mut content = ImageMessageEventContent::new(body, source);
+    content.filename = image.filename;
+    let mut info = ImageInfo::new();
+    info.mimetype = image.mime;
+    info.width = image.width.and_then(|width| UInt::try_from(width).ok());
+    info.height = image.height.and_then(|height| UInt::try_from(height).ok());
+    content.info = Some(Box::new(info));
+    Ok(RoomMessageEventContent::new(MessageType::Image(content)))
+}
+
 fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
     if memberships.is_empty() {
         return RoomMemberships::JOIN;
@@ -2016,8 +2047,8 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
 
 #[cfg(test)]
 mod tests {
-    use super::{message_content, state_event_content};
-    use crate::protocol::MessageKind;
+    use super::{edit_content, message_content, state_event_content};
+    use crate::protocol::{EditImageView, MessageKind};
     use crate::view;
     use matrix_sdk::ruma::owned_user_id;
 
@@ -2081,6 +2112,37 @@ mod tests {
             assert_eq!(plain.msgtype(), msgtype, "{kind:?} plain");
             assert_eq!(formatted.msgtype(), msgtype, "{kind:?} formatted");
         }
+    }
+
+    #[test]
+    fn editing_an_image_caption_preserves_the_image_content() {
+        let content = edit_content(
+            "updated caption".to_owned(),
+            None,
+            MessageKind::Text,
+            Some(EditImageView {
+                source: "mxc://example.org/photo".to_owned(),
+                filename: Some("photo.png".to_owned()),
+                mime: Some("image/png".to_owned()),
+                width: Some(800),
+                height: Some(600),
+            }),
+            Vec::new(),
+            false,
+        )
+        .expect("valid image source");
+
+        assert_eq!(content.msgtype(), "m.image");
+        assert_eq!(
+            serde_json::to_value(content).expect("serializable image content"),
+            serde_json::json!({
+                "msgtype": "m.image",
+                "body": "updated caption",
+                "filename": "photo.png",
+                "url": "mxc://example.org/photo",
+                "info": { "mimetype": "image/png", "w": 800, "h": 600 },
+            })
+        );
     }
 
     #[test]
