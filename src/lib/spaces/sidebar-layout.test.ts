@@ -28,10 +28,10 @@ describe('mergeSpaces', () => {
     expect(merged).toEqual([space('!b'), space('!a'), space('!c')]);
   });
 
-  it('keeps a space the room list cannot resolve yet', () => {
+  it('removes spaces the room list does not consider active', () => {
     const merged = mergeSpaces([space('!a'), folder('f', ['!b', '!c'])], ['!a', '!c']);
 
-    expect(merged).toEqual([space('!a'), folder('f', ['!b', '!c'])]);
+    expect(merged).toEqual([space('!a'), folder('f', ['!c'])]);
   });
 
   it('places a duplicated space once', () => {

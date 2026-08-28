@@ -32,19 +32,20 @@ export function mergeSpaces(
   items: readonly SidebarItem[],
   spaceIds: readonly string[]
 ): SidebarItem[] {
+  const active = new Set(spaceIds);
   const placed = new Set<string>();
   const merged: SidebarItem[] = [];
 
   for (const item of items) {
     if (item.kind === 'space') {
-      if (placed.has(item.room_id)) continue;
+      if (!active.has(item.room_id) || placed.has(item.room_id)) continue;
 
       placed.add(item.room_id);
       merged.push(item);
       continue;
     }
 
-    const content = item.content.filter((roomId) => !placed.has(roomId));
+    const content = item.content.filter((roomId) => active.has(roomId) && !placed.has(roomId));
     if (content.length === 0) continue;
 
     for (const roomId of content) placed.add(roomId);
