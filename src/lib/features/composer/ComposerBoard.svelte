@@ -136,21 +136,19 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    bottom: 1px;
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
     display: flex;
+    flex: 0 0 auto;
     height: var(--target);
     justify-content: center;
-    position: absolute;
-    right: 0.25rem;
     width: var(--target);
   }
 
   :global(.composer-board-trigger)::after {
     border-radius: inherit;
     content: '';
-    inset: calc((var(--target) - var(--target-hit)) / 2);
+    inset: 0;
     position: absolute;
   }
 

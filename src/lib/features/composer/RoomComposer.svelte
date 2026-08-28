@@ -747,6 +747,7 @@
 <style>
   .composer-stack {
     --composer-gutter: var(--space-1);
+    --target: var(--control-height-small);
 
     margin: 0 auto;
     position: relative;
@@ -756,6 +757,10 @@
   @media (width >= 32rem) {
     .composer-stack {
       --composer-gutter: var(--page-gutter);
+    }
+
+    .composer-row {
+      gap: var(--space-200);
     }
   }
 
@@ -821,7 +826,7 @@
   .composer-row {
     align-items: center;
     display: flex;
-    gap: var(--space-200);
+    gap: var(--space-compact);
     padding: var(--space-compact);
     width: 100%;
   }
@@ -838,7 +843,7 @@
   }
 
   .composer-field {
-    align-items: flex-end;
+    align-items: center;
     display: flex;
     flex: 1;
     min-width: 0;
@@ -933,13 +938,6 @@
         border-color var(--motion-fast) var(--motion-easing-standard),
         box-shadow var(--motion-fast) var(--motion-easing-standard),
         padding var(--motion-slow) var(--motion-easing-emphasized);
-    }
-  }
-
-  /* 36px against the 40px fine-pointer hit area still clears the 0.5rem gap. */
-  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
-    .composer {
-      --target: var(--control-height-small);
     }
   }
 </style>

@@ -30,10 +30,7 @@
     min-height: var(--target);
     min-width: 0;
     overflow-y: auto;
-
-    /* The right reserve is the sticker button, which is absolutely positioned
-       inside the field and so does not push the text itself. */
-    padding: var(--space-1) calc(var(--target) + var(--space-compact)) var(--space-1) var(--space-1);
+    padding: var(--space-1);
     position: relative;
   }
 
