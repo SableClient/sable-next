@@ -12,6 +12,7 @@
   import BannerDock from '#lib/ui/BannerDock.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
+  import WebUpdateBanner from '#lib/ui/WebUpdateBanner.svelte';
   import TelemetryConsentBanner from '#lib/ui/TelemetryConsentBanner.svelte';
   import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
@@ -68,6 +69,7 @@
     <TelemetryConsentBanner />
     <UnverifiedDeviceBanner />
     <DesktopUpdateBanner />
+    <WebUpdateBanner />
   </BannerDock>
 
   <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>

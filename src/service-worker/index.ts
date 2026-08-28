@@ -17,6 +17,11 @@ worker.addEventListener('push', (event) => {
   event.waitUntil(present(event.data?.json() as PushPayload | undefined));
 });
 
+worker.addEventListener('message', (event) => {
+  const message = event.data as { type?: unknown } | undefined;
+  if (message?.type === 'sable:skip-waiting') event.waitUntil(worker.skipWaiting());
+});
+
 async function present(payload: PushPayload | undefined): Promise<void> {
   if (!payload) return;
 
