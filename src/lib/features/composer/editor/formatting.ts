@@ -1,4 +1,4 @@
-import { chainCommands, lift, toggleMark } from 'prosemirror-commands';
+import { chainCommands, lift, setBlockType, toggleMark } from 'prosemirror-commands';
 import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
 import type { MarkType, NodeType } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
@@ -53,29 +53,73 @@ export const formattingInputRules: readonly InputRule[] = [
   textblockTypeInputRule(/^```$/, nodes.code_block),
 ];
 
+function isHeading(state: EditorState, level: number): boolean {
+  const { parent } = state.selection.$from;
+  return parent.type === nodes.heading && parent.attrs.level === level;
+}
+
+function headingCommand(level: number): Command {
+  return (state, dispatch) =>
+    isHeading(state, level)
+      ? setBlockType(nodes.paragraph)(state, dispatch)
+      : setBlockType(nodes.heading, { level })(state, dispatch);
+}
+
+const codeBlockCommand: Command = (state, dispatch) =>
+  state.selection.$from.parent.type === nodes.code_block
+    ? setBlockType(nodes.paragraph)(state, dispatch)
+    : setBlockType(nodes.code_block)(state, dispatch);
+
 export const formattingKeymap: Record<string, Command> = {
   'Mod-b': toggleMark(marks.strong),
   'Mod-i': toggleMark(marks.em),
+  'Mod-u': toggleMark(marks.underline),
   'Mod-Shift-x': toggleMark(marks.strike),
   'Mod-e': toggleMark(marks.code),
+  'Mod-h': toggleMark(marks.spoiler),
   'Mod-Shift-8': wrapInList(nodes.bullet_list),
   'Mod-Shift-9': wrapInList(nodes.ordered_list),
   'Mod-Shift-.': wrapIn(nodes.blockquote),
+  'Mod-1': headingCommand(1),
+  'Mod-2': headingCommand(2),
+  'Mod-3': headingCommand(3),
+  'Mod-;': codeBlockCommand,
   'Shift-Tab': liftListItem(nodes.list_item),
 };
 
 export const splitListEntry = splitListItem(nodes.list_item);
 export const sinkListEntry = sinkListItem(nodes.list_item);
 
-export type FormatAction = 'strong' | 'em' | 'strike' | 'code' | 'bullet_list' | 'blockquote';
+export type FormatAction =
+  | 'strong'
+  | 'em'
+  | 'underline'
+  | 'strike'
+  | 'code'
+  | 'spoiler'
+  | 'bullet_list'
+  | 'ordered_list'
+  | 'blockquote'
+  | 'code_block'
+  | 'heading1'
+  | 'heading2'
+  | 'heading3'
+  | 'link';
 
-export const formatCommands: Record<FormatAction, Command> = {
+export const formatCommands: Record<Exclude<FormatAction, 'link'>, Command> = {
   strong: toggleMark(marks.strong),
   em: toggleMark(marks.em),
+  underline: toggleMark(marks.underline),
   strike: toggleMark(marks.strike),
   code: toggleMark(marks.code),
+  spoiler: toggleMark(marks.spoiler),
   bullet_list: chainCommands(wrapInList(nodes.bullet_list), liftListItem(nodes.list_item)),
+  ordered_list: chainCommands(wrapInList(nodes.ordered_list), liftListItem(nodes.list_item)),
   blockquote: chainCommands(wrapIn(nodes.blockquote), lift),
+  code_block: codeBlockCommand,
+  heading1: headingCommand(1),
+  heading2: headingCommand(2),
+  heading3: headingCommand(3),
 };
 
 function isInside(state: EditorState, type: NodeType): boolean {
@@ -88,7 +132,7 @@ function isInside(state: EditorState, type: NodeType): boolean {
 
 export function activeMarks(state: EditorState): FormatAction[] {
   const { from, $from, to, empty } = state.selection;
-  const names = ['strong', 'em', 'strike', 'code'] as const;
+  const names = ['strong', 'em', 'underline', 'strike', 'code', 'spoiler', 'link'] as const;
 
   const active: FormatAction[] = names.filter((name) => {
     const type = marks[name];
@@ -98,6 +142,11 @@ export function activeMarks(state: EditorState): FormatAction[] {
   });
 
   if (isInside(state, nodes.bullet_list)) active.push('bullet_list');
+  if (isInside(state, nodes.ordered_list)) active.push('ordered_list');
   if (isInside(state, nodes.blockquote)) active.push('blockquote');
+  if ($from.parent.type === nodes.code_block) active.push('code_block');
+  if (isHeading(state, 1)) active.push('heading1');
+  if (isHeading(state, 2)) active.push('heading2');
+  if (isHeading(state, 3)) active.push('heading3');
   return active;
 }

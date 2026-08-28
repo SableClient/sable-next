@@ -64,6 +64,7 @@ function permissions(canChangeJoinRule: boolean): RoomPermissionsView {
     can_kick: false,
     can_ban: false,
     can_change_settings: false,
+    can_pin: false,
     can_change_join_rule: canChangeJoinRule,
     can_change_power_levels: false,
     can_manage_children: false,

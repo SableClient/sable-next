@@ -2,6 +2,7 @@
   import type { SearchHitView } from '#src/generated/SearchHitView';
   import type { SearchOrder } from '#src/generated/SearchOrder';
   import { onDestroy, onMount } from 'svelte';
+  import { RadioGroup } from 'bits-ui';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -12,12 +13,18 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
   import { formatDate, formatTime, senderColor } from '../room/timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { MessageSearch } from './message-search.svelte.js';
-  import { resolveRoomTarget, resolveUserTarget } from './resolve-targets';
+  import {
+    resolveRoomTarget,
+    resolveSpaceRooms,
+    resolveSpaceTarget,
+    resolveUserTarget,
+  } from './resolve-targets';
   import { coverageMessage } from './coverage';
   import { snippetAround } from './highlight';
   import ComposerAutocomplete from '../composer/ComposerAutocomplete.svelte';
@@ -34,6 +41,7 @@
   const search = new MessageSearch(core, () => ({
     roomId: (value) => resolveRoomTarget(roomList.rooms, value),
     userId: (value) => resolveUserTarget(knownSenders(), value),
+    spaceRooms: (value) => resolveSpaceRooms(roomList.rooms, value),
   }));
 
   search.query = page.url.searchParams.get('q') ?? '';
@@ -51,6 +59,8 @@
 
   let showOperatorList = $state(false);
 
+  let spaces = $derived(roomList.rooms.filter((room) => room.is_space && room.state === 'joined'));
+
   let suggestions = $derived(
     suggestionsOpen
       ? suggestionsFor(
@@ -63,6 +73,12 @@
               avatarUrl: room.avatar_url,
             })),
             senders: knownSenders(),
+            spaces: spaces.map((space) => ({
+              id: space.room_id,
+              alias: space.canonical_alias,
+              name: space.name,
+              avatarUrl: space.avatar_url,
+            })),
           },
           showOperatorList
         )
@@ -124,9 +140,15 @@
   }
 
   function chipLabel(chip: SearchToken): string {
-    if (chip.operator !== 'in') return chip.value;
-    const roomId = resolveRoomTarget(roomList.rooms, chip.value);
-    return roomId === undefined ? chip.value : roomName(roomId);
+    if (chip.operator === 'in') {
+      const roomId = resolveRoomTarget(roomList.rooms, chip.value);
+      return roomId === undefined ? chip.value : roomName(roomId);
+    }
+    if (chip.operator === 'space') {
+      const spaceId = resolveSpaceTarget(roomList.rooms, chip.value);
+      return spaceId === undefined ? chip.value : roomName(spaceId);
+    }
+    return chip.value;
   }
 
   function dropChip(chip: SearchToken): void {
@@ -138,6 +160,43 @@
     suggestionsOpen = false;
     input?.focus();
     runSearch();
+  }
+
+  let spaceScopeToken = $derived(
+    field.chips.find((chip) => chip.operator === 'space' && !chip.negated)
+  );
+  let scope = $derived<'all' | 'space'>(spaceScopeToken ? 'space' : 'all');
+  let scopeSpaceId = $derived(
+    spaceScopeToken ? resolveSpaceTarget(roomList.rooms, spaceScopeToken.value) : undefined
+  );
+
+  function spaceTokenValue(space: (typeof spaces)[number]): string {
+    const target = space.canonical_alias ?? space.name ?? space.room_id;
+    return target.includes(' ') ? `"${target}"` : target;
+  }
+
+  function setScopeToken(value: string | null): void {
+    const kept = field.chips
+      .filter((chip) => chip.operator !== 'space')
+      .map((chip) => chipText(search.query, chip));
+    const next = value === null ? kept : [`space:${value}`, ...kept];
+
+    search.query = composeQuery(next, field.draft);
+    runSearch();
+  }
+
+  function chooseScope(next: 'all' | 'space'): void {
+    if (next === 'all') {
+      setScopeToken(null);
+      return;
+    }
+    if (spaceScopeToken || spaces.length === 0) return;
+    setScopeToken(spaceTokenValue(spaces[0]));
+  }
+
+  function chooseSpace(roomId: string): void {
+    const space = spaces.find((entry) => entry.room_id === roomId);
+    if (space) setScopeToken(spaceTokenValue(space));
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -256,6 +315,41 @@
           {option.label}
         </Button>
       {/each}
+    </div>
+
+    <div class="scope-row">
+      <RadioGroup.Root
+        class="scope"
+        value={scope}
+        aria-label={$i18n.t('search.scope')}
+        onValueChange={(next) => {
+          chooseScope(next as 'all' | 'space');
+        }}
+      >
+        <RadioGroup.Item value="all" class="scope-option">
+          {$i18n.t('search.scopeAll')}
+        </RadioGroup.Item>
+        <RadioGroup.Item value="space" class="scope-option" disabled={spaces.length === 0}>
+          {$i18n.t('search.scopeSpace')}
+        </RadioGroup.Item>
+      </RadioGroup.Root>
+
+      {#if scope === 'space'}
+        <select
+          class="scope-space"
+          aria-label={$i18n.t('search.scopeSpaceLabel')}
+          value={scopeSpaceId ?? ''}
+          onchange={(event) => {
+            chooseSpace(event.currentTarget.value);
+          }}
+        >
+          {#each spaces as space (space.room_id)}
+            <option value={space.room_id}
+              >{space.name ?? space.canonical_alias ?? space.room_id}</option
+            >
+          {/each}
+        </select>
+      {/if}
     </div>
 
     <div class="field">
@@ -410,14 +504,23 @@
         {/each}
 
         {#if !search.exhausted}
-          <Button
-            variant="ghost"
-            size="small"
-            disabled={search.searching}
-            onclick={() => void search.loadMore()}
-          >
-            {search.searching ? $i18n.t('search.searching') : $i18n.t('search.loadMore')}
-          </Button>
+          <div class="load-more">
+            {#key search.hits.length}
+              <div
+                class="load-sentinel"
+                aria-hidden="true"
+                {@attach whenVisible(() => void search.loadMore())}
+              ></div>
+            {/key}
+            <Button
+              variant="ghost"
+              size="small"
+              disabled={search.searching}
+              onclick={() => void search.loadMore()}
+            >
+              {search.searching ? $i18n.t('search.searching') : $i18n.t('search.loadMore')}
+            </Button>
+          </div>
         {/if}
       {/if}
     </div>
@@ -563,6 +666,70 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-100);
+  }
+
+  .scope-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-100);
+  }
+
+  :global(.scope) {
+    display: flex;
+    gap: var(--space-100);
+  }
+
+  :global(.scope-option) {
+    background: var(--sable-surface-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radius-pill);
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-small);
+    padding: var(--space-tight) var(--space-200);
+  }
+
+  :global(.scope-option:hover:not([data-disabled])) {
+    background: var(--sable-bg-container-hover);
+  }
+
+  :global(.scope-option[data-state='checked']) {
+    background: var(--sable-primary-container);
+    border-color: var(--sable-primary-main);
+    color: var(--sable-primary-on-container);
+  }
+
+  :global(.scope-option[data-disabled]) {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+
+  :global(.scope-option:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .scope-space {
+    background: var(--sable-surface-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
+    color: inherit;
+    font: inherit;
+    font-size: var(--font-size-small);
+    padding: var(--space-tight) var(--space-200);
+  }
+
+  .load-more {
+    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .load-sentinel {
+    block-size: 1px;
+    inline-size: 100%;
   }
 
   .notice,

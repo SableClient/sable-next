@@ -8,7 +8,7 @@ import { serializeComposer, serializePlain } from './serialize';
 
 const { doc, paragraph, heading, blockquote, bullet_list, list_item, mention, emoticon } =
   composerSchema.nodes;
-const { strong, em, strike, code, link } = composerSchema.marks;
+const { strong, em, strike, code, link, underline, spoiler } = composerSchema.marks;
 
 function docOf(...blocks: ProseMirrorNode[]): ProseMirrorNode {
   return doc.create(null, blocks);
@@ -58,6 +58,21 @@ test('italic, strike and code each round trip', () => {
 
   expect(message.body).toBe('*i* ~~s~~ `c`');
   expect(message.formatted).toBe('<em>i</em> <del>s</del> <code>c</code>');
+});
+
+test('underline and spoiler each serialise to their Matrix HTML', () => {
+  const message = serializeComposer(
+    docOf(
+      para([
+        composerSchema.text('u', [underline.create()]),
+        composerSchema.text(' '),
+        composerSchema.text('secret', [spoiler.create()]),
+      ])
+    )
+  );
+
+  expect(message.body).toBe('__u__ ||secret||');
+  expect(message.formatted).toBe('<u>u</u> <span data-mx-spoiler="">secret</span>');
 });
 
 test('a heading keeps its level', () => {

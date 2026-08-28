@@ -11,6 +11,7 @@ import { MessageSearch } from './message-search.svelte.js';
 const resolvers = {
   roomId: (value: string) => value,
   userId: (value: string) => value,
+  spaceRooms: () => undefined,
 };
 
 function hit(eventId: string): SearchHitView {

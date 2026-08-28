@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import type { MembershipChangeView } from '#src/generated/MembershipChangeView';
 import type { StateChangeView } from '#src/generated/StateChangeView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
@@ -67,7 +68,13 @@ const message = item({
   edited: false,
 });
 const divider = item({ kind: 'date_divider', timestamp: 0 });
-const joined = item({ kind: 'membership', user_id: '@a:b', change: 'joined', display_name: null });
+const joined = item({
+  kind: 'membership',
+  user_id: '@a:b',
+  change: 'joined',
+  display_name: null,
+  reason: null,
+});
 const renamed = item({
   kind: 'profile_change',
   user_id: '@a:b',
@@ -154,7 +161,13 @@ test('drops a divider whose whole run was filtered out', () => {
 });
 
 test('keeps an unclassified membership change out of the timeline', () => {
-  const other = item({ kind: 'membership', user_id: '@a:b', change: 'other', display_name: null });
+  const other = item({
+    kind: 'membership',
+    user_id: '@a:b',
+    change: 'other',
+    display_name: null,
+    reason: null,
+  });
   expect(visibleTimelineItems([other, message], defaults)).toEqual([message]);
 });
 
@@ -208,6 +221,39 @@ test('words the state changes the core recognises', () => {
   );
   expect(stateEventText(stateChange({ kind: 'call_membership', joined: true }), t)).toBe(
     'timeline.callJoined:{"user":"Alice"}'
+  );
+});
+
+test('names the moderator and the reason on a membership someone else performed', () => {
+  const t = (key: string, values?: Record<string, unknown>) =>
+    `${key}:${JSON.stringify(values ?? {})}`;
+  const membership = (
+    change: MembershipChangeView,
+    reason: string | null,
+    sender: string,
+    senderName: string | null = null
+  ): TimelineItemView => ({
+    ...item({ kind: 'membership', user_id: '@bob:b', change, display_name: 'Bob', reason }),
+    sender,
+    sender_name: senderName,
+  });
+
+  expect(stateEventText(membership('kicked', null, '@alice:b', 'Alice'), t)).toBe(
+    'timeline.membershipBy.kicked:{"user":"Bob","actor":"Alice"}'
+  );
+  const key = (key: string) => key;
+  expect(stateEventText(membership('banned', 'spam', '@alice:b', 'Alice'), key)).toBe(
+    'timeline.withReason'
+  );
+
+  expect(stateEventText(membership('left', null, '@bob:b', 'Bob'), t)).toBe(
+    'timeline.membership.left:{"user":"Bob"}'
+  );
+  expect(stateEventText(membership('kicked', null, '@bob:b', 'Bob'), t)).toBe(
+    'timeline.membership.kicked:{"user":"Bob"}'
+  );
+  expect(stateEventText(membership('kicked', '', '@alice:b', 'Alice'), t)).toBe(
+    'timeline.membershipBy.kicked:{"user":"Bob","actor":"Alice"}'
   );
 });
 

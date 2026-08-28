@@ -44,11 +44,11 @@ async function present(payload: PushPayload | undefined): Promise<void> {
 
 worker.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const room = (event.notification.data as { roomId?: string } | undefined)?.roomId;
-  event.waitUntil(open(room));
+  const data = event.notification.data as { roomId?: string; eventId?: string } | undefined;
+  event.waitUntil(open(data?.roomId, data?.eventId));
 });
 
-async function open(roomId: string | undefined): Promise<void> {
+async function open(roomId: string | undefined, eventId: string | undefined): Promise<void> {
   const clients = await worker.clients.matchAll({
     type: 'window',
     includeUncontrolled: true,
@@ -56,16 +56,19 @@ async function open(roomId: string | undefined): Promise<void> {
 
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:open-room', roomId });
+    client.postMessage({ type: 'sable:open-room', roomId, eventId });
     await client.focus();
     return;
   }
 
-  const target =
-    roomId === undefined
-      ? resolve('/')
-      : resolve('/(app)/to/[...permalink]', { permalink: encodeURIComponent(roomId) });
-  await worker.clients.openWindow(target);
+  await worker.clients.openWindow(roomId === undefined ? resolve('/') : permalink(roomId, eventId));
+}
+
+function permalink(roomId: string, eventId: string | undefined): string {
+  const segments = eventId === undefined ? [roomId] : [roomId, eventId];
+  return resolve('/(app)/to/[...permalink]', {
+    permalink: segments.map((segment) => encodeURIComponent(segment)).join('/'),
+  });
 }
 
 /** Only the app can re-register a replaced subscription, so it is told to. */

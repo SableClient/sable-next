@@ -40,6 +40,8 @@ const markdown = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.marks,
     strike: { open: '~~', close: '~~', mixable: true, expelEnclosingWhitespace: true },
+    underline: { open: '__', close: '__', mixable: true, expelEnclosingWhitespace: true },
+    spoiler: { open: '||', close: '||', mixable: true, expelEnclosingWhitespace: true },
   }
 );
 

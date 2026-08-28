@@ -154,6 +154,14 @@ export const composerSchema = new Schema({
       parseDOM: [{ tag: 'code' }],
       toDOM: () => ['code', 0],
     },
+    underline: {
+      parseDOM: [{ tag: 'u' }],
+      toDOM: () => ['u', 0],
+    },
+    spoiler: {
+      parseDOM: [{ tag: 'span[data-mx-spoiler]' }],
+      toDOM: () => ['span', { 'data-mx-spoiler': '' }, 0],
+    },
     link: {
       attrs: { href: {} },
       inclusive: false,

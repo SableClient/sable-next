@@ -1,5 +1,7 @@
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
+import { localHierarchyRooms } from '../room/space-hierarchy';
+
 export function resolveRoomTarget(
   rooms: readonly RoomSummary[],
   value: string
@@ -23,6 +25,28 @@ export function resolveRoomTarget(
       room.name?.toLocaleLowerCase() === wanted ||
       room.canonical_alias?.toLocaleLowerCase().split(':')[0] === `#${localpart}`
   )?.room_id;
+}
+
+export function resolveSpaceTarget(
+  rooms: readonly RoomSummary[],
+  value: string
+): string | undefined {
+  return resolveRoomTarget(
+    rooms.filter((room) => room.is_space),
+    value
+  );
+}
+
+export function resolveSpaceRooms(
+  rooms: readonly RoomSummary[],
+  value: string
+): string[] | undefined {
+  const spaceId = resolveSpaceTarget(rooms, value);
+  if (spaceId === undefined) return undefined;
+
+  return localHierarchyRooms(rooms, spaceId)
+    .filter((room) => room.room_id !== spaceId && !room.is_space)
+    .map((room) => room.room_id);
 }
 
 export interface UserCandidate {

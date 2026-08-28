@@ -291,6 +291,16 @@
     "permImagePacks": "Manage emojis & stickers",
     "permServerAcl": "Change server ACLs",
     "permManageRooms": "Manage space rooms",
+    "permLevelCustomLabel": "Custom level for {{permission}}",
+    "permLevelNumberInvalid": "Enter a whole number.",
+    "permLevelNumberOutOfRange": "That level is out of range.",
+    "permLevelNumberExceedsOwn": "You cannot set a level above your own.",
+    "permRoleEdit": "Edit role",
+    "permRoleName": "Role name",
+    "permRoleColor": "Role colour",
+    "permRoleSave": "Save",
+    "permRoleCancel": "Cancel",
+    "permRoleRemove": "Remove role",
     "emojisFailed": "That could not be done.",
     "emojisEmpty": "This room has no packs.",
     "emojisPackEmpty": "This pack has no images.",
@@ -381,7 +391,26 @@
       "invited": "After invite",
       "joined": "After join",
       "world_readable": "All messages, including guests"
-    }
+    },
+    "joinDenied": "You do not have permission to join this room.",
+    "joinUnknownRoom": "That room could not be found.",
+    "joinRateLimited": "Too many attempts. Try again in a moment.",
+    "joinUnavailable": "The homeserver is temporarily unavailable. Try again.",
+    "leaveSpaceChildrenRoomsCount_one": "{{count}} room",
+    "leaveSpaceChildrenRoomsCount_other": "{{count}} rooms",
+    "leaveSpaceChildrenSubspacesCount_one": "{{count}} subspace",
+    "leaveSpaceChildrenSubspacesCount_other": "{{count}} subspaces",
+    "leaveSpaceChildrenWarningBoth": "You are also joined to {{rooms}} and {{subspaces}} in this space. Leaving the space alone will not remove you from them.",
+    "leaveSpaceChildrenWarningRooms": "You are also joined to {{rooms}} in this space. Leaving the space alone will not remove you from them.",
+    "leaveSpaceChildrenWarningSubspaces": "You are also joined to {{subspaces}} in this space. Leaving the space alone will not remove you from them.",
+    "leaveAllConfirm": "Leave space and all rooms",
+    "leaveFailedNames": "Could not leave: {{names}}",
+    "addToSpaceTitle": "Add {{name}} to a space",
+    "addToSpaceSearch": "Search spaces",
+    "addToSpaceEmpty": "No spaces available.",
+    "addToSpaceApply_one": "Add to {{count}} space",
+    "addToSpaceApply_other": "Add to {{count}} spaces",
+    "permRoleColorHint": "Hex colour, for example #0088ff"
   },
   "join": {
     "action": "Join",
@@ -483,7 +512,7 @@
     "profileNameSet": "{{user}} set their display name to {{name}}",
     "profileNameRemoved": "{{user}} removed their display name",
     "profileAvatarChanged": "{{user}} changed their avatar",
-    "stateEvent": "{{type}} was changed",
+    "stateEvent": "{{user}} changed {{type}}",
     "hiddenEvent": "{{type}} was sent",
     "unableToDecrypt": "Unable to decrypt: {{reason}}",
     "unsupported": "Unsupported event: {{description}}",
@@ -650,7 +679,21 @@
     "forwardSend": "Forward",
     "forwardEmpty": "No rooms match that search.",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "membershipBy": {
+      "banned": "{{actor}} banned {{user}}",
+      "unbanned": "{{actor}} unbanned {{user}}",
+      "kicked": "{{actor}} removed {{user}}",
+      "invited": "{{actor}} invited {{user}}",
+      "kicked_and_banned": "{{actor}} removed and banned {{user}}",
+      "invitation_revoked": "{{actor}} revoked {{user}}'s invitation",
+      "knock_accepted": "{{actor}} accepted {{user}}'s request to join",
+      "knock_denied": "{{actor}} denied {{user}}'s request to join"
+    },
+    "withReason": "{{text}} — {{reason}}",
+    "profileKickConfirm": "Remove {{name}} from the room?",
+    "profileBanConfirm": "Ban {{name}} from the room?",
+    "profileModerationFailed": "That action could not be completed."
   },
   "auth": {
     "welcome": "Welcome to Sable",
@@ -1069,7 +1112,15 @@
     "showRoomIconHint": "Show each room’s avatar beside its name.",
     "showRoomIconAlways": "Always",
     "showRoomIconCollapsed": "Only when collapsed",
-    "showRoomIconNever": "Never"
+    "showRoomIconNever": "Never",
+    "selectDevice": "Select {{name}}",
+    "selectAllDevices": "Select all",
+    "devicesSelectedCount_one": "{{count}} device selected",
+    "devicesSelectedCount_other": "{{count}} devices selected",
+    "removeSelectedDevices": "Sign out selected",
+    "removeSelectedDevicesConfirm_one": "Sign out {{count}} device?",
+    "removeSelectedDevicesConfirm_other": "Sign out {{count}} devices?",
+    "bulkRemoveDevicesFailed": "Could not sign out: {{names}}"
   },
   "errors": {
     "pageTitle": "Something went wrong",
@@ -1165,7 +1216,19 @@
     "strike": "Strikethrough",
     "code": "Code",
     "bulletList": "Bullet list",
+    "orderedList": "Numbered list",
     "quote": "Quote",
+    "underline": "Underline",
+    "spoiler": "Spoiler",
+    "link": "Link",
+    "codeBlock": "Code block",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "linkTitle": "Insert link",
+    "linkUrl": "URL",
+    "linkCancel": "Cancel",
+    "linkApply": "Insert",
     "closeInsert": "Close insert menu",
     "hintSend": "Enter sends · Shift+Enter newline · ↑ edits your last message",
     "hintSendModifier": "Shift+Enter sends · Enter newline · ↑ edits your last message",
@@ -1208,6 +1271,7 @@
     "pollCancel": "Cancel",
     "slashUnknown": "There is no /{{name}} command. Start a message with // to send a literal slash.",
     "slashDeveloperOnly": "This command is available when developer controls are enabled.",
+    "slashWildcardEmpty": "No member on {{server}} matches this room.",
     "slashFix": {
       "denied": "This device would not share its location.",
       "unavailable": "This device could not work out where it is.",
@@ -1280,11 +1344,11 @@
       },
       "kick": {
         "description": "Remove someone from this room",
-        "usage": "/kick <@user:server> [reason]"
+        "usage": "/kick <@user:server|@*:server> [@user:server|@*:server...] [reason]"
       },
       "ban": {
         "description": "Ban someone from this room",
-        "usage": "/ban <@user:server> [reason]"
+        "usage": "/ban <@user:server|@*:server> [@user:server|@*:server...] [reason]"
       },
       "unban": {
         "description": "Lift a ban on someone",
@@ -1293,6 +1357,30 @@
       "nick": {
         "description": "Change your display name everywhere",
         "usage": "/nick <name>"
+      },
+      "color": {
+        "description": "Set your name colour in this room",
+        "usage": "/color <#rrggbb|reset>"
+      },
+      "scolor": {
+        "description": "Set someone else's name colour in this room",
+        "usage": "/scolor <@user:server> <#rrggbb|reset>"
+      },
+      "font": {
+        "description": "Set your font in this room",
+        "usage": "/font <name|reset>"
+      },
+      "sfont": {
+        "description": "Set someone else's font in this room",
+        "usage": "/sfont <@user:server> <name|reset>"
+      },
+      "pronoun": {
+        "description": "Set your pronouns in this room",
+        "usage": "/pronoun <pronouns|reset>"
+      },
+      "spronoun": {
+        "description": "Set someone else's pronouns in this room",
+        "usage": "/spronoun <@user:server> <pronouns|reset>"
       },
       "roomname": {
         "description": "Change this room's name",
@@ -1396,7 +1484,7 @@
       },
       "delete": {
         "description": "Redact recent messages from selected users",
-        "usage": "/delete <@user:server> [-past 1d|2h|5m|30s] [-t event.type] [-r reason]"
+        "usage": "/delete <@user:server|@*:server> [-past 1d|2h|5m|30s] [-t event.type] [-r reason]"
       }
     }
   },
@@ -1431,7 +1519,11 @@
     "coveragePartial_one": "{{count}} room could not be read and will be retried next time you sign in.",
     "coveragePartial_other": "{{count}} rooms could not be read and will be retried next time you sign in.",
     "coverageStopped": "Indexing stopped at this session's limit.",
-    "coverageUnknown": "We could not check how much history has been indexed, so these results may be incomplete."
+    "coverageUnknown": "We could not check how much history has been indexed, so these results may be incomplete.",
+    "scope": "Search scope",
+    "scopeAll": "All rooms",
+    "scopeSpace": "This space",
+    "scopeSpaceLabel": "Choose a space"
   },
   "personas": {
     "title": "Per-Message Profiles",

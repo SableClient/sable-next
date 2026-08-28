@@ -484,7 +484,7 @@
           roomId={resolvedRoomId}
           revision={pinRevision}
           members={memberLoader.members}
-          canPin={permissions?.can_change_settings ?? false}
+          canPin={permissions?.can_pin ?? false}
           onJump={jumpToEvent}
         />
       {/snippet}

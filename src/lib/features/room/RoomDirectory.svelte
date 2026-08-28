@@ -10,6 +10,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { joinErrorMessage } from '#lib/rooms/join-errors.js';
   import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -30,7 +31,7 @@
 
   let search = $state('');
   let server = $state('');
-  let failedJoin = $state(false);
+  let failedJoin = $state<string | null>(null);
 
   let joinedIds = $derived(
     new Set(roomList.rooms.filter((room) => room.state === 'joined').map((room) => room.room_id))
@@ -63,7 +64,7 @@
     const knocking = lobbyAction(room.join_rule, invitedIds.has(room.room_id)) === 'knock';
 
     joining.add(room.room_id);
-    failedJoin = false;
+    failedJoin = null;
     try {
       if (knocking) {
         await core.commands.knockRoom(address);
@@ -75,7 +76,7 @@
       await goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(roomId) }));
     } catch (error) {
       console.warn('[sable directory] join failed', error);
-      failedJoin = true;
+      failedJoin = joinErrorMessage(error);
     } finally {
       joining.delete(room.room_id);
     }
@@ -111,8 +112,8 @@
   {#if directory.error}
     <Alert variant="critical" role="alert">{$i18n.t(directory.error)}</Alert>
   {/if}
-  {#if failedJoin}
-    <Alert variant="critical" role="alert">{$i18n.t('room.joinFailed')}</Alert>
+  {#if failedJoin !== null}
+    <Alert variant="critical" role="alert">{failedJoin}</Alert>
   {/if}
 
   {#if directory.rooms.length > 0}

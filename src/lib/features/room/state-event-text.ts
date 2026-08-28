@@ -32,13 +32,40 @@ function stateChangeText(change: StateChangeView, user: string, t: Translate): s
   }
 }
 
+const MODERATED: ReadonlySet<string> = new Set([
+  'banned',
+  'unbanned',
+  'kicked',
+  'invited',
+  'kicked_and_banned',
+  'invitation_revoked',
+  'knock_accepted',
+  'knock_denied',
+]);
+
+function membershipText(
+  content: Extract<TimelineItemView['content'], { kind: 'membership' }>,
+  item: TimelineItemView,
+  t: Translate
+): string {
+  const user = content.display_name ?? content.user_id;
+  const actor = item.sender_name ?? item.sender;
+  const attributed =
+    MODERATED.has(content.change) && actor !== null && item.sender !== content.user_id;
+
+  const text = attributed
+    ? t(`timeline.membershipBy.${content.change}`, { user, actor })
+    : t(`timeline.membership.${content.change}`, { user });
+
+  const reason = content.reason;
+  return reason ? t('timeline.withReason', { text, reason }) : text;
+}
+
 export function stateEventText(item: TimelineItemView, t: Translate): string {
   const content = item.content;
   switch (content.kind) {
     case 'membership':
-      return t(`timeline.membership.${content.change}`, {
-        user: content.display_name ?? content.user_id,
-      });
+      return membershipText(content, item, t);
     case 'profile_change': {
       const user = content.display_name?.old ?? content.user_id;
       if (content.display_name?.new) {
@@ -51,7 +78,7 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
     case 'state_event': {
       const user = item.sender_name ?? item.sender ?? t('timeline.unknownSender');
       if (content.change) return stateChangeText(content.change, user, t);
-      return t('timeline.stateEvent', { type: content.event_type });
+      return t('timeline.stateEvent', { user, type: content.event_type });
     }
     case 'hidden_event':
       return t('timeline.hiddenEvent', { type: content.event_type });

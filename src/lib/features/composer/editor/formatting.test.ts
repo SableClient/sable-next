@@ -5,7 +5,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, expect, test } from 'vitest';
 
-import { formattingInputRules } from './formatting';
+import { activeMarks, formatCommands, formattingInputRules } from './formatting';
 import { composerSchema } from './schema';
 
 let view: EditorView | undefined;
@@ -129,4 +129,76 @@ test('a mark rule keeps the marks the range already carried', () => {
 
   expect(view?.state.doc.textContent).toBe('a b c');
   expect(marksOn('b').sort()).toEqual(['strike', 'strong']);
+});
+
+function selectAll(): void {
+  const editor = view;
+  if (!editor) throw new Error('no editor');
+  const end = editor.state.doc.content.size;
+  editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1, end - 1)));
+}
+
+test('the underline command marks the selection', () => {
+  const editor = open();
+  type('hello');
+  selectAll();
+  formatCommands.underline(editor.state, editor.dispatch.bind(editor), editor);
+
+  expect(marksOn('hello')).toEqual(['underline']);
+  expect(activeMarks(editor.state)).toContain('underline');
+});
+
+test('the spoiler command marks the selection', () => {
+  const editor = open();
+  type('secret');
+  selectAll();
+  formatCommands.spoiler(editor.state, editor.dispatch.bind(editor), editor);
+
+  expect(marksOn('secret')).toEqual(['spoiler']);
+  expect(activeMarks(editor.state)).toContain('spoiler');
+});
+
+test('a heading command sets the level and toggles back to a paragraph', () => {
+  const editor = open();
+  type('Title');
+
+  formatCommands.heading1(editor.state, editor.dispatch.bind(editor), editor);
+  expect(editor.state.doc.firstChild?.type.name).toBe('heading');
+  expect(editor.state.doc.firstChild?.attrs.level).toBe(1);
+  expect(activeMarks(editor.state)).toContain('heading1');
+
+  formatCommands.heading1(editor.state, editor.dispatch.bind(editor), editor);
+  expect(editor.state.doc.firstChild?.type.name).toBe('paragraph');
+});
+
+test('the code_block command toggles the block type', () => {
+  const editor = open();
+  type('const x = 1');
+
+  formatCommands.code_block(editor.state, editor.dispatch.bind(editor), editor);
+  expect(editor.state.doc.firstChild?.type.name).toBe('code_block');
+  expect(activeMarks(editor.state)).toContain('code_block');
+
+  formatCommands.code_block(editor.state, editor.dispatch.bind(editor), editor);
+  expect(editor.state.doc.firstChild?.type.name).toBe('paragraph');
+});
+
+test('the ordered_list command wraps the paragraph in a numbered list', () => {
+  const editor = open();
+  type('one');
+
+  formatCommands.ordered_list(editor.state, editor.dispatch.bind(editor), editor);
+  expect(editor.state.doc.firstChild?.type.name).toBe('ordered_list');
+  expect(activeMarks(editor.state)).toContain('ordered_list');
+});
+
+test('activeMarks reports a link mark covering the selection', () => {
+  const editor = open();
+  type('docs');
+  const end = editor.state.doc.content.size;
+  const href = { href: 'https://example.org' };
+  editor.dispatch(editor.state.tr.addMark(1, end - 1, composerSchema.marks.link.create(href)));
+  selectAll();
+
+  expect(activeMarks(editor.state)).toContain('link');
 });

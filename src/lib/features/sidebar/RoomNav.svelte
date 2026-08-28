@@ -194,7 +194,8 @@
     if (directSection) {
       return roomList.rooms
         .filter((room) => room.state === 'joined' && room.is_direct)
-        .map(roomRow);
+        .map(roomRow)
+        .toSorted(byRecency);
     }
 
     if (page.url.pathname.startsWith('/space')) {
@@ -218,7 +219,18 @@
   });
   let subspaces = $derived(spaceRootItems.filter((item) => item.kind === 'category'));
   let visibleSubspaces = $derived<RoomNavItem[]>(visibleItems(subspaces));
-  let visibleRooms = $derived<RoomNavItem[]>([...(roomsClosed ? [] : rooms), ...visibleSubspaces]);
+  let collapsedRooms = $derived(
+    rooms.filter((item) => {
+      const room = item.room;
+      if (room === undefined) return false;
+      if (page.url.pathname === roomHref(item)) return true;
+      return !roomList.mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0);
+    })
+  );
+  let visibleRooms = $derived<RoomNavItem[]>([
+    ...(roomsClosed ? collapsedRooms : rooms),
+    ...visibleSubspaces,
+  ]);
 
   function roomRow(room: RoomSummary): RoomNavRow {
     return { room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id };

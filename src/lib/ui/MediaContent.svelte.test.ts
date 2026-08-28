@@ -54,6 +54,28 @@ test.each([
   }
 );
 
+test('renders the extension badge and human-readable size for a file attachment', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'file',
+      source: 'mxc://example.org/file',
+      mime: 'application/pdf',
+      body: 'report.pdf',
+      size: 1_500_000,
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.media-file-ext')?.textContent).toBe('pdf');
+  expect(document.querySelector('.media-file-size')?.textContent).toBe('1.5 MB');
+  await unmount(instance);
+});
+
 test('labels unavailable attachments', async () => {
   core.fetchMedia
     .mockRejectedValueOnce(new Error('media unavailable'))

@@ -28,6 +28,9 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
@@ -225,6 +228,43 @@
     };
   }
 
+  let moderationAction = $state<'kick' | 'ban' | null>(null);
+  let moderationReason = $state('');
+  let moderationBusy = $state(false);
+  let moderationFailed = $state(false);
+  const moderationFieldId = $props.id();
+
+  function openModeration(action: 'kick' | 'ban'): void {
+    moderationAction = action;
+    moderationReason = '';
+    moderationFailed = false;
+  }
+
+  function cancelModeration(): void {
+    moderationAction = null;
+    moderationReason = '';
+  }
+
+  async function confirmModeration(): Promise<void> {
+    const action = moderationAction;
+    if (!action || moderationBusy) return;
+
+    const reason = moderationReason.trim();
+    moderationBusy = true;
+    moderationFailed = false;
+    try {
+      if (action === 'kick') await core.commands.kickUser(roomId, userId, reason || null);
+      else await core.commands.banUser(roomId, userId, reason || null);
+      moderationAction = null;
+      moderationReason = '';
+    } catch (error) {
+      console.warn('[sable profile] moderation action failed', error);
+      moderationFailed = true;
+    } finally {
+      moderationBusy = false;
+    }
+  }
+
   function setPowerLevel(level: number): void {
     void core.commands.setUserPowerLevel(roomId, userId, level).catch((error: unknown) => {
       console.warn('[sable profile] power level change failed', error);
@@ -386,7 +426,9 @@
         {#if canKick}
           <DropdownMenu.Item
             class="sable-menu-item sable-menu-item-destructive profile-menu-destructive"
-            onSelect={moderate(core.commands.kickUser)}
+            onSelect={() => {
+              openModeration('kick');
+            }}
           >
             <SignOutIcon />
             {$i18n.t('timeline.profileKick')}
@@ -398,7 +440,9 @@
               'sable-menu-item sable-menu-item-destructive profile-menu-destructive',
               canKick && 'profile-menu-grouped',
             ]}
-            onSelect={moderate(core.commands.banUser)}
+            onSelect={() => {
+              openModeration('ban');
+            }}
           >
             <GavelIcon />
             {$i18n.t('timeline.profileBan')}
@@ -520,6 +564,41 @@
   composer={canMessage ? composer : undefined}
   {variant}
 />
+
+<DialogFrame
+  open={moderationAction !== null}
+  onOpenChange={(next) => {
+    if (!next) cancelModeration();
+  }}
+  variant="verification"
+  label={moderationAction === 'ban'
+    ? $i18n.t('timeline.profileBan')
+    : $i18n.t('timeline.profileKick')}
+>
+  {#if moderationAction}
+    <div class="moderation">
+      <h2>
+        {moderationAction === 'ban'
+          ? $i18n.t('timeline.profileBanConfirm', { name: displayName })
+          : $i18n.t('timeline.profileKickConfirm', { name: displayName })}
+      </h2>
+      {#if moderationFailed}
+        <Alert variant="critical" role="alert">{$i18n.t('timeline.profileModerationFailed')}</Alert>
+      {/if}
+      <FormField fieldId={moderationFieldId} label={$i18n.t('timeline.deleteReason')}>
+        <TextInput id={moderationFieldId} bind:value={moderationReason} autocomplete="off" />
+      </FormField>
+      <div class="moderation-actions">
+        <Button variant="ghost" onclick={cancelModeration}>{$i18n.t('timeline.cancel')}</Button>
+        <Button variant="danger" loading={moderationBusy} onclick={confirmModeration}>
+          {moderationAction === 'ban'
+            ? $i18n.t('timeline.profileBan')
+            : $i18n.t('timeline.profileKick')}
+        </Button>
+      </div>
+    </div>
+  {/if}
+</DialogFrame>
 
 <style>
   .profile-meta-item {
@@ -705,5 +784,24 @@
   .profile-extra dd {
     margin: 0 0 var(--space-1);
     overflow-wrap: anywhere;
+  }
+
+  .moderation {
+    display: grid;
+    gap: var(--space-2);
+    width: min(27rem, 100%);
+  }
+
+  .moderation h2 {
+    font-size: var(--font-size-large);
+    line-height: 1.3;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .moderation-actions {
+    display: flex;
+    gap: var(--space-1);
+    justify-content: flex-end;
   }
 </style>

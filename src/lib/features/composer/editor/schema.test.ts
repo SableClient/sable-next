@@ -126,3 +126,27 @@ test('an ordinary link stays text, so only real mentions become atoms', () => {
   expect(doc.textContent).toBe('see the docs');
   expect(doc.firstChild?.child(0).type.name).toBe('text');
 });
+
+test('underline serialises to <u> and parses back for edit', () => {
+  const { underline } = composerSchema.marks;
+  const doc = composerSchema.node('doc', null, [
+    paragraph.create(null, composerSchema.text('under', [underline.create()])),
+  ]);
+
+  expect(html(doc)).toBe('<p><u>under</u></p>');
+  expect(parse(html(doc)).firstChild?.firstChild?.marks.map((mark) => mark.type.name)).toEqual([
+    'underline',
+  ]);
+});
+
+test('a spoiler serialises to the data-mx-spoiler span and parses back for edit', () => {
+  const { spoiler } = composerSchema.marks;
+  const doc = composerSchema.node('doc', null, [
+    paragraph.create(null, composerSchema.text('shh', [spoiler.create()])),
+  ]);
+
+  expect(html(doc)).toBe('<p><span data-mx-spoiler="">shh</span></p>');
+  expect(parse(html(doc)).firstChild?.firstChild?.marks.map((mark) => mark.type.name)).toEqual([
+    'spoiler',
+  ]);
+});

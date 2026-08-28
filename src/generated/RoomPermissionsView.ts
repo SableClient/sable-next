@@ -12,7 +12,7 @@ can_redact_others: boolean, can_invite: boolean, can_kick: boolean, can_ban: boo
  * `m.room.name`, `m.room.topic` and `m.room.avatar` share one level in
  * practice, so they are reported together.
  */
-can_change_settings: boolean, can_change_join_rule: boolean, can_change_power_levels: boolean, 
+can_change_settings: boolean, can_pin: boolean, can_change_join_rule: boolean, can_change_power_levels: boolean, 
 /**
  * `m.space.child`. Meaningless outside a space.
  */

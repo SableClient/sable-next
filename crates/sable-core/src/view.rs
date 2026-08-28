@@ -13,7 +13,7 @@ use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
-use matrix_sdk::ruma::events::room::member::MembershipState;
+use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
@@ -783,6 +783,17 @@ fn per_message_profile(content: Option<&serde_json::Value>) -> Option<PerMessage
     })
 }
 
+fn membership_reason(content: &StateEventContentChange<RoomMemberEventContent>) -> Option<String> {
+    let StateEventContentChange::Original { content, .. } = content else {
+        return None;
+    };
+    content
+        .reason
+        .as_deref()
+        .filter(|reason| !reason.trim().is_empty())
+        .map(ToOwned::to_owned)
+}
+
 const fn membership_change(change: Option<MembershipChange>) -> MembershipChangeView {
     match change {
         Some(MembershipChange::Joined) => MembershipChangeView::Joined,
@@ -1064,6 +1075,7 @@ fn message_content(
             body: file.body.clone(),
             source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+            size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
         },
         MessageType::Location(location) => {
             let coordinates = geo_coordinates(&location.geo_uri);
@@ -1130,6 +1142,7 @@ fn content(
             user_id: change.user_id().to_owned(),
             change: membership_change(change.change()),
             display_name: change.display_name(),
+            reason: membership_reason(change.content()),
         },
 
         TimelineItemContent::ProfileChange(change) => TimelineItemContentView::ProfileChange {
@@ -1255,6 +1268,7 @@ pub fn room_permissions(power_levels: &RoomPowerLevels, user_id: &UserId) -> Roo
         can_kick: power_levels.user_can_kick(user_id),
         can_ban: power_levels.user_can_ban(user_id),
         can_change_settings: power_levels.user_can_send_state(user_id, StateEventType::RoomName),
+        can_pin: power_levels.user_can_send_state(user_id, StateEventType::RoomPinnedEvents),
         can_change_join_rule: power_levels
             .user_can_send_state(user_id, StateEventType::RoomJoinRules),
         can_change_power_levels: power_levels

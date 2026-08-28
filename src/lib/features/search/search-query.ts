@@ -1,7 +1,15 @@
 import type { SearchAttachment } from '#src/generated/SearchAttachment';
 import type { SearchFilter } from '#src/generated/SearchFilter';
 
-export type SearchOperator = 'in' | 'from' | 'mentions' | 'has' | 'before' | 'after' | 'during';
+export type SearchOperator =
+  | 'in'
+  | 'space'
+  | 'from'
+  | 'mentions'
+  | 'has'
+  | 'before'
+  | 'after'
+  | 'during';
 
 export interface SearchToken {
   operator: SearchOperator;
@@ -21,6 +29,7 @@ export interface ParsedQuery {
 
 export const SEARCH_OPERATORS: readonly SearchOperator[] = [
   'in',
+  'space',
   'from',
   'mentions',
   'has',
@@ -118,6 +127,7 @@ function startOfDay(value: string): number | null {
 export interface QueryResolvers {
   roomId: (value: string) => string | undefined;
   userId: (value: string) => string | undefined;
+  spaceRooms: (value: string) => string[] | undefined;
 }
 
 export interface ResolvedQuery {
@@ -147,6 +157,12 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
       case 'in': {
         const roomId = resolve.roomId(token.value);
         if (roomId) (token.negated ? filter.not_rooms : filter.rooms).push(roomId);
+        else unresolved.push(token);
+        break;
+      }
+      case 'space': {
+        const roomIds = resolve.spaceRooms(token.value);
+        if (roomIds) (token.negated ? filter.not_rooms : filter.rooms).push(...roomIds);
         else unresolved.push(token);
         break;
       }

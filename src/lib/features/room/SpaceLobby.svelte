@@ -2,13 +2,14 @@
   import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import type { RoomSummary } from '#src/generated/RoomSummary';
   import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import type { DropEdge } from '#lib/ui/drag-list.js';
+  import { joinErrorMessage } from '#lib/rooms/join-errors.js';
   import { matrixToUrl } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -46,6 +47,7 @@
   const roomList = useRoomList();
   const joining = new SvelteSet<string>();
   const knocked = new SvelteSet<string>();
+  const joinErrors = new SvelteMap<string, string>();
   const removed = new SvelteSet<string>();
   const closed = new SvelteSet<string>();
   const loadedLevels = new SvelteSet<string>();
@@ -109,6 +111,7 @@
     failedLevels.clear();
     removed.clear();
     knocked.clear();
+    joinErrors.clear();
     closed.clear();
   });
 
@@ -216,6 +219,7 @@
   async function join(child: HierarchyRoomView): Promise<void> {
     if (joining.has(child.room_id)) return;
     joining.add(child.room_id);
+    joinErrors.delete(child.room_id);
     try {
       const address = child.canonical_alias ?? child.room_id;
       if (lobbyAction(child.join_rule, invitedIds.has(child.room_id)) === 'knock') {
@@ -227,6 +231,7 @@
       open(child);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
+      joinErrors.set(child.room_id, joinErrorMessage(error));
     } finally {
       joining.delete(child.room_id);
     }
@@ -355,6 +360,7 @@
         {invitedIds}
         {joining}
         {knocked}
+        {joinErrors}
         {canManage}
         {label}
         onToggle={toggle}

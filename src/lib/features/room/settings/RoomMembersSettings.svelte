@@ -8,6 +8,8 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -135,6 +137,45 @@
     if (!target || level === member.power_level) return;
     void act(member.user_id, () => core.commands.setUserPowerLevel(target, member.user_id, level));
   }
+
+  let moderationTarget = $state<{ userId: string; action: 'kick' | 'ban' } | null>(null);
+  let moderationReason = $state('');
+  let moderationBusy = $state(false);
+  let moderationMember = $derived.by(() => {
+    const target = moderationTarget;
+    if (target === null) return null;
+    return members.find((member) => member.user_id === target.userId) ?? null;
+  });
+
+  function openModeration(userId: string, action: 'kick' | 'ban'): void {
+    moderationTarget = { userId, action };
+    moderationReason = '';
+  }
+
+  function cancelModeration(): void {
+    moderationTarget = null;
+    moderationReason = '';
+  }
+
+  async function confirmModeration(): Promise<void> {
+    const target = moderationTarget;
+    const room = roomId;
+    if (!target || !room || moderationBusy) return;
+
+    const reason = moderationReason.trim() || null;
+    moderationBusy = true;
+    try {
+      await act(target.userId, () =>
+        target.action === 'kick'
+          ? core.commands.kickUser(room, target.userId, reason)
+          : core.commands.banUser(room, target.userId, reason)
+      );
+    } finally {
+      moderationBusy = false;
+      moderationTarget = null;
+      moderationReason = '';
+    }
+  }
 </script>
 
 <div class="section">
@@ -226,11 +267,7 @@
                     variant="secondary"
                     disabled={busy === member.user_id}
                     onclick={() => {
-                      const target = roomId;
-                      if (target)
-                        void act(member.user_id, () =>
-                          core.commands.kickUser(target, member.user_id)
-                        );
+                      openModeration(member.user_id, 'kick');
                     }}
                   >
                     {$i18n.t('timeline.profileKick')}
@@ -242,11 +279,7 @@
                     variant="danger"
                     disabled={busy === member.user_id}
                     onclick={() => {
-                      const target = roomId;
-                      if (target)
-                        void act(member.user_id, () =>
-                          core.commands.banUser(target, member.user_id)
-                        );
+                      openModeration(member.user_id, 'ban');
                     }}
                   >
                     {$i18n.t('timeline.profileBan')}
@@ -260,6 +293,50 @@
     </SettingsSection>
   {/if}
 </div>
+
+<DialogFrame
+  open={moderationTarget !== null}
+  onOpenChange={(next) => {
+    if (!next) cancelModeration();
+  }}
+  variant="verification"
+  label={moderationTarget?.action === 'ban'
+    ? $i18n.t('timeline.profileBan')
+    : $i18n.t('timeline.profileKick')}
+>
+  {#if moderationTarget}
+    <div class="moderation">
+      <h2>
+        {moderationTarget.action === 'ban'
+          ? $i18n.t('timeline.profileBanConfirm', {
+              name: moderationMember ? memberName(moderationMember) : moderationTarget.userId,
+            })
+          : $i18n.t('timeline.profileKickConfirm', {
+              name: moderationMember ? memberName(moderationMember) : moderationTarget.userId,
+            })}
+      </h2>
+      <FormField fieldId="member-moderation-reason" label={$i18n.t('timeline.deleteReason')}>
+        <TextInput id="member-moderation-reason" bind:value={moderationReason} autocomplete="off" />
+      </FormField>
+      <div class="moderation-actions">
+        <Button variant="ghost" disabled={moderationBusy} onclick={cancelModeration}>
+          {$i18n.t('timeline.cancel')}
+        </Button>
+        <Button
+          variant="danger"
+          loading={moderationBusy}
+          onclick={() => {
+            void confirmModeration();
+          }}
+        >
+          {moderationTarget.action === 'ban'
+            ? $i18n.t('timeline.profileBan')
+            : $i18n.t('timeline.profileKick')}
+        </Button>
+      </div>
+    </div>
+  {/if}
+</DialogFrame>
 
 <style>
   .section {
@@ -314,5 +391,24 @@
   .power {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  .moderation {
+    display: grid;
+    gap: var(--space-2);
+    width: min(27rem, 100%);
+  }
+
+  .moderation h2 {
+    font-size: var(--font-size-large);
+    line-height: 1.3;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .moderation-actions {
+    display: flex;
+    gap: var(--space-1);
+    justify-content: flex-end;
   }
 </style>

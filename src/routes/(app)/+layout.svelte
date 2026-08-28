@@ -15,6 +15,7 @@
     RoomList,
     roomPathParamFromId,
   } from '#lib/rooms/room-list.svelte.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/features/room/bookmarks.svelte.js';
@@ -177,12 +178,12 @@
 
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
-        | { type?: string; roomId?: string }
+        | { type?: string; roomId?: string; eventId?: string }
         | undefined;
 
       if (message?.type === 'sable:push-resubscribe') resync();
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
-        void goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(message.roomId) }));
+        void goto(roomSectionPath(roomList.rooms, message.roomId, message.eventId));
       }
     });
   });

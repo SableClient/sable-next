@@ -31,7 +31,7 @@
       description: 'home.startRoomDescription',
     },
     {
-      href: undefined,
+      href: resolve('direct'),
       icon: ChatCircleDotsIcon,
       title: 'home.joinConversationTitle',
       description: 'home.joinConversationDescription',

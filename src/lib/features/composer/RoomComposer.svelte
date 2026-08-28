@@ -34,6 +34,7 @@
   import PersonaPicker from './PersonaPicker.svelte';
   import PollComposer from './PollComposer.svelte';
   import ComposerFormatting from './ComposerFormatting.svelte';
+  import ComposerLinkDialog from './ComposerLinkDialog.svelte';
   import LocationComposer from './LocationComposer.svelte';
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
   import { formattedForEditing, type ComposerContext } from './composer-context';
@@ -137,6 +138,7 @@
   let error = $state<string | null>(null);
   let pollOpen = $state(false);
   let locationOpen = $state(false);
+  let linkDialogOpen = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
   let activeFormats = $state.raw<FormatAction[]>([]);
@@ -202,6 +204,9 @@
     },
     onNavigate: navigate,
     onFiles: stage,
+    onLinkRequest: () => {
+      linkDialogOpen = true;
+    },
   });
 
   $effect(() => {
@@ -743,6 +748,13 @@
     }}
   />
 {/if}
+
+<ComposerLinkDialog
+  bind:open={linkDialogOpen}
+  onApply={(href: string) => {
+    editor.applyLink(href);
+  }}
+/>
 
 <style>
   .composer-stack {

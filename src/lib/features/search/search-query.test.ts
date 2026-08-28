@@ -5,6 +5,8 @@ import { parseSearchQuery, toSearchFilter } from './search-query';
 const resolve = {
   roomId: (value: string) => (value === 'dev' ? '!dev:example.org' : undefined),
   userId: (value: string) => (value === 'erwan' ? '@erwan:example.org' : undefined),
+  spaceRooms: (value: string) =>
+    value === 'eng' ? ['!dev:example.org', '!ops:example.org'] : undefined,
 };
 
 function filterFor(query: string) {
@@ -55,6 +57,26 @@ test('a negated sender is denied by identity, not as a body substring', () => {
   expect(filter.senders).toEqual([]);
   expect(filter.not_senders).toEqual(['@erwan:example.org']);
   expect(filter.exclude).toEqual([]);
+});
+
+test('a space token expands to its resolved room ids', () => {
+  const filter = filterFor('deploy space:eng');
+
+  expect(filter.rooms).toEqual(['!dev:example.org', '!ops:example.org']);
+});
+
+test('a negated space token denies its resolved room ids', () => {
+  const filter = filterFor('deploy -space:eng');
+
+  expect(filter.rooms).toEqual([]);
+  expect(filter.not_rooms).toEqual(['!dev:example.org', '!ops:example.org']);
+});
+
+test('an unresolvable space is reported rather than silently widening the search', () => {
+  const { filter, unresolved } = resolveFor('deploy space:unknown');
+
+  expect(filter.rooms).toEqual([]);
+  expect(unresolved.map((token) => token.value)).toEqual(['unknown']);
 });
 
 test('a negated room is denied by identity', () => {
@@ -158,6 +180,7 @@ test('a colon inside a matrix id survives', () => {
   const withId = {
     roomId: () => undefined,
     userId: (value: string) => (value === '@erwan:example.org' ? value : undefined),
+    spaceRooms: () => undefined,
   };
   const { filter } = toSearchFilter(parseSearchQuery('from:@erwan:example.org'), withId);
 

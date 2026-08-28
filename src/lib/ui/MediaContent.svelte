@@ -2,7 +2,9 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
+  import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
+  import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
 
   interface Props {
@@ -12,6 +14,7 @@
     kind: 'audio' | 'video' | 'file';
     width?: number | null;
     height?: number | null;
+    size?: number | null;
     class?: string;
   }
 
@@ -22,6 +25,7 @@
     kind,
     width = null,
     height = null,
+    size = null,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -55,6 +59,8 @@
         ? '16 / 9'
         : undefined
   );
+  let extension = $derived(mimeExtension(mime));
+  let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
   let retryLabel = $derived(
     retryWait === 0
@@ -153,10 +159,18 @@
       </audio>
     {:else}
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->
-      <a class="media-file" href={url} download={mediaLabel} onclick={download}>{mediaLabel}</a>
+      <a class="media-file" href={url} download={mediaLabel} onclick={download}>
+        {#if extension}<span class="media-file-ext">{extension}</span>{/if}
+        <span class="media-file-name">{mediaLabel}</span>
+        {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
+      </a>
     {/if}
   {:else if kind === 'file'}
-    <span class="media-file">{mediaLabel}</span>
+    <span class="media-file">
+      {#if extension}<span class="media-file-ext">{extension}</span>{/if}
+      <span class="media-file-name">{mediaLabel}</span>
+      {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
+    </span>
   {/if}
 </div>
 
@@ -195,10 +209,32 @@
   }
 
   .media-file {
+    align-items: center;
     color: var(--sable-primary-main);
-    display: inline-block;
+    display: inline-flex;
+    gap: var(--space-100);
     margin-top: var(--space-100);
+    max-width: 100%;
+  }
+
+  .media-file-ext {
+    background: var(--sable-surface-container);
+    border-radius: var(--radius-pill);
+    color: var(--sable-surface-on-container);
+    flex: none;
+    font-size: var(--font-size-small);
+    padding: var(--space-hairline) var(--space-100);
+    text-transform: uppercase;
+  }
+
+  .media-file-name {
     overflow-wrap: anywhere;
+  }
+
+  .media-file-size {
+    color: var(--sable-surface-var-on-container);
+    flex: none;
+    font-size: var(--font-size-small);
   }
 
   .media-error {

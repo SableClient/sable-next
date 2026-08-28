@@ -1,3 +1,4 @@
+import type { MemberView } from '#src/generated/MemberView';
 import type { MessageKind } from '#src/generated/MessageKind';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
@@ -21,6 +22,7 @@ export type SlashCommandApi = Pick<
   | 'leaveRoom'
   | 'personas'
   | 'removePersona'
+  | 'roomMembers'
   | 'roomStateEvent'
   | 'sendRawEvent'
   | 'savePersona'
@@ -153,6 +155,52 @@ function splitTargetUser(args: string): { userId: string; reason: string | null 
   return { userId: first, reason: reason === '' ? null : reason };
 }
 
+const SERVER_WILDCARD = /^@\*:(\S+)$/;
+
+function isTargetToken(token: string): boolean {
+  return USER_ID.test(token) || SERVER_WILDCARD.test(token);
+}
+
+function targetTokens(args: string): { tokens: string[]; reason: string | null } | null {
+  const all = words(args);
+  let end = 0;
+  while (end < all.length && isTargetToken(all[end])) end += 1;
+  if (end === 0) return null;
+
+  const reason = all.slice(end).join(' ').trim();
+  return { tokens: all.slice(0, end), reason: reason === '' ? null : reason };
+}
+
+async function resolveTargets(
+  tokens: readonly string[],
+  roomId: string,
+  commands: SlashCommandApi,
+  excludeBanned: boolean
+): Promise<{ userIds: string[] } | SlashOutcome> {
+  const userIds = new Set<string>();
+  let members: MemberView[] | null = null;
+
+  for (const token of tokens) {
+    const wildcard = SERVER_WILDCARD.exec(token);
+    if (wildcard === null) {
+      userIds.add(token);
+      continue;
+    }
+
+    const server = wildcard[1];
+    members ??= await commands.roomMembers(roomId);
+    const matches = members
+      .filter((member) => member.user_id.endsWith(`:${server}`))
+      .filter((member) => !excludeBanned || member.membership !== 'ban');
+    if (matches.length === 0) {
+      return { kind: 'error', key: 'composer.slashWildcardEmpty', values: { server } };
+    }
+    for (const match of matches) userIds.add(match.user_id);
+  }
+
+  return { userIds: [...userIds] };
+}
+
 type ModerationVerb = Extract<keyof SlashCommandApi, 'banUser' | 'kickUser' | 'unbanUser'>;
 
 function moderation(name: string, verb: ModerationVerb): SlashCommand {
@@ -163,6 +211,27 @@ function moderation(name: string, verb: ModerationVerb): SlashCommand {
       if (target === null) return usageError(name);
 
       await commands[verb](roomId, target.userId, target.reason);
+      return { kind: 'done' };
+    },
+  };
+}
+
+function moderationTargets(
+  name: string,
+  verb: ModerationVerb,
+  excludeBanned: boolean
+): SlashCommand {
+  return {
+    name,
+    run: async (args, { roomId, commands }) => {
+      const parsed = targetTokens(args);
+      if (parsed === null) return usageError(name);
+
+      const resolved = await resolveTargets(parsed.tokens, roomId, commands, excludeBanned);
+      if (!('userIds' in resolved)) return resolved;
+      if (resolved.userIds.length === 0) return usageError(name);
+
+      for (const userId of resolved.userIds) await commands[verb](roomId, userId, parsed.reason);
       return { kind: 'done' };
     },
   };
@@ -188,6 +257,78 @@ function memberProfile(
         membership: 'join',
         ...fields,
       });
+      return { kind: 'done' };
+    },
+  };
+}
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const PRONOUN_ENTRY = /^([a-z]{2}):(.+)$/;
+
+function isReset(text: string): boolean {
+  return text === '' || text.toLowerCase() === 'reset' || text.toLowerCase() === 'clear';
+}
+
+function colorContent(text: string): Record<string, unknown> | null {
+  if (isReset(text)) return {};
+  return HEX_COLOR.test(text) ? { on_dark: text, on_light: text } : null;
+}
+
+function fontContent(text: string): Record<string, unknown> | null {
+  if (isReset(text)) return {};
+  const font = text.replaceAll(/[;{}<>]/g, '').slice(0, 32);
+  return font === '' ? null : { font };
+}
+
+function pronounContent(text: string): Record<string, unknown> | null {
+  if (isReset(text)) return {};
+  const pronouns = text.split(',').map((entry) => {
+    const trimmed = entry.trim();
+    const match = PRONOUN_ENTRY.exec(trimmed);
+    return match ? { language: match[1], summary: match[2].trim() } : { summary: trimmed };
+  });
+  return { pronouns };
+}
+
+const COSMETIC_EVENT_TYPES = {
+  color: 'moe.sable.room.cosmetics.color',
+  font: 'moe.sable.room.cosmetics.font',
+  pronoun: 'moe.sable.room.cosmetics.pronouns',
+} as const;
+
+function ownCosmetic(
+  name: keyof typeof COSMETIC_EVENT_TYPES,
+  build: (text: string) => Record<string, unknown> | null
+): SlashCommand {
+  return {
+    name,
+    run: async (args, { roomId, userId, commands }) => {
+      if (userId === null) return usageError(name);
+
+      const content = build(args.trim());
+      if (content === null) return usageError(name);
+
+      await commands.sendStateEvent(roomId, COSMETIC_EVENT_TYPES[name], userId, content);
+      return { kind: 'done' };
+    },
+  };
+}
+
+function otherCosmetic(
+  name: string,
+  eventType: string,
+  build: (text: string) => Record<string, unknown> | null
+): SlashCommand {
+  return {
+    name,
+    run: async (args, { roomId, commands }) => {
+      const [first, ...rest] = args.trim().split(/\s+/);
+      if (!USER_ID.test(first)) return usageError(name);
+
+      const content = build(rest.join(' ').trim());
+      if (content === null) return usageError(name);
+
+      await commands.sendStateEvent(roomId, eventType, first, content);
       return { kind: 'done' };
     },
   };
@@ -288,7 +429,7 @@ function rawEventArgs(
 }
 
 function deleteArgs(args: string): {
-  senders: string[];
+  senderTokens: string[];
   afterTs: number;
   eventTypes: string[];
   reason: string | null;
@@ -303,11 +444,11 @@ function deleteArgs(args: string): {
   const value = Number(pastMatch[1]);
   const units = { d: 24 * 60 * 60 * 1000, h: 60 * 60 * 1000, m: 60 * 1000, s: 1000 };
   const afterTs = Date.now() - value * units[pastMatch[2] as keyof typeof units];
-  const senders = userIds(targets);
-  if (senders.length === 0 || !Number.isSafeInteger(afterTs)) return null;
+  const senderTokens = words(targets).filter(isTargetToken);
+  if (senderTokens.length === 0 || !Number.isSafeInteger(afterTs)) return null;
 
   return {
-    senders,
+    senderTokens,
     afterTs,
     eventTypes: flags.get('t') ?? [],
     reason: flags.get('r')?.join(' ') || null,
@@ -392,10 +533,16 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       return { kind: 'done' };
     },
   },
-  moderation('kick', 'kickUser'),
-  moderation('ban', 'banUser'),
+  moderationTargets('kick', 'kickUser', true),
+  moderationTargets('ban', 'banUser', false),
   moderation('unban', 'unbanUser'),
   setter('nick', (text, { commands }) => commands.setDisplayName(text)),
+  ownCosmetic('color', colorContent),
+  otherCosmetic('scolor', COSMETIC_EVENT_TYPES.color, colorContent),
+  ownCosmetic('font', fontContent),
+  otherCosmetic('sfont', COSMETIC_EVENT_TYPES.font, fontContent),
+  ownCosmetic('pronoun', pronounContent),
+  otherCosmetic('spronoun', COSMETIC_EVENT_TYPES.pronoun, pronounContent),
   setter('roomname', (text, { roomId, commands }) => commands.setRoomName(roomId, text)),
   setter('topic', (text, { roomId, commands }) => commands.setRoomTopic(roomId, text)),
   eachUser('disinvite', (userId, { roomId, commands }) => commands.kickUser(roomId, userId)),
@@ -706,9 +853,18 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       const parsed = deleteArgs(args);
       if (parsed === null) return usageError('delete');
 
+      const resolved = await resolveTargets(
+        parsed.senderTokens,
+        context.roomId,
+        context.commands,
+        false
+      );
+      if (!('userIds' in resolved)) return resolved;
+      if (resolved.userIds.length === 0) return usageError('delete');
+
       await context.commands.bulkRedact(
         context.roomId,
-        parsed.senders,
+        resolved.userIds,
         parsed.afterTs,
         parsed.eventTypes,
         parsed.reason

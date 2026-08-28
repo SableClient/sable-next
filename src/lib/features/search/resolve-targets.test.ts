@@ -2,7 +2,14 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-import { resolveRoomTarget, resolveUserTarget } from './resolve-targets';
+import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
+
+import {
+  resolveRoomTarget,
+  resolveSpaceRooms,
+  resolveSpaceTarget,
+  resolveUserTarget,
+} from './resolve-targets';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -100,4 +107,44 @@ test('a bare localpart is not mistaken for an id', () => {
 test('a display name resolves, including one with a space', () => {
   expect(resolveUserTarget(senders, 'Ada Lovelace')).toBe('@ada:example.org');
   expect(resolveUserTarget(senders, 'ada lovelace')).toBe('@ada:example.org');
+});
+
+function edge(roomId: string): SpaceChildEdge {
+  return { room_id: roomId, order: null, origin_server_ts: 0, suggested: false };
+}
+
+const spaceRooms = [
+  room({
+    room_id: '!eng:example.org',
+    canonical_alias: '#eng:example.org',
+    name: 'Engineering',
+    is_space: true,
+    space_children: [edge('!dev:example.org'), edge('!subteam:example.org')],
+  }),
+  room({
+    room_id: '!subteam:example.org',
+    name: 'Subteam',
+    is_space: true,
+    space_children: [edge('!ops:example.org')],
+  }),
+  room({ room_id: '!dev:example.org', canonical_alias: '#dev:example.org', name: 'Dev' }),
+  room({ room_id: '!ops:example.org', canonical_alias: '#ops:example.org', name: 'Ops' }),
+  room({ room_id: '!unrelated:example.org', name: 'Unrelated' }),
+];
+
+test('a space alias or name resolves to the space room id', () => {
+  expect(resolveSpaceTarget(spaceRooms, 'eng')).toBe('!eng:example.org');
+  expect(resolveSpaceTarget(spaceRooms, 'Engineering')).toBe('!eng:example.org');
+});
+
+test('a non-space room is not resolved as a space', () => {
+  expect(resolveSpaceTarget(spaceRooms, 'Dev')).toBeUndefined();
+});
+
+test('a space resolves to every non-space room in its subtree', () => {
+  expect(resolveSpaceRooms(spaceRooms, 'eng')).toEqual(['!dev:example.org', '!ops:example.org']);
+});
+
+test('an unknown space resolves to nothing', () => {
+  expect(resolveSpaceRooms(spaceRooms, 'nowhere')).toBeUndefined();
 });

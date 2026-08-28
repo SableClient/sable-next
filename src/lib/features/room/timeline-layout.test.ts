@@ -184,8 +184,9 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
     case 'sticker':
       return { kind, ...media };
     case 'audio':
-    case 'file':
       return { kind, body: '', source: media.source, mime: null };
+    case 'file':
+      return { kind, body: '', source: media.source, mime: null, size: null };
     case 'location':
       return { kind, body: 'Big Ben', geo_uri: 'geo:51.5,-0.12', latitude: 51.5, longitude: -0.12 };
     case 'gallery':
@@ -207,7 +208,7 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
     case 'unable_to_decrypt':
       return { kind, reason: 'undecryptable' };
     case 'membership':
-      return { kind, user_id: '@a:b', change: 'joined', display_name: null };
+      return { kind, user_id: '@a:b', change: 'joined', display_name: null, reason: null };
     case 'profile_change':
       return { kind, user_id: '@a:b', display_name: null, avatar_changed: true };
     case 'state_event':

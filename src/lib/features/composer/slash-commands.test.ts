@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
+import type { MemberView } from '#src/generated/MemberView';
 import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
 import type { PersonaView } from '#src/generated/PersonaView';
 
@@ -52,6 +53,7 @@ function fakeCommands() {
         reason: string | null
       ) => Promise<number>
     >(() => Promise.resolve(0)),
+    roomMembers: vi.fn(() => Promise.resolve<MemberView[]>([])),
   };
 }
 
@@ -588,4 +590,218 @@ test('/usepmp latches a profile and resets it', async () => {
 
   await runSlash('/usepmp reset', context(commands));
   expect(commands.setPersonaSelection).toHaveBeenLastCalledWith('!room:example.org', null);
+});
+
+function member(userId: string, membership: MemberView['membership'] = 'join'): MemberView {
+  return { user_id: userId, display_name: null, avatar_url: null, power_level: 0, membership };
+}
+
+test.each([
+  [
+    'color',
+    'moe.sable.room.cosmetics.color',
+    '#ff00ff',
+    { on_dark: '#ff00ff', on_light: '#ff00ff' },
+  ],
+  ['font', 'moe.sable.room.cosmetics.font', 'Courier New', { font: 'Courier New' }],
+  [
+    'pronoun',
+    'moe.sable.room.cosmetics.pronouns',
+    'they/them',
+    { pronouns: [{ summary: 'they/them' }] },
+  ],
+] as const)(
+  '/%s sets a cosmetic state event for yourself',
+  async (name, eventType, value, content) => {
+    const commands = fakeCommands();
+
+    await runSlash(`/${name} ${value}`, context(commands));
+
+    expect(commands.sendStateEvent).toHaveBeenCalledWith(
+      '!room:example.org',
+      eventType,
+      '@me:example.org',
+      content
+    );
+
+    await runSlash(`/${name} reset`, context(commands));
+    expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
+      '!room:example.org',
+      eventType,
+      '@me:example.org',
+      {}
+    );
+  }
+);
+
+test('/color rejects anything that is not a hex colour', async () => {
+  await expect(runSlash('/color blue', context(fakeCommands()))).rejects.toMatchObject({
+    key: 'composer.slash.color.usage',
+  });
+});
+
+test('/pronoun understands a language-tagged list', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/pronoun en:they/them, de:sie/ihr', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'moe.sable.room.cosmetics.pronouns',
+    '@me:example.org',
+    {
+      pronouns: [
+        { language: 'en', summary: 'they/them' },
+        { language: 'de', summary: 'sie/ihr' },
+      ],
+    }
+  );
+});
+
+test.each([
+  [
+    'scolor',
+    'moe.sable.room.cosmetics.color',
+    '#00ff00',
+    { on_dark: '#00ff00', on_light: '#00ff00' },
+  ],
+  ['sfont', 'moe.sable.room.cosmetics.font', 'Comic Sans', { font: 'Comic Sans' }],
+  [
+    'spronoun',
+    'moe.sable.room.cosmetics.pronouns',
+    'she/her',
+    { pronouns: [{ summary: 'she/her' }] },
+  ],
+] as const)(
+  '/%s sets a cosmetic state event for someone else',
+  async (name, eventType, value, content) => {
+    const commands = fakeCommands();
+
+    await runSlash(`/${name} @someone:example.org ${value}`, context(commands));
+
+    expect(commands.sendStateEvent).toHaveBeenCalledWith(
+      '!room:example.org',
+      eventType,
+      '@someone:example.org',
+      content
+    );
+
+    await expect(runSlash(`/${name} notauser ${value}`, context(commands))).rejects.toMatchObject({
+      key: `composer.slash.${name}.usage`,
+    });
+  }
+);
+
+test('/kick expands a server wildcard to matching members, excluding the already-banned', async () => {
+  const commands = fakeCommands();
+  commands.roomMembers.mockResolvedValueOnce([
+    member('@one:evil.example'),
+    member('@two:evil.example'),
+    member('@three:good.example'),
+    member('@banned:evil.example', 'ban'),
+  ]);
+
+  await runSlash('/kick @*:evil.example spamming', context(commands));
+
+  expect(commands.kickUser).toHaveBeenCalledTimes(2);
+  expect(commands.kickUser).toHaveBeenCalledWith(
+    '!room:example.org',
+    '@one:evil.example',
+    'spamming'
+  );
+  expect(commands.kickUser).toHaveBeenCalledWith(
+    '!room:example.org',
+    '@two:evil.example',
+    'spamming'
+  );
+  expect(commands.roomMembers).toHaveBeenCalledWith('!room:example.org');
+});
+
+test('/ban expands a server wildcard to matching members, including the already-banned', async () => {
+  const commands = fakeCommands();
+  commands.roomMembers.mockResolvedValueOnce([
+    member('@one:evil.example'),
+    member('@banned:evil.example', 'ban'),
+  ]);
+
+  await runSlash('/ban @*:evil.example spamming', context(commands));
+
+  expect(commands.banUser).toHaveBeenCalledTimes(2);
+  expect(commands.banUser).toHaveBeenCalledWith(
+    '!room:example.org',
+    '@one:evil.example',
+    'spamming'
+  );
+  expect(commands.banUser).toHaveBeenCalledWith(
+    '!room:example.org',
+    '@banned:evil.example',
+    'spamming'
+  );
+});
+
+test.each(['kick', 'ban'])(
+  '/%s reports a wildcard matching nobody as an error, not a no-op',
+  async (name) => {
+    const commands = fakeCommands();
+    commands.roomMembers.mockResolvedValueOnce([member('@one:good.example')]);
+
+    await expect(runSlash(`/${name} @*:evil.example`, context(commands))).rejects.toMatchObject({
+      key: 'composer.slashWildcardEmpty',
+      values: { server: 'evil.example' },
+    });
+    expect(commands[name === 'kick' ? 'kickUser' : 'banUser']).not.toHaveBeenCalled();
+  }
+);
+
+test('/kick can mix explicit users and a wildcard, deduplicated, with a trailing reason', async () => {
+  const commands = fakeCommands();
+  commands.roomMembers.mockResolvedValueOnce([
+    member('@one:evil.example'),
+    member('@two:evil.example'),
+  ]);
+
+  await runSlash('/kick @one:evil.example @*:evil.example being rude', context(commands));
+
+  expect(commands.kickUser).toHaveBeenCalledTimes(2);
+  expect(commands.kickUser).toHaveBeenCalledWith(
+    '!room:example.org',
+    '@one:evil.example',
+    'being rude'
+  );
+  expect(commands.kickUser).toHaveBeenCalledWith(
+    '!room:example.org',
+    '@two:evil.example',
+    'being rude'
+  );
+});
+
+test('/delete expands a server wildcard to matching senders', async () => {
+  const commands = fakeCommands();
+  commands.roomMembers.mockResolvedValueOnce([
+    member('@one:evil.example'),
+    member('@two:evil.example'),
+  ]);
+
+  await runSlash('/delete @*:evil.example -past 1d', context(commands));
+
+  expect(commands.bulkRedact).toHaveBeenCalledWith(
+    '!room:example.org',
+    expect.arrayContaining(['@one:evil.example', '@two:evil.example']),
+    expect.any(Number),
+    [],
+    null
+  );
+});
+
+test('/delete reports a wildcard matching nobody as an error', async () => {
+  const commands = fakeCommands();
+  commands.roomMembers.mockResolvedValueOnce([]);
+
+  await expect(
+    runSlash('/delete @*:evil.example -past 1d', context(commands))
+  ).rejects.toMatchObject({
+    key: 'composer.slashWildcardEmpty',
+    values: { server: 'evil.example' },
+  });
+  expect(commands.bulkRedact).not.toHaveBeenCalled();
 });

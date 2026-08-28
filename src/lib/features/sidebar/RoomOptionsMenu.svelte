@@ -21,6 +21,9 @@
 
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
+  import AddToSpaceDialog from './AddToSpaceDialog.svelte';
+  import { wouldCreateCycle } from './add-to-space.js';
+
   import '#lib/ui/primitives/menu.css';
 
   interface Props {
@@ -60,7 +63,8 @@
         candidate.is_space &&
         candidate.state === 'joined' &&
         candidate.room_id !== room.room_id &&
-        !candidate.space_children.some((child) => child.room_id === room.room_id)
+        !candidate.space_children.some((child) => child.room_id === room.room_id) &&
+        !wouldCreateCycle(roomList.rooms, candidate.room_id, room.room_id)
     )
   );
 
@@ -93,6 +97,7 @@
   );
 
   let opened = $state(false);
+  let addToSpaceOpen = $state(false);
 
   function report(error: unknown): void {
     console.warn('[sable room] room action failed', error);
@@ -112,8 +117,10 @@
     void core.commands.setDirect(room.room_id, false).catch(report);
   }
 
-  function addToSpace(spaceId: string): void {
-    void core.commands.addToSpace(spaceId, room.room_id).catch(report);
+  function addToSpaces(spaceIds: string[]): void {
+    for (const spaceId of spaceIds) {
+      void core.commands.addToSpace(spaceId, room.room_id).catch(report);
+    }
   }
 
   function removeFromSpace(spaceId: string): void {
@@ -197,27 +204,16 @@
         <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
       {/if}
 
-      {#if !room.is_space && offeredSpaces.length > 0}
-        <DropdownMenu.Sub>
-          <DropdownMenu.SubTrigger class="sable-menu-item">
-            <UsersThreeIcon />
-            {$i18n.t('room.menuAddToSpace')}
-          </DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
-            <IconContext values={{ 'aria-hidden': 'true' }}>
-              {#each offeredSpaces as space (space.room_id)}
-                <DropdownMenu.Item
-                  class="sable-menu-item"
-                  onSelect={() => {
-                    addToSpace(space.room_id);
-                  }}
-                >
-                  {space.name ?? space.room_id}
-                </DropdownMenu.Item>
-              {/each}
-            </IconContext>
-          </DropdownMenu.SubContent>
-        </DropdownMenu.Sub>
+      {#if offeredSpaces.length > 0}
+        <DropdownMenu.Item
+          class="sable-menu-item"
+          onSelect={() => {
+            addToSpaceOpen = true;
+          }}
+        >
+          <UsersThreeIcon />
+          {$i18n.t('room.menuAddToSpace')}
+        </DropdownMenu.Item>
       {/if}
 
       {#if !room.is_space && removableParent}
@@ -246,6 +242,16 @@
     </IconContext>
   </DropdownMenu.Content>
 </DropdownMenu.Root>
+
+<AddToSpaceDialog
+  open={addToSpaceOpen}
+  {room}
+  spaces={offeredSpaces}
+  onOpenChange={(next) => {
+    addToSpaceOpen = next;
+  }}
+  onApply={addToSpaces}
+/>
 
 <style>
   :global(.room-options-menu) {

@@ -104,6 +104,7 @@ export interface ComposerEditorOptions {
   onQuery: (query: AutocompleteQuery | null) => void;
   onNavigate: (key: NavigationKey) => boolean;
   onFiles: (files: File[]) => void;
+  onLinkRequest: () => void;
 }
 
 function filesFrom(transfer: DataTransfer | null): File[] {
@@ -171,7 +172,17 @@ export class ComposerEditor {
         inputRules({
           rules: [shortcodeInputRule(this.options.emotes), ...(rich ? formattingInputRules : [])],
         }),
-        ...(rich ? [keymap(formattingKeymap)] : []),
+        ...(rich
+          ? [
+              keymap(formattingKeymap),
+              keymap({
+                'Mod-k': () => {
+                  this.options.onLinkRequest();
+                  return true;
+                },
+              }),
+            ]
+          : []),
         gapCursor(),
         dropCursor(),
         keymap({
@@ -367,7 +378,23 @@ export class ComposerEditor {
   format(action: FormatAction): void {
     const view = this.view;
     if (!view) return;
+    if (action === 'link') {
+      this.options.onLinkRequest();
+      return;
+    }
     formatCommands[action](view.state, view.dispatch, view);
+    view.focus();
+  }
+
+  applyLink(href: string): void {
+    const view = this.view;
+    if (!view) return;
+    const { from, to, empty } = view.state.selection;
+    const mark = composerSchema.marks.link.create({ href });
+    const tr = empty
+      ? view.state.tr.insertText(href, from).addMark(from, from + href.length, mark)
+      : view.state.tr.addMark(from, to, mark);
+    view.dispatch(tr);
     view.focus();
   }
 }

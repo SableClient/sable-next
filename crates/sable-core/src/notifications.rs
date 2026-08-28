@@ -3,7 +3,7 @@ use matrix_sdk::notification_settings::{IsEncrypted, IsOneToOne, RoomNotificatio
 use matrix_sdk::ruma::api::client::push::{PusherIds, PusherInit, PusherKind};
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
-use matrix_sdk::ruma::events::room::message::MessageType;
+use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
 use matrix_sdk::ruma::push::{Action, HttpPusherData, PushFormat};
 use matrix_sdk::ruma::{EventId, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
@@ -246,15 +246,34 @@ fn body(event: &NotificationEvent) -> String {
     }
 }
 
+const FALLBACK_BODY: &str = "sent a message";
+
 fn timeline_body(event: &AnySyncTimelineEvent) -> String {
-    let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = event
-    else {
-        return String::new();
-    };
-    let Some(content) = message.as_original().map(|original| &original.content) else {
-        return String::new();
+    let AnySyncTimelineEvent::MessageLike(message) = event else {
+        return FALLBACK_BODY.to_owned();
     };
 
+    match message {
+        AnySyncMessageLikeEvent::RoomMessage(message) => message.as_original().map_or_else(
+            || FALLBACK_BODY.to_owned(),
+            |event| room_message_body(&event.content),
+        ),
+        AnySyncMessageLikeEvent::RoomEncrypted(_) => "sent an encrypted message".to_owned(),
+        AnySyncMessageLikeEvent::Sticker(_) => "sent a sticker".to_owned(),
+        AnySyncMessageLikeEvent::Reaction(reaction) => reaction.as_original().map_or_else(
+            || FALLBACK_BODY.to_owned(),
+            |event| format!("reacted with {}", event.content.relates_to.key),
+        ),
+        AnySyncMessageLikeEvent::UnstablePollStart(poll) => poll.as_original().map_or_else(
+            || FALLBACK_BODY.to_owned(),
+            |event| event.content.poll_start().question.text.clone(),
+        ),
+        AnySyncMessageLikeEvent::CallInvite(_) => "started a call".to_owned(),
+        _ => FALLBACK_BODY.to_owned(),
+    }
+}
+
+fn room_message_body(content: &RoomMessageEventContent) -> String {
     match &content.msgtype {
         MessageType::Image(_) => "sent an image".to_owned(),
         MessageType::Video(_) => "sent a video".to_owned(),
@@ -266,7 +285,99 @@ fn timeline_body(event: &AnySyncTimelineEvent) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::gateway;
+    use matrix_sdk::ruma::events::AnySyncTimelineEvent;
+    use matrix_sdk::ruma::serde::Raw;
+    use serde_json::json;
+
+    use super::{gateway, timeline_body};
+
+    fn event(value: &serde_json::Value) -> AnySyncTimelineEvent {
+        Raw::<AnySyncTimelineEvent>::from_json_string(value.to_string())
+            .expect("the fixture is valid JSON")
+            .deserialize()
+            .expect("the fixture is a timeline event")
+    }
+
+    fn stub(event_type: &str, content: &serde_json::Value) -> serde_json::Value {
+        json!({
+            "type": event_type,
+            "content": content,
+            "event_id": "$1:example.org",
+            "sender": "@alice:example.org",
+            "origin_server_ts": 0,
+        })
+    }
+
+    #[test]
+    fn every_notifiable_event_says_something() {
+        let cases = [
+            stub(
+                "m.room.message",
+                &json!({"msgtype": "m.text", "body": "hello"}),
+            ),
+            stub(
+                "m.room.message",
+                &json!({"msgtype": "m.image", "body": "cat.png", "url": "mxc://example.org/2"}),
+            ),
+            stub(
+                "m.room.encrypted",
+                &json!({"algorithm": "m.megolm.v1.aes-sha2", "ciphertext": "x", "sender_key": "k", "device_id": "D", "session_id": "s"}),
+            ),
+            stub(
+                "m.sticker",
+                &json!({"body": "wave", "url": "mxc://example.org/1", "info": {"w": 1, "h": 1, "mimetype": "image/png", "size": 1}}),
+            ),
+            stub(
+                "m.reaction",
+                &json!({"m.relates_to": {"rel_type": "m.annotation", "event_id": "$0:example.org", "key": "👍"}}),
+            ),
+            stub(
+                "org.matrix.msc3381.poll.start",
+                &json!({"org.matrix.msc3381.poll.start": {"question": {"org.matrix.msc1767.text": "Lunch?"}, "answers": [{"id": "a", "org.matrix.msc1767.text": "Yes"}]}}),
+            ),
+            stub("m.room.topic", &json!({"topic": "hi"})),
+        ];
+
+        for case in cases {
+            let body = timeline_body(&event(&case));
+            assert!(
+                !body.is_empty(),
+                "a notification for {case} would read as a bare sender name"
+            );
+        }
+    }
+
+    #[test]
+    fn the_body_describes_what_arrived() {
+        assert_eq!(
+            timeline_body(&event(&stub(
+                "m.room.message",
+                &json!({"msgtype": "m.text", "body": "hello"})
+            ))),
+            "hello"
+        );
+        assert_eq!(
+            timeline_body(&event(&stub(
+                "m.room.encrypted",
+                &json!({"algorithm": "m.megolm.v1.aes-sha2", "ciphertext": "x", "sender_key": "k", "device_id": "D", "session_id": "s"})
+            ))),
+            "sent an encrypted message"
+        );
+        assert_eq!(
+            timeline_body(&event(&stub(
+                "m.reaction",
+                &json!({"m.relates_to": {"rel_type": "m.annotation", "event_id": "$0:example.org", "key": "👍"}})
+            ))),
+            "reacted with 👍"
+        );
+        assert_eq!(
+            timeline_body(&event(&stub(
+                "org.matrix.msc3381.poll.start",
+                &json!({"org.matrix.msc3381.poll.start": {"question": {"org.matrix.msc1767.text": "Lunch?"}, "answers": [{"id": "a", "org.matrix.msc1767.text": "Yes"}]}})
+            ))),
+            "Lunch?"
+        );
+    }
 
     #[test]
     fn a_gateway_must_be_an_https_notify_endpoint() {

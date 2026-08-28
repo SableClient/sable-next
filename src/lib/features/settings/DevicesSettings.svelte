@@ -6,6 +6,7 @@
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
+  import { SvelteSet } from 'svelte/reactivity';
 
   import type { DeviceView } from '#src/generated/DeviceView';
   import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
@@ -23,9 +24,11 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Label from '#lib/ui/primitives/Label.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
 
@@ -46,6 +49,15 @@
   let linkCopied = $state(false);
   let currentDevice = $derived(devices.find((device) => device.is_own));
   let cancelled = false;
+
+  const bulkSelected = new SvelteSet<string>();
+  let bulkRemoving = $state(false);
+  let bulkBusy = $state(false);
+  let bulkPassword = $state('');
+  let selectableDevices = $derived(devices.filter((device) => !device.is_own));
+  let allSelected = $derived(
+    selectableDevices.length > 0 && bulkSelected.size === selectableDevices.length
+  );
 
   function deviceName(device: DeviceView | undefined): string {
     return device?.display_name?.trim() || t('settings.unnamedDevice');
@@ -156,6 +168,53 @@
     } catch (cause) {
       authWindow?.close();
       error = messageFor(cause);
+    }
+  }
+
+  function toggleSelected(deviceId: string): void {
+    if (bulkSelected.has(deviceId)) bulkSelected.delete(deviceId);
+    else bulkSelected.add(deviceId);
+  }
+
+  function toggleSelectAll(): void {
+    bulkSelected.clear();
+    if (!allSelected) {
+      for (const device of selectableDevices) bulkSelected.add(device.device_id);
+    }
+  }
+
+  function cancelBulkRemoval(): void {
+    bulkRemoving = false;
+    bulkPassword = '';
+  }
+
+  async function confirmBulkRemoval(): Promise<void> {
+    const ids = [...bulkSelected];
+    if (ids.length === 0 || bulkBusy) return;
+
+    bulkBusy = true;
+    error = null;
+    const failed: string[] = [];
+    for (const deviceId of ids) {
+      try {
+        const managementUrl = await core.commands.deleteDevice(
+          deviceId,
+          accountManagement ? null : bulkPassword || null
+        );
+        if (managementUrl) await openExternalAuthUrl(managementUrl);
+      } catch (cause) {
+        console.warn('[sable settings] device removal failed', cause);
+        failed.push(deviceName(devices.find((device) => device.device_id === deviceId)));
+      }
+    }
+
+    bulkPassword = '';
+    bulkBusy = false;
+    bulkRemoving = false;
+    bulkSelected.clear();
+    await refresh();
+    if (failed.length > 0) {
+      error = t('settings.bulkRemoveDevicesFailed', { names: failed.join(', ') });
     }
   }
 
@@ -335,10 +394,87 @@
           <p>{$i18n.t('settings.noDevices')}</p>
         </div>
       {:else}
+        {#if selectableDevices.length > 0}
+          <div class="bulk-bar">
+            <label class="bulk-select-all">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                disabled={bulkBusy}
+                onchange={toggleSelectAll}
+              />
+              {$i18n.t('settings.selectAllDevices')}
+            </label>
+            {#if bulkSelected.size > 0}
+              <span class="bulk-count"
+                >{$i18n.t('settings.devicesSelectedCount', { count: bulkSelected.size })}</span
+              >
+              <Button
+                variant="danger"
+                size="small"
+                disabled={bulkBusy}
+                onclick={() => {
+                  bulkRemoving = true;
+                }}
+              >
+                {$i18n.t('settings.removeSelectedDevices')}
+              </Button>
+            {/if}
+          </div>
+        {/if}
+
+        {#if bulkRemoving}
+          <div class="bulk-remove-form">
+            <div class="row-copy">
+              <strong
+                >{$i18n.t('settings.removeSelectedDevicesConfirm', {
+                  count: bulkSelected.size,
+                })}</strong
+              >
+              <p>{$i18n.t('settings.removeDeviceDescription')}</p>
+            </div>
+            {#if !accountManagement}
+              <Label for="bulk-device-password">{$i18n.t('settings.password')}</Label>
+              <TextInput
+                id="bulk-device-password"
+                type="password"
+                bind:value={bulkPassword}
+                autocomplete="current-password"
+                autofocus
+              />
+            {/if}
+            <div class="form-actions">
+              <Button
+                type="button"
+                variant="danger"
+                loading={bulkBusy}
+                onclick={() => void confirmBulkRemoval()}
+              >
+                {$i18n.t('settings.removeSelectedDevices')}
+              </Button>
+              <Button variant="ghost" disabled={bulkBusy} onclick={cancelBulkRemoval}>
+                {$i18n.t('settings.cancel')}
+              </Button>
+            </div>
+          </div>
+        {/if}
+
         <ul class="device-list">
           {#each devices as device (device.device_id)}
             <li class="device">
               <div class="device-summary">
+                {#if !device.is_own}
+                  <input
+                    type="checkbox"
+                    class="device-select"
+                    checked={bulkSelected.has(device.device_id)}
+                    disabled={bulkBusy}
+                    aria-label={$i18n.t('settings.selectDevice', { name: deviceName(device) })}
+                    onchange={() => {
+                      toggleSelected(device.device_id);
+                    }}
+                  />
+                {/if}
                 <span class="device-icon" aria-hidden="true"><DesktopTowerIcon /></span>
                 <div class="device-info">
                   <div class="device-name-line">
@@ -522,6 +658,43 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: calc(var(--space-1) / 2) 0 0;
+  }
+
+  .bulk-bar {
+    align-items: center;
+    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .bulk-select-all {
+    align-items: center;
+    display: flex;
+    gap: var(--space-1);
+  }
+
+  .bulk-count {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+  }
+
+  .bulk-remove-form {
+    background: var(--sable-surface-container);
+    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .form-actions {
+    display: flex;
+    gap: var(--space-1);
+  }
+
+  .device-select {
+    flex: 0 0 auto;
   }
 
   .device-list {

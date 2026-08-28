@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { undo } from 'prosemirror-history';
-import { Selection } from 'prosemirror-state';
+import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -38,6 +38,7 @@ function openWith(overrides: Partial<ComposerEditorOptions> = {}): ComposerEdito
     onQuery: () => {},
     onNavigate: () => false,
     onFiles: () => {},
+    onLinkRequest: () => {},
     ...overrides,
   });
   dispose = editor.mount(host);
@@ -197,6 +198,17 @@ describe('setHtml', () => {
     expect(doc && serializeComposer(doc).body).toBe('look **here**');
   });
 
+  test('keeps underline and spoiler marks for an edit', () => {
+    const editor = open();
+
+    editor.setHtml('<p><u>loud</u> and <span data-mx-spoiler>quiet</span></p>');
+    const doc = editor.doc();
+
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<u>loud</u> and <span data-mx-spoiler="">quiet</span>'
+    );
+  });
+
   test('keeps a mention as a mention, not as a link', () => {
     const editor = open();
 
@@ -304,6 +316,7 @@ test('the active option is written straight onto the editor node', () => {
     onQuery: () => {},
     onNavigate: () => false,
     onFiles: vi.fn(),
+    onLinkRequest: () => {},
   });
   dispose = editor.mount(host);
   const surface = host.querySelector('[contenteditable]');
@@ -393,5 +406,48 @@ describe('block editing', () => {
       view(editor).state.tr.setSelection(Selection.atStart(view(editor).state.doc))
     );
     expect(changes).toEqual([false]);
+  });
+});
+
+describe('link', () => {
+  test('format asks the caller for a link rather than mutating the document', () => {
+    const onLinkRequest = vi.fn();
+    const editor = openWith({ onLinkRequest });
+    editor.setText('docs');
+
+    editor.format('link');
+    const doc = editor.doc();
+
+    expect(onLinkRequest).toHaveBeenCalledOnce();
+    expect(doc && serializeComposer(doc).formatted).toBeNull();
+  });
+
+  test('applyLink marks the current selection', () => {
+    const editor = open();
+    editor.setText('docs');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atStart(view(editor).state.doc))
+    );
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(
+        TextSelection.create(view(editor).state.doc, 1, view(editor).state.doc.content.size - 1)
+      )
+    );
+
+    editor.applyLink('https://example.org');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe('<a href="https://example.org">docs</a>');
+  });
+
+  test('applyLink inserts the href as text when there is no selection', () => {
+    const editor = open();
+
+    editor.applyLink('https://example.org');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<a href="https://example.org">https://example.org</a>'
+    );
   });
 });

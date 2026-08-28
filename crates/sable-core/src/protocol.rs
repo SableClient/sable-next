@@ -1722,6 +1722,7 @@ pub struct RoomPermissionsView {
     /// `m.room.name`, `m.room.topic` and `m.room.avatar` share one level in
     /// practice, so they are reported together.
     pub can_change_settings: bool,
+    pub can_pin: bool,
     pub can_change_join_rule: bool,
     pub can_change_power_levels: bool,
     /// `m.space.child`. Meaningless outside a space.
@@ -1980,6 +1981,8 @@ pub enum TimelineItemContentView {
         body: String,
         source: String,
         mime: Option<String>,
+        #[ts(type = "number | null")]
+        size: Option<u64>,
     },
     Sticker {
         body: String,
@@ -2023,6 +2026,7 @@ pub enum TimelineItemContentView {
         /// The member's name at the time, so the copy does not have to fall
         /// back to a raw user id.
         display_name: Option<String>,
+        reason: Option<String>,
     },
     /// A display name or avatar change on an already-joined member. Separate
     /// from `Membership` because clients hide these by default.

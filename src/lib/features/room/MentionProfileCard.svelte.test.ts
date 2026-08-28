@@ -13,6 +13,8 @@ const core = vi.hoisted(() => {
     userRelations: vi.fn<() => Promise<{ mutualRooms: never[]; ignored: boolean }>>(),
     setUserIgnored: vi.fn<() => Promise<void>>(),
     sendMessage: vi.fn<() => Promise<void>>(),
+    kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
+    banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
   };
 
   return Object.assign(stub, { commands: stub });
@@ -197,5 +199,115 @@ test('keeps a failed profile silent when the room member still names the user', 
 
   expect(document.querySelector('[role="status"]')).toBeNull();
   expect(document.querySelector('.profile-card-name')?.textContent).toBe('Room Alice');
+  await unmount(instance);
+});
+
+test('collects an optional reason before kicking a member', async () => {
+  core.kickUser.mockResolvedValue(undefined);
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: true,
+        can_ban: false,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  document
+    .querySelector<HTMLButtonElement>('[aria-label="More actions"]')
+    ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  await tick();
+  document.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach((item) => {
+    if (item.textContent.includes('Remove from room')) item.click();
+  });
+  await tick();
+
+  const reasonInput = document.querySelector<HTMLInputElement>('.moderation input');
+  if (!reasonInput) throw new Error('reason input missing');
+  reasonInput.value = 'spamming links';
+  reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('.moderation-actions .sable-button-danger')?.click();
+  await vi.waitFor(() => {
+    expect(core.kickUser).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@alice:example.org',
+      'spamming links'
+    );
+  });
+
+  await unmount(instance);
+});
+
+test('sends no reason when the moderation reason is left blank', async () => {
+  core.banUser.mockResolvedValue(undefined);
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: false,
+        can_ban: true,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  document
+    .querySelector<HTMLButtonElement>('[aria-label="More actions"]')
+    ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  await tick();
+  document.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach((item) => {
+    if (item.textContent.includes('Ban from room')) item.click();
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('.moderation-actions .sable-button-danger')?.click();
+  await vi.waitFor(() => {
+    expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
+  });
+
   await unmount(instance);
 });

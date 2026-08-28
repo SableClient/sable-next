@@ -16,6 +16,10 @@ const sources = {
     { userId: '@ada:example.org', displayName: 'Ada', avatarUrl: null },
     { userId: '@erwan:example.org', displayName: 'Erwan', avatarUrl: null },
   ],
+  spaces: [
+    { id: '!eng:example.org', alias: '#eng:example.org', name: 'Engineering', avatarUrl: null },
+    { id: '!social:example.org', alias: null, name: 'Social', avatarUrl: null },
+  ],
 };
 
 test('a bare word suggests matching operators', () => {
@@ -32,6 +36,7 @@ test('an empty token suggests nothing unless the list is asked for', () => {
 test('the operator cheat-sheet is available on request', () => {
   expect(suggestionsFor('', sources, true).map((entry) => entry.label)).toEqual([
     'in:',
+    'space:',
     'from:',
     'mentions:',
     'has:',
@@ -61,6 +66,18 @@ test('a room whose alias has spaces in its name is quoted on insert', () => {
 
   expect(suggestion.insert).toBe('in:#design-crew:example.org ');
   expect(applySuggestion('deploy in:crew', suggestion)).toBe('deploy in:#design-crew:example.org ');
+});
+
+test('space: suggests joined spaces by alias and name', () => {
+  expect(suggestionsFor('space:', sources).map((entry) => entry.label)).toEqual([
+    'Engineering',
+    'Social',
+  ]);
+  expect(suggestionsFor('space:soc', sources).map((entry) => entry.label)).toEqual(['Social']);
+});
+
+test('space: falls back to nothing when no spaces are known', () => {
+  expect(suggestionsFor('space:', { rooms: [], senders: [] })).toEqual([]);
 });
 
 test('from: and mentions: suggest senders by name and insert their id', () => {

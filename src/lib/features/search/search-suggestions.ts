@@ -17,12 +17,14 @@ export interface SuggestionSender {
 export interface SuggestionSources {
   rooms: SuggestionRoom[];
   senders: SuggestionSender[];
+  spaces?: SuggestionRoom[];
 }
 
 const ATTACHMENT_VALUES = ['image', 'video', 'audio', 'file', 'link'];
 
 const OPERATOR_HINTS: Record<SearchOperator, string> = {
   in: 'room',
+  space: 'space',
   from: 'sender',
   mentions: 'pings a user',
   has: 'attachment',
@@ -114,6 +116,26 @@ export function suggestionsFor(
             label: room.name ?? target,
             detail: room.alias,
             avatarUrl: room.avatarUrl,
+            insert: `${prefix}${quoteIfNeeded(target)} `,
+          };
+        })
+        .slice(0, MAX_SUGGESTIONS);
+
+    case 'space':
+      return (sources.spaces ?? [])
+        .filter(
+          (space) =>
+            partial.value === '' ||
+            matches(space.alias ?? '', partial.value) ||
+            matches(space.name ?? '', partial.value)
+        )
+        .map((space) => {
+          const target = space.alias ?? space.name ?? space.id;
+          return {
+            id: `space:${space.id}`,
+            label: space.name ?? target,
+            detail: space.alias,
+            avatarUrl: space.avatarUrl,
             insert: `${prefix}${quoteIfNeeded(target)} `,
           };
         })

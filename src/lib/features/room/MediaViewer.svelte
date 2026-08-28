@@ -2,9 +2,11 @@
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
+  import { tick } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
   import {
     saveFile,
     saveImageToPhotos,
@@ -22,7 +24,10 @@
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 
-  export type MediaItem = Extract<TimelineItemView['content'], { kind: 'image' | 'sticker' }> & {
+  export type MediaItem = Extract<
+    TimelineItemView['content'],
+    { kind: 'image' | 'sticker' | 'video' | 'audio' }
+  > & {
     eventId: string;
     sender: string;
   };
@@ -46,16 +51,36 @@
   let failed = $state(false);
   let zoom = $state(1);
   let rotation = $state(0);
+  let pan = $state<Vector2>({ x: 0, y: 0 });
   let pixelated = $state(false);
   let canSaveToPhotos = $state(false);
+  let stageEl: HTMLElement | null = $state(null);
+  let imageEl: HTMLImageElement | null = $state(null);
   const touches = new SvelteMap<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let pinchZoom = 1;
+  let panPointerId: number | null = null;
+  let panOrigin: Vector2 = { x: 0, y: 0 };
+  let panStartPointer: Vector2 = { x: 0, y: 0 };
+  let isImage = $derived(item.kind === 'image' || item.kind === 'sticker');
+  let downloadLabel = $derived(
+    item.kind === 'video'
+      ? 'Download video'
+      : item.kind === 'audio'
+        ? 'Download audio'
+        : 'Download image'
+  );
+
+  function clampCurrentPan(next: Vector2): Vector2 {
+    if (!stageEl || !imageEl) return next;
+    return clampPan(next, stageEl.getBoundingClientRect(), imageEl.getBoundingClientRect());
+  }
 
   $effect(() => {
     let active = true;
     zoom = 1;
     rotation = 0;
+    pan = { x: 0, y: 0 };
     failed = false;
     const release = holdMediaUrl(core, item.source, 0, 0);
     const cached = cachedMediaUrl(core, item.source, 0, 0);
@@ -94,17 +119,45 @@
     if (index < items.length - 1) index += 1;
   }
 
+  function setZoom(next: number): void {
+    zoom = Math.min(5, Math.max(0.25, next));
+    void reclampPan();
+  }
+
+  function rotateBy(degrees: number): void {
+    rotation += degrees;
+    void reclampPan();
+  }
+
+  async function reclampPan(): Promise<void> {
+    await tick();
+    pan = zoom > 1 || rotation % 360 !== 0 ? clampCurrentPan(pan) : { x: 0, y: 0 };
+  }
+
+  const PAN_STEP = 40;
+
+  function panBy(dx: number, dy: number): void {
+    pan = clampCurrentPan({ x: pan.x + dx, y: pan.y + dy });
+  }
+
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') onClose();
+    if (isImage && zoom > 1.001) {
+      if (event.key === 'ArrowLeft') return panBy(PAN_STEP, 0);
+      if (event.key === 'ArrowRight') return panBy(-PAN_STEP, 0);
+      if (event.key === 'ArrowUp') return panBy(0, PAN_STEP);
+      if (event.key === 'ArrowDown') return panBy(0, -PAN_STEP);
+    }
     if (event.key === 'ArrowLeft') previous();
     if (event.key === 'ArrowRight') next();
-    if (event.key === '+' || event.key === '=') zoom = Math.min(5, zoom + 0.25);
-    if (event.key === '-') zoom = Math.max(0.25, zoom - 0.25);
+    if (event.key === '+' || event.key === '=') setZoom(zoom + 0.25);
+    if (event.key === '-') setZoom(zoom - 0.25);
   }
 
   function handleWheel(event: WheelEvent): void {
+    if (!isImage) return;
     event.preventDefault();
-    zoom = Math.min(5, Math.max(0.25, zoom - event.deltaY * 0.001));
+    setZoom(zoom - event.deltaY * 0.001);
   }
 
   function distance(): number {
@@ -116,26 +169,45 @@
     return Math.hypot(second.x - first.x, second.y - first.y);
   }
 
-  function startPinch(event: PointerEvent): void {
-    if (event.pointerType !== 'touch') return;
-    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (touches.size === 2) {
-      pinchDistance = distance();
-      pinchZoom = zoom;
+  function startPan(event: PointerEvent): void {
+    if (!isImage) return;
+    if (event.pointerType === 'touch') {
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touches.size === 2) {
+        pinchDistance = distance();
+        pinchZoom = zoom;
+        panPointerId = null;
+        return;
+      }
+      if (touches.size > 1) return;
     }
+    if (panPointerId !== null) return;
+    panPointerId = event.pointerId;
+    panOrigin = { ...pan };
+    panStartPointer = { x: event.clientX, y: event.clientY };
   }
 
-  function movePinch(event: PointerEvent): void {
-    if (!touches.has(event.pointerId)) return;
-    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (touches.size === 2 && pinchDistance > 0) {
-      zoom = Math.min(5, Math.max(0.25, pinchZoom * (distance() / pinchDistance)));
+  function movePan(event: PointerEvent): void {
+    if (!isImage) return;
+    if (event.pointerType === 'touch' && touches.has(event.pointerId)) {
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touches.size === 2 && pinchDistance > 0) {
+        setZoom(pinchZoom * (distance() / pinchDistance));
+        return;
+      }
     }
+    if (panPointerId !== event.pointerId) return;
+    pan = clampCurrentPan({
+      x: panOrigin.x + (event.clientX - panStartPointer.x),
+      y: panOrigin.y + (event.clientY - panStartPointer.y),
+    });
   }
 
-  function endPinch(event: PointerEvent): void {
+  function endPan(event: PointerEvent): void {
+    if (!isImage) return;
     touches.delete(event.pointerId);
     if (touches.size < 2) pinchDistance = 0;
+    if (panPointerId === event.pointerId) panPointerId = null;
   }
 
   async function copyImage(): Promise<void> {
@@ -194,20 +266,22 @@
             </div>
           </div>
           <div class="actions">
+            {#if isImage}
+              <IconButton
+                class="desktop-control"
+                label="Copy image"
+                size="medium"
+                variant="ghost"
+                onclick={() => void copyImage()}><CopyIcon /></IconButton
+              >
+            {/if}
             <IconButton
-              class="desktop-control"
-              label="Copy image"
-              size="medium"
-              variant="ghost"
-              onclick={() => void copyImage()}><CopyIcon /></IconButton
-            >
-            <IconButton
-              label="Download image"
+              label={downloadLabel}
               size="medium"
               variant="ghost"
               onclick={() => void download()}><DownloadSimpleIcon /></IconButton
             >
-            {#if canSaveToPhotos}
+            {#if canSaveToPhotos && isImage}
               <IconButton
                 label="Save to photos"
                 size="medium"
@@ -215,31 +289,34 @@
                 onclick={() => void saveToPhotos()}><DownloadSimpleIcon /></IconButton
               >
             {/if}
-            <IconButton
-              class="desktop-control"
-              label="Rotate image"
-              size="medium"
-              variant="ghost"
-              onclick={() => (rotation += 90)}><ArrowCounterClockwiseIcon /></IconButton
-            >
-            <button
-              class:active={pixelated}
-              class="pixel-toggle desktop-control"
-              type="button"
-              onclick={() => (pixelated = !pixelated)}
-            >
-              Pixelate
-            </button>
+            {#if isImage}
+              <IconButton
+                class="desktop-control"
+                label="Rotate image"
+                size="medium"
+                variant="ghost"
+                onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
+              >
+              <button
+                class:active={pixelated}
+                class="pixel-toggle desktop-control"
+                type="button"
+                onclick={() => (pixelated = !pixelated)}
+              >
+                Pixelate
+              </button>
+            {/if}
           </div>
         </header>
 
         <main
           class="stage"
+          bind:this={stageEl}
           onwheel={handleWheel}
-          onpointerdown={startPinch}
-          onpointermove={movePinch}
-          onpointerup={endPinch}
-          onpointercancel={endPinch}
+          onpointerdown={startPan}
+          onpointermove={movePan}
+          onpointerup={endPan}
+          onpointercancel={endPan}
         >
           {#if index > 0}
             <IconButton class="nav previous" label="Previous image" size="large" onclick={previous}
@@ -247,15 +324,28 @@
             >
           {/if}
           {#if url}
-            <img
-              class:pixelated
-              src={url}
-              alt={item.body || 'Image'}
-              width={item.width ?? undefined}
-              height={item.height ?? undefined}
-              draggable="false"
-              style:transform={`scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
-            />
+            {#if item.kind === 'video'}
+              <!-- Matrix carries no caption track for an attachment. -->
+              <!-- svelte-ignore a11y_media_has_caption -->
+              <video class="media-player" controls src={url} aria-label={item.body || 'Video'}>
+                {item.body}
+              </video>
+            {:else if item.kind === 'audio'}
+              <audio class="media-player" controls src={url} aria-label={item.body || 'Audio'}>
+                {item.body}
+              </audio>
+            {:else}
+              <img
+                bind:this={imageEl}
+                class:pixelated
+                src={url}
+                alt={item.body || 'Image'}
+                width={item.width ?? undefined}
+                height={item.height ?? undefined}
+                draggable="false"
+                style:transform={`translate(${String(pan.x)}px, ${String(pan.y)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
+              />
+            {/if}
           {:else if failed}
             <div class="error">
               <strong>{$i18n.t('timeline.mediaUnavailable')}</strong>
@@ -272,30 +362,35 @@
         </main>
 
         <footer class="bottom-bar">
-          <div class="zoom-controls">
-            <IconButton
-              label="Zoom out"
-              size="small"
-              variant="ghost"
-              onclick={() => (zoom = Math.max(0.25, zoom - 0.25))}><MinusIcon /></IconButton
+          {#if isImage}
+            <div class="zoom-controls">
+              <IconButton
+                label="Zoom out"
+                size="small"
+                variant="ghost"
+                onclick={() => setZoom(zoom - 0.25)}><MinusIcon /></IconButton
+              >
+              <span>{Math.round(zoom * 100)}%</span>
+              <IconButton
+                label="Zoom in"
+                size="small"
+                variant="ghost"
+                onclick={() => setZoom(zoom + 0.25)}><PlusIcon /></IconButton
+              >
+            </div>
+          {/if}
+          <p>{item.body || 'Shared media'}</p>
+          {#if isImage}
+            <button
+              class="reset"
+              type="button"
+              onclick={() => {
+                zoom = 1;
+                rotation = 0;
+                pan = { x: 0, y: 0 };
+              }}>Reset view</button
             >
-            <span>{Math.round(zoom * 100)}%</span>
-            <IconButton
-              label="Zoom in"
-              size="small"
-              variant="ghost"
-              onclick={() => (zoom = Math.min(5, zoom + 0.25))}><PlusIcon /></IconButton
-            >
-          </div>
-          <p>{item.body || 'Shared image'}</p>
-          <button
-            class="reset"
-            type="button"
-            onclick={() => {
-              zoom = 1;
-              rotation = 0;
-            }}>Reset view</button
-          >
+          {/if}
         </footer>
       </Dialog.Content>
     </Dialog.Portal>
@@ -431,6 +526,11 @@
 
   .stage img.pixelated {
     image-rendering: pixelated;
+  }
+
+  .stage .media-player {
+    max-height: 100%;
+    max-width: 100%;
   }
 
   :global(.nav) {

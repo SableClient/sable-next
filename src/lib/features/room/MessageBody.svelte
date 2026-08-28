@@ -81,6 +81,7 @@
     kind={item.content.kind}
     width={item.content.kind === 'video' ? item.content.width : null}
     height={item.content.kind === 'video' ? item.content.height : null}
+    size={item.content.kind === 'file' ? item.content.size : null}
   />
 {/if}
 

@@ -31,6 +31,7 @@
     invitedIds: ReadonlySet<string>;
     joining: ReadonlySet<string>;
     knocked: ReadonlySet<string>;
+    joinErrors: ReadonlyMap<string, string>;
     canManage: boolean;
     label: (child: HierarchyRoomView) => string;
     onToggle: (key: string) => void;
@@ -54,6 +55,7 @@
     invitedIds,
     joining,
     knocked,
+    joinErrors,
     canManage,
     label,
     onToggle,
@@ -172,6 +174,9 @@
                     >{/if}<span class="room-topic">{child.topic}</span>
                 {/if}
               </span>
+              {#if joinErrors.has(child.room_id)}
+                <span class="room-error" role="alert">{joinErrors.get(child.room_id)}</span>
+              {/if}
             </div>
             <div class="room-actions">
               {#if joined}
@@ -409,6 +414,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .room-error {
+    color: var(--sable-crit-main);
+    font-size: var(--font-size-small);
   }
 
   .badge {
