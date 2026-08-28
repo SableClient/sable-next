@@ -186,6 +186,14 @@
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
   let roomTopic = $derived(resolvedRoom?.topic ?? null);
+  let mentionCount = $derived(
+    roomList.rooms
+      .filter((room) => room.state === 'joined' && !room.is_space)
+      .reduce((total, room) => total + room.highlight, 0)
+  );
+  let pageTitle = $derived(
+    mentionCount > 0 ? `(${mentionCount}) ${roomName} - Sable` : `${roomName} - Sable`
+  );
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
   let typingLabel = $derived.by(() => {
@@ -451,6 +459,10 @@
     }
   }
 </script>
+
+<svelte:head>
+  <title>{pageTitle}</title>
+</svelte:head>
 
 <main class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
