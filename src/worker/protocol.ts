@@ -19,7 +19,7 @@ export type AttachmentRequest = {
 export type WorkerRequest =
   | { id: number; command: Command }
   | { disconnect: true }
-  | { shutdown: true }
+  | { id: number; reset: true }
   | { debugLogs: boolean }
   | { id: number; media: { source: string; width: number; height: number } }
   | { id: number; attachment: AttachmentRequest }

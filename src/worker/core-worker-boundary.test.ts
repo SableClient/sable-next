@@ -243,7 +243,7 @@ test('overflowing the log buffer drops and reports the excess', () => {
   vi.useRealTimers();
 });
 
-test('a shutdown request terminates the worker without answering', () => {
+test('a reset request terminates the worker after answering', () => {
   const terminate = vi.fn();
   const boundary = createCoreWorkerBoundary(
     Promise.resolve(fakeCore(() => Promise.resolve('{}'))),
@@ -253,10 +253,31 @@ test('a shutdown request terminates the worker without answering', () => {
   const port = new FakePort();
   boundary.connect(port);
 
-  port.onmessage?.({ data: { shutdown: true } } as MessageEvent<WorkerRequest>);
+  port.onmessage?.({ data: { id: 1, reset: true } } as MessageEvent<WorkerRequest>);
 
   expect(terminate).toHaveBeenCalledTimes(1);
-  expect(port.messages).toEqual([]);
+  expect(port.messages).toEqual([{ id: 1, uri: null }]);
+});
+
+test('a reset request fails while another port is connected', () => {
+  const terminate = vi.fn();
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(fakeCore(() => Promise.resolve('{}'))),
+    undefined,
+    terminate
+  );
+  const first = new FakePort();
+  const second = new FakePort();
+  boundary.connect(first);
+  boundary.connect(second);
+
+  first.onmessage?.({ data: { id: 1, reset: true } } as MessageEvent<WorkerRequest>);
+
+  expect(terminate).not.toHaveBeenCalled();
+  expect(first.messages).toEqual([
+    { id: 1, err: { code: 'failed', log_id: 'close other Sable tabs before resetting the cache' } },
+  ]);
+  expect(second.messages).toEqual([]);
 });
 
 test('a debugLogs request toggles WASM capture and clears buffered logs', () => {

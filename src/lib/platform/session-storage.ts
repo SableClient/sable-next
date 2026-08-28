@@ -3,7 +3,8 @@ const DATABASE_VERSION = 1;
 const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
 
-const MATRIX_DATABASE_NAMES = [
+const APP_DATABASE_PREFIX = 'sable-next';
+const KNOWN_DATABASE_NAMES = [
   'sable-next',
   'sable-next::matrix-sdk-state',
   'sable-next::matrix-sdk-crypto',
@@ -122,13 +123,43 @@ function deleteDatabase(name: string): Promise<void> {
     request.onerror = () => {
       reject(request.error ?? new Error(`Could not delete ${name}`));
     };
+    request.onblocked = () => {
+      reject(new Error(`Could not delete ${name}: database is still open`));
+    };
   });
 }
 
-export async function resetWebSession(): Promise<void> {
+async function appDatabaseNames(): Promise<string[]> {
+  if (typeof globalThis.indexedDB.databases !== 'function') {
+    return [DATABASE_NAME, ...KNOWN_DATABASE_NAMES];
+  }
+
+  try {
+    const listed = await globalThis.indexedDB.databases();
+    const owned = listed
+      .map((database) => database.name)
+      .filter((name): name is string => name?.startsWith(APP_DATABASE_PREFIX) ?? false);
+
+    return [DATABASE_NAME, ...owned];
+  } catch {
+    return [DATABASE_NAME, ...KNOWN_DATABASE_NAMES];
+  }
+}
+
+async function clearHttpCaches(): Promise<void> {
+  const storage = 'caches' in globalThis ? globalThis.caches : undefined;
+  if (!storage) return;
+
+  const names = await storage.keys();
+  await Promise.all(names.map((name) => storage.delete(name)));
+}
+
+export async function resetWebStorage(): Promise<void> {
   const database = await databasePromise?.catch(() => undefined);
   database?.close();
   databasePromise = undefined;
 
-  await Promise.all([DATABASE_NAME, ...MATRIX_DATABASE_NAMES].map(deleteDatabase));
+  const names = await appDatabaseNames();
+  await Promise.all([...new Set(names)].map(deleteDatabase));
+  await clearHttpCaches();
 }

@@ -10,9 +10,27 @@ class FakePort {
 
   postMessage(message: unknown): void {
     this.posted.push(message);
+    if (
+      message &&
+      typeof message === 'object' &&
+      'reset' in message &&
+      'id' in message &&
+      typeof message.id === 'number'
+    ) {
+      const { id } = message;
+      queueMicrotask(() => {
+        this.portMessage({ id, uri: null });
+      });
+    }
+  }
+
+  private portMessage(message: unknown): void {
+    this.onmessage?.({ data: message } as MessageEvent);
   }
 
   start(): void {}
+
+  close(): void {}
 }
 
 class FakeSharedWorker {
@@ -76,4 +94,27 @@ test('a slow media fetch does not report the core as unresponsive', async () => 
       void transport.fetchMedia('mxc://example.org/abc', 96, 96);
     })
   ).toBe(false);
+});
+
+test('resetCaches terminates the worker and wipes the browser storage', async () => {
+  const deleted: string[] = [];
+  vi.stubGlobal('indexedDB', {
+    databases: () => Promise.resolve([{ name: 'sable-next-account-a1::matrix-sdk-state' }]),
+    deleteDatabase(name: string) {
+      deleted.push(name);
+      const request = {} as IDBOpenDBRequest;
+      queueMicrotask(() => {
+        request.onsuccess?.call(request, new Event('success'));
+      });
+      return request;
+    },
+  });
+
+  const transport = await load();
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never).catch(() => {});
+
+  await transport.resetCaches();
+
+  expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 2, reset: true });
+  expect(deleted).toEqual(['sable-next-session', 'sable-next-account-a1::matrix-sdk-state']);
 });

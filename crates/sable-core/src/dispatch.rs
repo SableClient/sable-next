@@ -19,6 +19,7 @@ use matrix_sdk::ruma::api::client::room::upgrade_room;
 use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::api::error::ErrorKind;
+use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
 use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
@@ -45,8 +46,9 @@ use matrix_sdk::ruma::{
 use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::protocol::{
-    Command, CommandErr, CommandOk, CreateRoomKind, JoinRuleView, MembershipView, MessageKind,
-    MutualRoomView, PaginationDirection, RoomTag, RoomVersionView, RoomVersionsView,
+    Command, CommandErr, CommandOk, CreateRoomKind, HomeserverSoftwareView, JoinRuleView,
+    MembershipView, MessageKind, MutualRoomView, PaginationDirection, RoomTag, RoomVersionView,
+    RoomVersionsView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -176,6 +178,25 @@ impl Core {
             Command::RemoveAccount { account_id } => self.remove_inactive_account(account_id).await,
 
             Command::Logout => self.logout().await,
+
+            Command::HomeserverInfo => {
+                let client = self.client().await?;
+                let server = match client.send(get_server_version::v1::Request::new()).await {
+                    Ok(response) => response.server.map(|server| HomeserverSoftwareView {
+                        name: server.name,
+                        version: server.version,
+                    }),
+                    Err(error) => {
+                        tracing::debug!(%error, "the homeserver did not report its version");
+                        None
+                    }
+                };
+
+                Ok(CommandOk::HomeserverInfo {
+                    homeserver: client.homeserver().to_string(),
+                    server,
+                })
+            }
 
             Command::SubscribeRoomList => self.subscribe_room_list().await,
 

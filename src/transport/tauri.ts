@@ -4,6 +4,7 @@ import type { Command } from '#src/generated/Command';
 import type { CommandErr } from '#src/generated/CommandErr';
 import type { CoreEvent } from '#src/generated/CoreEvent';
 import { CoreError, type ResponseFor, type Transport } from './index';
+import { resetWebStorage } from '#lib/platform/session-storage.js';
 
 /**
  * A `Vec<u8>` argument would be marshalled as a JSON array of numbers, so the
@@ -86,6 +87,10 @@ export function createTauriTransport(): Transport {
 
     subscribeStall() {
       return () => {};
+    },
+
+    async resetCaches() {
+      await resetWebStorage();
     },
 
     close() {

@@ -61,6 +61,7 @@ pub enum Command {
         account_id: String,
     },
     Logout,
+    HomeserverInfo,
 
     SubscribeRoomList,
     SubscribeTimeline {
@@ -809,6 +810,10 @@ pub enum CommandOk {
     },
     RemoveAccount,
     Logout,
+    HomeserverInfo {
+        homeserver: String,
+        server: Option<HomeserverSoftwareView>,
+    },
 
     /// The snapshot. Everything after it carries the same `subscription`.
     SubscribeRoomList {
@@ -2456,6 +2461,13 @@ pub struct SessionInfo {
     #[ts(type = "string")]
     pub user_id: OwnedUserId,
     pub device_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct HomeserverSoftwareView {
+    pub name: Option<String>,
+    pub version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

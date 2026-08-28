@@ -326,7 +326,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         id: number;
         command?: { type: string };
         media?: { source: string };
+        reset?: true;
       }): void {
+        if (request.reset) {
+          window.setTimeout(() => {
+            this.onmessage?.({ data: { id: request.id, uri: null } } as MessageEvent);
+          });
+          return;
+        }
         if (request.media) {
           const { source } = request.media;
           window.setTimeout(
@@ -738,7 +745,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                                           next_batch: null,
                                                           total: 0,
                                                         }
-                                                      : { type: command },
+                                                      : command === 'homeserver_info'
+                                                        ? {
+                                                            type: command,
+                                                            homeserver: 'https://example.test',
+                                                            server: {
+                                                              name: 'Sable Test',
+                                                              version: '1.0',
+                                                            },
+                                                          }
+                                                        : { type: command },
               };
 
         window.setTimeout(

@@ -479,6 +479,10 @@ export class CoreClient {
     this.status = 'signed-out';
   }
 
+  async resetCaches(): Promise<void> {
+    await this.ensureTransport().resetCaches();
+  }
+
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {
     const response = await this.ensureTransport().send({
       type: 'request_verification',

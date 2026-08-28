@@ -46,6 +46,9 @@ export interface Transport {
   subscribeCrash(onCrash: (message: string) => void): () => void;
 
   subscribeStall(onStall: (stalled: boolean) => void): () => void;
+
+  resetCaches(): Promise<void>;
+
   close(): void;
 }
 

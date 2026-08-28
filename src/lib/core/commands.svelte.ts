@@ -4,6 +4,7 @@ import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
 import type { PersonaView } from '#src/generated/PersonaView';
 import type { DeviceView } from '#src/generated/DeviceView';
 import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+import type { HomeserverSoftwareView } from '#src/generated/HomeserverSoftwareView';
 import type { ImagePackView } from '#src/generated/ImagePackView';
 import type { JoinRuleView } from '#src/generated/JoinRuleView';
 import type { MemberView } from '#src/generated/MemberView';
@@ -116,6 +117,14 @@ export function createCommands(transport: () => Transport) {
 
     async cancelRegistration(): Promise<void> {
       await transport().send({ type: 'cancel_registration' });
+    },
+
+    async homeserverInfo(): Promise<{
+      homeserver: string;
+      server: HomeserverSoftwareView | null;
+    }> {
+      const response = await transport().send({ type: 'homeserver_info' });
+      return { homeserver: response.homeserver, server: response.server };
     },
 
     async subscribeRoomList(): Promise<{

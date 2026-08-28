@@ -126,7 +126,16 @@ export function createCoreWorkerBoundary(
         closePort(port);
         return;
       }
-      if ('shutdown' in request) {
+      if ('reset' in request) {
+        if (ports.size !== 1) {
+          port.postMessage({
+            id: request.id,
+            err: { code: 'failed', log_id: 'close other Sable tabs before resetting the cache' },
+          });
+          return;
+        }
+        closePort(port);
+        port.postMessage({ id: request.id, uri: null });
         terminate();
         return;
       }

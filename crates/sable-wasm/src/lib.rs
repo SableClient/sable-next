@@ -111,7 +111,7 @@ impl Drop for JsLogWriter {
         if !self.capturing || self.line.is_empty() || LOG_NOTIFYING.swap(true, Ordering::Relaxed) {
             return;
         }
-        let notify = LOG_NOTIFIER.with_borrow(|slot| slot.clone());
+        let notify = LOG_NOTIFIER.with_borrow(Clone::clone);
         if let Some(notify) = notify {
             let _ = notify.call1(&JsValue::NULL, &JsValue::from_str(&self.line));
         }

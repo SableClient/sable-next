@@ -1,10 +1,12 @@
 import type { Component } from 'svelte';
+import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
 import LockKeyIcon from 'phosphor-svelte/lib/LockKeyIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 
 import { SETTINGS_ACCOUNT_SECTION, SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
 
 import AccountSettings from './AccountSettings.svelte';
+import AboutSettings from './AboutSettings.svelte';
 import DevicesSettings from './DevicesSettings.svelte';
 
 export interface StandaloneSection {
@@ -29,6 +31,12 @@ export const sectionsAfterCategories: StandaloneSection[] = [
     label: 'settings.security',
     icon: LockKeyIcon,
     component: DevicesSettings,
+  },
+  {
+    id: 'about',
+    label: 'settings.about',
+    icon: InfoIcon,
+    component: AboutSettings,
   },
 ];
 

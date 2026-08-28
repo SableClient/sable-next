@@ -9,6 +9,7 @@ import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 import { on } from 'svelte/events';
 import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
+import { resetWebStorage } from '../lib/platform/session-storage.js';
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
@@ -148,6 +149,18 @@ export function createWebTransport(): Transport {
     return nextWorker;
   }
 
+  function detach(reason: string, farewell: WorkerRequest): void {
+    closed = true;
+    listeners.clear();
+    crashListeners.clear();
+    stallListeners.clear();
+    overdue.clear();
+    rejectPending(reason);
+    worker?.port.postMessage(farewell);
+    worker?.port.close();
+    worker = null;
+  }
+
   function request<T extends Reply>(
     body: (id: number) => WorkerRequest,
     transfers: Transferable[] = []
@@ -260,18 +273,14 @@ export function createWebTransport(): Transport {
       return () => stallListeners.delete(onStall);
     },
 
+    async resetCaches() {
+      await request<null>((id) => ({ id, reset: true }));
+      detach('cache reset', { disconnect: true });
+      await resetWebStorage();
+    },
+
     close() {
-      closed = true;
-      listeners.clear();
-      crashListeners.clear();
-      stallListeners.clear();
-      overdue.clear();
-      rejectPending('transport closed');
-      // The worker outlives the tab: others may be using it, and it is what
-      // keeps sync running.
-      worker?.port.postMessage({ disconnect: true });
-      worker?.port.close();
-      worker = null;
+      detach('transport closed', { disconnect: true });
     },
   };
 }
