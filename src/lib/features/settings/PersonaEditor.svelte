@@ -142,23 +142,34 @@
 
     <label class="field">
       <span>{$i18n.t('personas.name')}</span>
-      <TextInput bind:value={name} required maxlength={128} />
+      <TextInput
+        name="persona-name"
+        bind:value={name}
+        autocomplete="off"
+        required
+        maxlength={128}
+      />
       <small>{$i18n.t('personas.nameHint')}</small>
     </label>
 
     <label class="field">
       <span>{$i18n.t('personas.pronouns')}</span>
-      <TextInput bind:value={pronouns} placeholder={$i18n.t('personas.pronounsPlaceholder')} />
+      <TextInput
+        name="persona-pronouns"
+        bind:value={pronouns}
+        autocomplete="off"
+        placeholder={$i18n.t('personas.pronounsPlaceholder')}
+      />
     </label>
 
     <div class="colors">
       <label class="field">
         <span>{$i18n.t('personas.colorLight')}</span>
-        <TextInput bind:value={colorLight} type="color" />
+        <TextInput name="persona-color-light" bind:value={colorLight} type="color" />
       </label>
       <label class="field">
         <span>{$i18n.t('personas.colorDark')}</span>
-        <TextInput bind:value={colorDark} type="color" />
+        <TextInput name="persona-color-dark" bind:value={colorDark} type="color" />
       </label>
     </div>
 
@@ -170,7 +181,9 @@
           <label class="field">
             <span>{$i18n.t('personas.triggerPrefix')}</span>
             <TextInput
+              name={`persona-trigger-prefix-${String(index)}`}
               value={trigger.prefix ?? ''}
+              autocomplete="off"
               oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
                 triggers[index] = { ...trigger, prefix: event.currentTarget.value };
               }}
@@ -179,7 +192,9 @@
           <label class="field">
             <span>{$i18n.t('personas.triggerSuffix')}</span>
             <TextInput
+              name={`persona-trigger-suffix-${String(index)}`}
               value={trigger.suffix ?? ''}
+              autocomplete="off"
               oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
                 triggers[index] = { ...trigger, suffix: event.currentTarget.value };
               }}

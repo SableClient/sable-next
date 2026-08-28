@@ -274,6 +274,8 @@
         class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
         src={url}
         alt={showCanvas ? '' : alt}
+        {width}
+        {height}
         aria-hidden={showCanvas ? 'true' : undefined}
         onload={freezeFrame}
       />
@@ -282,7 +284,7 @@
       <span class="play-gif" aria-hidden="true"><PlayIcon /></span>
     {/if}
   {:else if url}
-    <img class="media-image-content" src={url} {alt} />
+    <img class="media-image-content" src={url} {alt} {width} {height} />
   {:else if failed}
     <span class="media-image-unavailable">
       <ImageBrokenIcon />

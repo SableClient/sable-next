@@ -220,6 +220,7 @@
 
 {#if core.status === 'ready'}
   {#key core.accountRevision}
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <AppShell>
       {@render children()}
     </AppShell>
@@ -272,6 +273,23 @@
 {/if}
 
 <style>
+  .skip-link {
+    background: var(--sable-bg-container);
+    border: var(--border-width) solid var(--sable-primary-main);
+    border-radius: var(--radius);
+    color: var(--sable-bg-on-container);
+    left: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    position: fixed;
+    top: var(--space-2);
+    transform: translateY(-150%);
+    z-index: var(--layer-tooltip);
+  }
+
+  .skip-link:focus-visible {
+    transform: translateY(0);
+  }
+
   .app-status {
     align-items: center;
     background: var(--sable-surface-container);

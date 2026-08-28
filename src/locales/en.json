@@ -203,6 +203,7 @@
     "lobbyKnockSent": "Request sent",
     "lobbyOpen": "Open",
     "lobbyRemove": "Remove",
+    "lobbyRemoveConfirm": "Remove {{room}} from this space?",
     "lobbyMoveUp": "Move up",
     "lobbyMoveDown": "Move down",
     "lobbySuggested": "Suggested",

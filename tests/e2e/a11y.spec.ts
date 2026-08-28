@@ -9,11 +9,7 @@ import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 async function violations(page: Page) {
-  const result = await new AxeBuilder({ page })
-    // Colour is a design decision, reviewed separately from structure.
-    .withTags(TAGS)
-    .disableRules(['color-contrast'])
-    .analyze();
+  const result = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   return result.violations.map((violation) => ({
     id: violation.id,
     nodes: violation.nodes.map((node) => node.target.join(' ')),
@@ -38,6 +34,11 @@ test('the signed-in surfaces have no accessibility violations', async ({
 }) => {
   await signIn();
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
+
+  const skipLink = page.getByRole('link', { name: 'Skip to main content' });
+  await skipLink.focus();
+  await skipLink.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
 
   await expect(page.getByRole('main')).toHaveCount(1);
   expect(await violations(page)).toEqual([]);

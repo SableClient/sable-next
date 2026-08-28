@@ -80,6 +80,11 @@
       },
     });
   }
+
+  function removeEntry(entry: HierarchyRoom): void {
+    if (!confirm($i18n.t('room.lobbyRemoveConfirm', { room: label(entry.room) }))) return;
+    onRemove(section, entry);
+  }
 </script>
 
 <div class="section">
@@ -235,7 +240,7 @@
                       <DropdownMenu.Item
                         class="sable-menu-item sable-menu-item-destructive"
                         onSelect={() => {
-                          onRemove(section, entry);
+                          removeEntry(entry);
                         }}
                       >
                         <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}

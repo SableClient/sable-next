@@ -186,7 +186,7 @@
       <SidebarNav mobile />
     </section>
     <section class="drawer-panel content-panel" inert={open && !appLayout.matches}>
-      <div class="content">
+      <div id="main-content" class="content" tabindex="-1">
         {@render children()}
       </div>
       {#if showMobileQuickTools}

@@ -158,6 +158,8 @@
             class="banner"
             src={profile.banner_url}
             alt="Current profile banner"
+            width="1000"
+            height="375"
           />{/if}
         <label class="file-button sable-button sable-button-secondary sable-button-small">
           <input

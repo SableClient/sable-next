@@ -75,6 +75,8 @@
             <img
               src={gif.previewUrl}
               alt=""
+              width="4"
+              height="3"
               loading="lazy"
               decoding="async"
               referrerpolicy="no-referrer"
