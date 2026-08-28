@@ -192,6 +192,59 @@ test('the ordered_list command wraps the paragraph in a numbered list', () => {
   expect(activeMarks(editor.state)).toContain('ordered_list');
 });
 
+function run(action: 'bullet_list' | 'ordered_list' | 'blockquote'): void {
+  const editor = view;
+  if (!editor) throw new Error('no editor');
+  formatCommands[action](editor.state, editor.dispatch.bind(editor), editor);
+}
+
+function caretInto(word: string): void {
+  const editor = view;
+  if (!editor) throw new Error('no editor');
+  let position = -1;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.isText && node.text === word) position = pos + 1;
+  });
+  if (position < 0) throw new Error(`no text node reading ${word}`);
+  editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, position)));
+}
+
+test('the blockquote command lifts out of a quote instead of nesting another', () => {
+  const editor = open();
+  type('quoted');
+
+  run('blockquote');
+  expect(editor.state.doc.toString()).toBe('doc(blockquote(paragraph("quoted")))');
+
+  run('blockquote');
+  expect(editor.state.doc.toString()).toBe('doc(paragraph("quoted"))');
+});
+
+test('the bullet_list command lifts out of a list from any item, not only the first', () => {
+  const editor = open();
+  type('one');
+  run('bullet_list');
+  editor.dispatch(editor.state.tr.split(editor.state.selection.from, 2));
+  editor.dispatch(editor.state.tr.insertText('two'));
+  caretInto('two');
+
+  run('bullet_list');
+  expect(editor.state.doc.toString()).toBe(
+    'doc(bullet_list(list_item(paragraph("one"))), paragraph("two"))'
+  );
+  expect(activeMarks(editor.state)).not.toContain('bullet_list');
+});
+
+test('switching list type replaces the list rather than nesting one inside it', () => {
+  const editor = open();
+  type('one');
+  run('bullet_list');
+  expect(editor.state.doc.toString()).toBe('doc(bullet_list(list_item(paragraph("one"))))');
+
+  run('ordered_list');
+  expect(editor.state.doc.toString()).toBe('doc(ordered_list(list_item(paragraph("one"))))');
+});
+
 test('activeMarks reports a link mark covering the selection', () => {
   const editor = open();
   type('docs');

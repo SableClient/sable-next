@@ -116,6 +116,7 @@
   <div class="thread-composer">
     <RoomComposer
       {roomId}
+      threadRoot={rootEventId}
       {roomName}
       {readOnly}
       onSend={conversation.sendMessage}

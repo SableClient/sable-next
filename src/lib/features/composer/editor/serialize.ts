@@ -5,11 +5,11 @@ import {
   MarkdownSerializer,
   type ParseSpec,
 } from 'prosemirror-markdown';
-import { DOMSerializer, type Node as ProseMirrorNode } from 'prosemirror-model';
+import { DOMSerializer, Fragment, type Node as ProseMirrorNode } from 'prosemirror-model';
 
 import type { OutgoingMentions } from '#lib/core/client.svelte.js';
 
-import { composerSchema, mentionHref } from './schema';
+import { composerSchema } from './schema';
 
 export interface ComposerMessage {
   body: string;
@@ -40,7 +40,7 @@ const markdown = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.marks,
     strike: { open: '~~', close: '~~', mixable: true, expelEnclosingWhitespace: true },
-    underline: { open: '__', close: '__', mixable: true, expelEnclosingWhitespace: true },
+    underline: { open: '', close: '', mixable: true },
     spoiler: { open: '||', close: '||', mixable: true, expelEnclosingWhitespace: true },
   }
 );
@@ -70,13 +70,33 @@ function html(doc: ProseMirrorNode): string {
 
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const body = markdown.serialize(doc).trim();
-  const mentions = mentionsOf(doc, body);
+  const mentions = mentionsOf(doc);
   if (body === '') return { body, formatted: null, mentions };
 
   return { body, formatted: isPlain(doc) ? null : html(doc), mentions };
 }
 
-export function mentionsOf(doc: ProseMirrorNode, body: string): OutgoingMentions {
+function mentionsRoom(doc: ProseMirrorNode): boolean {
+  let found = false;
+
+  doc.descendants((node) => {
+    if (found) return false;
+    if (!node.isTextblock) return true;
+    if (node.type === composerSchema.nodes.code_block) return false;
+
+    let text = '';
+    node.forEach((child) => {
+      const quoted = !child.isText || composerSchema.marks.code.isInSet(child.marks);
+      text += quoted ? ' ' : (child.text ?? '');
+    });
+    if (/(^|\s)@room(\s|$)/.test(text)) found = true;
+    return false;
+  });
+
+  return found;
+}
+
+export function mentionsOf(doc: ProseMirrorNode): OutgoingMentions {
   const userIds = new Set<string>();
 
   doc.descendants((node) => {
@@ -86,7 +106,7 @@ export function mentionsOf(doc: ProseMirrorNode, body: string): OutgoingMentions
     return false;
   });
 
-  return { userIds: [...userIds], room: /(^|\s)@room(\s|$)/.test(body) };
+  return { userIds: [...userIds], room: mentionsRoom(doc) };
 }
 
 /* `commonmark` leaves strikethrough off, and the composer schema has no image
@@ -122,27 +142,65 @@ const PARSE_TOKENS: Record<string, ParseSpec> = {
 
 const markdownParser = new MarkdownParser(composerSchema, tokenizer, PARSE_TOKENS);
 
+const ATOM_PLACEHOLDER = '\uFFFC';
+
+function atomText(node: ProseMirrorNode): string {
+  if (node.type === composerSchema.nodes.emoticon) return `:${node.attrs.shortcode as string}:`;
+  return node.attrs.name as string;
+}
+
 /** The literal characters the user typed, with the atoms spelled back out. */
 function plainTextOf(doc: ProseMirrorNode): string {
-  const { mention, emoticon, hard_break: hardBreak } = composerSchema.nodes;
+  const { hard_break: hardBreak } = composerSchema.nodes;
 
-  return doc.textBetween(0, doc.content.size, '\n\n', (node) => {
+  return doc.textBetween(0, doc.content.size, '\n\n', (node) =>
+    node.type === hardBreak ? '\n' : atomText(node)
+  );
+}
+
+function markdownSourceOf(doc: ProseMirrorNode): { source: string; atoms: ProseMirrorNode[] } {
+  const { mention, emoticon, hard_break: hardBreak } = composerSchema.nodes;
+  const atoms: ProseMirrorNode[] = [];
+
+  const source = doc.textBetween(0, doc.content.size, '\n\n', (node) => {
     if (node.type === hardBreak) return '\n';
-    if (node.type === emoticon) return `:${node.attrs.shortcode as string}:`;
-    if (node.type === mention) {
-      const href = mentionHref(node.attrs.userId as string, node.attrs.via as string[]);
-      return `[${node.attrs.name as string}](${href})`;
-    }
-    return '';
+    if (node.type !== mention && node.type !== emoticon) return '';
+    atoms.push(node);
+    return ATOM_PLACEHOLDER;
   });
+
+  return { source, atoms };
+}
+
+function spliceAtoms(node: ProseMirrorNode, atoms: ProseMirrorNode[]): ProseMirrorNode {
+  if (node.isLeaf) return node;
+
+  const children: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    if (!child.isText) {
+      children.push(spliceAtoms(child, atoms));
+      return;
+    }
+
+    for (const [index, part] of (child.text ?? '').split(ATOM_PLACEHOLDER).entries()) {
+      if (index > 0) {
+        const atom = atoms.shift();
+        if (atom) children.push(node.type.spec.code ? composerSchema.text(atomText(atom)) : atom);
+      }
+      if (part !== '') children.push(composerSchema.text(part, child.marks));
+    }
+  });
+
+  return node.copy(Fragment.fromArray(children));
 }
 
 /** Plain-text mode: what was typed is the body, parsed as markdown for the HTML. */
 export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   const body = plainTextOf(doc).trim();
-  const mentions = mentionsOf(doc, body);
+  const mentions = mentionsOf(doc);
   if (body === '') return { body, formatted: null, mentions };
 
-  const parsed = markdownParser.parse(body);
+  const { source, atoms } = markdownSourceOf(doc);
+  const parsed = spliceAtoms(markdownParser.parse(source.trim()), atoms);
   return { body, formatted: isPlain(parsed) ? null : html(parsed), mentions };
 }

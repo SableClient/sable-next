@@ -17,6 +17,9 @@
     $effect(() => {
       editor.syncLabel();
     });
+    $effect(() => {
+      editor.syncKeyHint();
+    });
     return detach;
   }
 </script>

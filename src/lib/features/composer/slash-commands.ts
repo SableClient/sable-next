@@ -6,7 +6,7 @@ import { parseJoinAddress } from '#lib/features/room/join-address.js';
 import { currentFix } from '#lib/platform/geolocation.js';
 
 import { coordinate, geoUriFor } from './composer-location.js';
-import { rainbowHtml } from './rainbow.js';
+import { escapeHtml, rainbowHtml } from './rainbow.js';
 
 export type SlashCommandApi = Pick<
   CoreCommands,
@@ -41,12 +41,19 @@ export type SlashCommandApi = Pick<
 export type SlashContext = {
   roomId: string;
   userId: string | null;
+  formatted?: string | null;
   developerTools?: boolean;
   commands: SlashCommandApi;
 };
 
 export type SlashOutcome =
-  | { kind: 'message'; body: string; msgtype: MessageKind; formatted?: string | null }
+  | {
+      kind: 'message';
+      body: string;
+      msgtype: MessageKind;
+      formatted?: string | null;
+      verbatim?: boolean;
+    }
   | { kind: 'gifSearch'; query: string }
   | { kind: 'bugReport' }
   | { kind: 'done' }
@@ -107,6 +114,18 @@ function message(
   return { kind: 'message', body, msgtype, formatted };
 }
 
+const SLASH_PREFIX = /^\s*\/([a-z0-9]+)(\s+|$)/i;
+
+function withoutPrefix(name: string, formatted: string | null | undefined): string | null {
+  if (!formatted) return null;
+  const match = SLASH_PREFIX.exec(formatted);
+  return match && match[1].toLowerCase() === name ? formatted.slice(match[0].length) : null;
+}
+
+function verbatim(body: string, msgtype: MessageKind, formatted: string | null): SlashOutcome {
+  return { kind: 'message', body, msgtype, formatted, verbatim: true };
+}
+
 function usageError(name: string): SlashOutcome {
   return { kind: 'error', key: localeKey(name, 'usage') };
 }
@@ -114,9 +133,11 @@ function usageError(name: string): SlashOutcome {
 function speech(name: string, msgtype: MessageKind): SlashCommand {
   return {
     name,
-    run: (args) => {
+    run: (args, { formatted }) => {
       const text = args.trim();
-      return text === '' ? usageError(name) : message(text, msgtype);
+      return text === ''
+        ? usageError(name)
+        : verbatim(text, msgtype, withoutPrefix(name, formatted));
     },
   };
 }
@@ -124,9 +145,16 @@ function speech(name: string, msgtype: MessageKind): SlashCommand {
 function decorated(name: string, suffix: string): SlashCommand {
   return {
     name,
-    run: (args) => {
+    run: (args, { formatted }) => {
       const text = args.trim();
-      return message(text === '' ? suffix : `${text} ${suffix}`, 'text');
+      if (text === '') return message(suffix, 'text');
+
+      const html = withoutPrefix(name, formatted);
+      return verbatim(
+        `${text} ${suffix}`,
+        'text',
+        html === null ? null : `${html} ${escapeHtml(suffix)}`
+      );
     },
   };
 }

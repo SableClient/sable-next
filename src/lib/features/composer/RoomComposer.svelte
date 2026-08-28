@@ -55,7 +55,7 @@
   import { serializeComposer, serializePlain } from './editor/serialize';
   import { sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
-  import { suggestionsFor } from './suggestions';
+  import { ROOM_MENTION, suggestionsFor } from './suggestions';
 
   const emoteSize = 24;
 
@@ -84,6 +84,7 @@
     context?: ComposerContext | null;
     onCancelContext?: () => void;
     onEditLast?: () => void;
+    threadRoot?: string | null;
   }
 
   let {
@@ -100,6 +101,7 @@
     context = null,
     onCancelContext,
     onEditLast,
+    threadRoot = null,
   }: Props = $props();
 
   const core = useCoreClient();
@@ -110,6 +112,8 @@
   const hintId = `composer-hint-${uid}`;
   const listboxId = `composer-suggestions-${uid}`;
   const optionId = (index: number): string => `${listboxId}-${String(index)}`;
+
+  const draftKey = (): string => (threadRoot === null ? roomId : `${roomId}/${threadRoot}`);
 
   let prefilledFor: string | null = null;
   let nextStagedId = 0;
@@ -163,7 +167,7 @@
     if (preferences.personaPicker || preferences.personaProxying) void personas.load();
   });
   let panelOpen = $derived(query !== null && dismissedAt !== query.start);
-  let suggestions = $derived(suggestionsFor(query, members, emotes, roomList.rooms));
+  let suggestions = $derived(suggestionsFor(query, members, emotes, roomList.rooms, $i18n.t));
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
   let placeholder = $derived(
     staged.length > 0
@@ -229,7 +233,7 @@
     if (restored) return;
     restored = true;
 
-    const draft = readDraft(roomId);
+    const draft = readDraft(draftKey());
     if (!draft) return;
     staged = draft.staged;
     nextStagedId = draft.nextStagedId;
@@ -242,8 +246,8 @@
     queue.dispose();
 
     const doc = preEdit ?? (editor.isEmpty() ? undefined : editor.doc());
-    if (!doc && staged.length === 0) clearDraft(roomId);
-    else writeDraft(roomId, { doc: doc?.toJSON() ?? null, staged, nextStagedId });
+    if (!doc && staged.length === 0) clearDraft(draftKey());
+    else writeDraft(draftKey(), { doc: doc?.toJSON() ?? null, staged, nextStagedId });
   });
 
   $effect(() => {
@@ -491,6 +495,7 @@
     if (sigil === '/') return composerSchema.text(suggestion.insert);
 
     if (sigil === '@') {
+      if (suggestion.id === ROOM_MENTION) return composerSchema.text(ROOM_MENTION);
       return composerSchema.nodes.mention.create({
         userId: suggestion.id,
         name: suggestion.label,
@@ -597,6 +602,7 @@
         {#if staged.length > 0}
           <ComposerAttachments
             files={staged}
+            disabled={sending}
             onRemove={(id: number) => {
               staged = unstageFile(staged, id);
             }}

@@ -76,6 +76,7 @@ export class Conversation {
     const outcome = await runSlash(body, {
       roomId: targetRoomId,
       userId: this.#core.session?.user_id ?? null,
+      formatted,
       developerTools: preferences.developerTools,
       commands: this.#core.commands,
     });
@@ -93,17 +94,17 @@ export class Conversation {
       return;
     }
 
-    const rewritten = outcome.body !== body;
+    const untouched = outcome.body === body;
     const outgoing = this.#personaFor(
       targetRoomId,
       outcome.body,
-      rewritten ? (outcome.formatted ?? null) : (outcome.formatted ?? formatted)
+      untouched ? (outcome.formatted ?? formatted) : (outcome.formatted ?? null)
     );
     await this.#core.commands.sendMessage(targetRoomId, outgoing.body, {
       inReplyTo: pending?.eventId ?? null,
       threadRoot: this.#threadRoot,
       formatted: outgoing.formatted,
-      mentions: rewritten ? NO_MENTIONS : mentions,
+      mentions: untouched || outcome.verbatim === true ? mentions : NO_MENTIONS,
       kind: outcome.msgtype,
       persona: outgoing.persona,
     });

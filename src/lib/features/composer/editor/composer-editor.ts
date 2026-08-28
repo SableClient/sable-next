@@ -158,13 +158,14 @@ export class ComposerEditor {
     };
   }
 
-  private createState(doc?: ProseMirrorNode): EditorState {
+  private createState(doc?: ProseMirrorNode, selection?: Selection): EditorState {
     /* Read once, here, rather than inside the view: an option the constructor
        calls becomes a dependency of the attachment that mounts it. */
     const rich = untrack(() => preferences.richTextComposer);
 
     return EditorState.create({
       ...(doc ? { doc } : {}),
+      ...(selection ? { selection } : {}),
       schema: composerSchema,
       plugins: [
         history(),
@@ -205,11 +206,16 @@ export class ComposerEditor {
     });
   }
 
-  /** Swapping the input rules in or out means rebuilding the plugin stack. */
-  reconfigure(): void {
+  private rebuild(): void {
     const view = this.view;
     if (!view) return;
-    view.updateState(this.createState(view.state.doc));
+    view.updateState(this.createState(view.state.doc, view.state.selection));
+    this.options.onChange(isDocEmpty(view.state.doc), activeMarks(view.state), false);
+    this.options.onQuery(queryKey.getState(view.state) ?? null);
+  }
+
+  reconfigure(): void {
+    this.rebuild();
   }
 
   mount(node: HTMLElement): () => void {
@@ -275,6 +281,11 @@ export class ComposerEditor {
     this.view?.setProps({});
   }
 
+  syncKeyHint(): void {
+    void preferences.enterForNewline;
+    this.view?.setProps({});
+  }
+
   syncActiveOption(): void {
     void this.options.activeOptionId();
     this.view?.setProps({});
@@ -304,9 +315,7 @@ export class ComposerEditor {
   }
 
   clearHistory(): void {
-    const view = this.view;
-    if (!view) return;
-    view.updateState(this.createState(view.state.doc));
+    this.rebuild();
   }
 
   setDoc(doc: ProseMirrorNode): void {

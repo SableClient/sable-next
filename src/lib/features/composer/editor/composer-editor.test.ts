@@ -409,6 +409,55 @@ describe('block editing', () => {
   });
 });
 
+test('the enter key hint follows the preference', () => {
+  const editor = open();
+  expect(surface().getAttribute('enterkeyhint')).toBe('send');
+
+  preferences.enterForNewline = true;
+  editor.syncKeyHint();
+
+  expect(surface().getAttribute('enterkeyhint')).toBe('enter');
+});
+
+describe('rebuilding the plugin stack', () => {
+  test('clearHistory leaves the caret where the writer had it', () => {
+    const editor = open();
+    editor.setText('hello there');
+    const before = view(editor).state.selection.from;
+
+    editor.clearHistory();
+
+    expect(view(editor).state.selection.from).toBe(before);
+  });
+
+  test('reconfigure leaves the caret where the writer had it', () => {
+    const editor = open();
+    editor.setText('hello there');
+    const before = view(editor).state.selection.from;
+
+    editor.reconfigure();
+
+    expect(view(editor).state.selection.from).toBe(before);
+  });
+
+  test('a rebuild reports the state the caller renders from', () => {
+    const changes: boolean[] = [];
+    const queries: (string | null)[] = [];
+    const editor = openWith({
+      onChange: (empty) => changes.push(empty),
+      onQuery: (next) => queries.push(next?.query ?? null),
+    });
+    editor.setText('hi @amp');
+    changes.length = 0;
+    queries.length = 0;
+
+    editor.reconfigure();
+
+    expect(changes).toEqual([false]);
+    expect(queries).toEqual(['amp']);
+  });
+});
+
 describe('link', () => {
   test('format asks the caller for a link rather than mutating the document', () => {
     const onLinkRequest = vi.fn();

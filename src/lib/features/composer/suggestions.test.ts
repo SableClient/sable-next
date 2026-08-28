@@ -156,3 +156,21 @@ test('a room name that already starts with # keeps a single #', () => {
 
   expect(suggestion.label).toBe('#General');
 });
+
+test('@room is offered while the needle still prefixes it', () => {
+  const members = [member('@rob:example.org', 'Rob')];
+
+  expect(suggestionsFor(mentionQuery('ro'), members, [], []).map((item) => item.id)).toEqual([
+    '@room',
+    '@rob:example.org',
+  ]);
+  expect(suggestionsFor(mentionQuery('rob'), members, [], []).map((item) => item.id)).toEqual([
+    '@rob:example.org',
+  ]);
+});
+
+test('a translator passed in is what renders the command descriptions', () => {
+  const [suggestion] = suggestionsFor(commandQuery('me'), [], [], [], (key) => `translated:${key}`);
+
+  expect(suggestion.detail).toBe('translated:composer.slash.me.description');
+});

@@ -63,6 +63,7 @@ interface ComposerProps {
   onSendAttachment?: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
+  threadRoot?: string | null;
   readOnly?: boolean;
   roomName?: string;
   registerReply?: (reply: () => void) => void;
@@ -555,6 +556,27 @@ test('another room does not inherit the draft', async () => {
 
   expect(stagedNames()).toEqual([]);
   void unmount(second);
+});
+
+test('a thread keeps its draft out of the room it hangs off', async () => {
+  const thread = render({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
+  await tick();
+  await pick(new File(['one'], 'thread.png', { type: 'image/png' }));
+
+  await unmount(thread);
+  document.body.replaceChildren();
+  const room = render({ roomId: '!room:example.org' });
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
+  void unmount(room);
+
+  document.body.replaceChildren();
+  const reopened = render({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
+  await tick();
+
+  expect(stagedNames()).toEqual(['thread.png']);
+  void unmount(reopened);
 });
 
 test('an edit hands back the draft it interrupted', async () => {

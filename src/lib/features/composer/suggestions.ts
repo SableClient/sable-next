@@ -19,6 +19,20 @@ function rank(left: boolean, right: boolean): number {
   return left ? -1 : 1;
 }
 
+export const ROOM_MENTION = '@room';
+
+function roomMention(needle: string, translate: Translate): Suggestion[] {
+  if (!'room'.startsWith(needle)) return [];
+  return [
+    {
+      id: ROOM_MENTION,
+      insert: ROOM_MENTION,
+      label: ROOM_MENTION,
+      detail: translate('composer.roomMention'),
+    },
+  ];
+}
+
 function memberSuggestions(needle: string, members: readonly MemberView[]): Suggestion[] {
   return members
     .map((member) => ({
@@ -105,7 +119,7 @@ function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggest
     }));
 }
 
-function commandSuggestions(needle: string): Suggestion[] {
+function commandSuggestions(needle: string, translate: Translate): Suggestion[] {
   return SLASH_COMMANDS.filter((command) => command.name.includes(needle))
     .sort((left, right) => {
       const byPrefix = rank(left.name.startsWith(needle), right.name.startsWith(needle));
@@ -116,21 +130,29 @@ function commandSuggestions(needle: string): Suggestion[] {
       id: command.name,
       insert: `/${command.name}`,
       label: `/${command.name}`,
-      detail: t(descriptionKey(command)),
+      detail: translate(descriptionKey(command)),
     }));
 }
+
+export type Translate = (key: string) => string;
 
 export function suggestionsFor(
   query: AutocompleteQuery | null,
   members: readonly MemberView[],
   emotes: readonly PackImageView[],
-  rooms: readonly RoomSummary[]
+  rooms: readonly RoomSummary[],
+  translate: Translate = t
 ): Suggestion[] {
   if (!query) return [];
   const needle = query.query.toLowerCase();
 
-  if (query.sigil === '/') return commandSuggestions(needle);
-  if (query.sigil === '@') return memberSuggestions(needle, members);
+  if (query.sigil === '/') return commandSuggestions(needle, translate);
+  if (query.sigil === '@') {
+    return [...roomMention(needle, translate), ...memberSuggestions(needle, members)].slice(
+      0,
+      limit
+    );
+  }
   if (query.sigil === '#') return roomSuggestions(needle, rooms);
   return emoteSuggestions(needle, emotes);
 }

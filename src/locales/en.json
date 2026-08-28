@@ -1270,6 +1270,7 @@
     "emotesHeading": "Emotes · \"{{query}}\"",
     "commandsHeading": "Commands · \"{{query}}\"",
     "noSuggestions": "No matches",
+    "roomMention": "Notify everyone in this room",
     "autocompleteHint": "↑↓ move · Tab or Enter insert · Esc closes",
     "replyingTo": "Replying to {{name}}",
     "editing": "Editing",

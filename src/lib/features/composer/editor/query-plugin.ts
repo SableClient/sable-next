@@ -20,7 +20,7 @@ export function queryPlugin(): Plugin<AutocompleteQuery | null> {
   return new Plugin<AutocompleteQuery | null>({
     key: queryKey,
     state: {
-      init: () => null,
+      init: (_config, state) => readQuery(state),
       apply: (_tr, _value, _old, state) => readQuery(state),
     },
   });

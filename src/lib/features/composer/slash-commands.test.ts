@@ -108,13 +108,43 @@ test('/me and /notice change the msgtype and nothing else', async () => {
     body: 'waves',
     msgtype: 'emote',
     formatted: null,
+    verbatim: true,
   });
   await expect(runSlash('/notice the build broke', commands)).resolves.toEqual({
     kind: 'message',
     body: 'the build broke',
     msgtype: 'notice',
     formatted: null,
+    verbatim: true,
   });
+});
+
+test('/me carries the formatted body across, without the command name', async () => {
+  const commands = { ...context(fakeCommands()), formatted: '/me waves <strong>hard</strong>' };
+
+  await expect(runSlash('/me waves **hard**', commands)).resolves.toEqual({
+    kind: 'message',
+    body: 'waves **hard**',
+    msgtype: 'emote',
+    formatted: 'waves <strong>hard</strong>',
+    verbatim: true,
+  });
+});
+
+test('a decorated command appends its suffix to the formatted body too', async () => {
+  const commands = { ...context(fakeCommands()), formatted: '/shrug <em>oh well</em>' };
+
+  await expect(runSlash('/shrug *oh well*', commands)).resolves.toMatchObject({
+    body: '*oh well* ¯\\_(ツ)_/¯',
+    formatted: '<em>oh well</em> ¯\\_(ツ)_/¯',
+    verbatim: true,
+  });
+});
+
+test('a formatted body whose command name is buried is dropped rather than mangled', async () => {
+  const commands = { ...context(fakeCommands()), formatted: '<strong>/me</strong> waves' };
+
+  await expect(runSlash('/me waves', commands)).resolves.toMatchObject({ formatted: null });
 });
 
 test('/gif returns a picker action instead of sending text', async () => {

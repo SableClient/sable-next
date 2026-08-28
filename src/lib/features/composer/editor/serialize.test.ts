@@ -71,7 +71,7 @@ test('underline and spoiler each serialise to their Matrix HTML', () => {
     )
   );
 
-  expect(message.body).toBe('__u__ ||secret||');
+  expect(message.body).toBe('u ||secret||');
   expect(message.formatted).toBe('<u>u</u> <span data-mx-spoiler="">secret</span>');
 });
 
@@ -233,5 +233,52 @@ describe('plain text mode', () => {
 
     expect(message.mentions.userIds).toEqual(['@amp:example.org']);
     expect(message.formatted).toContain('https://matrix.to/#/@amp:example.org');
+  });
+
+  test('the body names the mention rather than spelling out its link', () => {
+    const who = mention.create({ userId: '@amp:example.org', name: 'amp' });
+    const message = serializePlain(docOf(para([who, composerSchema.text(' hi')])));
+
+    expect(message.body).toBe('amp hi');
+  });
+
+  test('a custom emote survives as an image, not as its shortcode', () => {
+    const wave = emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' });
+    const message = serializePlain(docOf(para([composerSchema.text('hey '), wave])));
+
+    expect(message.body).toBe('hey :wave:');
+    expect(message.formatted).toBe(
+      'hey <img data-mx-emoticon="" src="mxc://example.org/wave" alt=":wave:" title=":wave:" height="32">'
+    );
+  });
+
+  test('markdown around an emote still parses', () => {
+    const wave = emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' });
+    const message = serializePlain(docOf(para([composerSchema.text('**hey** '), wave])));
+
+    expect(message.formatted).toContain('<strong>hey</strong>');
+    expect(message.formatted).toContain('data-mx-emoticon');
+  });
+});
+
+describe('@room', () => {
+  test('is picked up from ordinary prose', () => {
+    const message = serializeComposer(docOf(para(composerSchema.text('@room stand up'))));
+
+    expect(message.mentions.room).toBe(true);
+  });
+
+  test('notifies nobody from inside a code span', () => {
+    const message = serializeComposer(docOf(para(composerSchema.text('@room', [code.create()]))));
+
+    expect(message.mentions.room).toBe(false);
+  });
+
+  test('notifies nobody from inside a code block', () => {
+    const message = serializeComposer(
+      docOf(composerSchema.nodes.code_block.create(null, composerSchema.text('@room')))
+    );
+
+    expect(message.mentions.room).toBe(false);
   });
 });

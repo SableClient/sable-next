@@ -1,4 +1,4 @@
-import { chainCommands, lift, setBlockType, toggleMark } from 'prosemirror-commands';
+import { lift, setBlockType, toggleMark } from 'prosemirror-commands';
 import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
 import type { MarkType, NodeType } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
@@ -53,6 +53,14 @@ export const formattingInputRules: readonly InputRule[] = [
   textblockTypeInputRule(/^```$/, nodes.code_block),
 ];
 
+function isInside(state: EditorState, type: NodeType): boolean {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type === type) return true;
+  }
+  return false;
+}
+
 function isHeading(state: EditorState, level: number): boolean {
   const { parent } = state.selection.$from;
   return parent.type === nodes.heading && parent.attrs.level === level;
@@ -70,6 +78,35 @@ const codeBlockCommand: Command = (state, dispatch) =>
     ? setBlockType(nodes.paragraph)(state, dispatch)
     : setBlockType(nodes.code_block)(state, dispatch);
 
+const liftListEntry = liftListItem(nodes.list_item);
+
+function toggleWrap(type: NodeType): Command {
+  return (state, dispatch, view) =>
+    isInside(state, type) ? lift(state, dispatch, view) : wrapIn(type)(state, dispatch, view);
+}
+
+function toggleList(type: NodeType): Command {
+  const other = type === nodes.bullet_list ? nodes.ordered_list : nodes.bullet_list;
+  const wrap = wrapInList(type);
+
+  return (state, dispatch, view) => {
+    if (isInside(state, type)) return liftListEntry(state, dispatch, view);
+    if (!isInside(state, other)) return wrap(state, dispatch, view);
+
+    let lifted = state;
+    if (!liftListEntry(state, (tr) => (lifted = state.apply(tr)), view)) return false;
+    if (!wrap(lifted, undefined, view)) return false;
+    if (!dispatch) return true;
+
+    liftListEntry(state, dispatch, view);
+    return wrap(lifted, dispatch, view);
+  };
+}
+
+const bulletListCommand = toggleList(nodes.bullet_list);
+const orderedListCommand = toggleList(nodes.ordered_list);
+const blockquoteCommand = toggleWrap(nodes.blockquote);
+
 export const formattingKeymap: Record<string, Command> = {
   'Mod-b': toggleMark(marks.strong),
   'Mod-i': toggleMark(marks.em),
@@ -77,14 +114,14 @@ export const formattingKeymap: Record<string, Command> = {
   'Mod-Shift-x': toggleMark(marks.strike),
   'Mod-e': toggleMark(marks.code),
   'Mod-h': toggleMark(marks.spoiler),
-  'Mod-Shift-8': wrapInList(nodes.bullet_list),
-  'Mod-Shift-9': wrapInList(nodes.ordered_list),
-  'Mod-Shift-.': wrapIn(nodes.blockquote),
+  'Mod-Shift-8': bulletListCommand,
+  'Mod-Shift-9': orderedListCommand,
+  'Mod-Shift-.': blockquoteCommand,
   'Mod-1': headingCommand(1),
   'Mod-2': headingCommand(2),
   'Mod-3': headingCommand(3),
   'Mod-;': codeBlockCommand,
-  'Shift-Tab': liftListItem(nodes.list_item),
+  'Shift-Tab': liftListEntry,
 };
 
 export const splitListEntry = splitListItem(nodes.list_item);
@@ -113,22 +150,14 @@ export const formatCommands: Record<Exclude<FormatAction, 'link'>, Command> = {
   strike: toggleMark(marks.strike),
   code: toggleMark(marks.code),
   spoiler: toggleMark(marks.spoiler),
-  bullet_list: chainCommands(wrapInList(nodes.bullet_list), liftListItem(nodes.list_item)),
-  ordered_list: chainCommands(wrapInList(nodes.ordered_list), liftListItem(nodes.list_item)),
-  blockquote: chainCommands(wrapIn(nodes.blockquote), lift),
+  bullet_list: bulletListCommand,
+  ordered_list: orderedListCommand,
+  blockquote: blockquoteCommand,
   code_block: codeBlockCommand,
   heading1: headingCommand(1),
   heading2: headingCommand(2),
   heading3: headingCommand(3),
 };
-
-function isInside(state: EditorState, type: NodeType): boolean {
-  const { $from } = state.selection;
-  for (let depth = $from.depth; depth > 0; depth -= 1) {
-    if ($from.node(depth).type === type) return true;
-  }
-  return false;
-}
 
 export function activeMarks(state: EditorState): FormatAction[] {
   const { from, $from, to, empty } = state.selection;
