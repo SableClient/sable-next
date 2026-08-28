@@ -927,12 +927,10 @@
     if (document.visibilityState !== 'visible') return;
     requestAnimationFrame(() => {
       if (document.visibilityState !== 'visible' || !viewport) return;
-      const instance = get(virtualizer);
-      instance.scrollRect = {
+      get(virtualizer).scrollRect = {
         width: viewport.clientWidth,
         height: viewport.clientHeight,
       };
-      instance.measure();
       refreshAtLatest();
       if (position.kind === 'pinned') scheduleCommit();
     });

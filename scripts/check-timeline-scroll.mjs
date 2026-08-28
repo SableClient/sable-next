@@ -9,6 +9,15 @@ const required = [
   { option: 'scrollEndThreshold', value: '0' },
 ];
 
+const forbidden = [
+  {
+    label: 'virtualizer.measure()',
+    pattern: /(?<![A-Za-z])measure\(\)/g,
+    reason:
+      'clears the whole itemSizeCache, and a rendered row only re-measures on a real resize, so every row falls back to estimateSize and overlaps the next',
+  },
+];
+
 const failures = [];
 for (const { option, value } of required) {
   const found = [...text.matchAll(new RegExp(`^\\s*${option}:\\s*(.+?),\\s*$`, 'gm'))];
@@ -23,6 +32,13 @@ for (const { option, value } of required) {
   }
 }
 
+for (const { label, pattern, reason } of forbidden) {
+  for (const match of text.matchAll(pattern)) {
+    const line = text.slice(0, match.index).split('\n').length;
+    failures.push(`${source}:${line} calls ${label}, which ${reason}`);
+  }
+}
+
 if (failures.length > 0) {
   console.error('The timeline virtualiser must not own the scroll offset:');
   for (const failure of failures) console.error(`  ${failure}`);
@@ -32,5 +48,7 @@ if (failures.length > 0) {
   console.error('  TimelineAnchor is the sole owner. See .claude/CLAUDE.md.');
   process.exitCode = 1;
 } else {
-  console.log(`Timeline virtualiser owns no scroll offset; ${required.length} options pinned.`);
+  console.log(
+    `Timeline virtualiser owns no scroll offset; ${required.length} options pinned, ${forbidden.length} call forbidden.`
+  );
 }

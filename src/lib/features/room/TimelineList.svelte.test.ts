@@ -772,6 +772,26 @@ test('hides the jump control when a content shrink clamps an anchored reader to 
   await unmount(instance);
 });
 
+function contentHeight(): number {
+  const element = document.querySelector('.items');
+  if (!(element instanceof HTMLElement)) throw new Error('timeline content not found');
+  return Number.parseFloat(element.style.height);
+}
+
+test('a tab restore keeps the row heights it measured', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance } = await mountLive(roomTimeline);
+  const measured = contentHeight();
+  expect(measured).toBeGreaterThan(20 * ROW * 0.5);
+
+  document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+  await runAnimationFrames();
+
+  expect(contentHeight()).toBe(measured);
+  await unmount(instance);
+});
+
 test('a wheel notch inside the band also leaves follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
