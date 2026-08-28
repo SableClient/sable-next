@@ -142,6 +142,7 @@
     flex: 0 0 auto;
     height: var(--target);
     justify-content: center;
+    position: relative;
     width: var(--target);
   }
 
