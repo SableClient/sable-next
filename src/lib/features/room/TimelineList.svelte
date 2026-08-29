@@ -917,6 +917,17 @@
     };
   }
 
+  function remeasureRenderedRows(): void {
+    if (!viewport) return;
+    const instance = get(virtualizer);
+    for (const node of viewport.querySelectorAll<HTMLElement>('[data-index]')) {
+      const index = Number(node.dataset.index);
+      const height = node.offsetHeight;
+      if (!Number.isInteger(index) || index < 0 || height <= 0) continue;
+      instance.resizeItem(index, height);
+    }
+  }
+
   function refreshAfterVisibilityChange(): void {
     if (document.visibilityState !== 'visible') return;
     requestAnimationFrame(() => {
@@ -925,6 +936,7 @@
         width: viewport.clientWidth,
         height: viewport.clientHeight,
       };
+      remeasureRenderedRows();
       refreshAtLatest();
       if (position.kind === 'pinned') scheduleCommit();
     });

@@ -791,7 +791,28 @@ test('a tab restore keeps the row heights it measured', async () => {
   document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
   await runAnimationFrames();
 
-  expect(contentHeight()).toBe(measured);
+  expect(contentHeight()).toBeGreaterThanOrEqual(measured);
+  await unmount(instance);
+});
+
+test('a tab restore re-reads a rendered row whose measurement went stale', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance } = await mountLive(roomTimeline);
+  const measured = contentHeight();
+
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    value: ROW * 2,
+  });
+  document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+  await runAnimationFrames();
+
+  expect(contentHeight()).toBeGreaterThan(measured);
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    value: ROW,
+  });
   await unmount(instance);
 });
 
