@@ -6,7 +6,6 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from '../login/LoginMethod.svelte';
-  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import LegacyRegistrationForm from './LegacyRegistrationForm.svelte';
   import { REGISTRATION_METHOD_ORDER, registrationMethodAvailable } from './registration-methods';
 
@@ -99,13 +98,13 @@
       {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
         <LoginMethod reducedMotion={prefersReducedMotion.current}>
           <Button
-            disabled={isRegistering || isCheckingHomeserver}
+            loading={isRegistering}
+            disabled={isCheckingHomeserver}
             onclick={() => {
               onLaunchRedirectLogin('oidc');
             }}
             variant="primary"
           >
-            {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.createAccountOnServer', { server: serverLabel })}
           </Button>
         </LoginMethod>
@@ -117,7 +116,8 @@
             {#if loginFlows.sso_identity_providers.length > 0}
               {#each loginFlows.sso_identity_providers as provider (provider.id)}
                 <Button
-                  disabled={isRegistering}
+                  loading={isRegistering}
+                  disabled={isCheckingHomeserver}
                   onclick={() => {
                     onLaunchRedirectLogin('sso', provider.id);
                   }}
@@ -128,7 +128,8 @@
               {/each}
             {:else}
               <Button
-                disabled={isRegistering}
+                loading={isRegistering}
+                disabled={isCheckingHomeserver}
                 onclick={() => {
                   onLaunchRedirectLogin('sso');
                 }}

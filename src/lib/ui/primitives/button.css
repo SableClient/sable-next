@@ -34,11 +34,11 @@
 }
 
 .sable-button-primary {
-  --button-container: var(--sable-primary-main);
-  --button-container-hover: var(--sable-primary-main-hover);
-  --button-container-active: var(--sable-primary-main-active);
-  --button-line: var(--sable-primary-main-line);
-  --button-on-container: var(--sable-primary-on-main);
+  --button-container: var(--sable-primary-container);
+  --button-container-hover: var(--sable-primary-container-hover);
+  --button-container-active: var(--sable-primary-container-active);
+  --button-line: var(--sable-primary-container-line);
+  --button-on-container: var(--sable-primary-on-container);
 }
 
 .sable-button-secondary {
@@ -58,11 +58,11 @@
 }
 
 .sable-button-danger {
-  --button-container: var(--sable-crit-main);
-  --button-container-hover: var(--sable-crit-main-hover);
-  --button-container-active: var(--sable-crit-main-active);
-  --button-line: var(--sable-crit-main-line);
-  --button-on-container: var(--sable-crit-on-main);
+  --button-container: var(--sable-crit-container);
+  --button-container-hover: var(--sable-crit-container-hover);
+  --button-container-active: var(--sable-crit-container-active);
+  --button-line: var(--sable-crit-container-line);
+  --button-on-container: var(--sable-crit-on-container);
 }
 
 .sable-button-small {

@@ -10,7 +10,7 @@ import process from 'node:process';
 
 if (process.env.CI) process.exit(0);
 
-const { status } = spawnSync('mise', ['exec', '--', 'lefthook', 'install'], {
+const { status } = spawnSync('mise', ['exec', '--', 'lefthook', 'install', '--force'], {
   stdio: 'inherit',
   shell: true,
 });

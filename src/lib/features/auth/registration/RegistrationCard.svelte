@@ -148,7 +148,6 @@
         : error && !registrationFieldError
           ? error
           : null}
-      multiline
     />
 
     <RegistrationMethods

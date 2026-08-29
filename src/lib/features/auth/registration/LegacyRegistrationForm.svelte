@@ -3,7 +3,6 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
   import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
-  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
@@ -171,11 +170,14 @@
   <div class="submit-area">
     <AuthStatusSlot id={errorId} message={error} />
     <FormActions>
-      <Button type="submit" disabled={isRegistering || isCheckingHomeserver} variant="primary"
-        >{#if isRegistering}<Spinner />{/if}{$i18n.t('auth.createServerAccount', {
-          server: serverLabel,
-        })}</Button
+      <Button
+        type="submit"
+        loading={isRegistering}
+        disabled={isCheckingHomeserver}
+        variant="primary"
       >
+        {$i18n.t('auth.createServerAccount', { server: serverLabel })}
+      </Button>
     </FormActions>
   </div>
 </form>

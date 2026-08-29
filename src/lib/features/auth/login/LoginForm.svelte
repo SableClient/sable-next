@@ -133,7 +133,6 @@
     message={statusError ??
       (loginFlows && availableLoginMethodCount === 0 ? $i18n.t('errors.unsupportedSignIn') : null)}
     tone={statusError ? 'error' : 'muted'}
-    multiline
   />
 
   <div class="login-methods">
@@ -304,7 +303,7 @@
   }
 
   .action-slot {
-    min-height: 2.75rem;
+    min-height: var(--control-height-400);
   }
 
   .sso-actions {
