@@ -76,7 +76,7 @@ test('renders the extension badge and human-readable size for a file attachment'
   await unmount(instance);
 });
 
-test('renders a PDF attachment inline through the pdf viewer', async () => {
+test('keeps a PDF openable as a file and previews it inline', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const instance = mount(MediaContent, {
     target: document.body,
@@ -93,7 +93,7 @@ test('renders a PDF attachment inline through the pdf viewer', async () => {
   await tick();
 
   expect(document.querySelector('.pdf-viewer')).not.toBeNull();
-  expect(document.querySelector('a[download="report.pdf"]')).toBeNull();
+  expect(document.querySelector('a[download="report.pdf"]')).not.toBeNull();
   await unmount(instance);
 });
 

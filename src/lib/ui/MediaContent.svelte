@@ -191,8 +191,6 @@
       <audio class="media-content" controls src={url} aria-label={mediaLabel}>
         {body}
       </audio>
-    {:else if isPdf}
-      <PdfViewer src={url} name={mediaLabel} />
     {:else}
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->
       <a class="media-file" href={url} download={mediaLabel} onclick={download}>
@@ -200,6 +198,9 @@
         <span class="media-file-name">{mediaLabel}</span>
         {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
       </a>
+      {#if isPdf}
+        <PdfViewer src={url} name={mediaLabel} />
+      {/if}
     {/if}
   {:else if kind === 'file'}
     <span class="media-file">
