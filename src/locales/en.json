@@ -1731,7 +1731,9 @@
     "download": "Download",
     "loadFailed": "This document could not be loaded.",
     "retry": "Retry",
-    "open": "Open"
+    "openNamed": "Open {{name}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   },
   "shortcuts": {
     "paletteTitle": "Jump to room",

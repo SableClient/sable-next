@@ -3,6 +3,7 @@
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
   import { blurhashDataUrl } from '#lib/ui/blurhash.js';
+  import PdfThumbnail from '#lib/ui/PdfThumbnail.svelte';
   import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
@@ -195,10 +196,8 @@
         <span class="media-file-name">{mediaLabel}</span>
         {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
       </a>
-      {#if isPdf && onOpen}
-        <button class="media-file-open" type="button" onclick={onOpen}>
-          {$i18n.t('pdf.open')}
-        </button>
+      {#if isPdf}
+        <PdfThumbnail src={url} name={mediaLabel} {onOpen} />
       {/if}
     {/if}
   {:else if kind === 'file'}
@@ -251,23 +250,6 @@
     gap: var(--space-100);
     margin-top: var(--space-100);
     max-width: 100%;
-  }
-
-  .media-file-open {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
-    color: var(--sable-surface-on-container);
-    cursor: pointer;
-    display: block;
-    font: inherit;
-    margin-top: var(--space-100);
-    min-height: var(--target);
-    padding: var(--space-100) var(--space-200);
-  }
-
-  .media-file-open:hover {
-    background: var(--sable-surface-container-hover);
   }
 
   .media-file-ext {

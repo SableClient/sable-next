@@ -10,6 +10,8 @@
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
+  import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import WarningIcon from 'phosphor-svelte/lib/WarningIcon';
 
   interface Props {
@@ -25,9 +27,19 @@
   let numPages = $state(0);
   let pageNumber = $state(1);
   let containerWidth = $state(0);
+  let containerHeight = $state(0);
+  let zoom = $state(1);
   let loading = $state(true);
   let failed = $state(false);
   let attempt = $state(0);
+
+  function zoomIn(): void {
+    zoom = Math.min(4, zoom + 0.5);
+  }
+
+  function zoomOut(): void {
+    zoom = Math.max(1, zoom - 0.5);
+  }
 
   let pageLabel = $derived($i18n.t('pdf.pageIndicator', { page: pageNumber, pages: numPages }));
   let canvasLabel = $derived(
@@ -75,7 +87,9 @@
     if (!element) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) containerWidth = entry.contentRect.width;
+      if (!entry) return;
+      containerWidth = entry.contentRect.width;
+      containerHeight = entry.contentRect.height;
     });
     observer.observe(element);
     return () => {
@@ -87,7 +101,9 @@
     const activeDoc = doc;
     const target = canvas;
     const width = containerWidth;
+    const height = containerHeight;
     const page = pageNumber;
+    const magnification = zoom;
     if (!activeDoc || !target || width <= 0) return;
 
     let cancelled = false;
@@ -97,8 +113,11 @@
       const pdfPage = await activeDoc.getPage(page);
       if (cancelled) return;
       const unscaled = pdfPage.getViewport({ scale: 1 });
-      const scale = Math.min(width / unscaled.width, 2);
-      const viewport = pdfPage.getViewport({ scale });
+      const fit =
+        height > 0
+          ? Math.min(width / unscaled.width, height / unscaled.height)
+          : width / unscaled.width;
+      const viewport = pdfPage.getViewport({ scale: fit * magnification });
       const context = target.getContext('2d');
       if (!context) return;
 
@@ -125,10 +144,12 @@
 
   function previousPage(): void {
     pageNumber = Math.max(1, pageNumber - 1);
+    zoom = 1;
   }
 
   function nextPage(): void {
     pageNumber = Math.min(numPages, pageNumber + 1);
+    zoom = 1;
   }
 
   function retry(): void {
@@ -174,6 +195,20 @@
       >
       <span class="pdf-page-indicator" aria-live="polite">{pageLabel}</span>
       <IconButton
+        label={$i18n.t('pdf.zoomOut')}
+        size="medium"
+        variant="ghost"
+        disabled={zoom <= 1}
+        onclick={zoomOut}><MinusIcon /></IconButton
+      >
+      <IconButton
+        label={$i18n.t('pdf.zoomIn')}
+        size="medium"
+        variant="ghost"
+        disabled={zoom >= 4}
+        onclick={zoomIn}><PlusIcon /></IconButton
+      >
+      <IconButton
         label={$i18n.t('pdf.nextPage')}
         size="medium"
         variant="ghost"
@@ -195,7 +230,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-100);
-    max-width: var(--timeline-media-max);
+    height: 100%;
+    min-height: 0;
     width: 100%;
   }
 
@@ -204,16 +240,19 @@
     background: var(--sable-surface-container);
     border-radius: var(--radius);
     display: flex;
+    flex: 1 1 auto;
     justify-content: center;
-    max-height: 24rem;
-    min-height: 8rem;
+    min-height: 0;
     overflow: auto;
     width: 100%;
   }
 
+  .pdf-canvas-frame {
+    margin: auto;
+  }
+
   .pdf-canvas {
     display: block;
-    max-width: 100%;
   }
 
   .pdf-error {
@@ -238,11 +277,5 @@
     font-size: var(--font-size-small);
     min-width: 5rem;
     text-align: center;
-  }
-
-  @media (width >= 48rem) {
-    .pdf-page-frame {
-      max-height: 32rem;
-    }
   }
 </style>

@@ -76,7 +76,7 @@ test('renders the extension badge and human-readable size for a file attachment'
   await unmount(instance);
 });
 
-test('offers a PDF as a file plus an action that opens the viewer', async () => {
+test('offers a PDF as a file plus a preview that opens the viewer', async () => {
   const onOpen = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const instance = mount(MediaContent, {
@@ -96,7 +96,7 @@ test('offers a PDF as a file plus an action that opens the viewer', async () => 
 
   expect(document.querySelector('.pdf-viewer')).toBeNull();
   expect(document.querySelector('a[download="report.pdf"]')).not.toBeNull();
-  document.querySelector<HTMLButtonElement>('.media-file-open')?.click();
+  document.querySelector<HTMLButtonElement>('.pdf-thumbnail')?.click();
   expect(onOpen).toHaveBeenCalledTimes(1);
   await unmount(instance);
 });

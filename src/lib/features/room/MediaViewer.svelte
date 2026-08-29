@@ -520,6 +520,11 @@
     touch-action: none;
   }
 
+  .stage :global(.pdf-viewer) {
+    height: 100%;
+    width: 100%;
+  }
+
   .stage img {
     max-height: 100%;
     max-width: 100%;
