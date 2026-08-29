@@ -2,6 +2,8 @@
   import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
 
+  import { guardOverlayBack } from '#lib/platform/back-navigation.js';
+
   type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet';
 
   interface Props {
@@ -21,6 +23,14 @@
     onOpenChange,
     children,
   }: Props = $props();
+
+  $effect(() => {
+    if (open !== true) return;
+    return guardOverlayBack(() => {
+      open = false;
+      onOpenChange?.(false);
+    });
+  });
 </script>
 
 <Dialog.Root bind:open {onOpenChange}>

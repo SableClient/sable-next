@@ -14,6 +14,7 @@ import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 
 export type MessageActions = {
   onReact?: (emoji: string) => void;
@@ -23,6 +24,7 @@ export type MessageActions = {
   onReply?: () => void;
   onOpenThread?: () => void;
   onEdit?: () => void;
+  onReproxy?: () => void;
   onDelete?: () => void;
   onCopyText?: () => void;
   onCopyLink?: () => void;
@@ -68,6 +70,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   }
   if (actions.onEdit) {
     rows.push({ key: 'edit', label: 'timeline.editMessage', icon: EditIcon, run: actions.onEdit });
+  }
+  if (actions.onReproxy) {
+    rows.push({
+      key: 'reproxy',
+      label: 'timeline.reproxyMessage',
+      icon: UserSwitchIcon,
+      run: actions.onReproxy,
+    });
   }
   if (actions.onCopyText) {
     rows.push({

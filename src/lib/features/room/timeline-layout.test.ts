@@ -53,6 +53,7 @@ function media(
             width,
             height,
             blurhash: null,
+            spoiler: null,
           }
         : {
             kind,
@@ -62,6 +63,7 @@ function media(
             width,
             height,
             blurhash: null,
+            spoiler: null,
           },
     in_reply_to: null,
     thread_root: null,
@@ -188,13 +190,21 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
     case 'message':
       return { kind, body: 'hi', html: 'hi', emote: false, notice: false, edited: false };
     case 'image':
-      return { kind, filename: null, ...media, blurhash: null };
+      return { kind, filename: null, ...media, blurhash: null, spoiler: null };
     case 'video':
-      return { kind, ...media, blurhash: null };
+      return { kind, ...media, blurhash: null, spoiler: null };
     case 'sticker':
       return { kind, ...media };
     case 'audio':
-      return { kind, body: '', source: media.source, mime: null };
+      return {
+        kind,
+        body: '',
+        source: media.source,
+        mime: null,
+        duration_ms: null,
+        waveform: null,
+        voice: false,
+      };
     case 'file':
       return { kind, body: '', source: media.source, mime: null, size: null };
     case 'location':
@@ -206,7 +216,7 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
         kind,
         poll: {
           question: 'lunch?',
-          answers: [{ id: '0', text: 'ramen', votes: 1, selected: false }],
+          answers: [{ id: '0', text: 'ramen', votes: 1, selected: false, voters: null }],
           max_selections: 1,
           undisclosed: false,
           ended_at: null,
@@ -247,6 +257,7 @@ test('a poll grows with its answer count', () => {
   if (three.content.kind !== 'poll') throw new Error('poll fixture');
   three.content.poll.answers = ['0', '1', '2'].map((id) => ({
     id,
+    voters: null,
     text: id,
     votes: 0,
     selected: false,

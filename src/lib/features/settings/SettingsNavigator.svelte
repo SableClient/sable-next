@@ -4,6 +4,7 @@
   import type { Snippet } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
+  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -11,13 +12,15 @@
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
-  import { settingsCategories } from '#lib/settings/registry.js';
+  import { settingFocusId, settingsCategories } from '#lib/settings/registry.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { sectionsAfterCategories, sectionsBeforeCategories } from './sections.js';
   import { defaultSettingsSection } from './settings-navigation';
+  import { searchSettings } from './settings-search.js';
 
   interface Props {
     section: string | null;
@@ -47,6 +50,12 @@
     sections.find((entry) => entry.id === openSection)?.label ?? 'settings.title'
   );
 
+  let query = $state('');
+  let trimmedQuery = $derived(query.trim());
+  let results = $derived(
+    trimmedQuery ? searchSettings(trimmedQuery, settingsCategories, $i18n.t) : []
+  );
+
   function select(event: MouseEvent, nextSection: string): void {
     if (event.shiftKey || event.metaKey || event.ctrlKey || event.button !== 0) return;
 
@@ -68,24 +77,73 @@
           ><XIcon /></IconButton
         >
       </div>
-      <nav aria-label={$i18n.t('settings.sections')}>
-        {#each sections as entry (entry.id)}
-          {@const active = openSection === entry.id}
-          <a
-            class="sable-selection-layer"
-            href={resolve(`settings/${entry.id}`)}
-            class:active
-            aria-current={active ? 'page' : undefined}
-            onclick={(event) => {
-              select(event, entry.id);
-            }}
-          >
-            <span class="icon" aria-hidden="true"><entry.icon /></span>
-            <span class="label">{$i18n.t(entry.label)}</span>
-            <span class="chevron" aria-hidden="true"><CaretRightIcon /></span>
-          </a>
-        {/each}
-      </nav>
+      <div class="settings-search">
+        <label class="screen-reader-only" for="settings-search-input">
+          {$i18n.t('settings.searchLabel')}
+        </label>
+        <div class="search-field">
+          <MagnifyingGlassIcon aria-hidden="true" />
+          <TextInput
+            id="settings-search-input"
+            type="search"
+            bind:value={query}
+            placeholder={$i18n.t('settings.searchPlaceholder')}
+            autocomplete="off"
+          />
+        </div>
+        <p class="search-summary" aria-live="polite">
+          {#if trimmedQuery}
+            {results.length > 0
+              ? $i18n.t('settings.searchResultsCount', { count: results.length })
+              : $i18n.t('settings.searchNoResults', { query: trimmedQuery })}
+          {/if}
+        </p>
+      </div>
+
+      {#if trimmedQuery}
+        <ul class="search-results" role="list" aria-label={$i18n.t('settings.searchLabel')}>
+          {#each results as hit (`${hit.category.id}:${hit.setting.key}`)}
+            <li>
+              <a
+                class="sable-selection-layer"
+                href={`${resolve(`settings/${hit.category.id}`)}?focus=${settingFocusId(hit.setting.key)}`}
+                onclick={(event) => {
+                  select(event, hit.category.id);
+                }}
+              >
+                <span class="icon" aria-hidden="true"><hit.setting.icon /></span>
+                <span class="label">
+                  <span class="result-name">{$i18n.t(hit.setting.name)}</span>
+                  <span class="result-category">
+                    {$i18n.t('settings.searchResultCategory', {
+                      category: $i18n.t(hit.category.name),
+                    })}
+                  </span>
+                </span>
+              </a>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <nav aria-label={$i18n.t('settings.sections')}>
+          {#each sections as entry (entry.id)}
+            {@const active = openSection === entry.id}
+            <a
+              class="sable-selection-layer"
+              href={resolve(`settings/${entry.id}`)}
+              class:active
+              aria-current={active ? 'page' : undefined}
+              onclick={(event) => {
+                select(event, entry.id);
+              }}
+            >
+              <span class="icon" aria-hidden="true"><entry.icon /></span>
+              <span class="label">{$i18n.t(entry.label)}</span>
+              <span class="chevron" aria-hidden="true"><CaretRightIcon /></span>
+            </a>
+          {/each}
+        </nav>
+      {/if}
       <Button
         block
         class="settings-logout"
@@ -150,11 +208,66 @@
     padding: 0;
   }
 
-  nav {
+  nav,
+  .search-results {
     display: grid;
     gap: 0;
+    list-style: none;
+    margin: 0;
     min-height: 0;
     overflow-y: auto;
+    padding: 0;
+  }
+
+  .settings-search {
+    padding: 0 var(--space-3) var(--space-2);
+  }
+
+  .search-field {
+    align-items: center;
+    background: var(--sable-bg-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
+    display: flex;
+    gap: var(--space-2);
+    min-height: var(--control-height-medium);
+    padding: 0 var(--space-2);
+  }
+
+  .search-field :global(svg) {
+    color: var(--sable-surface-var-on-container);
+    flex: 0 0 auto;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .search-field :global(.text-input) {
+    background: transparent;
+    border: 0;
+    min-height: var(--control-height-medium);
+    padding: 0;
+  }
+
+  .search-summary {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: var(--space-1) 0 0;
+    min-height: 1lh;
+  }
+
+  .result-name,
+  .result-category {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .result-category {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-normal);
   }
 
   a {
@@ -241,7 +354,8 @@
     min-height: var(--control-height-large);
   }
 
-  .paged nav {
+  .paged nav,
+  .paged .search-results {
     flex: 1;
   }
 

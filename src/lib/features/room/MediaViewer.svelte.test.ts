@@ -34,6 +34,7 @@ const imageItem: MediaItem = {
   width: 1600,
   height: 900,
   blurhash: null,
+  spoiler: null,
   eventId: '$image',
   sender: 'Alice',
 };
@@ -46,12 +47,16 @@ const videoItem: MediaItem = {
   width: 640,
   height: 360,
   blurhash: null,
+  spoiler: null,
   eventId: '$video',
   sender: 'Alice',
 };
 
 const audioItem: MediaItem = {
   kind: 'audio',
+  duration_ms: null,
+  waveform: null,
+  voice: false,
   body: 'voice.ogg',
   source: 'mxc://example.org/audio',
   mime: 'audio/ogg',

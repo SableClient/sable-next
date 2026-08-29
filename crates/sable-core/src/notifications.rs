@@ -1,10 +1,15 @@
 use matrix_sdk::Client;
 use matrix_sdk::notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode};
-use matrix_sdk::ruma::api::client::push::{PusherIds, PusherInit, PusherKind};
+use matrix_sdk::ruma::api::client::push::{
+    PusherIds, PusherInit, PusherKind, delete_pushrule, set_pushrule,
+};
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
-use matrix_sdk::ruma::push::{Action, HttpPusherData, PushFormat};
+use matrix_sdk::ruma::push::{
+    Action, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule, PushFormat,
+    RuleKind, SoundTweakValue, Tweak,
+};
 use matrix_sdk::ruma::{EventId, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
@@ -208,6 +213,67 @@ pub async fn remove_pusher(client: &Client, pushkey: String, app_id: String) -> 
         .delete(PusherIds::new(pushkey, app_id))
         .await
         .map_err(|error| error.to_string())
+}
+
+/// # Errors
+///
+/// When the server rejects the read.
+pub async fn keywords(client: &Client) -> Result<Vec<String>, String> {
+    let ruleset = client
+        .account()
+        .push_rules()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let mut keywords: Vec<String> = ruleset
+        .content
+        .iter()
+        .filter(|rule| !rule.default)
+        .map(|rule| rule.pattern.clone())
+        .collect();
+    keywords.sort_unstable();
+    keywords.dedup();
+    Ok(keywords)
+}
+
+/// # Errors
+///
+/// When the keyword is blank, or the server rejects the rule.
+pub async fn add_keyword(client: &Client, keyword: String) -> Result<(), String> {
+    let pattern = keyword.trim().to_owned();
+    if pattern.is_empty() {
+        return Err("a keyword cannot be blank".to_owned());
+    }
+
+    let rule = NewPatternedPushRule::new(
+        pattern.clone(),
+        pattern,
+        vec![
+            Action::Notify,
+            Action::SetTweak(Tweak::Sound(SoundTweakValue::Default)),
+            Action::SetTweak(Tweak::Highlight(HighlightTweakValue::Yes)),
+        ],
+    );
+
+    client
+        .send(set_pushrule::v3::Request::new(NewPushRule::Content(rule)))
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+/// # Errors
+///
+/// When the server rejects the removal.
+pub async fn remove_keyword(client: &Client, keyword: String) -> Result<(), String> {
+    client
+        .send(delete_pushrule::v3::Request::new(
+            RuleKind::Content,
+            keyword,
+        ))
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 #[must_use]

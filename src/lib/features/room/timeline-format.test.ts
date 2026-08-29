@@ -301,6 +301,7 @@ test('anything you sent is yours to redact, not only your text', () => {
     width: 8,
     height: 8,
     blurhash: null,
+    spoiler: null,
   } as const;
 
   expect(canRedact(own(message.content), false)).toBe(true);

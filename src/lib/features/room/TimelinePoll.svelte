@@ -1,24 +1,38 @@
 <script lang="ts">
+  import type { MemberView } from '#src/generated/MemberView';
   import type { PollView } from '#src/generated/PollView';
 
   import { i18n } from '#lib/i18n.js';
+
+  import PollVotersDialog from './PollVotersDialog.svelte';
 
   interface Props {
     poll: PollView;
     /** Absent while the poll is a local echo, which cannot be voted on. */
     eventId: string | null;
     canEnd: boolean;
+    members?: readonly MemberView[];
     onVote?: (eventId: string, answers: string[]) => void;
     onEnd?: (eventId: string) => void;
   }
 
-  let { poll, eventId, canEnd, onVote, onEnd }: Props = $props();
+  let { poll, eventId, canEnd, members = [], onVote, onEnd }: Props = $props();
   let ended = $derived(poll.ended_at !== null);
   let multiple = $derived(poll.max_selections > 1);
   let selected = $derived(
     poll.answers.filter((answer) => answer.selected).map((answer) => answer.id)
   );
   let total = $derived(poll.answers.reduce((sum, answer) => sum + (answer.votes ?? 0), 0));
+  let votersAnswers = $derived(poll.answers.filter((answer) => answer.voters !== null));
+  let votersOpen = $state(false);
+  let votersActive = $state(0);
+
+  function viewVoters(answerId: string) {
+    const index = votersAnswers.findIndex((answer) => answer.id === answerId);
+    if (index === -1) return;
+    votersActive = index;
+    votersOpen = true;
+  }
 
   function share(votes: number | null): number {
     if (votes === null || total === 0) return 0;
@@ -53,7 +67,7 @@
   <ul class="answers">
     {#each poll.answers as answer (answer.id)}
       {@const percent = share(answer.votes)}
-      <li>
+      <li class="answer-row">
         <button
           type="button"
           class="answer"
@@ -66,10 +80,23 @@
         >
           <span class="fill" style:width={`${String(percent)}%`}></span>
           <span class="text">{answer.text}</span>
-          {#if answer.votes !== null}
+        </button>
+        {#if answer.votes !== null}
+          {#if answer.voters !== null}
+            <button
+              type="button"
+              class="count count-button"
+              onclick={() => {
+                viewVoters(answer.id);
+              }}
+              aria-label={$i18n.t('timeline.pollViewVoters', { answer: answer.text })}
+            >
+              {$i18n.t('timeline.pollVotes', { count: answer.votes })}
+            </button>
+          {:else}
             <span class="count">{$i18n.t('timeline.pollVotes', { count: answer.votes })}</span>
           {/if}
-        </button>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -102,6 +129,15 @@
     </button>
   {/if}
 </div>
+
+{#if votersOpen}
+  <PollVotersDialog
+    bind:open={votersOpen}
+    answers={votersAnswers}
+    {members}
+    bind:active={votersActive}
+  />
+{/if}
 
 <style>
   .poll {
@@ -136,6 +172,12 @@
     padding: 0;
   }
 
+  .answer-row {
+    align-items: center;
+    display: flex;
+    gap: var(--space-100);
+  }
+
   .answer {
     align-items: baseline;
     background: var(--sable-surface-container);
@@ -144,13 +186,14 @@
     color: inherit;
     cursor: pointer;
     display: flex;
+    flex: 1;
     font: inherit;
     gap: var(--space-200);
+    min-width: 0;
     overflow: hidden;
     padding: var(--space-200) var(--space-250);
     position: relative;
     text-align: start;
-    width: 100%;
   }
 
   .answer:disabled {
@@ -190,8 +233,22 @@
 
   .count {
     color: var(--sable-surface-var-on-container);
+    flex: 0 0 auto;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
+  }
+
+  .count-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    min-height: 2.75rem;
+    padding: var(--space-100);
+  }
+
+  .count-button:hover {
+    color: var(--sable-surface-on-container);
+    text-decoration: underline;
   }
 
   .footer {

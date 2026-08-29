@@ -4,16 +4,22 @@
   import { onDestroy } from 'svelte';
 
   import type { MemberView } from '#src/generated/MemberView';
+  import type { MessageKind } from '#src/generated/MessageKind';
   import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+  import type { PersonaView } from '#src/generated/PersonaView';
   import type { ProfileView } from '#src/generated/ProfileView';
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { LongPress } from './long-press.svelte.js';
   import { findMember, personaWithColor, stripReplyFallback } from './members.js';
+  import { firstPreviewableLink } from './link-preview.js';
+  import LinkPreviewCard from './LinkPreviewCard.svelte';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
+  import { projectPersona } from '#lib/personas/persona.js';
+  import { usePersonaStore } from '#lib/personas/personas.svelte.js';
+  import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
@@ -41,6 +47,7 @@
   import ReactionsDialog from './ReactionsDialog.svelte';
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
+  import MessageReproxyDialog from './MessageReproxyDialog.svelte';
   import type { MatrixLink } from './matrix-link';
   import './avatar-button.css';
   import {
@@ -120,6 +127,7 @@
     onPersonaOpenChange,
   }: Props = $props();
   const core = useCoreClient();
+  const personaStore = usePersonaStore();
   let profile = $state<ProfileView | null>(null);
   let senderMember = $derived(findMember(members, item.sender));
   let accountName = $derived(
@@ -253,6 +261,13 @@
               );
             }
           : undefined,
+      onReproxy:
+        editable && item.content.kind === 'message' && eventId !== ''
+          ? () => {
+              void personaStore.load();
+              reproxyOpen = true;
+            }
+          : undefined,
       onDelete:
         redactable && onDelete
           ? () => {
@@ -333,11 +348,33 @@
     });
   }
 
+  function reproxyKind(content: TimelineItemView['content']): MessageKind {
+    if (content.kind !== 'message') return 'text';
+    if (content.emote) return 'emote';
+    return content.notice ? 'notice' : 'text';
+  }
+
+  async function reproxy(newPersona: PersonaView | null): Promise<void> {
+    const eventId = item.event_id;
+    if (!eventId || item.content.kind !== 'message') return;
+    try {
+      await core.commands.editMessage(roomId, eventId, item.content.body, {
+        formatted: item.content.html,
+        kind: reproxyKind(item.content),
+        threadRoot: item.thread_root ?? null,
+        persona: newPersona ? projectPersona(newPersona, preferences.personaFallback) : null,
+      });
+    } catch (error) {
+      console.warn('[sable timeline] reproxy failed', error);
+    }
+  }
+
   let sheetOpen = $state(false);
   let emoteOpen = $state(false);
   let sourceOpen = $state(false);
   let reportOpen = $state(false);
   let forwardOpen = $state(false);
+  let reproxyOpen = $state(false);
   let source = $state('');
   let threadTarget = $derived(item.thread_root ?? item.event_id);
   let threadSummary = $derived(item.thread_summary);
@@ -451,6 +488,14 @@
           {/if}
           {#if forwardOpen}
             <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
+          {/if}
+          {#if reproxyOpen}
+            <MessageReproxyDialog
+              bind:open={reproxyOpen}
+              personas={personaStore.personas}
+              current={item.per_message_profile}
+              onChoose={(next) => void reproxy(next)}
+            />
           {/if}
           {#if emoteOpen}
             <ReactionSheet
@@ -611,9 +656,14 @@
                 <span class="edited">{$i18n.t('timeline.edited')}</span>
               {/if}
             </div>
+            {@const previewUrl = firstPreviewableLink(item.content.html)}
+            {#if previewUrl}
+              <LinkPreviewCard url={previewUrl} />
+            {/if}
           {:else}
             <MessageBody
               {item}
+              {members}
               {canRedactOthers}
               {onMatrixLink}
               {onOpenMedia}

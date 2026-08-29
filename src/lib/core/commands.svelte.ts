@@ -25,6 +25,7 @@ import type { SearchHitView } from '#src/generated/SearchHitView';
 import type { SearchOrder } from '#src/generated/SearchOrder';
 import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
 import type { RoomStateEventView } from '#src/generated/RoomStateEventView';
+import type { UrlPreviewView } from '#src/generated/UrlPreviewView';
 import type { RoomSummary } from '#src/generated/RoomSummary';
 import type { SidebarItemView } from '#src/generated/SidebarItemView';
 import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
@@ -268,6 +269,11 @@ export function createCommands(transport: () => Transport) {
         event_type: eventType,
       });
       return response.events;
+    },
+
+    async urlPreview(url: string): Promise<UrlPreviewView | null> {
+      const response = await transport().send({ type: 'url_preview', url });
+      return response.preview;
     },
 
     async roomPermissions(roomId: string): Promise<RoomPermissionsView> {
@@ -981,6 +987,27 @@ export function createCommands(transport: () => Transport) {
       await transport().send({
         type: 'set_notification_content',
         visible,
+      });
+    },
+
+    async notificationKeywords(): Promise<string[]> {
+      const response = await transport().send({
+        type: 'notification_keywords',
+      });
+      return response.keywords;
+    },
+
+    async addNotificationKeyword(keyword: string): Promise<void> {
+      await transport().send({
+        type: 'add_notification_keyword',
+        keyword,
+      });
+    },
+
+    async removeNotificationKeyword(keyword: string): Promise<void> {
+      await transport().send({
+        type: 'remove_notification_keyword',
+        keyword,
       });
     },
 

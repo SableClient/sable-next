@@ -89,6 +89,9 @@
     bind:open
     label={$i18n.t('timeline.userProfile')}
     closeLabel={$i18n.t('timeline.closeProfile')}
+    handleColor="var(--sable-bg-container)"
+    handleOpacity={1}
+    contentInset={false}
     onOpenChange={handleOpenChange}
   >
     {#if userId}

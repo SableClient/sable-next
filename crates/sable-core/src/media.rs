@@ -168,11 +168,18 @@ fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> Attac
             size,
             blurhash,
         }),
-        mime::AUDIO => AttachmentInfo::Audio(BaseAudioInfo {
-            duration,
-            size,
-            waveform: None,
-        }),
+        mime::AUDIO => {
+            let audio = BaseAudioInfo {
+                duration,
+                size,
+                waveform: view.waveform.clone(),
+            };
+            if view.voice {
+                AttachmentInfo::Voice(audio)
+            } else {
+                AttachmentInfo::Audio(audio)
+            }
+        }
         _ => AttachmentInfo::File(BaseFileInfo { size }),
     }
 }
@@ -200,6 +207,8 @@ mod tests {
             duration_ms,
             animated: None,
             blurhash: None,
+            waveform: None,
+            voice: false,
         }
     }
 

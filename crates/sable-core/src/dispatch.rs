@@ -3,12 +3,14 @@ use std::sync::{Arc, atomic::Ordering};
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
+use matrix_sdk::room::ListThreadsOptions;
 use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::room::reply::{EnforceThread, Reply as SdkReply};
 use matrix_sdk::room::{ParentSpace, Receipts};
 use matrix_sdk::ruma::RoomAliasId;
 use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
+use matrix_sdk::ruma::api::client::authenticated_media::get_media_preview;
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
 use matrix_sdk::ruma::api::client::presence::set_presence;
@@ -33,6 +35,7 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
+use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
 use matrix_sdk::ruma::presence::PresenceState;
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
@@ -50,7 +53,7 @@ use matrix_sdk_ui::timeline::TimelineEventItemId;
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
     JoinRuleView, MembershipView, MessageKind, MutualRoomView, PaginationDirection, PresenceView,
-    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView,
+    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -62,6 +65,48 @@ use crate::{Core, SubscriptionKind};
 use crate::{notifications, session, spaces, view};
 
 const MAX_SEARCH_RESULTS: usize = 200;
+
+fn thread_root(raw: &Raw<AnySyncTimelineEvent>) -> Option<ThreadRootView> {
+    let event = raw.deserialize().ok()?;
+    let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = event
+    else {
+        return None;
+    };
+    let original = message.as_original()?;
+
+    Some(ThreadRootView {
+        event_id: original.event_id.clone(),
+        sender: original.sender.clone(),
+        body: original.content.body().to_owned(),
+        timestamp: Some(u64::from(original.origin_server_ts.0)),
+    })
+}
+
+fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPreviewView> {
+    let text = |key: &str| {
+        data.get(key)
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    };
+    let number = |key: &str| data.get(key).and_then(serde_json::Value::as_u64);
+
+    let preview = UrlPreviewView {
+        url,
+        title: text("og:title"),
+        description: text("og:description"),
+        site_name: text("og:site_name"),
+        image: text("og:image").filter(|image| image.starts_with("mxc://")),
+        image_width: number("og:image:width"),
+        image_height: number("og:image:height"),
+    };
+
+    if preview.title.is_none() && preview.description.is_none() && preview.image.is_none() {
+        return None;
+    }
+    Some(preview)
+}
 
 fn join_rule_content(
     rule: Option<CreateJoinRuleView>,
@@ -793,6 +838,70 @@ impl Core {
                     })?;
 
                 Ok(CommandOk::SetRoomDirectoryVisibility)
+            }
+
+            Command::NotificationKeywords => {
+                let keywords = notifications::keywords(&self.client().await?)
+                    .await
+                    .map_err(|error| self.failed("notification_keywords", error))?;
+
+                Ok(CommandOk::NotificationKeywords { keywords })
+            }
+
+            Command::AddNotificationKeyword { keyword } => {
+                notifications::add_keyword(&self.client().await?, keyword)
+                    .await
+                    .map_err(|error| self.failed("add_notification_keyword", error))?;
+
+                Ok(CommandOk::AddNotificationKeyword)
+            }
+
+            Command::RemoveNotificationKeyword { keyword } => {
+                notifications::remove_keyword(&self.client().await?, keyword)
+                    .await
+                    .map_err(|error| self.failed("remove_notification_keyword", error))?;
+
+                Ok(CommandOk::RemoveNotificationKeyword)
+            }
+
+            Command::ListThreads { room_id, from } => {
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let options = ListThreadsOptions {
+                    from,
+                    ..ListThreadsOptions::default()
+                };
+                let threads = room
+                    .list_threads(options)
+                    .await
+                    .map_err(|error| self.room_error("list_threads", error))?;
+
+                let roots = threads
+                    .chunk
+                    .iter()
+                    .filter_map(|event| thread_root(event.raw()))
+                    .collect();
+
+                Ok(CommandOk::ListThreads {
+                    roots,
+                    next_batch: threads.prev_batch_token,
+                })
+            }
+
+            Command::UrlPreview { url } => {
+                let response = self
+                    .client()
+                    .await?
+                    .send(get_media_preview::v1::Request::new(url.clone()))
+                    .await
+                    .map_err(|error| self.failed("url_preview", error))?;
+
+                let preview = response
+                    .data
+                    .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw.get()).ok())
+                    .and_then(|data| url_preview(url, &data));
+
+                Ok(CommandOk::UrlPreview { preview })
             }
 
             Command::RoomStateEvents {
@@ -2187,6 +2296,32 @@ mod tests {
     use matrix_sdk::ruma::RoomId;
 
     use crate::protocol::{CreateJoinRuleView, EditImageView, MessageKind};
+
+    #[test]
+    fn a_preview_with_nothing_to_show_is_no_preview() {
+        let empty = serde_json::json!({ "og:title": "   ", "og:image": "https://cdn/x.png" });
+        assert!(super::url_preview("https://e".to_owned(), &empty).is_none());
+        assert!(super::url_preview("https://e".to_owned(), &serde_json::json!({})).is_none());
+    }
+
+    #[test]
+    fn a_preview_keeps_only_an_mxc_image() {
+        let data = serde_json::json!({
+            "og:title": "Title",
+            "og:image": "https://cdn.example/x.png",
+        });
+        let preview = super::url_preview("https://e".to_owned(), &data).expect("a preview");
+        assert_eq!(preview.image, None);
+
+        let data = serde_json::json!({
+            "og:title": "Title",
+            "og:image": "mxc://example.org/1",
+            "og:image:width": 640,
+        });
+        let preview = super::url_preview("https://e".to_owned(), &data).expect("a preview");
+        assert_eq!(preview.image.as_deref(), Some("mxc://example.org/1"));
+        assert_eq!(preview.image_width, Some(640));
+    }
 
     #[test]
     fn a_restricted_room_without_a_space_falls_back_to_invite() {

@@ -26,6 +26,10 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
 }));
 
+vi.mock('#lib/personas/personas.svelte.js', () => ({
+  usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
+}));
+
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 
 afterEach(() => {
@@ -68,6 +72,7 @@ function imageItem(): TimelineItemView {
       width: 800,
       height: 600,
       blurhash: null,
+      spoiler: null,
     },
   };
 }

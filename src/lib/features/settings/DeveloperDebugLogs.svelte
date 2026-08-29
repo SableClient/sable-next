@@ -13,6 +13,7 @@
     type DebugLogCategory,
     type DebugLogLevel,
   } from '#lib/observability/debug-log.svelte.js';
+  import { exportDiagnosticsBundle } from '#lib/observability/export-diagnostics.js';
 
   const categories: DebugLogCategory[] = [
     'sync',
@@ -37,15 +38,8 @@
     )
   );
 
-  function download(entries = filtered): void {
-    const url = URL.createObjectURL(
-      new Blob([exportDebugLogs(entries)], { type: 'application/json' })
-    );
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `sable-debug-logs-${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+  async function download(entries = filtered): Promise<void> {
+    await exportDiagnosticsBundle(entries);
   }
 
   async function copy(entries = filtered): Promise<void> {
@@ -93,7 +87,7 @@
     <Button variant="secondary" size="small" onclick={() => void copy()}
       >{$i18n.t('settings.developerLogsCopy')}</Button
     >
-    <Button variant="secondary" size="small" onclick={() => download()}
+    <Button variant="secondary" size="small" onclick={() => void download()}
       >{$i18n.t('settings.developerLogsExport')}</Button
     >
   </div>

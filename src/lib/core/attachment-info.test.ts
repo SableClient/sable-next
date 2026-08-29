@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { measureAttachment } from './attachment-info.js';
+import { markVoiceRecording, measureAttachment } from './attachment-info.js';
 
 function file(mime: string): Blob {
   return new Blob([new Uint8Array([1, 2, 3])], { type: mime });
@@ -56,6 +56,8 @@ test('an image reports the decoded dimensions', async () => {
     duration_ms: null,
     animated: false,
     blurhash: null,
+    waveform: null,
+    voice: false,
   });
 });
 
@@ -106,6 +108,8 @@ test('a video reports dimensions and a duration in milliseconds', async () => {
     duration_ms: 12_340,
     animated: null,
     blurhash: null,
+    waveform: null,
+    voice: false,
   });
 });
 
@@ -124,6 +128,8 @@ test('audio reports a duration and no dimensions', async () => {
     duration_ms: 5000,
     animated: null,
     blurhash: null,
+    waveform: null,
+    voice: false,
   });
 });
 
@@ -131,6 +137,23 @@ test('media the browser rejects measures nothing rather than throwing', async ()
   stubMediaElement({ duration: 5, fail: true });
 
   await expect(measureAttachment(file('audio/ogg'))).resolves.toBeNull();
+});
+
+test('a file marked as a voice recording carries its waveform', async () => {
+  stubMediaElement({ duration: 5 });
+
+  const recording = new File([new Uint8Array([1, 2, 3])], 'voice.webm', { type: 'audio/webm' });
+  markVoiceRecording(recording, [0, 0.5, 1]);
+
+  await expect(measureAttachment(recording)).resolves.toEqual({
+    width: null,
+    height: null,
+    duration_ms: 5000,
+    animated: null,
+    blurhash: null,
+    waveform: [0, 0.5, 1],
+    voice: true,
+  });
 });
 
 test('a document is not measured at all', async () => {

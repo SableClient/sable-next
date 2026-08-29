@@ -15,6 +15,7 @@ mod ios;
 mod mobile;
 mod notifications;
 mod sentry;
+mod share_inbox;
 
 use std::sync::{Arc, Mutex};
 
@@ -316,6 +317,9 @@ pub fn run() {
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,
             register_push,
+            share_inbox::share_inbox_drain,
+            share_inbox::share_inbox_read,
+            share_inbox::share_inbox_clear,
             sentry::set_native_sentry_enabled,
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,

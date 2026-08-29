@@ -61,8 +61,8 @@ test('renders the extension badge and human-readable size for a file attachment'
     props: {
       kind: 'file',
       source: 'mxc://example.org/file',
-      mime: 'application/pdf',
-      body: 'report.pdf',
+      mime: 'application/zip',
+      body: 'archive.zip',
       size: 1_500_000,
     },
   });
@@ -71,8 +71,75 @@ test('renders the extension badge and human-readable size for a file attachment'
   await Promise.resolve();
   await tick();
 
-  expect(document.querySelector('.media-file-ext')?.textContent).toBe('pdf');
+  expect(document.querySelector('.media-file-ext')?.textContent).toBe('zip');
   expect(document.querySelector('.media-file-size')?.textContent).toBe('1.5 MB');
+  await unmount(instance);
+});
+
+test('renders a PDF attachment inline through the pdf viewer', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'file',
+      source: 'mxc://example.org/pdf',
+      mime: 'application/pdf',
+      body: 'report.pdf',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.pdf-viewer')).not.toBeNull();
+  expect(document.querySelector('a[download="report.pdf"]')).toBeNull();
+  await unmount(instance);
+});
+
+test('renders a voice message with a waveform when a waveform is present', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'audio',
+      source: 'mxc://example.org/voice',
+      mime: 'audio/ogg',
+      body: 'Voice message',
+      durationMs: 4200,
+      waveform: [0, 0.5, 1, 0.5, 0],
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.voice-message-player')).not.toBeNull();
+  expect(document.querySelectorAll('.voice-bar')).toHaveLength(5);
+  expect(document.querySelector('audio.media-content')).toBeNull();
+  await unmount(instance);
+});
+
+test('falls back to the plain audio player when there is no waveform', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'audio',
+      source: 'mxc://example.org/audio-no-waveform',
+      mime: 'audio/ogg',
+      body: 'clip.ogg',
+      waveform: null,
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.voice-message-player')).toBeNull();
+  expect(document.querySelector('audio.media-content')).not.toBeNull();
   await unmount(instance);
 });
 

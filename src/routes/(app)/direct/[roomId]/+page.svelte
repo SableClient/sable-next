@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RoomPage from '#lib/features/room/RoomPage.svelte';
+  import RoomOrForumPage from '#lib/features/forum/RoomOrForumPage.svelte';
 </script>
 
-<RoomPage />
+<RoomOrForumPage />

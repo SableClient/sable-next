@@ -16,6 +16,9 @@ const core = vi.hoisted(() => ({
 
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
+vi.mock('#lib/personas/personas.svelte.js', () => ({
+  usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
+}));
 
 import TimelineListHarness from './TimelineListHarness.test.svelte';
 

@@ -67,12 +67,20 @@
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     gap: var(--space-hairline);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
     padding: var(--space-150) var(--space-200);
+    scrollbar-width: none;
+  }
+
+  .formatting::-webkit-scrollbar {
+    display: none;
   }
 
   :global(.format-button) {
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
+    flex: 0 0 auto;
     height: var(--target);
     min-height: var(--target);
     width: var(--target);

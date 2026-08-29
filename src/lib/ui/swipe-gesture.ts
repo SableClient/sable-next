@@ -28,11 +28,32 @@ export interface SwipeResult {
   velocityX: number;
 }
 
+export function scrollsHorizontally(element: Element): boolean {
+  if (element.scrollWidth <= element.clientWidth) return false;
+  const overflowX = getComputedStyle(element).overflowX;
+  return overflowX === 'auto' || overflowX === 'scroll';
+}
+
+export function startsInHorizontalScroller(target: EventTarget | null, root: Element): boolean {
+  let node = target instanceof Element ? target : null;
+  while (node && node !== root) {
+    if (scrollsHorizontally(node)) return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+
 export function startSwipeGesture(
   event: TouchEvent,
   startPosition: number
 ): SwipeGesture | undefined {
   if (event.touches.length !== 1) return undefined;
+  if (
+    event.currentTarget instanceof Element &&
+    startsInHorizontalScroller(event.target, event.currentTarget)
+  ) {
+    return undefined;
+  }
 
   const touch = event.touches[0];
 

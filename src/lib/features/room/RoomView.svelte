@@ -45,11 +45,13 @@
   import RoomHeaderMenu from './RoomHeaderMenu.svelte';
   import RoomInviteDialog from './RoomInviteDialog.svelte';
   import RoomPinMenu from './RoomPinMenu.svelte';
+  import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomTopicViewer from './RoomTopicViewer.svelte';
   import RoomReadReceipts from './RoomReadReceipts.svelte';
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
   import MediaViewer from './MediaViewer.svelte';
+  import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
   import { latestEventId } from './timeline-format';
@@ -98,6 +100,11 @@
   let callSupport = $state<CallSupportView | null>(null);
   let widgetsOpen = $state(false);
   let widgets = $state.raw<RoomWidget[]>([]);
+  let tombstoneReplacementId = $state<string | null>(null);
+  let tombstoneBody = $state<string | null>(null);
+  let tombstoneChecked = $state(false);
+  let tombstoneJoining = $state(false);
+  let tombstoneJoinFailed = $state(false);
 
   let ownMember = $derived(
     memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
@@ -197,6 +204,11 @@
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
   let roomTopic = $derived(resolvedRoom?.topic ?? null);
+  let isTombstoned = $derived(resolvedRoom?.is_tombstoned ?? false);
+  let tombstoneSuccessor = $derived(
+    tombstoneReplacementId ? findRoomByPathId(roomList.rooms, tombstoneReplacementId) : null
+  );
+  let tombstoneSuccessorJoined = $derived(tombstoneSuccessor?.state === 'joined');
   let mentionCount = $derived(
     roomList.rooms
       .filter((room) => room.state === 'joined' && !room.is_space)
@@ -250,6 +262,35 @@
       })
       .catch((error: unknown) => {
         console.debug('[sable room] permissions unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    const tombstoned = isTombstoned;
+    tombstoneReplacementId = null;
+    tombstoneBody = null;
+    tombstoneChecked = false;
+    tombstoneJoinFailed = false;
+    if (!tombstoned) return;
+
+    let current = true;
+    void core.commands
+      .roomStateEvent(activeRoomId, 'm.room.tombstone')
+      .then((content) => {
+        if (!current) return;
+        const grave = readTombstone(content);
+        tombstoneReplacementId = grave.replacement;
+        tombstoneBody = grave.body;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] tombstone unavailable', error);
+      })
+      .finally(() => {
+        if (current) tombstoneChecked = true;
       });
     return () => {
       current = false;
@@ -497,6 +538,39 @@
     mediaEventId = eventId;
   }
 
+  function tombstoneSuccessorPath(id: string, isSpace: boolean): string {
+    const param = roomPathParamFromId(id);
+    return isSpace
+      ? resolve('/(app)/space/[spaceId]', { spaceId: param })
+      : resolve('/(app)/rooms/[roomId]', { roomId: param });
+  }
+
+  function openTombstoneSuccessor(): void {
+    if (!tombstoneReplacementId) return;
+    const isSpace = tombstoneSuccessor?.is_space ?? resolvedRoom?.is_space ?? false;
+    void goto(tombstoneSuccessorPath(tombstoneReplacementId, isSpace));
+  }
+
+  async function joinTombstoneSuccessor(): Promise<void> {
+    const target = tombstoneReplacementId;
+    if (!target || tombstoneJoining) return;
+
+    tombstoneJoining = true;
+    tombstoneJoinFailed = false;
+    try {
+      const alias = resolvedRoom?.canonical_alias ?? null;
+      const via = alias ? [] : await core.commands.roomViaServers(resolvedRoomId);
+      const joinedId = await core.commands.joinRoom(target, via);
+      const isSpace = resolvedRoom?.is_space ?? false;
+      void goto(tombstoneSuccessorPath(joinedId, isSpace));
+    } catch (error) {
+      console.warn('[sable room] joining the replacement room failed', error);
+      tombstoneJoinFailed = true;
+    } finally {
+      tombstoneJoining = false;
+    }
+  }
+
   function openPrescreen(): void {
     call.clearFailure();
     prescreenMedia = { microphone: true, camera: resolvedRoom?.is_voice === false };
@@ -614,23 +688,37 @@
       </TimelineList>
     {/key}
     <div class="composer-dock">
-      {#key resolvedRoomId}
-        <RoomComposer
-          roomId={resolvedRoomId}
-          onSend={conversation.sendMessage}
-          onSendAttachment={conversation.sendAttachment}
-          onSendSticker={conversation.sendSticker}
-          onSendGif={conversation.sendGif}
-          onCreatePoll={conversation.createPoll}
-          onSendLocation={conversation.sendLocation}
-          onTyping={conversation.setTyping}
-          {roomName}
-          readOnly={permissions ? !permissions.can_post : false}
-          context={conversation.context}
-          onCancelContext={conversation.clearContext}
-          onEditLast={conversation.editLast}
+      {#if isTombstoned}
+        <RoomTombstoneBanner
+          isSpace={resolvedRoom?.is_space ?? false}
+          body={tombstoneBody}
+          resolved={tombstoneChecked}
+          successorId={tombstoneReplacementId}
+          joined={tombstoneSuccessorJoined}
+          joining={tombstoneJoining}
+          failed={tombstoneJoinFailed}
+          onOpen={openTombstoneSuccessor}
+          onJoin={() => void joinTombstoneSuccessor()}
         />
-      {/key}
+      {:else}
+        {#key resolvedRoomId}
+          <RoomComposer
+            roomId={resolvedRoomId}
+            onSend={conversation.sendMessage}
+            onSendAttachment={conversation.sendAttachment}
+            onSendSticker={conversation.sendSticker}
+            onSendGif={conversation.sendGif}
+            onCreatePoll={conversation.createPoll}
+            onSendLocation={conversation.sendLocation}
+            onTyping={conversation.setTyping}
+            {roomName}
+            readOnly={permissions ? !permissions.can_post : false}
+            context={conversation.context}
+            onCancelContext={conversation.clearContext}
+            onEditLast={conversation.editLast}
+          />
+        {/key}
+      {/if}
     </div>
   </div>
 

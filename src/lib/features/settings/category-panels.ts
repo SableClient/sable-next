@@ -4,6 +4,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
+import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
 import PushGateway from '#lib/features/notifications/PushGateway.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
@@ -25,7 +26,11 @@ export type CategoryPanel =
 
 export const categoryPanels: Record<string, CategoryPanel[]> = {
   appearance: [{ component: CustomThemes, class: 'custom-themes-card' }],
-  notifications: [{ component: NotificationDefaults }, { component: PushGateway }],
+  notifications: [
+    { component: NotificationDefaults },
+    { component: NotificationKeywords },
+    { component: PushGateway },
+  ],
   personas: [{ component: PersonaSettings, class: 'personas-card' }],
   developer: [
     {

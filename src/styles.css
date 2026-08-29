@@ -482,6 +482,12 @@ body {
   --link-decoration: none;
 }
 
+:root[data-reduced-motion='on'] {
+  --motion-fast: 0s;
+  --motion-normal: 0s;
+  --motion-slow: 0s;
+}
+
 @media (pointer: coarse) {
   :root {
     --font-size-input-min: 1rem;

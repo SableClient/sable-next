@@ -27,7 +27,9 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { clearDrafts } from '#lib/features/composer/composer-drafts.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
+  import { setUnreadBadge } from '#lib/platform/badge.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
+  import { ensureAndroidHistoryRoot } from '#lib/platform/android-back.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { registerNativePush } from '#lib/features/notifications/native-push.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
@@ -38,6 +40,11 @@
   import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
   import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
+  import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
+  import ShortcutsHelpDialog from '#lib/ui/shortcuts/ShortcutsHelpDialog.svelte';
+  import { registerGlobalShortcuts } from '#lib/ui/shortcuts/global-shortcuts.js';
+  import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
+  import { unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
 
   interface Props {
     children: Snippet;
@@ -122,11 +129,30 @@
     document.documentElement.dataset.underlineLinks = preferences.underlineLinks ? 'on' : 'off';
   });
 
+  let unreadTotal = $derived(
+    roomList.rooms
+      .filter((room) => room.state === 'joined' && !room.is_space)
+      .reduce((total, room) => total + room.highlight, 0)
+  );
+
+  $effect(() => {
+    void setUnreadBadge(unreadTotal);
+  });
+
+  $effect(() => {
+    document.documentElement.dataset.reducedMotion = preferences.reducedMotion ? 'on' : 'off';
+  });
+
   $effect(() => {
     // The bars only matter once the shell paints under them; the observer then
     // re-samples on navigation, overlays and theme swaps by itself.
     if (core.status !== 'ready') return;
     return startSystemBarSync();
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    ensureAndroidHistoryRoot(resolve('/(app)/home'));
   });
 
   // Delegated, because settings links can appear in any surface that renders a body.
@@ -232,6 +258,53 @@
       presence.stop();
     };
   });
+
+  let unreadCycleIndex = 0;
+
+  function jumpToRoom(roomId: string): void {
+    void goto(roomSectionPath(roomList.rooms, roomId));
+  }
+
+  $effect(() => {
+    return registerGlobalShortcuts({
+      'navigation.openRoomSearch': () => {
+        paletteState.open = true;
+      },
+      'app.searchMessages': () => {
+        void goto(resolve('search'));
+      },
+      'app.openBookmarks': () => {
+        void goto(resolve('inbox'));
+      },
+      'app.createRoom': () => {
+        void goto(resolve('create-room'));
+      },
+      'app.showShortcuts': () => {
+        shortcutsHelpState.open = true;
+      },
+      'navigation.nextUnread': () => {
+        const unread = unreadRoomsByPriority(roomList.rooms, openRoomId);
+        const target = unread[0];
+        if (!target) return;
+        unreadCycleIndex = 0;
+        jumpToRoom(target.room_id);
+      },
+      'navigation.cycleNextUnread': () => {
+        const unread = unreadRoomsByPriority(roomList.rooms, null);
+        if (unread.length === 0) return;
+        unreadCycleIndex = (unreadCycleIndex + 1) % unread.length;
+        const target = unread[unreadCycleIndex];
+        if (target) jumpToRoom(target.room_id);
+      },
+      'navigation.cyclePreviousUnread': () => {
+        const unread = unreadRoomsByPriority(roomList.rooms, null);
+        if (unread.length === 0) return;
+        unreadCycleIndex = (unreadCycleIndex - 1 + unread.length) % unread.length;
+        const target = unread[unreadCycleIndex];
+        if (target) jumpToRoom(target.room_id);
+      },
+    });
+  });
 </script>
 
 {#if core.status === 'ready'}
@@ -270,6 +343,8 @@
     {#if page.state.inbox}
       <InboxPanel />
     {/if}
+    <CommandPalette bind:open={paletteState.open} />
+    <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />
   {/key}
 {:else if core.status === 'error'}
   <main class="app-status" aria-labelledby="app-status-title">

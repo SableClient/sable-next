@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   finishSwipeGesture,
   startSwipeGesture,
+  startsInHorizontalScroller,
   updateSwipeGesture,
   type SwipeGesture,
 } from './swipe-gesture';
@@ -80,5 +81,68 @@ describe('swipe gesture helper', () => {
 
     const cancelled = horizontalGesture();
     expect(finishSwipeGesture(cancelled, 20, true).handled).toBe(false);
+  });
+});
+
+describe('a swipe that starts inside a horizontal scroller', () => {
+  function node(scrollWidth: number, clientWidth: number, overflowX: string): HTMLElement {
+    const element = document.createElement('div');
+    Object.defineProperty(element, 'scrollWidth', { value: scrollWidth });
+    Object.defineProperty(element, 'clientWidth', { value: clientWidth });
+    overflow.set(element, overflowX);
+    return element;
+  }
+
+  const overflow = new Map<Element, string>();
+
+  beforeEach(() => {
+    overflow.clear();
+    vi.stubGlobal('getComputedStyle', (element: Element) => ({
+      overflowX: overflow.get(element) ?? 'visible',
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is refused, so the formatting bar can scroll without opening the drawer', () => {
+    const root = document.createElement('div');
+    const bar = node(400, 200, 'auto');
+    const button = document.createElement('button');
+    bar.append(button);
+    root.append(bar);
+
+    expect(startsInHorizontalScroller(button, root)).toBe(true);
+  });
+
+  it('is allowed when the ancestor has nothing to scroll', () => {
+    const root = document.createElement('div');
+    const bar = node(200, 200, 'auto');
+    const button = document.createElement('button');
+    bar.append(button);
+    root.append(bar);
+
+    expect(startsInHorizontalScroller(button, root)).toBe(false);
+  });
+
+  it('is allowed when the overflow is clipped rather than scrollable', () => {
+    const root = document.createElement('div');
+    const bar = node(400, 200, 'hidden');
+    const button = document.createElement('button');
+    bar.append(button);
+    root.append(bar);
+
+    expect(startsInHorizontalScroller(button, root)).toBe(false);
+  });
+
+  it('stops at the gesture root rather than walking the whole document', () => {
+    const outer = node(400, 200, 'auto');
+    const root = document.createElement('div');
+    const button = document.createElement('button');
+    root.append(button);
+    outer.append(root);
+
+    expect(startsInHorizontalScroller(button, root)).toBe(false);
   });
 });

@@ -4,6 +4,7 @@
   import type { PackImageView } from '#src/generated/PackImageView';
   import { Portal } from 'bits-ui';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
+  import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
@@ -56,6 +57,8 @@
   import { sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
+  import VoiceRecorder from './VoiceRecorder.svelte';
+  import { isVoiceRecordingSupported } from './voice-recorder-support';
 
   const emoteSize = 24;
 
@@ -125,6 +128,9 @@
   let boardOpen = $state(false);
   let boardTab = $state<BoardTab>('emoticon');
   let boardQuery = $state('');
+  let recording = $state(false);
+  let micDenied = $state(false);
+  const voiceSupported = isVoiceRecordingSupported();
 
   function isGifSearchAction(value: unknown): value is ConversationSendResult {
     return (
@@ -161,6 +167,7 @@
   let desktop = $derived(appLayout.matches);
   let sending = $derived(inFlight > 0);
   let hasContent = $derived(!empty || staged.length > 0);
+  let primaryAction = $derived(!hasContent && voiceSupported && !micDenied ? 'record' : 'send');
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
   $effect(() => {
@@ -385,6 +392,23 @@
       console.debug('[sable composer] send failed', cause);
       if (doc && editor.isEmpty()) editor.setDoc(doc);
       staged = [...unsent, ...staged];
+      error = failureText(cause);
+    } finally {
+      inFlight -= 1;
+    }
+  }
+
+  async function sendVoice(file: File): Promise<void> {
+    recording = false;
+    inFlight += 1;
+    error = null;
+
+    try {
+      await queue.enqueue(async () => {
+        await onSendAttachment(roomId, file, {});
+      });
+    } catch (cause) {
+      console.debug('[sable composer] voice message failed', cause);
       error = failureText(cause);
     } finally {
       inFlight -= 1;
@@ -623,100 +647,123 @@
             void send();
           }}
         >
-          <ComposerDoor
-            {desktop}
-            onPick={pick}
-            onPoll={onCreatePoll
-              ? () => {
-                  pollOpen = true;
-                }
-              : undefined}
-            onLocation={onSendLocation
-              ? () => {
-                  locationOpen = true;
-                }
-              : undefined}
-            onBeforeOpen={!desktop ? blurEditor : undefined}
-          />
-          <input
-            bind:this={fileInput}
-            class="composer-file"
-            id="composer-file-{uid}"
-            name="attachment"
-            type="file"
-            multiple
-            tabindex="-1"
-            aria-hidden="true"
-            onchange={stageFromInput}
-          />
-          <div class="composer-field">
-            <ComposerEditorView {editor} {empty} {placeholder} />
-            {#if panelOpen && query}
-              <ComposerAutocomplete
-                id={listboxId}
-                {optionId}
-                sigil={query.sigil}
-                heading={query.sigil === '@'
-                  ? $i18n.t('composer.membersHeading', { query: query.query })
-                  : query.sigil === '#'
-                    ? $i18n.t('composer.roomsHeading', { query: query.query })
-                    : query.sigil === ':'
-                      ? $i18n.t('composer.emotesHeading', { query: query.query })
-                      : $i18n.t('composer.commandsHeading', { query: query.query })}
-                {suggestions}
-                {active}
-                onSelect={commit}
-              />
-            {/if}
-            <ComposerBoard
-              {roomId}
+          {#if recording}
+            <VoiceRecorder
+              onSend={(file: File) => {
+                void sendVoice(file);
+              }}
+              onCancel={() => {
+                recording = false;
+              }}
+              onDenied={() => {
+                micDenied = true;
+              }}
+            />
+          {:else}
+            <ComposerDoor
               {desktop}
-              bind:open={boardOpen}
-              bind:tab={boardTab}
-              bind:query={boardQuery}
-              onPick={pickFromBoard}
-              onPickUnicode={pickUnicodeFromBoard}
-              onPickGif={onSendGif ? pickGifFromBoard : undefined}
+              onPick={pick}
+              onPoll={onCreatePoll
+                ? () => {
+                    pollOpen = true;
+                  }
+                : undefined}
+              onLocation={onSendLocation
+                ? () => {
+                    locationOpen = true;
+                  }
+                : undefined}
               onBeforeOpen={!desktop ? blurEditor : undefined}
             />
-          </div>
-          {#if showPersonaPicker}
-            <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
-          {/if}
-          {#if richText}
+            <input
+              bind:this={fileInput}
+              class="composer-file"
+              id="composer-file-{uid}"
+              name="attachment"
+              type="file"
+              multiple
+              tabindex="-1"
+              aria-hidden="true"
+              onchange={stageFromInput}
+            />
+            <div class="composer-field">
+              <ComposerEditorView {editor} {empty} {placeholder} />
+              {#if panelOpen && query}
+                <ComposerAutocomplete
+                  id={listboxId}
+                  {optionId}
+                  sigil={query.sigil}
+                  heading={query.sigil === '@'
+                    ? $i18n.t('composer.membersHeading', { query: query.query })
+                    : query.sigil === '#'
+                      ? $i18n.t('composer.roomsHeading', { query: query.query })
+                      : query.sigil === ':'
+                        ? $i18n.t('composer.emotesHeading', { query: query.query })
+                        : $i18n.t('composer.commandsHeading', { query: query.query })}
+                  {suggestions}
+                  {active}
+                  onSelect={commit}
+                />
+              {/if}
+              <ComposerBoard
+                {roomId}
+                {desktop}
+                bind:open={boardOpen}
+                bind:tab={boardTab}
+                bind:query={boardQuery}
+                onPick={pickFromBoard}
+                onPickUnicode={pickUnicodeFromBoard}
+                onPickGif={onSendGif ? pickGifFromBoard : undefined}
+                onBeforeOpen={!desktop ? blurEditor : undefined}
+              />
+            </div>
+            {#if showPersonaPicker}
+              <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
+            {/if}
+            {#if richText}
+              <IconButton
+                variant="ghost"
+                size="small"
+                class="composer-format"
+                aria-pressed={formattingOpen}
+                label={$i18n.t('composer.formatting')}
+                onclick={() => {
+                  setPreference('formattingToolbar', !formattingOpen);
+                }}
+              >
+                <TextAaIcon />
+              </IconButton>
+            {/if}
             <IconButton
+              type={primaryAction === 'record' ? 'button' : 'submit'}
               variant="ghost"
               size="small"
-              class="composer-format"
-              aria-pressed={formattingOpen}
-              label={$i18n.t('composer.formatting')}
-              onclick={() => {
-                setPreference('formattingToolbar', !formattingOpen);
+              class="composer-send"
+              disabled={primaryAction === 'send' && !hasContent}
+              label={primaryAction === 'record'
+                ? $i18n.t('composer.voiceRecord')
+                : $i18n.t('timeline.sendMessage')}
+              onclick={primaryAction === 'record'
+                ? () => {
+                    recording = true;
+                  }
+                : undefined}
+              onpointerdown={(event: PointerEvent) => {
+                if (hasContent) event.preventDefault();
+              }}
+              onmousedown={(event: MouseEvent) => {
+                if (hasContent) event.preventDefault();
               }}
             >
-              <TextAaIcon />
+              {#if primaryAction === 'record'}
+                <MicrophoneIcon />
+              {:else if sending}
+                <Spinner small />
+              {:else}
+                <PaperPlaneIcon weight="fill" />
+              {/if}
             </IconButton>
           {/if}
-          <IconButton
-            type="submit"
-            variant="ghost"
-            size="small"
-            class="composer-send"
-            disabled={!hasContent}
-            label={$i18n.t('timeline.sendMessage')}
-            onpointerdown={(event: PointerEvent) => {
-              if (hasContent) event.preventDefault();
-            }}
-            onmousedown={(event: MouseEvent) => {
-              if (hasContent) event.preventDefault();
-            }}
-          >
-            {#if sending}
-              <Spinner small />
-            {:else}
-              <PaperPlaneIcon weight="fill" />
-            {/if}
-          </IconButton>
         </form>
         <p class="composer-hint" id={hintId}>
           {preferences.enterForNewline

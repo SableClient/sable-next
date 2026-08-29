@@ -6,7 +6,9 @@
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import { mimeExtension } from '#lib/ui/mime-extension.js';
+  import PdfViewer from '#lib/ui/PdfViewer.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import VoiceMessagePlayer from '#lib/ui/VoiceMessagePlayer.svelte';
 
   const BLURHASH_POSTER_WIDTH = 32;
 
@@ -19,6 +21,8 @@
     height?: number | null;
     size?: number | null;
     blurhash?: string | null;
+    durationMs?: number | null;
+    waveform?: number[] | null;
     class?: string;
   }
 
@@ -31,6 +35,8 @@
     height = null,
     size = null,
     blurhash = null,
+    durationMs = null,
+    waveform = null,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -78,6 +84,12 @@
       return undefined;
     }
   });
+  let isPdf = $derived(
+    kind === 'file' &&
+      (mime === 'application/pdf' ||
+        ((mime === null || mime === 'application/octet-stream') &&
+          body.toLowerCase().endsWith('.pdf')))
+  );
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
@@ -173,10 +185,14 @@
       >
         {body}
       </video>
+    {:else if kind === 'audio' && waveform !== null && waveform.length > 0}
+      <VoiceMessagePlayer {url} {body} {durationMs} {waveform} />
     {:else if kind === 'audio'}
       <audio class="media-content" controls src={url} aria-label={mediaLabel}>
         {body}
       </audio>
+    {:else if isPdf}
+      <PdfViewer src={url} name={mediaLabel} />
     {:else}
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->
       <a class="media-file" href={url} download={mediaLabel} onclick={download}>

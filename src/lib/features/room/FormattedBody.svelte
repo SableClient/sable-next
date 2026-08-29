@@ -131,6 +131,10 @@
         element.tabIndex = 0;
         element.role = 'button';
         element.ariaPressed = 'true';
+        if (!element.textContent?.trim()) {
+          const image = element.querySelector('img');
+          element.ariaLabel = image?.alt || $i18n.t('timeline.spoilerMedia');
+        }
       }
 
       const releases = resolveImages(node);
@@ -421,6 +425,11 @@
 
   .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) *) {
     visibility: hidden;
+  }
+
+  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) img) {
+    filter: blur(0.75rem);
+    visibility: visible;
   }
 
   .formatted-body :global(blockquote) {

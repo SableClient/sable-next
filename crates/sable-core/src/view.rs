@@ -14,7 +14,7 @@ use matrix_sdk::ruma::events::poll::start::PollKind;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
-use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType};
+use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, UnstableAmplitude};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
@@ -910,6 +910,14 @@ fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
                     votes: reveal.then(|| {
                         voters.map_or(0, |voters| u32::try_from(voters.len()).unwrap_or(u32::MAX))
                     }),
+                    voters: reveal.then(|| {
+                        voters.map_or_else(Vec::new, |voters| {
+                            voters
+                                .iter()
+                                .filter_map(|voter| OwnedUserId::try_from(voter.as_str()).ok())
+                                .collect()
+                        })
+                    }),
                     selected: own_user_id.is_some_and(|own| {
                         voters
                             .is_some_and(|voters| voters.iter().any(|voter| voter == own.as_str()))
@@ -1073,9 +1081,27 @@ pub(crate) const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
 /// back: it is there for other clients.
 pub(crate) const CALL_TYPE: &str = "org.matrix.msc3401.call";
 
+fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
+    const SPOILER: &str = "page.codeberg.everypizza.msc4193.spoiler";
+    const REASON: &str = "page.codeberg.everypizza.msc4193.spoiler.reason";
+
+    let content = content?;
+    if content.get(SPOILER)?.as_bool() != Some(true) {
+        return None;
+    }
+    Some(
+        content
+            .get(REASON)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+    )
+}
+
 fn message_content(
     message: &matrix_sdk_ui::timeline::Message,
     profile: Option<&PerMessageProfileView>,
+    raw: &RawFields,
 ) -> TimelineItemContentView {
     let dimension = |value: Option<UInt>| value.map(u64::from);
 
@@ -1088,6 +1114,7 @@ fn message_content(
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
             blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
+            spoiler: spoiler_reason(raw.content.as_ref()),
         },
         MessageType::Video(video) => TimelineItemContentView::Video {
             body: video.body.clone(),
@@ -1096,11 +1123,31 @@ fn message_content(
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
             blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
+            spoiler: spoiler_reason(raw.content.as_ref()),
         },
         MessageType::Audio(audio) => TimelineItemContentView::Audio {
             body: audio.body.clone(),
             source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+            duration_ms: audio
+                .audio
+                .as_ref()
+                .map(|details| details.duration)
+                .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
+                .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
+            waveform: audio.audio.as_ref().map(|details| {
+                details
+                    .waveform
+                    .iter()
+                    .map(|amplitude| {
+                        let value = u64::from(amplitude.get());
+                        #[allow(clippy::cast_precision_loss)]
+                        let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
+                        normalised
+                    })
+                    .collect()
+            }),
+            voice: audio.voice.is_some(),
         },
         MessageType::File(file) => TimelineItemContentView::File {
             body: file.body.clone(),
@@ -1144,7 +1191,7 @@ fn content(
 
     match content {
         TimelineItemContent::MsgLike(msg) => match &msg.kind {
-            MsgLikeKind::Message(message) => message_content(message, profile),
+            MsgLikeKind::Message(message) => message_content(message, profile, raw),
             MsgLikeKind::Redacted => TimelineItemContentView::Redacted {
                 reason: raw.redaction_reason(),
             },

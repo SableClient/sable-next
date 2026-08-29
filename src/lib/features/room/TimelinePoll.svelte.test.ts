@@ -11,8 +11,8 @@ function poll(overrides: Partial<PollView> = {}): PollView {
   return {
     question: 'lunch?',
     answers: [
-      { id: '0', text: 'ramen', votes: 3, selected: false },
-      { id: '1', text: 'curry', votes: 1, selected: false },
+      { id: '0', text: 'ramen', votes: 3, selected: false, voters: null },
+      { id: '1', text: 'curry', votes: 1, selected: false, voters: null },
     ],
     max_selections: 1,
     undisclosed: false,
@@ -119,6 +119,32 @@ test('an undisclosed poll shows no tally', async () => {
   await tick();
 
   expect(view.target.querySelector('.count')).toBeNull();
+  view.cleanup();
+});
+
+test('a null voters list shows the vote count with no affordance to open it', async () => {
+  const view = render({});
+  await tick();
+
+  expect(view.target.querySelector('.count-button')).toBeNull();
+  expect(view.target.querySelector('.count')?.textContent).toContain('3 votes');
+  view.cleanup();
+});
+
+test('tapping a vote count with voters opens the voters dialog', async () => {
+  const answers = poll().answers.map((answer) => ({
+    ...answer,
+    voters: answer.id === '0' ? ['@alice:example.org', '@bob:example.org'] : ['@carol:example.org'],
+  }));
+  const view = render({ poll: poll({ answers }) });
+  await tick();
+
+  view.target.querySelector<HTMLButtonElement>('.count-button')?.click();
+  await tick();
+
+  const dialog = document.body.querySelector('[role="tablist"]');
+  expect(dialog).not.toBeNull();
+  expect(document.body.textContent).toContain('alice');
   view.cleanup();
 });
 

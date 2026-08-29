@@ -291,6 +291,21 @@ pub enum Command {
         room_id: OwnedRoomId,
         event_type: String,
     },
+    UrlPreview {
+        url: String,
+    },
+    ListThreads {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        from: Option<String>,
+    },
+    NotificationKeywords,
+    AddNotificationKeyword {
+        keyword: String,
+    },
+    RemoveNotificationKeyword {
+        keyword: String,
+    },
     TimestampToEvent {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -937,6 +952,18 @@ pub enum CommandOk {
     RoomStateEvents {
         events: Vec<RoomStateEventView>,
     },
+    UrlPreview {
+        preview: Option<UrlPreviewView>,
+    },
+    ListThreads {
+        roots: Vec<ThreadRootView>,
+        next_batch: Option<String>,
+    },
+    NotificationKeywords {
+        keywords: Vec<String>,
+    },
+    AddNotificationKeyword,
+    RemoveNotificationKeyword,
     TimestampToEvent {
         #[ts(type = "string | null")]
         event_id: Option<OwnedEventId>,
@@ -1736,7 +1763,32 @@ pub enum MentionView {
     Loud,
 }
 
-/// What this account may do in one room, resolved from `m.room.power_levels`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ThreadRootView {
+    #[ts(type = "string")]
+    pub event_id: OwnedEventId,
+    #[ts(type = "string")]
+    pub sender: OwnedUserId,
+    pub body: String,
+    #[ts(type = "number | null")]
+    pub timestamp: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct UrlPreviewView {
+    pub url: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub site_name: Option<String>,
+    pub image: Option<String>,
+    #[ts(type = "number | null")]
+    pub image_width: Option<u64>,
+    #[ts(type = "number | null")]
+    pub image_height: Option<u64>,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct RoomStateEventView {
@@ -1745,6 +1797,7 @@ pub struct RoomStateEventView {
     pub content: serde_json::Value,
 }
 
+/// What this account may do in one room, resolved from `m.room.power_levels`.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 // Each field is an independent capability, not a state machine.
@@ -1855,6 +1908,9 @@ pub struct AttachmentInfoView {
     pub duration_ms: Option<u32>,
     pub animated: Option<bool>,
     pub blurhash: Option<String>,
+    pub waveform: Option<Vec<f32>>,
+    #[serde(default)]
+    pub voice: bool,
 }
 
 /// MSC4144 per-message profile, letting one account send under several
@@ -2002,6 +2058,7 @@ pub enum TimelineItemContentView {
         #[ts(type = "number | null")]
         height: Option<u64>,
         blurhash: Option<String>,
+        spoiler: Option<String>,
     },
     Video {
         body: String,
@@ -2012,11 +2069,16 @@ pub enum TimelineItemContentView {
         #[ts(type = "number | null")]
         height: Option<u64>,
         blurhash: Option<String>,
+        spoiler: Option<String>,
     },
     Audio {
         body: String,
         source: String,
         mime: Option<String>,
+        #[ts(type = "number | null")]
+        duration_ms: Option<u64>,
+        waveform: Option<Vec<f32>>,
+        voice: bool,
     },
     File {
         body: String,
@@ -2195,6 +2257,8 @@ pub struct PollView {
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct PollAnswerView {
+    #[ts(type = "string[] | null")]
+    pub voters: Option<Vec<OwnedUserId>>,
     pub id: String,
     pub text: String,
     /// Absent while an undisclosed poll is still open.

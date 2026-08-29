@@ -10,16 +10,32 @@ export async function measureAttachment(file: Blob): Promise<AttachmentInfoView 
 
   if (kind === 'image') {
     const size = await imageSize(file);
-    return size === null ? null : { ...size, duration_ms: null, animated: animated(file.type) };
+    return size === null
+      ? null
+      : {
+          ...size,
+          duration_ms: null,
+          animated: animated(file.type),
+          waveform: null,
+          voice: false,
+        };
   }
 
   if (kind === 'video' || kind === 'audio') {
     const metadata = await mediaMetadata(file, kind);
     if (metadata === null) return null;
-    return { ...metadata, animated: null, blurhash: null };
+    const recorded = file instanceof File ? voiceWaveforms.get(file) : undefined;
+    const waveform = recorded === undefined ? null : [...recorded];
+    return { ...metadata, animated: null, blurhash: null, waveform, voice: waveform !== null };
   }
 
   return null;
+}
+
+const voiceWaveforms = new WeakMap<File, readonly number[]>();
+
+export function markVoiceRecording(file: File, waveform: readonly number[]): void {
+  voiceWaveforms.set(file, waveform);
 }
 
 function animated(mime: string): boolean | null {

@@ -32,6 +32,7 @@ import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
+import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
@@ -226,6 +227,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: LinkIcon,
         name: 'settings.underlineLinks',
         description: 'settings.underlineLinksHint',
+        type: 'boolean',
+      },
+      {
+        key: 'reducedMotion',
+        icon: WheelchairMotionIcon,
+        name: 'settings.reducedMotion',
+        description: 'settings.reducedMotionHint',
         type: 'boolean',
       },
       {
@@ -436,7 +444,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.urlPreviews',
         description: 'settings.urlPreviewsHint',
         type: 'boolean',
-        unavailable: true,
       },
     ],
   },

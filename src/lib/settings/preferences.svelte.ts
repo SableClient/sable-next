@@ -10,6 +10,7 @@ export interface Preferences {
   messageSpacing: MessageSpacing;
   theme: ThemeMode;
   underlineLinks: boolean;
+  reducedMotion: boolean;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   showUnreadCounts: boolean;
@@ -104,6 +105,7 @@ const DEFAULTS: Preferences = {
   messageSpacing: 'cozy',
   theme: 'system',
   underlineLinks: true,
+  reducedMotion: prefersReducedMotion(),
   showRoomIcon: 'always',
   showRoomBanners: true,
   showUnreadCounts: false,
@@ -156,6 +158,10 @@ const DEFAULTS: Preferences = {
   showHiddenEvents: false,
   showNonStandardEvents: false,
 };
+
+function prefersReducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 function read(key: string): Record<string, unknown> | null {
   try {

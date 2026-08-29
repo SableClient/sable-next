@@ -3,9 +3,13 @@
 
   import type { MatrixLink } from './matrix-link.js';
 
+  import type { MemberView } from '#src/generated/MemberView';
+
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
+  import { firstPreviewableLink } from './link-preview.js';
+  import LinkPreviewCard from './LinkPreviewCard.svelte';
   import { isCaption } from './members.js';
   import TimelineGallery from './TimelineGallery.svelte';
   import TimelineLocation from './TimelineLocation.svelte';
@@ -14,13 +18,25 @@
   interface Props {
     item: TimelineItemView;
     canRedactOthers: boolean;
+    members?: readonly MemberView[];
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onOpenMedia?: (eventId: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
   }
 
-  let { item, canRedactOthers, onMatrixLink, onOpenMedia, onVotePoll, onEndPoll }: Props = $props();
+  let {
+    item,
+    canRedactOthers,
+    members = [],
+    onMatrixLink,
+    onOpenMedia,
+    onVotePoll,
+    onEndPoll,
+  }: Props = $props();
+  let previewLink = $derived(
+    item.content.kind === 'gallery' ? firstPreviewableLink(item.content.html) : null
+  );
 </script>
 
 {#if item.content.kind === 'sticker'}
@@ -70,6 +86,7 @@
     poll={item.content.poll}
     eventId={item.event_id}
     canEnd={item.is_own || canRedactOthers}
+    {members}
     onVote={onVotePoll}
     onEnd={onEndPoll}
   />
@@ -84,7 +101,12 @@
     height={item.content.kind === 'video' ? item.content.height : null}
     size={item.content.kind === 'file' ? item.content.size : null}
     blurhash={item.content.kind === 'video' ? item.content.blurhash : null}
+    durationMs={item.content.kind === 'audio' ? item.content.duration_ms : null}
+    waveform={item.content.kind === 'audio' ? item.content.waveform : null}
   />
+{/if}
+{#if previewLink}
+  <LinkPreviewCard url={previewLink} />
 {/if}
 
 <style>

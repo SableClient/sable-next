@@ -54,6 +54,7 @@
     "katex": "0.18.4",
     "livekit-client": "2.22.0",
     "markdown-it": "^14.3.0",
+    "pdfjs-dist": "6.2.108",
     "phosphor-svelte": "^3.1.0",
     "prosemirror-commands": "^1.7.2",
     "prosemirror-dropcursor": "^1.8.3",
