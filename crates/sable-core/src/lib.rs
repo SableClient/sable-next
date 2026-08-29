@@ -17,6 +17,7 @@ pub mod profiles;
 pub mod protocol;
 mod registration;
 mod rooms;
+mod scheduled;
 pub mod search;
 pub mod session;
 pub mod spaces;
@@ -27,6 +28,7 @@ mod tls;
 mod verification;
 pub mod view;
 mod watchers;
+mod widgets;
 
 use std::{
     collections::HashMap,

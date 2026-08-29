@@ -32,7 +32,6 @@
   .topic-dialog {
     display: grid;
     gap: var(--space-3);
-    padding: var(--space-4);
   }
 
   h2 {

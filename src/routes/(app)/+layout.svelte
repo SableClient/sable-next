@@ -26,6 +26,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
+  import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
@@ -35,6 +36,7 @@
   import {
     draftsDocument,
     recentEmojiDocument,
+    scheduledDocument,
     settingsDocument,
     workspaceDocument,
   } from '#lib/settings/sync-documents.js';
@@ -48,6 +50,8 @@
   import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
+  import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
+  import { ShareInbox, watchSharedContent } from '#lib/features/share/share-inbox.svelte.js';
   import ShortcutsHelpDialog from '#lib/ui/shortcuts/ShortcutsHelpDialog.svelte';
   import { registerGlobalShortcuts } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
@@ -72,6 +76,7 @@
   const incomingCalls = new IncomingCalls(core);
   const callSession = new CallSession(core);
   provideCallSession(callSession);
+  const shareInbox = new ShareInbox();
 
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
   let callRoom = $derived(
@@ -141,6 +146,7 @@
     workspaceDocument(spaceSidebar),
     draftsDocument,
     recentEmojiDocument,
+    scheduledDocument,
   ];
 
   $effect(() => {
@@ -251,6 +257,30 @@
         void goto(roomSectionPath(roomList.rooms, message.roomId, message.eventId));
       }
     });
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    return watchScheduledQueue(core);
+  });
+
+  $effect(() => {
+    const stop = watchSharedContent(shareInbox);
+    if (!('serviceWorker' in navigator)) return stop;
+
+    const off = on(navigator.serviceWorker, 'message', (event) => {
+      const message = (event as MessageEvent).data as
+        | { type?: string; text?: string; files?: File[] }
+        | undefined;
+      if (message?.type === 'sable:share')
+        shareInbox.accept(message.text ?? '', message.files ?? []);
+    });
+    navigator.serviceWorker.controller?.postMessage({ type: 'sable:share-take' });
+
+    return () => {
+      off();
+      stop();
+    };
   });
 
   const roomNames = new RoomNameWriter();
@@ -372,6 +402,7 @@
     {/if}
     <CommandPalette bind:open={paletteState.open} />
     <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />
+    <ShareTargetSheet inbox={shareInbox} />
   {/key}
 {:else if core.status === 'error'}
   <main class="app-status" aria-labelledby="app-status-title">

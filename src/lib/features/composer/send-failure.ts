@@ -11,6 +11,10 @@ function detailOf(cause: unknown): CommandErr | null {
   return detail as CommandErr;
 }
 
+export function isEncryptedScheduleUnsupported(cause: unknown): boolean {
+  return detailOf(cause)?.code === 'encrypted_schedule_unsupported';
+}
+
 export function sendFailure(cause: unknown): SendFailure {
   if (cause instanceof SlashError) return { key: cause.key, values: cause.values };
 

@@ -404,6 +404,53 @@ pub enum Command {
         #[ts(type = "string | null")]
         thread_root: Option<OwnedEventId>,
     },
+    RoomTimelineEvents {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+        #[serde(default)]
+        msgtype: Option<String>,
+        #[ts(type = "number")]
+        limit: u32,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        since: Option<OwnedEventId>,
+    },
+    RoomStateEventsRaw {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        event_type: String,
+        #[serde(default)]
+        state_key: Option<String>,
+    },
+    SearchUserDirectory {
+        term: String,
+        #[serde(default)]
+        #[ts(type = "number | null")]
+        limit: Option<u32>,
+    },
+    OpenIdToken,
+    ScheduleMessage {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        body: String,
+        #[serde(default)]
+        formatted: Option<String>,
+        #[ts(type = "number")]
+        delay_ms: u64,
+    },
+    ScheduledMessages {
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        room_id: Option<OwnedRoomId>,
+    },
+    CancelScheduledMessage {
+        delay_id: String,
+    },
+    SendScheduledMessage {
+        delay_id: String,
+    },
+    DelayedEventsSupported,
     /// MSC3381.
     CreatePoll {
         #[ts(type = "string")]
@@ -1006,6 +1053,32 @@ pub enum CommandOk {
         bookmarked: bool,
     },
     React,
+    RoomTimelineEvents {
+        #[ts(type = "unknown[]")]
+        events: Vec<serde_json::Value>,
+    },
+    RoomStateEventsRaw {
+        #[ts(type = "unknown[]")]
+        events: Vec<serde_json::Value>,
+    },
+    SearchUserDirectory {
+        limited: bool,
+        results: Vec<UserDirectoryEntryView>,
+    },
+    OpenIdToken {
+        token: OpenIdTokenView,
+    },
+    ScheduleMessage {
+        delay_id: String,
+    },
+    ScheduledMessages {
+        messages: Vec<ScheduledMessageView>,
+    },
+    CancelScheduledMessage,
+    SendScheduledMessage,
+    DelayedEventsSupported {
+        supported: bool,
+    },
     CreatePoll,
     VotePoll,
     EndPoll,
@@ -1139,6 +1212,7 @@ pub enum CommandErr {
     /// A poll needs a question and between 1 and 20 answers.
     InvalidPoll,
     InvalidLocation,
+    EncryptedScheduleUnsupported,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
@@ -2241,6 +2315,38 @@ pub enum GalleryItemView {
         source: String,
         mime: Option<String>,
     },
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct UserDirectoryEntryView {
+    pub user_id: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct OpenIdTokenView {
+    pub access_token: String,
+    pub token_type: String,
+    pub matrix_server_name: String,
+    #[ts(type = "number")]
+    pub expires_in_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ScheduledMessageView {
+    pub delay_id: String,
+    #[ts(type = "string")]
+    pub room_id: OwnedRoomId,
+    pub body: String,
+    pub formatted: Option<String>,
+    #[ts(type = "number")]
+    pub delay_ms: u64,
+    #[ts(type = "number | null")]
+    pub delivery_ts: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

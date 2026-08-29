@@ -51,7 +51,7 @@
   .delete {
     display: grid;
     gap: var(--space-2);
-    width: min(27rem, 100%);
+    width: min(27rem, calc(100vw - 2rem));
   }
 
   h2 {

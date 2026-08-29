@@ -739,7 +739,14 @@
     "profileKickConfirm": "Remove {{name}} from the room?",
     "profileBanConfirm": "Ban {{name}} from the room?",
     "profileModerationFailed": "That action could not be completed.",
-    "redactedWithReason": "Message deleted — {{reason}}"
+    "redactedWithReason": "Message deleted — {{reason}}",
+    "locationShowMap": "Show map",
+    "locationMapLoading": "Loading map…",
+    "locationMapFailed": "The map could not be loaded.",
+    "locationMapAlt": "Map showing {{label}}",
+    "forwardCancel": "Cancel",
+    "forwardSelected_one": "{{count}} room selected",
+    "forwardSelected_other": "{{count}} rooms selected"
   },
   "auth": {
     "welcome": "Welcome to Sable",
@@ -1323,7 +1330,7 @@
     "batchTooLarge": "These files come to more than {{limit}} together",
     "location": "Location",
     "locationTitle": "Share a location",
-    "locationExplain": "Sent as coordinates. Sable draws no map, so nothing is fetched from a tile provider.",
+    "locationExplain": "Sent as coordinates. The map is only drawn when a reader asks for it, so nothing reaches a tile provider on its own.",
     "locationUseCurrent": "Use my current location",
     "locationLatitude": "Latitude",
     "locationLongitude": "Longitude",
@@ -1571,7 +1578,26 @@
         "description": "Redact recent messages from selected users",
         "usage": "/delete <@user:server|@*:server> [-past 1d|2h|5m|30s] [-t event.type] [-r reason]"
       }
-    }
+    },
+    "schedule": "Schedule send",
+    "scheduleTitle": "Schedule this message",
+    "scheduleExplain": "Unencrypted rooms hand the message to the homeserver, which sends it whether or not Sable is running. In an encrypted room it is held on your devices and goes out from whichever one is open at the time.",
+    "scheduleEmpty": "Write the message first, then pick a time.",
+    "scheduleIn30Minutes": "In 30 minutes",
+    "scheduleIn1Hour": "In an hour",
+    "scheduleTomorrow9am": "Tomorrow, 9am",
+    "scheduleDate": "Date",
+    "scheduleTime": "Time",
+    "schedulePast": "Pick a time in the future.",
+    "scheduleConfirm": "Schedule",
+    "scheduleCancel": "Cancel",
+    "scheduleFailed": "That message could not be scheduled.",
+    "scheduledCount_one": "{{count}} message scheduled",
+    "scheduledCount_other": "{{count}} messages scheduled",
+    "scheduledCancel": "Cancel",
+    "scheduledSendNow": "Send now",
+    "scheduledFor": "Sends {{when}}",
+    "scheduledPending": "Waiting for a device to be open"
   },
   "search": {
     "title": "Search messages",
@@ -1733,7 +1759,22 @@
     "title": "Widgets",
     "close": "Close widgets",
     "empty": "This room has no widgets.",
-    "remove": "Remove {{name}}"
+    "remove": "Remove {{name}}",
+    "capabilitiesTitle": "{{name}} is asking for permissions",
+    "capabilitiesExplain": "A widget is third-party code. Grant only what it needs; anything left unticked is refused.",
+    "capabilitiesAllow": "Allow selected",
+    "capabilitiesDeny": "Refuse all",
+    "capabilitySensitive": "Sensitive — off by default",
+    "capabilityOpenId": "Prove who you are to its own server",
+    "capabilityAlwaysOnScreen": "Stay on screen while you use other rooms",
+    "capabilitySticker": "Send stickers as you",
+    "capabilitySend": "Send messages to this room as you",
+    "capabilitySendState": "Change this room’s settings",
+    "capabilityReceive": "Read messages in this room",
+    "capabilityReceiveState": "Read this room’s settings",
+    "capabilitySendToDevice": "Send data directly to your other devices",
+    "capabilityReceiveToDevice": "Receive data from your other devices",
+    "capabilityOther": "{{capability}}"
   },
   "pdf": {
     "documentLabel": "{{name}}, page {{page}} of {{pages}}",
@@ -1774,5 +1815,12 @@
     "threadUnread": "Unread. {{name}}: {{preview}}",
     "replyCount_one": "{{count}} reply",
     "replyCount_other": "{{count}} replies"
+  },
+  "share": {
+    "title": "Share to",
+    "files_one": "{{count}} file",
+    "files_other": "{{count}} files",
+    "staging": "Preparing the share…",
+    "failed": "That share could not be prepared."
   }
 }

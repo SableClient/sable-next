@@ -340,12 +340,14 @@
     });
   }
 
-  function forward(toRoomId: string): void {
+  function forward(toRoomIds: string[]): void {
     const eventId = item.event_id;
     if (!eventId) return;
-    void core.commands.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
-      console.warn('[sable timeline] forward failed', error);
-    });
+    for (const toRoomId of toRoomIds) {
+      void core.commands.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
+        console.warn('[sable timeline] forward failed', error);
+      });
+    }
   }
 
   function reproxyKind(content: TimelineItemView['content']): MessageKind {

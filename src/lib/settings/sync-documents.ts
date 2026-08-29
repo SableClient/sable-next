@@ -12,6 +12,11 @@ import {
   parseRoomIconOverrides,
   roomIconOverrides,
 } from '#lib/features/room/settings/room-appearance.svelte.js';
+import {
+  adoptQueue,
+  parseQueue,
+  scheduledQueue,
+} from '#lib/features/composer/scheduled-queue.svelte.js';
 import { parseShortcodes, readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
 import {
   adoptRecentReactions,
@@ -28,6 +33,7 @@ import { applySettings, prepareSettings, SETTINGS_ACCOUNT_DATA_TYPE } from './sy
 export const WORKSPACE_ACCOUNT_DATA_TYPE = 'moe.sable.next.workspace';
 export const DRAFTS_ACCOUNT_DATA_TYPE = 'moe.sable.next.drafts';
 export const RECENT_EMOJI_ACCOUNT_DATA_TYPE = 'm.recent_emoji';
+export const SCHEDULED_ACCOUNT_DATA_TYPE = 'moe.sable.next.scheduled';
 
 const DOCUMENT_VERSION = 1;
 const DRAFT_DEBOUNCE_MS = 5000;
@@ -102,6 +108,20 @@ export const draftsDocument: SyncedDocument = {
     if (drafts === null || typeof drafts !== 'object' || Array.isArray(drafts)) return false;
 
     adoptDraftDocuments(drafts as Record<string, unknown>);
+    return true;
+  },
+};
+
+export const scheduledDocument: SyncedDocument = {
+  eventType: SCHEDULED_ACCOUNT_DATA_TYPE,
+
+  snapshot: () => ({ content: { v: DOCUMENT_VERSION, scheduled: scheduledQueue() } }),
+
+  adopt(content) {
+    const body = versioned(content);
+    if (body === null) return scheduledQueue().length === 0;
+
+    adoptQueue(parseQueue(body.scheduled));
     return true;
   },
 };

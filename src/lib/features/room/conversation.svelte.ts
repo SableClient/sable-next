@@ -8,6 +8,8 @@ import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { EditImage } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
+import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
+import { isEncryptedScheduleUnsupported } from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
@@ -179,6 +181,32 @@ export class Conversation {
       this.#consumeReply(),
       this.#threadRoot
     );
+  };
+
+  readonly schedule = async (
+    targetRoomId: string,
+    body: string,
+    formatted: string | null,
+    dueTs: number
+  ): Promise<void> => {
+    const delayMs = dueTs - Date.now();
+    if (delayMs <= 0) return;
+
+    try {
+      await this.#core.commands.scheduleMessage(targetRoomId, body, formatted, delayMs);
+      return;
+    } catch (error) {
+      if (!isEncryptedScheduleUnsupported(error)) throw error;
+    }
+
+    enqueue({
+      id: crypto.randomUUID(),
+      roomId: targetRoomId,
+      body,
+      formatted,
+      dueTs,
+      owner: this.#core.session?.device_id ?? '',
+    });
   };
 
   readonly setTyping = async (targetRoomId: string, typing: boolean): Promise<void> => {

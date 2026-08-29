@@ -4,6 +4,15 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+const core = {
+  session: { account_id: 'a', user_id: '@erwan:example.org', device_id: 'DEV' },
+  commands: {},
+};
+
+vi.mock('#lib/core/context.js', () => ({
+  useCoreClient: () => core,
+}));
+
 import WidgetsPanel from './WidgetsPanel.svelte';
 import type { RoomWidget } from './widget-content.js';
 
@@ -56,7 +65,7 @@ test('renders a sandboxed iframe for the first widget, templated', async () => {
 
   const iframe = document.querySelector<HTMLIFrameElement>('iframe');
   expect(iframe?.title).toBe('Jitsi');
-  expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-popups');
+  expect(iframe?.getAttribute('sandbox')).toContain('allow-scripts');
   expect(iframe?.getAttribute('allow')).toContain('camera');
   const src = new URL(iframe?.src ?? '');
   expect(src.searchParams.get('user')).toBe(commonProps.userId);

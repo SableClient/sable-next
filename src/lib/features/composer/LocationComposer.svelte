@@ -118,8 +118,7 @@
   .location-composer {
     display: grid;
     gap: var(--space-3);
-    max-width: min(24rem, 100%);
-    padding: var(--space-4);
+    width: min(26rem, calc(100vw - 2rem));
   }
 
   h2 {

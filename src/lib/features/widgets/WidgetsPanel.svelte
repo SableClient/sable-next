@@ -6,6 +6,8 @@
 
   import type { RoomWidget } from './widget-content.js';
   import { templateWidgetUrl } from './widget-url.js';
+  import WidgetCapabilitiesDialog from './WidgetCapabilitiesDialog.svelte';
+  import WidgetFrame from './WidgetFrame.svelte';
 
   interface Props {
     roomId: string;
@@ -32,6 +34,26 @@
   }: Props = $props();
 
   let activeId = $state<string | null>(null);
+
+  interface PendingApproval {
+    widgetName: string;
+    requested: string[];
+    settle: (approved: string[]) => void;
+  }
+
+  let approval = $state.raw<PendingApproval | null>(null);
+
+  function requestCapabilities(widgetName: string) {
+    return async (requested: Set<string>): Promise<Set<string>> => {
+      if (requested.size === 0) return new Set();
+
+      const approved = await new Promise<string[]>((settle) => {
+        approval = { widgetName, requested: [...requested], settle };
+      });
+      approval = null;
+      return new Set(approved);
+    };
+  }
 
   let activeWidget = $derived(
     widgets.find((widget) => widget.id === activeId) ?? widgets[0] ?? null
@@ -86,18 +108,30 @@
     </div>
 
     {#if activeUrl && activeWidget}
-      {#key activeWidget.id}
-        <iframe
-          class="widgets-frame"
-          title={activeWidget.name}
-          src={activeUrl}
-          sandbox="allow-scripts allow-forms allow-popups"
-          allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen; encrypted-media"
-        ></iframe>
+      {#key activeUrl}
+        <div class="widgets-frame">
+          <WidgetFrame
+            {roomId}
+            widgetId={activeWidget.id}
+            url={activeUrl}
+            name={activeWidget.name}
+            onCapabilities={requestCapabilities(activeWidget.name)}
+          />
+        </div>
       {/key}
     {/if}
   {/if}
 </aside>
+
+{#if approval}
+  {@const pending = approval}
+  <WidgetCapabilitiesDialog
+    open
+    widgetName={pending.widgetName}
+    requested={pending.requested}
+    onDecide={pending.settle}
+  />
+{/if}
 
 <style>
   .widgets-panel {

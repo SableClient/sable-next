@@ -1,4 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 export interface SharedItem {
   kind: string;
@@ -33,4 +34,17 @@ export async function readSharedFile(batchId: string, fileName: string): Promise
 
 export async function clearSharedBatch(batchId: string): Promise<void> {
   await invoke('share_inbox_clear', { batchId });
+}
+
+export async function subscribeSharedContent(onShare: () => void): Promise<() => void> {
+  if (!receivesSharedContent()) return () => {};
+
+  try {
+    return await listen('share-received', () => {
+      onShare();
+    });
+  } catch (error) {
+    console.debug('[sable share-target] subscribe failed', error);
+    return () => {};
+  }
 }

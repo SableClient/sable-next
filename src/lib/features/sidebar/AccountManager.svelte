@@ -273,7 +273,6 @@
   .remove-dialog {
     display: grid;
     gap: var(--space-3);
-    padding: var(--space-4);
     width: min(26rem, calc(100vw - 2rem));
   }
 

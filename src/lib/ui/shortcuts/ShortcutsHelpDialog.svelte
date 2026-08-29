@@ -44,7 +44,7 @@
   .help {
     display: grid;
     gap: var(--space-3);
-    width: min(28rem, 100%);
+    width: min(28rem, calc(100vw - 2rem));
   }
 
   h2 {

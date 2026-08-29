@@ -16,6 +16,9 @@ import type { PresenceView } from '#src/generated/PresenceView';
 import type { PublicRoomView } from '#src/generated/PublicRoomView';
 import type { PusherView } from '#src/generated/PusherView';
 import type { RoomTag } from '#src/generated/RoomTag';
+import type { OpenIdTokenView } from '#src/generated/OpenIdTokenView';
+import type { ScheduledMessageView } from '#src/generated/ScheduledMessageView';
+import type { UserDirectoryEntryView } from '#src/generated/UserDirectoryEntryView';
 import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
 import type { CallSupportView } from '#src/generated/CallSupportView';
 import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
@@ -807,6 +810,92 @@ export function createCommands(transport: () => Transport) {
         event_id: eventId,
         to_room_id: toRoomId,
       });
+    },
+
+    async roomTimelineEvents(
+      roomId: string,
+      eventType: string,
+      msgtype: string | null,
+      limit: number,
+      since: string | null
+    ): Promise<unknown[]> {
+      const response = await transport().send({
+        type: 'room_timeline_events',
+        room_id: roomId,
+        event_type: eventType,
+        msgtype,
+        limit,
+        since,
+      });
+      return response.events;
+    },
+
+    async roomStateEventsRaw(
+      roomId: string,
+      eventType: string,
+      stateKey: string | null
+    ): Promise<unknown[]> {
+      const response = await transport().send({
+        type: 'room_state_events_raw',
+        room_id: roomId,
+        event_type: eventType,
+        state_key: stateKey,
+      });
+      return response.events;
+    },
+
+    async searchUserDirectory(
+      term: string,
+      limit: number | null
+    ): Promise<{ limited: boolean; results: UserDirectoryEntryView[] }> {
+      const response = await transport().send({
+        type: 'search_user_directory',
+        term,
+        limit,
+      });
+      return { limited: response.limited, results: response.results };
+    },
+
+    async openIdToken(): Promise<OpenIdTokenView> {
+      const response = await transport().send({ type: 'open_id_token' });
+      return response.token;
+    },
+
+    async scheduleMessage(
+      roomId: string,
+      body: string,
+      formatted: string | null,
+      delayMs: number
+    ): Promise<string> {
+      const response = await transport().send({
+        type: 'schedule_message',
+        room_id: roomId,
+        body,
+        formatted,
+        delay_ms: delayMs,
+      });
+      return response.delay_id;
+    },
+
+    async scheduledMessages(roomId: string | null): Promise<ScheduledMessageView[]> {
+      const response = await transport().send({
+        type: 'scheduled_messages',
+        room_id: roomId,
+      });
+      return response.messages;
+    },
+
+    async cancelScheduledMessage(delayId: string): Promise<void> {
+      await transport().send({ type: 'cancel_scheduled_message', delay_id: delayId });
+    },
+
+    async sendScheduledMessage(delayId: string): Promise<void> {
+      await transport().send({ type: 'send_scheduled_message', delay_id: delayId });
+    },
+
+    async delayedEventsSupported(): Promise<boolean> {
+      const response = await transport().send({ type: 'delayed_events_supported' });
+      return response.supported;
     },
 
     async toggleReaction(

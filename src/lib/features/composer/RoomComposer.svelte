@@ -37,6 +37,7 @@
   import ComposerFormatting from './ComposerFormatting.svelte';
   import ComposerLinkDialog from './ComposerLinkDialog.svelte';
   import LocationComposer from './LocationComposer.svelte';
+  import ScheduleComposer from './ScheduleComposer.svelte';
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
   import { formattedForEditing, type ComposerContext } from './composer-context';
   import { clearDraft, readDraft, writeDraft } from './composer-drafts.svelte';
@@ -80,6 +81,12 @@
       undisclosed: boolean
     ) => Promise<void>;
     onSendLocation?: (roomId: string, body: string, geoUri: string) => Promise<void>;
+    onSchedule?: (
+      roomId: string,
+      body: string,
+      formatted: string | null,
+      dueTs: number
+    ) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
     roomName?: string | null;
     readOnly?: boolean;
@@ -98,6 +105,7 @@
     onSendGif,
     onCreatePoll,
     onSendLocation,
+    onSchedule,
     onTyping,
     roomName = null,
     readOnly = false,
@@ -148,6 +156,7 @@
   let error = $state<string | null>(null);
   let pollOpen = $state(false);
   let locationOpen = $state(false);
+  let scheduleOpen = $state(false);
   let linkDialogOpen = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
@@ -393,6 +402,29 @@
       error = failureText(cause);
     } finally {
       inFlight -= 1;
+    }
+  }
+
+  async function scheduleDraft(dueTs: number): Promise<void> {
+    if (!onSchedule || !hasContent || readOnly) return;
+
+    const doc = editor.doc();
+    if (!doc) return;
+    const message = richText ? serializeComposer(doc) : serializePlain(doc);
+    if (message.body === '') return;
+
+    editor.clear();
+    if (typingTimeout) clearTimeout(typingTimeout);
+    stopTyping();
+
+    try {
+      await onSchedule(roomId, message.body, message.formatted, dueTs);
+      editor.clearHistory();
+      error = null;
+    } catch (cause) {
+      console.debug('[sable composer] schedule failed', cause);
+      if (editor.isEmpty()) editor.setDoc(doc);
+      error = $i18n.t('composer.scheduleFailed');
     }
   }
 
@@ -671,6 +703,11 @@
                     locationOpen = true;
                   }
                 : undefined}
+              onSchedule={onSchedule
+                ? () => {
+                    scheduleOpen = true;
+                  }
+                : undefined}
               onBeforeOpen={!desktop ? blurEditor : undefined}
             />
             <input
@@ -787,6 +824,16 @@
           error = failureText(cause);
         }
       });
+    }}
+  />
+{/if}
+
+{#if onSchedule}
+  <ScheduleComposer
+    bind:open={scheduleOpen}
+    empty={!hasContent || readOnly}
+    onSchedule={(dueTs: number) => {
+      void scheduleDraft(dueTs);
     }}
   />
 {/if}

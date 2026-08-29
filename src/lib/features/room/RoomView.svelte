@@ -27,6 +27,7 @@
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
+  import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -711,6 +712,7 @@
         />
       {:else}
         {#key resolvedRoomId}
+          <ScheduledMessages roomId={resolvedRoomId} />
           <RoomComposer
             roomId={resolvedRoomId}
             onSend={conversation.sendMessage}
@@ -719,6 +721,7 @@
             onSendGif={conversation.sendGif}
             onCreatePoll={conversation.createPoll}
             onSendLocation={conversation.sendLocation}
+            onSchedule={conversation.schedule}
             onTyping={conversation.setTyping}
             {roomName}
             readOnly={permissions ? !permissions.can_post : false}

@@ -11,8 +11,6 @@ import { roomName } from '#lib/features/notifications/room-names.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
-/** No `fetch` handler and no caches: an offline story nobody asked for would
-    take over every request. */
 worker.addEventListener('push', (event) => {
   event.waitUntil(present(event.data?.json() as PushPayload | undefined));
 });
@@ -20,7 +18,62 @@ worker.addEventListener('push', (event) => {
 worker.addEventListener('message', (event) => {
   const message = event.data as { type?: unknown } | undefined;
   if (message?.type === 'sable:skip-waiting') event.waitUntil(worker.skipWaiting());
+  if (message?.type === 'sable:share-take') event.waitUntil(handShares());
 });
+
+interface StashedShare {
+  text: string;
+  files: File[];
+}
+
+const shareAction = `${resolve('/').replace(/\/$/, '')}/share`;
+const shares = new Map<string, StashedShare>();
+
+worker.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'POST' || url.pathname !== shareAction) return;
+  event.respondWith(stashShare(event));
+});
+
+const SHARE_HOLD_MS = 15_000;
+
+async function stashShare(event: FetchEvent): Promise<Response> {
+  const form = await event.request.formData();
+  const text = ['title', 'text', 'url']
+    .map((field) => form.get(field))
+    .filter((value): value is string => typeof value === 'string' && value !== '')
+    .join('\n');
+  const files = form.getAll('files').filter((value): value is File => value instanceof File);
+
+  const id = crypto.randomUUID();
+  shares.set(id, { text, files });
+  event.waitUntil(holdShare(id));
+
+  return Response.redirect(resolve('/'), 303);
+}
+
+async function holdShare(id: string): Promise<void> {
+  const deadline = Date.now() + SHARE_HOLD_MS;
+  while (shares.has(id) && Date.now() < deadline) {
+    await handShares();
+    if (!shares.has(id)) return;
+    await new Promise((settle) => setTimeout(settle, 250));
+  }
+  shares.delete(id);
+}
+
+async function handShares(): Promise<void> {
+  if (shares.size === 0) return;
+
+  const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const client = clients.at(0);
+  if (!client) return;
+
+  for (const [id, share] of shares) {
+    shares.delete(id);
+    client.postMessage({ type: 'sable:share', text: share.text, files: share.files });
+  }
+}
 
 async function present(payload: PushPayload | undefined): Promise<void> {
   if (!payload) return;

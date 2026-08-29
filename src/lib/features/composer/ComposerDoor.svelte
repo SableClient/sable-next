@@ -3,6 +3,7 @@
   import { DropdownMenu } from 'bits-ui';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
+  import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
@@ -17,10 +18,19 @@
     onPick: (accept: string) => void;
     onPoll?: () => void;
     onLocation?: () => void;
+    onSchedule?: () => void;
     onBeforeOpen?: () => void;
   }
 
-  let { desktop, disabled = false, onPick, onPoll, onLocation, onBeforeOpen }: Props = $props();
+  let {
+    desktop,
+    disabled = false,
+    onPick,
+    onPoll,
+    onLocation,
+    onSchedule,
+    onBeforeOpen,
+  }: Props = $props();
   let open = $state(false);
 
   const media = 'image/*,video/*';
@@ -67,6 +77,12 @@
           <DropdownMenu.Item class="sable-menu-item" onclick={onLocation}>
             <MapPinIcon />
             {$i18n.t('composer.location')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if onSchedule}
+          <DropdownMenu.Item class="sable-menu-item" onclick={onSchedule}>
+            <ClockIcon />
+            {$i18n.t('composer.schedule')}
           </DropdownMenu.Item>
         {/if}
       </DropdownMenu.Content>
@@ -137,6 +153,19 @@
         >
           <MapPinIcon />
           {$i18n.t('composer.location')}
+        </Button>
+      {/if}
+      {#if onSchedule}
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onSchedule();
+          }}
+        >
+          <ClockIcon />
+          {$i18n.t('composer.schedule')}
         </Button>
       {/if}
     </div>

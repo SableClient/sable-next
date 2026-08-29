@@ -456,7 +456,7 @@
   .topic-dialog {
     display: grid;
     gap: var(--space-2);
-    width: min(32rem, 100%);
+    width: min(32rem, calc(100vw - 2rem));
   }
 
   .topic-dialog h2 {

@@ -1169,6 +1169,64 @@ impl Core {
                 Ok(CommandOk::React)
             }
 
+            Command::RoomTimelineEvents {
+                room_id,
+                event_type,
+                msgtype,
+                limit,
+                since,
+            } => Ok(CommandOk::RoomTimelineEvents {
+                events: self
+                    .room_timeline_events(
+                        &room_id,
+                        &event_type,
+                        msgtype.as_deref(),
+                        limit,
+                        since.as_ref(),
+                    )
+                    .await?,
+            }),
+            Command::RoomStateEventsRaw {
+                room_id,
+                event_type,
+                state_key,
+            } => Ok(CommandOk::RoomStateEventsRaw {
+                events: self
+                    .room_state_events_raw(&room_id, &event_type, state_key.as_deref())
+                    .await?,
+            }),
+            Command::SearchUserDirectory { term, limit } => {
+                let (limited, results) = self.search_user_directory(&term, limit).await?;
+                Ok(CommandOk::SearchUserDirectory { limited, results })
+            }
+            Command::OpenIdToken => Ok(CommandOk::OpenIdToken {
+                token: self.openid_token().await?,
+            }),
+            Command::ScheduleMessage {
+                room_id,
+                body,
+                formatted,
+                delay_ms,
+            } => {
+                let content =
+                    message_content(body, formatted, MessageKind::Text, Vec::new(), false);
+                let delay_id = self.schedule_message(&room_id, content, delay_ms).await?;
+                Ok(CommandOk::ScheduleMessage { delay_id })
+            }
+            Command::ScheduledMessages { room_id } => Ok(CommandOk::ScheduledMessages {
+                messages: self.scheduled_messages(room_id.as_ref()).await?,
+            }),
+            Command::CancelScheduledMessage { delay_id } => {
+                self.cancel_scheduled_message(delay_id).await?;
+                Ok(CommandOk::CancelScheduledMessage)
+            }
+            Command::SendScheduledMessage { delay_id } => {
+                self.send_scheduled_message_now(delay_id).await?;
+                Ok(CommandOk::SendScheduledMessage)
+            }
+            Command::DelayedEventsSupported => Ok(CommandOk::DelayedEventsSupported {
+                supported: self.delayed_events_supported().await?,
+            }),
             Command::SendLocation {
                 room_id,
                 body,

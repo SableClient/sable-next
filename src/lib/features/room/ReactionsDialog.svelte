@@ -66,7 +66,6 @@
   .reactions-dialog {
     display: grid;
     gap: var(--space-2);
-    padding: var(--space-4);
     width: min(24rem, calc(100vw - 2rem));
   }
 
