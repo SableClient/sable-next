@@ -22,6 +22,8 @@
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PdfViewer from '#lib/ui/PdfViewer.svelte';
+  import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 
@@ -64,6 +66,9 @@
   let panOrigin: Vector2 = { x: 0, y: 0 };
   let panStartPointer: Vector2 = { x: 0, y: 0 };
   let isImage = $derived(item.kind === 'image' || item.kind === 'sticker');
+  let isPdf = $derived(item.kind === 'file');
+  let pdfPages = $state(0);
+  let pdfPage = $state(1);
   let downloadLabel = $derived(
     item.kind === 'video'
       ? 'Download video'
@@ -82,6 +87,8 @@
     zoom = 1;
     rotation = 0;
     pan = { x: 0, y: 0 };
+    pdfPage = 1;
+    pdfPages = 0;
     failed = false;
     const release = holdMediaUrl(core, item.source, 0, 0);
     const cached = cachedMediaUrl(core, item.source, 0, 0);
@@ -336,7 +343,15 @@
                 {item.body}
               </audio>
             {:else if item.kind === 'file'}
-              <PdfViewer src={url} name={item.body} />
+              <PdfViewer
+                src={url}
+                name={item.body}
+                page={pdfPage}
+                {zoom}
+                onPages={(pages) => {
+                  pdfPages = pages;
+                }}
+              />
             {:else}
               <img
                 bind:this={imageEl}
@@ -365,7 +380,26 @@
         </main>
 
         <footer class="bottom-bar">
-          {#if isImage}
+          {#if isPdf && pdfPages > 1}
+            <div class="zoom-controls">
+              <IconButton
+                label={$i18n.t('pdf.previousPage')}
+                size="small"
+                variant="ghost"
+                disabled={pdfPage <= 1}
+                onclick={() => (pdfPage -= 1)}><CaretLeftIcon /></IconButton
+              >
+              <span>{$i18n.t('pdf.pageIndicator', { page: pdfPage, pages: pdfPages })}</span>
+              <IconButton
+                label={$i18n.t('pdf.nextPage')}
+                size="small"
+                variant="ghost"
+                disabled={pdfPage >= pdfPages}
+                onclick={() => (pdfPage += 1)}><CaretRightIcon /></IconButton
+              >
+            </div>
+          {/if}
+          {#if isImage || isPdf}
             <div class="zoom-controls">
               <IconButton
                 label="Zoom out"
@@ -383,7 +417,7 @@
             </div>
           {/if}
           <p>{item.body || 'Shared media'}</p>
-          {#if isImage}
+          {#if isImage || isPdf}
             <button
               class="reset"
               type="button"

@@ -131,7 +131,7 @@
       fileRatio = mediaAspectRatio(core, source);
       gifPreviewReady = false;
       gifPlaying = false;
-      imageLoaded = false;
+      if (url !== cached) imageLoaded = false;
       url = cached;
       return release;
     }
@@ -326,6 +326,9 @@
       {width}
       {height}
       onload={() => (imageLoaded = true)}
+      {@attach (node) => {
+        if (node instanceof HTMLImageElement && node.complete) imageLoaded = true;
+      }}
     />
   {:else if failed}
     <span class="media-image-unavailable">

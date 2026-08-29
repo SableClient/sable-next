@@ -445,3 +445,32 @@ test.each([
   );
   await unmount(instance);
 });
+
+test('a cached image does not come back blurred', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const props = {
+    source: 'mxc://example.org/cached-photo',
+    alt: 'photo',
+    width: 320,
+    height: 240,
+    blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+  };
+
+  const first = mount(MediaImage, { target: document.body, props });
+  await vi.waitFor(() => {
+    expect(document.querySelector('img.media-image-content')).not.toBeNull();
+  });
+  document
+    .querySelector<HTMLImageElement>('img.media-image-content')
+    ?.dispatchEvent(new Event('load'));
+  await tick();
+  await unmount(first);
+
+  const second = mount(MediaImage, { target: document.body, props });
+  await tick();
+  await tick();
+
+  const placeholder = document.querySelector('.media-image-blurhash');
+  expect(placeholder === null || placeholder.classList.contains('loaded')).toBe(true);
+  await unmount(second);
+});
