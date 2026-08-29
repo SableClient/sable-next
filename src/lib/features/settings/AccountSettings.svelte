@@ -123,7 +123,6 @@
     if (!userId) return;
     void core.userProfile(userId).then((next) => {
       profile = next;
-      displayName = next.display_name ?? '';
     });
   }
 </script>

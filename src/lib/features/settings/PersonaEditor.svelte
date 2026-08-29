@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
@@ -37,13 +38,15 @@
 
   $effect(() => {
     if (!open) return;
-    name = persona?.display_name ?? '';
-    avatarUrl = persona?.avatar_url ?? null;
-    pronouns = formatPronouns(persona?.pronouns ?? []);
-    colorLight = persona?.color_on_light ?? '';
-    colorDark = persona?.color_on_dark ?? '';
-    triggers = persona?.triggers.map((trigger) => ({ ...trigger })) ?? [];
-    error = null;
+    untrack(() => {
+      name = persona?.display_name ?? '';
+      avatarUrl = persona?.avatar_url ?? null;
+      pronouns = formatPronouns(persona?.pronouns ?? []);
+      colorLight = persona?.color_on_light ?? '';
+      colorDark = persona?.color_on_dark ?? '';
+      triggers = persona?.triggers.map((trigger) => ({ ...trigger })) ?? [];
+      error = null;
+    });
   });
 
   async function pickAvatar(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {

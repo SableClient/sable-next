@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+
   import type { ProfileView } from '#src/generated/ProfileView';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -37,19 +39,22 @@
   let error = $state<string | null>(null);
 
   $effect(() => {
-    status = profile.status?.text ?? '';
-    bio = profile.bio ?? '';
-    pronouns = profile.pronouns
-      .map(({ summary, language }) => `${summary}${language ? ` (${language})` : ''}`)
-      .join(', ');
-    timezone = profile.timezone ?? '';
-    lightColor = profile.name_color_light ?? '';
-    darkColor = profile.name_color_dark ?? '';
-    heroColor = profile.hero_color ?? '';
-    brightness = profile.hero_brightness ?? 'dark';
-    isAnimal = profile.animal?.is_animal ?? '';
-    hasAnimal = profile.animal?.has_animal ?? '';
-    animalNeed = profile.animal?.animal_need ?? '';
+    void core.session?.user_id;
+    untrack(() => {
+      status = profile.status?.text ?? '';
+      bio = profile.bio ?? '';
+      pronouns = profile.pronouns
+        .map(({ summary, language }) => `${summary}${language ? ` (${language})` : ''}`)
+        .join(', ');
+      timezone = profile.timezone ?? '';
+      lightColor = profile.name_color_light ?? '';
+      darkColor = profile.name_color_dark ?? '';
+      heroColor = profile.hero_color ?? '';
+      brightness = profile.hero_brightness ?? 'dark';
+      isAnimal = profile.animal?.is_animal ?? '';
+      hasAnimal = profile.animal?.has_animal ?? '';
+      animalNeed = profile.animal?.animal_need ?? '';
+    });
   });
 
   $effect(() => {
