@@ -245,3 +245,14 @@ export function formatDate(timestamp: number): string {
       return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 }
+
+export function hasNewLocalEcho(
+  previous: readonly TimelineItemView[],
+  next: readonly TimelineItemView[]
+): boolean {
+  const pending = new Set<string>();
+  for (const item of previous) {
+    if (item.transaction_id !== null) pending.add(item.transaction_id);
+  }
+  return next.some((item) => item.transaction_id !== null && !pending.has(item.transaction_id));
+}

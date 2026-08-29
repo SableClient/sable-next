@@ -9,6 +9,7 @@ import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
 import { stateEventSubject, stateEventText } from './state-event-text';
 import {
+  hasNewLocalEcho,
   canRedact,
   isCollapsed,
   jumboEmojiLevel,
@@ -387,4 +388,21 @@ test('the persona lookup reads the items only when first asked', () => {
   lookup('$a');
   lookup('$a');
   expect(reads).toBe(1);
+});
+
+test('a send is detected wherever the echo lands, not only at the end', () => {
+  const echo = (transactionId: string | null, id: string): TimelineItemView => ({
+    ...item({ kind: 'redacted', reason: null }, id),
+    transaction_id: transactionId,
+  });
+
+  const before = [echo(null, 'a')];
+
+  expect(hasNewLocalEcho(before, [echo(null, 'a'), echo('t1', 'mine')])).toBe(true);
+  expect(hasNewLocalEcho(before, [echo(null, 'a'), echo('t1', 'mine'), echo(null, 'theirs')])).toBe(
+    true
+  );
+  expect(hasNewLocalEcho(before, [echo(null, 'older'), echo(null, 'a')])).toBe(false);
+  expect(hasNewLocalEcho([echo('t1', 'mine')], [echo('t1', 'mine')])).toBe(false);
+  expect(hasNewLocalEcho([], [])).toBe(false);
 });

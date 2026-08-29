@@ -43,6 +43,7 @@
     type TimelinePosition,
   } from './timeline-position';
   import {
+    hasNewLocalEcho,
     isCollapsed,
     latestEventId,
     personaLookup,
@@ -737,14 +738,7 @@
         viewport: historyDebugSnapshot(),
       });
     }
-    // Sending goes to the newest event wherever the reader was, so a room opened
-    // on its first unread does not swallow the message just sent.
-    // A prepend also grows the list, so the newest row having changed is what
-    // separates a send from history arriving.
-    const appended =
-      identityTracker.key(previousItems, previousItems.length - 1) !==
-      identityTracker.key(items, items.length - 1);
-    const sent = appended && items.at(-1)?.transaction_id != null;
+    const sent = hasNewLocalEcho(previousItems, items);
     if (sent && position.kind !== 'pinned') {
       setPosition(nextPosition(position, { kind: 'jump-to-latest' }));
       // The virtualiser does not report the append as a size change here, so the

@@ -179,9 +179,7 @@
   let placeholder = $derived(
     staged.length > 0
       ? $i18n.t('composer.addMessageOrSend')
-      : roomName
-        ? $i18n.t('composer.messageRoom', { room: roomName })
-        : $i18n.t('timeline.messagePlaceholder')
+      : $i18n.t('timeline.messagePlaceholder')
   );
 
   const media: EmoteMedia = {
