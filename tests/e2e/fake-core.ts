@@ -12,7 +12,8 @@ export type RoomCoreMode =
   | 'delayed_snapshot'
   | 'empty_room'
   | 'delayed_layout_diff'
-  | 'spaces';
+  | 'spaces'
+  | 'tombstoned';
 
 type WorkerMode = RoomCoreMode;
 
@@ -117,10 +118,27 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     };
     const betaSpace = { ...alphaSpace, room_id: '!beta:example.test', name: 'Beta' };
     const gammaSpace = { ...alphaSpace, room_id: '!gamma:example.test', name: 'Gamma' };
+    const successorRoom = {
+      ...room,
+      room_id: '!successor:example.test',
+      name: 'Successor',
+      unread: 0,
+      highlight: 0,
+    };
+    const tombstonedRoom = {
+      ...room,
+      room_id: '!tombstoned:example.test',
+      name: 'Old Room',
+      is_tombstoned: true,
+      unread: 0,
+      highlight: 0,
+    };
     const joinedRooms =
       workerMode === 'spaces'
         ? [room, secondRoom, invitedRoom, alphaSpace, betaSpace, gammaSpace]
-        : [room, secondRoom, invitedRoom];
+        : workerMode === 'tombstoned'
+          ? [room, secondRoom, invitedRoom, tombstonedRoom, successorRoom]
+          : [room, secondRoom, invitedRoom];
     const hierarchyRoom = (
       roomId: string,
       name: string,
@@ -213,6 +231,51 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return [];
       }
     };
+
+    const WIDGET_STATE_KEY = 'dashboard';
+    const roomWidgets = new Map<string, Record<string, unknown> | null>([
+      [
+        room.room_id,
+        {
+          type: 'grafana',
+          url: 'https://widgets.example.test/dashboard?user=$matrix_user_id&room=$matrix_room_id&name=$matrix_display_name',
+          name: 'Dashboard',
+          data: {},
+        },
+      ],
+      [
+        secondRoom.room_id,
+        {
+          type: 'grafana',
+          url: 'https://widgets.example.test/dashboard?user=$matrix_user_id&room=$matrix_room_id&name=$matrix_display_name',
+          name: 'Dashboard',
+          data: {},
+        },
+      ],
+    ]);
+
+    const BOOKMARKS_KEY = 'e2e-bookmarks';
+    type StoredBookmark = {
+      bookmark_id: string;
+      room_id: string;
+      event_id: string;
+      room_name: string | null;
+      sender: string | null;
+      body_preview: string | null;
+      event_ts: number;
+      bookmarked_ts: number;
+    };
+    const readBookmarks = (): StoredBookmark[] => {
+      try {
+        const stored: unknown = JSON.parse(sessionStorage.getItem(BOOKMARKS_KEY) ?? '[]');
+        return Array.isArray(stored) ? (stored as StoredBookmark[]) : [];
+      } catch {
+        return [];
+      }
+    };
+    const writeBookmarks = (entries: StoredBookmark[]): void => {
+      sessionStorage.setItem(BOOKMARKS_KEY, JSON.stringify(entries));
+    };
     const searchHits = (payload: Record<string, unknown>) => {
       const query = (typeof payload.query === 'string' ? payload.query : '').toLowerCase();
       const filter = (payload.filter ?? {}) as {
@@ -285,9 +348,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       [room.room_id, room],
       [secondRoom.room_id, secondRoom],
       [invitedRoom.room_id, invitedRoom],
+      [tombstonedRoom.room_id, tombstonedRoom],
+      [successorRoom.room_id, successorRoom],
     ]);
     let nextSubscription = 2;
     const subscriptions = new Map<number, { roomId: string; page: number }>();
+    const notificationKeywords: string[] = [];
     let activePort: FakePort | null = null;
     /* Encoded, not a hand-written byte literal: those are easy to get wrong and an
        undecodable one measures nothing. A `wide-` source serves a file that
@@ -377,23 +443,152 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         if (command === 'notification_keywords') {
           window.setTimeout(() => {
             this.onmessage?.({
-              data: { id: request.id, ok: { type: command, keywords: [] } },
+              data: { id: request.id, ok: { type: command, keywords: [...notificationKeywords] } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'add_notification_keyword') {
+          const keyword = (request.command as { keyword?: string }).keyword ?? '';
+          window.setTimeout(() => {
+            if (keyword === 'network-fail') {
+              this.onmessage?.({
+                data: { id: request.id, err: { code: 'failed' } },
+              } as MessageEvent);
+              return;
+            }
+            if (!notificationKeywords.includes(keyword)) notificationKeywords.push(keyword);
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'remove_notification_keyword') {
+          const keyword = (request.command as { keyword?: string }).keyword ?? '';
+          window.setTimeout(() => {
+            if (keyword === 'stuck-keyword') {
+              this.onmessage?.({
+                data: { id: request.id, err: { code: 'failed' } },
+              } as MessageEvent);
+              return;
+            }
+            const index = notificationKeywords.indexOf(keyword);
+            if (index !== -1) notificationKeywords.splice(index, 1);
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command } },
             } as MessageEvent);
           });
           return;
         }
         if (command === 'room_state_events') {
+          const { room_id: roomId, event_type: eventType } = request.command as {
+            room_id?: string;
+            event_type?: string;
+          };
+          const content =
+            eventType === 'im.vector.modular.widgets' ? roomWidgets.get(roomId ?? '') : undefined;
+          const events = content ? [{ state_key: WIDGET_STATE_KEY, content }] : [];
           window.setTimeout(() => {
             this.onmessage?.({
-              data: { id: request.id, ok: { type: command, events: [] } },
+              data: { id: request.id, ok: { type: command, events } },
             } as MessageEvent);
           });
           return;
         }
-        if (command === 'url_preview') {
+        if (command === 'room_state_event') {
+          const { room_id: roomId, event_type: eventType } = request.command as {
+            room_id?: string;
+            event_type?: string;
+          };
+          const content =
+            eventType === 'm.room.tombstone' && roomId === tombstonedRoom.room_id
+              ? { replacement_room: successorRoom.room_id, body: null }
+              : null;
           window.setTimeout(() => {
             this.onmessage?.({
-              data: { id: request.id, ok: { type: command, preview: null } },
+              data: { id: request.id, ok: { type: command, content } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'send_state_event') {
+          const { room_id: roomId, event_type: eventType } = request.command as {
+            room_id?: string;
+            event_type?: string;
+          };
+          if (eventType === 'im.vector.modular.widgets' && roomId) roomWidgets.set(roomId, null);
+          window.setTimeout(() => {
+            this.onmessage?.({ data: { id: request.id, ok: { type: command } } } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'url_preview') {
+          const { url } = request.command as { url?: string };
+          const preview =
+            url === 'https://example.test/article'
+              ? {
+                  url,
+                  title: 'The Example Article',
+                  description: 'A short description of the article.',
+                  site_name: 'Example',
+                  image: null,
+                  image_width: null,
+                  image_height: null,
+                }
+              : null;
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, preview } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'bookmarks') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, bookmarks: readBookmarks() } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'set_bookmark') {
+          const {
+            room_id: roomId,
+            event_id: eventId,
+            bookmarked,
+            now_ms: nowMs,
+          } = request.command as unknown as {
+            room_id: string;
+            event_id: string;
+            bookmarked: boolean;
+            now_ms: number;
+          };
+          const entries = readBookmarks().filter(
+            (entry) => !(entry.room_id === roomId && entry.event_id === eventId)
+          );
+          if (bookmarked) {
+            const bookmarkedRoom = rooms.get(roomId);
+            const item = bookmarkedRoom
+              ? timelineItems(bookmarkedRoom.name).find(
+                  (candidate) => candidate.event_id === eventId
+                )
+              : undefined;
+            entries.push({
+              bookmark_id: `${roomId}|${eventId}`,
+              room_id: roomId,
+              event_id: eventId,
+              room_name: bookmarkedRoom?.name ?? null,
+              sender: item?.sender ?? null,
+              body_preview: item?.content.body ?? null,
+              event_ts: item?.timestamp ?? nowMs,
+              bookmarked_ts: nowMs,
+            });
+          }
+          writeBookmarks(entries);
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, bookmarked } },
             } as MessageEvent);
           });
           return;
