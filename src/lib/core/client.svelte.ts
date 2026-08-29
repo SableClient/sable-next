@@ -27,6 +27,32 @@ const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
 
+async function discoverBaseUrl(origin: URL): Promise<string | null> {
+  try {
+    const response = await fetch(new URL('/.well-known/matrix/client', origin), { mode: 'cors' });
+    if (!response.ok) return null;
+    const body = (await response.json()) as WellKnownResponse;
+    const baseUrl = body['m.homeserver']?.base_url;
+    if (typeof baseUrl !== 'string') return null;
+    return new URL(baseUrl).toString();
+  } catch (error) {
+    console.warn('[sable auth] page homeserver discovery failed; using entered server', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
+}
+
+async function grantLocalNetworkAccess(baseUrl: string): Promise<void> {
+  try {
+    await fetch(new URL('_matrix/client/versions', baseUrl), { mode: 'cors' });
+  } catch (error) {
+    console.warn('[sable auth] homeserver unreachable from the page', {
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+  }
+}
+
 async function resolveHomeserverInPage(
   homeserver: string,
   cache: Map<string, string>
@@ -41,21 +67,12 @@ async function resolveHomeserverInPage(
     return homeserver;
   }
 
-  try {
-    const response = await fetch(new URL('/.well-known/matrix/client', origin), { mode: 'cors' });
-    if (!response.ok) return homeserver;
-    const body = (await response.json()) as WellKnownResponse;
-    const baseUrl = body['m.homeserver']?.base_url;
-    if (typeof baseUrl !== 'string') return homeserver;
-    const resolved = new URL(baseUrl).toString();
-    cache.set(homeserver, resolved);
-    return resolved;
-  } catch (error) {
-    console.warn('[sable auth] page homeserver discovery failed; using entered server', {
-      error: error instanceof Error ? error.name : 'unknown',
-    });
-    return homeserver;
-  }
+  const resolved = await discoverBaseUrl(origin);
+  await grantLocalNetworkAccess(resolved ?? origin.toString());
+  if (resolved === null) return homeserver;
+
+  cache.set(homeserver, resolved);
+  return resolved;
 }
 
 export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
