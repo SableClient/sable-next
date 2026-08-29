@@ -15,8 +15,11 @@ async function rawInvoke<T>(
   bytes: Uint8Array<ArrayBuffer>,
   headers: Record<string, string>
 ): Promise<T> {
+  const encoded = Object.fromEntries(
+    Object.entries(headers).map(([name, value]) => [name, encodeURIComponent(value)])
+  );
   try {
-    return await invoke<T>(command, bytes, { headers });
+    return await invoke<T>(command, bytes, { headers: encoded });
   } catch (error) {
     throw new CoreError(error as CommandErr);
   }

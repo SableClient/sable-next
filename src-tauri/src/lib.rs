@@ -88,6 +88,16 @@ async fn fetch_media(
     Ok(Response::new(bytes))
 }
 
+fn decode_header(request: &Request<'_>, name: &str) -> Option<String> {
+    let value = request.headers().get(name)?.to_str().ok()?;
+    Some(
+        percent_encoding::percent_decode_str(value)
+            .decode_utf8()
+            .ok()?
+            .into_owned(),
+    )
+}
+
 /// Bytes in the raw body, metadata in the headers: a `Vec<u8>` argument would be
 /// marshalled as a JSON array of numbers.
 #[tauri::command]
@@ -99,13 +109,7 @@ async fn send_attachment(
         return Err(CommandErr::InvalidMedia);
     };
 
-    let header = |name: &str| {
-        request
-            .headers()
-            .get(name)
-            .and_then(|value| value.to_str().ok())
-            .map(str::to_owned)
-    };
+    let header = |name: &str| decode_header(&request, name);
 
     state
         .core
@@ -132,16 +136,9 @@ async fn upload_media(
         return Err(CommandErr::InvalidMedia);
     };
 
-    let mime = request
-        .headers()
-        .get("mime")
-        .and_then(|value| value.to_str().ok())
-        .ok_or(CommandErr::InvalidMedia)?;
+    let mime = decode_header(&request, "mime").ok_or(CommandErr::InvalidMedia)?;
 
-    state
-        .core
-        .upload_media(mime.to_owned(), bytes.clone())
-        .await
+    state.core.upload_media(mime, bytes.clone()).await
 }
 
 #[tauri::command]

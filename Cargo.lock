@@ -229,6 +229,7 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "objc2-photos",
+ "percent-encoding",
  "sable-core",
  "sentry",
  "serde",
