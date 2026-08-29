@@ -374,6 +374,38 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           });
           return;
         }
+        if (command === 'notification_keywords') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, keywords: [] } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'room_state_events') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, events: [] } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'url_preview') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, preview: null } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'list_threads') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, roots: [], next_batch: null } },
+            } as MessageEvent);
+          });
+          return;
+        }
         if (command === 'set_space_child_order') {
           recordChildOrder(request.command as unknown as Record<string, unknown>);
           window.setTimeout(() => {
@@ -399,6 +431,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                   can_kick: canPost,
                   can_ban: canPost,
                   can_change_settings: canPost,
+                  can_pin: canPost,
                   can_change_join_rule: canPost,
                   can_change_power_levels: canPost,
                   can_manage_children: canPost,
