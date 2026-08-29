@@ -361,12 +361,9 @@
     margin: var(--space-100) 0 0;
   }
 
-  .formatted-body :global(h1) {
-    font-size: var(--font-size-large);
-  }
-
+  .formatted-body :global(h1),
   .formatted-body :global(h2) {
-    font-size: var(--font-size-medium);
+    font-size: var(--font-size-heading);
   }
 
   .formatted-body :global(h3),

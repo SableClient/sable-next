@@ -109,8 +109,8 @@
   }
 
   h2 {
-    font-size: var(--font-size-h4);
-    line-height: var(--line-height-h4);
+    font-size: var(--font-size-heading);
+    line-height: var(--line-height-heading);
     margin: 0;
   }
 
@@ -146,7 +146,7 @@
 
   .empty {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-t300);
+    font-size: var(--font-size-small);
     margin: 0;
   }
 

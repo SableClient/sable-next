@@ -33,7 +33,11 @@
 >
   {#snippet meta()}
     {#if pronouns}
-      <PronounPill>{pronouns}</PronounPill>
+      <PronounPill
+        style={profile.color_on_light
+          ? `color: ${profile.color_on_light};`
+          : `color: ${senderColor(profile.id ?? displayName)};`}>{pronouns}</PronounPill
+      >
     {/if}
   {/snippet}
   {#snippet actions()}

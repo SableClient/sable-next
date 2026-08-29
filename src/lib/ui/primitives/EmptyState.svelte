@@ -56,7 +56,7 @@
   }
 
   .empty-state h1 {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: 0;
   }

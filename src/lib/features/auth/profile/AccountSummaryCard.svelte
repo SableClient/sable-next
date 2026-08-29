@@ -36,7 +36,7 @@
   }
 
   .summary-card h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
   }
 
   .summary-card p:not(.eyebrow, .user-id) {

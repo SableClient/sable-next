@@ -147,9 +147,9 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    font-size: var(--font-size-t300);
+    font-size: var(--font-size-small);
     gap: var(--space-2);
-    line-height: var(--line-height-t300);
+    line-height: var(--line-height-small);
     min-height: var(--control-height-medium);
     padding: 0 var(--space-2);
     text-align: left;
@@ -203,7 +203,7 @@
 
   :global(.page-title) {
     flex: 1;
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
     line-height: var(--line-height-heading);
     margin: 0;

@@ -150,7 +150,7 @@
   .name {
     align-items: center;
     display: flex;
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-medium);
     gap: var(--space-compact);
     line-height: var(--line-height-heading);

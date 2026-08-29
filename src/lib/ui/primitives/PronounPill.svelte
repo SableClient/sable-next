@@ -14,11 +14,18 @@
 
 <style>
   :global(.sable-pronoun-pill) {
-    background: var(--sable-surface-var-container);
+    align-items: center;
+    background: color-mix(in oklab, currentcolor 10%, transparent);
+    border: var(--border-width) solid color-mix(in oklab, currentcolor 20%, transparent);
     border-radius: var(--radii-pill);
-    font-size: 0.7rem;
-    opacity: var(--opacity-p400);
-    padding-inline: var(--space-200);
+    box-sizing: border-box;
+    display: inline-flex;
+    font-size: calc(var(--font-size-small) * 0.8);
+    font-weight: var(--font-weight-medium);
+    justify-content: center;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 0.125rem var(--space-1);
     text-transform: lowercase;
     white-space: nowrap;
   }

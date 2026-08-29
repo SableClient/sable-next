@@ -97,7 +97,7 @@
     --avatar-size: 1.75rem;
 
     background: var(--sable-surface-var-container);
-    font-size: var(--font-size-t300);
+    font-size: var(--font-size-small);
   }
 
   .invite-name {

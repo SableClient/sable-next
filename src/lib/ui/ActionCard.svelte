@@ -126,7 +126,7 @@
   }
 
   .action-card-title {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
   }
 

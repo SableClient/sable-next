@@ -102,8 +102,8 @@
     box-shadow: var(--shadow-e200);
     box-sizing: border-box;
     color: var(--sable-surface-on-container);
-    font-size: var(--font-size-t300);
-    line-height: var(--line-height-t300);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-small);
     max-width: min(15rem, calc(100vw - 2rem));
     overflow-wrap: anywhere;
     padding: var(--space-200) var(--space-250);

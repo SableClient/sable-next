@@ -50,7 +50,7 @@
     border-radius: var(--radii-pill);
     cursor: pointer;
     display: inline-flex;
-    font-size: var(--font-size-t500);
+    font-size: var(--font-size-body);
     height: var(--control-height-300);
     justify-content: center;
     line-height: 1;

@@ -51,7 +51,7 @@
   }
 
   h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: 0;
     padding: var(--space-3) var(--space-3) 0;

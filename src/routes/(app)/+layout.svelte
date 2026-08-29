@@ -471,7 +471,7 @@
   }
 
   .app-status-card h1 {
-    font-size: var(--font-size-medium);
+    font-size: var(--font-size-heading);
   }
 
   .app-status-card p {

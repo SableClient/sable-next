@@ -73,8 +73,8 @@
   }
 
   .who {
-    font-size: var(--font-size-h4);
-    line-height: var(--line-height-h4);
+    font-size: var(--font-size-heading);
+    line-height: var(--line-height-heading);
     margin: 0;
   }
 

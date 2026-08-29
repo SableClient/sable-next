@@ -77,7 +77,7 @@
   }
 
   .inbox-sheet h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     margin: 0;
   }
 

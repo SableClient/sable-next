@@ -68,7 +68,7 @@
     color: var(--sable-primary-on-container);
     display: inline-flex;
     flex: 0 0 var(--avatar-size);
-    font-size: var(--font-size-h4);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-600);
     height: var(--avatar-size);
     justify-content: center;
@@ -82,13 +82,13 @@
   :global(.sable-avatar-small) {
     --avatar-size: var(--avatar-size-300);
 
-    font-size: var(--font-size-b400);
+    font-size: var(--font-size-small);
   }
 
   :global(.sable-avatar-large) {
     --avatar-size: var(--avatar-size-500);
 
-    font-size: var(--font-size-h2);
+    font-size: var(--font-size-display);
   }
 
   :global(.sable-avatar-image),

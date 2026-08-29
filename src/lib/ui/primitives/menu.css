@@ -28,10 +28,10 @@
   cursor: pointer;
   display: flex;
   font: inherit;
-  font-size: var(--font-size-t300);
+  font-size: var(--font-size-small);
   gap: var(--menu-item-gap);
   justify-content: start;
-  line-height: var(--line-height-t300);
+  line-height: var(--line-height-small);
   min-height: var(--menu-item-height);
   padding: 0 var(--menu-item-padding);
   text-align: left;
@@ -72,7 +72,7 @@
 }
 
 .sable-menu-item:active,
-.sable-menu-item[aria-pressed='true'] {
+.sable-menu-item[aria-pressed="true"] {
   background: var(--sable-bg-container-active);
 }
 
@@ -83,7 +83,7 @@
 
 .sable-menu-item[data-disabled],
 .sable-menu-item:disabled,
-.sable-menu-item[aria-disabled='true'] {
+.sable-menu-item[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: var(--opacity-disabled);
 }

@@ -1,4 +1,4 @@
-@import url('@fontsource-variable/nunito');
+@import url("@fontsource-variable/nunito");
 
 /* Palette lifted verbatim from Sable's src/app/styles/themes.css so the two
    apps read as the same product. These stay plain CSS rather than a generated
@@ -366,47 +366,19 @@ html {
   --code-line-height: 1.25rem;
 
   /* Font families */
-  --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
-  --font-size-d400: 2.8125rem;
-  --line-height-d400: 3.25rem;
-  --font-size-h1: 2.1875rem;
-  --line-height-h1: 2.5rem;
-  --font-size-h2: 1.5625rem;
-  --line-height-h2: 1.875rem;
-  --font-size-h3: 1.25rem;
-  --line-height-h3: 1.625rem;
-  --font-size-h4: 1.125rem;
-  --line-height-h4: 1.5rem;
-  --font-size-h5: 1rem;
-  --line-height-h5: 1.375rem;
-  --font-size-h6: 0.875rem;
-  --line-height-h6: 1.125rem;
-  --font-size-t500: 1.0625rem;
-  --line-height-t500: 1.5rem;
-  --font-size-t400: 0.9375rem;
-  --line-height-t400: 1.375rem;
-  --font-size-t300: 0.875rem;
-  --line-height-t300: 1.25rem;
-  --font-size-t200: 0.75rem;
-  --line-height-t200: 1.125rem;
-  --font-size-b500: 1rem;
-  --line-height-b500: 1.25rem;
-  --font-size-b400: 0.875rem;
-  --line-height-b400: 1.125rem;
-  --font-size-b300: 0.75rem;
-  --line-height-b300: 1rem;
-  --font-size-l400: 0.75rem;
-  --line-height-l400: 1rem;
-  --font-size-o400: 0.75rem;
-  --line-height-o400: 1rem;
-  --font-size-c400: 0.75rem;
-  --line-height-c400: 1rem;
-  --font-size-small: var(--font-size-t300);
-  --font-size-body: var(--font-size-t400);
-  --font-size-medium: var(--font-size-h4);
-  --font-size-large: var(--font-size-h3);
-  --font-size-xlarge: var(--font-size-h2);
-  --font-size-display: var(--font-size-h1);
+  --font-family-mono:
+    ui-monospace, "Cascadia Code", "Source Code Pro", menlo, consolas, monospace;
+
+  /* Typography scale */
+  --font-size-small: 0.875rem;
+  --font-size-body: 0.9375rem;
+  --font-size-heading: 1.25rem;
+  --font-size-display: 2rem;
+
+  /* Line heights */
+  --line-height-small: 1.25rem;
+  --line-height-body: 1.5;
+  --line-height-heading: 1.2;
 
   /* iOS zooms the viewport when a focused field renders text under 16px, so
      every text-entry surface floors its own size with this. */
@@ -419,10 +391,6 @@ html {
   --font-weight-medium: var(--font-weight-600);
   --font-weight-bold: var(--font-weight-700);
 
-  /* Line heights */
-  --line-height-body: 1.5;
-  --line-height-heading: 1.2;
-
   /* The edge-to-edge plugin overwrites these inline on documentElement; the
      env() values are what desktop and a browser tab see. */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -431,7 +399,10 @@ html {
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   --safe-top: var(--safe-area-inset-top);
   --safe-right: var(--safe-area-inset-right);
-  --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
+  --safe-bottom: max(
+    var(--safe-area-inset-bottom),
+    var(--keyboard-height, 0px)
+  );
   --safe-left: var(--safe-area-inset-left);
 }
 
@@ -478,11 +449,11 @@ body {
   background-clip: padding-box;
 }
 
-:root[data-underline-links='off'] {
+:root[data-underline-links="off"] {
   --link-decoration: none;
 }
 
-:root[data-reduced-motion='on'] {
+:root[data-reduced-motion="on"] {
   --motion-fast: 0s;
   --motion-normal: 0s;
   --motion-slow: 0s;
@@ -497,7 +468,7 @@ body {
 body {
   background: var(--sable-bg-container);
   color: var(--sable-bg-on-container);
-  font-family: 'Nunito Variable', sans-serif;
+  font-family: "Nunito Variable", sans-serif;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-body);
@@ -515,7 +486,7 @@ textarea {
 }
 
 :disabled,
-[aria-disabled='true'] {
+[aria-disabled="true"] {
   cursor: not-allowed;
 }
 
@@ -553,13 +524,13 @@ button,
 a,
 input,
 label,
-[role='button'],
-[role='switch'] {
+[role="button"],
+[role="switch"] {
   -webkit-tap-highlight-color: transparent;
 }
 
 label[for],
-[role='switch'] {
+[role="switch"] {
   user-select: none;
 }
 
@@ -571,7 +542,7 @@ label[for],
 .sable-selection-layer::after {
   background: var(--sable-bg-container-active);
   border-radius: inherit;
-  content: '';
+  content: "";
   inset: 0;
   opacity: 0;
   pointer-events: none;
@@ -614,14 +585,30 @@ a:not([class]):hover {
       scale var(--motion-fast) ease-in-out;
   }
 
-  .sable-button:hover:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
-  .sable-menu-item:hover:not(:disabled, [data-disabled], [data-no-button-motion]),
+  .sable-button:hover:not(
+      :disabled,
+      [aria-disabled="true"],
+      [data-no-button-motion]
+    ),
+  .sable-menu-item:hover:not(
+      :disabled,
+      [data-disabled],
+      [data-no-button-motion]
+    ),
   .option-card:hover:not([data-disabled], [data-no-button-motion]) {
     translate: 0 -1px;
   }
 
-  .sable-button:active:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
-  .sable-menu-item:active:not(:disabled, [data-disabled], [data-no-button-motion]),
+  .sable-button:active:not(
+      :disabled,
+      [aria-disabled="true"],
+      [data-no-button-motion]
+    ),
+  .sable-menu-item:active:not(
+      :disabled,
+      [data-disabled],
+      [data-no-button-motion]
+    ),
   .option-card:active:not([data-disabled], [data-no-button-motion]) {
     scale: 0.96;
   }

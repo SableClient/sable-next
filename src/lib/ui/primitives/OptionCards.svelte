@@ -105,8 +105,8 @@
 
   :global(.option-card-hint) {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-t300);
-    line-height: var(--line-height-t300);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-small);
   }
 
   :global(.option-card.selected .option-card-hint) {

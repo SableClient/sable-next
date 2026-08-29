@@ -170,13 +170,17 @@
   }
 
   .title {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-body);
   }
 
   header p,
   .status {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
+  }
+
+  header p {
+    line-height: var(--line-height-small);
   }
 
   .status {

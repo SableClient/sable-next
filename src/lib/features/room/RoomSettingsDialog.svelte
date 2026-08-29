@@ -143,9 +143,9 @@
   }
 
   .room-name {
-    font-size: var(--font-size-h4);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
-    line-height: var(--line-height-h4);
+    line-height: var(--line-height-heading);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

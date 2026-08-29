@@ -100,7 +100,7 @@
 
   .preview {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-t300);
+    font-size: var(--font-size-small);
     margin: 0 0 var(--space-200);
     overflow: hidden;
     padding: 0 var(--space-400);

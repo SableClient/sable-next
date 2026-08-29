@@ -26,6 +26,7 @@ export default {
       '/^border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?$/': [
         '/\\b\\d*\\.?\\d+(?:px|rem|em)\\b/',
       ],
+      'font-size': ['/\\b\\d*\\.?\\d+(?:px|rem|em|pt)\\b/'],
     },
 
     'defensive-css/require-prefers-reduced-motion': [true, { severity: 'error' }],
@@ -37,4 +38,12 @@ export default {
       },
     ],
   },
+  overrides: [
+    {
+      files: ['src/styles.css'],
+      rules: {
+        'declaration-property-value-disallowed-list': null,
+      },
+    },
+  ],
 };

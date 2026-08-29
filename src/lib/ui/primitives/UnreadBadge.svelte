@@ -52,10 +52,10 @@
     align-items: center;
     border-radius: var(--radii-pill);
     display: inline-flex;
-    font-size: var(--font-size-l400);
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     justify-content: center;
-    line-height: var(--line-height-l400);
+    line-height: var(--line-height-small);
     min-width: 1rem;
     padding: 0 var(--space-100);
   }

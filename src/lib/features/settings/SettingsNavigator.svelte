@@ -202,7 +202,7 @@
   }
 
   :global(.settings-heading) {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
     margin: 0;
     padding: 0;
@@ -343,7 +343,7 @@
 
   .section-bar :global(.settings-heading) {
     flex: 1;
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

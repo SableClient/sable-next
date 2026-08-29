@@ -57,11 +57,11 @@
   }
 
   .editor :global(h1) {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
   }
 
   .editor :global(h2) {
-    font-size: var(--font-size-medium);
+    font-size: var(--font-size-heading);
   }
 
   .editor :global(h3) {

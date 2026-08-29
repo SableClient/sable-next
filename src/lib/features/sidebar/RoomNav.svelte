@@ -804,7 +804,7 @@
   }
 
   h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -956,7 +956,7 @@
   }
 
   .rooms-heading-label {
-    font-size: var(--font-size-b400);
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-500);
     margin: 0;
   }
@@ -1101,7 +1101,7 @@
     display: flex;
     flex: 1;
     font: inherit;
-    font-size: var(--font-size-b400);
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-500);
     gap: var(--space-100);
     min-height: var(--control-height-medium);
@@ -1142,9 +1142,9 @@
   }
 
   .room-topic {
-    font-size: var(--font-size-t200);
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-400);
-    line-height: var(--line-height-t200);
+    line-height: var(--line-height-small);
     margin-top: -2px;
     opacity: var(--opacity-p300);
   }

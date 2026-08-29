@@ -51,7 +51,7 @@
 
   .forum-header h1 {
     flex: 1;
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
     margin: 0;
     min-width: 0;

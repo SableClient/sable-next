@@ -24,7 +24,7 @@
   }
 
   .auth-heading h1 {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     margin: var(--space-400) 0 0;
   }
 </style>

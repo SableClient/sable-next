@@ -14,10 +14,11 @@
   box-sizing: border-box;
   color: var(--form-control-color);
   font: inherit;
-  font-size: max(var(--font-size-t400), var(--font-size-input-min));
+  font-size: max(var(--font-size-body), var(--font-size-input-min));
   min-height: var(--control-height-400);
-  padding: var(--form-control-padding-block) var(--form-control-padding-inline-end)
-    var(--form-control-padding-block) var(--form-control-padding-inline);
+  padding: var(--form-control-padding-block)
+    var(--form-control-padding-inline-end) var(--form-control-padding-block)
+    var(--form-control-padding-inline);
 }
 
 .form-control:focus,
@@ -28,7 +29,7 @@
   outline: none;
 }
 
-.form-control[aria-invalid='true'],
+.form-control[aria-invalid="true"],
 .form-control-error {
   --form-control-line: var(--sable-crit-main);
 }

@@ -11,6 +11,7 @@ const runtimeDeclarationPattern = /style:\s*(--[a-z0-9_-]+)\s*=/gi;
 const setPropertyPattern = /setProperty\(\s*['"](--[a-z0-9_-]+)['"]/gi;
 const variableReferencePattern = /var\(\s*(--[a-z0-9_-]+)/gi;
 const literalColorPattern = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\()/gi;
+const literalFontSizePattern = /font-size\s*:\s*(?!\s*(?:var|inherit|max|min|clamp|calc)\b)[^;]+/gi;
 const safeAreaPattern = /--safe-(?:top|right|bottom|left)\b/gi;
 
 // An inset must be applied once, by the element that paints under the system
@@ -64,6 +65,7 @@ const files = await sourceFiles(sourceRoot);
 const declared = new Map();
 const referenced = new Map();
 const literalColors = [];
+const literalFontSizes = [];
 const safeAreaTrespassers = [];
 
 for (const file of files) {
@@ -105,6 +107,9 @@ for (const file of files) {
     for (const match of source.matchAll(literalColorPattern)) {
       literalColors.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
     }
+    for (const match of source.matchAll(literalFontSizePattern)) {
+      literalFontSizes.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
+    }
   }
 }
 
@@ -112,7 +117,12 @@ const missing = [...referenced.keys()]
   .filter((property) => !declared.has(property) && !externalProperties.has(property))
   .sort();
 
-if (missing.length > 0 || literalColors.length > 0 || safeAreaTrespassers.length > 0) {
+if (
+  missing.length > 0 ||
+  literalColors.length > 0 ||
+  literalFontSizes.length > 0 ||
+  safeAreaTrespassers.length > 0
+) {
   if (missing.length > 0) {
     console.error('Unknown project custom properties:');
     for (const property of missing) {
@@ -122,6 +132,12 @@ if (missing.length > 0 || literalColors.length > 0 || safeAreaTrespassers.length
   if (literalColors.length > 0) {
     console.error('Literal colors must be declared as theme tokens in src/styles.css:');
     for (const location of literalColors) console.error(`  ${location}`);
+  }
+  if (literalFontSizes.length > 0) {
+    console.error(
+      'Literal font-size values are forbidden; use typography tokens from src/styles.css:'
+    );
+    for (const location of literalFontSizes) console.error(`  ${location}`);
   }
   if (safeAreaTrespassers.length > 0) {
     console.error('Safe-area insets may only be applied by a surface root:');

@@ -208,7 +208,7 @@
   }
 
   .section-heading h1 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
   }
 
   .section-heading p {

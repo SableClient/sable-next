@@ -91,8 +91,8 @@
 
 <style>
   h2 {
-    font-size: var(--font-size-h4);
-    line-height: var(--line-height-h4);
+    font-size: var(--font-size-heading);
+    line-height: var(--line-height-heading);
     margin: 0 0 var(--space-300);
   }
 
@@ -117,7 +117,7 @@
 
   .empty {
     color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-t300);
+    font-size: var(--font-size-small);
     margin: var(--space-400) 0 0;
   }
 

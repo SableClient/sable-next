@@ -802,7 +802,7 @@
     --avatar-size: 1rem;
 
     border-radius: var(--radii-300);
-    font-size: 0.5rem;
+    font-size: calc(var(--font-size-small) * 0.6);
   }
 
   .folder-open {

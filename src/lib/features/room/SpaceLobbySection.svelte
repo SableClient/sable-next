@@ -307,7 +307,7 @@
   }
 
   .section-name {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -823,7 +823,7 @@
   }
 
   .moderation h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     line-height: 1.3;
     margin: 0;
     overflow-wrap: anywhere;

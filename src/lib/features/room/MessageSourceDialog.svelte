@@ -40,8 +40,8 @@
 
 <style>
   h2 {
-    font-size: var(--font-size-h4);
-    line-height: var(--line-height-h4);
+    font-size: var(--font-size-heading);
+    line-height: var(--line-height-heading);
     margin: 0 0 var(--space-300);
   }
 
@@ -49,8 +49,8 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radii-400);
     font-family: var(--font-family-mono);
-    font-size: var(--font-size-t200);
-    line-height: var(--line-height-t200);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-small);
     margin: 0 0 var(--space-400);
     max-height: 22rem;
     overflow: auto;

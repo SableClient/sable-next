@@ -255,7 +255,7 @@
   }
 
   .profile-card-status-emoji {
-    font-size: var(--font-size-medium);
+    font-size: var(--font-size-heading);
     margin-right: var(--space-150);
   }
 
@@ -269,7 +269,7 @@
   }
 
   .profile-card-name {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
     letter-spacing: -0.01em;
     overflow-wrap: anywhere;
@@ -293,9 +293,9 @@
     color: var(--profile-text-muted);
     display: flex;
     flex-wrap: wrap;
-    font-size: var(--font-size-t200);
+    font-size: var(--font-size-small);
     gap: var(--space-200) var(--space-300);
-    line-height: var(--line-height-t200);
+    line-height: var(--line-height-small);
     margin-top: var(--space-300);
     opacity: var(--opacity-p400);
   }

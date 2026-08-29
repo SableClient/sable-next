@@ -417,7 +417,7 @@
   }
 
   h1 {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: var(--space-2) 0 0;
   }
@@ -460,7 +460,7 @@
   }
 
   .topic-dialog h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     line-height: 1.3;
     margin: 0;
   }

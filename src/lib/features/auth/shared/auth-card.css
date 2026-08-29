@@ -34,7 +34,7 @@
 }
 
 .auth-page .auth-card-heading h2 {
-  font-size: var(--font-size-large);
+  font-size: var(--font-size-heading);
 }
 
 .auth-page .auth-card-surface h2,
@@ -71,7 +71,7 @@
 
 /* Small text button, so the tap area is grown without changing the text box. */
 .auth-page .auth-link-button::after {
-  content: '';
+  content: "";
   inset: -0.25rem 0;
   position: absolute;
 }

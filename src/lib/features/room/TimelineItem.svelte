@@ -603,7 +603,12 @@
                 </span>
               {/if}
               {#each persona?.pronouns ?? profile?.pronouns ?? [] as pronoun, index (index)}
-                <PronounPill lang={pronoun.language ?? undefined}>{pronoun.summary}</PronounPill>
+                <PronounPill
+                  lang={pronoun.language ?? undefined}
+                  class={['timeline-pronoun', { tinted: nameTinted }]}
+                  style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
+                  >{pronoun.summary}</PronounPill
+                >
               {/each}
               <div class="message-details">
                 {#if item.sender}
@@ -1006,17 +1011,17 @@
   }
 
   .message header {
-    align-items: baseline;
+    align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-200);
   }
 
   .message header .message-details {
-    align-items: baseline;
+    align-items: center;
     display: flex;
     flex-grow: 1;
-    font-size: var(--font-size-t200);
+    font-size: var(--font-size-small);
     justify-content: end;
   }
 
@@ -1030,30 +1035,36 @@
   }
 
   .sender.tinted,
-  .compact-name.tinted {
+  .compact-name.tinted,
+  :global(.timeline-pronoun.tinted) {
     color: var(--name-color-on-light);
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) .sender.tinted,
     :root:not(.light) .compact-name.tinted,
+    :root:not(.light) :global(.timeline-pronoun.tinted),
     :root.dark .sender.tinted,
-    :root.dark .compact-name.tinted {
+    :root.dark .compact-name.tinted,
+    :root.dark :global(.timeline-pronoun.tinted) {
       color: var(--name-color-on-dark);
     }
   }
 
   @supports (color: oklch(from red l c h)) {
     .sender.tinted,
-    .compact-name.tinted {
+    .compact-name.tinted,
+    :global(.timeline-pronoun.tinted) {
       color: oklch(from var(--name-color-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
     }
 
     @media (prefers-color-scheme: dark) {
       :root:not(.light) .sender.tinted,
       :root:not(.light) .compact-name.tinted,
+      :root:not(.light) :global(.timeline-pronoun.tinted),
       :root.dark .sender.tinted,
-      :root.dark .compact-name.tinted {
+      :root.dark .compact-name.tinted,
+      :root.dark :global(.timeline-pronoun.tinted) {
         color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
       }
     }

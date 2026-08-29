@@ -658,7 +658,7 @@
 
   /* Sized to the 32px custom emote beside it, not to the surrounding type. */
   .grids .unicode button {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     line-height: 1;
     width: 100%;
   }
@@ -710,7 +710,7 @@
   /* Matches the pack avatars beside it, so the rail reads as one column. */
   .rail-glyph {
     align-items: center;
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     height: var(--avatar-size-small);
     justify-content: center;
     line-height: 1;

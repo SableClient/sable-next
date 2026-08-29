@@ -15,26 +15,11 @@
   const borders = scale('--border-width', ['300', '400', '500', '600', '700']);
   const shadows = scale('--shadow', ['e100', 'e200', 'e300', 'e400']);
   const type = [
-    'd400',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    't500',
-    't400',
-    't300',
-    't200',
-    'b500',
-    'b400',
-    'b300',
-    'l400',
-  ].map((step) => ({
-    step,
-    size: `--font-size-${step}`,
-    lineHeight: `--line-height-${step}`,
-  }));
+    { step: 'small', size: '--font-size-small', lineHeight: '--line-height-small' },
+    { step: 'body', size: '--font-size-body', lineHeight: '--line-height-body' },
+    { step: 'heading', size: '--font-size-heading', lineHeight: '--line-height-heading' },
+    { step: 'display', size: '--font-size-display', lineHeight: '--line-height-heading' },
+  ];
 
   const containerSteps = ['container', 'container-hover', 'container-active', 'container-line'];
   const mainSteps = ['main', 'main-hover', 'main-active', 'main-line'];
@@ -241,13 +226,13 @@
   .specimen code {
     color: var(--sable-sec-main);
     display: inline-block;
-    font-size: var(--font-size-t200);
+    font-size: var(--font-size-small);
     width: 4rem;
   }
 
   table {
     border-collapse: collapse;
-    font-size: var(--font-size-t200);
+    font-size: var(--font-size-small);
   }
 
   th,

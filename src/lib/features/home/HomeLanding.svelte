@@ -120,7 +120,7 @@
   }
 
   .hero h1 {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: var(--space-400) 0 0;
   }
@@ -157,7 +157,7 @@
   }
 
   .section-heading h2 {
-    font-size: var(--font-size-xlarge);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
   }
 

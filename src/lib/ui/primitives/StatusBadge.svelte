@@ -27,10 +27,10 @@
     border-radius: var(--radii-300);
     display: inline-flex;
     flex-shrink: 0;
-    font-size: var(--font-size-l400);
+    font-size: var(--font-size-small);
     font-weight: var(--font-weight-600);
     justify-content: center;
-    line-height: var(--line-height-l400);
+    line-height: var(--line-height-small);
     min-height: 1.25rem;
     min-width: 1.25rem;
     padding: 0 var(--space-200);

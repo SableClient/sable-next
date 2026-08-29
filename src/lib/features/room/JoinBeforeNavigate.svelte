@@ -150,7 +150,7 @@
   }
 
   .join h1 {
-    font-size: var(--font-size-medium);
+    font-size: var(--font-size-heading);
     margin: 0;
     overflow-wrap: anywhere;
   }

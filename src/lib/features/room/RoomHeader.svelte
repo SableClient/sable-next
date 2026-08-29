@@ -158,7 +158,7 @@
   }
 
   .room-header h1 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: 0;
     overflow: hidden;
@@ -177,7 +177,7 @@
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
-    line-height: var(--line-height-t200);
+    line-height: var(--line-height-small);
     margin: 0;
     overflow: hidden;
     padding: 0;

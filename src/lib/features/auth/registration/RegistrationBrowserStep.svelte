@@ -156,7 +156,7 @@
 
   h3 {
     color: var(--sable-bg-on-container);
-    font-size: var(--font-size-medium);
+    font-size: var(--font-size-heading);
     margin: 0;
   }
 
