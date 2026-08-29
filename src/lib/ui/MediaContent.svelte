@@ -3,10 +3,10 @@
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
   import { blurhashDataUrl } from '#lib/ui/blurhash.js';
+  import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import { mimeExtension } from '#lib/ui/mime-extension.js';
-  import PdfViewer from '#lib/ui/PdfViewer.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import VoiceMessagePlayer from '#lib/ui/VoiceMessagePlayer.svelte';
 
@@ -23,6 +23,7 @@
     blurhash?: string | null;
     durationMs?: number | null;
     waveform?: number[] | null;
+    onOpen?: () => void;
     class?: string;
   }
 
@@ -31,6 +32,7 @@
     mime,
     body,
     kind,
+    onOpen,
     width = null,
     height = null,
     size = null,
@@ -84,12 +86,7 @@
       return undefined;
     }
   });
-  let isPdf = $derived(
-    kind === 'file' &&
-      (mime === 'application/pdf' ||
-        ((mime === null || mime === 'application/octet-stream') &&
-          body.toLowerCase().endsWith('.pdf')))
-  );
+  let isPdf = $derived(kind === 'file' && isPdfAttachment(mime, body));
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
@@ -198,8 +195,10 @@
         <span class="media-file-name">{mediaLabel}</span>
         {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
       </a>
-      {#if isPdf}
-        <PdfViewer src={url} name={mediaLabel} />
+      {#if isPdf && onOpen}
+        <button class="media-file-open" type="button" onclick={onOpen}>
+          {$i18n.t('pdf.open')}
+        </button>
       {/if}
     {/if}
   {:else if kind === 'file'}
@@ -252,6 +251,23 @@
     gap: var(--space-100);
     margin-top: var(--space-100);
     max-width: 100%;
+  }
+
+  .media-file-open {
+    background: var(--sable-surface-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radius);
+    color: var(--sable-surface-on-container);
+    cursor: pointer;
+    display: block;
+    font: inherit;
+    margin-top: var(--space-100);
+    min-height: var(--target);
+    padding: var(--space-100) var(--space-200);
+  }
+
+  .media-file-open:hover {
+    background: var(--sable-surface-container-hover);
   }
 
   .media-file-ext {

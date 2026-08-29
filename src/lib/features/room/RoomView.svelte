@@ -51,6 +51,7 @@
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
   import MediaViewer from './MediaViewer.svelte';
+  import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
@@ -112,13 +113,21 @@
 
   let mediaItems = $derived(
     timeline.items.flatMap((entry) => {
-      if (!entry.event_id || (entry.content.kind !== 'image' && entry.content.kind !== 'sticker'))
+      const eventId = entry.event_id;
+      if (eventId === null) return [];
+      const content = entry.content;
+      if (
+        content.kind !== 'image' &&
+        content.kind !== 'sticker' &&
+        !(content.kind === 'file' && isPdfAttachment(content.mime, content.body))
+      ) {
         return [];
+      }
 
       return [
         {
-          ...entry.content,
-          eventId: entry.event_id,
+          ...content,
+          eventId,
           sender: entry.sender_name ?? entry.sender ?? 'Unknown sender',
         },
       ];

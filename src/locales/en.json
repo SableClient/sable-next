@@ -1730,7 +1730,8 @@
     "pageIndicator": "Page {{page}} of {{pages}}",
     "download": "Download",
     "loadFailed": "This document could not be loaded.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "open": "Open"
   },
   "shortcuts": {
     "paletteTitle": "Jump to room",

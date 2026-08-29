@@ -76,7 +76,8 @@ test('renders the extension badge and human-readable size for a file attachment'
   await unmount(instance);
 });
 
-test('keeps a PDF openable as a file and previews it inline', async () => {
+test('offers a PDF as a file plus an action that opens the viewer', async () => {
+  const onOpen = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const instance = mount(MediaContent, {
     target: document.body,
@@ -85,6 +86,7 @@ test('keeps a PDF openable as a file and previews it inline', async () => {
       source: 'mxc://example.org/pdf',
       mime: 'application/pdf',
       body: 'report.pdf',
+      onOpen,
     },
   });
 
@@ -92,8 +94,10 @@ test('keeps a PDF openable as a file and previews it inline', async () => {
   await Promise.resolve();
   await tick();
 
-  expect(document.querySelector('.pdf-viewer')).not.toBeNull();
+  expect(document.querySelector('.pdf-viewer')).toBeNull();
   expect(document.querySelector('a[download="report.pdf"]')).not.toBeNull();
+  document.querySelector<HTMLButtonElement>('.media-file-open')?.click();
+  expect(onOpen).toHaveBeenCalledTimes(1);
   await unmount(instance);
 });
 

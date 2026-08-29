@@ -21,12 +21,13 @@
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import PdfViewer from '#lib/ui/PdfViewer.svelte';
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 
   export type MediaItem = Extract<
     TimelineItemView['content'],
-    { kind: 'image' | 'sticker' | 'video' | 'audio' }
+    { kind: 'image' | 'sticker' | 'video' | 'audio' | 'file' }
   > & {
     eventId: string;
     sender: string;
@@ -334,6 +335,8 @@
               <audio class="media-player" controls src={url} aria-label={item.body || 'Audio'}>
                 {item.body}
               </audio>
+            {:else if item.kind === 'file'}
+              <PdfViewer src={url} name={item.body} />
             {:else}
               <img
                 bind:this={imageEl}
