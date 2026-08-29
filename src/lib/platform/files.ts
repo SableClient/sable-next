@@ -1,4 +1,6 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { isTauri } from '@tauri-apps/api/core';
+
+import { rawInvoke } from './raw-invoke.js';
 
 export type SaveOutcome = 'saved' | 'cancelled' | 'failed';
 
@@ -63,7 +65,7 @@ export async function saveImageToPhotos(
       return 'saved';
     }
     if (type() === 'ios') {
-      await invoke('save_media_to_photos', { bytes: Array.from(bytes), filename, mimeType: mime });
+      await rawInvoke('save_media_to_photos', bytes, { filename, 'mime-type': mime });
       return 'saved';
     }
   } catch (error) {

@@ -100,14 +100,16 @@ fn write_to_photos(bytes: &[u8], filename: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn save_media_to_photos(
-    bytes: Vec<u8>,
-    filename: String,
-    mime_type: String,
-) -> Result<(), String> {
+pub async fn save_media_to_photos(request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("the image bytes must ride the request body".into());
+    };
+    let filename = crate::decode_header(&request, "filename").ok_or("missing filename")?;
+    let mime_type = crate::decode_header(&request, "mime-type").ok_or("missing mime-type")?;
     if !mime_type.starts_with("image/") {
         return Err("only images can be saved to Photos".into());
     }
+    let bytes = bytes.clone();
     authorize().await?;
     tauri::async_runtime::spawn_blocking(move || write_to_photos(&bytes, &filename))
         .await

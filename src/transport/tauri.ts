@@ -4,22 +4,16 @@ import type { Command } from '#src/generated/Command';
 import type { CommandErr } from '#src/generated/CommandErr';
 import type { CoreEvent } from '#src/generated/CoreEvent';
 import { CoreError, type ResponseFor, type Transport } from './index';
+import { rawInvoke } from '#lib/platform/raw-invoke.js';
 import { resetWebStorage } from '#lib/platform/session-storage.js';
 
-/**
- * A `Vec<u8>` argument would be marshalled as a JSON array of numbers, so the
- * bytes ride the raw request body and the metadata the headers.
- */
-async function rawInvoke<T>(
+async function carry<T>(
   command: string,
   bytes: Uint8Array<ArrayBuffer>,
   headers: Record<string, string>
 ): Promise<T> {
-  const encoded = Object.fromEntries(
-    Object.entries(headers).map(([name, value]) => [name, encodeURIComponent(value)])
-  );
   try {
-    return await invoke<T>(command, bytes, { headers: encoded });
+    return await rawInvoke<T>(command, bytes, headers);
   } catch (error) {
     throw new CoreError(error as CommandErr);
   }
@@ -62,7 +56,7 @@ export function createTauriTransport(): Transport {
     },
 
     async sendAttachment({ roomId, filename, mime, bytes, caption, inReplyTo, info, threadRoot }) {
-      await rawInvoke('send_attachment', bytes, {
+      await carry('send_attachment', bytes, {
         'room-id': roomId,
         filename,
         mime,
@@ -74,7 +68,7 @@ export function createTauriTransport(): Transport {
     },
 
     uploadMedia(mime, bytes) {
-      return rawInvoke<string>('upload_media', bytes, { mime });
+      return carry<string>('upload_media', bytes, { mime });
     },
 
     setDebugLogs() {},

@@ -88,7 +88,7 @@ async fn fetch_media(
     Ok(Response::new(bytes))
 }
 
-fn decode_header(request: &Request<'_>, name: &str) -> Option<String> {
+pub(crate) fn decode_header(request: &Request<'_>, name: &str) -> Option<String> {
     let value = request.headers().get(name)?.to_str().ok()?;
     Some(
         percent_encoding::percent_decode_str(value)

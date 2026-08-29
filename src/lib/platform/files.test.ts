@@ -230,9 +230,23 @@ test('iOS sends image bytes to the native Photos command', async () => {
     'saved'
   );
 
-  expect(mocks.invoke).toHaveBeenCalledWith('save_media_to_photos', {
-    bytes: [1, 2, 3],
-    filename: 'photo.png',
-    mimeType: 'image/png',
+  expect(mocks.invoke).toHaveBeenCalledWith('save_media_to_photos', new Uint8Array([1, 2, 3]), {
+    headers: { filename: 'photo.png', 'mime-type': 'image%2Fpng' },
   });
+});
+
+test('iOS carries a non-ASCII filename a header value cannot hold', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('ios');
+  mocks.invoke.mockResolvedValue(undefined);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1]))));
+
+  await expect(saveImageToPhotos('https://example.org/p.png', 'été 😂.png')).resolves.toBe('saved');
+
+  const options = (mocks.invoke.mock.calls.at(-1) ?? [])[2] as {
+    headers: Record<string, string>;
+  };
+  const { headers } = options;
+  expect(headers.filename).toBe(encodeURIComponent('été 😂.png'));
+  for (const value of Object.values(headers)) expect(value).toMatch(/^[ -~]*$/);
 });
