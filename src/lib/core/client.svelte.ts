@@ -66,7 +66,7 @@ export type ActiveVerification = { flowId: string; state: VerificationView };
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
-  accounts = $state<CoreSession[]>([]);
+  accounts = $state.raw<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
   sync = $state<SyncStatus | null>(null);
@@ -75,7 +75,7 @@ export class CoreClient {
   searchCoverage = $state<SearchCoverageView | null>(null);
   searchCoverageUnavailable = $state(false);
   /** Every device on this account, pushed on change. Absolute, not a diff. */
-  deviceList = $state<DeviceView[]>([]);
+  deviceList = $state.raw<DeviceView[]>([]);
   unresponsive = $state(false);
   accountRevision = $state(0);
 

@@ -13,7 +13,7 @@
 
   const catalogUrl = 'https://raw.githubusercontent.com/SableClient/themes/main/catalog.json';
   const themeKinds = ['light', 'dark'] as const;
-  let catalog = $state<CatalogTheme[]>([]);
+  let catalog = $state.raw<CatalogTheme[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
   let picker = $state<HTMLInputElement>();

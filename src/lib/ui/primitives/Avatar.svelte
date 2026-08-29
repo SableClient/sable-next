@@ -32,12 +32,7 @@
   let fallback = $derived(initials ?? toInitials(name));
   let accessibleLabel = $derived(alt ?? name ?? fallback);
   let isMxc = $derived(src?.startsWith('mxc://') ?? false);
-  let loadingStatus = $state<Avatar.RootProps['loadingStatus']>('loading');
-
-  $effect(() => {
-    const next = src;
-    loadingStatus = next?.startsWith('mxc://') ? 'loaded' : 'loading';
-  });
+  let loadingStatus = $derived<Avatar.RootProps['loadingStatus']>(isMxc ? 'loaded' : 'loading');
 </script>
 
 <Avatar.Root

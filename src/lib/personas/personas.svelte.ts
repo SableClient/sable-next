@@ -6,7 +6,7 @@ import type { PersonaView } from '#src/generated/PersonaView';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 export class PersonaStore {
-  personas = $state<PersonaView[]>([]);
+  personas = $state.raw<PersonaView[]>([]);
   account = $state<PersonaSelectionView | null>(null);
   rooms = $state<Record<string, PersonaSelectionView>>({});
   loading = $state(false);

@@ -2,7 +2,7 @@
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
@@ -83,12 +83,18 @@
   }
 
   $effect(() => {
+    void item.source;
+    untrack(() => {
+      zoom = 1;
+      rotation = 0;
+      pan = { x: 0, y: 0 };
+      pdfPage = 1;
+      pdfPages = 0;
+    });
+  });
+
+  $effect(() => {
     let active = true;
-    zoom = 1;
-    rotation = 0;
-    pan = { x: 0, y: 0 };
-    pdfPage = 1;
-    pdfPages = 0;
     failed = false;
     const release = holdMediaUrl(core, item.source, 0, 0);
     const cached = cachedMediaUrl(core, item.source, 0, 0);

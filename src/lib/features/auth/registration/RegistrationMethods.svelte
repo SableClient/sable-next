@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import { i18n } from '#lib/i18n.js';
   import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
@@ -65,12 +66,12 @@
 
   const methodSlotId = $props.id();
   let showAllRegistrationMethods = $state(false);
-  let observedHomeserver = $state('');
 
   $effect(() => {
-    if (homeserver === observedHomeserver) return;
-    observedHomeserver = homeserver;
-    showAllRegistrationMethods = false;
+    void homeserver;
+    untrack(() => {
+      showAllRegistrationMethods = false;
+    });
   });
 
   let availableRegistrationMethodCount = $derived.by(() => {

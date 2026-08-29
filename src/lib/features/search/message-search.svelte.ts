@@ -24,7 +24,7 @@ export interface RoomGroup {
 export class MessageSearch {
   query = $state('');
   order = $state<SearchOrder>('rank');
-  hits = $state<SearchHitView[]>([]);
+  hits = $state.raw<SearchHitView[]>([]);
   searching = $state(false);
   failed = $state(false);
   exhausted = $state(true);

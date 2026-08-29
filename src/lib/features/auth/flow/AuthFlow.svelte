@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { i18n } from '#lib/i18n.js';
   import { useCoreClient } from '#lib/core/context.js';
   import AuthFooter from '#lib/features/auth/shared/AuthFooter.svelte';
@@ -214,7 +214,8 @@
   });
 
   $effect(() => {
-    if (activeIndex > furthestReached) furthestReached = activeIndex;
+    const next = activeIndex;
+    if (next > untrack(() => furthestReached)) furthestReached = next;
   });
 
   $effect(() => {

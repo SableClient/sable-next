@@ -33,7 +33,7 @@
   import DeviceActionForm from './DeviceActionForm.svelte';
 
   const core = useCoreClient();
-  let devices = $state<DeviceView[]>([]);
+  let devices = $state.raw<DeviceView[]>([]);
   let accountManagement = $state(false);
   let status = $state<EncryptionStatusView | null>(null);
   let loading = $state(true);
