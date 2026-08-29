@@ -39,7 +39,7 @@
   import LocationComposer from './LocationComposer.svelte';
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
   import { formattedForEditing, type ComposerContext } from './composer-context';
-  import { clearDraft, readDraft, writeDraft } from './composer-drafts';
+  import { clearDraft, readDraft, writeDraft } from './composer-drafts.svelte';
   import {
     filesFrom,
     formatSize,

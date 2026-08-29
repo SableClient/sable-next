@@ -8,6 +8,7 @@ import ChatTextIcon from 'phosphor-svelte/lib/ChatTextIcon';
 import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
 import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
 import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
+import CloudArrowUpIcon from 'phosphor-svelte/lib/CloudArrowUpIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
 import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
@@ -518,6 +519,29 @@ export const settingsCategories: SettingsCategory[] = [
     ],
   },
   ...updatesCategories,
+  {
+    id: 'sync',
+    name: 'settings.syncTitle',
+    description: 'settings.syncDescription',
+    icon: CloudArrowUpIcon,
+    items: [
+      {
+        key: 'settingsSync',
+        icon: CloudArrowUpIcon,
+        name: 'settings.settingsSync',
+        description: 'settings.settingsSyncHint',
+        type: 'boolean',
+      },
+      {
+        key: 'syncDrafts',
+        icon: PencilSimpleIcon,
+        name: 'settings.syncDrafts',
+        description: 'settings.syncDraftsHint',
+        type: 'boolean',
+        gatedBy: 'settingsSync',
+      },
+    ],
+  },
   {
     id: 'developer',
     name: 'settings.developerTitle',

@@ -7,6 +7,7 @@ import NotificationDefaults from '#lib/features/notifications/NotificationDefaul
 import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
 import PushGateway from '#lib/features/notifications/PushGateway.svelte';
+import SettingsSyncStatus from '#lib/features/settings/SettingsSyncStatus.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
 import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
@@ -32,6 +33,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: PushGateway },
   ],
   personas: [{ component: PersonaSettings, class: 'personas-card' }],
+  sync: [{ component: SettingsSyncStatus, when: () => preferences.settingsSync }],
   developer: [
     {
       component: DeveloperAccessToken,

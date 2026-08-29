@@ -8,7 +8,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
-import { clearDrafts } from './composer-drafts';
+import { clearDrafts } from './composer-drafts.svelte';
 import { ComposerEditor } from './editor/composer-editor';
 import Harness from './RoomComposerHarness.test.svelte';
 

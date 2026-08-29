@@ -5,7 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
-  import { isFavorite, readFavorites, toggleFavorite } from './favorites';
+  import { favoriteGifs, isFavorite, toggleFavorite } from './favorites.svelte';
   import { GifSearch } from './gif-search.svelte';
   import {
     gifProvider,
@@ -25,7 +25,7 @@
 
   const search = new GifSearch();
 
-  let favorites = $state.raw<GifResult[]>(readFavorites());
+  let favorites = $derived(favoriteGifs());
   let provider = $derived(gifProvider(config, providerSetting));
 
   $effect(() => {
@@ -42,7 +42,7 @@
 
   function star(event: MouseEvent, gif: GifResult): void {
     event.stopPropagation();
-    favorites = toggleFavorite(favorites, gif);
+    toggleFavorite(gif);
   }
 </script>
 

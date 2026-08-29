@@ -34,8 +34,9 @@ impl Core {
                         .load(std::sync::atomic::Ordering::SeqCst)
                         == generation
                     {
-                        core.remember_account_data_type(event.event_type().to_string())
-                            .await;
+                        let event_type = event.event_type().to_string();
+                        core.remember_account_data_type(event_type.clone()).await;
+                        core.emit(CoreEvent::AccountDataChanged { event_type });
                     }
                 }
             }

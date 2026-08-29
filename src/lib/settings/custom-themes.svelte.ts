@@ -9,7 +9,7 @@ export type CustomTheme = {
   css: string;
 };
 
-type StoredThemes = {
+export type StoredThemes = {
   themes: CustomTheme[];
   lightThemeId: string | null;
   darkThemeId: string | null;
@@ -52,6 +52,13 @@ function persist(): void {
 export function installCustomTheme(theme: CustomTheme): void {
   customThemes.themes = [...customThemes.themes.filter((item) => item.id !== theme.id), theme];
   customThemes[`${theme.kind}ThemeId`] = theme.id;
+  persist();
+}
+
+export function replaceCustomThemes(next: StoredThemes): void {
+  customThemes.themes = next.themes;
+  customThemes.lightThemeId = next.lightThemeId;
+  customThemes.darkThemeId = next.darkThemeId;
   persist();
 }
 

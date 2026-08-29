@@ -61,6 +61,9 @@ export interface Preferences {
 
   autoUpdateCheck: boolean;
 
+  settingsSync: boolean;
+  syncDrafts: boolean;
+
   developerTools: boolean;
   showHiddenEvents: boolean;
   showNonStandardEvents: boolean;
@@ -154,6 +157,9 @@ const DEFAULTS: Preferences = {
 
   autoUpdateCheck: true,
 
+  settingsSync: false,
+  syncDrafts: true,
+
   developerTools: false,
   showHiddenEvents: false,
   showNonStandardEvents: false,
@@ -176,28 +182,34 @@ function read(key: string): Record<string, unknown> | null {
   }
 }
 
+export const PREFERENCE_KEYS = Object.keys(DEFAULTS) as (keyof Preferences)[];
+
+export function sanitize(stored: Record<string, unknown>, base: Preferences): Preferences {
+  const next = { ...base };
+  for (const key of PREFERENCE_KEYS) {
+    const value = stored[key];
+    const allowed: readonly string[] | undefined =
+      key in ENUMS ? ENUMS[key as keyof typeof ENUMS] : undefined;
+    if (allowed) {
+      if (typeof value === 'string' && allowed.includes(value)) {
+        (next as Record<string, unknown>)[key] = value;
+      }
+    } else if ((FREE_TEXT as readonly string[]).includes(key)) {
+      if (typeof value === 'string') (next as Record<string, unknown>)[key] = value;
+    } else if (typeof value === 'boolean') {
+      (next as Record<string, unknown>)[key] = value;
+    }
+  }
+  return next;
+}
+
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
   const stored = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
   if (!stored) return { ...DEFAULTS };
 
-  const preferences = { ...DEFAULTS };
-  for (const key of Object.keys(DEFAULTS) as (keyof Preferences)[]) {
-    const value = stored[key];
-    const allowed: readonly string[] | undefined =
-      key in ENUMS ? ENUMS[key as keyof typeof ENUMS] : undefined;
-    if (allowed) {
-      if (typeof value === 'string' && allowed.includes(value)) {
-        (preferences as Record<string, unknown>)[key] = value;
-      }
-    } else if ((FREE_TEXT as readonly string[]).includes(key)) {
-      if (typeof value === 'string') (preferences as Record<string, unknown>)[key] = value;
-    } else if (typeof value === 'boolean') {
-      (preferences as Record<string, unknown>)[key] = value;
-    }
-  }
-  return preferences;
+  return sanitize(stored, DEFAULTS);
 }
 
 export const preferences = $state<Preferences>(load());
@@ -208,6 +220,17 @@ export function readReceiptIsPrivate(): boolean {
 
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
   preferences[key] = value;
+  persist();
+}
+
+export function applyPreferences(next: Preferences): void {
+  for (const key of PREFERENCE_KEYS) {
+    (preferences as unknown as Record<string, unknown>)[key] = next[key];
+  }
+  persist();
+}
+
+function persist(): void {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));

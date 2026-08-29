@@ -1279,6 +1279,10 @@ pub enum CoreEvent {
 
     NotificationSettingsChanged,
 
+    AccountDataChanged {
+        event_type: String,
+    },
+
     SpaceSidebarChanged {
         items: Vec<SidebarItemView>,
     },

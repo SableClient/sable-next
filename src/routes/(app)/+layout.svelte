@@ -25,12 +25,19 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
-  import { clearDrafts } from '#lib/features/composer/composer-drafts.js';
+  import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { ensureAndroidHistoryRoot } from '#lib/platform/android-back.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { accountSync } from '#lib/settings/account-sync.svelte.js';
+  import {
+    draftsDocument,
+    recentEmojiDocument,
+    settingsDocument,
+    workspaceDocument,
+  } from '#lib/settings/sync-documents.js';
   import { registerNativePush } from '#lib/features/notifications/native-push.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { NotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
@@ -128,6 +135,26 @@
   $effect(() => {
     document.documentElement.dataset.underlineLinks = preferences.underlineLinks ? 'on' : 'off';
   });
+
+  const syncDocuments = [
+    settingsDocument,
+    workspaceDocument(spaceSidebar),
+    draftsDocument,
+    recentEmojiDocument,
+  ];
+
+  $effect(() => {
+    void core.accountRevision;
+    if (core.status !== 'ready' || !preferences.settingsSync) return;
+
+    return accountSync.start(core, syncDocuments);
+  });
+
+  for (const synced of syncDocuments) {
+    $effect(() => {
+      accountSync.push(synced);
+    });
+  }
 
   let unreadTotal = $derived(
     roomList.rooms

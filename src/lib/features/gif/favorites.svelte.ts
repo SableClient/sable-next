@@ -33,35 +33,47 @@ function parse(entry: unknown): GifResult | undefined {
   };
 }
 
-export function readFavorites(): GifResult[] {
+export function parseFavorites(value: unknown): GifResult[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(parse).filter((gif): gif is GifResult => gif !== undefined);
+}
+
+function load(): GifResult[] {
   if (typeof localStorage === 'undefined') return [];
 
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-    if (!Array.isArray(raw)) return [];
-    return raw.map(parse).filter((gif): gif is GifResult => gif !== undefined);
+    return parseFavorites(JSON.parse(localStorage.getItem(storageKey) ?? '[]'));
   } catch {
     return [];
   }
 }
 
-function write(gifs: readonly GifResult[]): void {
-  if (typeof localStorage === 'undefined') return;
+const state = $state<{ gifs: GifResult[] }>({ gifs: load() });
 
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(gifs));
-  } catch {
-    /* A full store costs the list, not the picker. */
-  }
+export function favoriteGifs(): GifResult[] {
+  return state.gifs;
 }
 
 export function isFavorite(gifs: readonly GifResult[], gif: GifResult): boolean {
   return gifs.some((entry) => entry.mediaUrl === gif.mediaUrl);
 }
 
-export function toggleFavorite(gifs: readonly GifResult[], gif: GifResult): GifResult[] {
-  const without = gifs.filter((entry) => entry.mediaUrl !== gif.mediaUrl);
-  const next = without.length === gifs.length ? [gif, ...without].slice(0, limit) : without;
-  write(next);
-  return next;
+export function toggleFavorite(gif: GifResult): void {
+  const without = state.gifs.filter((entry) => entry.mediaUrl !== gif.mediaUrl);
+  write(without.length === state.gifs.length ? [gif, ...without] : without);
+}
+
+export function adoptFavorites(gifs: readonly GifResult[]): void {
+  write(gifs);
+}
+
+function write(gifs: readonly GifResult[]): void {
+  state.gifs = gifs.slice(0, limit);
+  if (typeof localStorage === 'undefined') return;
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state.gifs));
+  } catch {
+    /* A full store costs the list, not the picker. */
+  }
 }

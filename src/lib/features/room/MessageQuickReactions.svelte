@@ -1,7 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import { shortcodeFor } from '#lib/emoji/emoji.js';
-  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
+  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.svelte.js';
 
   interface Props {
     count: number;

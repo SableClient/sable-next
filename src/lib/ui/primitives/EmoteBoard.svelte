@@ -16,8 +16,8 @@
   import { SvelteSet } from 'svelte/reactivity';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
-  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.js';
-  import { readRecent, writeRecent } from '#lib/emoji/recent-packs.js';
+  import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.svelte.js';
+  import { readRecent, rememberEmote } from '#lib/emoji/recent-packs.svelte.js';
 
   interface Props {
     roomId: string;
@@ -54,8 +54,8 @@
   const loadedPacks = new SvelteSet<string>();
   let loading = $state(true);
   let failed = $state(false);
-  let recent = $state.raw<string[]>(readRecent());
-  let recentReactions = $state.raw<string[]>(uniqueReactions());
+  let recent = $derived(readRecent());
+  let recentReactions = $derived(uniqueReactions());
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
   let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
 
@@ -172,11 +172,6 @@
     return [...new Set(readRecentReactions())];
   }
 
-  function remember(emoji: string): void {
-    rememberReaction(emoji);
-    recentReactions = uniqueReactions();
-  }
-
   function emojiRows(emojis: string[]): string[][] {
     const rows: string[][] = [];
     for (let start = 0; start < emojis.length; start += emojiColumns) {
@@ -224,13 +219,12 @@
     if (text === '') return;
     event.preventDefault();
     const best = unicodeSections.at(0)?.emojis.at(0);
-    if (best !== undefined) remember(best);
+    if (best !== undefined) rememberReaction(best);
     onPickUnicode(best ?? text);
   }
 
   function pick(image: PackImageView): void {
-    recent = [image.shortcode, ...recent.filter((code) => code !== image.shortcode)].slice(0, 32);
-    writeRecent(recent);
+    rememberEmote(image.shortcode);
     onPick(image, tab as ImageUsageView);
   }
 </script>
@@ -491,7 +485,7 @@
                       title={shortcodeFor(emoji) ?? emoji}
                       aria-label={shortcodeFor(emoji) ?? emoji}
                       onclick={() => {
-                        remember(emoji);
+                        rememberReaction(emoji);
                         onPickUnicode?.(emoji);
                       }}>{emoji}</button
                     >

@@ -2,7 +2,7 @@
   import type { PackImageView } from '#src/generated/PackImageView';
 
   import { i18n } from '#lib/i18n.js';
-  import { rememberReaction } from '#lib/emoji/recents.js';
+  import { rememberReaction } from '#lib/emoji/recents.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
 

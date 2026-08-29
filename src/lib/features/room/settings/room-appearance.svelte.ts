@@ -11,18 +11,29 @@ function load(): [string, ShowRoomIcon][] {
   if (typeof localStorage === 'undefined') return [];
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return [];
-
-    return Object.entries(parsed).flatMap(([roomId, value]) => {
-      const mode = MODES.find((entry) => entry === value);
-      return mode === undefined ? [] : [[roomId, mode] as [string, ShowRoomIcon]];
-    });
+    return parseRoomIconOverrides(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null'));
   } catch {
     return [];
   }
+}
+
+export function parseRoomIconOverrides(value: unknown): [string, ShowRoomIcon][] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+
+  return Object.entries(value).flatMap(([roomId, mode]) => {
+    const known = MODES.find((entry) => entry === mode);
+    return known === undefined ? [] : [[roomId, known] as [string, ShowRoomIcon]];
+  });
+}
+
+export function roomIconOverrides(): Record<string, ShowRoomIcon> {
+  return Object.fromEntries(overrides);
+}
+
+export function adoptRoomIconOverrides(entries: [string, ShowRoomIcon][]): void {
+  overrides.clear();
+  for (const [roomId, mode] of entries) overrides.set(roomId, mode);
+  persist();
 }
 
 function persist(): void {

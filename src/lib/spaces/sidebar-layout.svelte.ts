@@ -118,6 +118,12 @@ export class SpaceSidebar {
     if (pruned) this.persistOpenFolders();
   }
 
+  adoptOpenFolders(ids: readonly string[]): void {
+    this.openFolders.clear();
+    for (const id of ids) this.openFolders.add(id);
+    this.persistOpenFolders();
+  }
+
   private persistOpenFolders(): void {
     if (typeof localStorage === 'undefined') return;
 
