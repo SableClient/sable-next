@@ -99,14 +99,22 @@ impl Core {
                 }
             }
             _ if matches!(error, matrix_sdk::HttpError::Reqwest(_)) => {
-                tracing::warn!(context, category = "network", "homeserver request failed");
+                tracing::warn!(
+                    context,
+                    category = "network",
+                    "homeserver request failed: {error}"
+                );
                 CommandErr::Unavailable
             }
             _ if error
                 .as_client_api_error()
                 .is_some_and(|api_error| api_error.status_code.is_server_error()) =>
             {
-                tracing::warn!(context, category = "server", "homeserver request failed");
+                tracing::warn!(
+                    context,
+                    category = "server",
+                    "homeserver request failed: {error}"
+                );
                 CommandErr::Unavailable
             }
             _ => self.failed(context, error),
