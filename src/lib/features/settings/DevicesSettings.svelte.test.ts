@@ -34,6 +34,8 @@ const own: DeviceView = {
   display_name: 'This device',
   is_own: true,
   is_verified: true,
+  last_seen_ts: null,
+  last_seen_ip: null,
 };
 
 const other1: DeviceView = {
@@ -41,6 +43,8 @@ const other1: DeviceView = {
   display_name: 'Phone',
   is_own: false,
   is_verified: true,
+  last_seen_ts: null,
+  last_seen_ip: null,
 };
 
 const other2: DeviceView = {
@@ -48,6 +52,8 @@ const other2: DeviceView = {
   display_name: 'Tablet',
   is_own: false,
   is_verified: false,
+  last_seen_ts: null,
+  last_seen_ip: null,
 };
 
 afterEach(() => {

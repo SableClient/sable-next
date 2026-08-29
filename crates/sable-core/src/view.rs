@@ -24,13 +24,14 @@ use matrix_sdk::ruma::room::{
 use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{EncryptionState, RoomState};
+use matrix_sdk_base::crypto::types::events::UtdCause;
 use matrix_sdk_ui::{
     eyeball_im,
     room_list_service::RoomListItem,
     timeline::{
-        AnyOtherStateEventContentChange, EventSendState, EventTimelineItem, MembershipChange,
-        MsgLikeContent, MsgLikeKind, OtherState, PollState, Profile, TimelineDetails, TimelineItem,
-        TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+        AnyOtherStateEventContentChange, EncryptedMessage, EventSendState, EventTimelineItem,
+        MembershipChange, MsgLikeContent, MsgLikeKind, OtherState, PollState, Profile,
+        TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
     },
 };
 
@@ -50,7 +51,7 @@ use crate::protocol::{
     ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
     RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
     SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
-    TimelineItemContentView, TimelineItemView, UploadProgressView, VectorDiff,
+    TimelineItemContentView, TimelineItemView, UploadProgressView, UtdCauseView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -1098,6 +1099,30 @@ fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
     )
 }
 
+const fn utd_cause(message: &EncryptedMessage) -> UtdCauseView {
+    let EncryptedMessage::MegolmV1AesSha2 { cause, .. } = message else {
+        return UtdCauseView::Unknown;
+    };
+
+    match cause {
+        UtdCause::SentBeforeWeJoined => UtdCauseView::SentBeforeWeJoined,
+        UtdCause::VerificationViolation => UtdCauseView::VerificationViolation,
+        UtdCause::UnsignedDevice => UtdCauseView::UnsignedDevice,
+        UtdCause::UnknownDevice => UtdCauseView::UnknownDevice,
+        UtdCause::HistoricalMessageAndBackupIsDisabled => {
+            UtdCauseView::HistoricalMessageBackupDisabled
+        }
+        UtdCause::HistoricalMessageAndDeviceIsUnverified => {
+            UtdCauseView::HistoricalMessageDeviceUnverified
+        }
+        UtdCause::WithheldForUnverifiedOrInsecureDevice => {
+            UtdCauseView::WithheldForUnverifiedOrInsecureDevice
+        }
+        UtdCause::WithheldBySender => UtdCauseView::WithheldBySender,
+        UtdCause::Unknown => UtdCauseView::Unknown,
+    }
+}
+
 fn message_content(
     message: &matrix_sdk_ui::timeline::Message,
     profile: Option<&PerMessageProfileView>,
@@ -1195,8 +1220,8 @@ fn content(
             MsgLikeKind::Redacted => TimelineItemContentView::Redacted {
                 reason: raw.redaction_reason(),
             },
-            MsgLikeKind::UnableToDecrypt(_) => TimelineItemContentView::UnableToDecrypt {
-                reason: "undecryptable".to_owned(),
+            MsgLikeKind::UnableToDecrypt(message) => TimelineItemContentView::UnableToDecrypt {
+                reason: utd_cause(message),
             },
             MsgLikeKind::Sticker(sticker) => {
                 let sticker = sticker.content();

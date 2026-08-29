@@ -1658,6 +1658,9 @@ pub struct DeviceView {
     pub is_verified: bool,
     /// The session this core is running in.
     pub is_own: bool,
+    #[ts(type = "number | null")]
+    pub last_seen_ts: Option<u64>,
+    pub last_seen_ip: Option<String>,
 }
 
 /// `restricted` and `knock_restricted` need an allowed-spaces list, so they are
@@ -2200,7 +2203,7 @@ pub enum TimelineItemContentView {
         reason: Option<String>,
     },
     UnableToDecrypt {
-        reason: String,
+        reason: UtdCauseView,
     },
     Membership {
         #[ts(type = "string")]
@@ -2315,6 +2318,21 @@ pub enum GalleryItemView {
         source: String,
         mime: Option<String>,
     },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum UtdCauseView {
+    Unknown,
+    SentBeforeWeJoined,
+    VerificationViolation,
+    UnsignedDevice,
+    UnknownDevice,
+    HistoricalMessageBackupDisabled,
+    HistoricalMessageDeviceUnverified,
+    WithheldForUnverifiedOrInsecureDevice,
+    WithheldBySender,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

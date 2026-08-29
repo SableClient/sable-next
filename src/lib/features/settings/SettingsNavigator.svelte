@@ -241,9 +241,14 @@
     width: var(--icon-size-small);
   }
 
+  .search-field:focus-within {
+    border-color: var(--sable-primary-main);
+    box-shadow: inset 0 0 0 var(--border-width-600) var(--sable-primary-main);
+  }
+
   .search-field :global(.text-input) {
     background: transparent;
-    border: 0;
+    box-shadow: none;
     min-height: var(--control-height-medium);
     padding: 0;
   }

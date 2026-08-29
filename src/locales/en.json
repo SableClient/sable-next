@@ -550,7 +550,6 @@
     "profileAvatarChanged": "{{user}} changed their avatar",
     "stateEvent": "{{user}} changed {{type}}",
     "hiddenEvent": "{{type}} was sent",
-    "unableToDecrypt": "Unable to decrypt: {{reason}}",
     "unsupported": "Unsupported event: {{description}}",
     "redacted": "Message deleted",
     "codeLabel": "Code",
@@ -746,7 +745,17 @@
     "locationMapAlt": "Map showing {{label}}",
     "forwardCancel": "Cancel",
     "forwardSelected_one": "{{count}} room selected",
-    "forwardSelected_other": "{{count}} rooms selected"
+    "forwardSelected_other": "{{count}} rooms selected",
+    "utdUnknown": "This message could not be decrypted. Its key may still be in your key backup.",
+    "utdSentBeforeWeJoined": "This message was sent before you joined the room.",
+    "utdVerificationViolation": "The sender’s identity changed and has not been verified again, so this message was not decrypted.",
+    "utdUnsignedDevice": "Sent from a device its owner has not signed, so this message was not decrypted.",
+    "utdUnknownDevice": "Sent from a device this session could not securely identify, so this message was not decrypted.",
+    "utdBackupDisabled": "This message predates this session and key backup is off, so its key was never stored.",
+    "utdDeviceUnverified": "This message predates this session. Verify this device to get its key from your backup.",
+    "utdWithheldUnverified": "The sender withheld the key because this device is unverified or insecure.",
+    "utdWithheldBySender": "The sender chose not to send this device the key.",
+    "utdRecoverAction": "Set up recovery"
   },
   "auth": {
     "welcome": "Welcome to Sable",
@@ -1203,7 +1212,8 @@
     "searchResultsCount_one": "{{count}} result",
     "searchResultsCount_other": "{{count}} results",
     "searchNoResults": "No settings match “{{query}}”.",
-    "searchResultCategory": "In {{category}}"
+    "searchResultCategory": "In {{category}}",
+    "deviceLastActivity": "Last activity: {{when}}"
   },
   "errors": {
     "pageTitle": "Something went wrong",

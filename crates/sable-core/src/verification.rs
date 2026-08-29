@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use futures_util::StreamExt;
@@ -8,7 +9,7 @@ use matrix_sdk::encryption::{VerificationState, recovery::RecoveryState};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
-use matrix_sdk::ruma::{OwnedUserId, UserId};
+use matrix_sdk::ruma::{OwnedDeviceId, OwnedUserId, UserId};
 
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, RecoveryStateView,
@@ -267,15 +268,43 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
         return Vec::new();
     };
 
-    devices
+    let mut seen: BTreeMap<OwnedDeviceId, (Option<u64>, Option<String>)> = BTreeMap::new();
+    if let Ok(response) = client.devices().await {
+        for device in response.devices {
+            seen.insert(
+                device.device_id,
+                (
+                    device.last_seen_ts.map(|ts| u64::from(ts.get())),
+                    device.last_seen_ip,
+                ),
+            );
+        }
+    }
+
+    let mut views: Vec<DeviceView> = devices
         .devices()
-        .map(|device| DeviceView {
-            is_own: Some(device.device_id()) == own_device_id,
-            device_id: device.device_id().to_owned(),
-            display_name: device.display_name().map(str::to_owned),
-            is_verified: device.is_verified(),
+        .map(|device| {
+            let device_id = device.device_id().to_owned();
+            let (last_seen_ts, last_seen_ip) = seen.get(&device_id).cloned().unwrap_or_default();
+
+            DeviceView {
+                is_own: Some(device.device_id()) == own_device_id,
+                display_name: device.display_name().map(str::to_owned),
+                is_verified: device.is_verified(),
+                device_id,
+                last_seen_ts,
+                last_seen_ip,
+            }
         })
-        .collect()
+        .collect();
+
+    views.sort_by(|a, b| {
+        b.is_own
+            .cmp(&a.is_own)
+            .then(b.last_seen_ts.cmp(&a.last_seen_ts))
+            .then(a.device_id.cmp(&b.device_id))
+    });
+    views
 }
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {

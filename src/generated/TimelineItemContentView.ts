@@ -4,6 +4,7 @@ import type { GalleryItemView } from "./GalleryItemView";
 import type { MembershipChangeView } from "./MembershipChangeView";
 import type { PollView } from "./PollView";
 import type { StateChangeView } from "./StateChangeView";
+import type { UtdCauseView } from "./UtdCauseView";
 
 export type TimelineItemContentView = { "kind": "message", 
 /**
@@ -25,7 +26,7 @@ body: string,
 /**
  * Sanitised display HTML, safe to inject as-is.
  */
-html: string, items: Array<GalleryItemView>, } | { "kind": "poll", poll: PollView, } | { "kind": "redacted", reason: string | null, } | { "kind": "unable_to_decrypt", reason: string, } | { "kind": "membership", user_id: string, change: MembershipChangeView, 
+html: string, items: Array<GalleryItemView>, } | { "kind": "poll", poll: PollView, } | { "kind": "redacted", reason: string | null, } | { "kind": "unable_to_decrypt", reason: UtdCauseView, } | { "kind": "membership", user_id: string, change: MembershipChangeView, 
 /**
  * The member's name at the time, so the copy does not have to fall
  * back to a raw user id.

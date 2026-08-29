@@ -13,6 +13,7 @@
   import { CoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';
+  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import {
     openExternalAuthUrl,
     openExternalAuthWindow,
@@ -493,6 +494,13 @@
                     />
                     <code title={device.device_id}>{device.device_id}</code>
                   </div>
+                  {#if device.last_seen_ts !== null}
+                    <span class="device-seen">
+                      {$i18n.t('settings.deviceLastActivity', {
+                        when: `${formatDate(device.last_seen_ts)} ${formatTime(device.last_seen_ts)}`,
+                      })}
+                    </span>
+                  {/if}
                 </div>
                 {#if !device.is_own && editing !== device.device_id && deleting !== device.device_id}
                   <div class="device-actions">
@@ -567,6 +575,11 @@
 {/if}
 
 <style>
+  .device-seen {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+  }
+
   :global(.app-page-shell.devices-settings) {
     max-width: 56rem;
   }

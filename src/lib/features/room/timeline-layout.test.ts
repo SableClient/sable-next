@@ -226,7 +226,7 @@ function contentOfKind(kind: TimelineItemContentView['kind']): TimelineItemConte
     case 'redacted':
       return { kind, reason: null };
     case 'unable_to_decrypt':
-      return { kind, reason: 'undecryptable' };
+      return { kind, reason: 'unknown' };
     case 'membership':
       return { kind, user_id: '@a:b', change: 'joined', display_name: null, reason: null };
     case 'profile_change':

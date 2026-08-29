@@ -4,4 +4,4 @@ export type DeviceView = { device_id: string, display_name: string | null, is_ve
 /**
  * The session this core is running in.
  */
-is_own: boolean, };
+is_own: boolean, last_seen_ts: number | null, last_seen_ip: string | null, };

@@ -3,10 +3,14 @@
 
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
+  import { resolve } from '$app/paths';
+
   import { i18n } from '#lib/i18n.js';
+  import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
 
   import StateEventText from './StateEventText.svelte';
   import { formatDate } from './timeline-format';
+  import { utdCauseKey, utdIsRecoverable } from './utd-cause';
 
   interface Props {
     item: TimelineItemView;
@@ -42,8 +46,17 @@
     </div>
   </div>
 {:else if item.content.kind === 'unable_to_decrypt'}
+  {@const cause = item.content.reason}
   <p class="undecryptable">
-    {$i18n.t('timeline.unableToDecrypt', { reason: item.content.reason })}
+    {$i18n.t(utdCauseKey(cause))}
+    {#if utdIsRecoverable(cause)}
+      <a
+        href={resolve('/(app)/settings/[section]', { section: SETTINGS_DEVICES_SECTION })}
+        data-settings-link={SETTINGS_DEVICES_SECTION}
+      >
+        {$i18n.t('timeline.utdRecoverAction')}
+      </a>
+    {/if}
   </p>
 {:else if item.content.kind === 'unsupported'}
   <p class="state">
