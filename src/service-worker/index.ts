@@ -6,6 +6,7 @@
 import { resolve } from '$app/paths';
 
 import favicon from '#lib/assets/favicon.png';
+import { appendLine, readLines, summarise } from '#lib/features/notifications/conversation.js';
 import { alert, type PushPayload, unreadCount } from '#lib/features/notifications/push-payload.js';
 import { roomName } from '#lib/features/notifications/room-names.js';
 
@@ -87,12 +88,25 @@ async function present(payload: PushPayload | undefined): Promise<void> {
   const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), true);
   if (!showing) return;
 
-  await worker.registration.showNotification(showing.title, {
-    body: showing.body,
+  const lines = appendLine(await conversation(showing.tag), showing.line);
+
+  const options: NotificationOptions & { renotify?: boolean; timestamp?: number } = {
+    body: lines.length > 1 ? summarise(lines) : showing.body,
     tag: showing.tag,
+    renotify: true,
     icon: favicon,
-    data: { roomId: showing.roomId, eventId: showing.eventId },
-  });
+    badge: favicon,
+    timestamp: Date.now(),
+    data: { roomId: showing.roomId, eventId: showing.eventId, lines },
+  };
+
+  await worker.registration.showNotification(showing.title, options);
+}
+
+async function conversation(tag: string): Promise<ReturnType<typeof readLines>> {
+  const open = await worker.registration.getNotifications({ tag });
+  const previous = open.at(-1)?.data as { lines?: unknown } | undefined;
+  return readLines(previous?.lines);
 }
 
 worker.addEventListener('notificationclick', (event) => {

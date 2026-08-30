@@ -1598,8 +1598,10 @@ impl Core {
                 Ok(CommandOk::RemovePusher)
             }
 
-            Command::SetNotificationContent { visible } => {
+            Command::SetNotificationContent { visible, encrypted } => {
                 self.notification_content.store(visible, Ordering::Relaxed);
+                self.notification_encrypted_content
+                    .store(encrypted, Ordering::Relaxed);
 
                 Ok(CommandOk::SetNotificationContent)
             }

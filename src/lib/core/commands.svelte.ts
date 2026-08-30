@@ -1072,10 +1072,11 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async setNotificationContent(visible: boolean): Promise<void> {
+    async setNotificationContent(visible: boolean, encrypted: boolean): Promise<void> {
       await transport().send({
         type: 'set_notification_content',
         visible,
+        encrypted,
       });
     },
 

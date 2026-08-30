@@ -691,6 +691,7 @@ pub enum Command {
     /// Mirrors the reader's choice so a native shell can apply it too.
     SetNotificationContent {
         visible: bool,
+        encrypted: bool,
     },
     SetPresence {
         presence: PresenceView,
@@ -2488,6 +2489,7 @@ pub struct NotificationView {
     pub room_name: String,
     pub room_avatar_url: Option<String>,
     pub is_direct: bool,
+    pub encrypted: bool,
     #[ts(type = "string")]
     pub sender: OwnedUserId,
     pub sender_name: Option<String>,

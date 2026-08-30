@@ -7,6 +7,9 @@ export interface NativePushConfig {
   vapidKey: string;
   webAppId: string;
   nativeAppId: string | null;
+  eventIdOnly: boolean;
+  userId: string | null;
+  deviceId: string | null;
 }
 
 export async function registerNativePushConfig(config: NativePushConfig): Promise<void> {
@@ -18,6 +21,9 @@ export async function registerNativePushConfig(config: NativePushConfig): Promis
       vapid_key: config.vapidKey,
       web_app_id: config.webAppId,
       native_app_id: config.nativeAppId,
+      event_id_only: config.eventIdOnly,
+      user_id: config.userId,
+      device_id: config.deviceId,
     },
   });
 }

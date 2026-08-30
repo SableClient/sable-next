@@ -28,6 +28,9 @@ mod tls;
 mod verification;
 pub mod view;
 mod watchers;
+
+pub use matrix_sdk::ruma;
+
 mod widgets;
 
 use std::{
@@ -77,6 +80,7 @@ pub struct Core {
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
     thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
     notification_content: AtomicBool,
+    notification_encrypted_content: AtomicBool,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
     server_search: Mutex<search::ServerSearch>,
@@ -141,6 +145,7 @@ impl Core {
             sessions,
             events,
             notification_content: AtomicBool::new(false),
+            notification_encrypted_content: AtomicBool::new(false),
             next_subscription: AtomicU32::new(1),
             foreground_paginations: AtomicU32::new(0),
             next_log_id: AtomicU64::new(1),
@@ -172,6 +177,11 @@ impl Core {
     #[must_use]
     pub fn notification_content(&self) -> bool {
         self.notification_content.load(Ordering::Relaxed)
+    }
+
+    #[must_use]
+    pub fn notification_encrypted_content(&self) -> bool {
+        self.notification_encrypted_content.load(Ordering::Relaxed)
     }
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.

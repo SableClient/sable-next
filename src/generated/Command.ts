@@ -91,7 +91,7 @@ passphrase: string | null, } | { "type": "reset_recovery_key", passphrase: strin
 /**
  * False removes it.
  */
-set: boolean, } | { "type": "set_pusher", pusher: PusherView, } | { "type": "remove_pusher", pushkey: string, app_id: string, } | { "type": "set_notification_content", visible: boolean, } | { "type": "set_presence", presence: PresenceView, status_message: string | null, } | { "type": "set_room_notification_mode", room_id: string, 
+set: boolean, } | { "type": "set_pusher", pusher: PusherView, } | { "type": "remove_pusher", pushkey: string, app_id: string, } | { "type": "set_notification_content", visible: boolean, encrypted: boolean, } | { "type": "set_presence", presence: PresenceView, status_message: string | null, } | { "type": "set_room_notification_mode", room_id: string, 
 /**
  * `null` drops the room's own rules so it follows the default again.
  */

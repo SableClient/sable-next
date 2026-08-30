@@ -27,11 +27,17 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
+  import {
+    alertsNatively,
+    setNativeEncryptedContentAllowed,
+    watchNativeNotificationActions,
+    watchNativeNotificationClicks,
+  } from '#lib/platform/native-notifications.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { ensureAndroidHistoryRoot } from '#lib/platform/android-back.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
   import {
     draftsDocument,
@@ -42,7 +48,11 @@
   } from '#lib/settings/sync-documents.js';
   import { registerNativePush } from '#lib/features/notifications/native-push.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
-  import { NotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
+  import { performNotificationAction } from '#lib/features/notifications/native-actions.js';
+  import {
+    NotificationCenter,
+    provideNotificationCenter,
+  } from '#lib/features/notifications/notifications.svelte.js';
   import IncomingCallDialog from '#lib/features/call/IncomingCallDialog.svelte';
   import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
@@ -73,6 +83,7 @@
   const presence = new PresenceStore();
   providePresenceStore(presence);
   const notifications = new NotificationCenter();
+  provideNotificationCenter(notifications);
   const incomingCalls = new IncomingCalls(core);
   const callSession = new CallSession(core);
   provideCallSession(callSession);
@@ -209,7 +220,14 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
-    void core.commands.setNotificationContent(preferences.notificationContent).catch(() => {});
+    void core.commands
+      .setNotificationContent(
+        preferences.notificationContent,
+        preferences.notificationEncryptedContent
+      )
+      .catch(() => {});
+
+    void setNativeEncryptedContentAllowed(preferences.notificationEncryptedContent).catch(() => {});
   });
 
   $effect(() => {
@@ -227,7 +245,7 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
-    void registerNativePush(pushOverride()).catch((error: unknown) => {
+    void registerNativePush(pushOverride(), core.session).catch((error: unknown) => {
       console.debug('[sable notifications] native push not registered', error);
     });
   });
@@ -306,13 +324,56 @@
 
     void roomList.start();
     void spaceSidebar.start(core);
-    notifications.start(core);
+    notifications.start(core, openNotification);
     presence.start(core);
     return () => {
       roomList.stop();
       spaceSidebar.stop();
       notifications.stop();
       presence.stop();
+    };
+  });
+
+  function openNotification(roomId: string, eventId: string | null): void {
+    void goto(roomSectionPath(roomList.rooms, roomId, eventId ?? undefined));
+  }
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    notifications.retireRead(roomList.rooms);
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready' || !alertsNatively()) return;
+
+    let stop: (() => void) | null = null;
+    let stopped = false;
+
+    void Promise.all([
+      watchNativeNotificationActions((action) => {
+        void performNotificationAction(core, action, readReceiptIsPrivate()).catch(
+          (error: unknown) => {
+            console.debug('[sable notifications] action not performed', error);
+          }
+        );
+      }),
+      watchNativeNotificationClicks((target) => {
+        openNotification(target.roomId, target.eventId);
+      }),
+    ])
+      .then((offs) => {
+        stop = () => {
+          for (const off of offs) off();
+        };
+        if (stopped) stop();
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable notifications] native listeners not attached', error);
+      });
+
+    return () => {
+      stopped = true;
+      stop?.();
     };
   });
 

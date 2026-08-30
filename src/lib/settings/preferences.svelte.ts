@@ -48,6 +48,9 @@ export interface Preferences {
   desktopNotifications: boolean;
   notificationSounds: boolean;
   notificationContent: boolean;
+  notificationEncryptedContent: boolean;
+  richPushPayloads: boolean;
+  clearNotificationsOnRead: boolean;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
   pushGatewayUrl: string;
@@ -146,6 +149,9 @@ const DEFAULTS: Preferences = {
   desktopNotifications: false,
   notificationSounds: true,
   notificationContent: false,
+  notificationEncryptedContent: false,
+  richPushPayloads: true,
+  clearNotificationsOnRead: true,
 
   pushGatewayUrl: '',
   pushVapidKey: '',

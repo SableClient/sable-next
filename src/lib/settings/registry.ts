@@ -4,6 +4,7 @@ import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVertical
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
 import BugIcon from 'phosphor-svelte/lib/BugIcon';
 import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
+import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 import ChatTextIcon from 'phosphor-svelte/lib/ChatTextIcon';
 import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
 import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -21,9 +22,11 @@ import KeyboardIcon from 'phosphor-svelte/lib/KeyboardIcon';
 import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
+import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
+import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
@@ -478,6 +481,28 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.notificationContentHint',
         type: 'boolean',
         gatedBy: 'desktopNotifications',
+      },
+      {
+        key: 'notificationEncryptedContent',
+        icon: LockIcon,
+        name: 'settings.notificationEncryptedContent',
+        description: 'settings.notificationEncryptedContentHint',
+        type: 'boolean',
+        gatedBy: 'notificationContent',
+      },
+      {
+        key: 'richPushPayloads',
+        icon: PaperPlaneTiltIcon,
+        name: 'settings.richPushPayloads',
+        description: 'settings.richPushPayloadsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'clearNotificationsOnRead',
+        icon: CheckCircleIcon,
+        name: 'settings.clearNotificationsOnRead',
+        description: 'settings.clearNotificationsOnReadHint',
+        type: 'boolean',
       },
     ],
   },

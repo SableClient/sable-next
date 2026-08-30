@@ -157,6 +157,32 @@ async fn register_push(
     notifications::register_push(&app, &core, config).await
 }
 
+#[tauri::command]
+async fn test_notification(
+    app: AppHandle<BrowserEngine>,
+    state: State<'_, AppState>,
+    sequence: u32,
+) -> Result<(), CommandErr> {
+    let core = state.core.clone();
+    notifications::show_test(&app, &core, sequence).await;
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
+fn set_notification_encrypted_content(app: AppHandle<BrowserEngine>, allowed: bool) {
+    notifications::allow_encrypted_content(&app, allowed);
+}
+
+#[tauri::command]
+async fn dismiss_room_notification(
+    app: AppHandle<BrowserEngine>,
+    user_id: String,
+    room_id: String,
+) {
+    notifications::dismiss(&app, &user_id, &room_id).await;
+}
+
 #[cfg(all(feature = "cef", target_os = "linux"))]
 #[tauri::command]
 fn pending_deep_links() -> Vec<String> {
@@ -296,6 +322,8 @@ pub fn run() {
                 event_sink: event_sink.clone(),
             });
             spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
+            #[cfg(desktop)]
+            notifications::register_actions(app.handle());
 
             #[cfg(target_os = "ios")]
             if let Some(window) = app.get_webview_window("main") {
@@ -314,6 +342,9 @@ pub fn run() {
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,
             register_push,
+            dismiss_room_notification,
+            test_notification,
+            set_notification_encrypted_content,
             share_inbox::share_inbox_drain,
             share_inbox::share_inbox_read,
             share_inbox::share_inbox_clear,

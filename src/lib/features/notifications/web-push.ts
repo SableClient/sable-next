@@ -20,9 +20,10 @@ export function vapidBytes(key: string): Uint8Array<ArrayBuffer> {
 export function registrationMarker(
   accountId: string,
   endpoint: string,
-  settings: PushConfig
+  settings: PushConfig,
+  eventIdOnly: boolean
 ): string {
-  return [accountId, settings.gateway, settings.appId, endpoint].join('\n');
+  return [accountId, settings.gateway, settings.appId, endpoint, String(eventIdOnly)].join('\n');
 }
 
 export function needsRegistering(marker: string, registered: string | null): boolean {
@@ -58,7 +59,8 @@ export async function syncPushSubscription(
   if (endpoint === undefined || !keys?.p256dh || !keys.auth) return;
 
   const registered = localStorage.getItem(REGISTERED_ENDPOINT);
-  const marker = registrationMarker(accountId, endpoint, settings);
+  const eventIdOnly = !preferences.richPushPayloads;
+  const marker = registrationMarker(accountId, endpoint, settings, eventIdOnly);
   if (!needsRegistering(marker, registered)) return;
 
   const abandoned = abandonedAppId(registered, settings.appId);
@@ -70,7 +72,7 @@ export async function syncPushSubscription(
     url: settings.gateway,
     device_display_name: 'This browser',
     web_push: { endpoint, p256dh: keys.p256dh, auth: keys.auth },
-    event_id_only: !preferences.notificationContent,
+    event_id_only: eventIdOnly,
     append: false,
   });
   localStorage.setItem(REGISTERED_ENDPOINT, marker);

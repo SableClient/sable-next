@@ -12,6 +12,7 @@ import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
 import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
 import DeveloperDebugLogs from '#lib/features/settings/DeveloperDebugLogs.svelte';
+import DeveloperNotifications from '#lib/features/settings/DeveloperNotifications.svelte';
 import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
 import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
 
@@ -50,6 +51,12 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
       when: () => preferences.developerTools,
       title: 'settings.developerAccountDataTitle',
       headingId: 'developer-account-data',
+    },
+    {
+      component: DeveloperNotifications,
+      when: () => preferences.developerTools,
+      title: 'settings.developerNotificationsTitle',
+      headingId: 'developer-notifications',
     },
     {
       component: DeveloperDebugLogs,

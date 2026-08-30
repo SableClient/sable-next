@@ -296,6 +296,7 @@ fn view(
         room_name: item.room_computed_display_name,
         room_avatar_url: item.room_avatar_url,
         is_direct: item.is_direct_message_room,
+        encrypted: item.is_room_encrypted.unwrap_or(false),
         sender: item.event.sender().to_owned(),
         sender_name: item.sender_display_name,
         sender_avatar_url: item.sender_avatar_url,

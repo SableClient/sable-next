@@ -18,6 +18,7 @@ function view(overrides: Partial<NotificationView> = {}): NotificationView {
     room_name: 'Design crew',
     room_avatar_url: null,
     is_direct: false,
+    encrypted: false,
     sender: '@ada:example.org',
     sender_name: 'Ada',
     sender_avatar_url: null,
@@ -30,6 +31,7 @@ function view(overrides: Partial<NotificationView> = {}): NotificationView {
 
 beforeEach(() => {
   preferences.notificationContent = true;
+  preferences.notificationEncryptedContent = false;
 });
 
 test('a room names the sender, a chat does not', () => {
@@ -47,6 +49,13 @@ test('content stays out of the alert when the reader asked it to', () => {
 
   expect(body(view())).toBe('New message from Ada');
   expect(body(view({ is_direct: true }))).toBe('New message');
+});
+
+test('an encrypted room keeps its content back until it is allowed', () => {
+  expect(body(view({ encrypted: true }))).toBe('New message from Ada');
+
+  preferences.notificationEncryptedContent = true;
+  expect(body(view({ encrypted: true }))).toBe('Ada: shipped the patch');
 });
 
 test('one alert per room and account, so a busy room replaces its own', () => {

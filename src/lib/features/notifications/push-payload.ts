@@ -1,3 +1,6 @@
+import type { ConversationLine } from './conversation';
+import { roomTag } from './tag';
+
 /** With `event_id_only` the payload holds a room, an event and counts, and
     nothing else, so none of this can be relied on. */
 export type PushPayload = {
@@ -16,6 +19,7 @@ export type PushPayload = {
 export type PushAlert = {
   title: string;
   body: string;
+  line: ConversationLine;
   tag: string;
   roomId: string;
   eventId: string | null;
@@ -41,10 +45,27 @@ export function alert(
   return {
     title: notification.room_name ?? roomName ?? 'Sable',
     body: body(notification, sender, showContent),
-    tag: `${notification.user_id ?? ''} ${roomId}`,
+    line: line(notification, sender, showContent),
+    tag: roomTag(notification.user_id, roomId),
     roomId,
     eventId: notification.event_id ?? null,
   };
+}
+
+function line(
+  notification: NonNullable<PushPayload['notification']>,
+  sender: string | null,
+  showContent: boolean
+): ConversationLine {
+  const said = notification.content?.body;
+  if (showContent && !invites(notification) && said !== undefined && said !== '') {
+    return { sender, body: said };
+  }
+  return { sender: null, body: body(notification, sender, showContent) };
+}
+
+function invites(notification: NonNullable<PushPayload['notification']>): boolean {
+  return notification.type === 'm.room.member' && notification.content?.membership === 'invite';
 }
 
 function body(
@@ -52,7 +73,7 @@ function body(
   sender: string | null,
   showContent: boolean
 ): string {
-  if (notification.type === 'm.room.member' && notification.content?.membership === 'invite') {
+  if (invites(notification)) {
     return sender === null ? 'Invited you' : `${sender} invited you`;
   }
 

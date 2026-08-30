@@ -3,6 +3,9 @@ import type { NotificationView } from '#src/generated/NotificationView';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
+import type { ConversationLine } from './conversation';
+import { roomTag } from './tag';
+
 export function enabled(): boolean {
   return presentsInApp() && preferences.desktopNotifications && permission() === 'granted';
 }
@@ -20,11 +23,22 @@ export function title(view: NotificationView): string {
   return view.room_name;
 }
 
+function showsContent(view: NotificationView): boolean {
+  return (
+    preferences.notificationContent && (!view.encrypted || preferences.notificationEncryptedContent)
+  );
+}
+
 export function body(view: NotificationView): string {
-  if (!preferences.notificationContent) {
+  if (!showsContent(view)) {
     return view.is_direct ? 'New message' : `New message from ${sender(view)}`;
   }
   return view.is_direct ? view.body : `${sender(view)}: ${view.body}`;
+}
+
+export function line(view: NotificationView): ConversationLine {
+  if (!showsContent(view)) return { sender: null, body: body(view) };
+  return { sender: view.is_direct ? null : sender(view), body: view.body };
 }
 
 function sender(view: NotificationView): string {
@@ -32,5 +46,5 @@ function sender(view: NotificationView): string {
 }
 
 export function tag(view: NotificationView): string {
-  return `${view.user_id} ${view.room_id}`;
+  return roomTag(view.user_id, view.room_id);
 }
