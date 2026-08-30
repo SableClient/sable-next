@@ -16,6 +16,8 @@ mod mobile;
 mod notifications;
 mod sentry;
 mod share_inbox;
+#[cfg(desktop)]
+mod tray;
 
 use std::sync::{Arc, Mutex};
 
@@ -174,6 +176,77 @@ fn set_notification_encrypted_content(app: AppHandle<BrowserEngine>, allowed: bo
     notifications::allow_encrypted_content(&app, allowed);
 }
 
+#[allow(clippy::unnecessary_wraps)]
+fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::Error>> {
+    // GTK's X11 backend swaps out the X error handlers on the way in,
+    // so the runtime's have to go back on after it.
+    #[cfg(all(feature = "cef", target_os = "linux"))]
+    {
+        gtk::init()?;
+        tauri_runtime_cef::install_x_error_handlers();
+    }
+
+    // Linux never registers schemes at install time, and a Windows dev
+    // build skips the installer, so claim it at runtime.
+    #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+    {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        app.deep_link().register_all()?;
+    }
+
+    #[cfg(all(feature = "cef", target_os = "linux"))]
+    deep_link_ipc::install_handler(app.handle());
+
+    let data_dir = app.path().app_data_dir()?;
+    // Android resolves that to the app data root, which the app
+    // itself may not write to; only `files` under it.
+    #[cfg(target_os = "android")]
+    let data_dir = data_dir.join("files");
+    let (core, events) = Core::new(
+        data_dir.to_string_lossy().into_owned(),
+        Box::new(sable_core::store::FileSessionStore::new(&data_dir)),
+    );
+    let event_sink = Arc::new(EventSink::default());
+    let pushing = core.clone();
+    app.manage(AppState {
+        core,
+        event_sink: event_sink.clone(),
+    });
+    spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
+    #[cfg(desktop)]
+    notifications::register_actions(app.handle());
+    #[cfg(desktop)]
+    app.manage(tray::DesktopWindowStore::default());
+
+    #[cfg(target_os = "ios")]
+    if let Some(window) = app.get_webview_window("main") {
+        ios::hide_form_accessory_bar(&window);
+    }
+
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn apply_desktop_window_settings(
+    app: AppHandle<BrowserEngine>,
+    settings: tray::DesktopWindowSettings,
+) -> Result<tray::DesktopWindowState, String> {
+    tray::apply(&app, settings).map_err(|error| error.to_string())
+}
+
+#[cfg(desktop)]
+fn hide_to_tray_on_close(window: &tauri::Window<BrowserEngine>, event: &tauri::WindowEvent) {
+    let tauri::WindowEvent::CloseRequested { api, .. } = event else {
+        return;
+    };
+    if tray::hides_to_tray(window.app_handle()) {
+        api.prevent_close();
+        tray::hide_to_tray(window);
+    }
+}
+
 #[tauri::command]
 async fn dismiss_room_notification(
     app: AppHandle<BrowserEngine>,
@@ -263,7 +336,9 @@ pub fn run() {
     }));
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    let builder = builder
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .on_window_event(hide_to_tray_on_close);
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder
@@ -286,52 +361,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notifications::init())
-        .setup(|app| {
-            // GTK's X11 backend swaps out the X error handlers on the way in,
-            // so the runtime's have to go back on after it.
-            #[cfg(all(feature = "cef", target_os = "linux"))]
-            {
-                gtk::init()?;
-                tauri_runtime_cef::install_x_error_handlers();
-            }
-
-            // Linux never registers schemes at install time, and a Windows dev
-            // build skips the installer, so claim it at runtime.
-            #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
-            {
-                use tauri_plugin_deep_link::DeepLinkExt;
-                app.deep_link().register_all()?;
-            }
-
-            #[cfg(all(feature = "cef", target_os = "linux"))]
-            deep_link_ipc::install_handler(app.handle());
-
-            let data_dir = app.path().app_data_dir()?;
-            // Android resolves that to the app data root, which the app
-            // itself may not write to; only `files` under it.
-            #[cfg(target_os = "android")]
-            let data_dir = data_dir.join("files");
-            let (core, events) = Core::new(
-                data_dir.to_string_lossy().into_owned(),
-                Box::new(sable_core::store::FileSessionStore::new(&data_dir)),
-            );
-            let event_sink = Arc::new(EventSink::default());
-            let pushing = core.clone();
-            app.manage(AppState {
-                core,
-                event_sink: event_sink.clone(),
-            });
-            spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
-            #[cfg(desktop)]
-            notifications::register_actions(app.handle());
-
-            #[cfg(target_os = "ios")]
-            if let Some(window) = app.get_webview_window("main") {
-                ios::hide_form_accessory_bar(&window);
-            }
-
-            Ok(())
-        })
+        .setup(setup)
         .invoke_handler(tauri::generate_handler![
             submit_command,
             subscribe_events,
@@ -345,6 +375,8 @@ pub fn run() {
             dismiss_room_notification,
             test_notification,
             set_notification_encrypted_content,
+            #[cfg(desktop)]
+            apply_desktop_window_settings,
             share_inbox::share_inbox_drain,
             share_inbox::share_inbox_read,
             share_inbox::share_inbox_clear,

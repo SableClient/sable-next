@@ -355,6 +355,12 @@ html {
   --timeline-row-gap: var(--space-250);
   --timeline-row-padding: var(--space-100);
   --link-decoration: underline;
+  --font-scale: 1;
+  --titlebar-height: 0px;
+  --resize-handle: 4px;
+  --mac-traffic-lights: 4.5rem;
+
+  font-size: calc(100% * var(--font-scale));
 
   /* Code blocks: the estimator reads this, so it has to be a fixed length. */
   --code-line-height: 1.25rem;
@@ -394,6 +400,12 @@ html {
   --safe-right: var(--safe-area-inset-right);
   --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
   --safe-left: var(--safe-area-inset-left);
+}
+
+:root[data-client-decorations='desktop'],
+:root[data-client-decorations='mac'] {
+  --titlebar-height: 2rem;
+  --safe-top: calc(var(--safe-area-inset-top) + var(--titlebar-height));
 }
 
 html,
@@ -447,6 +459,28 @@ body {
   --motion-fast: 0s;
   --motion-normal: 0s;
   --motion-slow: 0s;
+}
+
+:root[data-font-scale='small'] {
+  --font-scale: 0.9375;
+}
+
+:root[data-font-scale='large'] {
+  --font-scale: 1.125;
+}
+
+:root[data-font-scale='largest'] {
+  --font-scale: 1.25;
+}
+
+:root[data-high-contrast='on'] {
+  --border-width: var(--border-width-500);
+  --focus-ring-width: var(--border-width-700);
+  --link-decoration: underline;
+  --opacity-p300: 1;
+  --opacity-p400: 1;
+  --opacity-disabled: 0.6;
+  --opacity-placeholder: 0.8;
 }
 
 @media (pointer: coarse) {

@@ -52,6 +52,7 @@
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import { DropdownMenu } from 'bits-ui';
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
+  import { publishVisibleRoomOrder } from './visible-rooms.svelte.js';
   import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
 
   let contextRoom = $state<RoomSummary | null>(null);
@@ -225,6 +226,9 @@
       )
       .map(roomRow)
       .toSorted(byRecency);
+  });
+  $effect(() => {
+    publishVisibleRoomOrder(rooms.map((row) => row.roomId));
   });
   let subspaces = $derived(spaceRootItems.filter((item) => item.kind === 'category'));
   let visibleSubspaces = $derived<RoomNavItem[]>(visibleItems(subspaces));

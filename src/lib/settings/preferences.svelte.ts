@@ -1,9 +1,12 @@
+import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
+
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
+export type FontScale = 'small' | 'default' | 'large' | 'largest';
 
 export interface Preferences {
   layout: TimelineLayout;
@@ -11,6 +14,9 @@ export interface Preferences {
   theme: ThemeMode;
   underlineLinks: boolean;
   reducedMotion: boolean;
+  fontScale: FontScale;
+  highContrast: boolean;
+  alwaysShowAltText: boolean;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   showUnreadCounts: boolean;
@@ -63,6 +69,9 @@ export interface Preferences {
   telemetryAsked: boolean;
 
   autoUpdateCheck: boolean;
+  closeToTray: boolean;
+  showSystemTrayIcon: boolean;
+  useCustomTitleBar: boolean;
 
   settingsSync: boolean;
   syncDrafts: boolean;
@@ -94,6 +103,7 @@ const ENUMS = {
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'collapsed', 'never'],
+  fontScale: ['small', 'default', 'large', 'largest'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -112,6 +122,9 @@ const DEFAULTS: Preferences = {
   theme: 'system',
   underlineLinks: true,
   reducedMotion: prefersReducedMotion(),
+  fontScale: 'default',
+  highContrast: false,
+  alwaysShowAltText: false,
   showRoomIcon: 'always',
   showRoomBanners: true,
   showUnreadCounts: false,
@@ -162,6 +175,9 @@ const DEFAULTS: Preferences = {
   telemetryAsked: false,
 
   autoUpdateCheck: true,
+  closeToTray: false,
+  showSystemTrayIcon: true,
+  useCustomTitleBar: customTitleBarDefault(),
 
   settingsSync: false,
   syncDrafts: true,

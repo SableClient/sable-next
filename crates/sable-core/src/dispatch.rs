@@ -52,8 +52,9 @@ use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
-    JoinRuleView, MembershipView, MessageKind, MutualRoomView, PaginationDirection, PresenceView,
-    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
+    JoinRuleView, MembershipView, MessageKind, MutualRoomView, PackImageInfoView,
+    PaginationDirection, PresenceView, RoomStateEventView, RoomTag, RoomVersionView,
+    RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -447,6 +448,7 @@ impl Core {
                 room_id,
                 url,
                 body,
+                info,
                 in_reply_to,
                 thread_root,
             } => {
@@ -456,7 +458,7 @@ impl Core {
                 }
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
-                let mut content = StickerEventContent::new(body, ImageInfo::new(), url);
+                let mut content = StickerEventContent::new(body, sticker_info(info), url);
 
                 content.relates_to = match (thread_root, in_reply_to) {
                     (Some(root), reply) => {
@@ -641,6 +643,7 @@ impl Core {
             }
 
             Command::ImagePacks { room_id } => self.image_packs(room_id).await,
+            Command::AllImagePacks => self.all_image_packs().await,
 
             Command::UserProfile { user_id } => {
                 let response = self
@@ -2329,6 +2332,19 @@ fn edit_content(
     info.height = image.height.and_then(|height| UInt::try_from(height).ok());
     content.info = Some(Box::new(info));
     Ok(RoomMessageEventContent::new(MessageType::Image(content)))
+}
+
+fn sticker_info(declared: Option<PackImageInfoView>) -> ImageInfo {
+    let mut info = ImageInfo::new();
+    let Some(declared) = declared else {
+        return info;
+    };
+
+    info.width = declared.width.map(Into::into);
+    info.height = declared.height.map(Into::into);
+    info.mimetype = declared.mimetype;
+    info.size = declared.size.map(Into::into);
+    info
 }
 
 fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {

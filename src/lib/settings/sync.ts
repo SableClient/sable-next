@@ -20,6 +20,9 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'sessionReplay',
   'telemetryAsked',
   'autoUpdateCheck',
+  'closeToTray',
+  'showSystemTrayIcon',
+  'useCustomTitleBar',
   'developerTools',
 ]);
 

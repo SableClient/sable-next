@@ -5,15 +5,20 @@ export type ShortcutId =
   | 'app.openBookmarks'
   | 'app.createRoom'
   | 'app.showShortcuts'
+  | 'app.openSettings'
   | 'navigation.openRoomSearch'
+  | 'navigation.previousRoom'
+  | 'navigation.nextRoom'
   | 'navigation.nextUnread'
   | 'navigation.cycleNextUnread'
-  | 'navigation.cyclePreviousUnread';
+  | 'navigation.cyclePreviousUnread'
+  | 'room.markRead'
+  | 'room.markAllRead';
 
 export interface ShortcutDefinition {
   id: ShortcutId;
   labelKey: string;
-  category: 'general' | 'navigation';
+  category: 'general' | 'navigation' | 'room';
   binding: string;
   allowInEditable?: boolean;
 }
@@ -52,6 +57,24 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     binding: 'mod+/',
   },
   {
+    id: 'app.openSettings',
+    labelKey: 'shortcuts.openSettings',
+    category: 'general',
+    binding: 'mod+,',
+  },
+  {
+    id: 'navigation.previousRoom',
+    labelKey: 'shortcuts.previousRoom',
+    category: 'navigation',
+    binding: 'alt+up',
+  },
+  {
+    id: 'navigation.nextRoom',
+    labelKey: 'shortcuts.nextRoom',
+    category: 'navigation',
+    binding: 'alt+down',
+  },
+  {
     id: 'navigation.nextUnread',
     labelKey: 'shortcuts.nextUnread',
     category: 'navigation',
@@ -68,6 +91,18 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.cyclePreviousUnread',
     category: 'navigation',
     binding: 'alt+shift+up',
+  },
+  {
+    id: 'room.markRead',
+    labelKey: 'shortcuts.markRead',
+    category: 'room',
+    binding: 'shift+escape',
+  },
+  {
+    id: 'room.markAllRead',
+    labelKey: 'shortcuts.markAllRead',
+    category: 'room',
+    binding: 'mod+shift+escape',
   },
 ] as const;
 

@@ -37,7 +37,15 @@ const packs: ImagePackView[] = [
     name: 'Room pack',
     avatar_url: null,
     attribution: null,
-    images: [{ shortcode: 'wave', url: 'mxc://example.org/wave', body: null, usage: ['emoticon'] }],
+    images: [
+      {
+        shortcode: 'wave',
+        url: 'mxc://example.org/wave',
+        body: null,
+        usage: ['emoticon'],
+        info: null,
+      },
+    ],
   },
 ];
 

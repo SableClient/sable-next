@@ -1,7 +1,8 @@
 import { on } from 'svelte/events';
 
 import { isDialogOpen, isEditableTarget, matchesBinding } from './binding.js';
-import { SHORTCUTS, type ShortcutId } from './shortcuts.js';
+import { effectiveShortcuts } from './bindings.svelte.js';
+import { type ShortcutId } from './shortcuts.js';
 
 export type ShortcutHandlers = Partial<Record<ShortcutId, (event: KeyboardEvent) => void>>;
 
@@ -15,7 +16,7 @@ export function registerGlobalShortcuts(handlers: ShortcutHandlers): () => void 
 
     const isMac = isMacPlatform();
 
-    for (const shortcut of SHORTCUTS) {
+    for (const shortcut of effectiveShortcuts()) {
       const handler = handlers[shortcut.id];
       if (!handler) continue;
       if (!shortcut.allowInEditable && isEditableTarget(event.target)) continue;

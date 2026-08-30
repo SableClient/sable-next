@@ -308,6 +308,7 @@
     .sidebar {
       height: 100dvh;
       left: 0;
+      padding-top: var(--titlebar-height);
       position: fixed;
       top: 0;
       width: calc(var(--navigation-rail-width) + var(--room-nav-width));

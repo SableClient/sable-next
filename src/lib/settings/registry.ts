@@ -8,9 +8,11 @@ import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
 import ChatTextIcon from 'phosphor-svelte/lib/ChatTextIcon';
 import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
 import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
+import CircleHalfIcon from 'phosphor-svelte/lib/CircleHalfIcon';
 import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
 import CloudArrowUpIcon from 'phosphor-svelte/lib/CloudArrowUpIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
+import DesktopIcon from 'phosphor-svelte/lib/DesktopIcon';
 import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
 import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
@@ -41,6 +43,7 @@ import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
+import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
 import { setPreference } from './preferences.svelte';
 import type { FreeTextPreference, Preferences } from './preferences.svelte';
@@ -151,6 +154,45 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
     ]
   : [];
 
+const desktopCategories: SettingsCategory[] = supportsDesktopWindow()
+  ? [
+      {
+        id: 'desktop',
+        name: 'settings.desktopTitle',
+        description: 'settings.desktopDescription',
+        icon: DesktopIcon,
+        items: [
+          {
+            key: 'useCustomTitleBar',
+            icon: DesktopIcon,
+            name: 'settings.useCustomTitleBar',
+            description: 'settings.useCustomTitleBarHint',
+            type: 'boolean',
+          },
+          ...(supportsTray()
+            ? ([
+                {
+                  key: 'showSystemTrayIcon',
+                  icon: DesktopIcon,
+                  name: 'settings.showSystemTrayIcon',
+                  description: 'settings.showSystemTrayIconHint',
+                  type: 'boolean',
+                },
+                {
+                  key: 'closeToTray',
+                  icon: DesktopIcon,
+                  name: 'settings.closeToTray',
+                  description: 'settings.closeToTrayHint',
+                  type: 'boolean',
+                  gatedBy: 'showSystemTrayIcon',
+                },
+              ] satisfies SettingDefinition[])
+            : []),
+        ],
+      },
+    ]
+  : [];
+
 const updatesCategories: SettingsCategory[] = supportsAutoUpdate()
   ? [
       {
@@ -227,20 +269,6 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
-        key: 'underlineLinks',
-        icon: LinkIcon,
-        name: 'settings.underlineLinks',
-        description: 'settings.underlineLinksHint',
-        type: 'boolean',
-      },
-      {
-        key: 'reducedMotion',
-        icon: WheelchairMotionIcon,
-        name: 'settings.reducedMotion',
-        description: 'settings.reducedMotionHint',
-        type: 'boolean',
-      },
-      {
         key: 'showRoomBanners',
         icon: ImageIcon,
         name: 'settings.showRoomBanners',
@@ -266,6 +294,55 @@ export const settingsCategories: SettingsCategory[] = [
         icon: MegaphoneIcon,
         name: 'settings.showPingCounts',
         description: 'settings.showPingCountsHint',
+        type: 'boolean',
+      },
+    ],
+  },
+  {
+    id: 'accessibility',
+    name: 'settings.accessibilityTitle',
+    description: 'settings.accessibilityDescription',
+    icon: WheelchairMotionIcon,
+    items: [
+      {
+        key: 'fontScale',
+        icon: TextAaIcon,
+        name: 'settings.fontScale',
+        description: 'settings.fontScaleHint',
+        type: 'select',
+        options: [
+          { value: 'small', label: 'settings.fontScaleSmall' },
+          { value: 'default', label: 'settings.fontScaleDefault' },
+          { value: 'large', label: 'settings.fontScaleLarge' },
+          { value: 'largest', label: 'settings.fontScaleLargest' },
+        ],
+      },
+      {
+        key: 'highContrast',
+        icon: CircleHalfIcon,
+        name: 'settings.highContrast',
+        description: 'settings.highContrastHint',
+        type: 'boolean',
+      },
+      {
+        key: 'underlineLinks',
+        icon: LinkIcon,
+        name: 'settings.underlineLinks',
+        description: 'settings.underlineLinksHint',
+        type: 'boolean',
+      },
+      {
+        key: 'reducedMotion',
+        icon: WheelchairMotionIcon,
+        name: 'settings.reducedMotion',
+        description: 'settings.reducedMotionHint',
+        type: 'boolean',
+      },
+      {
+        key: 'alwaysShowAltText',
+        icon: EyeIcon,
+        name: 'settings.alwaysShowAltText',
+        description: 'settings.alwaysShowAltTextHint',
         type: 'boolean',
       },
     ],
@@ -543,6 +620,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
     ],
   },
+  ...desktopCategories,
   ...updatesCategories,
   {
     id: 'sync',

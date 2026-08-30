@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import {
+  bindingFromEvent,
   findShortcutConflicts,
   formatBinding,
   isEditableTarget,
@@ -172,4 +173,22 @@ test('formats a non-mac binding with words', () => {
 
 test('formats named keys by their display label', () => {
   expect(formatBinding('alt+shift+down', false)).toBe('Alt+Shift+Down');
+});
+
+test('turns an event into a binding the parser round-trips', () => {
+  expect(bindingFromEvent(event({ key: 'K', ctrlKey: true, shiftKey: true }), false)).toBe(
+    'mod+shift+k'
+  );
+  expect(bindingFromEvent(event({ key: 'K', metaKey: true }), true)).toBe('mod+k');
+  expect(
+    matchesBinding('mod+shift+k', event({ key: 'k', ctrlKey: true, shiftKey: true }), false)
+  ).toBe(true);
+});
+
+test('reports a modifier-only event as unbindable', () => {
+  expect(bindingFromEvent(event({ key: 'Shift', shiftKey: true }), false)).toBeNull();
+});
+
+test('keeps a mac control press distinct from the command modifier', () => {
+  expect(bindingFromEvent(event({ key: 'p', ctrlKey: true }), true)).toBe('ctrl+p');
 });

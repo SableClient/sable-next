@@ -5,11 +5,15 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-use crate::protocol::{ImagePackOriginView, ImagePackView, ImageUsageView, PackImageView};
+use crate::protocol::{
+    ImagePackOriginView, ImagePackView, ImageUsageView, PackImageInfoView, PackImageView,
+};
 
 pub const USER_EMOTES: &str = "im.ponies.user_emotes";
 pub const ROOM_EMOTES: &str = "im.ponies.room_emotes";
+pub const ROOM_IMAGE_PACK: &str = "m.room.image_pack";
 pub const EMOTE_ROOMS: &str = "im.ponies.emote_rooms";
+pub const IMAGE_PACK_ROOMS: &str = "m.image_pack.rooms";
 
 #[derive(Debug, Deserialize)]
 pub struct PackContent {
@@ -23,6 +27,28 @@ pub struct PackImage {
     pub url: String,
     pub body: Option<String>,
     pub usage: Option<Vec<String>>,
+    pub info: Option<PackImageInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PackImageInfo {
+    #[serde(rename = "w")]
+    pub width: Option<u32>,
+    #[serde(rename = "h")]
+    pub height: Option<u32>,
+    pub mimetype: Option<String>,
+    pub size: Option<u32>,
+}
+
+impl From<PackImageInfo> for PackImageInfoView {
+    fn from(info: PackImageInfo) -> Self {
+        Self {
+            width: info.width,
+            height: info.height,
+            mimetype: info.mimetype,
+            size: info.size,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,6 +108,7 @@ pub fn pack_view(
         .map(|(shortcode, image)| PackImageView {
             usage: usages(image.usage.as_ref().or(pack_usage)),
             body: image.body,
+            info: image.info.map(Into::into),
             url: image.url,
             shortcode,
         })
@@ -138,16 +165,23 @@ impl Core {
 
         let room = self.room(&room_id).await?;
         packs.extend(
-            Self::room_packs(&client, &room, ImagePackOriginView::Room, None)
+            Self::room_packs(&client, &room, ImagePackOriginView::Room, None, true)
                 .await
                 .map_err(|error| self.failed("image_packs_room", error))?,
         );
 
-        let subscribed = client
+        let mut subscribed = client
             .account()
-            .account_data_raw(GlobalAccountDataEventType::from(EMOTE_ROOMS))
+            .account_data_raw(GlobalAccountDataEventType::from(IMAGE_PACK_ROOMS))
             .await
             .map_err(|error| self.failed("image_packs_global", error))?;
+        if subscribed.is_none() {
+            subscribed = client
+                .account()
+                .account_data_raw(GlobalAccountDataEventType::from(EMOTE_ROOMS))
+                .await
+                .map_err(|error| self.failed("image_packs_global", error))?;
+        }
         if let Some(rooms) =
             subscribed.and_then(|raw| raw.deserialize_as_unchecked::<EmoteRooms>().ok())
         {
@@ -168,6 +202,7 @@ impl Core {
                         &subscribed_room,
                         ImagePackOriginView::Global,
                         Some(&wanted),
+                        true,
                     )
                     .await
                     .map_err(|error| self.failed("image_packs_global_room", error))?,
@@ -177,6 +212,38 @@ impl Core {
 
         packs.retain(|pack| !pack.images.is_empty());
         Ok(CommandOk::ImagePacks { packs })
+    }
+
+    pub(crate) async fn all_image_packs(&self) -> Result<CommandOk, CommandErr> {
+        let client = self.client().await?;
+        let mut packs = Vec::new();
+
+        let own = client
+            .account()
+            .account_data_raw(GlobalAccountDataEventType::from(USER_EMOTES))
+            .await
+            .map_err(|error| self.failed("all_image_packs_account", error))?;
+        if let Some(content) =
+            own.and_then(|raw| raw.deserialize_as_unchecked::<PackContent>().ok())
+        {
+            packs.push(pack_view(
+                content,
+                String::new(),
+                ImagePackOriginView::Account,
+                None,
+            ));
+        }
+
+        for room in client.joined_rooms() {
+            let room_packs =
+                Self::room_packs(&client, &room, ImagePackOriginView::Room, None, false)
+                    .await
+                    .map_err(|error| self.failed("all_image_packs", error))?;
+            packs.extend(room_packs);
+        }
+
+        packs.retain(|pack| pack.origin == ImagePackOriginView::Account || !pack.images.is_empty());
+        Ok(CommandOk::AllImagePacks { packs })
     }
 
     /// `None` takes every pack the room publishes.
@@ -189,45 +256,50 @@ impl Core {
         room: &matrix_sdk::Room,
         origin: ImagePackOriginView,
         wanted: Option<&[String]>,
+        network_fallback: bool,
     ) -> Result<Vec<ImagePackView>, matrix_sdk::Error> {
-        let stored = room
-            .get_state_events(StateEventType::from(ROOM_EMOTES))
-            .await?;
-        let mut parsed: Vec<RoomPackEvent> = stored
-            .iter()
-            .filter_map(|event| {
+        let mut parsed: BTreeMap<String, RoomPackEvent> = BTreeMap::new();
+        for event_type in [ROOM_EMOTES, ROOM_IMAGE_PACK] {
+            let stored = room
+                .get_state_events(StateEventType::from(event_type))
+                .await?;
+            for event in &stored {
                 let json = match event {
                     RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
                     RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
                 };
-                serde_json::from_str::<RoomPackEvent>(json.get()).ok()
-            })
-            .collect();
+                if let Ok(pack) = serde_json::from_str::<RoomPackEvent>(json.get()) {
+                    parsed.insert(pack.state_key.clone(), pack);
+                }
+            }
+        }
 
-        if parsed.is_empty() {
+        if parsed.is_empty() && network_fallback {
             let response = client
                 .send(get_state_events::v3::Request::new(
                     room.room_id().to_owned(),
                 ))
                 .await?;
-            parsed = response
-                .room_state
-                .iter()
-                .filter_map(|raw| {
-                    let event = serde_json::from_str::<RoomPackEvent>(raw.json().get()).ok()?;
-                    (event.event_type == ROOM_EMOTES).then_some(event)
-                })
-                .collect();
+            for event_type in [ROOM_EMOTES, ROOM_IMAGE_PACK] {
+                for raw in &response.room_state {
+                    let Ok(pack) = serde_json::from_str::<RoomPackEvent>(raw.json().get()) else {
+                        continue;
+                    };
+                    if pack.event_type == event_type {
+                        parsed.insert(pack.state_key.clone(), pack);
+                    }
+                }
+            }
         }
 
         let mut packs = Vec::new();
-        for event in parsed {
-            if wanted.is_some_and(|keys| !keys.contains(&event.state_key)) {
+        for (state_key, event) in parsed {
+            if wanted.is_some_and(|keys| !keys.contains(&state_key)) {
                 continue;
             }
             packs.push(pack_view(
                 event.content,
-                event.state_key,
+                state_key,
                 origin,
                 Some(room.room_id().to_string()),
             ));
@@ -287,6 +359,29 @@ mod tests {
             view.images[0].usage,
             vec![ImageUsageView::Emoticon, ImageUsageView::Sticker]
         );
+    }
+
+    #[test]
+    fn an_image_carries_the_info_the_pack_declares() {
+        let content = parse(
+            r#"{"images":{"blob":{"url":"mxc://a/b",
+                "info":{"w":1,"h":2,"mimetype":"image/png","size":3}}}}"#,
+        );
+        let view = pack_view(content, String::new(), ImagePackOriginView::Account, None);
+        let info = view.images[0].info.as_ref().expect("info");
+
+        assert_eq!(info.width, Some(1));
+        assert_eq!(info.height, Some(2));
+        assert_eq!(info.mimetype.as_deref(), Some("image/png"));
+        assert_eq!(info.size, Some(3));
+    }
+
+    #[test]
+    fn an_image_with_no_declared_info_carries_none() {
+        let content = parse(r#"{"images":{"blob":{"url":"mxc://a/b"}}}"#);
+        let view = pack_view(content, String::new(), ImagePackOriginView::Account, None);
+
+        assert!(view.images[0].info.is_none());
     }
 
     #[test]

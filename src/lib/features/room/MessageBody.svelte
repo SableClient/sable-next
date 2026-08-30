@@ -8,6 +8,8 @@
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+
   import { firstPreviewableLink } from './link-preview.js';
   import LinkPreviewCard from './LinkPreviewCard.svelte';
   import { isCaption } from './members.js';
@@ -52,6 +54,7 @@
     retryable
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
   />
+  {#if preferences.alwaysShowAltText}<p class="body">{item.content.body}</p>{/if}
 {:else if item.content.kind === 'image'}
   <MediaImage
     class="image"
@@ -66,7 +69,9 @@
     retryable
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
   />
-  {#if isCaption(item.content.body)}<p class="body">{item.content.body}</p>{/if}
+  {#if isCaption(item.content.body) || preferences.alwaysShowAltText}<p class="body">
+      {item.content.body}
+    </p>{/if}
 {:else if item.content.kind === 'gallery'}
   <TimelineGallery
     items={item.content.items}

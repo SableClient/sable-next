@@ -160,3 +160,20 @@ export function formatBinding(binding: string, isMac: boolean): string {
 
   return parts.join('+');
 }
+
+const MODIFIER_KEYS = new Set(['control', 'meta', 'alt', 'shift', 'os', 'altgraph']);
+
+export function bindingFromEvent(event: KeyboardEventLike, isMac: boolean): string | null {
+  const key = event.key.toLowerCase();
+  if (MODIFIER_KEYS.has(key)) return null;
+
+  const parts: string[] = [];
+  if (isMac ? event.metaKey : event.ctrlKey) parts.push('mod');
+  if (isMac && event.ctrlKey) parts.push('ctrl');
+  if (!isMac && event.metaKey) parts.push('meta');
+  if (event.altKey) parts.push('alt');
+  if (event.shiftKey) parts.push('shift');
+  parts.push(key === ' ' ? 'space' : key);
+
+  return parts.join('+');
+}

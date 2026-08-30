@@ -35,7 +35,7 @@ test('enabling it in settings sets the attribute on the document element', async
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await installRoomCore('ready');
   await app.openHome();
-  await page.goto('/settings/appearance');
+  await page.goto('/settings/accessibility');
 
   const toggle = page.getByRole('switch', { name: 'Reduce motion' });
   await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'off');

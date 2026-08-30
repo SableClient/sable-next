@@ -56,7 +56,13 @@ function open(emotes: PackImageView[] = []): EditorView {
 }
 
 function emote(shortcode: string): PackImageView {
-  return { shortcode, url: `mxc://example.org/${shortcode}`, body: null, usage: ['emoticon'] };
+  return {
+    shortcode,
+    url: `mxc://example.org/${shortcode}`,
+    body: null,
+    usage: ['emoticon'],
+    info: null,
+  };
 }
 
 test('a hand-typed shortcode becomes the emoji', () => {

@@ -4,7 +4,8 @@
 
   import { formatBinding } from './binding.js';
   import { isMacPlatform } from './global-shortcuts.js';
-  import { SHORTCUTS, type ShortcutDefinition } from './shortcuts.js';
+  import { effectiveShortcuts } from './bindings.svelte.js';
+  import { type ShortcutDefinition } from './shortcuts.js';
 
   interface Props {
     open?: boolean;
@@ -15,7 +16,10 @@
   const categories: Array<{ id: ShortcutDefinition['category']; labelKey: string }> = [
     { id: 'navigation', labelKey: 'shortcuts.categoryNavigation' },
     { id: 'general', labelKey: 'shortcuts.categoryGeneral' },
+    { id: 'room', labelKey: 'shortcuts.categoryRoom' },
   ];
+
+  let shortcuts = $derived(effectiveShortcuts());
 
   let isMac = $derived(isMacPlatform());
 </script>
@@ -24,7 +28,7 @@
   <div class="help">
     <h2>{$i18n.t('shortcuts.helpTitle')}</h2>
     {#each categories as category (category.id)}
-      {@const items = SHORTCUTS.filter((shortcut) => shortcut.category === category.id)}
+      {@const items = shortcuts.filter((shortcut) => shortcut.category === category.id)}
       <section aria-labelledby="shortcuts-{category.id}">
         <h3 id="shortcuts-{category.id}">{$i18n.t(category.labelKey)}</h3>
         <ul>

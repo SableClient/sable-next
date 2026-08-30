@@ -22,6 +22,7 @@ function emote(shortcode: string): PackImageView {
     url: `mxc://example.org/${shortcode}`,
     body: null,
     usage: ['emoticon'],
+    info: null,
   };
 }
 

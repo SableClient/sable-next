@@ -1,3 +1,4 @@
+import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
 import type { MessageKind } from '#src/generated/MessageKind';
 import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
@@ -125,11 +126,17 @@ export class Conversation {
     });
   };
 
-  readonly sendSticker = async (targetRoomId: string, url: string, body: string): Promise<void> => {
+  readonly sendSticker = async (
+    targetRoomId: string,
+    url: string,
+    body: string,
+    info: PackImageInfoView | null = null
+  ): Promise<void> => {
     await this.#core.commands.sendSticker(
       targetRoomId,
       url,
       body,
+      info,
       this.#consumeReply(),
       this.#threadRoot
     );

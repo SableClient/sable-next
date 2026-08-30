@@ -1,4 +1,5 @@
 import type { BookmarkView } from '#src/generated/BookmarkView';
+import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
 import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
 import type { PersonaView } from '#src/generated/PersonaView';
@@ -401,6 +402,11 @@ export function createCommands(transport: () => Transport) {
       return response.packs;
     },
 
+    async allImagePacks(): Promise<ImagePackView[]> {
+      const response = await transport().send({ type: 'all_image_packs' });
+      return response.packs;
+    },
+
     async inviteUser(roomId: string, userId: string): Promise<void> {
       await transport().send({
         type: 'invite_user',
@@ -586,6 +592,7 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       url: string,
       body: string,
+      info: PackImageInfoView | null = null,
       inReplyTo: string | null = null,
       threadRoot: string | null = null
     ): Promise<void> {
@@ -594,6 +601,7 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
         url,
         body,
+        info,
         in_reply_to: inReplyTo,
         thread_root: threadRoot,
       });

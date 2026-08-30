@@ -1,5 +1,7 @@
 import type { Component } from 'svelte';
 import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
+import KeyboardIcon from 'phosphor-svelte/lib/KeyboardIcon';
+import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import LockKeyIcon from 'phosphor-svelte/lib/LockKeyIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 
@@ -8,6 +10,8 @@ import { SETTINGS_ACCOUNT_SECTION, SETTINGS_DEVICES_SECTION } from '#lib/setting
 import AccountSettings from './AccountSettings.svelte';
 import AboutSettings from './AboutSettings.svelte';
 import DevicesSettings from './DevicesSettings.svelte';
+import EmoteSettings from '#lib/features/emotes/EmoteSettings.svelte';
+import KeyboardSettings from './KeyboardSettings.svelte';
 
 export interface StandaloneSection {
   id: string;
@@ -26,6 +30,18 @@ export const sectionsBeforeCategories: StandaloneSection[] = [
 ];
 
 export const sectionsAfterCategories: StandaloneSection[] = [
+  {
+    id: 'emotes',
+    label: 'settings.emotes',
+    icon: SmileyIcon,
+    component: EmoteSettings,
+  },
+  {
+    id: 'keyboard',
+    label: 'settings.keyboard',
+    icon: KeyboardIcon,
+    component: KeyboardSettings,
+  },
   {
     id: SETTINGS_DEVICES_SECTION,
     label: 'settings.security',

@@ -66,6 +66,8 @@
   import { registerGlobalShortcuts } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
+  import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
+  import { roomAtOffset } from '#lib/features/sidebar/visible-rooms.svelte.js';
 
   interface Props {
     children: Snippet;
@@ -399,6 +401,24 @@
       },
       'app.showShortcuts': () => {
         shortcutsHelpState.open = true;
+      },
+      'app.openSettings': () => {
+        void goto(resolve('/(app)/settings'));
+      },
+      'navigation.previousRoom': () => {
+        const target = roomAtOffset(openRoomId, -1);
+        if (target) jumpToRoom(target);
+      },
+      'navigation.nextRoom': () => {
+        const target = roomAtOffset(openRoomId, 1);
+        if (target) jumpToRoom(target);
+      },
+      'room.markRead': () => {
+        const room = roomList.rooms.find((candidate) => candidate.room_id === openRoomId);
+        markRoomsRead([room], core.commands, readReceiptIsPrivate());
+      },
+      'room.markAllRead': () => {
+        markRoomsRead(roomList.rooms, core.commands, readReceiptIsPrivate());
       },
       'navigation.nextUnread': () => {
         const unread = unreadRoomsByPriority(roomList.rooms, openRoomId);

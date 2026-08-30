@@ -10,6 +10,7 @@
   import { createCoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
   import BannerDock from '#lib/ui/BannerDock.svelte';
+  import TitleBar from '#lib/ui/TitleBar.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
   import WebUpdateBanner from '#lib/ui/WebUpdateBanner.svelte';
@@ -17,6 +18,11 @@
   import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
+  import {
+    applyDesktopWindowSettings,
+    titleBarKind,
+    type TitleBarKind,
+  } from '#lib/platform/window-decorations.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { activeCustomThemeCss } from '#lib/settings/custom-themes.svelte.js';
   import { applyCustomTheme, applyTheme, resolveTheme } from '#lib/settings/theme.js';
@@ -29,6 +35,7 @@
   const core = createCoreClient();
   provideCoreClient(core);
   let systemPrefersDark = $state(false);
+  let titlebar = $state<TitleBarKind | null>(null);
 
   onMount(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -41,6 +48,7 @@
     if (isTauri()) {
       document.documentElement.dataset.tauriOs = osType();
     }
+
     const stopTrackingKeyboard = trackKeyboardInset();
     void core.start();
     return () => {
@@ -48,6 +56,25 @@
       stopTrackingKeyboard();
       core.stop();
     };
+  });
+
+  $effect(() => {
+    const kind = titleBarKind(preferences.useCustomTitleBar);
+    titlebar = kind;
+    document.documentElement.dataset.clientDecorations = kind === null ? 'off' : kind;
+
+    void applyDesktopWindowSettings({
+      closeToTray: preferences.closeToTray,
+      showSystemTrayIcon: preferences.showSystemTrayIcon,
+      useCustomTitleBar: preferences.useCustomTitleBar,
+    }).catch((error: unknown) => {
+      console.debug('[sable window] the desktop window settings were not applied', error);
+    });
+  });
+
+  $effect(() => {
+    document.documentElement.dataset.fontScale = preferences.fontScale;
+    document.documentElement.dataset.highContrast = preferences.highContrast ? 'on' : 'off';
   });
 
   $effect(() => {
@@ -64,6 +91,9 @@
 <!-- Icons ride along with a labelled control, so `role="img"` would only add a
      nameless node to the tree. -->
 <IconContext values={{ 'aria-hidden': true }}>
+  {#if titlebar}
+    <TitleBar kind={titlebar} />
+  {/if}
   <CoreHealthBanner />
   <BannerDock>
     <TelemetryConsentBanner />

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ImageUsageView } from '#src/generated/ImageUsageView';
   import type { MemberView } from '#src/generated/MemberView';
+  import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
   import type { PackImageView } from '#src/generated/PackImageView';
   import { Portal } from 'bits-ui';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
@@ -72,7 +73,12 @@
       mentions: OutgoingMentions
     ) => Promise<unknown>;
     onSendAttachment: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
-    onSendSticker?: (roomId: string, url: string, body: string) => Promise<void>;
+    onSendSticker?: (
+      roomId: string,
+      url: string,
+      body: string,
+      info: PackImageInfoView | null
+    ) => Promise<void>;
     onSendGif?: (roomId: string, gif: GifResult) => Promise<void>;
     onCreatePoll?: (
       roomId: string,
@@ -464,7 +470,7 @@
     if (usage === 'sticker') {
       if (!onSendSticker) return;
       try {
-        await onSendSticker(roomId, image.url, image.body ?? image.shortcode);
+        await onSendSticker(roomId, image.url, image.body ?? image.shortcode, image.info);
         error = null;
       } catch (cause) {
         console.debug('[sable composer] sticker failed', cause);

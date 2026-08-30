@@ -108,6 +108,7 @@ pub enum Command {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
     },
+    AllImagePacks,
     UserProfile {
         #[ts(type = "string")]
         user_id: OwnedUserId,
@@ -151,6 +152,8 @@ pub enum Command {
         /// `mxc://` only; the core rejects anything else.
         url: String,
         body: String,
+        #[serde(default)]
+        info: Option<PackImageInfoView>,
         #[serde(default)]
         #[ts(type = "string | null")]
         in_reply_to: Option<OwnedEventId>,
@@ -933,6 +936,9 @@ pub enum CommandOk {
         notification: Option<NotificationView>,
     },
     ImagePacks {
+        packs: Vec<ImagePackView>,
+    },
+    AllImagePacks {
         packs: Vec<ImagePackView>,
     },
     /// Boxed: the extended fields make this the widest variant by far.
@@ -2569,6 +2575,20 @@ pub struct PackImageView {
     pub url: String,
     pub body: Option<String>,
     pub usage: Vec<ImageUsageView>,
+    pub info: Option<PackImageInfoView>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(default)]
+pub struct PackImageInfoView {
+    #[ts(type = "number | null")]
+    pub width: Option<u32>,
+    #[ts(type = "number | null")]
+    pub height: Option<u32>,
+    pub mimetype: Option<String>,
+    #[ts(type = "number | null")]
+    pub size: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, TS)]

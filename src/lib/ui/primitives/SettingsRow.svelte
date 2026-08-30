@@ -21,6 +21,7 @@
     'data-settings-focus'?: string;
     badge?: string;
     titleAction?: TitleAction;
+    before?: Snippet;
     children?: Snippet;
   }
 
@@ -36,6 +37,7 @@
     'data-settings-focus': dataSettingsFocus,
     badge,
     titleAction,
+    before,
     children,
   }: Props = $props();
 </script>
@@ -45,6 +47,7 @@
   data-settings-focus={dataSettingsFocus}
   class={['setting-row', { disabled, highlighted }, className]}
 >
+  {#if before}<span class="row-before">{@render before()}</span>{/if}
   {#if Icon}<span class="row-icon" aria-hidden="true"><Icon /></span>{/if}
   <div class="row-copy">
     <div class="row-name">
@@ -75,6 +78,12 @@
 
   :global(.setting-row + .setting-row) {
     border-top: var(--border-width) solid var(--sable-bg-container-line);
+  }
+
+  .row-before {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
   }
 
   .row-icon {

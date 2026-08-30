@@ -8,6 +8,7 @@ import type { JoinRuleView } from "./JoinRuleView";
 import type { MembershipView } from "./MembershipView";
 import type { MessageKind } from "./MessageKind";
 import type { NotificationModeView } from "./NotificationModeView";
+import type { PackImageInfoView } from "./PackImageInfoView";
 import type { PaginationDirection } from "./PaginationDirection";
 import type { PerMessageProfileView } from "./PerMessageProfileView";
 import type { PersonaView } from "./PersonaView";
@@ -26,7 +27,7 @@ export type Command = { "type": "discover_homeserver", server_name: string, } | 
  * arrive as `HiddenEvent`. Baked into the timeline, so flipping it
  * means re-subscribing.
  */
-hidden_events: boolean, } | { "type": "unsubscribe", subscription: SubscriptionId, } | { "type": "paginate", subscription: SubscriptionId, direction: PaginationDirection, count: number, } | { "type": "room_members", room_id: string, memberships: Array<MembershipView>, } | { "type": "room_permissions", room_id: string, } | { "type": "notification_settings", room_id: string, } | { "type": "default_notification_modes" } | { "type": "notification", room_id: string, event_id: string, } | { "type": "image_packs", room_id: string, } | { "type": "user_profile", user_id: string, } | { "type": "user_relations", user_id: string, } | { "type": "send_message", room_id: string, body: string, formatted: string | null, kind: MessageKind, thread_root: string | null, 
+hidden_events: boolean, } | { "type": "unsubscribe", subscription: SubscriptionId, } | { "type": "paginate", subscription: SubscriptionId, direction: PaginationDirection, count: number, } | { "type": "room_members", room_id: string, memberships: Array<MembershipView>, } | { "type": "room_permissions", room_id: string, } | { "type": "notification_settings", room_id: string, } | { "type": "default_notification_modes" } | { "type": "notification", room_id: string, event_id: string, } | { "type": "image_packs", room_id: string, } | { "type": "all_image_packs" } | { "type": "user_profile", user_id: string, } | { "type": "user_relations", user_id: string, } | { "type": "send_message", room_id: string, body: string, formatted: string | null, kind: MessageKind, thread_root: string | null, 
 /**
  * Replying inside a thread needs no extra field: the SDK infers the
  * thread from the replied-to event.
@@ -35,7 +36,7 @@ in_reply_to: string | null, mentions: string[], mentions_room: boolean, persona:
 /**
  * `mxc://` only; the core rejects anything else.
  */
-url: string, body: string, in_reply_to: string | null, thread_root: string | null, } | { "type": "send_gif", room_id: string, 
+url: string, body: string, info: PackImageInfoView | null, in_reply_to: string | null, thread_root: string | null, } | { "type": "send_gif", room_id: string, 
 /**
  * `mxc://` only; the core rejects anything else.
  */
