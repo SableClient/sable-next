@@ -40,7 +40,7 @@
     align-items: center;
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--space-400);
     max-width: 32rem;
     text-align: center;
   }

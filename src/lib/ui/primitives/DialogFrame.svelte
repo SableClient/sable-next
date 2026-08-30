@@ -94,14 +94,20 @@
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
     box-shadow: var(--shadow-dialog);
-    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-2) * 2);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);
     overflow: auto;
-    padding: var(--space-4);
+    padding: var(--space-500);
 
     /* Bottom-anchored, so the home indicator would otherwise sit on the content. */
-    padding-bottom: calc(var(--space-4) + var(--safe-bottom));
+    padding-bottom: calc(var(--space-500) + var(--safe-bottom));
     width: 100%;
     z-index: var(--layer-sheet);
+  }
+
+  /* Several dialog bodies cap themselves against the viewport. Keep those
+     widths inside this panel's padded content box on narrow screens. */
+  :global(.sable-dialog-content-verification > *) {
+    max-width: 100%;
   }
 
   :global(.sable-dialog-content-sheet) {
@@ -115,7 +121,7 @@
       bottom: auto;
       left: 50%;
       max-width: min(34rem, calc(100vw - 3rem));
-      padding: calc(var(--space-2) * 2);
+      padding: var(--space-600);
       top: 50%;
       transform: translate(-50%, -50%);
 
@@ -143,20 +149,20 @@
   @keyframes dialog-in {
     from {
       opacity: 0;
-      transform: translate(-50%, calc(-50% + var(--space-1))) scale(0.98);
+      transform: translate(-50%, calc(-50% + var(--space-200))) scale(0.98);
     }
   }
 
   @keyframes sheet-in {
     from {
       opacity: 0;
-      transform: translateY(var(--space-2));
+      transform: translateY(var(--space-300));
     }
   }
 
   @keyframes drawer-in {
     from {
-      transform: translateX(var(--space-3));
+      transform: translateX(var(--space-400));
     }
   }
 

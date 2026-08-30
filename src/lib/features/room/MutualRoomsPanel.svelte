@@ -58,13 +58,13 @@
   .profile-rooms-title {
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-200);
   }
 
   .profile-rooms {
     display: grid;
     font-size: var(--font-size-small);
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -94,7 +94,7 @@
     display: grid;
     gap: var(--space-100);
     justify-items: start;
-    margin-top: var(--space-1);
+    margin-top: var(--space-200);
   }
 
   :global(.profile-rooms-link) {

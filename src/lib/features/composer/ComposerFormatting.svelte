@@ -66,7 +66,7 @@
   .formatting {
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     overflow-x: auto;
     overscroll-behavior-x: contain;
     padding: var(--space-150) var(--space-200);

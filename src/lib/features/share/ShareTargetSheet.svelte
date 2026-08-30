@@ -100,12 +100,12 @@
 <style>
   .share {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     width: min(28rem, calc(100vw - 2rem));
   }
 
   h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     margin: 0;
   }
 

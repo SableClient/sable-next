@@ -35,8 +35,8 @@
     box-shadow: var(--shadow-dialog);
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-3);
+    gap: var(--space-400);
+    padding: var(--space-400);
   }
 
   .banner-warning {
@@ -78,13 +78,13 @@
   .body {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: calc(var(--space-1) / 2) 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .actions {
     display: flex;
     flex: 0 0 auto;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
     pointer-events: auto;
     width: 100%;

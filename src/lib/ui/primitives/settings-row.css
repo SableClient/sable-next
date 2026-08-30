@@ -8,9 +8,9 @@
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  min-height: calc(var(--control-height-medium) + var(--space-2));
-  padding: var(--space-2) var(--space-3);
+  gap: var(--space-400);
+  min-height: calc(var(--control-height-medium) + var(--space-300));
+  padding: var(--space-300) var(--space-400);
 }
 
 .settings-row + .settings-row {
@@ -30,7 +30,7 @@
 .settings-row-copy p {
   color: var(--sable-surface-var-on-container);
   font-size: var(--font-size-small);
-  margin: calc(var(--space-1) / 2) 0 0;
+  margin: var(--space-100) 0 0;
   max-width: 60ch;
   overflow-wrap: anywhere;
 }
@@ -40,7 +40,7 @@
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-300);
   justify-content: flex-end;
   margin-left: auto;
 }
@@ -51,11 +51,11 @@
 
 .settings-form {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-3);
+  gap: var(--space-400);
+  padding: var(--space-400);
 }
 
 .settings-field {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-200);
 }

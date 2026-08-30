@@ -353,12 +353,12 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .tabs {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .tabs button {
@@ -370,7 +370,7 @@
     font: inherit;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
   }
 
   .tabs button.active {
@@ -386,7 +386,7 @@
   .status {
     color: var(--sable-surface-var-on-container);
     margin: 0;
-    padding: var(--space-3) 0;
+    padding: var(--space-400) 0;
     text-align: center;
   }
 
@@ -413,7 +413,7 @@
 
   .moderation {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     width: min(27rem, calc(100vw - 2rem));
   }
 
@@ -426,7 +426,7 @@
 
   .moderation-actions {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: flex-end;
   }
 </style>

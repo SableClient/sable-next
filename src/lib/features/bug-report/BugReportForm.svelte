@@ -293,25 +293,25 @@
 <style>
   .bug-report {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
   }
 
   fieldset {
     border: 0;
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     margin: 0;
     padding: 0;
   }
 
   legend {
     font-weight: var(--font-weight-bold);
-    margin-bottom: var(--space-1);
+    margin-bottom: var(--space-200);
   }
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .field :global(.form-control) {
@@ -328,15 +328,15 @@
   .search-status {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .similar {
     background: var(--sable-primary-container);
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-200);
+    padding: var(--space-300) var(--space-400);
   }
 
   .similar a {
@@ -344,25 +344,25 @@
   }
 
   .options {
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .option {
     align-items: flex-start;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .option input {
     accent-color: var(--sable-primary-main);
     flex: 0 0 auto;
-    margin: 0.2rem 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

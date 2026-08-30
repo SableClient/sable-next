@@ -150,14 +150,14 @@
   }
 
   :global(.verification-description) {
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-300);
   }
 
   .emoji {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: var(--space-3) 0;
+    gap: var(--space-300);
+    margin: var(--space-400) 0;
   }
 
   .emoji-item {
@@ -165,7 +165,7 @@
     display: flex;
     flex: 1 1 4.5rem;
     flex-direction: column;
-    gap: calc(var(--space-1) / 2);
+    gap: var(--space-100);
     text-align: center;
   }
 
@@ -180,7 +180,7 @@
 
   .verification-actions {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   :global(.verification-action) {
@@ -188,7 +188,7 @@
   }
 
   :global(.verification-cancel) {
-    margin-top: var(--space-1);
+    margin-top: var(--space-200);
   }
 
   .verification-wait::before {
@@ -197,7 +197,7 @@
     content: '';
     display: inline-block;
     height: 0.55rem;
-    margin-right: var(--space-1);
+    margin-right: var(--space-200);
     width: 0.55rem;
   }
 

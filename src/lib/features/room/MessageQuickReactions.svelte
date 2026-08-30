@@ -6,9 +6,10 @@
   interface Props {
     count: number;
     onReact: (emoji: string) => void;
+    roomy?: boolean;
   }
 
-  let { count, onReact }: Props = $props();
+  let { count, onReact, roomy = false }: Props = $props();
   let recents = $derived(readRecentReactions().slice(0, count));
 
   function react(emoji: string): void {
@@ -18,7 +19,7 @@
 </script>
 
 {#if recents.length > 0}
-  <div class="quick-strip" role="group" aria-label={$i18n.t('timeline.addReaction')}>
+  <div class:roomy class="quick-strip" role="group" aria-label={$i18n.t('timeline.addReaction')}>
     {#each recents as emoji (emoji)}
       <button
         type="button"
@@ -64,6 +65,11 @@
   .quick-reaction:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  .quick-strip.roomy .quick-reaction {
+    height: var(--control-height-400);
+    min-width: var(--control-height-400);
   }
 
   .quick-line {

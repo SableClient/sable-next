@@ -48,7 +48,7 @@
   .call-bar {
     align-items: center;
     background: var(--sable-surface-container);
-    border: var(--space-hairline) solid var(--sable-surface-container-line);
+    border: var(--border-width-500) solid var(--sable-surface-container-line);
     border-radius: var(--radii-pill);
     box-shadow: var(--sable-shadow);
     display: flex;

@@ -4,6 +4,7 @@
 
   import MessageQuickReactions from '#lib/features/room/MessageQuickReactions.svelte';
   import { messageMenuRows } from '#lib/features/room/message-menu-items.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import '#lib/ui/primitives/menu.css';
 
   const { Story } = defineMeta({
@@ -48,12 +49,12 @@
   </div>
 </Story>
 
-<Story name="Touch sheet" asChild>
-  <div class="sheet">
+<Story name="Touch sheet" parameters={{ layout: 'fullscreen' }} asChild>
+  <BottomSheet open label="Message actions" closeLabel="Close message actions">
     <IconContext values={decorative}>
       <p class="preview">Shipped the search crawl fix, coverage looks right now</p>
       <div class="line"></div>
-      <MessageQuickReactions count={8} onReact={noop} />
+      <MessageQuickReactions count={8} onReact={noop} roomy />
       <div class="sheet-list">
         {#each rows as row (row.key)}
           {@const RowIcon = row.icon}
@@ -71,7 +72,7 @@
         {/each}
       </div>
     </IconContext>
-  </div>
+  </BottomSheet>
 </Story>
 
 <style>
@@ -81,21 +82,16 @@
     width: max-content;
   }
 
-  .sheet {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radii-400) var(--radii-400) 0 0;
-    max-width: 26rem;
-    padding-block: var(--space-400);
-  }
-
   .sheet-list {
     display: grid;
   }
 
   .sheet-list :global(.sable-menu-item) {
+    --menu-item-height: var(--control-height-400);
     --menu-item-padding: var(--space-400);
     --menu-item-radius: var(--radii-300);
+
+    font-size: var(--font-size-body);
   }
 
   .preview {

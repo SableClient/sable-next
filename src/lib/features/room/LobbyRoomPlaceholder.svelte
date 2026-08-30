@@ -32,8 +32,8 @@
   .row {
     align-items: center;
     display: flex;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-400);
+    padding: var(--space-300) var(--space-400);
   }
 
   .row + .row,
@@ -44,7 +44,7 @@
   .row-text {
     display: grid;
     flex: 1;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 

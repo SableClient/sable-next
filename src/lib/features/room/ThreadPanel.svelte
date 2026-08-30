@@ -152,9 +152,9 @@
     align-items: center;
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
   }
 
   .thread-header h2 {
@@ -165,6 +165,6 @@
 
   .thread-composer {
     border-top: var(--border-width) solid var(--sable-surface-container-line);
-    padding: var(--space-2);
+    padding: var(--space-300);
   }
 </style>

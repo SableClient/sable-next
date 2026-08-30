@@ -42,11 +42,11 @@
     border-block-end: var(--border-width) solid var(--sable-warn-container-line);
     color: var(--sable-warn-on-container);
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     inset-block-start: 0;
     inset-inline: 0;
     justify-content: center;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
     position: fixed;
     z-index: 100;
   }

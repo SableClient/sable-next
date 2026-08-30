@@ -227,12 +227,12 @@
   .settings-stack,
   .profile-settings {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   .profile-settings,
   .matrix-id {
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .avatar-row,
@@ -241,7 +241,7 @@
   .matrix-id {
     align-items: center;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .avatar-actions,
@@ -262,7 +262,7 @@
 
   .name-form {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .name-form label {
@@ -286,6 +286,6 @@
   .loading {
     display: flex;
     justify-content: center;
-    padding: var(--space-4);
+    padding: var(--space-500);
   }
 </style>

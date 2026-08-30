@@ -43,7 +43,7 @@
 <style>
   .help {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     width: min(28rem, calc(100vw - 2rem));
   }
 

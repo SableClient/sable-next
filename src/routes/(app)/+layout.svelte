@@ -427,10 +427,10 @@
     border: var(--border-width) solid var(--sable-primary-main);
     border-radius: var(--radius);
     color: var(--sable-bg-on-container);
-    left: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    left: var(--space-300);
+    padding: var(--space-300) var(--space-400);
     position: fixed;
-    top: var(--space-2);
+    top: var(--space-300);
     transform: translateY(-150%);
     z-index: var(--layer-tooltip);
   }

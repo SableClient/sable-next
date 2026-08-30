@@ -55,13 +55,13 @@
 
   .forum-thread-list-empty {
     color: var(--sable-surface-var-on-container);
-    padding: var(--space-4);
+    padding: var(--space-500);
     text-align: center;
   }
 
   .forum-thread-list-more {
     display: flex;
     justify-content: center;
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 </style>

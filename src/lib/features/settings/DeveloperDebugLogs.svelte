@@ -118,11 +118,11 @@
   .logs,
   .entries {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .logs > :not(.settings) {
-    margin-inline: var(--space-3);
+    margin-inline: var(--space-400);
   }
 
   .filters,
@@ -130,7 +130,7 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   p {
@@ -164,7 +164,7 @@
   .entry {
     background: var(--sable-bg-container);
     border-radius: var(--radius);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
   }
 
   summary {
@@ -172,7 +172,7 @@
     display: grid;
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
-    gap: var(--space-1);
+    gap: var(--space-200);
     grid-template-columns: auto auto auto 1fr;
   }
 
@@ -192,7 +192,7 @@
   pre {
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
-    margin: var(--space-1) 0 0;
+    margin: var(--space-200) 0 0;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
   }

@@ -250,13 +250,13 @@
 
   .forum-composer {
     flex: 0 0 auto;
-    padding-bottom: var(--space-1);
+    padding-bottom: var(--space-200);
   }
 
   .forum-composer-hint {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-2) var(--space-3) 0;
+    padding: var(--space-300) var(--space-400) 0;
   }
 </style>

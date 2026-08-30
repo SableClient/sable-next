@@ -61,13 +61,13 @@
 <style>
   .inbox {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
   }
 
   .inbox-sheet {
     display: grid;
-    gap: var(--space-4);
-    padding: 0 var(--space-300) var(--space-3) var(--space-400);
+    gap: var(--space-500);
+    padding: 0 var(--space-300) var(--space-400) var(--space-400);
   }
 
   .inbox-sheet header {

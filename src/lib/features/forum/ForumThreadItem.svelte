@@ -72,9 +72,9 @@
     box-sizing: border-box;
     cursor: pointer;
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-400);
     min-height: 2.75rem;
-    padding: var(--space-3);
+    padding: var(--space-400);
     text-align: left;
     width: 100%;
   }
@@ -87,14 +87,14 @@
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
   }
 
   .forum-thread-top {
     align-items: baseline;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
   }
 
@@ -122,7 +122,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: var(--space-2);
+    gap: var(--space-300);
     overflow: hidden;
   }
 

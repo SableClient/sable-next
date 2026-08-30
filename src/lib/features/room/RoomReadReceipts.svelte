@@ -155,10 +155,10 @@
     cursor: pointer;
     display: inline-flex;
     font: inherit;
-    gap: var(--space-tight);
+    gap: var(--space-150);
     height: 1.375rem;
     max-width: 100%;
-    padding: 0 var(--space-tight);
+    padding: 0 var(--space-150);
     position: relative;
     transition:
       background-color var(--motion-fast) var(--motion-easing-standard),
@@ -207,11 +207,11 @@
     align-items: center;
     display: flex;
     flex: none;
-    padding-left: var(--space-hairline);
+    padding-left: var(--space-050);
   }
 
   .stack > * + * {
-    margin-left: -0.375rem;
+    margin-left: calc(-1 * var(--space-150));
   }
 
   .stack :global(.receipt-face) {
@@ -237,7 +237,7 @@
     justify-content: center;
     line-height: 1;
     min-width: 1.125rem;
-    padding: 0 var(--space-hairline);
+    padding: 0 var(--space-050);
   }
 
   :global(.read-receipts-popover) {

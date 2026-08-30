@@ -25,7 +25,7 @@
     justify-content: center;
     letter-spacing: 0.02em;
     line-height: 1;
-    padding: 0.125rem var(--space-1);
+    padding: var(--space-050) var(--space-200);
     text-transform: lowercase;
     white-space: nowrap;
   }

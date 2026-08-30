@@ -82,9 +82,9 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-height: var(--control-height-500);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
     text-align: left;
     width: 100%;
   }

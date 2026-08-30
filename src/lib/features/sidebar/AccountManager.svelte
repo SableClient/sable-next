@@ -185,7 +185,7 @@
   .account-manager {
     align-content: start;
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
     margin: 0 auto;
     max-width: 42rem;
     overflow: auto;
@@ -195,11 +195,11 @@
 
   .account-list {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .section-heading {
-    margin-bottom: var(--space-1);
+    margin-bottom: var(--space-200);
   }
 
   .section-heading h1,
@@ -213,7 +213,7 @@
 
   .section-heading p {
     color: var(--sable-surface-var-on-container);
-    margin-top: var(--space-1);
+    margin-top: var(--space-200);
   }
 
   .account-row {
@@ -222,8 +222,8 @@
     border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
     display: flex;
-    gap: var(--space-2);
-    padding: var(--space-2);
+    gap: var(--space-300);
+    padding: var(--space-300);
   }
 
   .account-row.active {
@@ -239,7 +239,7 @@
     cursor: pointer;
     display: flex;
     flex: 1;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
     padding: 0;
     text-align: left;
@@ -272,7 +272,7 @@
 
   .remove-dialog {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     width: min(26rem, calc(100vw - 2rem));
   }
 
@@ -283,7 +283,7 @@
 
   .dialog-actions {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: flex-end;
   }
 </style>

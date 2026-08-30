@@ -22,7 +22,7 @@
 <style>
   .form-field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .form-field-error {

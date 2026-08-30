@@ -361,7 +361,7 @@
   .profile-stack,
   .form-stack {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   .setting-row,
@@ -369,13 +369,13 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-400);
   }
 
   .banner-setting {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .setting-label {
@@ -384,7 +384,7 @@
 
   .form-stack,
   .form-row {
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .form-row :global(.text-input) {
@@ -395,7 +395,7 @@
   .form-stack label {
     display: grid;
     font-weight: var(--font-weight-medium);
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .banner {
@@ -418,29 +418,29 @@
 
   .ignored-users {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     list-style: none;
     margin: 0;
-    padding: 0 var(--space-3) var(--space-3);
+    padding: 0 var(--space-400) var(--space-400);
   }
 
   .ignored-users li {
     align-items: center;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
   }
 
   .extra-fields {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     margin: 0;
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .extra-fields div {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .extra-fields dt {

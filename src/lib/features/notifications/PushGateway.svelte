@@ -129,8 +129,8 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-400);
   }
 
   h3 {
@@ -146,12 +146,12 @@
 
   .rows {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   label {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   label :global(.text-input) {
@@ -160,6 +160,6 @@
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 </style>

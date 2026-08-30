@@ -538,14 +538,14 @@
     align-items: center;
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    gap: var(--space-1);
-    padding: var(--space-1);
+    gap: var(--space-200);
+    padding: var(--space-200);
   }
 
   .tabs {
     display: flex;
     flex: 0 0 auto;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
   }
 
   .tabs button {
@@ -584,7 +584,7 @@
     gap: var(--space-100);
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--space-1) var(--space-150);
+    padding: var(--space-200) var(--space-150);
     scrollbar-width: none;
   }
 
@@ -604,7 +604,7 @@
     border-radius: var(--radius);
     cursor: pointer;
     display: flex;
-    padding: var(--space-hairline);
+    padding: var(--space-050);
   }
 
   .rail-pack:hover {
@@ -615,7 +615,7 @@
     flex: 1;
     min-width: 0;
     overflow-y: auto;
-    padding: var(--space-1);
+    padding: var(--space-200);
   }
 
   .grids h3 {
@@ -638,7 +638,7 @@
     flex-wrap: wrap;
     gap: var(--space-100);
     list-style: none;
-    margin: 0 0 var(--space-2);
+    margin: 0 0 var(--space-300);
     padding: 0;
   }
 
@@ -680,9 +680,9 @@
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-300);
     overflow: hidden;
-    padding: var(--space-150) var(--space-1);
+    padding: var(--space-150) var(--space-200);
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -697,7 +697,7 @@
   .grids .unicode .grid {
     display: grid;
     gap: var(--space-100);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-300);
   }
 
   /* Column count must match emojiColumns, or the arrow keys walk another grid. */
@@ -731,7 +731,7 @@
     font-size: var(--font-size-small);
     gap: var(--space-150);
     min-height: 2.25rem;
-    padding: 0 var(--space-1);
+    padding: 0 var(--space-200);
   }
 
   .preview code {
@@ -762,7 +762,7 @@
     flex: 1;
     font-size: var(--font-size-small);
     justify-content: center;
-    padding: var(--space-3);
+    padding: var(--space-400);
     text-align: center;
   }
 </style>

@@ -641,7 +641,7 @@
   }
 
   .profile-meta-item :global(svg) {
-    margin-top: var(--space-hairline);
+    margin-top: var(--space-050);
   }
 
   .profile-meta-aside {
@@ -671,7 +671,7 @@
     gap: var(--space-100);
     justify-content: center;
     min-height: 2rem;
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-300);
     white-space: nowrap;
   }
 
@@ -700,7 +700,7 @@
 
   :global(.profile-action-overflow) {
     margin-left: auto;
-    padding: var(--space-hairline) var(--space-1);
+    padding: var(--space-050) var(--space-200);
   }
 
   :global(.profile-power-name) {
@@ -726,7 +726,7 @@
   .profile-composer {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .profile-composer :global(.profile-composer-input) {
@@ -750,7 +750,7 @@
   .profile-composer-error {
     color: var(--sable-crit-main);
     font-size: var(--font-size-small);
-    margin: var(--space-1) 0 0;
+    margin: var(--space-200) 0 0;
   }
 
   .profile-extra {
@@ -763,11 +763,11 @@
     cursor: pointer;
     display: flex;
     font-weight: var(--font-weight-medium);
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     min-height: 2.75rem;
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-300);
   }
 
   .profile-extra summary::-webkit-details-marker {
@@ -800,9 +800,9 @@
 
   .profile-extra dl {
     display: grid;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     margin: 0;
-    padding: 0 var(--space-2) var(--space-2);
+    padding: 0 var(--space-300) var(--space-300);
   }
 
   .profile-extra dt {
@@ -812,13 +812,13 @@
   }
 
   .profile-extra dd {
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-200);
     overflow-wrap: anywhere;
   }
 
   .moderation {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     width: min(27rem, calc(100vw - 2rem));
   }
 
@@ -831,7 +831,7 @@
 
   .moderation-actions {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: flex-end;
   }
 </style>

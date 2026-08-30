@@ -108,7 +108,7 @@
     align-items: baseline;
     display: flex;
     justify-content: space-between;
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-300);
   }
 
   h2 {
@@ -123,8 +123,8 @@
   .search {
     align-items: center;
     display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
+    gap: var(--space-300);
+    margin-bottom: var(--space-300);
   }
 
   .search :global(svg) {
@@ -156,8 +156,8 @@
   li {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
-    padding-right: var(--space-2);
+    gap: var(--space-200);
+    padding-right: var(--space-300);
   }
 
   li + li {
@@ -173,9 +173,9 @@
     color: inherit;
     display: flex;
     flex: 1;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
     text-decoration: none;
   }
 
@@ -187,14 +187,14 @@
   .body {
     display: grid;
     flex: 1;
-    gap: var(--space-compact);
+    gap: var(--space-100);
     min-width: 0;
   }
 
   .head {
     align-items: baseline;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
   }
 

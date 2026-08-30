@@ -543,7 +543,7 @@
     cursor: text;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-tight);
+    gap: var(--space-150);
     width: 100%;
   }
 
@@ -578,10 +578,10 @@
     color: var(--sable-sec-on-container);
     display: inline-flex;
     font-size: var(--font-size-small);
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     max-width: 100%;
     min-width: 0;
-    padding-inline: var(--space-200) var(--space-hairline);
+    padding-inline: var(--space-200) var(--space-050);
   }
 
   .chip.negated {
@@ -611,7 +611,7 @@
     display: flex;
     flex: 0 0 auto;
     font-size: inherit;
-    padding: var(--space-hairline);
+    padding: var(--space-050);
   }
 
   .chip-remove:hover,
@@ -688,7 +688,7 @@
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
-    padding: var(--space-tight) var(--space-200);
+    padding: var(--space-150) var(--space-200);
   }
 
   :global(.scope-option:hover:not([data-disabled])) {
@@ -718,7 +718,7 @@
     color: inherit;
     font: inherit;
     font-size: var(--font-size-small);
-    padding: var(--space-tight) var(--space-200);
+    padding: var(--space-150) var(--space-200);
   }
 
   .load-more {
@@ -783,7 +783,7 @@
   .hit-text {
     display: flex;
     flex-direction: column;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 

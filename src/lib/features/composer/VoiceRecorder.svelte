@@ -200,7 +200,7 @@
     align-items: center;
     display: flex;
     flex: 1;
-    gap: var(--space-compact);
+    gap: var(--space-100);
     min-width: 0;
   }
 

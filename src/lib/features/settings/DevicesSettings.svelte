@@ -586,7 +586,7 @@
 
   .settings-stack {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .status-grid {
@@ -599,9 +599,9 @@
     align-items: center;
     border-bottom: var(--border-width) solid var(--sable-bg-container-line);
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .status-item:last-child {
@@ -646,7 +646,7 @@
   }
 
   dd {
-    margin: calc(var(--space-1) / 2) 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .setting-row {
@@ -654,8 +654,8 @@
     border-top: var(--border-width) solid var(--sable-bg-container-line);
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-400);
+    padding: var(--space-300) var(--space-400);
   }
 
   .setting-row > :global(.sable-button) {
@@ -670,7 +670,7 @@
   .row-copy p {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: calc(var(--space-1) / 2) 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .bulk-bar {
@@ -678,14 +678,14 @@
     border-bottom: var(--border-width) solid var(--sable-bg-container-line);
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-300) var(--space-400);
   }
 
   .bulk-select-all {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .bulk-count {
@@ -697,13 +697,13 @@
     background: var(--sable-surface-container);
     border-bottom: var(--border-width) solid var(--sable-bg-container-line);
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-300) var(--space-400);
   }
 
   .form-actions {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .device-select {
@@ -724,15 +724,15 @@
     align-items: flex-start;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
-    min-height: calc(var(--control-height-medium) + var(--space-2));
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-400);
+    min-height: calc(var(--control-height-medium) + var(--space-300));
+    padding: var(--space-300) var(--space-400);
   }
 
   .device-info {
     display: grid;
     flex: 1;
-    gap: calc(var(--space-2) / 2);
+    gap: var(--space-150);
     min-width: 0;
   }
 
@@ -742,7 +742,7 @@
   .recovery-key-heading {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .device-meta code {
@@ -755,7 +755,7 @@
 
   .device-actions {
     flex: 0 0 auto;
-    padding-left: calc(var(--control-height-small) + var(--space-3));
+    padding-left: calc(var(--control-height-small) + var(--space-400));
     width: 100%;
   }
 
@@ -764,10 +764,10 @@
     align-items: center;
     color: var(--sable-surface-var-on-container);
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: center;
     min-height: 5rem;
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .empty-state {
@@ -785,12 +785,12 @@
 
   :global(.settings-error),
   :global(.recovery-key) {
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-400);
   }
 
   :global(.sable-alert.recovery-key) {
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-400);
   }
 
   .recovery-key-heading :global(svg) {
@@ -805,7 +805,7 @@
     border-radius: var(--radius);
     display: block;
     overflow-wrap: anywhere;
-    padding: var(--space-2);
+    padding: var(--space-300);
     user-select: all;
   }
 

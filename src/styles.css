@@ -1,4 +1,4 @@
-@import url("@fontsource-variable/nunito");
+@import url('@fontsource-variable/nunito');
 
 /* Palette lifted verbatim from Sable's src/app/styles/themes.css so the two
    apps read as the same product. These stay plain CSS rather than a generated
@@ -267,24 +267,18 @@ html {
 /* Global CSS */
 
 :root {
-  --space-0: 0;
+  --space-050: 0.125rem;
   --space-100: 0.25rem;
+  --space-150: 0.375rem;
   --space-200: 0.5rem;
+  --space-250: 0.625rem;
   --space-300: 0.75rem;
   --space-400: 1rem;
   --space-500: 1.25rem;
   --space-600: 1.5rem;
   --space-700: 2rem;
-  --space-hairline: 0.125rem;
-  --space-150: 0.375rem;
-  --space-250: 0.625rem;
-  --space-compact: var(--space-100);
-  --space-tight: var(--space-150);
-  --space-relaxed-tight: var(--space-250);
-  --space-1: var(--space-200);
-  --space-2: var(--space-300);
-  --space-3: var(--space-400);
-  --space-4: var(--space-500);
+  --space-800: 3rem;
+  --space-900: 4rem;
   --radii-0: 0;
   --radii-300: 0.25rem;
   --radii-400: 0.5rem;
@@ -358,16 +352,15 @@ html {
   --layer-tooltip: 500;
   --page-gutter: var(--space-300);
   --navigation-rail-width: 4.125rem;
-  --timeline-row-gap: var(--space-relaxed-tight);
-  --timeline-row-padding: var(--space-compact);
+  --timeline-row-gap: var(--space-250);
+  --timeline-row-padding: var(--space-100);
   --link-decoration: underline;
 
   /* Code blocks: the estimator reads this, so it has to be a fixed length. */
   --code-line-height: 1.25rem;
 
   /* Font families */
-  --font-family-mono:
-    ui-monospace, "Cascadia Code", "Source Code Pro", menlo, consolas, monospace;
+  --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 
   /* Typography scale */
   --font-size-small: 0.875rem;
@@ -399,10 +392,7 @@ html {
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   --safe-top: var(--safe-area-inset-top);
   --safe-right: var(--safe-area-inset-right);
-  --safe-bottom: max(
-    var(--safe-area-inset-bottom),
-    var(--keyboard-height, 0px)
-  );
+  --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
   --safe-left: var(--safe-area-inset-left);
 }
 
@@ -449,11 +439,11 @@ body {
   background-clip: padding-box;
 }
 
-:root[data-underline-links="off"] {
+:root[data-underline-links='off'] {
   --link-decoration: none;
 }
 
-:root[data-reduced-motion="on"] {
+:root[data-reduced-motion='on'] {
   --motion-fast: 0s;
   --motion-normal: 0s;
   --motion-slow: 0s;
@@ -468,7 +458,7 @@ body {
 body {
   background: var(--sable-bg-container);
   color: var(--sable-bg-on-container);
-  font-family: "Nunito Variable", sans-serif;
+  font-family: 'Nunito Variable', sans-serif;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-body);
@@ -486,7 +476,7 @@ textarea {
 }
 
 :disabled,
-[aria-disabled="true"] {
+[aria-disabled='true'] {
   cursor: not-allowed;
 }
 
@@ -524,13 +514,13 @@ button,
 a,
 input,
 label,
-[role="button"],
-[role="switch"] {
+[role='button'],
+[role='switch'] {
   -webkit-tap-highlight-color: transparent;
 }
 
 label[for],
-[role="switch"] {
+[role='switch'] {
   user-select: none;
 }
 
@@ -542,7 +532,7 @@ label[for],
 .sable-selection-layer::after {
   background: var(--sable-bg-container-active);
   border-radius: inherit;
-  content: "";
+  content: '';
   inset: 0;
   opacity: 0;
   pointer-events: none;
@@ -585,30 +575,14 @@ a:not([class]):hover {
       scale var(--motion-fast) ease-in-out;
   }
 
-  .sable-button:hover:not(
-      :disabled,
-      [aria-disabled="true"],
-      [data-no-button-motion]
-    ),
-  .sable-menu-item:hover:not(
-      :disabled,
-      [data-disabled],
-      [data-no-button-motion]
-    ),
+  .sable-button:hover:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
+  .sable-menu-item:hover:not(:disabled, [data-disabled], [data-no-button-motion]),
   .option-card:hover:not([data-disabled], [data-no-button-motion]) {
     translate: 0 -1px;
   }
 
-  .sable-button:active:not(
-      :disabled,
-      [aria-disabled="true"],
-      [data-no-button-motion]
-    ),
-  .sable-menu-item:active:not(
-      :disabled,
-      [data-disabled],
-      [data-no-button-motion]
-    ),
+  .sable-button:active:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
+  .sable-menu-item:active:not(:disabled, [data-disabled], [data-no-button-motion]),
   .option-card:active:not([data-disabled], [data-no-button-motion]) {
     scale: 0.96;
   }
@@ -628,7 +602,7 @@ a:not([class]):hover {
 
 @media (width >= 42rem) {
   :root {
-    --page-gutter: var(--space-3);
+    --page-gutter: var(--space-400);
   }
 }
 

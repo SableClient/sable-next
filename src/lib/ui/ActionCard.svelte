@@ -69,10 +69,10 @@
     display: flex;
     flex-direction: column;
     font: inherit;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-height: 0;
     min-width: 0;
-    padding: var(--space-3);
+    padding: var(--space-400);
     position: relative;
     text-align: left;
     text-decoration: none;
@@ -120,9 +120,9 @@
   .action-card-copy {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
-    padding-right: var(--space-3);
+    padding-right: var(--space-400);
   }
 
   .action-card-title {
@@ -137,13 +137,13 @@
 
   .action-card-arrow {
     align-items: center;
-    bottom: var(--space-3);
+    bottom: var(--space-400);
     color: var(--sable-primary-main);
     display: inline-flex;
     height: var(--icon-size-small);
     justify-content: center;
     position: absolute;
-    right: var(--space-3);
+    right: var(--space-400);
     width: var(--icon-size-small);
   }
 

@@ -59,7 +59,7 @@
     color: var(--sable-sec-main);
     display: flex;
     font-size: var(--font-size-small);
-    gap: var(--space-1);
+    gap: var(--space-200);
     line-height: var(--line-height-body);
   }
 

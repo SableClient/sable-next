@@ -123,7 +123,7 @@
 
   .actions {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: flex-end;
     margin-top: var(--space-300);
   }

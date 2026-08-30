@@ -654,7 +654,7 @@
   .auth-main {
     align-self: start;
     min-width: 0;
-    padding-bottom: 3rem;
+    padding-bottom: var(--space-800);
   }
 
   .bootstrap {

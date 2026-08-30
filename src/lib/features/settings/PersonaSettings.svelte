@@ -228,21 +228,21 @@
 <style>
   .persona-stack {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   .persona-list {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
-    padding: var(--space-2);
+    padding: var(--space-300);
   }
 
   .persona-list li {
     align-items: center;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .persona-copy {
@@ -269,24 +269,24 @@
   .persona-empty {
     color: var(--sable-surface-var-on-container);
     margin: 0;
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .persona-actions {
     display: flex;
     justify-content: flex-end;
-    padding: 0 var(--space-3) var(--space-3);
+    padding: 0 var(--space-400) var(--space-400);
   }
 
   .import-form {
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-3) 0;
+    gap: var(--space-300);
+    padding: var(--space-400) var(--space-400) 0;
   }
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .field span {

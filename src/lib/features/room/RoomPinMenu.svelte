@@ -276,8 +276,8 @@
     --menu-min-width: 20rem;
     --menu-max-height: min(28rem, 70dvh);
 
-    gap: var(--space-1);
-    max-width: min(24rem, calc(100vw - var(--space-4)));
+    gap: var(--space-200);
+    max-width: min(24rem, calc(100vw - var(--space-500)));
   }
 
   :global(.pin-button) {
@@ -293,7 +293,7 @@
     left: 0;
     line-height: 1;
     min-width: 1rem;
-    padding: 0.0625rem 0.1875rem;
+    padding: var(--space-050) var(--space-100);
     position: absolute;
     text-align: center;
     top: 0;
@@ -302,9 +302,9 @@
   .pin-header {
     align-items: center;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
-    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-200) var(--space-200) var(--space-300);
   }
 
   .pin-header h2 {
@@ -317,14 +317,14 @@
     display: flex;
     justify-content: center;
     margin: 0;
-    padding: var(--space-4);
+    padding: var(--space-500);
   }
 
   .pin-empty {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-items: center;
-    padding: var(--space-4) var(--space-3);
+    padding: var(--space-500) var(--space-400);
     text-align: center;
   }
 
@@ -347,7 +347,7 @@
 
   .pin-list {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -357,8 +357,8 @@
     align-items: center;
     border-radius: var(--radii-400);
     display: flex;
-    gap: var(--space-1);
-    padding-right: var(--space-1);
+    gap: var(--space-200);
+    padding-right: var(--space-200);
   }
 
   .pin-item.fresh {
@@ -376,22 +376,22 @@
     display: flex;
     flex: 1;
     font: inherit;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
     text-align: left;
   }
 
   .pin-text {
     display: grid;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 
   .pin-meta {
     align-items: baseline;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
   }
 

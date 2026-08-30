@@ -77,7 +77,7 @@
 <style>
   .join-address {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
   }
 
   .examples {
@@ -87,13 +87,13 @@
   }
 
   .examples p {
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-200);
   }
 
   .examples ul {
     display: grid;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     margin: 0;
-    padding-left: var(--space-4);
+    padding-left: var(--space-500);
   }
 </style>

@@ -133,7 +133,7 @@
 <style>
   .leave {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     width: min(26rem, calc(100vw - 2rem));
   }
 
@@ -151,7 +151,7 @@
 
   .actions {
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: flex-end;
   }
 </style>

@@ -68,6 +68,6 @@
 <style>
   .create-chat {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
   }
 </style>

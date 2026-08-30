@@ -92,12 +92,12 @@
 <style>
   .schedule {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     width: min(26rem, calc(100vw - 2rem));
   }
 
   h2 {
-    font-size: var(--font-size-large);
+    font-size: var(--font-size-heading);
     margin: 0;
   }
 
@@ -111,18 +111,18 @@
   .presets {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .pair {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     grid-template-columns: 1fr 1fr;
   }
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

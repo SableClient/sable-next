@@ -174,11 +174,11 @@
   .account-data,
   .editor {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .account-data > :not(.settings) {
-    margin-inline: var(--space-3);
+    margin-inline: var(--space-400);
   }
 
   .empty {
@@ -193,7 +193,7 @@
 
   .event-list {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     max-height: 14rem;
@@ -203,7 +203,7 @@
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   :global(.account-data-content) {
@@ -213,7 +213,7 @@
 
   .editor-actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

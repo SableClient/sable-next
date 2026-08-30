@@ -33,7 +33,7 @@
     min-height: var(--target);
     min-width: 0;
     overflow-y: auto;
-    padding: var(--space-1);
+    padding: var(--space-200);
     position: relative;
   }
 
@@ -71,19 +71,19 @@
   .editor :global(blockquote) {
     border-inline-start: calc(var(--border-width) * 3) solid var(--sable-primary-main);
     margin: 0;
-    padding-inline-start: var(--space-2);
+    padding-inline-start: var(--space-300);
   }
 
   .editor :global(ul),
   .editor :global(ol) {
     margin: 0;
-    padding-inline-start: var(--space-3);
+    padding-inline-start: var(--space-400);
   }
 
   .editor :global(code) {
     background: var(--sable-surface-var-container);
     border-radius: calc(var(--radius) - 0.25rem);
-    padding: 0 var(--space-hairline);
+    padding: 0 var(--space-050);
   }
 
   .editor :global(pre) {
@@ -91,7 +91,7 @@
     border-radius: var(--radius);
     margin: 0;
     overflow-x: auto;
-    padding: var(--space-1);
+    padding: var(--space-200);
   }
 
   .editor :global(a) {
@@ -102,10 +102,10 @@
   .editor.empty::before {
     color: var(--sable-surface-var-on-container);
     content: attr(data-placeholder);
-    left: var(--space-1);
+    left: var(--space-200);
     pointer-events: none;
     position: absolute;
-    top: var(--space-1);
+    top: var(--space-200);
   }
 
   .editor :global(.composer-mention) {

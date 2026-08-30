@@ -169,7 +169,7 @@
 
   .settings-stack {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .settings-card {
@@ -180,7 +180,7 @@
 
   .custom-themes-card,
   .personas-card {
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .settings {
@@ -190,6 +190,6 @@
   }
 
   :global(.state-event-section .settings-section-content) {
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 </style>

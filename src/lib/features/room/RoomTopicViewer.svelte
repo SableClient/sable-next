@@ -31,7 +31,7 @@
 <style>
   .topic-dialog {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   h2 {

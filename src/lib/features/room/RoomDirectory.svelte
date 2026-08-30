@@ -200,13 +200,13 @@
 <style>
   .directory {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
   }
 
   .filters {
     align-items: end;
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
   }
 
@@ -224,7 +224,7 @@
 
   .rooms {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -234,9 +234,9 @@
     align-items: center;
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     grid-template-columns: auto minmax(0, 1fr) auto;
-    padding: var(--space-2);
+    padding: var(--space-300);
   }
 
   .room:hover {
@@ -245,14 +245,14 @@
 
   .room-text {
     display: grid;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 
   .room-name {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -270,7 +270,7 @@
   .room-meta {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .badge {
@@ -290,6 +290,6 @@
   .loading {
     display: flex;
     justify-content: center;
-    padding: var(--space-4);
+    padding: var(--space-500);
   }
 </style>

@@ -45,7 +45,7 @@
 <style>
   .palette {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     max-width: 34rem;
     width: 100%;
   }
@@ -54,13 +54,13 @@
     font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: 0;
-    padding: var(--space-3) var(--space-3) 0;
+    padding: var(--space-400) var(--space-400) 0;
   }
 
   footer {
     border-top: var(--border-width) solid var(--sable-bg-container-line);
     display: flex;
     justify-content: flex-end;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
   }
 </style>

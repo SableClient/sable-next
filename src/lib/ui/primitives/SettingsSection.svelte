@@ -44,9 +44,9 @@
   .settings-section-header {
     align-items: flex-start;
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-400);
     justify-content: space-between;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
   }
 
   .settings-section-heading {
@@ -57,7 +57,7 @@
   .settings-section-title {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .settings-section-icon {
@@ -86,7 +86,7 @@
   p {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: calc(var(--space-1) / 2) 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .settings-section-actions {

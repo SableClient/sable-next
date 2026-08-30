@@ -116,12 +116,12 @@
 <style>
   .state-event {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .hint {

@@ -65,7 +65,7 @@
 
   .app-page-header p {
     color: var(--sable-surface-var-on-container);
-    margin: var(--space-1) 0 0;
+    margin: var(--space-200) 0 0;
     max-width: 65ch;
   }
 
@@ -78,14 +78,14 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-200);
     text-transform: uppercase;
   }
 
   .app-page-header,
   .app-page-actions {
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-400);
     justify-content: space-between;
   }
 
@@ -94,13 +94,13 @@
   }
 
   .app-page-shell-compact {
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .app-page-shell-compact .app-page-header {
     align-items: center;
     flex-direction: row;
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-400);
   }
 
   @media (width >= 42rem) {
@@ -110,7 +110,7 @@
     }
 
     .app-page-shell-compact {
-      padding: var(--space-4);
+      padding: var(--space-500);
     }
   }
 </style>

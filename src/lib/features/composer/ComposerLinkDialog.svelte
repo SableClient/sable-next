@@ -51,7 +51,7 @@
 <style>
   .link-dialog {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     width: min(24rem, calc(100vw - 2rem));
   }
 
@@ -62,7 +62,7 @@
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

@@ -98,8 +98,8 @@
 <style>
   .jump-list {
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-400);
   }
 
   ul {
@@ -130,7 +130,7 @@
   .empty {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: var(--space-3) 0 0;
+    margin: var(--space-400) 0 0;
     text-align: center;
   }
 </style>

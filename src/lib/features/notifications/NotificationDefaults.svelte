@@ -115,8 +115,8 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-400);
   }
 
   h3 {
@@ -132,14 +132,14 @@
 
   .rows {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   label {
     align-items: stretch;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: space-between;
   }
 
@@ -147,7 +147,7 @@
     label {
       align-items: center;
       display: grid;
-      gap: var(--space-3);
+      gap: var(--space-400);
       grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
     }
   }

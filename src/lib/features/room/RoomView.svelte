@@ -935,6 +935,6 @@
 
   .composer-dock {
     flex: 0 0 auto;
-    padding-bottom: var(--space-1);
+    padding-bottom: var(--space-200);
   }
 </style>

@@ -122,7 +122,7 @@
     background: var(--sable-bg-container);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
-    padding: var(--space-1);
+    padding: var(--space-200);
     width: min(18rem, calc(100vw - 2rem));
     z-index: var(--layer-popover);
   }

@@ -51,7 +51,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-200);
     text-transform: uppercase;
   }
 
@@ -63,13 +63,13 @@
 
   .empty-state-description {
     color: var(--sable-surface-var-on-container);
-    margin: var(--space-3) 0 0;
+    margin: var(--space-400) 0 0;
   }
 
   .empty-state-actions {
     display: grid;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
+    gap: var(--space-300);
+    margin-top: var(--space-500);
   }
 
   @media (width >= 32rem) {

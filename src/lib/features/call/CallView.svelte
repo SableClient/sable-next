@@ -101,7 +101,7 @@
 <style>
   .call {
     background: var(--sable-surface-container);
-    border-block-end: var(--space-hairline) solid var(--sable-surface-container-line);
+    border-block-end: var(--space-050) solid var(--sable-surface-container-line);
     display: flex;
     flex-direction: column;
     gap: var(--space-200);

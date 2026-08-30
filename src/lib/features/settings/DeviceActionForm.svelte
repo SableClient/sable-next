@@ -68,9 +68,9 @@
     background: var(--sable-surface-container);
     border-top: var(--border-width) solid var(--sable-bg-container-line);
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     grid-template-columns: 1fr;
-    padding: var(--space-3);
+    padding: var(--space-400);
     width: 100%;
   }
 
@@ -81,16 +81,16 @@
   .row-copy p {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: calc(var(--space-1) / 2) 0 0;
+    margin: var(--space-100) 0 0;
   }
 
   .danger-form {
-    border-left: calc(var(--space-1) / 2) solid var(--sable-crit-main);
+    border-left: var(--border-width-700) solid var(--sable-crit-main);
   }
 
   .form-actions {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     grid-template-columns: 1fr 1fr;
   }
 
@@ -101,7 +101,7 @@
   @media (width >= 42rem) {
     .device-form {
       grid-template-columns: minmax(0, 1fr) auto;
-      padding: var(--space-2) var(--space-3);
+      padding: var(--space-300) var(--space-400);
       width: auto;
     }
 

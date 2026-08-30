@@ -9,7 +9,20 @@
   const scale = (prefix: string, steps: string[]) =>
     steps.map((step) => ({ step, token: `${prefix}-${step}` }));
 
-  const space = scale('--space', ['100', '200', '300', '400', '500', '600', '700']);
+  const space = scale('--space', [
+    '050',
+    '100',
+    '150',
+    '200',
+    '250',
+    '300',
+    '400',
+    '500',
+    '600',
+    '700',
+    '800',
+    '900',
+  ]);
   const radii = scale('--radii', ['300', '400', '500', 'pill']);
   const sizes = scale('--size', ['x50', 'x100', 'x200', 'x300', 'x400', 'x500', 'x600']);
   const borders = scale('--border-width', ['300', '400', '500', '600', '700']);

@@ -130,7 +130,7 @@
   .voice-waveform {
     align-items: flex-end;
     display: flex;
-    gap: 2px;
+    gap: var(--space-050);
     height: 1.75rem;
   }
 

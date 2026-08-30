@@ -14,10 +14,10 @@
 
 <style>
   .dock {
-    bottom: var(--space-3);
+    bottom: var(--space-400);
     display: grid;
-    gap: var(--space-2);
-    inset-inline: var(--space-3);
+    gap: var(--space-300);
+    inset-inline: var(--space-400);
     justify-items: center;
     pointer-events: none;
     position: fixed;

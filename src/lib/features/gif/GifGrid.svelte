@@ -114,7 +114,7 @@
     flex-direction: column;
     min-width: 0;
     overflow-y: auto;
-    padding: var(--space-1);
+    padding: var(--space-200);
   }
 
   .gif-grid h3 {
@@ -186,7 +186,7 @@
   .gif-attribution {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: var(--space-2) 0 0;
+    margin: var(--space-300) 0 0;
   }
 
   .gif-note {
@@ -196,7 +196,7 @@
     flex: 1;
     font-size: var(--font-size-small);
     justify-content: center;
-    padding: var(--space-3);
+    padding: var(--space-400);
     text-align: center;
   }
 </style>

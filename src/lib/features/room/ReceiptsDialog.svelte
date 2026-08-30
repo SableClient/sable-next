@@ -45,7 +45,7 @@
 <style>
   .receipts-dialog {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     width: min(22rem, calc(100vw - 2rem));
   }
 
@@ -56,7 +56,7 @@
 
   ul {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     max-height: 16rem;
@@ -67,6 +67,6 @@
   li {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 </style>

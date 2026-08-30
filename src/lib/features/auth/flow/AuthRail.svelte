@@ -280,7 +280,7 @@
     align-items: start;
     box-sizing: border-box;
     display: flex;
-    gap: 3rem;
+    gap: var(--space-800);
     margin-inline: auto;
     overflow-x: auto;
     overscroll-behavior-inline: contain;

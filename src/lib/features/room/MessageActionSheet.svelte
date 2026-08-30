@@ -37,7 +37,7 @@
   {/if}
   <IconContext values={{ 'aria-hidden': 'true' }}>
     {#if actions.onReact}
-      <MessageQuickReactions count={8} onReact={react} />
+      <MessageQuickReactions count={8} onReact={react} roomy />
     {/if}
     <div class="sheet-list">
       {#each messageMenuRows(actions) as row (row.key)}
@@ -82,7 +82,10 @@
   }
 
   .sheet-list :global(.sable-menu-item) {
+    --menu-item-height: var(--control-height-400);
     --menu-item-padding: var(--space-400);
     --menu-item-radius: var(--radii-300);
+
+    font-size: var(--font-size-body);
   }
 </style>

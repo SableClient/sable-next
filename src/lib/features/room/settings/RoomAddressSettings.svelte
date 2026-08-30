@@ -228,12 +228,12 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
   }
 
   .inline {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     grid-template-columns: 1fr auto;
   }
 </style>

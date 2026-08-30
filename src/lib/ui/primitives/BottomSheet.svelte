@@ -90,7 +90,7 @@
   bind:open
   variant="sheet"
   {label}
-  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-2) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
+  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
   {onOpenChange}
 >
   <div class:content-inset={contentInset}>{@render children()}</div>
@@ -152,6 +152,6 @@
   }
 
   .content-inset {
-    padding: var(--control-height-medium) 0 var(--space-4);
+    padding: var(--control-height-medium) 0 var(--space-500);
   }
 </style>

@@ -175,8 +175,8 @@
 <style>
   .door-sheet {
     display: grid;
-    gap: 0.25rem;
-    padding: 0 var(--space-2) var(--space-2);
+    gap: var(--space-100);
+    padding: 0 var(--space-300) var(--space-300);
   }
 
   :global(.door-action) {
@@ -184,9 +184,9 @@
     border-color: transparent;
     border-radius: var(--radius);
     color: inherit;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-height: 3rem;
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-300);
     text-align: left;
     width: 100%;
   }
@@ -248,8 +248,8 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     display: grid;
-    gap: 0.25rem;
-    padding: 0.375rem;
+    gap: var(--space-100);
+    padding: var(--space-150);
     width: min(15rem, calc(100vw - 2rem));
     z-index: var(--layer-popover);
   }

@@ -153,14 +153,14 @@
   .color-setting {
     display: grid;
     font-weight: var(--font-weight-medium);
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .color-controls {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   :global(.swatch-button) {
@@ -183,7 +183,7 @@
     border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
-    padding: var(--space-3);
+    padding: var(--space-400);
     width: 14rem;
     z-index: var(--layer-popover);
   }
@@ -213,7 +213,7 @@
 
   .hue-slider {
     accent-color: var(--sable-primary-main);
-    margin-top: var(--space-3);
+    margin-top: var(--space-400);
     width: 100%;
   }
 </style>

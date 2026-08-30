@@ -14,7 +14,7 @@
 
 <style>
   .auth-secondary-action {
-    padding-top: var(--space-1);
+    padding-top: var(--space-200);
     text-align: center;
   }
 </style>

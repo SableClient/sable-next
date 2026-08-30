@@ -143,13 +143,13 @@
     background: var(--sable-surface-container);
     border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
-    inset-inline-end: var(--space-2);
-    bottom: calc(100% - var(--space-1));
+    inset-inline-end: var(--space-300);
+    bottom: calc(100% - var(--space-200));
     box-shadow: var(--shadow-float);
     display: flex;
-    gap: 2px;
+    gap: var(--space-050);
     opacity: 0;
-    padding: 2px;
+    padding: var(--space-050);
     pointer-events: none;
     position: absolute;
     z-index: 3;

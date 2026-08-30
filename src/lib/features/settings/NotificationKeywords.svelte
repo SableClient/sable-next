@@ -144,8 +144,8 @@
     background: var(--sable-surface-var-container);
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-400);
   }
 
   h3 {
@@ -166,7 +166,7 @@
 
   .keyword-list {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -177,8 +177,8 @@
     background: var(--sable-surface-container);
     border-radius: var(--radius);
     display: flex;
-    gap: var(--space-2);
-    padding: var(--space-1) var(--space-2);
+    gap: var(--space-300);
+    padding: var(--space-200) var(--space-300);
   }
 
   .keyword-text {
@@ -189,13 +189,13 @@
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .keyword-input-row {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .keyword-input-row :global(.text-input) {

@@ -1017,7 +1017,7 @@
   /* A subspace heading opens a group, so it needs air above it to read as a
      break rather than as one more row. */
   .room-row-wrap:has(.room-category):not(:first-child) {
-    margin-top: var(--space-2);
+    margin-top: var(--space-300);
   }
 
   .room-row,
@@ -1145,7 +1145,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-400);
     line-height: var(--line-height-small);
-    margin-top: -2px;
+    margin-top: calc(-1 * var(--space-050));
     opacity: var(--opacity-p300);
   }
 
@@ -1186,7 +1186,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     min-width: 1.25rem;
-    padding: var(--space-hairline) var(--space-150);
+    padding: var(--space-050) var(--space-150);
   }
 
   .room-list.collapsed {

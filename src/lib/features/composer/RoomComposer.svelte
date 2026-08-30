@@ -856,7 +856,7 @@
 
 <style>
   .composer-stack {
-    --composer-gutter: var(--space-1);
+    --composer-gutter: var(--space-200);
     --target: var(--control-height-small);
 
     margin: 0 auto;
@@ -936,8 +936,8 @@
   .composer-row {
     align-items: center;
     display: flex;
-    gap: var(--space-compact);
-    padding: var(--space-compact);
+    gap: var(--space-100);
+    padding: var(--space-100);
     width: 100%;
   }
 
@@ -949,7 +949,7 @@
     justify-content: center;
     margin: 0;
     min-height: var(--target);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
   }
 
   .composer-field {

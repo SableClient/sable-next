@@ -85,7 +85,7 @@
   .settings,
   .categories {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .settings {
@@ -109,6 +109,6 @@
     list-style: none;
     margin: 0;
     padding-left: 0;
-    padding-top: var(--space-2);
+    padding-top: var(--space-300);
   }
 </style>

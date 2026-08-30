@@ -383,13 +383,13 @@
 
   .formatted-body :global(ul),
   .formatted-body :global(ol) {
-    margin: var(--space-1) 0;
+    margin: var(--space-200) 0;
     padding-inline-start: var(--space-600);
   }
 
   .formatted-body :global(ol) {
     list-style-position: inside;
-    padding-inline-start: var(--space-1);
+    padding-inline-start: var(--space-200);
   }
 
   .formatted-body :global(a) {
@@ -409,7 +409,7 @@
     color: var(--sable-sec-on-container);
     display: inline-block;
     font-weight: var(--font-weight-medium);
-    padding: 0 var(--space-tight);
+    padding: 0 var(--space-150);
     text-decoration: none;
   }
 
@@ -431,8 +431,8 @@
 
   .formatted-body :global(blockquote) {
     border-left: calc(var(--border-width) * 2) solid var(--sable-primary-main);
-    margin: var(--space-compact) 0;
-    padding-left: var(--space-1);
+    margin: var(--space-100) 0;
+    padding-left: var(--space-200);
   }
 
   /* Inline code had no rule at all, so it read as prose. */
@@ -449,7 +449,7 @@
     background: var(--sable-surface-container);
     border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius);
-    margin: var(--space-compact) 0;
+    margin: var(--space-100) 0;
     overflow: hidden;
     position: relative;
   }
@@ -459,9 +459,9 @@
     background: var(--sable-surface-var-container);
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-height: var(--control-height-small);
-    padding: 0 var(--space-1);
+    padding: 0 var(--space-200);
   }
 
   .formatted-body :global(.code-language) {
@@ -484,7 +484,7 @@
     flex: 0 0 auto;
     font: inherit;
     font-size: var(--font-size-small);
-    padding: 0 var(--space-1);
+    padding: 0 var(--space-200);
   }
 
   .formatted-body :global(.code-action:hover) {
@@ -498,7 +498,7 @@
     margin: 0;
     overflow: auto hidden;
     overscroll-behavior-x: contain;
-    padding: var(--space-1);
+    padding: var(--space-200);
   }
 
   .formatted-body :global(pre code) {
@@ -539,13 +539,13 @@
 
   .formatted-body :global(table) {
     border-collapse: collapse;
-    margin: var(--space-compact) 0;
+    margin: var(--space-100) 0;
   }
 
   .formatted-body :global(th),
   .formatted-body :global(td) {
     border: var(--border-width) solid var(--sable-surface-container-line);
-    padding: calc(var(--space-compact) / 2) var(--space-tight);
+    padding: var(--space-050) var(--space-150);
     text-align: left;
   }
 

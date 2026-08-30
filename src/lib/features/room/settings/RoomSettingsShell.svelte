@@ -122,20 +122,20 @@
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 auto;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
     min-height: var(--control-height-large);
-    padding: 0 var(--space-1) 0 var(--space-2);
+    padding: 0 var(--space-200) 0 var(--space-300);
   }
 
   nav {
     align-content: start;
     display: grid;
     flex: 1;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-height: 0;
     overflow-y: auto;
-    padding: var(--space-1);
+    padding: var(--space-200);
   }
 
   nav button {
@@ -148,10 +148,10 @@
     display: flex;
     font: inherit;
     font-size: var(--font-size-small);
-    gap: var(--space-2);
+    gap: var(--space-300);
     line-height: var(--line-height-small);
     min-height: var(--control-height-medium);
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-300);
     text-align: left;
     width: 100%;
   }
@@ -196,9 +196,9 @@
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 auto;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-height: var(--control-height-large);
-    padding: 0 var(--space-1) 0 var(--space-3);
+    padding: 0 var(--space-200) 0 var(--space-400);
   }
 
   :global(.page-title) {
@@ -221,16 +221,16 @@
 
   .page-body {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     margin-inline: auto;
     max-width: 56rem;
-    padding: var(--space-3);
+    padding: var(--space-400);
     width: 100%;
   }
 
   @media (width >= 42rem) {
     .page-body {
-      padding: var(--space-4);
+      padding: var(--space-500);
     }
   }
 

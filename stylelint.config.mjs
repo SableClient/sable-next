@@ -27,6 +27,10 @@ export default {
         '/\\b\\d*\\.?\\d+(?:px|rem|em)\\b/',
       ],
       'font-size': ['/\\b\\d*\\.?\\d+(?:px|rem|em|pt)\\b/'],
+      '/^(?:padding|margin)(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?$/': [
+        '/-?(?:\\d*\\.)?\\d+(?:px|rem|em)\\b/',
+      ],
+      '/^(?:gap|row-gap|column-gap)$/': ['/-?(?:\\d*\\.)?\\d+(?:px|rem|em)\\b/'],
     },
 
     'defensive-css/require-prefers-reduced-motion': [true, { severity: 'error' }],

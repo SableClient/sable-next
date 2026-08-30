@@ -200,7 +200,7 @@
     align-items: center;
     display: flex;
     flex: 0 0 auto;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
   }
 
   :global(.sable-avatar.room-avatar) {
@@ -216,7 +216,7 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-100);
-    padding: var(--space-hairline) var(--space-200);
+    padding: var(--space-050) var(--space-200);
   }
 
   .voice-chip.live {
@@ -240,7 +240,7 @@
   }
 
   .voice-faces :global(.sable-avatar.voice-face:not(:first-child)) {
-    margin-left: -0.375rem;
+    margin-left: calc(-1 * var(--space-150));
   }
 
   .voice-count {

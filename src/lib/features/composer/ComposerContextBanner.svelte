@@ -38,7 +38,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: var(--space-1);
+    gap: var(--space-200);
     margin-inline: var(--space-150);
     min-width: 0;
     padding: var(--space-150) 0 var(--space-150);

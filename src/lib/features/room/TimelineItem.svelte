@@ -802,8 +802,8 @@
     display: flex;
     font: inherit;
     font-size: var(--font-size-small);
-    gap: var(--space-1);
-    margin-top: var(--space-hairline);
+    gap: var(--space-200);
+    margin-top: var(--space-050);
     max-width: 100%;
     padding: 0;
     text-align: left;
@@ -972,7 +972,7 @@
        negative margin assumes survives. */
     .message.mention-silent,
     .message.mention-loud {
-      padding-inline: calc(var(--page-gutter) - 4px) var(--page-gutter);
+      padding-inline: calc(var(--page-gutter) - var(--space-100)) var(--page-gutter);
     }
 
     /* The rule above resets the whole shorthand, and a collapsed row still
@@ -980,7 +980,7 @@
     .message.collapsed.mention-silent,
     .message.collapsed.mention-loud {
       padding-left: calc(
-        var(--page-gutter) - 4px + var(--avatar-size-small) + var(--timeline-row-gap)
+        var(--page-gutter) - var(--space-100) + var(--avatar-size-small) + var(--timeline-row-gap)
       );
     }
 
@@ -1184,7 +1184,7 @@
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
-    margin-top: var(--space-hairline);
+    margin-top: var(--space-050);
   }
 
   .send-failure button {
@@ -1230,12 +1230,12 @@
     display: grid;
     font: inherit;
     font-size: var(--font-size-small);
-    gap: var(--space-1);
+    gap: var(--space-200);
     grid-template-columns: auto minmax(0, 1fr);
     line-height: 1.4;
     margin: 0;
     margin-bottom: var(--space-100);
-    padding: var(--space-100) var(--space-1);
+    padding: var(--space-100) var(--space-200);
     text-align: start;
     width: 100%;
   }
@@ -1321,7 +1321,7 @@
      above, and a second copy elsewhere would drift out of sync. */
   .message.layout-compact {
     align-items: baseline;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .message.layout-compact.collapsed {
@@ -1332,7 +1332,7 @@
     align-items: baseline;
     display: flex;
     flex: 0 0 clamp(6rem, 20%, 10.625rem);
-    gap: var(--space-1);
+    gap: var(--space-200);
     justify-content: flex-end;
     min-width: 0;
     overflow: hidden;
@@ -1367,7 +1367,7 @@
     border-radius: var(--radius);
     color: var(--sable-surface-on-container);
     max-width: 50rem;
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
   }
 
   .message.layout-bubble.own :global(.formatted-body) {

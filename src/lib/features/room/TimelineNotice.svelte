@@ -125,7 +125,7 @@
     border-radius: var(--radius-pill);
     display: inline-flex;
     gap: var(--space-100);
-    padding: var(--space-hairline) var(--space-1);
+    padding: var(--space-050) var(--space-200);
   }
 
   .debug-event {
@@ -141,7 +141,7 @@
 
   .debug-body {
     display: grid;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 
@@ -165,7 +165,7 @@
     margin: var(--space-100) 0 0;
     max-height: 14rem;
     overflow: auto;
-    padding: var(--space-1);
+    padding: var(--space-200);
   }
 
   .debug-event code {
@@ -209,7 +209,7 @@
     border-radius: var(--radius-pill);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.06em;
-    padding: var(--space-hairline) var(--space-2);
+    padding: var(--space-050) var(--space-300);
     text-transform: uppercase;
   }
 
@@ -250,6 +250,6 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
-    padding: var(--space-hairline) var(--space-200);
+    padding: var(--space-050) var(--space-200);
   }
 </style>

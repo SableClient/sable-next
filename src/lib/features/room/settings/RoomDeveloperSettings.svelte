@@ -160,12 +160,12 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

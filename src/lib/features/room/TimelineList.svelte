@@ -1124,9 +1124,9 @@
   }
 
   .timeline-content {
-    --timeline-group-gap: var(--space-1);
-    --timeline-row-gap: var(--space-relaxed-tight);
-    --timeline-row-padding: var(--space-compact);
+    --timeline-group-gap: var(--space-200);
+    --timeline-row-gap: var(--space-250);
+    --timeline-row-padding: var(--space-100);
 
     display: flex;
     flex: 1;
@@ -1136,11 +1136,11 @@
   }
 
   .timeline-content.spacing-compact {
-    --timeline-row-gap: var(--space-compact);
+    --timeline-row-gap: var(--space-100);
   }
 
   .timeline-content.spacing-roomy {
-    --timeline-row-gap: var(--space-2);
+    --timeline-row-gap: var(--space-300);
   }
 
   /* Desktop chat leads tighter; the type size is the same as everywhere else. */
@@ -1179,9 +1179,9 @@
     display: grid;
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
-    gap: calc(var(--space-compact) / 2);
-    left: var(--space-1);
-    padding: var(--space-1);
+    gap: var(--space-050);
+    left: var(--space-200);
+    padding: var(--space-200);
     pointer-events: auto;
     position: absolute;
     top: 0.5rem;
@@ -1189,7 +1189,7 @@
   }
 
   :global(.timeline-debug button) {
-    margin-top: var(--space-compact);
+    margin-top: var(--space-100);
   }
 
   .viewport {
@@ -1267,7 +1267,7 @@
     gap: var(--space-200);
     inset-inline: 0;
     margin: 0;
-    padding: 0 var(--space-3);
+    padding: 0 var(--space-400);
     pointer-events: none;
     position: absolute;
     top: 0;
@@ -1288,14 +1288,14 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
-    padding: var(--space-hairline) var(--space-200);
+    padding: var(--space-050) var(--space-200);
   }
 
   .timeline-foot {
     align-items: center;
     display: flex;
     flex: none;
-    gap: var(--space-1);
+    gap: var(--space-200);
     height: 1.5rem;
     justify-content: space-between;
     padding: 0 var(--page-gutter);

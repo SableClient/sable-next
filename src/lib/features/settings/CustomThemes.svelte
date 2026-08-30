@@ -159,7 +159,7 @@
 <style>
   .custom-themes {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   h3,
@@ -180,14 +180,14 @@
   .theme-slots {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .theme-slots label {
     display: grid;
     flex: 1 1 12rem;
     font-size: var(--font-size-small);
-    gap: var(--space-compact);
+    gap: var(--space-100);
   }
 
   .error {

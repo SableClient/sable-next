@@ -271,14 +271,14 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .section-header {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
-    padding: 0 var(--space-1);
+    gap: var(--space-200);
+    padding: 0 var(--space-200);
   }
 
   :global(.section-toggle) {
@@ -291,9 +291,9 @@
     display: flex;
     flex: 1;
     font: inherit;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
-    padding: var(--space-1);
+    padding: var(--space-200);
     text-align: left;
   }
 
@@ -342,8 +342,8 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-400);
+    padding: var(--space-300) var(--space-400);
   }
 
   .room + .room {
@@ -368,7 +368,7 @@
     cursor: grab;
     display: inline-flex;
     flex: none;
-    margin-left: calc(-1 * var(--space-2));
+    margin-left: calc(-1 * var(--space-300));
   }
 
   .room:hover {
@@ -378,7 +378,7 @@
   .room-text {
     display: grid;
     flex: 1;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 
@@ -386,7 +386,7 @@
     align-items: center;
     display: flex;
     font-weight: var(--font-weight-medium);
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
   }
 
@@ -395,7 +395,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
   }
 
@@ -434,7 +434,7 @@
     align-items: center;
     display: flex;
     flex: none;
-    gap: var(--space-1);
+    gap: var(--space-200);
     margin-left: auto;
   }
 
@@ -442,7 +442,7 @@
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
   }
 
   :global(.room-menu-trigger) {

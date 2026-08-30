@@ -489,7 +489,7 @@
 
   .heading div {
     display: grid;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     min-width: 0;
   }
 

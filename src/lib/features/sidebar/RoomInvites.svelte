@@ -83,7 +83,7 @@
     align-items: center;
     border-radius: var(--radius);
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-height: var(--control-height-medium);
     min-width: 0;
     padding: 0 var(--space-100) 0 var(--space-200);

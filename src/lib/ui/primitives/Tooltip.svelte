@@ -58,7 +58,7 @@
     cursor: pointer;
     display: flex;
     justify-content: center;
-    padding: var(--space-hairline);
+    padding: var(--space-050);
   }
 
   .tooltip-trigger-icon:hover,

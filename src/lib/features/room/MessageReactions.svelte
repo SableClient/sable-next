@@ -142,7 +142,7 @@
     display: inline-flex;
     justify-content: center;
     min-height: 1.5rem;
-    padding: 2px var(--space-200);
+    padding: var(--space-050) var(--space-200);
   }
 
   .reaction {
@@ -159,7 +159,7 @@
     font-weight: var(--font-weight-medium);
     gap: var(--space-100);
     min-height: 1.5rem;
-    padding: 2px var(--space-200) 2px var(--space-150);
+    padding: var(--space-050) var(--space-200) var(--space-050) var(--space-150);
     position: relative;
   }
 

@@ -24,8 +24,8 @@
     border: var(--border-width) solid;
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-compact);
-    padding: var(--space-2);
+    gap: var(--space-100);
+    padding: var(--space-300);
   }
 
   :global(.sable-alert p) {

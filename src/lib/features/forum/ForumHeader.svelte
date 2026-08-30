@@ -45,8 +45,8 @@
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
     flex: 0 0 auto;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-300);
+    padding: var(--space-300) var(--space-400);
   }
 
   .forum-header h1 {

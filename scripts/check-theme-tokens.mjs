@@ -12,6 +12,8 @@ const setPropertyPattern = /setProperty\(\s*['"](--[a-z0-9_-]+)['"]/gi;
 const variableReferencePattern = /var\(\s*(--[a-z0-9_-]+)/gi;
 const literalColorPattern = /(?:#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\()/gi;
 const literalFontSizePattern = /font-size\s*:\s*(?!\s*(?:var|inherit|max|min|clamp|calc)\b)[^;]+/gi;
+const literalSpacingPattern =
+  /(?:padding|margin)(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?\s*:[^;}]*-?(?:\d*\.)?\d+(?:px|rem|em)\b|(?:gap|row-gap|column-gap)\s*:[^;}]*-?(?:\d*\.)?\d+(?:px|rem|em)\b/gi;
 const safeAreaPattern = /--safe-(?:top|right|bottom|left)\b/gi;
 
 // An inset must be applied once, by the element that paints under the system
@@ -66,6 +68,7 @@ const declared = new Map();
 const referenced = new Map();
 const literalColors = [];
 const literalFontSizes = [];
+const literalSpacingValues = [];
 const safeAreaTrespassers = [];
 
 for (const file of files) {
@@ -110,6 +113,9 @@ for (const file of files) {
     for (const match of source.matchAll(literalFontSizePattern)) {
       literalFontSizes.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
     }
+    for (const match of source.matchAll(literalSpacingPattern)) {
+      literalSpacingValues.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
+    }
   }
 }
 
@@ -121,6 +127,7 @@ if (
   missing.length > 0 ||
   literalColors.length > 0 ||
   literalFontSizes.length > 0 ||
+  literalSpacingValues.length > 0 ||
   safeAreaTrespassers.length > 0
 ) {
   if (missing.length > 0) {
@@ -138,6 +145,12 @@ if (
       'Literal font-size values are forbidden; use typography tokens from src/styles.css:'
     );
     for (const location of literalFontSizes) console.error(`  ${location}`);
+  }
+  if (literalSpacingValues.length > 0) {
+    console.error(
+      'Literal padding, margin and gap lengths are forbidden; use spacing tokens from src/styles.css:'
+    );
+    for (const location of literalSpacingValues) console.error(`  ${location}`);
   }
   if (safeAreaTrespassers.length > 0) {
     console.error('Safe-area insets may only be applied by a surface root:');

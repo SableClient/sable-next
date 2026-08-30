@@ -278,19 +278,19 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .status {
     color: var(--sable-surface-var-on-container);
     margin: 0;
-    padding: var(--space-3) 0;
+    padding: var(--space-400) 0;
     text-align: center;
   }
 
   .inline {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     grid-template-columns: 1fr auto;
   }
 

@@ -102,7 +102,8 @@
     max-width: 64rem;
     min-height: 100%;
     overflow: auto;
-    padding: clamp(var(--space-4), 5vw, 3.5rem) var(--page-gutter) 4rem;
+    padding: clamp(var(--space-500), 5vw, calc(var(--space-700) + var(--space-600)))
+      var(--page-gutter) var(--space-900);
     width: 100%;
   }
 
@@ -110,7 +111,12 @@
     align-items: center;
     display: flex;
     flex-direction: column;
-    padding: clamp(var(--space-700), 7vw, 4.75rem) clamp(var(--space-4), 7vw, 5.5rem);
+    padding: clamp(
+        var(--space-700),
+        7vw,
+        calc(var(--space-700) + var(--space-600) + var(--space-500))
+      )
+      clamp(var(--space-500), 7vw, calc(var(--space-700) + var(--space-700) + var(--space-600)));
     text-align: center;
   }
 
@@ -128,9 +134,9 @@
   .hero-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: center;
-    margin-top: var(--space-4);
+    margin-top: var(--space-500);
   }
 
   .hero-actions :global(.sable-button) {
@@ -149,11 +155,15 @@
   }
 
   .start-section {
-    padding-top: clamp(2.75rem, 7vw, 4.5rem);
+    padding-top: clamp(
+      calc(var(--space-700) + var(--space-300)),
+      7vw,
+      calc(var(--space-700) + var(--space-600) + var(--space-400))
+    );
   }
 
   .section-heading {
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-500);
   }
 
   .section-heading h2 {
@@ -163,7 +173,7 @@
 
   .start-grid {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 

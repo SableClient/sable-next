@@ -157,7 +157,7 @@
 <style>
   .about-page {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
     margin: 0 auto;
     max-width: 52rem;
     padding: var(--page-gutter);
@@ -166,7 +166,7 @@
   .product {
     align-items: flex-start;
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   :global(.about-logo) {
@@ -184,7 +184,7 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   h1 {
@@ -200,7 +200,7 @@
   }
 
   p {
-    margin: var(--space-1) 0 var(--space-2);
+    margin: var(--space-200) 0 var(--space-300);
   }
 
   .settings {
@@ -217,7 +217,7 @@
 
   .reset {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     width: min(27rem, calc(100vw - 2rem));
   }
 
@@ -239,8 +239,8 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
-    margin-top: var(--space-1);
+    margin-top: var(--space-200);
   }
 </style>

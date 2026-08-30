@@ -57,7 +57,7 @@
     align-items: center;
     color: inherit;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
   }
 
@@ -90,7 +90,7 @@
   .identity-row-meta {
     align-items: center;
     display: inline-flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
     margin-left: auto;
   }
 </style>

@@ -395,7 +395,7 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .read-only-value {
@@ -423,7 +423,7 @@
   .save-bar {
     align-items: center;
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-400);
     justify-content: flex-end;
   }
 

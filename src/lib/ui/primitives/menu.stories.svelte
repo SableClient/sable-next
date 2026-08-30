@@ -113,6 +113,6 @@
   }
 
   .pad {
-    padding-bottom: 14rem;
+    padding-bottom: calc(var(--space-900) * 3.5);
   }
 </style>

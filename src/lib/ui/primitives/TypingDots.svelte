@@ -12,7 +12,7 @@
   :global(.sable-typing-dots) {
     display: inline-flex;
     flex: 0 0 auto;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
   }
 
   :global(.sable-typing-dots i) {

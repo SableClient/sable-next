@@ -145,9 +145,9 @@
     align-items: baseline;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
+    gap: var(--space-200) var(--space-400);
     justify-content: space-between;
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-300);
   }
 
   h2 {
@@ -162,7 +162,7 @@
   .filters {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-compact);
+    gap: var(--space-100);
   }
 
   :global(.filter) {
@@ -171,7 +171,7 @@
     border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-300);
   }
 
   :global(.filter:hover:not(:disabled)) {
@@ -203,8 +203,8 @@
   li {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
-    padding-right: var(--space-2);
+    gap: var(--space-200);
+    padding-right: var(--space-300);
   }
 
   li + li {
@@ -220,9 +220,9 @@
     color: inherit;
     display: flex;
     flex: 1;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
     text-decoration: none;
   }
 
@@ -234,7 +234,7 @@
   .body {
     display: grid;
     flex: 1;
-    gap: var(--space-compact);
+    gap: var(--space-100);
     min-width: 0;
   }
 
@@ -242,7 +242,7 @@
   .foot {
     align-items: baseline;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     min-width: 0;
   }
 
@@ -279,7 +279,7 @@
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-bold);
     min-width: 1.375rem;
-    padding: 0 var(--space-compact);
+    padding: 0 var(--space-100);
     text-align: center;
   }
 

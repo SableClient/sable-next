@@ -156,9 +156,9 @@
     align-items: center;
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-300) var(--space-400);
   }
 
   .widgets-header h2 {
@@ -174,7 +174,7 @@
 
   .widgets-empty {
     color: var(--sable-surface-var-on-container);
-    padding: var(--space-3);
+    padding: var(--space-400);
   }
 
   .widgets-tabs {
@@ -182,7 +182,7 @@
     flex-wrap: nowrap;
     gap: var(--space-100);
     overflow-x: auto;
-    padding: var(--space-2);
+    padding: var(--space-300);
   }
 
   .widgets-tab {
@@ -210,7 +210,7 @@
     font: inherit;
     font-size: var(--font-size-small);
     min-height: 2.75rem;
-    padding: var(--space-100) var(--space-2);
+    padding: var(--space-100) var(--space-300);
   }
 
   .widgets-tab :global(.sable-icon-button) {

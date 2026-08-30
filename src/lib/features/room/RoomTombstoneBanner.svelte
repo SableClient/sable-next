@@ -50,8 +50,8 @@
   :global(.tombstone-banner) {
     align-items: flex-start;
     display: grid;
-    gap: var(--space-2);
-    margin: var(--space-2);
+    gap: var(--space-300);
+    margin: var(--space-300);
   }
 
   .tombstone-body {

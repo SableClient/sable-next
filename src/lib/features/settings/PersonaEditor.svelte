@@ -245,8 +245,8 @@
 <style>
   .persona-editor {
     display: grid;
-    gap: var(--space-3);
-    padding: var(--space-3);
+    gap: var(--space-400);
+    padding: var(--space-400);
   }
 
   h2 {
@@ -258,13 +258,13 @@
   .identity {
     align-items: center;
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   .identity-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .file-button {
@@ -280,7 +280,7 @@
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     min-width: 0;
   }
 
@@ -295,21 +295,21 @@
 
   .colors {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .triggers {
     border: var(--border-width) solid var(--sable-bg-container-line);
     border-radius: var(--radius);
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     margin: 0;
-    padding: var(--space-2) var(--space-3) var(--space-3);
+    padding: var(--space-300) var(--space-400) var(--space-400);
   }
 
   .triggers legend {
     font-weight: var(--font-weight-medium);
-    padding: 0 var(--space-1);
+    padding: 0 var(--space-200);
   }
 
   .triggers p {
@@ -321,12 +321,12 @@
   .trigger-row {
     align-items: end;
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 

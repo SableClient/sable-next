@@ -367,13 +367,13 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .status {
     color: var(--sable-surface-var-on-container);
     margin: 0;
-    padding: var(--space-3) 0;
+    padding: var(--space-400) 0;
     text-align: center;
   }
 
@@ -388,8 +388,8 @@
     border: var(--border-width) solid var(--sable-surface-container-line);
     border-radius: var(--radius-pill);
     display: inline-flex;
-    gap: var(--space-1);
-    padding: calc(var(--space-1) / 2) var(--space-2);
+    gap: var(--space-200);
+    padding: var(--space-100) var(--space-300);
   }
 
   .role-swatch {
@@ -407,7 +407,7 @@
 
   .number-field {
     display: grid;
-    gap: calc(var(--space-1) / 2);
+    gap: var(--space-100);
     width: 6rem;
   }
 
@@ -419,7 +419,7 @@
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

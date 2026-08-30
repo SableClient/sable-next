@@ -68,9 +68,9 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
-    min-height: calc(var(--control-height-medium) + var(--space-2));
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-400);
+    min-height: calc(var(--control-height-medium) + var(--space-300));
+    padding: var(--space-300) var(--space-400);
   }
 
   :global(.setting-row + .setting-row) {
@@ -103,7 +103,7 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .name {
@@ -113,7 +113,7 @@
   .row-copy p {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: calc(var(--space-1) / 2) 0 0;
+    margin: var(--space-100) 0 0;
     max-width: 60ch;
   }
 
@@ -171,7 +171,7 @@
     display: flex;
     flex: 0 0 auto;
     justify-content: flex-start;
-    padding-left: calc(var(--control-height-small) + var(--space-3));
+    padding-left: calc(var(--control-height-small) + var(--space-400));
     width: 100%;
   }
 

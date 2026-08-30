@@ -63,7 +63,7 @@
 <style>
   .voters-dialog {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     width: min(24rem, calc(100vw - 2rem));
   }
 
@@ -89,7 +89,7 @@
     font: inherit;
     font-size: var(--font-size-small);
     gap: var(--space-100);
-    padding: var(--space-hairline) var(--space-200);
+    padding: var(--space-050) var(--space-200);
   }
 
   :global(.tab.active) {
@@ -104,7 +104,7 @@
 
   ul {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     max-height: 16rem;
@@ -115,6 +115,6 @@
   li {
     align-items: center;
     display: flex;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 </style>

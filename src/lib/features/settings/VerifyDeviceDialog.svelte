@@ -51,9 +51,9 @@
   .dialog-heading {
     align-items: flex-start;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-400);
   }
 
   :global(.dialog-title),
@@ -69,6 +69,6 @@
   :global(.dialog-description) {
     color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin-top: var(--space-1);
+    margin-top: var(--space-200);
   }
 </style>

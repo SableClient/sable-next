@@ -406,20 +406,20 @@
 <style>
   .lobby {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   .hero {
     display: grid;
     justify-items: center;
-    padding: var(--space-4) 0 var(--space-2);
+    padding: var(--space-500) 0 var(--space-300);
     text-align: center;
   }
 
   h1 {
     font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
-    margin: var(--space-2) 0 0;
+    margin: var(--space-300) 0 0;
   }
 
   .topic {
@@ -429,7 +429,7 @@
     cursor: pointer;
     display: block;
     font: inherit;
-    margin: var(--space-1) 0 0;
+    margin: var(--space-200) 0 0;
     max-width: 48ch;
     padding: 0;
     text-align: center;
@@ -455,7 +455,7 @@
 
   .topic-dialog {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
     width: min(32rem, calc(100vw - 2rem));
   }
 
@@ -485,7 +485,7 @@
     color: var(--sable-surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: var(--space-tight);
+    gap: var(--space-150);
     margin: 0;
   }
 

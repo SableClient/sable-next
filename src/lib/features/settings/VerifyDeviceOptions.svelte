@@ -119,12 +119,12 @@
 <style>
   .verification-methods {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .method-choices {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .method-choices :global(.sable-button) {
@@ -145,12 +145,12 @@
   .recovery-method {
     align-items: end;
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .recovery-controls {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
     grid-template-columns: 1fr;
   }
 

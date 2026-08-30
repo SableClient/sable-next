@@ -793,7 +793,7 @@
   .folder-tiles {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-hairline);
+    gap: var(--space-050);
     place-content: center;
     width: 100%;
   }

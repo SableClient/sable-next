@@ -447,12 +447,12 @@
 <style>
   .create-room {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
   }
 
   .field {
     display: grid;
-    gap: var(--space-1);
+    gap: var(--space-200);
   }
 
   .field-label {
@@ -478,13 +478,13 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
+    gap: var(--space-400);
     justify-content: space-between;
   }
 
   .row-text {
     display: grid;
-    gap: calc(var(--space-1) / 2);
+    gap: var(--space-100);
     min-width: 0;
   }
 
@@ -505,14 +505,14 @@
 
   .advanced-content {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-500);
     padding: 0 var(--space-300) var(--space-300);
   }
 
   .invite-row {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .invite-row :global(.text-input) {
@@ -524,7 +524,7 @@
     display: grid;
     gap: var(--space-100);
     list-style: none;
-    margin: var(--space-1) 0 0;
+    margin: var(--space-200) 0 0;
     padding: 0;
   }
 
@@ -533,9 +533,9 @@
     background: var(--sable-surface-container);
     border-radius: var(--radius);
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: space-between;
-    padding: var(--space-100) var(--space-100) var(--space-100) var(--space-2);
+    padding: var(--space-100) var(--space-100) var(--space-100) var(--space-300);
   }
 
   .invites span {

@@ -258,7 +258,7 @@
     color: var(--sable-surface-on-container);
     flex: none;
     font-size: var(--font-size-small);
-    padding: var(--space-hairline) var(--space-100);
+    padding: var(--space-050) var(--space-100);
     text-transform: uppercase;
   }
 
@@ -279,6 +279,6 @@
   }
 
   .retry-media {
-    margin-left: var(--space-2);
+    margin-left: var(--space-300);
   }
 </style>

@@ -108,7 +108,7 @@
 <style>
   .confirm {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-400);
   }
 
   h2 {
@@ -129,7 +129,7 @@
 
   .actions {
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     justify-content: flex-end;
   }
 </style>

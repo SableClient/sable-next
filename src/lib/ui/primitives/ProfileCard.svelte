@@ -223,9 +223,9 @@
   .profile-card-crest {
     align-items: flex-end;
     display: flex;
-    gap: var(--space-2);
+    gap: var(--space-300);
     margin-top: calc(var(--profile-avatar-size) / -2);
-    padding: 0 var(--space-3);
+    padding: 0 var(--space-400);
     position: relative;
   }
 
@@ -247,11 +247,11 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     line-height: var(--line-height-body);
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-200);
     min-width: 0;
     overflow: hidden;
     overflow-wrap: anywhere;
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-200) var(--space-300);
   }
 
   .profile-card-status-emoji {
@@ -260,7 +260,7 @@
   }
 
   .profile-card-identity {
-    padding: var(--space-2) var(--space-3) var(--space-3);
+    padding: var(--space-300) var(--space-400) var(--space-400);
   }
 
   .profile-card-name,
@@ -282,7 +282,7 @@
   .profile-card-user-id {
     color: var(--profile-text-muted);
     font-size: var(--font-size-small);
-    margin-top: var(--space-hairline);
+    margin-top: var(--space-050);
     overflow-wrap: anywhere;
   }
 
@@ -308,7 +308,7 @@
   /* Same gutter as the identity text, and framed only with a bio to hold: a lone
      misc-data line in a panel reads as an empty box. */
   .profile-card-panel {
-    margin: 0 var(--space-3) var(--space-2);
+    margin: 0 var(--space-400) var(--space-300);
   }
 
   /* Padding sits on the rows, not here, so the divider between them can reach
@@ -322,7 +322,7 @@
 
   .profile-card-bio-block {
     display: grid;
-    padding: var(--space-2);
+    padding: var(--space-300);
   }
 
   /* One toolbar of equal targets, which is what separates verbs from the facts
@@ -332,7 +332,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-100);
-    margin-top: var(--space-2);
+    margin-top: var(--space-300);
   }
 
   .profile-card-bio {
@@ -363,7 +363,7 @@
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
     justify-self: start;
-    margin: var(--space-1) 0 0;
+    margin: var(--space-200) 0 0;
     padding: 0;
     text-decoration: underline;
     text-underline-offset: 0.15em;
@@ -387,7 +387,7 @@
   /* No hairline: the framed panel above already draws one edge, and two reads as
      a double rule. */
   .profile-card-composer {
-    padding: 0 var(--space-3) var(--space-3);
+    padding: 0 var(--space-400) var(--space-400);
   }
 
   .profile-card-footer.divided {

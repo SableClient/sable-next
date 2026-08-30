@@ -61,7 +61,7 @@
 <style>
   .diagnostics {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-300);
   }
 
   .settings {
