@@ -30,7 +30,7 @@
     void core.commands
       .scheduledMessages(room)
       .then((messages) => {
-        if (alive) remote = messages;
+        if (alive) remote = messages ?? [];
       })
       .catch((error: unknown) => {
         console.debug('[sable composer] scheduled messages unavailable', error);

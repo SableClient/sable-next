@@ -929,9 +929,10 @@
   }
 
   function refreshAfterVisibilityChange(): void {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible' || position.kind === 'settling') return;
     requestAnimationFrame(() => {
-      if (document.visibilityState !== 'visible' || !viewport) return;
+      if (document.visibilityState !== 'visible' || !viewport || position.kind === 'settling')
+        return;
       get(virtualizer).scrollRect = {
         width: viewport.clientWidth,
         height: viewport.clientHeight,

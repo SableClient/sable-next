@@ -675,6 +675,71 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           });
           return;
         }
+        if (command === 'scheduled_messages') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, messages: [] } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'delayed_events_supported') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, supported: true } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'schedule_message') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, delay_id: 'e2e-delay' } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'cancel_scheduled_message' || command === 'send_scheduled_message') {
+          window.setTimeout(() => {
+            this.onmessage?.({ data: { id: request.id, ok: { type: command } } } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'open_id_token') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: {
+                id: request.id,
+                ok: {
+                  type: command,
+                  token: {
+                    access_token: 'e2e-openid',
+                    token_type: 'Bearer',
+                    matrix_server_name: 'example.test',
+                    expires_in_ms: 3_600_000,
+                  },
+                },
+              },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'room_timeline_events' || command === 'room_state_events_raw') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, events: [] } },
+            } as MessageEvent);
+          });
+          return;
+        }
+        if (command === 'search_user_directory') {
+          window.setTimeout(() => {
+            this.onmessage?.({
+              data: { id: request.id, ok: { type: command, limited: false, results: [] } },
+            } as MessageEvent);
+          });
+          return;
+        }
 
         const refusedHierarchy =
           command === 'space_hierarchy' &&

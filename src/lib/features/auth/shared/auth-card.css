@@ -71,7 +71,7 @@
 
 /* Small text button, so the tap area is grown without changing the text box. */
 .auth-page .auth-link-button::after {
-  content: "";
+  content: '';
   inset: -0.25rem 0;
   position: absolute;
 }
