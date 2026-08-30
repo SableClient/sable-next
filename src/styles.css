@@ -402,6 +402,10 @@ html {
   --safe-left: var(--safe-area-inset-left);
 }
 
+:root[data-tauri-os='android'] {
+  --safe-bottom: var(--safe-area-inset-bottom);
+}
+
 :root[data-client-decorations='desktop'],
 :root[data-client-decorations='mac'] {
   --titlebar-height: 2rem;
