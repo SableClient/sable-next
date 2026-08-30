@@ -221,13 +221,11 @@
   $effect(() => {
     if ((!isAddingAccount && core.status !== 'signed-out') || initialized) return;
     initialized = true;
-    let cancelled = false;
-    void flow.validateHomeserver(displayedStage).finally(() => {
-      if (!cancelled) hasCompletedInitialHomeserverCheck = true;
-    });
-    return () => {
-      cancelled = true;
-    };
+    void untrack(() =>
+      flow.validateHomeserver(displayedStage).finally(() => {
+        hasCompletedInitialHomeserverCheck = true;
+      })
+    );
   });
 
   $effect(() => {
