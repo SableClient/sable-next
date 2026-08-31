@@ -883,7 +883,7 @@
       anchorTop: anchor.held?.top ?? 0,
     });
     if (next !== position) setPosition(next);
-    historyController.refreshQueuedRequest();
+    if (position.kind !== 'settling') historyController.observeScroll(movedAway, nearLatest);
     historyController.clearUserScrollPending();
     const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
     if (

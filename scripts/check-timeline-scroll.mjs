@@ -9,6 +9,14 @@ const required = [
   { option: 'scrollEndThreshold', value: '0' },
 ];
 
+const requiredCalls = [
+  {
+    label: 'historyController.observeScroll(',
+    reason:
+      "backward pagination must follow the reader's offset: momentum, a scrollbar drag and a programmatic scroll reach no wheel, key or touch handler",
+  },
+];
+
 const forbidden = [
   {
     label: 'virtualizer.measure()',
@@ -32,6 +40,11 @@ for (const { option, value } of required) {
   }
 }
 
+for (const { label, reason } of requiredCalls) {
+  if (text.includes(label)) continue;
+  failures.push(`${source} never calls ${label}; ${reason}`);
+}
+
 for (const { label, pattern, reason } of forbidden) {
   for (const match of text.matchAll(pattern)) {
     const line = text.slice(0, match.index).split('\n').length;
@@ -49,6 +62,6 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Timeline virtualiser owns no scroll offset; ${required.length} options pinned, ${forbidden.length} call forbidden.`
+    `Timeline virtualiser owns no scroll offset; ${required.length} options pinned, ${requiredCalls.length} call required, ${forbidden.length} call forbidden.`
   );
 }

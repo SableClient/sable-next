@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
 
-import { TimelineHistoryController } from './timeline-history';
+import { nextHistoryDecision, TimelineHistoryController } from './timeline-history';
 import { TIMELINE_LAYOUT } from './timeline-layout';
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -51,6 +51,35 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('nextHistoryDecision', () => {
+  const base = {
+    wanted: true,
+    pagination: 'idle' as BackwardPaginationState,
+    nearOldest: true,
+    requestPending: false,
+    anchorSuppressed: false,
+    anchorFailing: false,
+    pagesRequested: 0,
+    msSinceRequest: Number.POSITIVE_INFINITY,
+  };
+
+  test.for([
+    [{}, 'request'],
+    [{ wanted: false }, 'wait'],
+    [{ pagination: 'end' as BackwardPaginationState }, 'stop'],
+    [{ pagination: 'loading' as BackwardPaginationState }, 'wait'],
+    [{ nearOldest: false }, 'stop'],
+    [{ requestPending: true }, 'wait'],
+    [{ anchorSuppressed: true }, 'defer'],
+    [{ anchorFailing: true }, 'stop'],
+    [{ pagesRequested: TIMELINE_LAYOUT.historyFillMaxPages }, 'stop'],
+    [{ msSinceRequest: 0 }, 'request'],
+    [{ pagesRequested: 1, msSinceRequest: 0 }, 'wait'],
+  ] as const)('%o decides %s', ([overrides, decision]) => {
+    expect(nextHistoryDecision({ ...base, ...overrides })).toBe(decision);
+  });
+});
+
 describe('TimelineHistoryController', () => {
   test('rate limits sparse fills and stops at the page limit', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
@@ -77,34 +106,79 @@ describe('TimelineHistoryController', () => {
     expect(requestHistory).toHaveBeenCalledTimes(1);
   });
 
-  test('requires a new upward key gesture after keyup', () => {
+  test('serves an intent the key gesture could not, once the reader arrives', () => {
     const { controller, requestHistory, state } = setup();
     state.nearOldest = false;
 
     controller.markKeyScroll(key('ArrowUp'));
     controller.markKeyEnd(key('ArrowUp'));
-    state.nearOldest = true;
-    controller.refreshQueuedRequest();
-
     expect(requestHistory).not.toHaveBeenCalled();
-    controller.markKeyScroll(key('PageUp'));
+
+    state.nearOldest = true;
+    controller.observeScroll(true, false);
     expect(requestHistory).toHaveBeenCalledTimes(1);
   });
 
-  test('requests history for an upward touch gesture and resets on touchend', () => {
+  test('requests history on momentum after the finger has left', () => {
     const { controller, requestHistory, state } = setup();
     state.nearOldest = false;
 
     controller.markTouchStart(touch(100));
     controller.markTouchMove(touch(120));
     controller.markTouchEnd();
+    expect(requestHistory).not.toHaveBeenCalled();
+
     state.nearOldest = true;
-    controller.refreshQueuedRequest();
+    controller.observeScroll(true, false);
+    expect(requestHistory).toHaveBeenCalledTimes(1);
+  });
+
+  test('requests history for an offset that raised no device gesture', () => {
+    const { controller, requestHistory } = setup();
+
+    controller.observeScroll(false, false);
+
+    expect(requestHistory).toHaveBeenCalledTimes(1);
+  });
+
+  test('leaves a room sitting at both ends alone', () => {
+    const { controller, requestHistory } = setup();
+
+    controller.observeScroll(false, true);
 
     expect(requestHistory).not.toHaveBeenCalled();
-    controller.markTouchStart(touch(100));
-    controller.markTouchMove(touch(120));
+  });
+
+  test('downward input cancels an intent the position would not renew', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const { controller, requestHistory, state } = setup();
+    state.nearOldest = false;
+
+    controller.markWheelScroll(wheel(-1));
+    controller.markWheelScroll(wheel(1));
+    state.nearOldest = true;
+    controller.observeScroll(false, true);
+    await vi.runAllTimersAsync();
+
+    expect(requestHistory).not.toHaveBeenCalled();
+  });
+
+  test('anchor failures brake the fill they happened in, and no later one', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const { controller } = setup(requestHistory);
+
+    controller.markWheelScroll(wheel(-1));
+    await Promise.resolve();
+    controller.suspendForAnchor();
+    controller.resumeAfterAnchor(40);
+    controller.suspendForAnchor();
+    controller.resumeAfterAnchor(40);
+    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.historyRequestMinInterval * 4);
     expect(requestHistory).toHaveBeenCalledTimes(1);
+
+    controller.markWheelScroll(wheel(-1));
+    expect(requestHistory).toHaveBeenCalledTimes(2);
   });
 
   test('detaches listeners and clears gesture timers', async () => {
