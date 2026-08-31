@@ -1,7 +1,18 @@
 export type RedirectLoginType = 'oidc' | 'sso';
 
-function hasSingleNonemptyParameter(url: URL, name: string): boolean {
-  const values = url.searchParams.getAll(name);
+const RESPONSE_PARAMETERS = ['code', 'state', 'error', 'loginToken'];
+
+function carriesResponse(parameters: URLSearchParams): boolean {
+  return RESPONSE_PARAMETERS.some((name) => parameters.has(name));
+}
+
+function callbackParameters(url: URL): URLSearchParams {
+  const fragment = new URLSearchParams(url.hash.slice(1));
+  return carriesResponse(fragment) ? fragment : url.searchParams;
+}
+
+function hasSingleNonemptyParameter(parameters: URLSearchParams, name: string): boolean {
+  const values = parameters.getAll(name);
   return values.length === 1 && values[0].length > 0;
 }
 
@@ -13,10 +24,11 @@ export function redirectLoginType(callbackUrl: string): RedirectLoginType | null
     return null;
   }
 
-  if (hasSingleNonemptyParameter(url, 'loginToken')) return 'sso';
-  const hasCode = hasSingleNonemptyParameter(url, 'code');
-  const hasError = hasSingleNonemptyParameter(url, 'error');
-  if (hasSingleNonemptyParameter(url, 'state') && hasCode !== hasError) {
+  const parameters = callbackParameters(url);
+  if (hasSingleNonemptyParameter(parameters, 'loginToken')) return 'sso';
+  const hasCode = hasSingleNonemptyParameter(parameters, 'code');
+  const hasError = hasSingleNonemptyParameter(parameters, 'error');
+  if (hasSingleNonemptyParameter(parameters, 'state') && hasCode !== hasError) {
     return 'oidc';
   }
   return null;
@@ -38,11 +50,13 @@ export function tauriRedirectUri(loginType: RedirectLoginType): string {
 
 export function callbackChannelName(callbackUrl: string, windowName: string): string {
   const url = new URL(callbackUrl);
-  const state = url.searchParams.get('state') ?? url.searchParams.get('sable_sso_state');
+  const parameters = callbackParameters(url);
+  const state = parameters.get('state') ?? url.searchParams.get('sable_sso_state');
   return `sable-auth-callback:${state ?? windowName}`;
 }
 
 export function scrubbedCallbackPath(callbackUrl: string): string {
   const url = new URL(callbackUrl);
-  return `${url.pathname}${url.hash}`;
+  const hash = carriesResponse(new URLSearchParams(url.hash.slice(1))) ? '' : url.hash;
+  return `${url.pathname}${hash}`;
 }

@@ -25,6 +25,18 @@ describe('redirect authentication', () => {
     expect(redirectLoginType('not a URL')).toBeNull();
   });
 
+  test('reads an MSC2964 fragment response', () => {
+    expect(redirectLoginType('https://next.sable.moe/login#code=code&state=state')).toBe('oidc');
+    expect(redirectLoginType('https://next.sable.moe/login#error=denied&state=state')).toBe('oidc');
+    expect(redirectLoginType('https://next.sable.moe/login#code=code')).toBeNull();
+    expect(redirectLoginType('https://next.sable.moe/login?iss=server#code=code&state=state')).toBe(
+      'oidc'
+    );
+    expect(redirectLoginType('https://next.sable.moe/login?code=code&state=state#section')).toBe(
+      'oidc'
+    );
+  });
+
   test('adds a correlation value only to legacy SSO', () => {
     expect(createRedirectUri('sso', 'https://next.sable.moe/login', 'nonce')).toBe(
       'https://next.sable.moe/login?sable_sso_state=nonce'
@@ -46,6 +58,9 @@ describe('redirect authentication', () => {
     expect(callbackChannelName('https://next.sable.moe/login?code=code&state=oauth', 'popup')).toBe(
       'sable-auth-callback:oauth'
     );
+    expect(callbackChannelName('https://next.sable.moe/login#code=code&state=oauth', 'popup')).toBe(
+      'sable-auth-callback:oauth'
+    );
     expect(
       callbackChannelName(
         'https://next.sable.moe/login?sable_sso_state=sso&loginToken=token',
@@ -59,5 +74,8 @@ describe('redirect authentication', () => {
       '/login#section'
     );
     expect(scrubbedCallbackPath('https://next.sable.moe/login?loginToken=token')).toBe('/login');
+    expect(scrubbedCallbackPath('https://next.sable.moe/login#code=code&state=state')).toBe(
+      '/login'
+    );
   });
 });

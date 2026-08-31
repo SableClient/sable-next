@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
 use matrix_sdk::ruma::api::client::session::get_login_types::v3::LoginType;
+use matrix_sdk::utils::UrlOrQuery;
 use url::Url;
 
 use crate::protocol::{AuthIntent, CommandErr, CommandOk};
@@ -200,7 +201,11 @@ impl Core {
             .await
             .map_err(|error| self.failed("start_oidc_login", error))?;
 
-        let authorization_url = data.url.to_string();
+        let mut authorization_url = data.url;
+        authorization_url
+            .query_pairs_mut()
+            .append_pair("response_mode", response_mode(&redirect_uri));
+        let authorization_url = authorization_url.to_string();
         let mut pending = self.pending_login.lock().await;
         if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _, _, _))) {
             return Err(CommandErr::Unavailable);
@@ -249,7 +254,7 @@ impl Core {
 
         client
             .oauth()
-            .finish_login(url.into())
+            .finish_login(authorization_response(&url))
             .await
             .map_err(|error| self.failed("complete_oidc_login", error))?;
 
@@ -417,6 +422,20 @@ impl Core {
     }
 }
 
+fn response_mode(redirect_uri: &Url) -> &'static str {
+    match redirect_uri.scheme() {
+        "http" | "https" => "fragment",
+        _ => "query",
+    }
+}
+
+fn authorization_response(callback: &Url) -> UrlOrQuery {
+    match callback.fragment() {
+        Some(fragment) if !fragment.is_empty() => UrlOrQuery::Query(fragment.to_owned()),
+        _ => UrlOrQuery::Url(callback.clone()),
+    }
+}
+
 fn same_redirect_target(expected: &Url, callback: &Url) -> bool {
     if expected.scheme() != callback.scheme()
         || expected.host_str() != callback.host_str()
@@ -435,11 +454,15 @@ fn same_redirect_target(expected: &Url, callback: &Url) -> bool {
 }
 
 fn unexpected_callback(operation: &str, expected: &Url, callback: &Url) {
-    let extra = callback
-        .query_pairs()
-        .map(|(key, _)| key.into_owned())
-        .collect::<Vec<_>>()
-        .join(",");
+    let extra = authorization_response(callback)
+        .query()
+        .map(|query| {
+            url::form_urlencoded::parse(query.as_bytes())
+                .map(|(key, _)| key.into_owned())
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+        .unwrap_or_default();
     tracing::warn!(
         operation,
         expected = %expected,
@@ -472,7 +495,7 @@ mod tests {
         let issuer = Url::parse(
             "https://next.sable.moe/login?code=secret&state=csrf&iss=https%3A%2F%2Fsable.moe%2F",
         )?;
-        let fragment = Url::parse("https://next.sable.moe/login?code=secret&state=csrf#token")?;
+        let fragment = Url::parse("https://next.sable.moe/login#code=secret&state=csrf")?;
         let wrong_path = Url::parse("https://next.sable.moe/other?code=secret&state=csrf")?;
         let wrong_origin = Url::parse("https://attacker.invalid/login?code=secret&state=csrf")?;
         let wrong_port = Url::parse("https://next.sable.moe:8443/login?code=secret&state=csrf")?;
@@ -483,6 +506,39 @@ mod tests {
         for invalid in [wrong_path, wrong_origin, wrong_port] {
             assert!(!same_redirect_target(&expected, &invalid));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn browser_redirect_uris_ask_for_a_fragment_response() -> Result<(), url::ParseError> {
+        assert_eq!(
+            response_mode(&Url::parse("https://next.sable.moe/login")?),
+            "fragment"
+        );
+        assert_eq!(
+            response_mode(&Url::parse("moe.sable.next:/login")?),
+            "query"
+        );
+        assert_eq!(
+            response_mode(&Url::parse("http://localhost:5173/login")?),
+            "fragment"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_fragment_carries_the_authorization_response() -> Result<(), url::ParseError> {
+        let fragment = Url::parse("https://next.sable.moe/login#code=secret&state=csrf")?;
+        let query = Url::parse("moe.sable.next:/login?code=secret&state=csrf")?;
+
+        assert_eq!(
+            authorization_response(&fragment).query(),
+            Some("code=secret&state=csrf")
+        );
+        assert_eq!(
+            authorization_response(&query).query(),
+            Some("code=secret&state=csrf")
+        );
         Ok(())
     }
 
