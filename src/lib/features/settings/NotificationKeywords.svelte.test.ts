@@ -133,3 +133,63 @@ test('reports a load failure instead of showing an empty list', async () => {
 
   await unmount(instance);
 });
+
+test('a slow initial load cannot overwrite the list a fresh add produced', async () => {
+  let releaseInitial = (): void => {};
+  const initial = new Promise<string[]>((resolve) => {
+    releaseInitial = () => {
+      resolve([]);
+    };
+  });
+  core.notificationKeywords.mockReturnValueOnce(initial);
+  core.addNotificationKeyword.mockResolvedValue(undefined);
+
+  const instance = mount(NotificationKeywords, { target: document.body });
+  await tick();
+
+  const input = required('.keyword-form input', HTMLInputElement);
+  setInput(input, 'urgent');
+  await tick();
+  required('.keyword-form button', HTMLButtonElement).click();
+
+  await vi.waitFor(() => {
+    expect(core.addNotificationKeyword).toHaveBeenCalledWith('urgent');
+  });
+
+  releaseInitial();
+  await vi.waitFor(() => {
+    expect(document.querySelector('.keyword-list')).not.toBeNull();
+  });
+
+  expect(
+    [...document.querySelectorAll('.keyword-list .keyword-text')].map((n) => n.textContent)
+  ).toEqual(['urgent']);
+  expect(core.notificationKeywords).toHaveBeenCalledTimes(1);
+
+  await unmount(instance);
+});
+
+test('a removal survives a load that was already in flight', async () => {
+  let releaseInitial = (): void => {};
+  const initial = new Promise<string[]>((resolve) => {
+    releaseInitial = () => {
+      resolve(['sable']);
+    };
+  });
+  core.notificationKeywords.mockReturnValueOnce(initial);
+  core.removeNotificationKeyword.mockResolvedValue(undefined);
+
+  const instance = mount(NotificationKeywords, { target: document.body });
+  releaseInitial();
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
+  });
+
+  document.querySelector<HTMLButtonElement>('[aria-label="Remove keyword sable"]')?.click();
+
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('.keyword-list li').length).toBe(0);
+  });
+
+  await unmount(instance);
+});

@@ -13,6 +13,7 @@
   const core = useCoreClient();
 
   let alive = true;
+  let version = 0;
   let keywords = $state<string[]>([]);
   let loading = $state(true);
   let draft = $state('');
@@ -23,15 +24,21 @@
   const trimmedDraft = $derived(draft.trim());
   const canAdd = $derived(trimmedDraft !== '' && !keywords.includes(trimmedDraft));
 
+  function commit(next: string[]): void {
+    version += 1;
+    keywords = next;
+  }
+
   async function reload(): Promise<void> {
+    const token = version;
     try {
       const result = await core.commands.notificationKeywords();
-      if (!alive) return;
+      if (!alive || token !== version) return;
       keywords = result;
       error = null;
     } catch (cause) {
       console.warn('[sable notifications] loading keywords failed', cause);
-      if (alive) error = 'settings.notificationKeywordsLoadFailed';
+      if (alive && token === version) error = 'settings.notificationKeywordsLoadFailed';
     }
   }
 
@@ -56,7 +63,7 @@
       await core.commands.addNotificationKeyword(keyword);
       if (!alive) return;
       draft = '';
-      await reload();
+      commit([...keywords, keyword].sort((left, right) => left.localeCompare(right)));
     } catch (cause) {
       console.warn('[sable notifications] adding a keyword failed', cause);
       if (alive) error = 'settings.notificationKeywordsAddFailed';
@@ -71,7 +78,7 @@
     try {
       await core.commands.removeNotificationKeyword(keyword);
       if (!alive) return;
-      await reload();
+      commit(keywords.filter((existing) => existing !== keyword));
     } catch (cause) {
       console.warn('[sable notifications] removing a keyword failed', cause);
       if (alive) error = 'settings.notificationKeywordsRemoveFailed';
