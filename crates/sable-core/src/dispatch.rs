@@ -19,7 +19,7 @@ use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
 use matrix_sdk::ruma::api::client::room::upgrade_room;
-use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
+use matrix_sdk::ruma::api::client::state::{get_state_event_for_key, get_state_events};
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
@@ -914,11 +914,11 @@ impl Core {
                 let client = self.client().await?;
                 let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
                 let stored = room
-                    .get_state_events(event_type.into())
+                    .get_state_events(event_type.as_str().into())
                     .await
                     .map_err(|error| self.room_error("room_state_events", error))?;
 
-                let events = stored
+                let events: Vec<RoomStateEventView> = stored
                     .iter()
                     .filter_map(|raw| {
                         let (state_key, content) = match raw {
@@ -937,6 +937,14 @@ impl Core {
                         })
                     })
                     .collect();
+
+                if !events.is_empty() {
+                    return Ok(CommandOk::RoomStateEvents { events });
+                }
+
+                let events = room_state_events_from_server(&client, &room, &event_type)
+                    .await
+                    .map_err(|error| self.room_error("room_state_events", error))?;
 
                 Ok(CommandOk::RoomStateEvents { events })
             }
@@ -2385,6 +2393,38 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
                     MembershipView::Ban => RoomMemberships::BAN,
                 }
         })
+}
+
+async fn room_state_events_from_server(
+    client: &matrix_sdk::Client,
+    room: &matrix_sdk::Room,
+    event_type: &str,
+) -> Result<Vec<RoomStateEventView>, matrix_sdk::Error> {
+    let response = client
+        .send(get_state_events::v3::Request::new(
+            room.room_id().to_owned(),
+        ))
+        .await?;
+
+    Ok(response
+        .room_state
+        .iter()
+        .filter(|raw| {
+            raw.get_field::<String>("type")
+                .ok()
+                .flatten()
+                .is_some_and(|found| found == event_type)
+        })
+        .filter_map(|raw| {
+            Some(RoomStateEventView {
+                state_key: raw.get_field::<String>("state_key").ok().flatten()?,
+                content: raw
+                    .get_field::<serde_json::Value>("content")
+                    .ok()
+                    .flatten()?,
+            })
+        })
+        .collect())
 }
 
 #[cfg(test)]
