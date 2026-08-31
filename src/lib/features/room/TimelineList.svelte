@@ -64,6 +64,7 @@
     onCopyLink?: (eventId: string) => void;
     onMarkUnread?: (eventId: string) => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onMentionUser?: (userId: string, name: string) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
@@ -97,6 +98,7 @@
     onCopyLink,
     onMarkUnread,
     onSenderProfile,
+    onMentionUser,
     onRetrySend,
     onCancelSend,
     currentUserId,
@@ -1064,6 +1066,7 @@
                   {onCopyLink}
                   {onMarkUnread}
                   {onSenderProfile}
+                  {onMentionUser}
                   {onRetrySend}
                   {onCancelSend}
                   {currentUserId}

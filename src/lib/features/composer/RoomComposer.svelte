@@ -451,6 +451,16 @@
     }
   }
 
+  export function insertMention(userId: string, name: string): void {
+    editor.insert(
+      composerSchema.nodes.mention.create({
+        userId,
+        name: name.startsWith('@') ? name : `@${name}`,
+      })
+    );
+    updateTyping();
+  }
+
   function pickUnicodeFromBoard(emoji: string): void {
     editor.insert(composerSchema.text(emoji));
   }

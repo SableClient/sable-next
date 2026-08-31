@@ -30,6 +30,8 @@ vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
 }));
 
+import { setPreference } from '#lib/settings/preferences.svelte.js';
+
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 
 afterEach(() => {
@@ -99,6 +101,38 @@ test('keeps the sender header for an ordinary message', async () => {
 
   expect(document.querySelector('header .sender')?.textContent).toBe('Alice');
   expect(document.querySelector('.emote')).toBeNull();
+  await unmount(instance);
+});
+
+test('clicking the sender name mentions the account behind it', async () => {
+  const onMentionUser = vi.fn();
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: {
+        item: {
+          ...item(false),
+          per_message_profile: {
+            id: 'kris',
+            display_name: 'Kris',
+            avatar_url: null,
+            pronouns: [],
+            color_on_light: null,
+            color_on_dark: null,
+            has_fallback: false,
+          },
+        },
+        collapsed: false,
+        onMentionUser,
+      },
+    },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('header button.sender')?.click();
+
+  expect(onMentionUser).toHaveBeenCalledWith('@alice:example.org', 'Alice');
   await unmount(instance);
 });
 
@@ -364,11 +398,31 @@ test('shows every pronoun set from the sender account profile', async () => {
   await unmount(instance);
 });
 
-test('tolerates repeated pronoun summaries', async () => {
+test('shows only the sets tagged with the reader language', async () => {
   core.userProfile.mockResolvedValue({
     pronouns: [
       { summary: 'she/her', language: 'en' },
-      { summary: 'she/her', language: 'fr' },
+      { summary: 'elle', language: 'fr' },
+    ],
+  });
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+  });
+  await vi.waitFor(() => {
+    const pills = document.querySelectorAll('header .sable-pronoun-pill');
+    expect(pills).toHaveLength(1);
+    expect(pills[0].textContent).toBe('she/her');
+  });
+  await unmount(instance);
+});
+
+test('shows every set once the language filter is switched off', async () => {
+  setPreference('filterPronounsByLanguage', false);
+  core.userProfile.mockResolvedValue({
+    pronouns: [
+      { summary: 'she/her', language: 'en' },
+      { summary: 'elle', language: 'fr' },
     ],
   });
   const instance = mount(TimelineItemHarness, {
@@ -377,6 +431,32 @@ test('tolerates repeated pronoun summaries', async () => {
   });
   await vi.waitFor(() => {
     expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(2);
+  });
+  setPreference('filterPronounsByLanguage', true);
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(1);
+  });
+  await unmount(instance);
+});
+
+test('caps the pills at three and counts the rest', async () => {
+  core.userProfile.mockResolvedValue({
+    pronouns: [
+      { summary: 'she/her', language: 'en' },
+      { summary: 'they/them', language: 'en' },
+      { summary: 'he/him', language: 'en' },
+      { summary: 'it/its', language: 'en' },
+    ],
+  });
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+  });
+  await vi.waitFor(() => {
+    const pills = document.querySelectorAll('header .sable-pronoun-pill');
+    expect(pills).toHaveLength(4);
+    expect(pills[3].textContent).toBe('+1');
+    expect(pills[3].getAttribute('title')).toBe('it/its (en)');
   });
   await unmount(instance);
 });

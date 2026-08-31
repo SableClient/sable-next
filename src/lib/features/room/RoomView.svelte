@@ -76,6 +76,7 @@
   let prescreenMedia = $state<CallMedia>({ microphone: true, camera: false });
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
+  let composer = $state<RoomComposer>();
   let profileOpen = $state(false);
   let receiptsOpen = $state(false);
   let profileUserId = $state<string | null>(null);
@@ -439,6 +440,10 @@
     profileFailed = false;
   }
 
+  function mentionUser(userId: string, name: string): void {
+    composer?.insertMention(userId, name);
+  }
+
   function openProfile(userId: string, anchor: HTMLElement): void {
     const requestId = ++profileRequestId;
     profileUserId = userId;
@@ -671,6 +676,7 @@
         onMatrixLink={handleMatrixLink}
         onCopyLink={copyEventLink}
         onSenderProfile={openProfile}
+        onMentionUser={mentionUser}
         onRetrySend={conversation.retrySend}
         onCancelSend={conversation.cancelSend}
         onToggleReaction={conversation.toggleReaction}
@@ -723,6 +729,7 @@
         {#key resolvedRoomId}
           <ScheduledMessages roomId={resolvedRoomId} />
           <RoomComposer
+            bind:this={composer}
             roomId={resolvedRoomId}
             onSend={conversation.sendMessage}
             onSendAttachment={conversation.sendAttachment}

@@ -41,6 +41,8 @@
     onOpenMedia,
   }: Props = $props();
 
+  let composer = $state<RoomComposer>();
+
   const core = useCoreClient();
   const personas = usePersonaStore();
   const timeline = new RoomTimeline(core);
@@ -97,6 +99,7 @@
     {readOnly}
     {canRedactOthers}
     {onSenderProfile}
+    onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
     {onCopyLink}
     {onOpenMedia}
     onRequestHistory={requestHistory}
@@ -115,6 +118,7 @@
 
   <div class="thread-composer">
     <RoomComposer
+      bind:this={composer}
       {roomId}
       threadRoot={rootEventId}
       {roomName}

@@ -18,6 +18,7 @@
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { projectPersona } from '#lib/personas/persona.js';
+  import { formatPronouns, pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -67,6 +68,7 @@
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onMentionUser?: (userId: string, name: string) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
@@ -108,6 +110,7 @@
     highlighted = false,
     onMatrixLink,
     onSenderProfile,
+    onMentionUser,
     onRetrySend,
     onCancelSend,
     currentUserId = null,
@@ -145,6 +148,13 @@
     persona?.avatar_url ?? item.sender_avatar ?? senderMember?.avatar_url ?? null
   );
   let personaTint = $derived(personaWithColor(persona));
+  let pronouns = $derived(
+    visiblePronouns(persona?.pronouns ?? profile?.pronouns ?? [], {
+      language: $i18n.resolvedLanguage ?? $i18n.language,
+      filterByLanguage: preferences.filterPronounsByLanguage,
+      limit: pronounPillLimit(preferences.pronounPillLimit),
+    })
+  );
   let replyName = $derived(
     replyPersona?.display_name ??
       item.in_reply_to?.sender_name ??
@@ -429,6 +439,10 @@
     if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
   }
 
+  function mentionSender(): void {
+    if (item.sender) onMentionUser?.(item.sender, accountName);
+  }
+
   function openAccountFromPersona(): void {
     if (item.sender && messageRow) onSenderProfile?.(item.sender, messageRow);
   }
@@ -547,13 +561,24 @@
             <time datetime={new Date(item.timestamp).toISOString()}
               >{formatTime(item.timestamp)}</time
             >
-            <span
-              class="compact-name"
-              class:tinted={nameTinted}
-              style:color={nameTinted ? undefined : nameColor}
-            >
-              {collapsed ? '' : senderName}
-            </span>
+            {#if onMentionUser && item.sender && !collapsed}
+              <button
+                class="compact-name name-button"
+                class:tinted={nameTinted}
+                style:color={nameTinted ? undefined : nameColor}
+                type="button"
+                aria-label={$i18n.t('timeline.mentionSender', { name: senderName })}
+                onclick={mentionSender}>{senderName}</button
+              >
+            {:else}
+              <span
+                class="compact-name"
+                class:tinted={nameTinted}
+                style:color={nameTinted ? undefined : nameColor}
+              >
+                {collapsed ? '' : senderName}
+              </span>
+            {/if}
           </div>
         {:else if !collapsed}
           {#if persona && item.sender}
@@ -602,15 +627,26 @@
           {#if !collapsed && layout !== 'compact'}
             <header>
               {#if !emote}
-                <span
-                  class="sender"
-                  class:tinted={nameTinted}
-                  style:color={nameTinted ? undefined : nameColor}
-                >
-                  {senderName}
-                </span>
+                {#if onMentionUser && item.sender}
+                  <button
+                    class="sender name-button"
+                    class:tinted={nameTinted}
+                    style:color={nameTinted ? undefined : nameColor}
+                    type="button"
+                    aria-label={$i18n.t('timeline.mentionSender', { name: senderName })}
+                    onclick={mentionSender}>{senderName}</button
+                  >
+                {:else}
+                  <span
+                    class="sender"
+                    class:tinted={nameTinted}
+                    style:color={nameTinted ? undefined : nameColor}
+                  >
+                    {senderName}
+                  </span>
+                {/if}
               {/if}
-              {#each persona?.pronouns ?? profile?.pronouns ?? [] as pronoun, index (index)}
+              {#each pronouns.visible as pronoun, index (index)}
                 <PronounPill
                   lang={pronoun.language ?? undefined}
                   class={['timeline-pronoun', { tinted: nameTinted }]}
@@ -618,6 +654,16 @@
                   >{pronoun.summary}</PronounPill
                 >
               {/each}
+              {#if pronouns.overflow.length > 0}
+                <PronounPill
+                  class={['timeline-pronoun', { tinted: nameTinted }]}
+                  style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
+                  title={formatPronouns(pronouns.overflow)}
+                  >{$i18n.t('timeline.morePronouns', {
+                    count: pronouns.overflow.length,
+                  })}</PronounPill
+                >
+              {/if}
               <div class="message-details">
                 {#if item.sender}
                   <button
@@ -1040,6 +1086,29 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .name-button {
+    all: unset;
+    cursor: pointer;
+    font: inherit;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.005em;
+    max-width: 24ch;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .name-button:hover {
+    text-decoration: underline;
+  }
+
+  .name-button:focus-visible {
+    border-radius: 0.125rem;
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: 0.15rem;
   }
 
   .sender.tinted,
