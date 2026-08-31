@@ -20,7 +20,7 @@ test('lists rooms that named us, and opens one', async ({ page, app, admin, gues
   await expect(inbox.getByText(body, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
 
   await inbox.getByRole('link', { name: new RegExp(`^${roomName}`) }).click();
-  await expect(page).toHaveURL(new RegExp(encodeURIComponent(roomId).replace(/\$/g, '\\$')));
+  await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(roomId)));
 });
 
 test('filters notifications, and says so when nothing matches', async ({

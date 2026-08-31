@@ -25,7 +25,7 @@ test('a tombstoned room replaces the composer with a banner offering the success
   await expect(page.getByRole('combobox', { name: 'Send a message...' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Join new room' }).click();
-  await expect(page).toHaveURL(new RegExp(encodeURIComponent(successorId).replace(/\$/g, '\\$')), {
+  await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(successorId)), {
     timeout: 20_000,
   });
 });

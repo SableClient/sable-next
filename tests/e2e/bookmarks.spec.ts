@@ -29,7 +29,7 @@ test('bookmarking a message surfaces it in the inbox and opens the event', async
   await expect(row.getByText(body)).toBeVisible();
 
   await row.getByRole('link').click();
-  await expect(page).toHaveURL(new RegExp(encodeURIComponent(roomId).replace(/[$]/g, '\\$')));
+  await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(roomId)));
   await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(eventId);
 });
 
