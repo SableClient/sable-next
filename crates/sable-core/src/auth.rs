@@ -236,11 +236,8 @@ impl Core {
             return Err(CommandErr::Unavailable);
         };
 
-        if !same_redirect_target(
-            expected_redirect_uri,
-            &url,
-            &["code", "state", "error", "error_description", "error_uri"],
-        ) {
+        if !same_redirect_target(expected_redirect_uri, &url) {
+            unexpected_callback("oidc_login", expected_redirect_uri, &url);
             return Err(self.failed(
                 "complete_oidc_login: callback_url",
                 "callback URL does not match the redirect URI used to start OAuth",
@@ -364,7 +361,8 @@ impl Core {
             return Err(CommandErr::Unavailable);
         };
 
-        if !same_redirect_target(expected_redirect_uri, &callback_url, &["loginToken"]) {
+        if !same_redirect_target(expected_redirect_uri, &callback_url) {
+            unexpected_callback("sso_login", expected_redirect_uri, &callback_url);
             return Err(self.failed(
                 "complete_sso_login: callback_url",
                 "callback URL does not match the redirect URI used to start SSO",
@@ -415,21 +413,37 @@ impl Core {
     }
 }
 
-fn same_redirect_target(expected: &Url, callback: &Url, response_parameters: &[&str]) -> bool {
-    let mut callback_target = callback.clone();
-    let query = callback
-        .query_pairs()
-        .filter(|(key, _)| !response_parameters.contains(&key.as_ref()))
-        .map(|(key, value)| (key.into_owned(), value.into_owned()))
-        .collect::<Vec<_>>();
-    callback_target.set_query(None);
-    if !query.is_empty() {
-        callback_target
-            .query_pairs_mut()
-            .extend_pairs(query.iter().map(|(key, value)| (key, value)));
+fn same_redirect_target(expected: &Url, callback: &Url) -> bool {
+    if expected.scheme() != callback.scheme()
+        || expected.host_str() != callback.host_str()
+        || expected.port_or_known_default() != callback.port_or_known_default()
+        || expected.path() != callback.path()
+    {
+        return false;
     }
 
-    expected == &callback_target
+    let returned = callback.query_pairs().collect::<Vec<_>>();
+    expected.query_pairs().all(|(key, value)| {
+        returned
+            .iter()
+            .any(|(returned_key, returned_value)| *returned_key == key && *returned_value == value)
+    })
+}
+
+fn unexpected_callback(operation: &str, expected: &Url, callback: &Url) {
+    let extra = callback
+        .query_pairs()
+        .map(|(key, _)| key.into_owned())
+        .collect::<Vec<_>>()
+        .join(",");
+    tracing::warn!(
+        operation,
+        expected = %expected,
+        callback_origin = %callback.origin().ascii_serialization(),
+        callback_path = callback.path(),
+        callback_parameters = extra,
+        "callback URL does not match the redirect URI"
+    );
 }
 
 fn has_single_nonempty_query_parameter(url: &Url, name: &str) -> bool {
@@ -451,30 +465,19 @@ mod tests {
         let error = Url::parse(
             "https://next.sable.moe/login?error=access_denied&error_description=no&state=csrf",
         )?;
+        let issuer = Url::parse(
+            "https://next.sable.moe/login?code=secret&state=csrf&iss=https%3A%2F%2Fsable.moe%2F",
+        )?;
+        let fragment = Url::parse("https://next.sable.moe/login?code=secret&state=csrf#token")?;
         let wrong_path = Url::parse("https://next.sable.moe/other?code=secret&state=csrf")?;
         let wrong_origin = Url::parse("https://attacker.invalid/login?code=secret&state=csrf")?;
         let wrong_port = Url::parse("https://next.sable.moe:8443/login?code=secret&state=csrf")?;
-        let fragment = Url::parse("https://next.sable.moe/login?code=secret&state=csrf#token")?;
-        let extra_query =
-            Url::parse("https://next.sable.moe/login?code=secret&state=csrf&next=attacker")?;
 
-        let response_parameters = ["code", "state", "error", "error_description", "error_uri"];
-        assert!(same_redirect_target(
-            &expected,
-            &valid,
-            &response_parameters
-        ));
-        assert!(same_redirect_target(
-            &expected,
-            &error,
-            &response_parameters
-        ));
-        for invalid in [wrong_path, wrong_origin, wrong_port, fragment, extra_query] {
-            assert!(!same_redirect_target(
-                &expected,
-                &invalid,
-                &response_parameters
-            ));
+        for accepted in [valid, error, issuer, fragment] {
+            assert!(same_redirect_target(&expected, &accepted));
+        }
+        for invalid in [wrong_path, wrong_origin, wrong_port] {
+            assert!(!same_redirect_target(&expected, &invalid));
         }
         Ok(())
     }
@@ -487,12 +490,8 @@ mod tests {
         let wrong_state =
             Url::parse("moe.sable.next://login?sable_sso_state=attacker&loginToken=secret")?;
 
-        assert!(same_redirect_target(&expected, &valid, &["loginToken"]));
-        assert!(!same_redirect_target(
-            &expected,
-            &wrong_state,
-            &["loginToken"]
-        ));
+        assert!(same_redirect_target(&expected, &valid));
+        assert!(!same_redirect_target(&expected, &wrong_state));
         assert!(has_single_nonempty_query_parameter(
             &expected,
             "sable_sso_state"
