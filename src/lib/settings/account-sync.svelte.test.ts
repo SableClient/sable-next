@@ -177,4 +177,22 @@ describe('AccountSync', () => {
       value: 'again',
     });
   });
+
+  it('detaches the payload from live state before handing it to the core', async () => {
+    const themes = $state([{ id: 'one', css: 'body {}' }]);
+    const document = {
+      eventType: 'moe.sable.next.test',
+      snapshot: () => ({ content: { v: 1, themes } }),
+      adopt: () => false,
+    } satisfies SyncedDocument;
+    const { core, commands } = stubCore({});
+
+    new AccountSync().start(core, [document]);
+    await vi.runAllTimersAsync();
+
+    const content = commands.setAccountData.mock.calls[0]?.[1];
+    themes[0].css = 'body { color: red }';
+
+    expect(content).toEqual({ v: 1, themes: [{ id: 'one', css: 'body {}' }] });
+  });
 });

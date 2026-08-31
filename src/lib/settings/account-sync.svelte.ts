@@ -27,6 +27,10 @@ interface DocumentState {
 
 const DEFAULT_DEBOUNCE_MS = 2000;
 
+function detach(snapshot: SyncedSnapshot): SyncedSnapshot {
+  return { ...snapshot, content: $state.snapshot(snapshot.content) };
+}
+
 export class AccountSync {
   status = $state<AccountSyncStatus>('idle');
   lastSyncedAt = $state<number | null>(null);
@@ -71,7 +75,7 @@ export class AccountSync {
 
   push(document: SyncedDocument): void {
     const state = this.#stateFor(document.eventType);
-    state.pending = document.snapshot();
+    state.pending = detach(document.snapshot());
     this.#schedule(document, state);
   }
 
@@ -125,12 +129,12 @@ export class AccountSync {
 
     state.pulled = true;
     if (!document.adopt(content)) {
-      state.pending ??= document.snapshot();
+      state.pending ??= detach(document.snapshot());
       this.#schedule(document, state);
       return;
     }
 
-    const next = document.snapshot();
+    const next = detach(document.snapshot());
     state.pending = next;
     state.remote = fingerprint(next.content);
     state.status = next.partial === true ? 'partial' : 'idle';
