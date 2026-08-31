@@ -53,8 +53,8 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 
 [dev-dependencies]
 matrix-sdk = { workspace = true, features = ["testing"] }
-matrix-sdk-test = "0.18"
-matrix-sdk-test-utils = "0.18"
+matrix-sdk-test = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
+matrix-sdk-test-utils = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
