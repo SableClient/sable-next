@@ -684,137 +684,139 @@
               </div>
             </header>
           {/if}
-          {#if item.in_reply_to}
-            {@const tint = personaWithColor(replyPersona)}
-            {@const target = item.in_reply_to.event_id}
-            <button
-              class={['reply-preview', { persona: tint }]}
-              type="button"
-              style:--pmp-on-light={tint?.color_on_light ?? undefined}
-              style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
-              onclick={() => {
-                onJumpToEvent?.(target);
-              }}
-            >
-              <ReplyIcon class="reply-icon" />
-              <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
-            </button>
-          {/if}
-          {#if item.content.kind === 'message' && item.content.emote}
-            <div class="emote">
-              <span
-                class="sender"
-                class:tinted={nameTinted}
-                style:color={nameTinted ? undefined : nameColor}>* {senderName}</span
+          <div class="message-main">
+            {#if item.in_reply_to}
+              {@const tint = personaWithColor(replyPersona)}
+              {@const target = item.in_reply_to.event_id}
+              <button
+                class={['reply-preview', { persona: tint }]}
+                type="button"
+                style:--pmp-on-light={tint?.color_on_light ?? undefined}
+                style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+                onclick={() => {
+                  onJumpToEvent?.(target);
+                }}
               >
-              <FormattedBody html={item.content.html} {onMatrixLink} />
-            </div>
-          {:else if item.content.kind === 'message'}
-            <div
-              class={[
-                jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
-                { notice, 'has-edited': item.content.edited },
-              ]}
-            >
-              <FormattedBody html={item.content.html} {onMatrixLink} />
-              <!-- Trails the body, where the edit happened, not the header. -->
-              {#if item.content.edited}
-                <span class="edited">{$i18n.t('timeline.edited')}</span>
-              {/if}
-            </div>
-            {@const previewUrl = firstPreviewableLink(item.content.html)}
-            {#if previewUrl}
-              <LinkPreviewCard url={previewUrl} />
+                <ReplyIcon class="reply-icon" />
+                <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
+              </button>
             {/if}
-          {:else}
-            <MessageBody
-              {item}
-              {members}
-              {canRedactOthers}
-              {onMatrixLink}
-              {onOpenMedia}
-              {onVotePoll}
-              {onEndPoll}
-            />
-          {/if}
-          {#if threadSummary && onOpenThread && threadTarget}
-            {@const target = threadTarget}
-            <button
-              type="button"
-              class="thread-summary"
-              onclick={() => {
-                onOpenThread(target);
-              }}
-            >
-              <ThreadIcon size={14} aria-hidden="true" />
-              <span class="thread-count"
-                >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
+            {#if item.content.kind === 'message' && item.content.emote}
+              <div class="emote">
+                <span
+                  class="sender"
+                  class:tinted={nameTinted}
+                  style:color={nameTinted ? undefined : nameColor}>* {senderName}</span
+                >
+                <FormattedBody html={item.content.html} {onMatrixLink} />
+              </div>
+            {:else if item.content.kind === 'message'}
+              <div
+                class={[
+                  jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
+                  { notice, 'has-edited': item.content.edited },
+                ]}
               >
-              {#if threadSummary.latest_body}
-                <span class="thread-latest">{threadSummary.latest_body}</span>
+                <FormattedBody html={item.content.html} {onMatrixLink} />
+                <!-- Trails the body, where the edit happened, not the header. -->
+                {#if item.content.edited}
+                  <span class="edited">{$i18n.t('timeline.edited')}</span>
+                {/if}
+              </div>
+              {@const previewUrl = firstPreviewableLink(item.content.html)}
+              {#if previewUrl}
+                <LinkPreviewCard url={previewUrl} />
               {/if}
-            </button>
-          {:else if item.thread_root && onOpenThread}
-            {@const target = item.thread_root}
-            <button
-              type="button"
-              class="thread-summary"
-              onclick={() => {
-                onOpenThread(target);
-              }}
-            >
-              <ThreadIcon size={14} aria-hidden="true" />
-              <span class="thread-count">{$i18n.t('timeline.thread')}</span>
-            </button>
-          {/if}
-          {#if item.reactions.length > 0}
-            <MessageReactions
-              reactions={item.reactions}
-              eventId={item.event_id}
-              {currentUserId}
-              {members}
-              {roomId}
-              {actionable}
-              onReact={actions.onReact}
-              {onToggleReaction}
-              onViewReactions={(index: number) => {
-                reactionActive = index;
-                reactionsOpen = true;
-              }}
-            />
-          {/if}
-          {#if upload}
-            <progress
-              class="upload"
-              max={upload.total}
-              value={upload.current}
-              aria-label={$i18n.t('timeline.uploading')}
-            ></progress>
-          {/if}
-          {#if stalled}
-            <p class="send-failure">
-              <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
-              {#if item.transaction_id}
-                {@const transactionId = item.transaction_id}
-                <button
-                  type="button"
-                  onclick={() => {
-                    onRetrySend?.(transactionId);
-                  }}
+            {:else}
+              <MessageBody
+                {item}
+                {members}
+                {canRedactOthers}
+                {onMatrixLink}
+                {onOpenMedia}
+                {onVotePoll}
+                {onEndPoll}
+              />
+            {/if}
+            {#if threadSummary && onOpenThread && threadTarget}
+              {@const target = threadTarget}
+              <button
+                type="button"
+                class="thread-summary"
+                onclick={() => {
+                  onOpenThread(target);
+                }}
+              >
+                <ThreadIcon size={14} aria-hidden="true" />
+                <span class="thread-count"
+                  >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
                 >
-                  {$i18n.t('timeline.retrySend')}
-                </button>
-                <button
-                  type="button"
-                  onclick={() => {
-                    onCancelSend?.(transactionId);
-                  }}
-                >
-                  {$i18n.t('timeline.cancelSend')}
-                </button>
-              {/if}
-            </p>
-          {/if}
+                {#if threadSummary.latest_body}
+                  <span class="thread-latest">{threadSummary.latest_body}</span>
+                {/if}
+              </button>
+            {:else if item.thread_root && onOpenThread}
+              {@const target = item.thread_root}
+              <button
+                type="button"
+                class="thread-summary"
+                onclick={() => {
+                  onOpenThread(target);
+                }}
+              >
+                <ThreadIcon size={14} aria-hidden="true" />
+                <span class="thread-count">{$i18n.t('timeline.thread')}</span>
+              </button>
+            {/if}
+            {#if item.reactions.length > 0}
+              <MessageReactions
+                reactions={item.reactions}
+                eventId={item.event_id}
+                {currentUserId}
+                {members}
+                {roomId}
+                {actionable}
+                onReact={actions.onReact}
+                {onToggleReaction}
+                onViewReactions={(index: number) => {
+                  reactionActive = index;
+                  reactionsOpen = true;
+                }}
+              />
+            {/if}
+            {#if upload}
+              <progress
+                class="upload"
+                max={upload.total}
+                value={upload.current}
+                aria-label={$i18n.t('timeline.uploading')}
+              ></progress>
+            {/if}
+            {#if stalled}
+              <p class="send-failure">
+                <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
+                {#if item.transaction_id}
+                  {@const transactionId = item.transaction_id}
+                  <button
+                    type="button"
+                    onclick={() => {
+                      onRetrySend?.(transactionId);
+                    }}
+                  >
+                    {$i18n.t('timeline.retrySend')}
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => {
+                      onCancelSend?.(transactionId);
+                    }}
+                  >
+                    {$i18n.t('timeline.cancelSend')}
+                  </button>
+                {/if}
+              </p>
+            {/if}
+          </div>
           {#if actionable && showReceiptBadge}
             <ReadReceiptStack
               readers={receiptReaders}
@@ -1075,15 +1077,25 @@
   }
 
   .message-content {
+    display: grid;
     flex: 1;
+    grid-template-columns: minmax(0, 1fr) auto;
     min-width: 0;
   }
 
-  .message-content :global(.read-receipt-stack) {
-    display: flex;
-    margin-inline-start: auto;
-    margin-top: var(--space-050);
-    width: fit-content;
+  .message-content > header {
+    grid-column: 1 / -1;
+  }
+
+  .message-main {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .message-content > :global(.read-receipt-stack) {
+    align-self: end;
+    grid-column: 2;
+    margin-inline-start: var(--space-150);
   }
 
   .message header {
@@ -1453,7 +1465,7 @@
     text-overflow: ellipsis;
   }
 
-  .message.layout-bubble .message-content {
+  .message.layout-bubble .message-main {
     align-items: flex-start;
     display: flex;
     flex-direction: column;
@@ -1480,7 +1492,7 @@
     flex-direction: row-reverse;
   }
 
-  .message.layout-bubble.own .message-content {
+  .message.layout-bubble.own .message-main {
     align-items: flex-end;
   }
 
