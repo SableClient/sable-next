@@ -1,6 +1,6 @@
 import type { RoomSummary } from '#src/generated/RoomSummary';
 
-export type UnreadCount = { unread: number; highlight: number };
+export type UnreadCount = { unread: number; highlight: number; marked?: boolean };
 
 export function spaceUnreadCounts(
   spaces: readonly RoomSummary[],
@@ -24,8 +24,10 @@ export function spaceUnreadCounts(
         accumulate(room.room_id, visited, total);
         continue;
       }
-      if (visited.has(room.room_id) || mutedRoomIds.has(room.room_id)) continue;
+      if (visited.has(room.room_id)) continue;
       visited.add(room.room_id);
+      if (room.marked_unread) total.marked = true;
+      if (mutedRoomIds.has(room.room_id)) continue;
       total.unread += room.unread;
       total.highlight += room.highlight;
     }
@@ -34,12 +36,20 @@ export function spaceUnreadCounts(
 
   const counts = new Map<string, UnreadCount>();
   for (const space of spaces) {
-    const total = accumulate(space.room_id, new Set(), { unread: 0, highlight: 0 });
-    if (total.unread > 0 || total.highlight > 0) counts.set(space.room_id, total);
+    const total = accumulate(space.room_id, new Set(), {
+      unread: 0,
+      highlight: 0,
+      marked: false,
+    });
+    if (total.unread > 0 || total.highlight > 0 || total.marked) counts.set(space.room_id, total);
   }
   return counts;
 }
 
 export function addUnread(left: UnreadCount, right: UnreadCount): UnreadCount {
-  return { unread: left.unread + right.unread, highlight: left.highlight + right.highlight };
+  return {
+    unread: left.unread + right.unread,
+    highlight: left.highlight + right.highlight,
+    marked: (left.marked ?? false) || (right.marked ?? false),
+  };
 }

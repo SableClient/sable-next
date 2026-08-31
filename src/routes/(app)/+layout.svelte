@@ -34,6 +34,7 @@
     watchNativeNotificationClicks,
   } from '#lib/platform/native-notifications.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
+  import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { ensureAndroidHistoryRoot } from '#lib/platform/android-back.js';
@@ -201,18 +202,30 @@
     ensureAndroidHistoryRoot(resolve('/(app)/home'));
   });
 
-  // Delegated, because settings links can appear in any surface that renders a body.
   $effect(() => {
     const shallow = appLayout.matches;
     const onClick = (event: MouseEvent): void => {
       const target = event.target;
       if (!(target instanceof Element)) return;
 
-      const anchor = target.closest<HTMLAnchorElement>('a[data-settings-link]');
-      const section = anchor?.dataset.settingsLink;
-      if (section === undefined) return;
+      const anchor = target.closest<HTMLAnchorElement>('a');
+      if (!anchor) return;
 
-      followSettingsLink(event, section, anchor?.dataset.settingsLinkFocus, shallow);
+      const section = anchor.dataset.settingsLink;
+      if (section !== undefined) {
+        followSettingsLink(event, section, anchor.dataset.settingsLinkFocus, shallow);
+        return;
+      }
+
+      if (anchor.target !== '_blank' || event.button !== 0) return;
+      if (!opensExternalUrls()) return;
+      if (anchor.protocol !== 'http:' && anchor.protocol !== 'https:') return;
+
+      event.preventDefault();
+      const href = anchor.href;
+      void openExternalUrl(href).catch((error: unknown) => {
+        console.warn('[sable links] external link unavailable', href, error);
+      });
     };
 
     return on(document, 'click', onClick);

@@ -9,6 +9,23 @@ test('nothing to badge yields nothing', () => {
   expect(resolveUnreadBadge({ unread: 0, highlight: 0 }, off)).toBeNull();
 });
 
+test('a hand-marked room dots with no count', () => {
+  expect(resolveUnreadBadge({ unread: 0, highlight: 0, marked: true }, off)).toEqual({
+    mode: 'dot',
+    count: 0,
+    highlight: false,
+  });
+  expect(
+    resolveUnreadBadge(
+      { unread: 0, highlight: 0, marked: true },
+      {
+        ...off,
+        showUnreadCounts: true,
+      }
+    )?.mode
+  ).toBe('dot');
+});
+
 test('a room counts its messages only where room counts are on', () => {
   const counts = { unread: 4, highlight: 0 };
 

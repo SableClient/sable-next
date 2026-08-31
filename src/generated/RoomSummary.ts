@@ -30,4 +30,4 @@ call_participants: string[], has_space_parent: boolean, supports_knock: boolean,
 /**
  * Already sorted by `order`, then the child event's age.
  */
-space_children: Array<SpaceChildEdge>, unread: number, highlight: number, latest_event: LatestEventView | null, };
+space_children: Array<SpaceChildEdge>, unread: number, highlight: number, marked_unread: boolean, latest_event: LatestEventView | null, };

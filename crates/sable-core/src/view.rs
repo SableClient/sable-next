@@ -118,6 +118,7 @@ pub fn room_summary<S: BuildHasher>(
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
         unread,
         highlight,
+        marked_unread: item.is_marked_unread(),
         latest_event: latest_event(item),
     }
 }

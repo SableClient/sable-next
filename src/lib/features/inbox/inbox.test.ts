@@ -7,6 +7,7 @@ import {
   countInvites,
   countNotifications,
   filteredBookmarks,
+  hasMarkedUnread,
   inviter,
   notifications,
   parseFilter,
@@ -38,6 +39,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     space_children: [],
     unread: 0,
     highlight: 0,
+    marked_unread: false,
     latest_event: null,
     ...overrides,
   };
@@ -179,4 +181,21 @@ test('a bookmark search matches the room, the sender or the preview', () => {
     'bmk_preview',
   ]);
   expect(filteredBookmarks(bookmarks, '').map((each) => each.bookmark_id)).toHaveLength(4);
+});
+
+test('a hand-marked room reaches the inbox with no count of its own', () => {
+  const marked = room({ room_id: '!marked', marked_unread: true });
+  const quiet = room({ room_id: '!quiet' });
+
+  expect(notifications([marked, quiet], 'all').map((entry) => entry.room_id)).toEqual(['!marked']);
+  expect(countNotifications([marked])).toBe(0);
+  expect(hasMarkedUnread([marked])).toBe(true);
+  expect(hasMarkedUnread([quiet])).toBe(false);
+});
+
+test('a marked direct chat shows under the direct filter', () => {
+  const marked = room({ room_id: '!dm', is_direct: true, marked_unread: true });
+
+  expect(notifications([marked], 'direct').map((entry) => entry.room_id)).toEqual(['!dm']);
+  expect(notifications([marked], 'mentions')).toEqual([]);
 });

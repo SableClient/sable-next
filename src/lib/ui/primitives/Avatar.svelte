@@ -15,6 +15,7 @@
     size?: AvatarSize;
     color?: string;
     decorative?: boolean;
+    uniform?: boolean;
     class?: ClassValue;
   };
 
@@ -26,6 +27,7 @@
     size = 'medium',
     color,
     decorative = alt === undefined,
+    uniform = false,
     class: className = '',
   }: Props = $props();
 
@@ -50,6 +52,7 @@
       alt=""
       width={96}
       height={96}
+      {uniform}
       onfailed={() => (loadingStatus = 'error')}
     />
   {:else if src}

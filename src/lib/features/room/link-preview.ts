@@ -1,7 +1,9 @@
 import { parseMatrixLink } from './matrix-link';
 
-const CODE_BLOCK_REGEX = /<pre\b[^>]*>[\s\S]*?<\/pre>|<code\b[^>]*>[\s\S]*?<\/code>/gi;
-const HREF_REGEX = /<a\b[^>]*\bhref\s*=\s*"([^"]*)"[^>]*>/gi;
+const TAG_REGEX = /<(\/?)([a-z0-9-]+)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/gi;
+const HREF_REGEX = /\bhref\s*=\s*"([^"]*)"/i;
+
+const VERBATIM_ELEMENTS = new Set(['pre', 'code']);
 
 const ENTITIES: Record<string, string> = {
   '&amp;': '&',
@@ -25,11 +27,37 @@ function isPreviewable(href: string): boolean {
   }
 }
 
+function hidesItsLinks(name: string, attributes: string): boolean {
+  return (
+    VERBATIM_ELEMENTS.has(name) || (name === 'span' && /\bdata-mx-spoiler\b/i.test(attributes))
+  );
+}
+
 export function firstPreviewableLink(html: string): string | null {
-  const withoutCode = html.replace(CODE_BLOCK_REGEX, '');
-  for (const match of withoutCode.matchAll(HREF_REGEX)) {
-    const href = decodeEntities(match[1]);
-    if (isPreviewable(href)) return href;
+  let skipped: { name: string; depth: number } | null = null;
+
+  for (const [, closing, rawName, attributes = '', slash] of html.matchAll(TAG_REGEX)) {
+    const name = rawName.toLowerCase();
+    const opens = closing === '' && slash === '';
+
+    if (skipped !== null) {
+      if (name !== skipped.name) continue;
+      if (opens) skipped.depth += 1;
+      else if (closing !== '' && --skipped.depth === 0) skipped = null;
+      continue;
+    }
+
+    if (opens && hidesItsLinks(name, attributes)) {
+      skipped = { name, depth: 1 };
+      continue;
+    }
+    if (!opens || name !== 'a') continue;
+
+    const href = HREF_REGEX.exec(attributes)?.[1];
+    if (href === undefined) continue;
+    const decoded = decodeEntities(href);
+    if (isPreviewable(decoded)) return decoded;
   }
+
   return null;
 }

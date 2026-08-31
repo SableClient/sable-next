@@ -78,9 +78,12 @@ test('leaves a user mention that already carries its sigil alone', async () => {
   await unmount(instance);
 });
 
-test('turns a bare room permalink into a room mention', async () => {
+test('turns a room permalink whose label is its href into a room mention', async () => {
   const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
-  const instance = mount(FormattedBody, { target: document.body, props: { html: url } });
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: `<a href="${url}">${url}</a>` },
+  });
   await tick();
 
   const anchor = document.querySelector<HTMLAnchorElement>('a');
@@ -93,7 +96,10 @@ test('turns a bare room permalink into a room mention', async () => {
 test('resolves a room permalink name through its via server', async () => {
   core.roomPreview.mockResolvedValue({ name: 'Sable' });
   const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
-  const instance = mount(FormattedBody, { target: document.body, props: { html: url } });
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: `<a href="${url}">${url}</a>` },
+  });
 
   await vi.waitFor(() => {
     expect(document.querySelector('a')?.textContent).toBe('#Sable');
@@ -112,11 +118,10 @@ test('uses the local room-list name before requesting a preview', async () => {
       name: 'Sable',
     },
   ];
+  const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';
   const instance = mount(FormattedBody, {
     target: document.body,
-    props: {
-      html: 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe',
-    },
+    props: { html: `<a href="${url}">${url}</a>` },
   });
 
   await vi.waitFor(() => {
@@ -294,6 +299,20 @@ test('an unhighlightable language leaves the escaped source intact', async () =>
   await unmount(instance);
 });
 
+test('keeps a matrix link out of the app when nothing handles it', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<a href="https://matrix.to/#/@ana:example.org">Ana</a>' },
+  });
+  await tick();
+
+  const anchor = document.querySelector<HTMLAnchorElement>('a');
+  expect(anchor?.dataset.matrixLink).toBe('user');
+  expect(anchor?.target).toBe('_blank');
+  expect(anchor?.rel).toBe('noopener noreferrer');
+  await unmount(instance);
+});
+
 test('renders a settings link as a labelled chip', async () => {
   const instance = mount(FormattedBody, {
     target: document.body,
@@ -307,7 +326,5 @@ test('renders a settings link as a labelled chip', async () => {
   expect(anchor?.dataset.settingsLink).toBe('timeline');
   expect(anchor?.dataset.settingsLinkFocus).toBe('hide-read-receipts');
   expect(anchor?.textContent).toBe('Timeline / Hide read receipts');
-  // The app-level delegate follows it, so the anchor is not sent to a new tab.
-  expect(anchor?.target).toBe('');
   await unmount(instance);
 });

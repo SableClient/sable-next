@@ -3,6 +3,7 @@
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { decodeBlurhashPixels } from '#lib/ui/blurhash.js';
+  import { dominantColor } from '#lib/ui/dominant-color.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import {
     cachedMediaUrl,
@@ -30,6 +31,7 @@
     onclick?: () => void;
     onfailed?: () => void;
     retryable?: boolean;
+    uniform?: boolean;
   }
 
   let {
@@ -45,6 +47,7 @@
     onclick,
     onfailed,
     retryable = false,
+    uniform = false,
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
@@ -67,6 +70,13 @@
   let fileRatio = $state<number | null>(null);
   let blurhashCanvas = $state<HTMLCanvasElement>();
   let imageLoaded = $state(false);
+  let imageElement = $state<HTMLImageElement>();
+  let plate = $derived.by(() => {
+    if (!uniform || !preferences.uniformIcons || !imageLoaded) return null;
+    const image = imageElement;
+    if (!image?.complete) return null;
+    return dominantColor(image);
+  });
   let animatedGif = $derived(mime === 'image/gif');
   let manualGif = $derived(animatedGif && !preferences.autoplayGifs);
   let steppedGif = $derived(gifFrames !== null);
@@ -320,7 +330,9 @@
     {/if}
   {:else if url}
     <img
+      bind:this={imageElement}
       class="media-image-content"
+      style:background-color={plate ?? undefined}
       src={url}
       {alt}
       {width}

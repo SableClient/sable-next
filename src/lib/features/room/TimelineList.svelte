@@ -62,6 +62,7 @@
     onRead: (eventId: string) => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onCopyLink?: (eventId: string) => void;
+    onMarkUnread?: (eventId: string) => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
@@ -94,6 +95,7 @@
     onRead,
     onMatrixLink,
     onCopyLink,
+    onMarkUnread,
     onSenderProfile,
     onRetrySend,
     onCancelSend,
@@ -1060,6 +1062,7 @@
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
                   {onCopyLink}
+                  {onMarkUnread}
                   {onSenderProfile}
                   {onRetrySend}
                   {onCancelSend}

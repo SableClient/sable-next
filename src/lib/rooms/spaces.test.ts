@@ -28,6 +28,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     space_children: [],
     unread: 0,
     highlight: 0,
+    marked_unread: false,
     latest_event: null,
     ...overrides,
   };
@@ -68,8 +69,23 @@ test('sums the mentions of a space across its nested rooms, counting each room o
 
   expect(spaceUnreadCounts([root, sub], [root, sub, deep, shared])).toEqual(
     new Map([
-      ['!root:example.org', { unread: 6, highlight: 3 }],
-      ['!sub:example.org', { unread: 6, highlight: 3 }],
+      ['!root:example.org', { unread: 6, highlight: 3, marked: false }],
+      ['!sub:example.org', { unread: 6, highlight: 3, marked: false }],
     ])
+  );
+});
+
+test('a hand-marked room dots its parent space, even muted', () => {
+  const root = room({
+    room_id: '!root:example.org',
+    is_space: true,
+    space_children: [
+      { room_id: '!muted:example.org', order: null, origin_server_ts: 1, suggested: false },
+    ],
+  });
+  const muted = room({ room_id: '!muted:example.org', marked_unread: true });
+
+  expect(spaceUnreadCounts([root], [root, muted], new Set(['!muted:example.org']))).toEqual(
+    new Map([['!root:example.org', { unread: 0, highlight: 0, marked: true }]])
   );
 });

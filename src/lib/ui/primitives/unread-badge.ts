@@ -3,6 +3,7 @@ export type UnreadBadgeMode = 'dot' | 'count';
 export interface UnreadBadgeCounts {
   unread: number;
   highlight: number;
+  marked?: boolean;
 }
 
 export interface UnreadBadgeSettings {
@@ -26,7 +27,9 @@ export function resolveUnreadBadge(
 
   const highlight = counts.highlight > 0;
   const count = highlight ? counts.highlight : counts.unread;
-  if (count <= 0) return null;
+  if (count <= 0) {
+    return counts.marked ? { mode: 'dot', count: 0, highlight: false } : null;
+  }
 
   const numeric =
     (dm && settings.badgeCountDMsOnly) ||

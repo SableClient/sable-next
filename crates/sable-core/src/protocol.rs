@@ -499,6 +499,13 @@ pub enum Command {
         #[serde(default)]
         private_receipt: bool,
     },
+    MarkUnread {
+        #[ts(type = "string")]
+        room_id: OwnedRoomId,
+        #[serde(default)]
+        #[ts(type = "string | null")]
+        read_marker: Option<OwnedEventId>,
+    },
     RetrySend {
         #[ts(type = "string")]
         room_id: OwnedRoomId,
@@ -1090,6 +1097,7 @@ pub enum CommandOk {
     VotePoll,
     EndPoll,
     MarkRead,
+    MarkUnread,
     RetrySend,
     /// False when there was no such echo left to discard.
     CancelSend {
@@ -1583,6 +1591,7 @@ pub struct RoomSummary {
     pub space_children: Vec<SpaceChildEdge>,
     pub unread: u32,
     pub highlight: u32,
+    pub marked_unread: bool,
     pub latest_event: Option<LatestEventView>,
 }
 

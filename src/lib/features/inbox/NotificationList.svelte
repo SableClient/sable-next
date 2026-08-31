@@ -13,6 +13,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
 
   interface Props {
     filter: NotificationFilter;
@@ -113,10 +114,18 @@
               </span>
               <span class="foot">
                 <span class="preview">{line ?? ''}</span>
-                <span
-                  class={['count', { highlight: room.highlight > 0 }]}
-                  aria-label={$i18n.t('timeline.unreadCount', { count })}>{count}</span
-                >
+                {#if count > 0}
+                  <span
+                    class={['count', { highlight: room.highlight > 0 }]}
+                    aria-label={$i18n.t('timeline.unreadCount', { count })}>{count}</span
+                  >
+                {:else}
+                  <UnreadBadge
+                    counts={{ unread: 0, highlight: 0, marked: true }}
+                    role="img"
+                    aria-label={$i18n.t('nav.markedUnread')}
+                  />
+                {/if}
               </span>
             </span>
           </a>

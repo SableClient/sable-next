@@ -11,6 +11,7 @@ import { stateEventSubject, stateEventText } from './state-event-text';
 import {
   hasNewLocalEcho,
   canRedact,
+  eventBefore,
   isCollapsed,
   jumboEmojiLevel,
   personaLookup,
@@ -28,6 +29,18 @@ const scrolledPast = {
 test('marks the newest event scrolled past', () => {
   expect(readReceiptEventId(items, scrolledPast)).toBe('$latest');
   expect(readReceiptEventId(items, { ...scrolledPast, visibleEventId: '$older' })).toBe('$older');
+});
+
+test('the read marker for a marked-unread message is the event before it', () => {
+  const rows = [
+    { event_id: '$first' },
+    { event_id: null },
+    { event_id: '$second' },
+  ] as TimelineItemView[];
+
+  expect(eventBefore(rows, '$second')).toBe('$first');
+  expect(eventBefore(rows, '$first')).toBeNull();
+  expect(eventBefore(rows, '$missing')).toBeNull();
 });
 
 test('does not repeat or rewind the receipt', () => {

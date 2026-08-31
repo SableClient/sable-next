@@ -22,6 +22,7 @@ export interface Preferences {
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
   showPingCounts: boolean;
+  uniformIcons: boolean;
 
   hour24Clock: boolean;
   dateFormat: DateFormat;
@@ -130,6 +131,7 @@ const DEFAULTS: Preferences = {
   showUnreadCounts: false,
   badgeCountDMsOnly: true,
   showPingCounts: true,
+  uniformIcons: false,
 
   hour24Clock: false,
   dateFormat: 'auto',

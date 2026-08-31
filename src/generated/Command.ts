@@ -56,7 +56,7 @@ event_id: string,
 /**
  * Answer ids, not their text.
  */
-answers: Array<string>, thread_root: string | null, } | { "type": "end_poll", room_id: string, event_id: string, thread_root: string | null, } | { "type": "mark_read", room_id: string, event_id: string, private_receipt: boolean, } | { "type": "retry_send", room_id: string, transaction_id: string, thread_root: string | null, } | { "type": "cancel_send", room_id: string, transaction_id: string, thread_root: string | null, } | { "type": "create_room", name: string | null, topic: string | null, kind: CreateRoomKind, 
+answers: Array<string>, thread_root: string | null, } | { "type": "end_poll", room_id: string, event_id: string, thread_root: string | null, } | { "type": "mark_read", room_id: string, event_id: string, private_receipt: boolean, } | { "type": "mark_unread", room_id: string, read_marker: string | null, } | { "type": "retry_send", room_id: string, transaction_id: string, thread_root: string | null, } | { "type": "cancel_send", room_id: string, transaction_id: string, thread_root: string | null, } | { "type": "create_room", name: string | null, topic: string | null, kind: CreateRoomKind, 
 /**
  * Published in the directory, joinable by link.
  */

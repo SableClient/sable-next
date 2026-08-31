@@ -1031,6 +1031,14 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async markUnread(roomId: string, readMarker: string | null = null): Promise<void> {
+      await transport().send({
+        type: 'mark_unread',
+        room_id: roomId,
+        read_marker: readMarker,
+      });
+    },
+
     async notificationSettings(roomId: string): Promise<NotificationSettingsView> {
       const response = await transport().send({
         type: 'notification_settings',

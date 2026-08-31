@@ -23,6 +23,7 @@
   } from '#lib/spaces/sidebar-layout.js';
   import { saveSpacePath, savedSpacePaths, spaceNavigationHref } from './space-paths.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { toInitials } from '#lib/ui/primitives/initials.js';
@@ -173,17 +174,16 @@
     return item.icon !== undefined || item.dm === true;
   }
 
-  let displayAnchor = $state<HTMLElement | null>(null);
+  let displayAnchor = $state.raw<CursorAnchor | null>(null);
   let displayOpen = $state(false);
 
   function openDisplayMenu(event: MouseEvent): void {
     const target = event.target;
-    const rail = event.currentTarget;
-    if (mobile || !(rail instanceof HTMLElement)) return;
+    if (mobile) return;
     if (target instanceof Element && target.closest('a, button, [role="button"]')) return;
 
     event.preventDefault();
-    displayAnchor = rail;
+    displayAnchor = cursorAnchor(event);
     displayOpen = true;
   }
 
@@ -192,9 +192,10 @@
     { key: 'badgeCountDMsOnly', label: 'settings.badgeCountDMsOnly' },
     { key: 'showPingCounts', label: 'settings.showPingCounts' },
   ] as const;
+  const iconToggles = [{ key: 'uniformIcons', label: 'settings.uniformIcons' }] as const;
 
   let contextSpace = $state<RoomSummary | null>(null);
-  let contextAnchor = $state<HTMLElement | null>(null);
+  let contextAnchor = $state.raw<CursorAnchor | null>(null);
   let contextOpen = $state(false);
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
@@ -204,11 +205,11 @@
 
   function openSpaceContextMenu(event: MouseEvent, roomId: string): void {
     const space = spacesById.get(roomId);
-    const target = event.currentTarget;
-    if (space === undefined || !(target instanceof HTMLElement)) return;
+    if (space === undefined) return;
     event.preventDefault();
+    event.stopPropagation();
     contextSpace = space;
-    contextAnchor = target;
+    contextAnchor = cursorAnchor(event);
     contextOpen = true;
   }
 
@@ -342,7 +343,7 @@
   {#if item.icon}
     <span class="icon" aria-hidden="true"><item.icon weight={active ? 'fill' : 'regular'} /></span>
   {:else}
-    <Avatar class="space-initial" src={item.avatar} initials={item.initial} />
+    <Avatar class="space-initial" src={item.avatar} initials={item.initial} uniform />
   {/if}
   {#if item.badge !== false}
     {@render unreadMark(item.unread, item.dm ?? false)}
@@ -636,9 +637,27 @@
       class="sable-menu rail-display-menu"
       side="right"
       align="start"
+      preventScroll={false}
       aria-label={$i18n.t('nav.displayOptions')}
     >
       {#each displayToggles as toggle (toggle.key)}
+        {@const on = preferences[toggle.key]}
+        <DropdownMenu.Item
+          class="sable-menu-item"
+          closeOnSelect={false}
+          aria-checked={on}
+          onSelect={() => {
+            setPreference(toggle.key, !on);
+          }}
+        >
+          <span class="sable-menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+          {$i18n.t(toggle.label)}
+        </DropdownMenu.Item>
+      {/each}
+
+      <DropdownMenu.Separator class="sable-menu-separator" />
+
+      {#each iconToggles as toggle (toggle.key)}
         {@const on = preferences[toggle.key]}
         <DropdownMenu.Item
           class="sable-menu-item"
@@ -660,6 +679,8 @@
   <RoomOptionsMenu
     room={contextSpace}
     anchor={contextAnchor}
+    align="start"
+    side="right"
     bind:open={contextOpen}
     onSettings={(room: RoomSummary) => {
       settingsRoomId = room.room_id;

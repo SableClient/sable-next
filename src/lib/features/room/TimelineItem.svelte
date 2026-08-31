@@ -87,6 +87,7 @@
     ) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     onCopyLink?: (eventId: string) => void;
+    onMarkUnread?: (eventId: string) => void;
     canRedactOthers?: boolean;
     selected?: boolean;
     layout?: TimelineLayout;
@@ -116,6 +117,7 @@
     onEdit,
     onDelete,
     onCopyLink,
+    onMarkUnread,
     canRedactOthers = false,
     selected = false,
     layout = 'modern',
@@ -237,6 +239,12 @@
       onReadReceipts: () => {
         receiptsOpen = true;
       },
+      onMarkUnread:
+        onMarkUnread && eventId !== ''
+          ? () => {
+              onMarkUnread(eventId);
+            }
+          : undefined,
       onReply: onReply
         ? () => {
             onReply(eventId);

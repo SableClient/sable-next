@@ -56,7 +56,7 @@
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
-  import { latestEventId } from './timeline-format';
+  import { eventBefore, latestEventId } from './timeline-format';
 
   interface Props {
     roomId: string;
@@ -534,6 +534,14 @@
     await core.commands.markRead(resolvedRoomId, eventId, readReceiptIsPrivate());
   }
 
+  function markUnreadFrom(eventId: string): void {
+    void core.commands
+      .markUnread(resolvedRoomId, eventBefore(timeline.items, eventId))
+      .catch((error: unknown) => {
+        console.warn('[sable room] mark as unread failed', error);
+      });
+  }
+
   function markRoomRead(): void {
     const newest = latestEventId(timeline.items);
     if (!newest) return;
@@ -659,6 +667,7 @@
         onRequestHistory={requestHistory}
         onRequestFuture={requestFuture}
         onRead={markRead}
+        onMarkUnread={markUnreadFrom}
         onMatrixLink={handleMatrixLink}
         onCopyLink={copyEventLink}
         onSenderProfile={openProfile}

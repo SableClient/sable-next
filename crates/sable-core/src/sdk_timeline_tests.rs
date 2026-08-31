@@ -21,7 +21,7 @@ use matrix_sdk_ui::sync_service::{State as SyncState, SyncService};
 use serde_json::json;
 use wiremock::{
     Mock, ResponseTemplate,
-    matchers::{method, path},
+    matchers::{method, path, path_regex},
 };
 
 use super::{
@@ -1320,6 +1320,132 @@ async fn mark_read_body(private_receipt: bool) -> serde_json::Value {
         .expect("a read marker request");
 
     serde_json::from_slice(&marker.body).expect("a JSON body")
+}
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[tokio::test]
+async fn marking_unread_writes_the_room_account_data_flag() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!unread:example.org");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .sync_room(&client, JoinedRoomBuilder::new(room_id))
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(
+            r"^/_matrix/client/v3/user/.*/rooms/.*/account_data/m\.marked_unread$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    core.dispatch(Command::MarkUnread {
+        room_id: room_id.to_owned(),
+        read_marker: None,
+    })
+    .await
+    .unwrap();
+
+    let requests = server
+        .server()
+        .received_requests()
+        .await
+        .expect("wiremock records requests");
+    let write = requests
+        .iter()
+        .rev()
+        .find(|request| {
+            request
+                .url
+                .path()
+                .ends_with("/account_data/m.marked_unread")
+        })
+        .expect("a marked-unread write");
+    let body: serde_json::Value = serde_json::from_slice(&write.body).expect("a JSON body");
+
+    assert_eq!(body["unread"], json!(true));
+}
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[tokio::test]
+async fn marking_unread_from_a_message_walks_the_read_marker_back() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!unread-from:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.text_msg("first").event_id(event_id!("$first")))
+                .add_timeline_event(factory.text_msg("second").event_id(event_id!("$second"))),
+        )
+        .await;
+    Mock::given(method("POST"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room_id}/read_markers"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(
+            r"^/_matrix/client/v3/user/.*/rooms/.*/account_data/m\.marked_unread$",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    core.dispatch(Command::MarkUnread {
+        room_id: room_id.to_owned(),
+        read_marker: Some(event_id!("$first").to_owned()),
+    })
+    .await
+    .unwrap();
+
+    let requests = server
+        .server()
+        .received_requests()
+        .await
+        .expect("wiremock records requests");
+    let marker = requests
+        .iter()
+        .rev()
+        .find(|request| request.url.path().ends_with("/read_markers"))
+        .expect("a read marker request");
+    let body: serde_json::Value = serde_json::from_slice(&marker.body).expect("a JSON body");
+
+    assert_eq!(body["m.fully_read"], json!("$first"));
+    assert!(body.get("m.read").is_none());
 }
 
 #[tokio::test]

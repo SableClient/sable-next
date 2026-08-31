@@ -3,6 +3,7 @@
   import type { RoomTag } from '#src/generated/RoomTag';
   import { DropdownMenu } from 'bits-ui';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
+  import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -17,12 +18,15 @@
   import { i18n } from '#lib/i18n.js';
   import { matrixToUrl } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import AddToSpaceDialog from './AddToSpaceDialog.svelte';
   import { wouldCreateCycle } from './add-to-space.js';
+  import { markRoomsRead, spaceDescendantRooms } from './nav-rooms.js';
 
   import '#lib/ui/primitives/menu.css';
 
@@ -30,7 +34,9 @@
     room: RoomSummary;
     parentSpaceId?: string | null;
     open?: boolean;
-    anchor?: HTMLElement | null;
+    anchor?: HTMLElement | CursorAnchor | null;
+    align?: 'start' | 'end';
+    side?: 'bottom' | 'right';
     onSettings: (room: RoomSummary) => void;
     onLeave: (room: RoomSummary) => void;
   }
@@ -40,6 +46,8 @@
     parentSpaceId = null,
     open = $bindable(false),
     anchor = null,
+    align = 'end',
+    side = 'bottom',
     onSettings,
     onLeave,
   }: Props = $props();
@@ -66,6 +74,13 @@
         !candidate.space_children.some((child) => child.room_id === room.room_id) &&
         !wouldCreateCycle(roomList.rooms, candidate.room_id, room.room_id)
     )
+  );
+
+  let readable = $derived(
+    room.is_space ? spaceDescendantRooms(roomList.rooms, room.room_id) : [room]
+  );
+  let unread = $derived(
+    readable.some((entry) => entry.unread > 0 || entry.highlight > 0 || entry.marked_unread)
   );
 
   const manageable = new SvelteSet<string>();
@@ -127,6 +142,10 @@
     void core.commands.removeFromSpace(spaceId, room.room_id).catch(report);
   }
 
+  function markRead(): void {
+    markRoomsRead(readable, core.commands, readReceiptIsPrivate());
+  }
+
   async function copyLink(): Promise<void> {
     try {
       const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
@@ -153,11 +172,17 @@
   <DropdownMenu.Content
     customAnchor={anchor}
     class="sable-menu room-options-menu"
-    side="bottom"
-    align="end"
+    {side}
+    {align}
     sideOffset={4}
+    preventScroll={false}
   >
     <IconContext values={{ 'aria-hidden': 'true' }}>
+      <DropdownMenu.Item class="sable-menu-item" disabled={!unread} onSelect={markRead}>
+        <ChecksIcon />
+        {$i18n.t('room.menuMarkRead')}
+      </DropdownMenu.Item>
+      <DropdownMenu.Separator class="sable-menu-separator" />
       <DropdownMenu.Item
         class="sable-menu-item"
         onSelect={() => {

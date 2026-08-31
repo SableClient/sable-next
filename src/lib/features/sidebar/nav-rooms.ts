@@ -20,10 +20,40 @@ export function markRoomsRead(
 ): void {
   for (const room of rooms) {
     const eventId = room?.latest_event?.event_id;
-    if (!room || !eventId || (room.unread === 0 && room.highlight === 0)) continue;
+    if (!room || !eventId) continue;
+    if (room.unread === 0 && room.highlight === 0 && !room.marked_unread) continue;
 
     void commands.markRead(room.room_id, eventId, privateReceipt).catch((error: unknown) => {
       console.warn('[sable nav] mark as read failed', error);
     });
   }
+}
+
+export function spaceDescendantRooms(
+  rooms: readonly RoomSummary[],
+  spaceId: string
+): RoomSummary[] {
+  const byId = new Map(rooms.map((room) => [room.room_id, room]));
+  const seen = new Set<string>();
+  const found: RoomSummary[] = [];
+
+  const walk = (id: string): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const space = byId.get(id);
+    if (!space) return;
+    for (const child of space.space_children) {
+      const room = byId.get(child.room_id);
+      if (!room || seen.has(room.room_id)) continue;
+      if (room.is_space) {
+        walk(room.room_id);
+        continue;
+      }
+      seen.add(room.room_id);
+      found.push(room);
+    }
+  };
+
+  walk(spaceId);
+  return found;
 }

@@ -2229,6 +2229,25 @@ impl Core {
                 Ok(CommandOk::MarkRead)
             }
 
+            Command::MarkUnread {
+                room_id,
+                read_marker,
+            } => {
+                let room = self.room(&room_id).await?;
+
+                if let Some(event_id) = read_marker {
+                    room.send_multiple_receipts(Receipts::new().fully_read_marker(event_id))
+                        .await
+                        .map_err(|error| self.room_error("mark_unread_marker", error))?;
+                }
+
+                room.set_unread_flag(true)
+                    .await
+                    .map_err(|error| self.room_error("mark_unread", error))?;
+
+                Ok(CommandOk::MarkUnread)
+            }
+
             Command::RetrySend {
                 room_id,
                 transaction_id,

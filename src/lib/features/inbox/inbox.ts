@@ -14,11 +14,11 @@ export function notificationCount(room: RoomSummary): number {
 function matchesFilter(room: RoomSummary, filter: NotificationFilter): boolean {
   switch (filter) {
     case 'direct':
-      return room.is_direct && room.unread > 0;
+      return room.is_direct && (room.unread > 0 || room.marked_unread);
     case 'mentions':
       return room.highlight > 0;
     default:
-      return notificationCount(room) > 0;
+      return notificationCount(room) > 0 || room.marked_unread;
   }
 }
 
@@ -37,6 +37,10 @@ export function notifications(
 
 export function countNotifications(rooms: readonly RoomSummary[]): number {
   return notifications(rooms, 'all').reduce((total, room) => total + notificationCount(room), 0);
+}
+
+export function hasMarkedUnread(rooms: readonly RoomSummary[]): boolean {
+  return notifications(rooms, 'all').some((room) => room.marked_unread);
 }
 
 export function pendingInvites(rooms: readonly RoomSummary[]): RoomSummary[] {

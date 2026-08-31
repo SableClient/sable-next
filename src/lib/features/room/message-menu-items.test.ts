@@ -21,3 +21,13 @@ test('bookmark reads back the state it was given', () => {
 test('an action with no handler contributes no row', () => {
   expect(messageMenuRows({})).toEqual([]);
 });
+
+test('mark unread is offered only when the room can carry it', () => {
+  const rows = messageMenuRows({ onMarkUnread: () => {} });
+
+  expect(rows.map((row) => row.key)).toEqual(['mark-unread']);
+  expect(rows[0].label).toBe('timeline.markUnread');
+  expect(messageMenuRows({ onReply: () => {} }).some((row) => row.key === 'mark-unread')).toBe(
+    false
+  );
+});

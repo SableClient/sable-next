@@ -27,6 +27,7 @@ function room(overrides: Partial<RoomSummary> & { room_id: string }): RoomSummar
     space_children: [],
     unread: 0,
     highlight: 0,
+    marked_unread: false,
     latest_event: null,
     ...overrides,
   };

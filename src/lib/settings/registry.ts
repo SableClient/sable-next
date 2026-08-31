@@ -26,6 +26,7 @@ import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
+import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
@@ -294,6 +295,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: MegaphoneIcon,
         name: 'settings.showPingCounts',
         description: 'settings.showPingCountsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'uniformIcons',
+        icon: SquaresFourIcon,
+        name: 'settings.uniformIcons',
+        description: 'settings.uniformIconsHint',
         type: 'boolean',
       },
     ],

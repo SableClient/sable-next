@@ -58,4 +58,25 @@ describe('firstPreviewableLink', () => {
   it('returns null for a malformed href', () => {
     expect(firstPreviewableLink('<a href="not a url">x</a>')).toBeNull();
   });
+
+  it('does not preview a link inside a spoiler', () => {
+    expect(
+      firstPreviewableLink('<span data-mx-spoiler=""><a href="https://example.org/a">a</a></span>')
+    ).toBeNull();
+  });
+
+  it('previews a link after a spoiler that holds a nested span', () => {
+    expect(
+      firstPreviewableLink(
+        '<span data-mx-spoiler=""><span>x</span><a href="https://example.org/a">a</a></span>' +
+          '<a href="https://example.org/b">b</a>'
+      )
+    ).toBe('https://example.org/b');
+  });
+
+  it('does not preview a link inside a nested code element', () => {
+    expect(
+      firstPreviewableLink('<code>x<code><a href="https://example.org/a">a</a></code>y</code>')
+    ).toBeNull();
+  });
 });

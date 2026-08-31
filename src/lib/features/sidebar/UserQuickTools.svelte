@@ -6,7 +6,7 @@
     defaultSettingsSection,
     openSettingsOver,
   } from '#lib/features/settings/settings-navigation.js';
-  import { countInvites, countNotifications } from '#lib/features/inbox/inbox.js';
+  import { countInvites, countNotifications, hasMarkedUnread } from '#lib/features/inbox/inbox.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
@@ -28,7 +28,11 @@
   const roomList = useRoomList();
 
   let inboxCount = $derived(countNotifications(roomList.rooms) + countInvites(roomList.rooms));
-  let inboxCounts = $derived({ unread: 0, highlight: inboxCount });
+  let inboxCounts = $derived({
+    unread: 0,
+    highlight: inboxCount,
+    marked: hasMarkedUnread(roomList.rooms),
+  });
 
   const mobileTools = [
     { href: '/home', icon: ChatsIcon, label: 'nav.messages' },

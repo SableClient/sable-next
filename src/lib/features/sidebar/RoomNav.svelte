@@ -29,6 +29,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
+  import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -57,7 +58,7 @@
 
   let contextRoom = $state<RoomSummary | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
-  let contextAnchor = $state<HTMLElement | null>(null);
+  let contextAnchor = $state.raw<CursorAnchor | null>(null);
   let contextOpen = $state(false);
 
   function openContextMenu(
@@ -65,12 +66,11 @@
     room: RoomSummary,
     parentSpaceId: string | null
   ): void {
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLElement)) return;
     event.preventDefault();
+    event.stopPropagation();
     contextRoom = room;
     contextParentSpaceId = parentSpaceId;
-    contextAnchor = target;
+    contextAnchor = cursorAnchor(event);
     contextOpen = true;
   }
 
@@ -237,6 +237,7 @@
       const room = item.room;
       if (room === undefined) return false;
       if (page.url.pathname === roomHref(item)) return true;
+      if (room.marked_unread) return true;
       return !roomList.mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0);
     })
   );
@@ -410,8 +411,8 @@
       const room = item.room;
       return (
         room !== undefined &&
-        !roomList.mutedRoomIds.has(room.room_id) &&
-        (room.unread > 0 || room.highlight > 0)
+        (room.marked_unread ||
+          (!roomList.mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0)))
       );
     })
   );
@@ -578,6 +579,9 @@
                   type="button"
                   class="room-category sable-selection-layer"
                   class:collapsed
+                  oncontextmenu={(event) => {
+                    openContextMenu(event, item.room, null);
+                  }}
                   style:--room-depth={collapsed ? 0 : item.depth}
                   aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
                   aria-expanded={!isClosed}
@@ -601,6 +605,7 @@
               {@const muted = !room || roomList.mutedRoomIds.has(room.room_id)}
               {@const mentions = muted ? 0 : room.highlight}
               {@const unread = muted ? 0 : room.unread}
+              {@const marked = room?.marked_unread ?? false}
               {@const live = room?.call_participants.length ?? 0}
               {@const notifyMode = room ? roomList.notificationOverride(room.room_id) : null}
               {@const typing =
@@ -608,7 +613,8 @@
                 room !== undefined &&
                 roomList.typingRoomIds.has(room.room_id) &&
                 mentions === 0 &&
-                unread === 0}
+                unread === 0 &&
+                !marked}
               {@const peerId = room?.is_direct ? dmPeerId(room) : null}
               {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
               <div class="room-row-wrap">
@@ -618,7 +624,7 @@
                   }}
                   class="room-row sable-selection-layer"
                   class:active={page.url.pathname === href}
-                  class:unread={mentions > 0 || unread > 0}
+                  class:unread={mentions > 0 || unread > 0 || marked}
                   {href}
                   style:--room-depth={collapsed ? 0 : item.depth}
                   onclick={() => onNavigate?.(href)}
@@ -639,6 +645,7 @@
                             alt=""
                             width={56}
                             height={56}
+                            uniform
                             class="room-image"
                           />
                         {:else}
@@ -672,12 +679,14 @@
                       >
                     {/if}
                     <UnreadBadge
-                      counts={{ unread, highlight: mentions }}
+                      counts={{ unread, highlight: mentions, marked }}
                       dm={room?.is_direct ?? false}
                       role="img"
                       aria-label={mentions > 0
                         ? $i18n.t('nav.unreadMentions', { count: mentions })
-                        : $i18n.t('nav.unreadMessages', { count: unread })}
+                        : unread > 0
+                          ? $i18n.t('nav.unreadMessages', { count: unread })
+                          : $i18n.t('nav.markedUnread')}
                     />
                     {#if notifyMode}
                       {@const chip = notificationChip(notifyMode)}
@@ -725,6 +734,8 @@
     room={contextRoom}
     parentSpaceId={contextParentSpaceId}
     anchor={contextAnchor}
+    align="start"
+    side="right"
     bind:open={contextOpen}
     onSettings={openSettings}
     onLeave={openLeave}

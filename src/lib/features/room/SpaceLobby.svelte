@@ -2,6 +2,7 @@
   import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
   import type { RoomSummary } from '#src/generated/RoomSummary';
   import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
+  import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import { goto } from '$app/navigation';
@@ -15,7 +16,9 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import {
@@ -35,7 +38,11 @@
   } from './space-hierarchy';
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
 
+  import RoomOptionsMenu from '#lib/features/sidebar/RoomOptionsMenu.svelte';
+
+  import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
+  import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import SpaceLobbySection from './SpaceLobbySection.svelte';
 
   interface Props {
@@ -43,6 +50,10 @@
   }
 
   let { space }: Props = $props();
+  let optionsAnchor = $state.raw<HTMLElement | CursorAnchor | null>(null);
+  let optionsOpen = $state(false);
+  let settingsOpen = $state(false);
+  let leaveOpen = $state(false);
   const core = useCoreClient();
   const roomList = useRoomList();
   const joining = new SvelteSet<string>();
@@ -318,11 +329,39 @@
   function label(child: HierarchyRoomView): string {
     return child.name ?? child.canonical_alias ?? child.room_id;
   }
+
+  function openOptions(anchor: HTMLElement | CursorAnchor | null): void {
+    if (anchor === null) return;
+    optionsAnchor = anchor;
+    optionsOpen = true;
+  }
 </script>
 
 <section class="lobby" aria-label={$i18n.t('nav.lobby')}>
-  <header class="hero">
-    <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" />
+  <header
+    class="hero"
+    role="presentation"
+    oncontextmenu={(event) => {
+      if (!space) return;
+      event.preventDefault();
+      openOptions(cursorAnchor(event));
+    }}
+  >
+    {#if space}
+      <div class="hero-menu">
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('room.menuLabel')}
+          onclick={(event) => {
+            openOptions(event.currentTarget instanceof HTMLElement ? event.currentTarget : null);
+          }}
+        >
+          <DotsThreeVerticalIcon />
+        </IconButton>
+      </div>
+    {/if}
+    <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" uniform />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if space?.topic}
       <button
@@ -403,6 +442,40 @@
   </div>
 </DialogFrame>
 
+{#if space}
+  <RoomOptionsMenu
+    room={space}
+    anchor={optionsAnchor}
+    bind:open={optionsOpen}
+    onSettings={() => {
+      settingsOpen = true;
+    }}
+    onLeave={() => {
+      leaveOpen = true;
+    }}
+  />
+
+  {#if settingsOpen}
+    <RoomSettingsDialog
+      open
+      room={space}
+      onOpenChange={(next) => {
+        settingsOpen = next;
+      }}
+    />
+  {/if}
+
+  {#if leaveOpen}
+    <LeaveRoomDialog
+      open
+      room={space}
+      onOpenChange={(next) => {
+        leaveOpen = next;
+      }}
+    />
+  {/if}
+{/if}
+
 <style>
   .lobby {
     display: grid;
@@ -413,7 +486,14 @@
     display: grid;
     justify-items: center;
     padding: var(--space-500) 0 var(--space-300);
+    position: relative;
     text-align: center;
+  }
+
+  .hero-menu {
+    position: absolute;
+    right: 0;
+    top: var(--space-300);
   }
 
   h1 {

@@ -9,7 +9,7 @@ export function openExternalAuthWindow(name: string): ExternalAuthWindow | null 
   if (isTauri()) {
     return {
       navigate: async (url) => {
-        await invoke('open_auth_url', { url });
+        await invoke('open_external_url', { url });
       },
       close: () => {},
     };
@@ -32,7 +32,7 @@ export function openExternalAuthWindow(name: string): ExternalAuthWindow | null 
 
 export async function openExternalAuthUrl(url: string): Promise<void> {
   if (isTauri()) {
-    await invoke('open_auth_url', { url });
+    await invoke('open_external_url', { url });
 
     return;
   }

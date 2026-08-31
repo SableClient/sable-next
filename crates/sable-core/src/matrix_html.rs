@@ -292,6 +292,109 @@ fn linkify_plain_text(text: &str) -> String {
     html
 }
 
+const LINKIFY_SKIP_ELEMENTS: [&str; 8] = [
+    "a", "code", "mx-reply", "noscript", "pre", "script", "style", "textarea",
+];
+
+fn markup_span_end(formatted: &str, start: usize) -> usize {
+    let Some(rest) = formatted.get(start..) else {
+        return formatted.len();
+    };
+    if rest.starts_with("<!--") {
+        return rest
+            .find("-->")
+            .map_or(formatted.len(), |at| start + at + "-->".len());
+    }
+
+    let mut quote = None;
+    for (offset, character) in rest.char_indices().skip(1) {
+        match (quote, character) {
+            (None, '"' | '\'') => quote = Some(character),
+            (Some(open), _) if open == character => quote = None,
+            (None, '>') => return start + offset + 1,
+            _ => {}
+        }
+    }
+    formatted.len()
+}
+
+fn tag_name(tag: &str) -> Option<(String, bool)> {
+    let body = tag.strip_prefix('<')?;
+    let (body, closing) = body
+        .strip_prefix('/')
+        .map_or((body, false), |rest| (rest, true));
+    let name: String = body
+        .chars()
+        .take_while(|character| character.is_ascii_alphanumeric() || *character == '-')
+        .map(|character| character.to_ascii_lowercase())
+        .collect();
+    (!name.is_empty()).then_some((name, closing))
+}
+
+fn linkify_text_run(run: &str) -> String {
+    let linkified = linkify_plain_text(&html_escape::decode_html_entities(run));
+    if linkified.contains("<a href=") {
+        linkified
+    } else {
+        run.to_owned()
+    }
+}
+
+fn linkify_markup(formatted: &str) -> String {
+    let mut out = String::with_capacity(formatted.len());
+    let mut run_start = 0;
+    let mut cursor = 0;
+    let mut skip: Option<(String, usize)> = None;
+
+    while let Some(offset) = formatted.get(cursor..).and_then(|rest| rest.find('<')) {
+        let start = cursor + offset;
+        let run = formatted.get(run_start..start).unwrap_or_default();
+        if skip.is_none() {
+            out.push_str(&linkify_text_run(run));
+        } else {
+            out.push_str(run);
+        }
+
+        let end = markup_span_end(formatted, start);
+        let tag = formatted.get(start..end).unwrap_or_default();
+        out.push_str(tag);
+
+        if let Some((name, closing)) = tag_name(tag) {
+            let self_closing = tag.trim_end_matches('>').trim_end().ends_with('/');
+            match &mut skip {
+                Some((open, depth)) if *open == name => {
+                    if closing {
+                        *depth -= 1;
+                        if *depth == 0 {
+                            skip = None;
+                        }
+                    } else if !self_closing {
+                        *depth += 1;
+                    }
+                }
+                None if !closing
+                    && !self_closing
+                    && LINKIFY_SKIP_ELEMENTS.contains(&name.as_str()) =>
+                {
+                    skip = Some((name, 1));
+                }
+                _ => {}
+            }
+        }
+
+        run_start = end;
+        cursor = end.max(start + 1);
+    }
+
+    let tail = formatted.get(run_start..).unwrap_or_default();
+    if skip.is_none() {
+        out.push_str(&linkify_text_run(tail));
+    } else {
+        out.push_str(tail);
+    }
+    out
+}
+
 /// MSC4144 senders prepend the profile name so clients that cannot read the
 /// profile still show who spoke. Sable renders the profile itself, so leaving
 /// the prefix in would print the name twice.
@@ -406,7 +509,7 @@ fn sanitize(formatted: &str) -> String {
     if nests_too_deeply(formatted) {
         return String::new();
     }
-    let html = Html::parse(formatted);
+    let html = Html::parse(&linkify_markup(formatted));
     html.sanitize_with(&MATRIX_POLICY);
     SANITIZER.clean(&html.to_string()).to_string()
 }
@@ -427,7 +530,8 @@ pub fn display_html(body: &str, formatted: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        display_html, linkify_plain_text, strip_profile_fallback_body, strip_profile_fallback_html,
+        display_html, linkify_markup, linkify_plain_text, strip_profile_fallback_body,
+        strip_profile_fallback_html,
     };
 
     #[test]
@@ -703,5 +807,101 @@ mod tests {
 
         assert!(html.contains("href=\"matrix:u/alice:example.org\""));
         assert!(html.contains("href=\"mailto:alice@example.org\""));
+    }
+
+    #[test]
+    fn linkifies_bare_urls_inside_formatted_markup() {
+        let html = display_html(
+            "hi see https://example.org/a",
+            Some("<strong>hi</strong> see https://example.org/a"),
+        );
+
+        assert!(html.contains("<strong>hi</strong>"));
+        assert!(html.contains("href=\"https://example.org/a\""));
+    }
+
+    #[test]
+    fn linkifies_matrix_uris_and_permalinks_inside_formatted_markup() {
+        let html = display_html(
+            "",
+            Some(
+                "<em>ping</em> matrix:u/alice:example.org and https://matrix.to/#/@bob:example.org",
+            ),
+        );
+
+        assert!(html.contains("href=\"matrix:u/alice:example.org\""));
+        assert!(html.contains("href=\"https://matrix.to/#/@bob:example.org\""));
+    }
+
+    #[test]
+    fn markup_linkifying_leaves_trailing_punctuation_out() {
+        let html = display_html(
+            "",
+            Some("<p>see https://matrix.to/#/@alice:example.org.</p>"),
+        );
+
+        assert!(html.contains("href=\"https://matrix.to/#/@alice:example.org\""));
+        assert!(html.contains("</a>."));
+    }
+
+    #[test]
+    fn markup_linkifying_skips_anchors_and_verbatim_elements() {
+        let markup = "<a href=\"https://example.org/a\">https://example.org/a</a>\
+                      <code>https://example.org/b</code>\
+                      <pre><code>https://example.org/c</code></pre>";
+        let html = display_html("", Some(markup));
+
+        assert_eq!(html.matches("<a ").count(), 1);
+        assert!(html.contains("<code>https://example.org/b</code>"));
+        assert!(html.contains("<code>https://example.org/c</code>"));
+    }
+
+    #[test]
+    fn markup_linkifying_survives_a_nested_verbatim_element() {
+        let html = display_html(
+            "",
+            Some("<code>a <code>https://example.org/a</code> b</code> https://example.org/c"),
+        );
+
+        assert!(!html.contains("href=\"https://example.org/a\""));
+        assert!(html.contains("href=\"https://example.org/c\""));
+    }
+
+    #[test]
+    fn markup_linkifying_ignores_tags_comments_and_attribute_values() {
+        let markup = "<!-- https://example.org/a -->\
+                      <img src=\"https://example.org/b.png\" alt=\"https://example.org/c\">\
+                      <span data-mx-color=\"#ff0000\">plain</span>";
+        let html = display_html("", Some(markup));
+
+        assert!(!html.contains("<a "));
+        assert!(html.contains("src=\"https://example.org/b.png\""));
+    }
+
+    #[test]
+    fn markup_linkifying_keeps_a_query_that_arrived_as_an_entity() {
+        let html = display_html("", Some("<p>https://example.org/a?x=1&amp;y=2</p>"));
+
+        assert!(html.contains("href=\"https://example.org/a?x=1&amp;y=2\""));
+    }
+
+    #[test]
+    fn markup_without_a_link_is_left_byte_identical() {
+        let markup = "<p>plain <strong>text</strong> &amp; more</p>";
+
+        assert_eq!(linkify_markup(markup), markup);
+    }
+
+    #[test]
+    fn markup_linkifying_does_not_panic_on_unbalanced_or_truncated_markup() {
+        for markup in [
+            "<code>https://example.org/a",
+            "<p https://example.org/a",
+            "<!-- https://example.org/a",
+            "</code>https://example.org/a",
+            "<a/>https://example.org/a",
+        ] {
+            let _ = linkify_markup(markup);
+        }
     }
 }

@@ -264,7 +264,7 @@ fn pending_deep_links() -> Vec<String> {
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
-fn open_auth_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
+fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
     let parsed = tauri::Url::parse(&url).map_err(|_| CommandErr::Denied)?;
     if !matches!(parsed.scheme(), "http" | "https") {
         return Err(CommandErr::Denied);
@@ -368,7 +368,7 @@ pub fn run() {
             fetch_media,
             send_attachment,
             upload_media,
-            open_auth_url,
+            open_external_url,
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,
             register_push,

@@ -93,8 +93,10 @@
   function decorate(html: string) {
     return (node: HTMLElement) => {
       void html;
-      linkifyMatrixPermalinks(node);
       for (const anchor of node.querySelectorAll('a')) {
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+
         const link = parseMatrixLink(anchor.href);
         if (link) {
           anchor.dataset.matrixLink = link.kind;
@@ -115,11 +117,7 @@
           anchor.dataset.settingsLink = settings.section;
           if (settings.focus !== undefined) anchor.dataset.settingsLinkFocus = settings.focus;
           anchor.textContent = settingsLinkLabel(settings);
-          continue;
         }
-
-        anchor.target = '_blank';
-        anchor.rel = 'noopener noreferrer';
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
         element.style.color = element.dataset.mxColor ?? '';
@@ -166,39 +164,6 @@
         () => null
       ));
     if (name && anchor.isConnected) anchor.textContent = name.startsWith('#') ? name : `#${name}`;
-  }
-
-  function linkifyMatrixPermalinks(node: HTMLElement): void {
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-    const textNodes: Text[] = [];
-    let text = walker.nextNode();
-    while (text) {
-      if (!text.parentElement?.closest('a, code')) textNodes.push(text as Text);
-      text = walker.nextNode();
-    }
-
-    for (const textNode of textNodes) {
-      const source = textNode.data;
-      const matches = [...source.matchAll(/https?:\/\/matrix\.to\/#\/[^\s<]+/gi)].filter((match) =>
-        parseMatrixLink(match[0])
-      );
-      if (matches.length === 0) continue;
-
-      const fragment = document.createDocumentFragment();
-      let offset = 0;
-      for (const match of matches) {
-        const url = match[0];
-        const index = match.index;
-        fragment.append(source.slice(offset, index));
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.textContent = url;
-        fragment.append(anchor);
-        offset = index + url.length;
-      }
-      fragment.append(source.slice(offset));
-      textNode.replaceWith(fragment);
-    }
   }
 
   /** Past this many lines a block collapses behind a toggle. */

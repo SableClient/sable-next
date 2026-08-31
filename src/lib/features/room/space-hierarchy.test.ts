@@ -201,6 +201,7 @@ function summary(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSumm
     space_children: [],
     unread: 0,
     highlight: 0,
+    marked_unread: false,
     latest_event: null,
     ...overrides,
   };

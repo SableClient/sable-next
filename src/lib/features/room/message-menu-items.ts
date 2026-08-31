@@ -9,6 +9,7 @@ import ReportIcon from 'phosphor-svelte/lib/FlagIcon';
 import UnpinIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
+import MarkUnreadIcon from 'phosphor-svelte/lib/CircleDashedIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
@@ -21,6 +22,7 @@ export type MessageActions = {
   onAddReaction?: () => void;
   onViewReactions?: () => void;
   onReadReceipts?: () => void;
+  onMarkUnread?: () => void;
   onReply?: () => void;
   onOpenThread?: () => void;
   onEdit?: () => void;
@@ -117,6 +119,15 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.forwardMessage',
       icon: ForwardIcon,
       run: actions.onForward,
+    });
+  }
+  if (actions.onMarkUnread) {
+    rows.push({
+      key: 'mark-unread',
+      label: 'timeline.markUnread',
+      icon: MarkUnreadIcon,
+      run: actions.onMarkUnread,
+      separated: true,
     });
   }
   if (actions.onViewReactions) {

@@ -38,6 +38,17 @@ vi.mock('#lib/i18n.js', () => ({
 }));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.room_id),
+  useRoomList: () => ({ rooms: [] }),
+}));
+vi.mock('#lib/core/context.js', () => ({
+  useCoreClient: () => ({
+    commands: {
+      roomPermissions: () => Promise.resolve({ can_manage_children: false }),
+      roomViaServers: () => Promise.resolve([]),
+      setRoomTag: () => Promise.resolve(),
+      markRead: () => Promise.resolve(),
+    },
+  }),
 }));
 vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
@@ -73,6 +84,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
     space_children: [],
     unread: 0,
     highlight: 0,
+    marked_unread: false,
     latest_event: null,
   };
 }
@@ -154,6 +166,7 @@ test('shows unread direct rooms as individual avatars', async () => {
     space_children: [],
     unread: 2,
     highlight: 0,
+    marked_unread: false,
     latest_event: null,
   } satisfies RoomSummary;
   const instance = mount(NavigationRail, {
@@ -497,6 +510,30 @@ test('a folder whose spaces are all unresolved renders nothing', async () => {
 
   expect(document.querySelector('.folder-preview')).toBeNull();
   expect(document.querySelectorAll('.rail-slot a')).toHaveLength(1);
+
+  await unmount(instance);
+});
+
+test('right-clicking a top-level space opens its options menu', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [space('!a:example.org', 'Alpha')] },
+  });
+  await tick();
+
+  const anchor = [...document.querySelectorAll('.rail-menu-anchor')].find((element) =>
+    element.querySelector('.rail-slot')
+  );
+  expect(anchor).not.toBeUndefined();
+  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+
+  const labels = [...document.querySelectorAll<HTMLElement>('.sable-menu-item')].map((element) =>
+    element.textContent.trim()
+  );
+  expect(labels).toContain('room.menuMarkRead');
+  expect(labels).not.toContain('settings.showUnreadCounts');
 
   await unmount(instance);
 });

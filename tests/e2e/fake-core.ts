@@ -71,14 +71,23 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       name: 'General',
       avatar_url: null,
       is_direct: false,
+      direct_targets: [] as string[],
+      join_rule: 'invite',
+      tags: [] as string[],
       state: 'joined',
       encrypted: true,
       is_space: false,
+      is_tombstoned: false,
       is_voice: false,
       call_participants: [] as string[],
+      has_space_parent: false,
+      supports_knock: false,
+      supports_restricted: false,
+      supports_knock_restricted: false,
       space_children: [],
       unread: 2,
       highlight: 1,
+      marked_unread: false,
       latest_event: {
         sender: '@alice:example.test',
         body: 'General message 19',
@@ -1002,6 +1011,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                                           group: 'mentions',
                                         }
                                       : command === 'mark_read' ||
+                                          command === 'mark_unread' ||
                                           command === 'set_typing' ||
                                           command === 'set_room_account_data'
                                         ? { type: command }
