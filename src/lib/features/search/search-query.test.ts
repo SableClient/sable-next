@@ -226,3 +226,11 @@ test('a quoted token span covers the quotes', () => {
 
   expect(query.slice(token.start, token.end)).toBe('in:"Design crew"');
 });
+
+test('a negated quoted phrase excludes the phrase, not its quotes', () => {
+  const parsed = parseSearchQuery('deploy -"staging box"');
+
+  expect(parsed.exclude).toEqual(['staging box']);
+  expect(parsed.text).toBe('deploy');
+  expect(parsed.phrases).toEqual([]);
+});

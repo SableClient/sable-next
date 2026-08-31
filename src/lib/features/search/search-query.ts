@@ -50,7 +50,7 @@ const ATTACHMENTS: Record<string, SearchAttachment | undefined> = {
   link: 'link',
 };
 
-const SEGMENT = /-?[A-Za-z]+:"[^"]*"|"[^"]*"|\S+/g;
+const SEGMENT = /-?[A-Za-z]+:"[^"]*"|-?"[^"]*"|\S+/g;
 const DAY_MS = 86_400_000;
 
 function isOperator(candidate: string): candidate is SearchOperator {
@@ -71,15 +71,18 @@ export function parseSearchQuery(input: string): ParsedQuery {
     const segment = match[0];
     const start = match.index;
 
-    if (segment.startsWith('"')) {
-      const phrase = segment.slice(1, -1);
-      if (phrase.trim() !== '') parsed.phrases.push(phrase);
-      continue;
-    }
-
     const negated = segment.startsWith('-');
     const term = negated ? segment.slice(1) : segment;
     if (term === '') continue;
+
+    if (term.startsWith('"')) {
+      const phrase = term.slice(1, -1);
+      if (phrase.trim() !== '') {
+        if (negated) parsed.exclude.push(phrase);
+        else parsed.phrases.push(phrase);
+      }
+      continue;
+    }
 
     const separator = term.indexOf(':');
     if (separator <= 0) {
