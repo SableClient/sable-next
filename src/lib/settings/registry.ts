@@ -426,6 +426,17 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'readReceiptPlacement',
+        icon: ChecksIcon,
+        name: 'settings.readReceiptPlacement',
+        description: 'settings.readReceiptPlacementHint',
+        type: 'select',
+        options: [
+          { value: 'message', label: 'settings.readReceiptPlacementMessage' },
+          { value: 'room', label: 'settings.readReceiptPlacementRoom' },
+        ],
+      },
+      {
         key: 'hideTypingIndicators',
         icon: DotsThreeIcon,
         name: 'settings.hideTypingIndicators',

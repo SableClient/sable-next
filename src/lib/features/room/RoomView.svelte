@@ -193,7 +193,11 @@
   onMount(() => {
     void bookmarks.load();
   });
+  let showReceiptFooter = $derived(
+    !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'room'
+  );
   let latestReadBy = $derived.by(() => {
+    if (!showReceiptFooter) return [];
     const userId = core.session?.user_id;
     for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
       const item = timeline.items[index];
@@ -332,10 +336,6 @@
   // until it is asked for.
   $effect(() => {
     conversation.fetchMissingReplyDetails();
-  });
-
-  $effect(() => {
-    if (latestReadBy.length > 0) void loadMembers();
   });
 
   $effect(() => {
@@ -699,7 +699,7 @@
         bind:followingLive={timelineFollowingLive}
       >
         {#snippet footTrailing()}
-          {#if !preferences.hideReadReceipts}
+          {#if showReceiptFooter}
             <RoomReadReceipts
               bind:open={receiptsOpen}
               readers={latestReadBy}

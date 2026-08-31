@@ -46,6 +46,7 @@
   import '#lib/ui/primitives/menu.css';
   import PersonaProfile from './PersonaProfile.svelte';
   import ReactionsDialog from './ReactionsDialog.svelte';
+  import ReadReceiptStack from './ReadReceiptStack.svelte';
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import MessageReproxyDialog from './MessageReproxyDialog.svelte';
@@ -407,6 +408,10 @@
   let reactionActive = $state(0);
   let receiptsOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
+  let receiptReaders = $derived(item.read_by.filter((readerId) => readerId !== currentUserId));
+  let showReceiptBadge = $derived(
+    !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'message'
+  );
 
   const rowPress = new LongPress({
     enabled: () => actionable,
@@ -553,7 +558,7 @@
             />
           {/if}
           {#if receiptsOpen}
-            <ReceiptsDialog bind:open={receiptsOpen} readers={item.read_by} {members} />
+            <ReceiptsDialog bind:open={receiptsOpen} readers={receiptReaders} {members} />
           {/if}
         {/if}
         {#if layout === 'compact'}
@@ -811,6 +816,16 @@
             </p>
           {/if}
         </div>
+        {#if actionable && showReceiptBadge}
+          <ReadReceiptStack
+            readers={receiptReaders}
+            {members}
+            expanded={receiptsOpen}
+            onOpen={() => {
+              receiptsOpen = true;
+            }}
+          />
+        {/if}
       </article>
     </ContextMenu.Trigger>
     {#if actionable}
@@ -1062,6 +1077,11 @@
   .message-content {
     flex: 1;
     min-width: 0;
+  }
+
+  .message :global(.read-receipt-stack) {
+    align-self: flex-end;
+    margin-bottom: var(--space-050);
   }
 
   .message header {

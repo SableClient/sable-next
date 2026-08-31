@@ -1,20 +1,14 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
-  import { cubicOut } from 'svelte/easing';
-  import { prefersReducedMotion } from 'svelte/motion';
-  import { scale } from 'svelte/transition';
   import type { MemberView } from '#src/generated/MemberView';
 
   import { i18n } from '#lib/i18n.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
 
   import MembersDrawer from './MembersDrawer.svelte';
-  import { senderColor } from './timeline-format';
-
-  const MAX_FACES = 3;
+  import ReadReceiptStack from './ReadReceiptStack.svelte';
 
   interface Props {
     readers: readonly string[];
@@ -36,65 +30,25 @@
   let anchor = $state<HTMLButtonElement | null>(null);
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
-  let seen = $derived(
-    readers.map((userId) => {
-      const member = members.find((entry) => entry.user_id === userId);
-      return {
-        userId,
-        name: member?.display_name ?? localPart(userId),
-        avatar: member?.avatar_url,
-      };
-    })
-  );
-  let names = $derived(seen.map((reader) => reader.name).join(', '));
 
   $effect(() => {
     // Losing the readers unmounts the anchor, which would drop a desktop
     // popover through to the bottom sheet branch.
     if (!visible || readers.length === 0) open = false;
   });
-
-  function localPart(userId: string): string {
-    const match = /^@?([^:]+)(?::.*)?$/.exec(userId);
-    return match?.[1] ?? userId;
-  }
 </script>
 
 <div class="room-read-receipts">
-  {#if visible && readers.length > 0}
-    <button
-      type="button"
-      aria-label={$i18n.t('timeline.seenByNames', { names })}
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      title={names}
-      bind:this={anchor}
-      onclick={() => {
+  {#if visible}
+    <ReadReceiptStack
+      {readers}
+      {members}
+      expanded={open}
+      onOpen={(element) => {
+        anchor = element;
         open = true;
       }}
-    >
-      <span class="stack">
-        {#each seen.slice(0, MAX_FACES) as reader (reader.userId)}
-          <span
-            transition:scale={{
-              duration: prefersReducedMotion.current ? 0 : 200,
-              start: 0.72,
-              easing: cubicOut,
-            }}
-          >
-            <Avatar
-              class="receipt-face"
-              src={reader.avatar}
-              name={reader.name}
-              color={senderColor(reader.userId)}
-            />
-          </span>
-        {/each}
-        {#if readers.length > MAX_FACES}
-          <span class="overflow">+{readers.length - MAX_FACES}</span>
-        {/if}
-      </span>
-    </button>
+    />
   {/if}
 </div>
 
@@ -142,102 +96,6 @@
     display: flex;
     justify-content: flex-end;
     min-width: 0;
-
-    --stack-ring: var(--sable-bg-container);
-  }
-
-  button {
-    align-items: center;
-    background: transparent;
-    border: var(--border-width) solid transparent;
-    border-radius: var(--radius-pill);
-    color: var(--sable-sec-main);
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    gap: var(--space-150);
-    height: 1.375rem;
-    max-width: 100%;
-    padding: 0 var(--space-150);
-    position: relative;
-    transition:
-      background-color var(--motion-fast) var(--motion-easing-standard),
-      border-color var(--motion-fast) var(--motion-easing-standard),
-      color var(--motion-fast) var(--motion-easing-standard);
-    white-space: nowrap;
-  }
-
-  button::after {
-    content: '';
-    inset: -0.25rem 0;
-    position: absolute;
-  }
-
-  button:hover {
-    --stack-ring: var(--sable-bg-container-hover);
-
-    background: var(--sable-bg-container-hover);
-    border-color: var(--sable-bg-container-line);
-    color: var(--sable-surface-var-on-container);
-  }
-
-  button:active {
-    --stack-ring: var(--sable-surface-var-container);
-
-    background: var(--sable-surface-var-container);
-    border-color: var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
-  }
-
-  button[aria-expanded='true'] {
-    --stack-ring: var(--sable-surface-container);
-
-    background: var(--sable-surface-container);
-    border-color: var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
-  }
-
-  button:focus-visible {
-    color: var(--sable-surface-var-on-container);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: 0.15rem;
-  }
-
-  .stack {
-    align-items: center;
-    display: flex;
-    flex: none;
-    padding-left: var(--space-050);
-  }
-
-  .stack > * + * {
-    margin-left: calc(-1 * var(--space-150));
-  }
-
-  .stack :global(.receipt-face) {
-    box-shadow: 0 0 0 0.125rem var(--stack-ring);
-  }
-
-  :global(.sable-avatar.receipt-face) {
-    --avatar-size: 1.125rem;
-
-    font-size: var(--font-size-small);
-  }
-
-  .overflow {
-    align-items: center;
-    background: var(--sable-surface-var-container);
-    border-radius: var(--radius-pill);
-    box-shadow: 0 0 0 0.125rem var(--stack-ring);
-    color: var(--sable-surface-var-on-container);
-    display: inline-flex;
-    font-size: var(--font-size-small);
-    font-variant-numeric: tabular-nums;
-    height: 1.125rem;
-    justify-content: center;
-    line-height: 1;
-    min-width: 1.125rem;
-    padding: 0 var(--space-050);
   }
 
   :global(.read-receipts-popover) {

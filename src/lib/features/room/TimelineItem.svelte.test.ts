@@ -92,6 +92,43 @@ test('reads an emote as one sentence, with the name only in the action', async (
   await unmount(instance);
 });
 
+test('badges a message with its own readers, and only in that placement', async () => {
+  const read = { ...item(false), read_by: ['@alice:example.org', '@bob:example.org'] };
+  const members = [
+    {
+      user_id: '@bob:example.org',
+      display_name: 'Bob',
+      avatar_url: null,
+      power_level: 0,
+      membership: 'join' as const,
+    },
+  ];
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: { item: read, collapsed: false, members, currentUserId: '@alice:example.org' },
+    },
+  });
+  await tick();
+
+  const badge = document.querySelector('.read-receipt-stack');
+  expect(badge?.getAttribute('title')).toBe('Bob');
+
+  setPreference('readReceiptPlacement', 'room');
+  await tick();
+  expect(document.querySelector('.read-receipt-stack')).toBeNull();
+
+  setPreference('readReceiptPlacement', 'message');
+  await tick();
+  setPreference('hideReadReceipts', true);
+  await tick();
+  expect(document.querySelector('.read-receipt-stack')).toBeNull();
+
+  setPreference('hideReadReceipts', false);
+  await unmount(instance);
+});
+
 test('keeps the sender header for an ordinary message', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

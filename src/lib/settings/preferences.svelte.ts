@@ -8,6 +8,7 @@ export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
 export type FontScale = 'small' | 'default' | 'large' | 'largest';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
+export type ReadReceiptPlacement = 'message' | 'room';
 
 export interface Preferences {
   layout: TimelineLayout;
@@ -33,6 +34,7 @@ export interface Preferences {
   hideMemberInReadOnly: boolean;
   showTombstoneEvents: boolean;
   hideReadReceipts: boolean;
+  readReceiptPlacement: ReadReceiptPlacement;
   hideTypingIndicators: boolean;
   filterPronounsByLanguage: boolean;
   pronounPillLimit: PronounPillLimit;
@@ -109,6 +111,7 @@ const ENUMS = {
   showRoomIcon: ['always', 'collapsed', 'never'],
   fontScale: ['small', 'default', 'large', 'largest'],
   pronounPillLimit: ['1', '2', '3', 'all'],
+  readReceiptPlacement: ['message', 'room'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -145,6 +148,7 @@ const DEFAULTS: Preferences = {
   hideMemberInReadOnly: true,
   showTombstoneEvents: true,
   hideReadReceipts: false,
+  readReceiptPlacement: 'message',
   hideTypingIndicators: false,
   filterPronounsByLanguage: true,
   pronounPillLimit: '3',
