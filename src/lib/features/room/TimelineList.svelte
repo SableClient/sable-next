@@ -1312,12 +1312,12 @@
     flex: none;
   }
 
-  /* Container tokens are a translucent tint in some themes, which the messages
-     scrolling underneath show through. The element selector outranks the
-     variant's own background. */
   :global(button.jump-to-latest) {
     background-color: var(--sable-bg-container);
-    background-image: linear-gradient(var(--sable-primary-main), var(--sable-primary-main));
+    background-image: linear-gradient(
+      var(--sable-primary-container),
+      var(--sable-primary-container)
+    );
     bottom: var(--space-400);
     box-shadow: var(--shadow-float);
     left: 50%;
