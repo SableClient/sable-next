@@ -367,7 +367,8 @@ impl Core {
             + 1;
         self.pending_registration.lock().await.take();
         let (account_id, store_id) = self.allocate_account().await?;
-        let client = session::build_client(&store_id, &homeserver)
+        let client = self
+            .build_account_client(&store_id, &homeserver)
             .await
             .map_err(|error| self.failed("register: build_client", error))?;
 
@@ -847,6 +848,7 @@ impl Core {
         let client = session::discovery_client(&homeserver)
             .await
             .map_err(|error| self.discovery_error(error))?;
+        self.remember_homeserver(&homeserver, &client).await;
 
         let error = client
             .matrix_auth()

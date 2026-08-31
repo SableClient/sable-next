@@ -197,7 +197,27 @@ pub async fn build_client(
     store_id: &str,
     homeserver: &str,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
-    let builder = apply_server(Client::builder(), homeserver)
+    account_builder(apply_server(Client::builder(), homeserver), store_id)
+        .build()
+        .await
+}
+
+/// # Errors
+///
+/// Returns the Matrix SDK build error if the local store cannot be initialized.
+pub async fn build_client_at(
+    store_id: &str,
+    homeserver_url: &Url,
+) -> Result<Client, matrix_sdk::ClientBuildError> {
+    let builder = crate::tls::apply_sdk(Client::builder())
+        .homeserver_url(homeserver_url.as_str())
+        .request_config(RequestConfig::new().timeout(Duration::from_secs(15)));
+
+    account_builder(builder, store_id).build().await
+}
+
+fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
+    let builder = builder
         .handle_refresh_tokens()
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::OneShot,
@@ -211,7 +231,7 @@ pub async fn build_client(
     #[cfg(target_family = "wasm")]
     let builder = builder.indexeddb_store(store_id, None);
 
-    builder.build().await
+    builder
 }
 
 /// For dynamic client registration. The redirect URI must match the one handed

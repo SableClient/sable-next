@@ -24,7 +24,8 @@ impl Core {
             homeserver,
             "building Matrix client"
         );
-        let client = session::build_client(&account_store_id, &homeserver)
+        let client = self
+            .build_account_client(&account_store_id, &homeserver)
             .await
             .map_err(|error| self.failed("build_client", error))?;
 
@@ -86,6 +87,7 @@ impl Core {
         let client = session::discovery_client(&homeserver)
             .await
             .map_err(|error| self.discovery_error(error))?;
+        self.remember_homeserver(&homeserver, &client).await;
         let mut flows = protocol::LoginFlowsView {
             password: false,
             oidc: false,
@@ -178,7 +180,8 @@ impl Core {
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_oidc_login: redirect_uri", error))?;
 
-        let client = session::build_client(&account_store_id, &homeserver)
+        let client = self
+            .build_account_client(&account_store_id, &homeserver)
             .await
             .map_err(|error| self.failed("start_oidc_login: build_client", error))?;
 
@@ -300,7 +303,8 @@ impl Core {
             return Err(CommandErr::Denied);
         }
 
-        let client = session::build_client(&account_store_id, &homeserver)
+        let client = self
+            .build_account_client(&account_store_id, &homeserver)
             .await
             .map_err(|error| self.failed("start_sso_login: build_client", error))?;
 

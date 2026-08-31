@@ -69,6 +69,7 @@ pub struct Core {
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
     accounts: Mutex<Option<AccountRegistry>>,
+    discovered_homeservers: Mutex<HashMap<String, Url>>,
     session: RwLock<Option<Session>>,
     pending_login: Mutex<Option<PendingLogin>>,
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
@@ -156,6 +157,7 @@ impl Core {
             session_swap_lock: Mutex::new(()),
             restore_lock: Mutex::new(()),
             accounts: Mutex::new(None),
+            discovered_homeservers: Mutex::new(HashMap::new()),
             session: RwLock::new(None),
             pending_login: Mutex::new(None),
             pending_registration: Mutex::new(None),
@@ -249,6 +251,31 @@ impl Core {
         }
         *accounts = Some(registry.clone());
         Ok(registry)
+    }
+
+    pub(crate) async fn remember_homeserver(&self, homeserver: &str, client: &matrix_sdk::Client) {
+        self.discovered_homeservers
+            .lock()
+            .await
+            .insert(homeserver.to_owned(), client.homeserver());
+    }
+
+    pub(crate) async fn build_account_client(
+        &self,
+        store_id: &str,
+        homeserver: &str,
+    ) -> Result<matrix_sdk::Client, matrix_sdk::ClientBuildError> {
+        let resolved = self
+            .discovered_homeservers
+            .lock()
+            .await
+            .get(homeserver)
+            .cloned();
+
+        match resolved {
+            Some(url) => session::build_client_at(store_id, &url).await,
+            None => session::build_client(store_id, homeserver).await,
+        }
     }
 
     pub(crate) async fn allocate_account(&self) -> Result<(String, String), CommandErr> {

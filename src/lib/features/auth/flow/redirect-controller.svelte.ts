@@ -33,12 +33,23 @@ interface RedirectControllerOptions {
   onNavigateRegistrationRecovery: () => Promise<void>;
 }
 
-export function reserveRedirectPopup(intent: RedirectIntent): Window | null {
-  return window.open(
+export function reserveRedirectPopup(intent: RedirectIntent, homeserver: string): Window | null {
+  const popup = window.open(
     'about:blank',
     `sable-${intent}-${crypto.randomUUID()}`,
     'popup,width=520,height=720'
   );
+  if (!popup) return null;
+
+  const message = t('auth.redirectingTo', { name: homeserver });
+  popup.document.title = message;
+  popup.document.documentElement.style.colorScheme = 'light dark';
+  const paragraph = popup.document.createElement('p');
+  paragraph.textContent = message;
+  paragraph.style.cssText =
+    'margin:0;min-height:100vh;display:grid;place-items:center;padding:2rem;text-align:center;font:1rem/1.5 system-ui,sans-serif';
+  popup.document.body.append(paragraph);
+  return popup;
 }
 
 export function closeRedirectPopup(popup: Window | null): void {
@@ -69,7 +80,9 @@ export class RedirectController {
     this.registrationError = null;
     this.pendingIntent = intent;
     this.isLaunching = true;
-    const reservedPopup = deliversDeepLinks() ? null : reserveRedirectPopup(intent);
+    const reservedPopup = deliversDeepLinks()
+      ? null
+      : reserveRedirectPopup(intent, this.options.getHomeserver().trim());
     if (!deliversDeepLinks() && !reservedPopup) {
       this.setError(intent, t('auth.allowPopups'));
       this.isLaunching = false;
