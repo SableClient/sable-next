@@ -1,22 +1,45 @@
+import { runTemplate, type IWidget } from 'matrix-widget-api';
+
+import type { RoomWidget } from './widget-content.js';
+
 export interface WidgetTemplateVars {
   userId: string;
   roomId: string;
   displayName: string;
   avatarUrl: string;
-  widgetId: string;
+  deviceId?: string;
+  baseUrl?: string;
+  clientTheme?: string;
+  clientLanguage?: string;
 }
 
-export function templateWidgetUrl(url: string, vars: WidgetTemplateVars): string {
-  const resolved = url
-    .replaceAll('$matrix_user_id', encodeURIComponent(vars.userId))
-    .replaceAll('$matrix_room_id', encodeURIComponent(vars.roomId))
-    .replaceAll('$matrix_display_name', encodeURIComponent(vars.displayName))
-    .replaceAll('$matrix_avatar_url', encodeURIComponent(vars.avatarUrl))
-    .replaceAll('$matrix_widget_id', encodeURIComponent(vars.widgetId));
+export const WIDGET_CLIENT_ID = 'moe.sable.next';
+
+export function templateWidgetUrl(widget: RoomWidget, vars: WidgetTemplateVars): string {
+  const definition: IWidget = {
+    id: widget.id,
+    creatorUserId: vars.userId,
+    type: widget.type,
+    url: widget.url,
+    name: widget.name,
+    data: widget.data,
+  };
+
+  const resolved = runTemplate(widget.url, definition, {
+    widgetRoomId: vars.roomId,
+    currentUserId: vars.userId,
+    userDisplayName: vars.displayName,
+    userHttpAvatarUrl: vars.avatarUrl,
+    clientId: WIDGET_CLIENT_ID,
+    clientTheme: vars.clientTheme,
+    clientLanguage: vars.clientLanguage,
+    deviceId: vars.deviceId,
+    baseUrl: vars.baseUrl,
+  });
 
   try {
     const parsed = new URL(resolved);
-    if (!parsed.searchParams.has('widgetId')) parsed.searchParams.set('widgetId', vars.widgetId);
+    if (!parsed.searchParams.has('widgetId')) parsed.searchParams.set('widgetId', widget.id);
     return parsed.toString();
   } catch {
     return resolved;

@@ -60,12 +60,11 @@
   );
   let activeUrl = $derived(
     activeWidget
-      ? templateWidgetUrl(activeWidget.url, {
+      ? templateWidgetUrl(activeWidget, {
           roomId,
           userId,
           displayName,
           avatarUrl,
-          widgetId: activeWidget.id,
         })
       : null
   );
