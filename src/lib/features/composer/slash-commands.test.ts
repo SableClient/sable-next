@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { expect, test, vi } from 'vitest';
 
 import type { MemberView } from '#src/generated/MemberView';
@@ -489,6 +491,23 @@ test('/html sends the markup and a stripped plain-text body', async () => {
     body: 'bold\nand a link (https://example.org)',
     formatted: '<b>bold</b><br>and <a href="https://example.org">a link</a>',
   });
+});
+
+test('/html decodes entities into the plain-text body', async () => {
+  const outcome = await runSlash('/html Fish &amp; Chips &lt;yes&gt;', context(fakeCommands()));
+
+  expect(outcome).toMatchObject({ body: 'Fish & Chips <yes>' });
+});
+
+test('/html cannot carry a tag into the plain-text body', async () => {
+  const outcome = await runSlash(
+    '/html <a href="https://example.org"><script</a>',
+    context(fakeCommands())
+  );
+
+  expect(outcome.kind).toBe('message');
+  if (outcome.kind !== 'message') return;
+  expect(outcome.body).not.toContain('<script');
 });
 
 test('/rainbow colours every visible character and escapes the text', async () => {

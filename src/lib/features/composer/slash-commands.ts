@@ -902,13 +902,38 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   },
 ];
 
+function textFrom(node: Node): string {
+  let text = '';
+  for (const child of node.childNodes) {
+    if (child.nodeType === child.TEXT_NODE) {
+      text += child.nodeValue ?? '';
+      continue;
+    }
+    if (child.nodeType !== child.ELEMENT_NODE) continue;
+
+    const element = child as Element;
+    switch (element.tagName.toLowerCase()) {
+      case 'br':
+        text += '\n';
+        break;
+      case 'li':
+        text += `\n- ${textFrom(element)}`;
+        break;
+      case 'a': {
+        const href = element.getAttribute('href');
+        const label = textFrom(element);
+        text += href === null || href === '' ? label : `${label} (${href})`;
+        break;
+      }
+      default:
+        text += textFrom(element);
+    }
+  }
+  return text;
+}
+
 function plainTextFrom(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '\n- ')
-    .replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
-    .replace(/<[^>]+>/g, '')
-    .trim();
+  return textFrom(new DOMParser().parseFromString(html, 'text/html').body).trim();
 }
 
 const byName = new Map(SLASH_COMMANDS.map((command) => [command.name, command]));
