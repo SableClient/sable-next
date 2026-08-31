@@ -13,6 +13,7 @@ import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
+import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
 import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
@@ -247,13 +248,13 @@ export class Conversation {
 
   readonly reply = (eventId: string): void => {
     const item = this.#timeline.items.find((entry) => entry.event_id === eventId);
-    if (!item || (item.content.kind !== 'message' && item.content.kind !== 'image')) return;
+    if (!item) return;
 
     this.context = {
       kind: 'reply',
       eventId,
       sender: item.sender_name ?? item.sender,
-      body: item.content.body,
+      body: replyPreviewBody(item.content),
     };
   };
 
