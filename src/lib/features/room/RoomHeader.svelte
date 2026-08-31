@@ -5,11 +5,10 @@
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
-  import UsersIcon from 'phosphor-svelte/lib/UsersThreeIcon';
+  import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import type { MemberView } from '#src/generated/MemberView';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { senderColor } from './timeline-format';
@@ -23,12 +22,14 @@
     isVoice: boolean;
     callParticipants: readonly string[];
     members: readonly MemberView[];
+    membersOpen?: boolean;
     onCall?: (() => void) | null;
     onBack: () => void;
     onMembers: () => void;
     onSearch: () => void;
     onTopic?: (() => void) | null;
     pins?: Snippet;
+    widgets?: Snippet;
     menu?: Snippet;
   }
 
@@ -39,12 +40,14 @@
     isVoice,
     callParticipants,
     members,
+    membersOpen = false,
     onCall = null,
     onBack,
     onMembers,
     onSearch,
     onTopic = null,
     pins,
+    widgets,
     menu,
   }: Props = $props();
 
@@ -125,16 +128,17 @@
         <PhoneIcon />
       </IconButton>
     {/if}
-    <Button
+    {@render widgets?.()}
+    <IconButton
       class="members-button"
       variant="ghost"
       size="small"
-      aria-label={$i18n.t('timeline.members')}
+      label={$i18n.t('timeline.members')}
+      aria-pressed={membersOpen}
       onclick={onMembers}
     >
-      <UsersIcon />
-      <span>{$i18n.t('timeline.members')}</span>
-    </Button>
+      <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />
+    </IconButton>
     {@render menu?.()}
   </div>
 </header>
@@ -206,6 +210,7 @@
   :global(.sable-avatar.room-avatar) {
     background: var(--sable-primary-main);
     color: var(--sable-primary-on-main);
+    display: none;
   }
 
   .voice-chip {
@@ -248,18 +253,8 @@
     font-weight: var(--font-weight-bold);
   }
 
-  :global(.back-button),
-  :global(.members-button) {
-    gap: var(--space-150);
-  }
-
   :global(.back-button) {
     display: inline-flex;
-  }
-
-  :global(.sable-avatar.room-avatar),
-  :global(.members-button span) {
-    display: none;
   }
 
   :global(.back-button svg),
@@ -276,10 +271,6 @@
 
     :global(.sable-avatar.room-avatar) {
       display: inline-flex;
-    }
-
-    :global(.members-button span) {
-      display: inline;
     }
   }
 </style>

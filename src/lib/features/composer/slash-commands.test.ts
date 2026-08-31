@@ -623,7 +623,15 @@ test('/usepmp latches a profile and resets it', async () => {
 });
 
 function member(userId: string, membership: MemberView['membership'] = 'join'): MemberView {
-  return { user_id: userId, display_name: null, avatar_url: null, power_level: 0, membership };
+  return {
+    user_id: userId,
+    display_name: null,
+    avatar_url: null,
+    power_level: 0,
+    membership,
+    member_ts: null,
+    kicked: false,
+  };
 }
 
 test.each([

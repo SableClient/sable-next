@@ -13,6 +13,8 @@ function member(userId: string, displayName: string | null): MemberView {
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
+    member_ts: null,
+    kicked: false,
   };
 }
 

@@ -101,6 +101,8 @@ test('badges a message with its own readers, and only in that placement', async 
       avatar_url: null,
       power_level: 0,
       membership: 'join' as const,
+      member_ts: null,
+      kicked: false,
     },
   ];
   const instance = mount(TimelineItemHarness, {
@@ -312,6 +314,8 @@ test('provides a formatted reaction attribution tooltip', async () => {
             avatar_url: null,
             power_level: 0,
             membership: 'join',
+            member_ts: null,
+            kicked: false,
           },
         ],
       },
@@ -365,6 +369,8 @@ test('long pressing a reaction opens its people list without toggling it', async
             avatar_url: null,
             power_level: 0,
             membership: 'join',
+            member_ts: null,
+            kicked: false,
           },
         ],
       },

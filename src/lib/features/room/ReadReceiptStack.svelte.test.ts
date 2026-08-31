@@ -12,6 +12,8 @@ const members = [
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
+    member_ts: null,
+    kicked: false,
   },
   {
     user_id: '@carol:example.org',
@@ -19,6 +21,8 @@ const members = [
     avatar_url: null,
     power_level: 0,
     membership: 'join' as const,
+    member_ts: null,
+    kicked: false,
   },
 ];
 
@@ -62,6 +66,8 @@ test('caps the stack at three faces and renders nothing without readers', async 
         avatar_url: null,
         power_level: 0,
         membership: 'join' as const,
+        member_ts: null,
+        kicked: false,
       })),
       onOpen: () => {},
     },

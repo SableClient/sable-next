@@ -2543,6 +2543,9 @@ pub struct MemberView {
     pub avatar_url: Option<String>,
     pub power_level: i32,
     pub membership: MembershipView,
+    #[ts(type = "number | null")]
+    pub member_ts: Option<u64>,
+    pub kicked: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq, Eq)]

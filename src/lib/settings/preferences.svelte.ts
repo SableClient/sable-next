@@ -1,3 +1,4 @@
+import type { MemberSort } from '#lib/features/room/member-listing.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
@@ -36,6 +37,7 @@ export interface Preferences {
   hideReadReceipts: boolean;
   readReceiptPlacement: ReadReceiptPlacement;
   hideTypingIndicators: boolean;
+  memberSort: MemberSort;
   filterPronounsByLanguage: boolean;
   pronounPillLimit: PronounPillLimit;
 
@@ -112,6 +114,7 @@ const ENUMS = {
   fontScale: ['small', 'default', 'large', 'largest'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   readReceiptPlacement: ['message', 'room'],
+  memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -150,6 +153,7 @@ const DEFAULTS: Preferences = {
   hideReadReceipts: false,
   readReceiptPlacement: 'message',
   hideTypingIndicators: false,
+  memberSort: 'name-asc',
   filterPronounsByLanguage: true,
   pronounPillLimit: '3',
 

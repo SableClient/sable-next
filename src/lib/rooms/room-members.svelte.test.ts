@@ -11,6 +11,8 @@ function member(userId: string): MemberView {
     avatar_url: null,
     power_level: 0,
     membership: 'join',
+    member_ts: null,
+    kicked: false,
   };
 }
 

@@ -3,10 +3,13 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { setPreference } from '#lib/settings/preferences.svelte.js';
+
 import MembersDrawer from './MembersDrawer.svelte';
 
 afterEach(() => {
   document.body.replaceChildren();
+  setPreference('memberSort', 'name-asc');
 });
 
 test('sorts members by power then name and opens their profile', async () => {
@@ -22,6 +25,8 @@ test('sorts members by power then name and opens their profile', async () => {
           avatar_url: null,
           power_level: 0,
           membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
         },
         {
           user_id: '@bob:example.org',
@@ -29,6 +34,8 @@ test('sorts members by power then name and opens their profile', async () => {
           avatar_url: null,
           power_level: 100,
           membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
         },
         {
           user_id: '@amy:example.org',
@@ -36,6 +43,8 @@ test('sorts members by power then name and opens their profile', async () => {
           avatar_url: null,
           power_level: 100,
           membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
         },
       ],
       onClose: vi.fn(),
@@ -52,5 +61,45 @@ test('sorts members by power then name and opens their profile', async () => {
   ]);
   members[0]?.click();
   expect(onMemberProfile).toHaveBeenCalledWith('@amy:example.org', members[0]);
+  await unmount(instance);
+});
+
+test('honours the sort preference and fetches the membership a filter names', async () => {
+  setPreference('memberSort', 'name-desc');
+  const loadMembership = vi.fn(() => Promise.resolve([]));
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: {
+      loading: false,
+      members: [
+        {
+          user_id: '@zoe:example.org',
+          display_name: 'Zoe',
+          avatar_url: null,
+          power_level: 0,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+        },
+        {
+          user_id: '@amy:example.org',
+          display_name: 'Amy',
+          avatar_url: null,
+          power_level: 0,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+        },
+      ],
+      loadMembership,
+      onClose: vi.fn(),
+      onMemberProfile: vi.fn(),
+    },
+  });
+  await tick();
+
+  const names = [...document.querySelectorAll('.member .name')].map((node) => node.textContent);
+  expect(names).toEqual(['Zoe', 'Amy']);
+  expect(loadMembership).not.toHaveBeenCalled();
   await unmount(instance);
 });

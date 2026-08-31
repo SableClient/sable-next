@@ -1,15 +1,32 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/MemberView';
-  import { Dialog } from 'bits-ui';
+  import { Dialog, DropdownMenu } from 'bits-ui';
+  import ArrowsDownUpIcon from 'phosphor-svelte/lib/ArrowsDownUpIcon';
+  import FunnelIcon from 'phosphor-svelte/lib/FunnelIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
-  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import {
+    MEMBERSHIP_FILTERS,
+    MEMBERSHIP_FILTER_LABELS,
+    MEMBER_SORTS,
+    MEMBER_SORT_LABELS,
+    groupMembers,
+    matchesFilter,
+    memberName,
+    membershipFor,
+    type MembershipFilter,
+  } from './member-listing';
+  import { powerTag } from './power-tags';
+  import type { PowerLevelTagMap } from './settings/power-level-tags';
   import { senderColor } from './timeline-format';
+
+  import '#lib/ui/primitives/menu.css';
 
   interface Props {
     members: readonly MemberView[];
@@ -18,6 +35,8 @@
     compact?: boolean;
     searchable?: boolean;
     title?: string;
+    powerTags?: PowerLevelTagMap;
+    loadMembership?: ((membership: MemberView['membership']) => Promise<MemberView[]>) | null;
     onClose: () => void;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
   }
@@ -29,32 +48,47 @@
     compact = false,
     searchable = true,
     title = $i18n.t('timeline.members'),
+    powerTags = {},
+    loadMembership = null,
     onClose,
     onMemberProfile,
   }: Props = $props();
   let search = $state('');
-  let sortedMembers = $derived(
-    [...members].toSorted(
-      (left, right) =>
-        right.power_level - left.power_level ||
-        memberName(left).localeCompare(memberName(right), undefined, { sensitivity: 'base' })
-    )
-  );
-  let filteredMembers = $derived.by(() => {
+  let filter = $state<MembershipFilter>('join');
+  let fetched = $state.raw<MemberView[]>([]);
+  let fetching = $state(false);
+  let generation = 0;
+
+  let sort = $derived(preferences.memberSort);
+  let listed = $derived(filter === 'join' ? members : fetched);
+  let matching = $derived(listed.filter((member) => matchesFilter(member, filter)));
+  let searched = $derived.by(() => {
     const query = search.trim().toLocaleLowerCase();
-    if (!query) return sortedMembers;
-    return sortedMembers.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
+    if (!query) return matching;
+    return matching.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
   });
+  let groups = $derived(groupMembers(searched, sort));
+  let busy = $derived(filter === 'join' ? loading : fetching);
 
-  function memberName(member: MemberView): string {
-    return member.display_name ?? member.user_id;
-  }
+  $effect(() => {
+    const load = loadMembership;
+    const membership = membershipFor(filter);
+    if (filter === 'join' || !load) return;
 
-  function powerLevel(member: MemberView): string | null {
-    if (member.power_level >= 100) return $i18n.t('timeline.powerLevelAdmin');
-    if (member.power_level >= 50) return $i18n.t('timeline.powerLevelModerator');
-    return null;
-  }
+    const run = ++generation;
+    fetching = true;
+    void load(membership)
+      .then((next) => {
+        if (run === generation) fetched = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] members unavailable', error);
+        if (run === generation) fetched = [];
+      })
+      .finally(() => {
+        if (run === generation) fetching = false;
+      });
+  });
 
   function openMemberProfile(
     member: MemberView,
@@ -89,43 +123,98 @@
     {/if}
   </header>
 
-  {#if loading}
+  {#if searchable}
+    <div class="controls">
+      <div class="filters">
+        {#if loadMembership}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger class="chip" aria-label={$i18n.t('timeline.memberFilter')}>
+              <FunnelIcon aria-hidden="true" />
+              <span>{$i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content class="sable-menu" side="bottom" align="start" sideOffset={4}>
+              {#each MEMBERSHIP_FILTERS as option (option)}
+                <DropdownMenu.Item
+                  class="sable-menu-item"
+                  aria-checked={filter === option}
+                  onSelect={() => {
+                    filter = option;
+                  }}
+                >
+                  <span class="sable-menu-check" aria-hidden="true"
+                    >{filter === option ? '✓' : ''}</span
+                  >
+                  {$i18n.t(MEMBERSHIP_FILTER_LABELS[option])}
+                </DropdownMenu.Item>
+              {/each}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        {/if}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger class="chip" aria-label={$i18n.t('timeline.memberSort')}>
+            <span>{$i18n.t(MEMBER_SORT_LABELS[sort])}</span>
+            <ArrowsDownUpIcon aria-hidden="true" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+            {#each MEMBER_SORTS as option (option)}
+              <DropdownMenu.Item
+                class="sable-menu-item"
+                aria-checked={sort === option}
+                onSelect={() => {
+                  setPreference('memberSort', option);
+                }}
+              >
+                <span class="sable-menu-check" aria-hidden="true">{sort === option ? '✓' : ''}</span
+                >
+                {$i18n.t(MEMBER_SORT_LABELS[option])}
+              </DropdownMenu.Item>
+            {/each}
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      </div>
+      <TextInput
+        bind:value={search}
+        class="member-search-input"
+        placeholder={$i18n.t('timeline.searchMembers')}
+        aria-label={$i18n.t('timeline.searchMembers')}
+      />
+    </div>
+  {/if}
+
+  {#if busy}
     <p class="status">{$i18n.t('timeline.loadingMembers')}</p>
   {:else}
-    {#if searchable}
-      <div class="search">
-        <TextInput
-          bind:value={search}
-          class="member-search-input"
-          placeholder={$i18n.t('timeline.searchMembers')}
-          aria-label={$i18n.t('timeline.searchMembers')}
-        />
-      </div>
-    {/if}
-    {#if filteredMembers.length > 0}
-      <ul>
-        {#each filteredMembers as member (member.user_id)}
-          {@const label = powerLevel(member)}
-          <li>
-            <IdentityRow
-              class="member"
-              displayName={memberName(member)}
-              avatarUrl={member.avatar_url}
-              color={senderColor(member.user_id)}
-              ariaLabel={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
-              onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
-                openMemberProfile(member, event);
-              }}
-            >
-              {#snippet meta()}
-                {#if label}<StatusBadge {label} variant="secondary" />{/if}
-              {/snippet}
-            </IdentityRow>
-          </li>
+    {#if groups.length > 0}
+      <div class="member-groups">
+        {#each groups as group (group.level)}
+          {@const tag = powerTag(group.level, $i18n.t, powerTags)}
+          <h3 class="group-label" style:color={tag.color ?? undefined}>{tag.name}</h3>
+          <ul>
+            {#each group.members as member (member.user_id)}
+              <li>
+                <IdentityRow
+                  class="member"
+                  displayName={memberName(member)}
+                  avatarUrl={member.avatar_url}
+                  color={senderColor(member.user_id)}
+                  ariaLabel={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
+                  onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
+                    openMemberProfile(member, event);
+                  }}
+                />
+              </li>
+            {/each}
+          </ul>
         {/each}
-      </ul>
-    {:else}
+      </div>
+    {:else if search.trim() !== ''}
       <p class="status">{$i18n.t('timeline.noMembersFound')}</p>
+    {:else}
+      <p class="status">
+        {$i18n.t('timeline.noMembersForFilter', {
+          filter: $i18n.t(MEMBERSHIP_FILTER_LABELS[filter]),
+        })}
+      </p>
     {/if}
   {/if}
 </aside>
@@ -188,12 +277,55 @@
     padding: var(--space-300) var(--space-400);
   }
 
-  .search {
+  .controls {
     background: var(--sable-bg-container);
+    display: grid;
+    gap: var(--space-200);
     padding: var(--space-300);
     position: sticky;
     top: 3.75rem;
     z-index: 1;
+  }
+
+  .filters {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+    justify-content: space-between;
+  }
+
+  .filters :global(.chip) {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--sable-surface-var-on-container);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: var(--font-size-small);
+    gap: var(--space-100);
+    min-height: 1.75rem;
+    padding: 0 var(--space-150);
+  }
+
+  .filters :global(.chip:hover) {
+    background: var(--sable-surface-container);
+    color: var(--sable-bg-on-container);
+  }
+
+  .filters :global(.chip:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .filters :global(.chip svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .filters :global(.chip:first-child svg) {
+    color: var(--sable-primary-main);
   }
 
   :global(.member-search-input) {
@@ -206,13 +338,26 @@
     width: 100%;
   }
 
-  ul {
+  .member-groups {
     flex: 1;
-    list-style: none;
-    margin: 0;
     min-height: 0;
     overflow: auto;
     padding: var(--space-100) var(--space-200) var(--space-200);
+  }
+
+  .group-label {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-small);
+    margin: 0;
+    padding: var(--space-200) var(--space-200) var(--space-100);
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
 
   li {

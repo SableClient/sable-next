@@ -1353,6 +1353,9 @@ pub fn member_view(member: &RoomMember) -> MemberView {
         avatar_url: member.avatar_url().map(ToString::to_string),
         power_level: clamp_power_level(member.power_level()),
         membership: membership_view(member.membership()),
+        member_ts: member.event().timestamp().map(u64::from),
+        kicked: matches!(member.membership(), MembershipState::Leave)
+            && member.event().sender() != member.user_id(),
     }
 }
 

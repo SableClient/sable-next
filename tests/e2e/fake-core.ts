@@ -673,6 +673,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             avatar_url: null,
             power_level: 100,
             membership: 'join',
+            member_ts: null,
+            kicked: false,
           },
         ],
       }),
