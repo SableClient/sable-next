@@ -5,6 +5,7 @@
 
   import type { ScheduledMessageView } from '#src/generated/ScheduledMessageView';
   import { useCoreClient } from '#lib/core/context.js';
+  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
@@ -44,7 +45,7 @@
   function when(ts: number | null): string {
     if (ts === null) return $i18n.t('composer.scheduledPending');
     return $i18n.t('composer.scheduledFor', {
-      when: new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+      when: `${formatDate(ts)} ${formatTime(ts)}`,
     });
   }
 

@@ -4,11 +4,12 @@ import type { MembershipChangeView } from '#src/generated/MembershipChangeView';
 import type { StateChangeView } from '#src/generated/StateChangeView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
-import { preferences } from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
 import { stateEventSubject, stateEventText } from './state-event-text';
 import {
+  formatTime,
   hasNewLocalEcho,
   canRedact,
   eventBefore,
@@ -418,4 +419,21 @@ test('a send is detected wherever the echo lands, not only at the end', () => {
   expect(hasNewLocalEcho(before, [echo(null, 'older'), echo(null, 'a')])).toBe(false);
   expect(hasNewLocalEcho([echo('t1', 'mine')], [echo('t1', 'mine')])).toBe(false);
   expect(hasNewLocalEcho([], [])).toBe(false);
+});
+
+test('formatTime follows the 24-hour clock preference', () => {
+  const afternoon = new Date(2026, 0, 1, 13, 5).getTime();
+  const midnight = new Date(2026, 0, 1, 0, 5).getTime();
+  const previous = preferences.hour24Clock;
+
+  setPreference('hour24Clock', true);
+  expect(formatTime(afternoon)).toBe('13:05');
+  expect(formatTime(midnight)).toBe('00:05');
+
+  setPreference('hour24Clock', false);
+  expect(formatTime(afternoon)).toBe(
+    new Date(afternoon).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  );
+
+  setPreference('hour24Clock', previous);
 });

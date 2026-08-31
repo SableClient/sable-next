@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -102,7 +103,7 @@
             <span>{entry.level.toUpperCase()}</span>
             <span>{entry.category}</span>
             <time datetime={new Date(entry.timestamp).toISOString()}
-              >{new Date(entry.timestamp).toLocaleTimeString()}</time
+              >{formatTime(entry.timestamp)}</time
             >
             <span>{entry.namespace}</span>
           </summary>
