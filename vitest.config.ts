@@ -55,6 +55,26 @@ export default mergeConfig(
         reporter: ['text', 'html', 'lcov'],
         include: ['src/**/*.{ts,svelte}'],
         exclude: ['src/**/*.d.ts', 'src/**/*.test.ts', 'src/app.d.ts', 'src/generated/**'],
+        thresholds: {
+          autoUpdate: !process.env.CI,
+          lines: 47,
+          functions: 45,
+          branches: 45,
+          statements: 47,
+          'src/lib/features/room/timeline-position.ts': { 100: true },
+          'src/lib/spaces/sidebar-layout.ts': {
+            lines: 98,
+            functions: 97,
+            statements: 94,
+            branches: 90,
+          },
+          'src/lib/features/search/search-query.ts': {
+            lines: 93,
+            functions: 100,
+            statements: 90,
+            branches: 84,
+          },
+        },
       },
     },
   })

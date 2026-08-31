@@ -35,7 +35,12 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Run Playwright tests
+        if: ${{ github.event_name == 'pull_request' }}
         run: pnpm test:e2e
+
+      - name: Run Playwright tests, failing on flake
+        if: ${{ github.event_name != 'pull_request' }}
+        run: pnpm test:e2e --fail-on-flaky-tests
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
