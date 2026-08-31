@@ -32,12 +32,7 @@ async function storedOverride(page: import('@playwright/test').Page) {
   });
 }
 
-test('the deployment default holds until all three fields are applied', async ({
-  page,
-  app,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('the deployment default holds until all three fields are applied', async ({ page, app }) => {
   await app.openHome();
   await expect(app.primaryNavigation).toBeVisible();
   await page.goto('/settings/notifications');
@@ -75,12 +70,7 @@ test('the deployment default holds until all three fields are applied', async ({
   await expect(apply).toBeDisabled();
 });
 
-test('an address the core would refuse cannot be applied', async ({
-  page,
-  app,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('an address the core would refuse cannot be applied', async ({ page, app }) => {
   await app.openHome();
   await expect(app.primaryNavigation).toBeVisible();
   await page.goto('/settings/notifications');
@@ -106,8 +96,7 @@ test('an address the core would refuse cannot be applied', async ({
   await expect(url).not.toHaveAttribute('aria-invalid', 'true');
 });
 
-test('the default comes back on reset', async ({ page, app, installRoomCore }) => {
-  await installRoomCore('ready');
+test('the default comes back on reset', async ({ page, app }) => {
   await app.openHome();
   await expect(app.primaryNavigation).toBeVisible();
   await page.goto('/settings/notifications');

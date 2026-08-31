@@ -52,6 +52,43 @@ export class RoomTimeline {
     await expect(this.container).not.toHaveClass(/initial/);
   }
 
+  async trackRebuilds(): Promise<void> {
+    await this.page.addInitScript(() => {
+      const counter = { value: 0 };
+      Object.defineProperty(window, '__e2eTimelineRebuilds', {
+        configurable: true,
+        get: () => counter.value,
+      });
+      const seen = new WeakSet<Element>();
+      new MutationObserver(() => {
+        for (const node of document.querySelectorAll('.timeline-viewport')) {
+          if (seen.has(node)) continue;
+          seen.add(node);
+          counter.value += 1;
+        }
+      }).observe(document, { childList: true, subtree: true });
+    });
+  }
+
+  rebuilds(): Promise<number> {
+    return this.page.evaluate(() => window.__e2eTimelineRebuilds);
+  }
+
+  async waitForScrollSettled(): Promise<void> {
+    let previous = Number.NaN;
+    await expect
+      .poll(
+        async () => {
+          const current = await this.scrollTop();
+          const settled = current === previous;
+          previous = current;
+          return settled;
+        },
+        { intervals: [100, 100, 100, 100, 100, 100], timeout: 5_000 }
+      )
+      .toBe(true);
+  }
+
   visibleItems(): Locator {
     return this.items.filter({ visible: true });
   }

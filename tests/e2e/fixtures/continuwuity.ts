@@ -19,6 +19,7 @@ export type TestHomeserver = {
 export type RegisteredSession = {
   accessToken: string;
   userId: string;
+  deviceId: string;
 };
 
 export const TIMELINE_ROOM_NAME = 'Timeline fixture';
@@ -99,11 +100,14 @@ export async function registerUser(
         })
       : probe;
   if (!response.ok) {
-    throw new Error(`register failed: ${String(response.status)} ${await response.text()}`);
+    const body = await response.text();
+    if (body.includes('M_USER_IN_USE')) return logIn(baseUrl, username, password);
+    throw new Error(`register failed: ${String(response.status)} ${body}`);
   }
   const registration = (await response.json()) as {
     access_token?: string;
     user_id?: string;
+    device_id?: string;
   };
   if (!registration.access_token || !registration.user_id) {
     throw new Error('register response did not include a session');
@@ -111,6 +115,39 @@ export async function registerUser(
   return {
     accessToken: registration.access_token,
     userId: registration.user_id,
+    deviceId: registration.device_id ?? '',
+  };
+}
+
+export async function logIn(
+  baseUrl: string,
+  username: string,
+  password: string
+): Promise<RegisteredSession> {
+  const response = await fetch(`${baseUrl}/_matrix/client/v3/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      type: 'm.login.password',
+      identifier: { type: 'm.id.user', user: username },
+      password,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`login failed: ${String(response.status)} ${await response.text()}`);
+  }
+  const session = (await response.json()) as {
+    access_token?: string;
+    user_id?: string;
+    device_id?: string;
+  };
+  if (!session.access_token || !session.user_id) {
+    throw new Error('login response did not include a session');
+  }
+  return {
+    accessToken: session.access_token,
+    userId: session.user_id,
+    deviceId: session.device_id ?? '',
   };
 }
 

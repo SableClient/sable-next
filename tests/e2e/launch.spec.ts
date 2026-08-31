@@ -1,4 +1,6 @@
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
+
+test.use({ storageState: SIGNED_OUT });
 
 test('starts at the sign-in flow', async ({ page, auth }) => {
   const workerErrors: string[] = [];

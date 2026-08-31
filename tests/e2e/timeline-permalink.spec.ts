@@ -1,45 +1,35 @@
-// Scripted transport: the jump only restarts the timeline when the target is
-// outside the loaded range, and a real homeserver cannot withhold events.
-
 import { expect, test } from './fixtures/test';
-import { timelineItem } from './fixtures/timeline-items';
-
-const DISTANT_EVENT = '$distant:example.test';
 
 test('jumps to an event outside the loaded range', async ({
   page,
   app,
   timeline,
-  core,
-  installRoomCore,
+  admin,
+  deepRoom,
 }) => {
-  await installRoomCore('ready');
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
-  await app.openRoomFromList('General');
+
+  const distantEventId = deepRoom.eventIds[0];
+  const distantBody = deepRoom.bodies[0];
+  const replyBody = `Answering something older ${String(Date.now())}`;
+  await admin.sendMessage(deepRoom.roomId, replyBody, {
+    'm.relates_to': { 'm.in_reply_to': { event_id: distantEventId } },
+  });
+
+  await app.openRoom(deepRoom.roomId);
   await timeline.expectRevealed();
-  await expect.poll(() => core.subscribeCount()).toBe(1);
 
-  const subscription = await core.subscription();
-  await core.emitTimelineDiff(subscription, [
-    {
-      op: 'push_back',
-      value: {
-        ...timelineItem('reply-to-distant', 'Answering something older'),
-        in_reply_to: {
-          event_id: DISTANT_EVENT,
-          sender: '@bob:example.test',
-          sender_name: 'Bob',
-          body: 'The distant message',
-        },
-      },
-    },
-  ]);
+  const reply = timeline.container
+    .locator('.item')
+    .filter({ hasText: replyBody })
+    .locator('.reply-preview');
+  await expect(reply).toBeVisible({ timeout: 20_000 });
+  await expect(timeline.itemByEventId(distantEventId)).toHaveCount(0);
 
-  const reply = timeline.itemById('reply-to-distant').locator('.reply-preview');
-  await expect(reply).toBeVisible();
   await reply.click();
 
-  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(DISTANT_EVENT);
-  await expect.poll(() => core.subscribeCount()).toBe(2);
+  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(distantEventId);
+  await expect(timeline.itemByEventId(distantEventId)).toBeVisible({ timeout: 30_000 });
+  await expect(timeline.message(distantBody)).toBeVisible();
 });

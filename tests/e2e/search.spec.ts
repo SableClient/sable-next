@@ -1,8 +1,20 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from './fixtures/test';
+import { expect, test as base } from './fixtures/test';
+
+const test = base.extend({
+  storageState: ({ workerSearchCorpus }, use) => use(workerSearchCorpus.statePath),
+});
 
 const SEARCH_FIELD = 'Search messages — try from:ada in:#general has:image';
+
+function group(page: Page, name: string) {
+  return page.getByRole('main').getByRole('heading', { name, level: 2 });
+}
+
+function anyGroup(page: Page, name: string) {
+  return group(page, name).first();
+}
 
 function searchField(page: Page) {
   return page.getByRole('combobox', { name: SEARCH_FIELD });
@@ -11,9 +23,7 @@ function searchField(page: Page) {
 test('the room header search button opens the search page scoped to that room', async ({
   page,
   app,
-  installRoomCore,
 }) => {
-  await installRoomCore('ready');
   await app.openHome();
   await app.openRoomFromList('General');
 
@@ -24,11 +34,7 @@ test('the room header search button opens the search page scoped to that room', 
   await expect(searchField(page)).toHaveValue('');
 });
 
-test('a query returns hits grouped by room and opens the message it lands on', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a query returns hits grouped by room and opens the message it lands on', async ({ page }) => {
   await page.goto('/search');
 
   const field = searchField(page);
@@ -36,28 +42,26 @@ test('a query returns hits grouped by room and opens the message it lands on', a
 
   const results = page.getByRole('button', { name: /Welcome to/ });
   await expect(results.first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'General', level: 2 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Random', level: 2 })).toBeVisible();
+  await expect(anyGroup(page, 'General')).toBeVisible();
+  await expect(anyGroup(page, 'Random')).toBeVisible();
 
   await results.first().click();
-  await expect(page).toHaveURL(/event=%24general-0%3Aexample\.test/);
+  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toMatch(/^\$/);
 });
 
-test('in: narrows the results to one room', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('in: narrows the results to one room', async ({ page, searchCorpus }) => {
   await page.goto('/search');
 
-  await searchField(page).fill('welcome in:!second:example.test');
+  await searchField(page).fill('welcome');
+  await expect(anyGroup(page, 'Random')).toBeVisible({ timeout: 20_000 });
 
-  await expect(page.getByRole('heading', { name: 'Random', level: 2 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'General', level: 2 })).toHaveCount(0);
+  await searchField(page).fill(`welcome in:${searchCorpus.randomId}`);
+
+  await expect(anyGroup(page, 'Random')).toBeVisible();
+  await expect(group(page, 'General')).toHaveCount(0);
 });
 
-test('a quoted phrase and an exclusion change the result set', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a quoted phrase and an exclusion change the result set', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -65,11 +69,10 @@ test('a quoted phrase and an exclusion change the result set', async ({
   await expect(page.getByRole('button', { name: /General message 1$/ })).toBeVisible();
 
   await field.fill('message -Random');
-  await expect(page.getByRole('heading', { name: 'Random', level: 2 })).toHaveCount(0);
+  await expect(group(page, 'Random')).toHaveCount(0);
 });
 
-test('the query survives a reload through the url', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('the query survives a reload through the url', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('welcome');
   await expect(page).toHaveURL(/q=welcome/);
@@ -80,11 +83,7 @@ test('the query survives a reload through the url', async ({ page, installRoomCo
   await expect(page.getByRole('button', { name: /Welcome to/ }).first()).toBeVisible();
 });
 
-test('an unsupported operator is reported rather than silently dropped', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('an unsupported operator is reported rather than silently dropped', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('welcome pinned:true');
@@ -92,11 +91,7 @@ test('an unsupported operator is reported rather than silently dropped', async (
   await expect(page.getByText('Not supported yet: pinned')).toBeVisible();
 });
 
-test('a query with no matches says so instead of staying blank', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a query with no matches says so instead of staying blank', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('zzzznothingmatches');
@@ -105,8 +100,7 @@ test('a query with no matches says so instead of staying blank', async ({
   await expect(page.locator('.empty')).toBeVisible();
 });
 
-test('sorting by newest reorders the results', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('sorting by newest reorders the results', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('message');
 
@@ -121,34 +115,37 @@ test('sorting by newest reorders the results', async ({ page, installRoomCore })
   await expect.poll(async () => page.locator('.hit-row').first().innerText()).not.toBe(firstBefore);
 });
 
-test('in: accepts a room name with spaces when quoted', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('in: accepts a room name with spaces when quoted', async ({ page }) => {
   await page.goto('/search');
+
+  await searchField(page).fill('message');
+  await expect(anyGroup(page, 'Random')).toBeVisible({ timeout: 20_000 });
 
   await searchField(page).fill('message in:"Random"');
 
-  await expect(page.getByRole('heading', { name: 'Random', level: 2 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'General', level: 2 })).toHaveCount(0);
+  await expect(anyGroup(page, 'Random')).toBeVisible();
+  await expect(group(page, 'General')).toHaveCount(0);
 });
 
 test('from: accepts a sender localpart rather than a full id', async ({
   page,
-  installRoomCore,
+  app,
+  searchCorpus,
 }) => {
-  await installRoomCore('ready');
+  await app.openRoom(searchCorpus.generalId);
   await page.goto('/search');
 
-  await searchField(page).fill('message from:alice');
+  await searchField(page).fill('message');
+  await expect(page.locator('.hit-row').first()).toBeVisible({ timeout: 20_000 });
+
+  const localpart = searchCorpus.sender.userId.replace(/^@/, '').split(':')[0];
+  await searchField(page).fill(`message from:${localpart}`);
 
   await expect(page.locator('.hit-row').first()).toBeVisible();
   await expect(page.getByText('No messages matched.')).toHaveCount(0);
 });
 
-test('an unknown from: yields nothing rather than every message', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('an unknown from: yields nothing rather than every message', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message from:nobody');
@@ -157,11 +154,7 @@ test('an unknown from: yields nothing rather than every message', async ({
   await expect(page.getByText(/No match for from:nobody/)).toBeVisible();
 });
 
-test('typing an operator prefix offers completions and Enter accepts one', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('typing an operator prefix offers completions and Enter accepts one', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -173,8 +166,7 @@ test('typing an operator prefix offers completions and Enter accepts one', async
   await expect(field).toHaveValue('from:');
 });
 
-test('in: offers rooms and accepting one inserts its alias', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('in: offers rooms and accepting one inserts its alias', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -186,14 +178,10 @@ test('in: offers rooms and accepting one inserts its alias', async ({ page, inst
 
   await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
   await expect(field).toHaveValue('message ');
-  await expect(page.getByRole('heading', { name: 'Random', level: 2 })).toBeVisible();
+  await expect(anyGroup(page, 'Random')).toBeVisible();
 });
 
-test('escape dismisses the suggestions without clearing the query', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('escape dismisses the suggestions without clearing the query', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -206,8 +194,7 @@ test('escape dismisses the suggestions without clearing the query', async ({
   await expect(field).toHaveValue('has:');
 });
 
-test('matched terms are marked in the result body', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('matched terms are marked in the result body', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('welcome');
@@ -215,8 +202,7 @@ test('matched terms are marked in the result body', async ({ page, installRoomCo
   await expect(page.locator('.hit-body mark').first()).toHaveText(/Welcome/i);
 });
 
-test('the result count is announced', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('the result count is announced', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('welcome');
@@ -224,8 +210,7 @@ test('the result count is announced', async ({ page, installRoomCore }) => {
   await expect(page.locator('.count')).toHaveText(/\d+ results?/);
 });
 
-test('the sort order rides in the url and survives a reload', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('the sort order rides in the url and survives a reload', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('message');
 
@@ -240,18 +225,16 @@ test('the sort order rides in the url and survives a reload', async ({ page, ins
   );
 });
 
-test('zero results are announced and offer a way out', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('zero results are announced and offer a way out', async ({ page, searchCorpus }) => {
   await page.goto('/search');
 
-  await searchField(page).fill('zzznothing in:!room:example.test');
+  await searchField(page).fill(`zzznothing in:${searchCorpus.generalId}`);
 
   await expect(page.locator('.announcement')).toHaveText('No messages matched.');
   await expect(page.getByText(/Remove a filter/)).toBeVisible();
 });
 
-test('a completed filter does not keep the suggestions open', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('a completed filter does not keep the suggestions open', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message in:Random ');
@@ -259,11 +242,7 @@ test('a completed filter does not keep the suggestions open', async ({ page, ins
   await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
-test('alt+arrowdown offers the operator cheat-sheet on demand', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('alt+arrowdown offers the operator cheat-sheet on demand', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message ');
@@ -275,11 +254,7 @@ test('alt+arrowdown offers the operator cheat-sheet on demand', async ({
   await expect(page.getByRole('option', { name: /^during:/ })).toBeVisible();
 });
 
-test('alt+arrowdown opens the suggestions without moving focus', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('alt+arrowdown opens the suggestions without moving focus', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -293,11 +268,7 @@ test('alt+arrowdown opens the suggestions without moving focus', async ({
   await expect(field).toBeFocused();
 });
 
-test('escape clears the field only once the suggestions are closed', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('escape clears the field only once the suggestions are closed', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -312,8 +283,7 @@ test('escape clears the field only once the suggestions are closed', async ({
   await expect(field).toHaveValue('');
 });
 
-test('a stemmed match is still marked in the body', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('a stemmed match is still marked in the body', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('messag');
@@ -321,11 +291,7 @@ test('a stemmed match is still marked in the body', async ({ page, installRoomCo
   await expect(page.locator('.hit-body mark').first()).toHaveText(/message/i);
 });
 
-test('a result row names the sender and shows their avatar initials', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a result row names the sender and shows their avatar initials', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('welcome');
@@ -334,11 +300,7 @@ test('a result row names the sender and shows their avatar initials', async ({
   await expect(page.locator('.hit-row').first().locator('.sable-avatar')).toBeVisible();
 });
 
-test('an operator under the caret stays as text until it is committed', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('an operator under the caret stays as text until it is committed', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -353,28 +315,24 @@ test('an operator under the caret stays as text until it is committed', async ({
   await expect(field).toHaveValue('message ');
 });
 
-test('the remove button drops the chip and rebroadens the results', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('the remove button drops the chip and rebroadens the results', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message in:Random ');
-  await expect(page.getByRole('heading', { name: 'General', level: 2 })).toHaveCount(0);
+  await expect(group(page, 'General')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Remove in:Random' }).click();
 
   await expect(page.locator('.chip')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'General', level: 2 })).toBeVisible();
+  await expect(anyGroup(page, 'General')).toBeVisible();
 });
 
-test('backspace on an empty draft removes the last chip', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('backspace on an empty draft removes the last chip', async ({ page, searchCorpus }) => {
   await page.goto('/search');
   const field = searchField(page);
 
-  await field.fill('in:Random from:alice ');
+  const localpart = searchCorpus.sender.userId.replace(/^@/, '').split(':')[0];
+  await field.fill(`in:Random from:${localpart} `);
   await expect(page.locator('.chip')).toHaveCount(2);
 
   await field.press('Backspace');
@@ -383,32 +341,27 @@ test('backspace on an empty draft removes the last chip', async ({ page, install
   await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
 });
 
-test('a chip names the room rather than its id', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('a chip names the room rather than its id', async ({ page, searchCorpus }) => {
   await page.goto('/search');
 
-  await searchField(page).fill('message in:!second:example.test ');
+  await searchField(page).fill(`message in:${searchCorpus.randomId} `);
 
   await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
 });
 
-test('from: suggestions show display names', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('from: suggestions show display names', async ({ page, app, searchCorpus }) => {
+  await app.openRoom(searchCorpus.generalId);
   await page.goto('/search');
 
   await searchField(page).fill('welcome');
   await expect(page.locator('.hit-sender').first()).toHaveText('Alice');
 
-  await searchField(page).fill('welcome from:ali');
+  await searchField(page).fill('welcome from:Ali');
 
   await expect(page.getByRole('option', { name: 'Alice' })).toBeVisible();
 });
 
-test('accepting a suggestion closes the list instead of reopening it', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('accepting a suggestion closes the list instead of reopening it', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
   const listbox = page.getByRole('listbox');
@@ -423,8 +376,7 @@ test('accepting a suggestion closes the list instead of reopening it', async ({
   await expect(listbox).toHaveCount(0);
 });
 
-test('clicking a suggestion closes the list', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('clicking a suggestion closes the list', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('in:Ran');
 
@@ -436,8 +388,7 @@ test('clicking a suggestion closes the list', async ({ page, installRoomCore }) 
   await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
-test('leaving the field closes the list', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('leaving the field closes the list', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('has:');
   await expect(page.getByRole('listbox')).toBeVisible();
@@ -447,8 +398,7 @@ test('leaving the field closes the list', async ({ page, installRoomCore }) => {
   await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
-test('the sort controls are not covered by the suggestions', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('the sort controls are not covered by the suggestions', async ({ page }) => {
   await page.goto('/search');
   await searchField(page).fill('has:');
   await expect(page.getByRole('listbox')).toBeVisible();
@@ -461,11 +411,7 @@ test('the sort controls are not covered by the suggestions', async ({ page, inst
   );
 });
 
-test('a pasted filter commits to a chip without stranding text in the input', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a pasted filter commits to a chip without stranding text in the input', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -481,8 +427,7 @@ test('a pasted filter commits to a chip without stranding text in the input', as
   await expect(page).toHaveURL(/q=in%3ARandom%20message/);
 });
 
-test('a space typed after a committed chip is not swallowed', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('a space typed after a committed chip is not swallowed', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -493,11 +438,7 @@ test('a space typed after a committed chip is not swallowed', async ({ page, ins
   await expect(page.locator('.chip')).toHaveCount(1);
 });
 
-test('backspace after that space deletes the space, not the chip', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('backspace after that space deletes the space, not the chip', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -509,11 +450,7 @@ test('backspace after that space deletes the space, not the chip', async ({
   await expect(field).toHaveValue('');
 });
 
-test('typing in the middle of the draft keeps the space and the caret', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('typing in the middle of the draft keeps the space and the caret', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -526,11 +463,7 @@ test('typing in the middle of the draft keeps the space and the caret', async ({
   await expect(page.locator('.chip')).toHaveCount(1);
 });
 
-test('a chip is built character by character in front of existing text', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a chip is built character by character in front of existing text', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -543,21 +476,16 @@ test('a chip is built character by character in front of existing text', async (
   await expect(field).toHaveValue('message ');
 });
 
-test('a negated room filter drops that room instead of matching its text', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a negated room filter drops that room instead of matching its text', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message -in:Random ');
 
-  await expect(page.getByRole('heading', { name: 'General', level: 2 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Random', level: 2 })).toHaveCount(0);
+  await expect(anyGroup(page, 'General')).toBeVisible();
+  await expect(group(page, 'Random')).toHaveCount(0);
 });
 
-test('a negated date bound is reported as unsupported', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('a negated date bound is reported as unsupported', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message -before:2024-01-01');
@@ -565,11 +493,7 @@ test('a negated date bound is reported as unsupported', async ({ page, installRo
   await expect(page.getByText('Not supported yet: -before')).toBeVisible();
 });
 
-test('a negated chip names the negation in its remove button', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('a negated chip names the negation in its remove button', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('message -in:Random ');
@@ -577,8 +501,7 @@ test('a negated chip names the negation in its remove button', async ({
   await expect(page.getByRole('button', { name: 'Remove -in:Random' })).toBeVisible();
 });
 
-test('clicking the field padding focuses the input', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('clicking the field padding focuses the input', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -588,8 +511,7 @@ test('clicking the field padding focuses the input', async ({ page, installRoomC
   await expect(field).toBeFocused();
 });
 
-test('the operator cheat-sheet does not reopen on refocus', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('the operator cheat-sheet does not reopen on refocus', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -604,8 +526,7 @@ test('the operator cheat-sheet does not reopen on refocus', async ({ page, insta
   await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
-test('a quoted phrase is marked whole in the result body', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('a quoted phrase is marked whole in the result body', async ({ page }) => {
   await page.goto('/search');
 
   await searchField(page).fill('"General message 1"');

@@ -1,57 +1,61 @@
 import { expect, test } from './fixtures/test';
 
+test.beforeEach(async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+});
+
 test('bookmarking a message surfaces it in the inbox and opens the event', async ({
   page,
   app,
-  core,
-  installRoomCore,
+  admin,
 }) => {
-  await installRoomCore('ready');
-  await app.openHome();
-  await app.openRoomFromList('General');
+  const roomName = `Bookmarks ${String(Date.now())}`;
+  const roomId = await admin.createRoom({ name: roomName });
+  const body = `Worth keeping ${String(Date.now())}`;
+  const eventId = await admin.sendMessage(roomId, body);
 
-  const message = page.locator('.timeline-viewport').getByText('General message 1', {
-    exact: true,
+  await app.openRoom(roomId);
+
+  await page.locator('.timeline-viewport').getByText(body, { exact: true }).click({
+    button: 'right',
   });
-  await message.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Bookmark' }).click();
-  await expect.poll(() => core.commands()).toContain('set_bookmark');
 
   await app.openInbox();
-  await app.dismissDeviceBanner();
   const bookmarks = page.getByRole('region', { name: 'Bookmarks' });
-  const row = bookmarks.getByRole('listitem').filter({ hasText: 'General' });
-  await expect(row).toBeVisible();
-  await expect(row.getByText('General message 1')).toBeVisible();
+  const row = bookmarks.getByRole('listitem').filter({ hasText: roomName });
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row.getByText(body)).toBeVisible();
 
   await row.getByRole('link').click();
-  await expect(page).toHaveURL(/\/home\/!room%3Aexample\.test/);
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get('event'))
-    .toBe('$general-1:example.test');
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(roomId).replace(/[$]/g, '\\$')));
+  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(eventId);
 });
 
 test('removing a bookmark from the inbox takes it out of the list', async ({
   page,
   app,
-  installRoomCore,
+  admin,
 }) => {
-  await installRoomCore('ready');
-  await app.openHome();
-  await app.openRoomFromList('General');
+  const roomName = `Unbookmark ${String(Date.now())}`;
+  const roomId = await admin.createRoom({ name: roomName });
+  const body = `Not worth keeping ${String(Date.now())}`;
+  await admin.sendMessage(roomId, body);
 
-  const message = page.locator('.timeline-viewport').getByText('General message 1', {
-    exact: true,
+  await app.openRoom(roomId);
+
+  await page.locator('.timeline-viewport').getByText(body, { exact: true }).click({
+    button: 'right',
   });
-  await message.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Bookmark' }).click();
 
   await app.openInbox();
-  await app.dismissDeviceBanner();
   const bookmarks = page.getByRole('region', { name: 'Bookmarks' });
-  const row = bookmarks.getByRole('listitem').filter({ hasText: 'General' });
-  await expect(row).toBeVisible();
+  const row = bookmarks.getByRole('listitem').filter({ hasText: roomName });
+  await expect(row).toBeVisible({ timeout: 15_000 });
 
   await row.getByRole('button', { name: /Remove bookmark/ }).click();
-  await expect(bookmarks.getByText('Star a message to save it here.')).toBeVisible();
+
+  await expect(row).toHaveCount(0);
 });

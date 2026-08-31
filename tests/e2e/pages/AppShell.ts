@@ -52,9 +52,42 @@ export class AppShell {
     await this.page.goto('/create-room');
   }
 
+  async createRoom(
+    name: string,
+    {
+      kind = 'Room',
+      parentSpace,
+    }: { kind?: 'Room' | 'Space' | 'Voice room'; parentSpace?: string } = {}
+  ): Promise<string> {
+    await this.openCreateRoom();
+    await this.createRoomName.fill(name);
+    if (kind !== 'Room') await this.page.getByRole('radio', { name: kind, exact: true }).click();
+    if (parentSpace !== undefined) {
+      await this.page.getByRole('combobox', { name: 'Add to space' }).click();
+      await this.page.getByRole('option', { name: parentSpace, exact: true }).click();
+    }
+    await this.createRoomSubmit.click();
+    await expect(this.page).toHaveURL(/\/(home|space)\/[^/]+/, { timeout: COLD_BOOT_TIMEOUT });
+    return this.currentRoomId();
+  }
+
+  currentRoomId(): string {
+    const path = new URL(this.page.url()).pathname;
+    const segment = path.split('/').filter(Boolean).at(-1);
+    if (segment === undefined) throw new Error(`no room id in ${path}`);
+    return decodeURIComponent(segment);
+  }
+
   async openRoom(roomId: string, { settled = true } = {}): Promise<void> {
     await this.page.goto(`/home/${encodeURIComponent(roomId)}`);
     if (settled) await this.awaitTimelineSettled();
+  }
+
+  async openRoomShowing(roomId: string, target: Locator): Promise<void> {
+    await expect(async () => {
+      await this.openRoom(roomId);
+      await expect(target).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 45_000 });
   }
 
   async openPermalink(roomId: string, eventId: string): Promise<void> {

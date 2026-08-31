@@ -2,13 +2,15 @@
 // mid-scroll, delay a snapshot on cue, or confirm a local echo at a chosen
 // moment.
 
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 import {
   historyItems,
   timelineImage,
   timelineItem,
   timelineMessage,
 } from './fixtures/timeline-items';
+
+test.use({ storageState: SIGNED_OUT });
 
 const ROOM_ID = '!room:example.test';
 const LATEST = 'General message 19';

@@ -6,8 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 
-test.beforeEach(async ({ app, installRoomCore }) => {
-  await installRoomCore('ready');
+test.beforeEach(async ({ app }) => {
   await app.openHome();
 });
 
@@ -37,17 +36,18 @@ test('keeps account settings in profile order', async ({ page }) => {
   );
 });
 
-test('saves a display name through the account command', async ({ core, page }) => {
+test('saves a display name onto the account', async ({ admin, page }) => {
   const account = new AccountSettings(page);
   await account.open();
 
-  await account.displayName.fill('Updated E2E User');
+  const name = `Updated ${String(Date.now())}`;
+  await account.displayName.fill(name);
   await account.saveDisplayName.click();
 
-  await expect.poll(() => core.commands()).toContain('set_display_name');
+  await expect.poll(() => admin.profile().then((profile) => profile.displayname)).toBe(name);
 });
 
-test('saves a name color through the account command', async ({ core, page }) => {
+test('a saved name color survives a reload', async ({ page }) => {
   const account = new AccountSettings(page);
   await account.open();
 
@@ -56,7 +56,8 @@ test('saves a name color through the account command', async ({ core, page }) =>
   await expect(account.colorSave('Dark theme name color')).toBeEnabled();
   await account.colorSave('Dark theme name color').click();
 
-  await expect.poll(() => core.commands()).toContain('set_profile_field');
+  await page.reload();
+  await expect(account.colorValue('Dark theme name color')).toHaveValue('#336699');
 });
 
 test('opens a profile color picker next to its swatch', async ({ page }) => {

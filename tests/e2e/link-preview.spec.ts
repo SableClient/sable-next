@@ -1,40 +1,45 @@
-import { expect, test } from './fixtures/test';
-import { timelineItem } from './fixtures/timeline-items';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-const LINK_MESSAGE = {
-  kind: 'message',
-  body: 'Check this out https://example.test/article',
-  html: 'Check this out <a href="https://example.test/article">https://example.test/article</a>',
-  emote: false,
-  edited: false,
+const ARTICLE = 'https://example.test/article';
+
+const PREVIEW = {
+  'og:url': ARTICLE,
+  'og:title': 'The Example Article',
+  'og:description': 'A short description of the article.',
+  'og:site_name': 'Example',
 };
+
+test.use({ storageState: SIGNED_OUT });
+
+test.beforeEach(async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+});
 
 test('a message with a link renders a preview when link previews are enabled', async ({
   page,
   app,
   timeline,
-  core,
-  installRoomCore,
+  homeserverProxy,
+  proxiedLogin,
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem('sable-preferences', JSON.stringify({ urlPreviews: true }));
   });
-  await installRoomCore('ready');
-  await app.openHome();
-  await app.openRoomFromList('General');
+  homeserverProxy.respond(/GET \/_matrix\/(media|client)\/[^ ]*preview_url/, PREVIEW, {
+    times: 10,
+  });
+
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Link on ${String(Date.now())}` });
+  await account.sendMessage(roomId, `Check this out ${ARTICLE}`);
+
+  await app.openRoom(roomId);
   await timeline.expectRevealed();
 
-  const subscription = await core.subscription();
-  await core.emitTimelineDiff(subscription, [
-    {
-      op: 'push_back',
-      value: { ...timelineItem('link-message-on', 'Check this out'), content: LINK_MESSAGE },
-    },
-  ]);
-
   const preview = page.locator('.link-preview');
-  await expect(preview).toBeVisible();
-  await expect(preview).toHaveAttribute('href', 'https://example.test/article');
+  await expect(preview).toBeVisible({ timeout: 20_000 });
+  await expect(preview).toHaveAttribute('href', ARTICLE);
   await expect(preview.locator('.link-preview-title')).toHaveText('The Example Article');
   await expect(preview.locator('.link-preview-site')).toHaveText('Example');
 });
@@ -43,23 +48,18 @@ test('a message with a link renders nothing when link previews are disabled', as
   page,
   app,
   timeline,
-  core,
-  installRoomCore,
+  homeserverProxy,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
-  await app.openHome();
-  await app.openRoomFromList('General');
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Link off ${String(Date.now())}` });
+  const body = `Check this out ${ARTICLE}`;
+  await account.sendMessage(roomId, body);
+
+  await app.openRoom(roomId);
   await timeline.expectRevealed();
 
-  const subscription = await core.subscription();
-  await core.emitTimelineDiff(subscription, [
-    {
-      op: 'push_back',
-      value: { ...timelineItem('link-message-off', 'Check this out'), content: LINK_MESSAGE },
-    },
-  ]);
-
-  await expect(timeline.message('Check this out https://example.test/article')).toBeVisible();
+  await expect(timeline.message(body)).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.link-preview')).toHaveCount(0);
-  expect(await core.commands()).not.toContain('url_preview');
+  expect(homeserverProxy.count(/preview_url/)).toBe(0);
 });

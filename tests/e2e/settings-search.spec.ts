@@ -5,9 +5,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 
-test.beforeEach(async ({ app, installRoomCore, page }) => {
-  await installRoomCore('ready');
-  await app.openHome();
+test.beforeEach(async ({ page }) => {
   await page.goto('/settings');
 });
 

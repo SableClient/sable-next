@@ -1,8 +1,10 @@
 // Real stack. Anything needing a scripted transport belongs in
 // timeline-anchoring.spec.ts or timeline-transport.spec.ts.
 
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_MESSAGE_COUNT, TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
+
+test.use({ storageState: SIGNED_OUT });
 
 const LATEST = `Timeline message ${String(TIMELINE_MESSAGE_COUNT - 1)}`;
 

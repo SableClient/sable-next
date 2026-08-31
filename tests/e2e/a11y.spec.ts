@@ -3,8 +3,10 @@
 
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
+
+test.use({ storageState: SIGNED_OUT });
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 

@@ -1,6 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
+
+test.use({ storageState: SIGNED_OUT });
 
 function rail(page: Page): Locator {
   return page.getByRole('navigation', { name: 'Primary navigation' });
@@ -22,17 +24,22 @@ async function spaceOrder(page: Page): Promise<(string | null)[]> {
 
 async function openRail(page: Page): Promise<void> {
   await page.goto('/home');
-  await expect(railSpaces(page)).toHaveCount(3);
+  await expect(railSpaces(page)).toHaveCount(3, { timeout: 90_000 });
 }
 
 async function group(page: Page): Promise<void> {
-  await railLink(page, 'Beta').dragTo(railLink(page, 'Alpha'));
-  await expect(page.getByRole('button', { name: 'Alpha, Beta' })).toBeVisible();
+  await expect(async () => {
+    await railLink(page, 'Beta').dragTo(railLink(page, 'Alpha'));
+    await expect(page.getByRole('button', { name: 'Alpha, Beta' })).toBeVisible({
+      timeout: 3_000,
+    });
+  }).toPass({ timeout: 30_000 });
 }
 
-test.beforeEach(async ({ page, installRoomCore }) => {
+test.beforeEach(async ({ page, spacesLogin }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await installRoomCore('spaces');
+  await spacesLogin();
 });
 
 test('dragging one space onto another groups them into a folder', async ({ page }) => {
@@ -71,11 +78,14 @@ test('a folder opens to its spaces and takes another one by drag', async ({ page
   await page.getByRole('button', { name: 'Alpha, Beta' }).click();
   await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Beta', 'Gamma']);
 
-  await railLink(page, 'Gamma').dragTo(railLink(page, 'Alpha'), {
-    targetPosition: { x: 17, y: 30 },
-  });
-
-  await expect(page.getByRole('button', { name: 'Collapse Alpha, Gamma, Beta' })).toBeVisible();
+  await expect(async () => {
+    await railLink(page, 'Gamma').dragTo(railLink(page, 'Alpha'), {
+      targetPosition: { x: 17, y: 30 },
+    });
+    await expect(page.getByRole('button', { name: 'Collapse Alpha, Gamma, Beta' })).toBeVisible({
+      timeout: 3_000,
+    });
+  }).toPass({ timeout: 30_000 });
   await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Gamma', 'Beta']);
 });
 

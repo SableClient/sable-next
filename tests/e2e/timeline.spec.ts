@@ -1,9 +1,11 @@
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 import {
   TIMELINE_MESSAGE_COUNT,
   TIMELINE_ROOM_NAME,
   sendTimelineMessage,
 } from './fixtures/continuwuity';
+
+test.use({ storageState: SIGNED_OUT });
 
 test('loads a real room at latest and preserves the viewport while paginating', async ({
   page,

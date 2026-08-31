@@ -1,146 +1,172 @@
-// Exactly one subscribe and no stray pagination. The command log that proves it
-// only exists on the double, and the rendered output looks identical either way.
+import { expect, test, SIGNED_OUT } from './fixtures/test';
+import type { HomeserverProxy } from './fixtures/proxy';
 
-import { expect, test } from './fixtures/test';
+const MESSAGES = /GET \/_matrix\/client\/v[13]\/rooms\/[^ ]*\/messages/;
+
+test.use({ storageState: SIGNED_OUT });
+
+function pages(proxy: HomeserverProxy): number {
+  return proxy.count(MESSAGES);
+}
+
+test.beforeEach(async ({ timeline }) => {
+  test.setTimeout(150_000);
+  await timeline.trackRebuilds();
+});
 
 test('subscribes once when opening a room on mobile', async ({
   page,
   app,
-  core,
-  installRoomCore,
+  timeline,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Mobile open ${String(Date.now())}` });
+  await account.sendMessage(roomId, 'Welcome to the room');
   await page.setViewportSize({ width: 390, height: 420 });
-  await app.openHome();
-  await app.openRoomFromList('General');
 
-  await expect(app.roomHeading('General')).toBeVisible();
-  await expect.poll(() => core.timelineCommands()).toEqual(['subscribe_timeline']);
+  await app.openRoom(roomId);
+
+  await expect(timeline.message('Welcome to the room')).toBeVisible({ timeout: 20_000 });
+  const built = await timeline.rebuilds();
+  await expect.poll(() => timeline.rebuilds(), { timeout: 3_000 }).toBe(built);
 });
 
 test('subscribes once and loads initial room history', async ({
   page,
   app,
-  core,
-  installRoomCore,
+  timeline,
+  homeserverProxy,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Opening fill ${String(Date.now())}` });
+  for (let index = 0; index < 60; index += 1) {
+    await account.sendMessage(roomId, `Fill message ${String(index)}`);
+  }
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
-  await app.openRoomFromList('General');
+  homeserverProxy.clearRequests();
 
-  await expect(page.getByText('Welcome to General')).toBeVisible();
-  // The snapshot does not fill a window this tall, so the opening fill pads it
-  // out. This double reports the timeline start on its second page.
-  await expect.poll(() => core.paginateCount()).toBe(2);
-  expect(await core.subscribeCount()).toBe(1);
+  await app.openRoom(roomId);
+  await expect(timeline.message('Fill message 59')).toBeVisible({ timeout: 20_000 });
+
+  await expect.poll(() => pages(homeserverProxy)).toBeGreaterThan(0);
+  const settled = pages(homeserverProxy);
 
   // The prefetch fires on a settle, so a passing poll above proves nothing yet.
-  await page.waitForTimeout(75);
-  expect(await core.paginateCount()).toBe(2);
-  expect(await core.subscribeCount()).toBe(1);
+  await expect.poll(() => pages(homeserverProxy), { timeout: 3_000 }).toBe(settled);
+  const built = await timeline.rebuilds();
+  await expect.poll(() => timeline.rebuilds(), { timeout: 3_000 }).toBe(built);
 });
 
 test('does not resubscribe the timeline after a room refresh', async ({
   page,
   app,
   timeline,
-  core,
-  installRoomCore,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
-  await app.openHome();
-  await app.openRoomFromList('General');
-  await expect(page.getByText('Welcome to General')).toBeVisible();
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Refresh ${String(Date.now())}` });
+  await account.sendMessage(roomId, 'Welcome to the room');
+  const last = `Latest before refresh ${String(Date.now())}`;
+  await account.sendMessage(roomId, last);
+
+  await app.openRoom(roomId);
+  await expect(timeline.message('Welcome to the room')).toBeVisible({ timeout: 20_000 });
+  const beforeReload = await timeline.rebuilds();
 
   await page.reload();
 
-  await expect(page.getByText('Welcome to General')).toBeVisible();
-  await timeline.expectAtLatest('General message 19');
-  await expect.poll(() => core.timelineCommands()).toEqual(['subscribe_timeline']);
+  await expect(timeline.message('Welcome to the room')).toBeVisible({ timeout: 20_000 });
+  await timeline.expectAtLatest(last);
+  await expect.poll(() => timeline.rebuilds(), { timeout: 3_000 }).toBe(beforeReload);
 });
 
 test('keeps the active timeline while crossing the layout breakpoint', async ({
   page,
   app,
-  core,
-  installRoomCore,
+  timeline,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Breakpoint ${String(Date.now())}` });
+  await account.sendMessage(roomId, 'Welcome to the room');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
-  await app.openRoomFromList('General');
-  await expect(page.getByText('Welcome to General')).toBeVisible();
+
+  await app.openRoom(roomId);
+  await expect(timeline.message('Welcome to the room')).toBeVisible({ timeout: 20_000 });
+  const built = await timeline.rebuilds();
 
   await page.setViewportSize({ width: 390, height: 844 });
 
-  await expect.poll(() => core.subscribeCount()).toBe(1);
+  await expect(timeline.message('Welcome to the room')).toBeVisible();
+  await expect.poll(() => timeline.rebuilds(), { timeout: 3_000 }).toBe(built);
 });
 
 test('prefetches history within the oldest timeline items', async ({
   page,
   app,
   timeline,
-  core,
-  installRoomCore,
+  homeserverProxy,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Prefetch ${String(Date.now())}` });
+  for (let index = 0; index < 80; index += 1) {
+    await account.sendMessage(roomId, `Prefetch message ${String(index)}`);
+  }
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
-  await app.openRoomFromList('General');
 
-  await timeline.scrollToAndNotify(await timeline.offsetOfIndex(8));
+  await app.openRoom(roomId);
+  await expect(timeline.message('Prefetch message 79')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  homeserverProxy.clearRequests();
+
+  await timeline.scrollToAndNotify(await timeline.prefetchBand());
   await expect(timeline.viewport).not.toHaveJSProperty('scrollTop', 0);
 
   await timeline.wheelUp(100);
 
-  await expect.poll(() => core.paginateCount()).toBe(1);
+  await expect.poll(() => pages(homeserverProxy), { timeout: 20_000 }).toBeGreaterThan(0);
 });
 
 test('anchors each history page requested by separate upward gestures', async ({
   page,
   app,
   timeline,
-  core,
-  installRoomCore,
+  homeserverProxy,
+  proxiedLogin,
 }) => {
-  await installRoomCore('ready');
+  const account = await proxiedLogin();
+  const roomId = await account.createRoom({ name: `Gestures ${String(Date.now())}` });
+  for (let index = 0; index < 120; index += 1) {
+    await account.sendMessage(roomId, `Gesture message ${String(index)}`);
+  }
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
-  await app.openRoomFromList('General');
 
-  const first = timeline.items.first();
-  const [firstId, firstIndexValue] = await Promise.all([
-    first.getAttribute('data-item-id'),
-    first.getAttribute('data-index'),
-  ]);
-  if (!firstId || firstIndexValue === null) throw new Error('missing first timeline item');
-  const firstIndex = Number(firstIndexValue);
-  if (!Number.isInteger(firstIndex)) throw new Error('invalid first timeline item index');
+  await app.openRoom(roomId);
+  await expect(timeline.message('Gesture message 119')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  homeserverProxy.clearRequests();
+
+  homeserverProxy.delay(MESSAGES, 600, { times: 6 });
 
   await timeline.scrollTo(0);
   await timeline.wheelUp(200);
+  await timeline.waitForScrollSettled();
+  const firstPageAnchor = await timeline.fullyVisibleAnchor();
 
-  await expect.poll(() => core.paginateCount()).toBe(1);
-  await expect
-    .poll(() => timeline.itemById(firstId).getAttribute('data-index'))
-    .toBe(String(firstIndex + 1));
+  await expect.poll(() => pages(homeserverProxy), { timeout: 20_000 }).toBe(1);
   // A second page must need a second gesture, so idling cannot produce one.
-  await page.waitForTimeout(300);
-  expect(await core.paginateCount()).toBe(1);
+  await expect.poll(() => pages(homeserverProxy), { timeout: 3_000 }).toBe(1);
   await expect(timeline.viewport).not.toHaveJSProperty('scrollTop', 0);
+  await timeline.expectAnchorHeld(firstPageAnchor, { tolerance: 2 });
 
-  await page.waitForTimeout(150);
   await timeline.scrollTo(0);
-  const beforeSecondPage = await timeline.itemById(firstId).boundingBox();
-  if (!beforeSecondPage) throw new Error('missing second-page anchor bounds');
   await timeline.wheelUp(200);
+  await timeline.waitForScrollSettled();
+  const secondPageAnchor = await timeline.fullyVisibleAnchor();
 
-  await expect.poll(() => core.paginateCount()).toBe(2);
-  await expect
-    .poll(() => timeline.itemById(firstId).getAttribute('data-index'))
-    .toBe(String(firstIndex + 2));
-  await expect
-    .poll(async () => (await timeline.itemById(firstId).boundingBox())?.y)
-    .toBeCloseTo(beforeSecondPage.y, 0);
+  await expect.poll(() => pages(homeserverProxy), { timeout: 20_000 }).toBe(2);
+  await timeline.expectAnchorHeld(secondPageAnchor, { tolerance: 2 });
 });

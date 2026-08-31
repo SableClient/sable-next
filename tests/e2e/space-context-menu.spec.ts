@@ -1,6 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
+
+test.use({ storageState: SIGNED_OUT });
 
 function rail(page: Page): Locator {
   return page.getByRole('navigation', { name: 'Primary navigation' });
@@ -14,11 +16,12 @@ function menu(page: Page): Locator {
   return page.locator('.room-options-menu');
 }
 
-test.beforeEach(async ({ page, installRoomCore }) => {
+test.beforeEach(async ({ page, spacesLogin }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await installRoomCore('spaces');
+  await spacesLogin();
   await page.goto('/home');
-  await expect(railSpaces(page)).toHaveCount(3);
+  await expect(railSpaces(page)).toHaveCount(3, { timeout: 90_000 });
 });
 
 test('right-clicking a space opens its options, not the display menu', async ({ page }) => {

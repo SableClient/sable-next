@@ -1,7 +1,11 @@
-// A core that never finishes restoring, or fails to start, has no server-side
-// trigger, so those states are scripted.
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-import { expect, test } from './fixtures/test';
+test.use({ storageState: SIGNED_OUT });
+
+test.beforeEach(async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+});
 
 test('renders a startup state while the core is restoring', async ({ app, installEmptyCore }) => {
   await installEmptyCore('loading');

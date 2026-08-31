@@ -13,8 +13,8 @@ const RAIL_DESTINATIONS = [
 ] as const;
 
 for (const { link, path } of RAIL_DESTINATIONS) {
-  test(`reaches ${path} from the primary navigation`, async ({ page, app, signIn }) => {
-    await signIn();
+  test(`reaches ${path} from the primary navigation`, async ({ page, app }) => {
+    await app.openHome();
 
     await app.primaryNavigation.getByRole('link', { name: link, exact: true }).click();
 
@@ -33,8 +33,7 @@ const MOBILE_DESTINATIONS = [
 ] as const;
 
 for (const { path, heading } of MOBILE_DESTINATIONS) {
-  test(`shows ${path} instead of the room list on mobile`, async ({ page, installRoomCore }) => {
-    await installRoomCore('ready');
+  test(`shows ${path} instead of the room list on mobile`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(path);
 
@@ -46,11 +45,7 @@ for (const { path, heading } of MOBILE_DESTINATIONS) {
   });
 }
 
-test('opens the chats list first, and reaches the new-chat form from there', async ({
-  page,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('opens the chats list first, and reaches the new-chat form from there', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/direct');
 
@@ -68,8 +63,7 @@ test('opens the chats list first, and reaches the new-chat form from there', asy
   await expect(page.getByRole('button', { name: 'Start chat' })).toBeVisible();
 });
 
-test('keeps the mobile quick tools visible on inbox', async ({ page, installRoomCore }) => {
-  await installRoomCore('ready');
+test('keeps the mobile quick tools visible on inbox', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/inbox');
 
@@ -77,12 +71,7 @@ test('keeps the mobile quick tools visible on inbox', async ({ page, installRoom
   await expect(page.getByRole('button', { name: 'Account' }).last()).toBeVisible();
 });
 
-test('dismissing the inbox popover returns to the previous page', async ({
-  page,
-  app,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('dismissing the inbox popover returns to the previous page', async ({ page, app }) => {
   await app.openHome();
 
   await page.getByRole('link', { name: 'Inbox' }).first().click();
@@ -96,15 +85,11 @@ test('dismissing the inbox popover returns to the previous page', async ({
   await expect(page).toHaveURL(/\/home$/);
 });
 
-test('closing the inbox sheet returns to the previous page', async ({
-  page,
-  app,
-  installRoomCore,
-}) => {
-  await installRoomCore('ready');
+test('closing the inbox sheet returns to the previous page', async ({ page, app }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await app.openHome();
-  await page.getByRole('button', { name: 'Dismiss' }).click();
+  const dismiss = page.getByRole('button', { name: 'Dismiss' });
+  if (await dismiss.isVisible()) await dismiss.click();
 
   await page.getByRole('link', { name: 'Inbox' }).first().click();
   const inbox = page.getByRole('region', { name: 'Inbox' });
@@ -117,16 +102,14 @@ test('closing the inbox sheet returns to the previous page', async ({
   await expect(page).toHaveURL(/\/home$/);
 });
 
-test('opens a settings section over the app shell', async ({ page, app, signIn }) => {
-  await signIn();
+test('opens a settings section over the app shell', async ({ page, app }) => {
   await page.goto('/settings/appearance');
 
   await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
   await expect(app.primaryNavigation).toBeVisible();
 });
 
-test('closes settings and returns to the app', async ({ page, app, signIn }) => {
-  await signIn();
+test('closes settings and returns to the app', async ({ page, app }) => {
   await page.goto('/settings/appearance');
   await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
 

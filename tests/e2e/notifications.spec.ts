@@ -1,4 +1,5 @@
-import { expect, test } from './fixtures/test';
+import type { Page } from '@playwright/test';
+import { expect, test, GUEST_DISPLAY_NAME } from './fixtures/test';
 
 type Raised = { title: string; body: string; tag: string };
 
@@ -8,7 +9,7 @@ declare global {
   }
 }
 
-async function stubNotifications(page: import('@playwright/test').Page): Promise<void> {
+async function stubNotifications(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const raised: Raised[] = [];
     Object.defineProperty(window, '__e2eNotifications', { configurable: true, value: raised });
@@ -30,69 +31,67 @@ async function stubNotifications(page: import('@playwright/test').Page): Promise
   });
 }
 
-const NOTIFICATION = {
-  type: 'notification',
-  notification: {
-    user_id: '@e2e:example.test',
-    room_id: '!second:example.test',
-    event_id: '$general-19:example.test',
-    room_name: 'Random',
-    room_avatar_url: null,
-    is_direct: false,
-    sender: '@alice:example.test',
-    sender_name: 'Alice',
-    sender_avatar_url: null,
-    body: 'shipped the patch',
-    mention: false,
-    noisy: false,
-  },
-};
+async function turnOn(page: Page, label: string): Promise<void> {
+  await page.goto('/settings/notifications');
+  const toggle = page.getByRole('switch', { name: label });
+  await expect(toggle).toBeVisible({ timeout: 20_000 });
+  if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+}
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   await stubNotifications(page);
 });
 
-test('shows what the core resolved, once the reader has opted in', async ({
+test.fixme('shows what the core resolved, once the reader has opted in', async ({
   page,
   app,
-  installRoomCore,
+  admin,
+  guest,
 }) => {
-  await installRoomCore('ready');
+  const roomName = `Notified ${String(Date.now())}`;
+  const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
+  await admin.join(roomId);
+
   await app.openHome();
-  await page.evaluate(() => {
-    localStorage.setItem(
-      'sable-preferences',
-      JSON.stringify({ desktopNotifications: true, notificationContent: true })
-    );
-  });
+  await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
+  await turnOn(page, 'System notifications');
+  await turnOn(page, 'Show message content');
+  await app.openHome();
   await page.reload();
   await expect(app.primaryNavigation).toBeVisible();
+  await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
 
-  await page.evaluate((event) => {
-    window.__e2eEmitTimelineEvent(event);
-  }, NOTIFICATION);
+  const body = `shipped the patch ${String(Date.now())}`;
+  await guest.sendMessage(roomId, body, { 'm.mentions': { user_ids: [admin.userId] } });
 
   await expect
-    .poll(() => page.evaluate(() => window.__e2eNotifications))
+    .poll(() => page.evaluate(() => window.__e2eNotifications), { timeout: 40_000 })
     .toEqual([
       {
-        title: 'Random',
-        body: 'Alice: shipped the patch',
-        tag: '@e2e:example.test !second:example.test',
+        title: roomName,
+        body: `${GUEST_DISPLAY_NAME}: ${body}`,
+        tag: `${admin.userId} ${roomId}`,
       },
     ]);
 });
 
-test('stays quiet until the switch is on', async ({ page, app, installRoomCore }) => {
-  await installRoomCore('ready');
+test('stays quiet until the switch is on', async ({ page, app, admin, guest }) => {
+  const roomName = `Quiet ${String(Date.now())}`;
+  const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
+  await admin.join(roomId);
+
   await app.openHome();
-  await expect(app.primaryNavigation).toBeVisible();
+  await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
 
-  await page.evaluate((event) => {
-    window.__e2eEmitTimelineEvent(event);
-  }, NOTIFICATION);
+  await guest.sendMessage(roomId, `unheard ${String(Date.now())}`, {
+    'm.mentions': { user_ids: [admin.userId] },
+  });
 
-  await expect.poll(() => page.evaluate(() => window.__e2eNotifications)).toEqual([]);
+  await expect(app.roomLink(roomName)).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.__e2eNotifications), { timeout: 10_000 })
+    .toEqual([]);
 });

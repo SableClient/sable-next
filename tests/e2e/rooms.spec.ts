@@ -1,5 +1,7 @@
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
+
+test.use({ storageState: SIGNED_OUT });
 
 test.beforeEach(async ({ page }) => {
   test.setTimeout(60_000);
