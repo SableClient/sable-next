@@ -84,7 +84,7 @@ address: string,
 /**
  * Servers to try when the id is not resolvable on ours, or empty.
  */
-via: Array<string>, } | { "type": "knock_room", address: string, via: Array<string>, reason: string | null, } | { "type": "room_via_servers", room_id: string, } | { "type": "leave_room", room_id: string, } | { "type": "invite_user", room_id: string, user_id: string, } | { "type": "encryption_status" } | { "type": "search_coverage" } | { "type": "devices" } | { "type": "recover_identity", recovery_key: string, } | { "type": "enable_recovery", 
+via: Array<string>, } | { "type": "knock_room", address: string, via: Array<string>, reason: string | null, } | { "type": "room_via_servers", room_id: string, } | { "type": "leave_room", room_id: string, } | { "type": "invite_user", room_id: string, user_id: string, } | { "type": "encryption_status" } | { "type": "sync_status" } | { "type": "search_coverage" } | { "type": "devices" } | { "type": "recover_identity", recovery_key: string, } | { "type": "enable_recovery", 
 /**
  * A passphrase to unlock the key with. The key is returned either way.
  */

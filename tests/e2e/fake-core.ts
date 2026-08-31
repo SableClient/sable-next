@@ -890,6 +890,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       join_room: (command) => ({ type: 'join_room', room_id: command.address }),
       knock_room: (command) => ({ type: 'knock_room', room_id: command.address }),
       room_via_servers: () => ({ type: 'room_via_servers', servers: ['example.test'] }),
+      sync_status: () => ({
+        type: 'sync_status',
+        status: { state: 'live' },
+      }),
       encryption_status: () => ({
         type: 'encryption_status',
         status: {

@@ -316,7 +316,8 @@ impl Core {
 
 pub(crate) fn sync_status(state: SyncState) -> SyncStatus {
     match state {
-        SyncState::Idle | SyncState::Terminated | SyncState::Offline => SyncStatus::Offline,
+        SyncState::Offline => SyncStatus::Offline,
+        SyncState::Idle | SyncState::Terminated => SyncStatus::Syncing,
         SyncState::Running => SyncStatus::Live,
         SyncState::Error(error) => SyncStatus::Error {
             message: error.to_string(),

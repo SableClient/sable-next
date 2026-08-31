@@ -5,6 +5,7 @@ import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
 import type { PersonaView } from '#src/generated/PersonaView';
 import type { DeviceView } from '#src/generated/DeviceView';
 import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+import type { SyncStatus } from '#src/generated/SyncStatus';
 import type { HomeserverSoftwareView } from '#src/generated/HomeserverSoftwareView';
 import type { ImagePackView } from '#src/generated/ImagePackView';
 import type { JoinRuleView } from '#src/generated/JoinRuleView';
@@ -1129,6 +1130,11 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'encryption_status',
       });
+      return response.status;
+    },
+
+    async syncStatus(): Promise<SyncStatus> {
+      const response = await transport().send({ type: 'sync_status' });
       return response.status;
     },
 

@@ -618,6 +618,7 @@ pub enum Command {
     },
 
     EncryptionStatus,
+    SyncStatus,
     SearchCoverage,
     Devices,
     RecoverIdentity {
@@ -1145,6 +1146,9 @@ pub enum CommandOk {
 
     EncryptionStatus {
         status: EncryptionStatusView,
+    },
+    SyncStatus {
+        status: SyncStatus,
     },
     SearchCoverage {
         coverage: SearchCoverageView,

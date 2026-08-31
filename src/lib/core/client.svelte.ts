@@ -600,7 +600,10 @@ export class CoreClient {
       this.resetCachedState();
     }
     this.session = session;
-    if (changed && session) void this.primeEncryptionStatus();
+    if (changed && session) {
+      void this.primeEncryptionStatus();
+      void this.primeSyncStatus();
+    }
     if (changed && broadcast) this.accountChannel?.postMessage(null);
   }
 
@@ -693,6 +696,17 @@ export class CoreClient {
       }
     }
     return 'error';
+  }
+
+  private async primeSyncStatus(): Promise<void> {
+    const generation = this.generation;
+    try {
+      const status = await this.commands.syncStatus();
+      if (generation !== this.generation || this.sync !== null) return;
+      this.sync = status;
+    } catch (error) {
+      console.debug('[sable core] sync status unavailable', error);
+    }
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {

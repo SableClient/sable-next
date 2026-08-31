@@ -1324,6 +1324,10 @@ impl Core {
                 status: encryption_status(&self.client().await?).await,
             }),
 
+            Command::SyncStatus => Ok(CommandOk::SyncStatus {
+                status: crate::watchers::sync_status(self.sync_service().await?.state().get()),
+            }),
+
             Command::SearchCoverage => Ok(CommandOk::SearchCoverage {
                 coverage: self.search_coverage(&self.client().await?).await,
             }),

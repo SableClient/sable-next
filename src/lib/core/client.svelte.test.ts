@@ -123,6 +123,21 @@ test('core events from the transport reach client state', async () => {
   expect(core.deviceList).toEqual([]);
 });
 
+test('the sync status outlives the reset the session replacement performs', async () => {
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: { accounts: [session] },
+    sync_status: { status: { state: 'live' } },
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+
+  await vi.waitFor(() => {
+    expect(core.sync?.state).toBe('live');
+  });
+});
+
 test('a cancellation for an unknown verification flow does not open the verification dialog', async () => {
   const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
   const core = createCoreClient(() => fake.transport);
