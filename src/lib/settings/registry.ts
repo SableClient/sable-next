@@ -35,6 +35,7 @@ import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
+import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
@@ -430,6 +431,26 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.hideTypingIndicators',
         description: 'settings.hideTypingIndicatorsHint',
         type: 'boolean',
+      },
+      {
+        key: 'filterPronounsByLanguage',
+        icon: TranslateIcon,
+        name: 'settings.filterPronounsByLanguage',
+        description: 'settings.filterPronounsByLanguageHint',
+        type: 'boolean',
+      },
+      {
+        key: 'pronounPillLimit',
+        icon: UserCircleIcon,
+        name: 'settings.pronounPillLimit',
+        description: 'settings.pronounPillLimitHint',
+        type: 'select',
+        options: [
+          { value: '1', label: 'settings.pronounPillLimitOne' },
+          { value: '2', label: 'settings.pronounPillLimitTwo' },
+          { value: '3', label: 'settings.pronounPillLimitThree' },
+          { value: 'all', label: 'settings.pronounPillLimitAll' },
+        ],
       },
     ],
   },

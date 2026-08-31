@@ -27,6 +27,8 @@
   import type { MutualRoomView } from '#src/generated/MutualRoomView';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferredPronouns } from '#lib/personas/pronouns.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -90,7 +92,12 @@
   let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let pronouns = $derived(
-    (currentProfile?.pronouns ?? []).map((pronoun) => pronoun.summary).join(', ')
+    (preferences.filterPronounsByLanguage
+      ? preferredPronouns(currentProfile?.pronouns ?? [], $i18n.resolvedLanguage ?? $i18n.language)
+      : (currentProfile?.pronouns ?? [])
+    )
+      .map((pronoun) => pronoun.summary)
+      .join(', ')
   );
   let localTime = $derived.by(() => {
     const timezone = currentProfile?.timezone;

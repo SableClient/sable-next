@@ -7,6 +7,7 @@ export type ThemeMode = 'system' | 'dark' | 'light';
 export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
 export type FontScale = 'small' | 'default' | 'large' | 'largest';
+export type PronounPillLimit = '1' | '2' | '3' | 'all';
 
 export interface Preferences {
   layout: TimelineLayout;
@@ -33,6 +34,8 @@ export interface Preferences {
   showTombstoneEvents: boolean;
   hideReadReceipts: boolean;
   hideTypingIndicators: boolean;
+  filterPronounsByLanguage: boolean;
+  pronounPillLimit: PronounPillLimit;
 
   enterForNewline: boolean;
   formattingToolbar: boolean;
@@ -105,6 +108,7 @@ const ENUMS = {
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'collapsed', 'never'],
   fontScale: ['small', 'default', 'large', 'largest'],
+  pronounPillLimit: ['1', '2', '3', 'all'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -142,6 +146,8 @@ const DEFAULTS: Preferences = {
   showTombstoneEvents: true,
   hideReadReceipts: false,
   hideTypingIndicators: false,
+  filterPronounsByLanguage: true,
+  pronounPillLimit: '3',
 
   enterForNewline: false,
   formattingToolbar: false,

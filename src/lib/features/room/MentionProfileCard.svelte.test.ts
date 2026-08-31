@@ -156,7 +156,7 @@ test('renders the extended profile fields', async () => {
   await tick();
 
   const meta = document.querySelectorAll('.profile-card-meta .profile-meta-item');
-  expect(meta[0].textContent).toBe('she/her, iel');
+  expect(meta[0].textContent).toBe('she/her');
   expect(meta[1].textContent).toContain('(Europe/Paris)');
   expect(meta[2].textContent).toBe('Is cat, give headpats!');
   expect(document.querySelector('.profile-card-status')?.textContent.trim()).toBe(

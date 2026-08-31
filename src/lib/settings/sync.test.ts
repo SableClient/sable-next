@@ -65,6 +65,32 @@ describe('applySettings', () => {
     expect(applied?.preferences.layout).toBe(base.layout);
   });
 
+  it('carries the pronoun preferences across devices', () => {
+    const { content } = prepareSettings(
+      { ...base, filterPronounsByLanguage: false, pronounPillLimit: 'all' },
+      noThemes
+    );
+
+    expect(content.settings.filterPronounsByLanguage).toBe(false);
+    expect(content.settings.pronounPillLimit).toBe('all');
+
+    const applied = applySettings(content, base, noThemes, []);
+
+    expect(applied?.preferences.filterPronounsByLanguage).toBe(false);
+    expect(applied?.preferences.pronounPillLimit).toBe('all');
+  });
+
+  it('ignores a pill count outside the accepted set', () => {
+    const applied = applySettings(
+      { v: 1, settings: { pronounPillLimit: '12' }, themes: noThemes },
+      base,
+      noThemes,
+      []
+    );
+
+    expect(applied?.preferences.pronounPillLimit).toBe(base.pronounPillLimit);
+  });
+
   it('refuses content from another schema version', () => {
     expect(applySettings({ v: 2, settings: {} }, base, noThemes, [])).toBeNull();
     expect(applySettings(null, base, noThemes, [])).toBeNull();
