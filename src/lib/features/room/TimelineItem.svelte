@@ -815,17 +815,17 @@
               {/if}
             </p>
           {/if}
+          {#if actionable && showReceiptBadge}
+            <ReadReceiptStack
+              readers={receiptReaders}
+              {members}
+              expanded={receiptsOpen}
+              onOpen={() => {
+                receiptsOpen = true;
+              }}
+            />
+          {/if}
         </div>
-        {#if actionable && showReceiptBadge}
-          <ReadReceiptStack
-            readers={receiptReaders}
-            {members}
-            expanded={receiptsOpen}
-            onOpen={() => {
-              receiptsOpen = true;
-            }}
-          />
-        {/if}
       </article>
     </ContextMenu.Trigger>
     {#if actionable}
@@ -1079,9 +1079,11 @@
     min-width: 0;
   }
 
-  .message :global(.read-receipt-stack) {
-    align-self: flex-end;
-    margin-bottom: var(--space-050);
+  .message-content :global(.read-receipt-stack) {
+    display: flex;
+    margin-inline-start: auto;
+    margin-top: var(--space-050);
+    width: fit-content;
   }
 
   .message header {
