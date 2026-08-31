@@ -98,6 +98,14 @@ impl Core {
                     retry_after_ms: None,
                 }
             }
+            Some(ErrorKind::Unrecognized) => {
+                tracing::info!(
+                    context,
+                    category = "unsupported",
+                    "homeserver does not implement this endpoint"
+                );
+                CommandErr::Unsupported
+            }
             _ if matches!(error, matrix_sdk::HttpError::Reqwest(_)) => {
                 tracing::warn!(
                     context,

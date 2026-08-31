@@ -113,7 +113,7 @@ impl Core {
             .await?
             .send(request)
             .await
-            .map_err(|error| self.failed("search_user_directory", error))?;
+            .map_err(|error| self.homeserver_http_error("search_user_directory", error))?;
 
         Ok((
             response.limited,
@@ -136,7 +136,7 @@ impl Core {
         let response = client
             .send(request_openid_token::v3::Request::new(user_id))
             .await
-            .map_err(|error| self.failed("openid_token", error))?;
+            .map_err(|error| self.homeserver_http_error("openid_token", error))?;
 
         Ok(OpenIdTokenView {
             access_token: response.access_token,

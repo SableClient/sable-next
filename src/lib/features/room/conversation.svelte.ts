@@ -10,7 +10,7 @@ import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { EditImage } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
 import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
-import { isEncryptedScheduleUnsupported } from '#lib/features/composer/send-failure.js';
+import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
@@ -203,7 +203,7 @@ export class Conversation {
       await this.#core.commands.scheduleMessage(targetRoomId, body, formatted, delayMs);
       return;
     } catch (error) {
-      if (!isEncryptedScheduleUnsupported(error)) throw error;
+      if (!isServerScheduleUnsupported(error)) throw error;
     }
 
     enqueue({

@@ -11,8 +11,9 @@ function detailOf(cause: unknown): CommandErr | null {
   return detail as CommandErr;
 }
 
-export function isEncryptedScheduleUnsupported(cause: unknown): boolean {
-  return detailOf(cause)?.code === 'encrypted_schedule_unsupported';
+export function isServerScheduleUnsupported(cause: unknown): boolean {
+  const code = detailOf(cause)?.code;
+  return code === 'encrypted_schedule_unsupported' || code === 'delayed_events_unsupported';
 }
 
 export function sendFailure(cause: unknown): SendFailure {

@@ -50,6 +50,9 @@ impl Core {
         content: RoomMessageEventContent,
         delay_ms: u64,
     ) -> Result<String, CommandErr> {
+        if !self.delayed_events_supported().await? {
+            return Err(CommandErr::DelayedEventsUnsupported);
+        }
         let room = self.room(room_id).await?;
         if room
             .latest_encryption_state()
@@ -114,6 +117,9 @@ impl Core {
         &self,
         room_id: Option<&OwnedRoomId>,
     ) -> Result<Vec<ScheduledMessageView>, CommandErr> {
+        if !self.delayed_events_supported().await? {
+            return Ok(Vec::new());
+        }
         let client = self.client().await?;
         let endpoint = client
             .homeserver()

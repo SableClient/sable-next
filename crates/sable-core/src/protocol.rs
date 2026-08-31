@@ -1220,6 +1220,7 @@ pub enum CommandErr {
     InvalidPoll,
     InvalidLocation,
     EncryptedScheduleUnsupported,
+    DelayedEventsUnsupported,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
