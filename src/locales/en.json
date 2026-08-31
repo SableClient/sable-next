@@ -1785,12 +1785,12 @@
     "importFailed": "Could not read that system from PluralKit.",
     "importAvatarFailed": "Imported, but {{count}} pictures could not be fetched.",
     "pickerLabel": "Send as",
-    "pickerNone": "Yourself",
+    "pickerNone": "Default",
     "pickerHeading": "Send as",
     "scopeRoom": "This room",
     "scopeAccount": "Everywhere",
     "sendingAs": "Sending as {{name}}",
-    "clearSelection": "Send as yourself again"
+    "clearSelection": "Send as default again"
   },
   "call": {
     "start": "Start call",
