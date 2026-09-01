@@ -781,7 +781,8 @@
     "utdDeviceUnverified": "This message predates this session. Verify this device to get its key from your backup.",
     "utdWithheldUnverified": "The sender withheld the key because this device is unverified or insecure.",
     "utdWithheldBySender": "The sender chose not to send this device the key.",
-    "utdRecoverAction": "Set up recovery"
+    "utdRecoverAction": "Set up recovery",
+    "utdWaiting": "Waiting for this message’s key…"
   },
   "auth": {
     "welcome": "Welcome to Sable",
@@ -1006,6 +1007,9 @@
     "unverifiedOthersBody_one": "Until you verify it, people you talk to will see a warning next to messages it sends.",
     "unverifiedOthersBody_other": "Until you verify them, people you talk to will see a warning next to messages they send.",
     "unverifiedBannerVerify": "Verify",
+    "recoveryIncompleteTitle": "This device cannot open your key backup",
+    "recoveryIncompleteBody": "Your account has a backup of your message keys, but this device has not unlocked it. Until it does, older messages stay unreadable here.",
+    "recoveryIncompleteAction": "Unlock",
     "unverifiedBannerDismiss": "Dismiss",
     "updatesTitle": "Updates",
     "updatesDescription": "How Sable keeps this desktop install current.",

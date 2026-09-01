@@ -15,6 +15,7 @@
   import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
   import WebUpdateBanner from '#lib/ui/WebUpdateBanner.svelte';
   import TelemetryConsentBanner from '#lib/ui/TelemetryConsentBanner.svelte';
+  import RecoveryIncompleteBanner from '#lib/ui/RecoveryIncompleteBanner.svelte';
   import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
@@ -98,6 +99,7 @@
   <BannerDock>
     <TelemetryConsentBanner />
     <UnverifiedDeviceBanner />
+    <RecoveryIncompleteBanner />
     <DesktopUpdateBanner />
     <WebUpdateBanner />
   </BannerDock>

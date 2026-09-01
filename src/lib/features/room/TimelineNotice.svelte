@@ -3,14 +3,11 @@
 
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
-  import { resolve } from '$app/paths';
-
   import { i18n } from '#lib/i18n.js';
-  import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
 
   import StateEventText from './StateEventText.svelte';
   import { formatDate } from './timeline-format';
-  import { utdCauseKey, utdIsRecoverable } from './utd-cause';
+  import UndecryptableNotice from './UndecryptableNotice.svelte';
 
   interface Props {
     item: TimelineItemView;
@@ -46,18 +43,7 @@
     </div>
   </div>
 {:else if item.content.kind === 'unable_to_decrypt'}
-  {@const cause = item.content.reason}
-  <p class="undecryptable">
-    {$i18n.t(utdCauseKey(cause))}
-    {#if utdIsRecoverable(cause)}
-      <a
-        href={resolve('/(app)/settings/[section]', { section: SETTINGS_DEVICES_SECTION })}
-        data-settings-link={SETTINGS_DEVICES_SECTION}
-      >
-        {$i18n.t('timeline.utdRecoverAction')}
-      </a>
-    {/if}
-  </p>
+  <UndecryptableNotice id={item.id} cause={item.content.reason} />
 {:else if item.content.kind === 'unsupported'}
   <p class="state">
     <span class="state-rail" aria-hidden="true"></span>
@@ -91,8 +77,7 @@
   .unread,
   .date-divider,
   .state,
-  .debug-event,
-  .undecryptable {
+  .debug-event {
     margin: 0;
   }
 
@@ -172,18 +157,6 @@
     flex: 0 0 auto;
     font-family: var(--font-family-mono);
     margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
-  }
-
-  .undecryptable {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) dashed var(--sable-surface-var-container-line);
-    border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
-    max-width: 32rem;
-    padding: var(--space-150) var(--space-200);
-    width: fit-content;
   }
 
   .date-divider {

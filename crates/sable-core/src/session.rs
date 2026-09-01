@@ -220,7 +220,7 @@ fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
     let builder = builder
         .handle_refresh_tokens()
         .with_encryption_settings(EncryptionSettings {
-            backup_download_strategy: BackupDownloadStrategy::OneShot,
+            backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
             auto_enable_cross_signing: true,
             auto_enable_backups: true,
         });
