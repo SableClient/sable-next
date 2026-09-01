@@ -239,12 +239,22 @@ describe('middle-button autoscroll', () => {
     expect(controller.gesture).toBe('autoscroll');
   });
 
+  test('scroll observation does not erase an active autoscroll gesture', () => {
+    const { controller } = setup();
+    controller.markPointerStart(1);
+    controller.clearUserScrollPending();
+
+    expect(controller.gesture).toBe('autoscroll');
+    expect(controller.isScrollGestureActive).toBe(true);
+  });
+
   test('a second press ends it and settles the gesture', () => {
     const { controller, gestureSettled } = setup();
     controller.markPointerStart(1);
+    controller.clearUserScrollPending();
     expect(gestureSettled).not.toHaveBeenCalled();
 
-    controller.markPointerStart(0);
+    controller.markPointerStart(1);
     expect(controller.gesture).toBe('none');
     expect(controller.isScrollGestureActive).toBe(false);
     expect(gestureSettled).toHaveBeenCalledTimes(1);

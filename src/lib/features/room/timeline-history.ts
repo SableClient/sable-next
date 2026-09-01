@@ -66,6 +66,7 @@ export class TimelineHistoryController {
   private wheelGestureActive = false;
   private wheelUsesNativeScrollEnd = false;
   private gestureSawScroll = false;
+  private autoscrollActive = false;
   /** Any scroll clears this, so a gesture still set here has not moved anything. */
   private activeGesture: Gesture = 'none';
   private readonly wheelHandler = (event: WheelEvent): void => {
@@ -103,11 +104,13 @@ export class TimelineHistoryController {
   constructor(private readonly options: TimelineHistoryControllerOptions) {}
 
   get gesture(): Gesture {
-    return this.activeGesture;
+    return this.activeGesture === 'none' && this.autoscrollActive
+      ? 'autoscroll'
+      : this.activeGesture;
   }
 
   get isScrollGestureActive(): boolean {
-    return isScrolling(this.activeGesture);
+    return isScrolling(this.gesture);
   }
 
   get isRequestPending(): boolean {
@@ -329,11 +332,12 @@ export class TimelineHistoryController {
 
   markPointerStart(button = 0): void {
     if (this.destroyed) return;
-    if (this.activeGesture === 'autoscroll') {
+    if (this.autoscrollActive) {
       this.finishAutoscrollGesture();
       return;
     }
     if (button === AUTOSCROLL_BUTTON) {
+      this.autoscrollActive = true;
       this.activeGesture = 'autoscroll';
       this.historyInputArmed = true;
       return;
@@ -348,8 +352,9 @@ export class TimelineHistoryController {
 
   finishAutoscrollGesture(): void {
     if (this.destroyed) return;
-    if (this.activeGesture !== 'autoscroll') return;
-    this.activeGesture = 'none';
+    if (!this.autoscrollActive) return;
+    this.autoscrollActive = false;
+    if (this.activeGesture === 'autoscroll') this.activeGesture = 'none';
     this.options.onGestureSettled();
     this.historyInputArmed = true;
     this.flushHistoryRequest();
@@ -390,6 +395,7 @@ export class TimelineHistoryController {
     this.historyFillActive = false;
     this.historyFillPages = 0;
     this.wheelGestureActive = false;
+    this.autoscrollActive = false;
     this.activeGesture = 'none';
     this.anchorSuppressed = false;
     this.anchorDeferredRequest = false;

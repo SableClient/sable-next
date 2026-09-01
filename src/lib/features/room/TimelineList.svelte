@@ -89,6 +89,12 @@
     footTrailing?: Snippet;
   }
 
+  type TimelineRenderRow =
+    | { kind: 'history' }
+    | { kind: 'item'; item: TimelineItemView; itemIndex: number };
+
+  const HISTORY_ROW_KEY = 'history-placeholder';
+
   let {
     timeline,
     focusEventId = null,
@@ -128,6 +134,7 @@
   /* The paginate call's own answer, as well as the store's: that only settles to
      `end` on a two-second timeout when a page moves no boundary. */
   let historyExhausted = $state(false);
+  let historyRequestPending = $state(false);
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
   );
@@ -142,7 +149,8 @@
     let seen: string | null = null;
     for (const row of $virtualizer.getVirtualItems()) {
       if (row.end > bottom) break;
-      seen = visibleItems[row.index]?.event_id ?? seen;
+      const rendered = renderRows[row.index];
+      if (rendered?.kind === 'item') seen = rendered.item.event_id ?? seen;
     }
     return seen;
   });
@@ -152,7 +160,9 @@
   let readMarker = $derived.by(() => {
     const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
 
-    return index === -1 ? null : { index, unread: unreadCountAfter(visibleItems, index) };
+    return index === -1
+      ? null
+      : { index: index + historyRowOffset, unread: unreadCountAfter(visibleItems, index) };
   });
 
   let stuckUnreadCount = $derived.by(() => {
@@ -176,7 +186,7 @@
     if (target === smoothTarget) return;
     const index = visibleItems.findIndex((item) => item.event_id === target);
     if (index < 0) return;
-    const offset = offsetOfIndex(index, 'center');
+    const offset = offsetOfIndex(index + historyRowOffset, 'center');
     if (offset === null) return;
     smoothTarget = target;
     setPosition({ kind: 'focused', eventId: target });
@@ -191,6 +201,8 @@
   let initialFillPages = 0;
   let emptyRefillPages = 0;
   let emptyRefillPending = false;
+  let openingBackfillState = $state<'idle' | 'running' | 'done'>('idle');
+  let openingBackfillGeneration = 0;
   let hadVisibleItems = false;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
@@ -199,6 +211,32 @@
   // Only the mount-time target picks the mode; later ones go through the effect.
   // svelte-ignore state_referenced_locally
   let position = $state<TimelinePosition>(initialPosition(focusEventId));
+  const HISTORY_PLACEHOLDER_REM = 14;
+  const HISTORY_PLACEHOLDER_VIEWPORT_RATIO = 1 / 3;
+  let measuredHistoryPlaceholderHeight = $state(0);
+  let historyLoading = $derived(
+    position.kind !== 'settling' &&
+      visibleItems.length > 0 &&
+      (openingBackfillState === 'running' ||
+        historyRequestPending ||
+        timeline.backwardPagination === 'loading')
+  );
+  let historyPlaceholderTargetHeight = $derived(
+    historyLoading
+      ? Math.max(
+          HISTORY_PLACEHOLDER_REM * rootFontSize(),
+          (viewport?.clientHeight ?? virtualizerViewportSize) * HISTORY_PLACEHOLDER_VIEWPORT_RATIO
+        )
+      : 0
+  );
+  let historyPlaceholderHeight = $derived(
+    historyLoading ? Math.max(historyPlaceholderTargetHeight, measuredHistoryPlaceholderHeight) : 0
+  );
+  let historyRowOffset = $derived(historyLoading ? 1 : 0);
+  let renderRows = $derived<TimelineRenderRow[]>([
+    ...(historyLoading ? ([{ kind: 'history' }] as const) : []),
+    ...visibleItems.map((item, itemIndex) => ({ kind: 'item' as const, item, itemIndex })),
+  ]);
   function setPosition(next: TimelinePosition): void {
     position = next;
     followingLive = next.kind === 'pinned';
@@ -213,6 +251,7 @@
   const timelineDebugEnabledForView = timelineDebugEnabled();
   let historyController: TimelineHistoryController;
   let configuredItems: readonly TimelineItemView[] = initialItems;
+  let configuredRows: readonly TimelineRenderRow[] = [];
   let historyDebugChange = 0;
 
   let anchorHolding = false;
@@ -314,11 +353,29 @@
     return true;
   };
 
+  $effect(() => {
+    if (!historyLoading) measuredHistoryPlaceholderHeight = 0;
+  });
+
+  function setHistoryPlaceholderHeight(height: number): void {
+    if (!historyLoading || Math.abs(height - measuredHistoryPlaceholderHeight) < 1) return;
+    measuredHistoryPlaceholderHeight = height;
+  }
+
+  async function requestHistory(): Promise<boolean> {
+    historyRequestPending = true;
+    try {
+      return await onRequestHistory();
+    } finally {
+      historyRequestPending = false;
+    }
+  }
+
   historyController = new TimelineHistoryController({
     getBackwardPagination: () => timeline.backwardPagination,
     isNearOldest: () => viewport !== null && viewport.scrollTop < viewport.clientHeight * 2,
     isVirtualizerScrolling: () => get(virtualizer).isScrolling,
-    requestHistory: () => onRequestHistory(),
+    requestHistory,
     onGestureSettled: () => {
       if (!commitDeferred) return;
       commitDeferred = false;
@@ -482,7 +539,7 @@
       visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
     );
     if (!target || view.topOf(target.snapshot.key) !== null) return;
-    const offset = offsetOfIndex(target.index, 'start');
+    const offset = offsetOfIndex(target.index + historyRowOffset, 'start');
     if (offset === null) return;
     scrollToOffsetNow(Math.max(0, offset - target.snapshot.top), 'bringAnchorIntoView');
     await new Promise(requestAnimationFrame);
@@ -544,7 +601,7 @@
   function landOn(key: string): void {
     const index = visibleItems.findIndex((item) => anchorKeyForItem(item) === key);
     if (index < 0) return;
-    const offset = offsetOfIndex(index, 'start');
+    const offset = offsetOfIndex(index + historyRowOffset, 'start');
     if (offset === null) return;
     scrollToOffsetNow(offset, 'landOn');
     refreshRollingAnchor();
@@ -576,12 +633,14 @@
    * holds `loading` until the boundary moves. Bounded: a lost diff must not leave
    * the timeline hidden. False only when the fill was cancelled.
    */
-  async function awaitPaginationSettled(): Promise<boolean> {
+  async function awaitPaginationSettled(
+    cancelled: () => boolean = initialFillCancelled
+  ): Promise<boolean> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
     while (timeline.backwardPagination === 'loading') {
       if (performance.now() >= deadline) return true;
       await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval));
-      if (initialFillCancelled()) return false;
+      if (cancelled()) return false;
     }
     return true;
   }
@@ -603,7 +662,7 @@
       const contentHeight = get(virtualizer).getTotalSize();
       if (contentHeight >= node.clientHeight * TIMELINE_LAYOUT.initialFillViewports) return;
       initialFillPages += 1;
-      const reachedStart = await onRequestHistory();
+      const reachedStart = await requestHistory();
       historyExhausted = reachedStart;
       // The last page has to settle too, or the handover finds `loading` and declines.
       if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
@@ -626,6 +685,8 @@
       historyExhausted = false;
       emptyRefillPages = 0;
       initialFillPages = 0;
+      openingBackfillGeneration += 1;
+      openingBackfillState = 'idle';
     }
     if (
       timeline.loading ||
@@ -643,7 +704,7 @@
     emptyRefillPending = true;
     void (async () => {
       try {
-        const reachedStart = await onRequestHistory();
+        const reachedStart = await requestHistory();
         historyExhausted = reachedStart && visibleItems.length > 0;
       } finally {
         emptyRefillPending = false;
@@ -664,6 +725,64 @@
       scheduleInitialEndReconciliation();
     });
   }
+
+  function startOpeningBackfill(): void {
+    if (openingBackfillState !== 'idle') return;
+    const generation = (openingBackfillGeneration += 1);
+    const cancelled = (): boolean =>
+      generation !== openingBackfillGeneration || viewport === null || position.kind === 'settling';
+    openingBackfillState = 'running';
+    void (async () => {
+      try {
+        for (let page = 0; page < TIMELINE_LAYOUT.emptyFillMaxPages; page += 1) {
+          const node = currentViewport();
+          if (cancelled() || node === null) return;
+          if (historyExhausted || timeline.backwardPagination === 'end') return;
+          if (timeline.backwardPagination === 'loading') {
+            if (!(await awaitPaginationSettled(cancelled))) return;
+            page -= 1;
+            continue;
+          }
+          const messageHeight = Math.max(
+            0,
+            get(virtualizer).getTotalSize() - historyPlaceholderHeight
+          );
+          if (messageHeight >= node.clientHeight) return;
+
+          const reachedStart = await requestHistory();
+          if (cancelled()) return;
+          historyExhausted = reachedStart;
+          if (!(await awaitPaginationSettled(cancelled))) return;
+          await tick();
+          await new Promise(requestAnimationFrame);
+          if (reachedStart || cancelled()) return;
+          await new Promise((resolve) =>
+            setTimeout(resolve, TIMELINE_LAYOUT.historyRequestMinInterval)
+          );
+        }
+      } finally {
+        if (generation === openingBackfillGeneration) openingBackfillState = 'done';
+      }
+    })();
+  }
+
+  $effect(() => {
+    const viewportHeight = virtualizerViewportSize || viewport?.clientHeight || 0;
+    const messageHeight = Math.max(0, virtualizerTotalSize - historyPlaceholderHeight);
+    if (
+      position.kind === 'settling' ||
+      initialFillState !== 'done' ||
+      viewportHeight <= 0 ||
+      messageHeight >= viewportHeight ||
+      visibleItems.length === 0 ||
+      historyExhausted ||
+      timeline.backwardPagination === 'end' ||
+      openingBackfillState !== 'idle'
+    ) {
+      return;
+    }
+    startOpeningBackfill();
+  });
 
   function scheduleInitialEndReconciliation(): void {
     if (position.kind !== 'settling' || initialEndReconciliationPending) return;
@@ -718,18 +837,39 @@
     cachedRootFontSize = rootFontSize();
   });
 
+  function renderRowKey(
+    rows: readonly TimelineRenderRow[],
+    items: readonly TimelineItemView[],
+    index: number
+  ): string {
+    const row = rows[index];
+    if (!row) return 'missing';
+    return row.kind === 'history' ? HISTORY_ROW_KEY : identityTracker.key(items, row.itemIndex);
+  }
+
   $effect.pre(() => {
     const items = visibleItems;
+    const rows = renderRows;
     const instance = get(virtualizer);
     const previousItems = configuredItems;
+    const previousRows = configuredRows;
     configuredItems = items;
+    configuredRows = rows;
     identityTracker.reconcile(items);
-    const edgesChanged =
+    const itemEdgesChanged =
       previousItems.length !== items.length ||
       identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0) ||
       identityTracker.key(previousItems, previousItems.length - 1) !==
         identityTracker.key(items, items.length - 1);
     const prepended = identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0);
+    const edgesChanged =
+      itemEdgesChanged ||
+      previousRows.length !== rows.length ||
+      renderRowKey(previousRows, previousItems, 0) !== renderRowKey(rows, items, 0) ||
+      renderRowKey(previousRows, previousItems, previousRows.length - 1) !==
+        renderRowKey(rows, items, rows.length - 1);
+    const rowPrepended =
+      renderRowKey(previousRows, previousItems, 0) !== renderRowKey(rows, items, 0);
     historyController.resetForNewItems(prepended);
     const change = edgesChanged ? (historyDebugChange += 1) : historyDebugChange;
     if (edgesChanged) {
@@ -759,7 +899,7 @@
     if (
       edgesChanged &&
       !sent &&
-      (prepended || !pinnedToEnd) &&
+      (rowPrepended || !pinnedToEnd) &&
       position.kind !== 'settling' &&
       position.kind !== 'focused'
     ) {
@@ -769,19 +909,24 @@
     nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * rem;
     const layout = preferences.layout;
     instance.setOptions({
-      count: items.length,
+      count: rows.length,
       getScrollElement: () => viewport,
-      estimateSize: (index) =>
-        estimateTimelineItemSize(
-          items,
-          index,
-          viewport?.clientWidth ?? TIMELINE_LAYOUT.mediaMaxRem * rem,
-          rem,
-          layout
-        ),
+      estimateSize: (index) => {
+        const row = rows[index];
+        if (!row) return 0;
+        return row.kind === 'history'
+          ? historyPlaceholderTargetHeight
+          : estimateTimelineItemSize(
+              items,
+              row.itemIndex,
+              viewport?.clientWidth ?? TIMELINE_LAYOUT.mediaMaxRem * rem,
+              rem,
+              layout
+            );
+      },
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
-      getItemKey: (index) => identityTracker.key(items, index),
+      getItemKey: (index) => renderRowKey(rows, items, index),
       anchorTo: 'start',
       followOnAppend: false,
       scrollEndThreshold: 0,
@@ -823,7 +968,7 @@
         ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
         : -1;
       if (focusIndex >= 0 && !focusAnchored) {
-        const offset = offsetOfIndex(focusIndex, 'center');
+        const offset = offsetOfIndex(focusIndex + historyRowOffset, 'center');
         if (offset !== null) scrollToOffsetNow(offset, 'focus');
         focusAnchored = true;
       } else if (position.kind === 'settling') {
@@ -889,7 +1034,11 @@
     if (next !== position) setPosition(next);
     if (position.kind !== 'settling') historyController.observeScroll(movedAway, nearLatest);
     historyController.clearUserScrollPending();
-    const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
+    let newestVisibleIndex: number | undefined;
+    for (const virtualItem of get(virtualizer).getVirtualItems()) {
+      const row = renderRows[virtualItem.index];
+      if (row?.kind === 'item') newestVisibleIndex = row.itemIndex;
+    }
     if (
       position.kind === 'focused' &&
       timeline.forwardPagination === 'idle' &&
@@ -1045,10 +1194,26 @@
           style:height={String($virtualizer.getTotalSize()) + 'px'}
         >
           {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
-            {@const item = visibleItems[virtualItem.index]}
-            {#if item}
-              {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
-              {@const groupStart = virtualItem.index > 0 && !collapsed}
+            {@const row = renderRows[virtualItem.index]}
+            {#if row?.kind === 'history'}
+              <div
+                class="item history-placeholder-row"
+                data-index={virtualItem.index}
+                style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
+                {@attach measure}
+              >
+                <TimelineSkeleton
+                  mode="history"
+                  layout={preferences.layout}
+                  targetHeight={historyPlaceholderTargetHeight}
+                  onHeightChange={setHistoryPlaceholderHeight}
+                />
+              </div>
+            {:else if row?.kind === 'item'}
+              {@const item = row.item}
+              {@const itemIndex = row.itemIndex}
+              {@const collapsed = isCollapsed(visibleItems, itemIndex)}
+              {@const groupStart = itemIndex > 0 && !collapsed}
               <div
                 class={['item', { collapsed, 'group-start': groupStart }]}
                 data-event-id={item.event_id ?? undefined}
@@ -1061,7 +1226,7 @@
                   {item}
                   {collapsed}
                   unreadCount={item.content.kind === 'read_marker'
-                    ? unreadCountAfter(visibleItems, virtualItem.index)
+                    ? unreadCountAfter(visibleItems, itemIndex)
                     : 0}
                   replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
@@ -1261,6 +1426,10 @@
     right: 0;
     top: 0;
     width: 100%;
+  }
+
+  .item.history-placeholder-row {
+    padding: 0;
   }
 
   .item.collapsed {

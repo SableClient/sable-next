@@ -151,7 +151,7 @@ test('fills a short live timeline until the server reports the timeline start', 
   await unmount(instance);
 });
 
-test('bounds the opening fill when the viewport never fills', async () => {
+test('continues filling an underfilled room after the opening handoff', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
@@ -172,7 +172,13 @@ test('bounds the opening fill when the viewport never fills', async () => {
   await runAnimationFrames();
   await runAnimationFrames();
 
-  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.initialFillMaxPages);
+  expect(history.mock.calls.length).toBeGreaterThan(TIMELINE_LAYOUT.initialFillMaxPages);
+  const placeholder = document.querySelector('.timeline-placeholder.history');
+  expect(placeholder).toBeInstanceOf(HTMLElement);
+  expect(placeholder?.classList.contains('items')).toBe(true);
+  expect(placeholder?.querySelector('.item .message.placeholder-message')).toBeInstanceOf(
+    HTMLElement
+  );
   await unmount(instance);
 });
 
@@ -517,13 +523,18 @@ test('rate limits and bounds sparse history fill', async () => {
     element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
     await tick();
     await Promise.resolve();
+    await runAnimationFrames();
     expect(history).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(299);
     expect(history).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
     expect(history).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(600);
+    await runAnimationFrames();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(history).toHaveBeenCalledTimes(3);
+    await runAnimationFrames();
+    await vi.advanceTimersByTimeAsync(300);
     expect(history).toHaveBeenCalledTimes(4);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(history).toHaveBeenCalledTimes(4);
@@ -667,10 +678,14 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   };
 }
 
-test('a backward pagination adds no content of its own', async () => {
+test('a backward pagination adds a scrollable history placeholder', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element } = await mountLive(roomTimeline);
+  element.scrollTop = 0;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+  await runAnimationFrames();
   const beforeScroll = element.scrollTop;
   const beforeHeight = contentHeight();
 
@@ -678,7 +693,14 @@ test('a backward pagination adds no content of its own', async () => {
   await tick();
   await runAnimationFrames();
 
-  expect(contentHeight()).toBe(beforeHeight);
+  expect(contentHeight()).toBeGreaterThan(beforeHeight);
+  expect(contentHeight() - beforeHeight).toBeGreaterThanOrEqual(100 / 3);
+  const placeholder = document.querySelector('.timeline-placeholder.history');
+  expect(placeholder).toBeInstanceOf(HTMLElement);
+  expect(placeholder?.classList.contains('items')).toBe(true);
+  expect(placeholder?.querySelector('.item .message.placeholder-message')).toBeInstanceOf(
+    HTMLElement
+  );
   expect(element.scrollTop).toBe(beforeScroll);
 
   roomTimeline.backwardPagination = 'idle';
@@ -825,7 +847,27 @@ test('middle-button autoscroll leaves follow mode', async () => {
   const { instance, element, end } = await mountLive(roomTimeline);
 
   element.dispatchEvent(new PointerEvent('pointerdown', { button: 1 }));
-  element.scrollTop = end - 900;
+  element.scrollTop = end - 30;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(anchored()).toBe(true);
+
+  element.scrollTop = end - 60;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(anchored()).toBe(true);
+  expect(element.scrollTop).toBe(end - 60);
+  await unmount(instance);
+});
+
+test('an upward browser scroll without an input event leaves follow mode', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  element.scrollTop = end - 30;
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
