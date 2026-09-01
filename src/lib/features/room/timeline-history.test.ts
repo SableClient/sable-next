@@ -30,7 +30,7 @@ function setup(requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValu
     debugLog,
     debugSnapshot: () => ({ scrollTop: 0 }),
   });
-  return { controller, debugLog, requestHistory, state };
+  return { controller, debugLog, gestureSettled, requestHistory, state };
 }
 
 function wheel(deltaY: number): WheelEvent {
@@ -216,5 +216,67 @@ describe('TimelineHistoryController', () => {
     expect(debugLog.mock.calls.map(([event]) => event)).not.toContain('request:settled');
     expect(requestHistory).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('middle-button autoscroll', () => {
+  test('a middle press is a scrolling gesture, a left press is not', () => {
+    const { controller } = setup();
+    controller.markPointerStart(0);
+    expect(controller.gesture).toBe('press');
+    expect(controller.isScrollGestureActive).toBe(false);
+
+    controller.markPointerEnd();
+    controller.markPointerStart(1);
+    expect(controller.gesture).toBe('autoscroll');
+    expect(controller.isScrollGestureActive).toBe(true);
+  });
+
+  test('the button coming back up does not end it', () => {
+    const { controller } = setup();
+    controller.markPointerStart(1);
+    controller.markPointerEnd();
+    expect(controller.gesture).toBe('autoscroll');
+  });
+
+  test('a second press ends it and settles the gesture', () => {
+    const { controller, gestureSettled } = setup();
+    controller.markPointerStart(1);
+    expect(gestureSettled).not.toHaveBeenCalled();
+
+    controller.markPointerStart(0);
+    expect(controller.gesture).toBe('none');
+    expect(controller.isScrollGestureActive).toBe(false);
+    expect(gestureSettled).toHaveBeenCalledTimes(1);
+  });
+
+  test('a wheel notch ends it and takes over', () => {
+    const { controller } = setup();
+    controller.markPointerStart(1);
+    controller.markWheelScroll(wheel(-10));
+    expect(controller.gesture).toBe('wheel');
+  });
+
+  test('a key ends it and takes over', () => {
+    const { controller } = setup();
+    controller.markPointerStart(1);
+    controller.markKeyScroll(key('PageUp'));
+    expect(controller.gesture).toBe('keys');
+  });
+
+  test('ending a gesture that never started is a no-op', () => {
+    const { controller } = setup();
+    controller.finishAutoscrollGesture();
+    expect(controller.gesture).toBe('none');
+    controller.markPointerStart(0);
+    controller.finishAutoscrollGesture();
+    expect(controller.gesture).toBe('press');
+  });
+
+  test('a destroyed controller starts no gesture', () => {
+    const { controller } = setup();
+    controller.destroy();
+    controller.markPointerStart(1);
+    expect(controller.gesture).toBe('none');
   });
 });

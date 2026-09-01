@@ -2,6 +2,8 @@ import type { BackwardPaginationState } from '#lib/rooms/timeline.svelte.js';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
 import { isScrolling, type Gesture } from './timeline-position';
+
+const AUTOSCROLL_BUTTON = 1;
 import { on } from 'svelte/events';
 
 interface TimelineHistoryControllerOptions {
@@ -81,13 +83,17 @@ export class TimelineHistoryController {
   private readonly touchEndHandler = (): void => {
     this.markTouchEnd();
   };
-  private readonly pointerStartHandler = (): void => {
-    this.markPointerStart();
+  private readonly pointerStartHandler = (event: PointerEvent): void => {
+    this.markPointerStart(event.button);
   };
   private readonly pointerEndHandler = (): void => {
     this.markPointerEnd();
   };
+  private readonly autoscrollEndHandler = (): void => {
+    this.finishAutoscrollGesture();
+  };
   private readonly keyHandler = (event: KeyboardEvent): void => {
+    this.finishAutoscrollGesture();
     this.markKeyScroll(event);
   };
   private readonly keyEndHandler = (event: KeyboardEvent): void => {
@@ -223,6 +229,7 @@ export class TimelineHistoryController {
 
   markWheelScroll(event: WheelEvent): void {
     if (this.destroyed) return;
+    this.finishAutoscrollGesture();
     if (this.wheelGestureTimer !== null) clearTimeout(this.wheelGestureTimer);
     this.wheelGestureTimer = setTimeout(() => {
       if (this.destroyed) return;
@@ -324,14 +331,32 @@ export class TimelineHistoryController {
     this.flushHistoryRequest();
   }
 
-  markPointerStart(): void {
+  markPointerStart(button = 0): void {
     if (this.destroyed) return;
+    if (this.activeGesture === 'autoscroll') {
+      this.finishAutoscrollGesture();
+      return;
+    }
+    if (button === AUTOSCROLL_BUTTON) {
+      this.activeGesture = 'autoscroll';
+      this.historyInputArmed = true;
+      return;
+    }
     this.activeGesture = 'press';
   }
 
   markPointerEnd(): void {
     if (this.destroyed) return;
     if (this.activeGesture === 'press') this.activeGesture = 'none';
+  }
+
+  finishAutoscrollGesture(): void {
+    if (this.destroyed) return;
+    if (this.activeGesture !== 'autoscroll') return;
+    this.activeGesture = 'none';
+    this.options.onGestureSettled();
+    this.historyInputArmed = true;
+    this.flushHistoryRequest();
   }
 
   attach(node: HTMLDivElement): () => void {
@@ -348,6 +373,7 @@ export class TimelineHistoryController {
       on(node, 'pointerup', this.pointerEndHandler, { passive: true }),
       on(node, 'pointercancel', this.pointerEndHandler, { passive: true }),
       on(node, 'keydown', this.keyHandler),
+      on(node, 'blur', this.autoscrollEndHandler),
       on(node, 'keyup', this.keyEndHandler),
     ];
 

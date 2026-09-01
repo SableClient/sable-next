@@ -649,3 +649,9 @@ a:not([class]):hover {
     --target-hit: 3rem;
   }
 }
+
+@keyframes sable-skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

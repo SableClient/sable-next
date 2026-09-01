@@ -5,7 +5,7 @@ export type TimelinePosition =
   | { kind: 'focused'; eventId: string };
 
 /** A press is not a scroll, and a context menu can hold one open indefinitely. */
-export type Gesture = 'none' | 'press' | 'wheel' | 'touch' | 'keys';
+export type Gesture = 'none' | 'press' | 'wheel' | 'touch' | 'keys' | 'autoscroll';
 
 export type TimelineEvent =
   | { kind: 'items-changed'; prepended: boolean; appended: boolean }

@@ -16,7 +16,7 @@ const pinned: TimelinePosition = { kind: 'pinned' };
 const anchored: TimelinePosition = { kind: 'anchored', key: 'event:$a', top: 40 };
 const focused: TimelinePosition = { kind: 'focused', eventId: '$target' };
 
-const gesture = fc.constantFrom<Gesture>('none', 'press', 'wheel', 'touch', 'keys');
+const gesture = fc.constantFrom<Gesture>('none', 'press', 'wheel', 'touch', 'keys', 'autoscroll');
 const timelineMode = fc.constantFrom<'live' | 'focused'>('live', 'focused');
 
 const position = fc.oneof(
@@ -310,5 +310,41 @@ describe('isScrolling', () => {
     expect(isScrolling('wheel')).toBe(true);
     expect(isScrolling('touch')).toBe(true);
     expect(isScrolling('keys')).toBe(true);
+  });
+});
+
+describe('autoscroll is a scrolling gesture', () => {
+  test('isScrolling accepts it and rejects a plain press', () => {
+    expect(isScrolling('autoscroll')).toBe(true);
+    expect(isScrolling('press')).toBe(false);
+  });
+
+  test('it leaves follow mode exactly like a wheel notch', () => {
+    const read = (gesture: Gesture): TimelinePosition =>
+      nextPosition(pinned, {
+        kind: 'user-scrolled',
+        timelineMode: 'live',
+        nearLatest: true,
+        movedAway: true,
+        gesture,
+        anchorKey: 'event:$a',
+        anchorTop: 40,
+      });
+    expect(read('autoscroll')).toEqual(read('wheel'));
+    expect(read('autoscroll').kind).toBe('anchored');
+  });
+
+  test('it cannot unpin without moving away', () => {
+    expect(
+      nextPosition(pinned, {
+        kind: 'user-scrolled',
+        timelineMode: 'live',
+        nearLatest: true,
+        movedAway: false,
+        gesture: 'autoscroll',
+        anchorKey: 'event:$a',
+        anchorTop: 40,
+      })
+    ).toEqual(pinned);
   });
 });
