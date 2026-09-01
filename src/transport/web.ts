@@ -9,9 +9,29 @@ import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
 import { on } from 'svelte/events';
 import { recordDebugLog } from '../lib/observability/debug-log.svelte.js';
+import {
+  wasmErrorFingerprint,
+  wasmErrorTitle,
+  wasmLogLevel,
+} from '../lib/observability/wasm-log.js';
 import { resetWebStorage } from '../lib/platform/session-storage.js';
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
+
+const MAX_REPORTED_CORE_ERRORS = 20;
+const reportedCoreErrors = new Set<string>();
+
+function reportCoreError(line: string): void {
+  if (reportedCoreErrors.size >= MAX_REPORTED_CORE_ERRORS) return;
+  const fingerprint = wasmErrorFingerprint(line);
+  if (fingerprint === '' || reportedCoreErrors.has(fingerprint)) return;
+  reportedCoreErrors.add(fingerprint);
+  Sentry.captureMessage(wasmErrorTitle(line), {
+    level: 'error',
+    fingerprint: ['wasm-core-error', fingerprint],
+    tags: { source: 'wasm-core' },
+  });
+}
 
 function requestLabel(request: WorkerRequest): RequestLabel | undefined {
   if ('command' in request) return request.command.type;
@@ -109,12 +129,9 @@ export function createWebTransport(): Transport {
 
       if ('logs' in data) {
         for (const line of data.logs) {
-          const level = line.includes(' ERROR ')
-            ? 'error'
-            : line.includes(' WARN ')
-              ? 'warn'
-              : 'info';
+          const level = wasmLogLevel(line);
           recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', line.trim());
+          if (level === 'error') reportCoreError(line);
         }
         return;
       }
