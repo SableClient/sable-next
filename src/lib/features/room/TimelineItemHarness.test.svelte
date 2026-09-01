@@ -7,6 +7,7 @@
     providePinnedEvents,
     type PinnedEventCommands,
   } from './pinned-events.svelte.js';
+  import MessageContextMenu from './MessageContextMenu.svelte';
   import TimelineItem from './TimelineItem.svelte';
 
   interface Props {
@@ -21,3 +22,4 @@
 </script>
 
 <TimelineItem {...item} />
+<MessageContextMenu />

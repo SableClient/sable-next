@@ -6,7 +6,6 @@ import {
   isNearLatest,
   isScrolling,
   nextPosition,
-  type Gesture,
   type TimelineEvent,
   type TimelinePosition,
 } from './timeline-position';
@@ -16,7 +15,6 @@ const pinned: TimelinePosition = { kind: 'pinned' };
 const anchored: TimelinePosition = { kind: 'anchored', key: 'event:$a', top: 40 };
 const focused: TimelinePosition = { kind: 'focused', eventId: '$target' };
 
-const gesture = fc.constantFrom<Gesture>('none', 'press', 'wheel', 'touch', 'keys', 'autoscroll');
 const timelineMode = fc.constantFrom<'live' | 'focused'>('live', 'focused');
 
 const position = fc.oneof(
@@ -50,7 +48,7 @@ const event = fc.oneof(
     timelineMode,
     nearLatest: fc.boolean(),
     movedAway: fc.boolean(),
-    gesture,
+    byReader: fc.boolean(),
     anchorKey: fc.option(fc.string({ minLength: 1 }), { nil: null }),
     anchorTop: fc.integer({ min: -500, max: 500 }),
   }),
@@ -100,7 +98,7 @@ describe('nextPosition', () => {
         timelineMode: 'live',
         nearLatest: false,
         movedAway: true,
-        gesture: 'wheel',
+        byReader: true,
         anchorKey: 'event:$b',
         anchorTop: 12,
       })
@@ -114,7 +112,7 @@ describe('nextPosition', () => {
         timelineMode: 'live',
         nearLatest: true,
         movedAway: true,
-        gesture: 'wheel',
+        byReader: true,
         anchorKey: 'event:$b',
         anchorTop: 12,
       })
@@ -128,7 +126,7 @@ describe('nextPosition', () => {
         timelineMode: 'live',
         nearLatest: true,
         movedAway: false,
-        gesture: 'wheel',
+        byReader: true,
         anchorKey: 'event:$b',
         anchorTop: 12,
       })
@@ -137,24 +135,24 @@ describe('nextPosition', () => {
 });
 
 describe('properties', () => {
-  test('a press never moves the position where no gesture would not', () => {
+  test('an offset the view wrote itself never moves the position away from the end', () => {
     fc.assert(
       fc.property(
         position,
         fc.boolean(),
         fc.option(fc.string({ minLength: 1 }), { nil: null }),
-        (from, nearLatest, anchorKey) => {
-          const scrolled = (g: Gesture): TimelinePosition =>
+        (from, movedAway, anchorKey) => {
+          expect(
             nextPosition(from, {
               kind: 'user-scrolled',
               timelineMode: 'live',
-              nearLatest,
-              movedAway: false,
-              gesture: g,
+              nearLatest: false,
+              movedAway,
+              byReader: false,
               anchorKey,
               anchorTop: 0,
-            });
-          expect(scrolled('press')).toEqual(scrolled('none'));
+            })
+          ).toEqual(from);
         }
       )
     );
@@ -194,7 +192,7 @@ describe('properties', () => {
         const after = nextPosition(settling, next);
         if (after.kind === 'settling') return;
         if (next.kind === 'user-scrolled') {
-          expect(isScrolling(next.gesture) && (!next.nearLatest || next.movedAway)).toBe(true);
+          expect(next.byReader && (!next.nearLatest || next.movedAway)).toBe(true);
           return;
         }
         expect(['focus-requested', 'fill-finished', 'jump-to-latest']).toContain(next.kind);
@@ -204,14 +202,14 @@ describe('properties', () => {
 
   test('settling is never ended by arriving near the end on its own', () => {
     fc.assert(
-      fc.property(gesture, (g) => {
+      fc.property(fc.boolean(), (byReader) => {
         expect(
           nextPosition(settling, {
             kind: 'user-scrolled',
             timelineMode: 'live',
             nearLatest: true,
             movedAway: false,
-            gesture: g,
+            byReader,
             anchorKey: 'event:$a',
             anchorTop: 0,
           })
@@ -229,16 +227,16 @@ describe('properties', () => {
     );
   });
 
-  test('reaching the live end resumes following without a gesture', () => {
+  test('reaching the live end resumes following however the offset got there', () => {
     fc.assert(
-      fc.property(gesture, (g) => {
+      fc.property(fc.boolean(), (byReader) => {
         expect(
           nextPosition(anchored, {
             kind: 'user-scrolled',
             timelineMode: 'live',
             nearLatest: true,
             movedAway: false,
-            gesture: g,
+            byReader,
             anchorKey: 'event:$a',
             anchorTop: 0,
           })
@@ -247,16 +245,30 @@ describe('properties', () => {
     );
   });
 
+  test('a self-written offset that moves back inside the band does not re-pin', () => {
+    expect(
+      nextPosition(anchored, {
+        kind: 'user-scrolled',
+        timelineMode: 'live',
+        nearLatest: true,
+        movedAway: true,
+        byReader: false,
+        anchorKey: 'event:$a',
+        anchorTop: 0,
+      })
+    ).toEqual(anchored);
+  });
+
   test("a permalink's own end is not the live end", () => {
     fc.assert(
-      fc.property(position, gesture, fc.boolean(), (from, g, nearLatest) => {
+      fc.property(position, fc.boolean(), fc.boolean(), (from, byReader, nearLatest) => {
         expect(
           nextPosition(from, {
             kind: 'user-scrolled',
             timelineMode: 'focused',
             nearLatest,
             movedAway: false,
-            gesture: g,
+            byReader,
             anchorKey: 'event:$a',
             anchorTop: 0,
           })
@@ -318,20 +330,21 @@ describe('autoscroll is a scrolling gesture', () => {
     expect(isScrolling('autoscroll')).toBe(true);
     expect(isScrolling('press')).toBe(false);
   });
+});
 
-  test('it leaves follow mode exactly like a wheel notch', () => {
-    const read = (gesture: Gesture): TimelinePosition =>
+describe('the reader, not the device, leaves follow mode', () => {
+  test('a scrollbar drag reading back anchors like a wheel notch', () => {
+    expect(
       nextPosition(pinned, {
         kind: 'user-scrolled',
         timelineMode: 'live',
-        nearLatest: true,
+        nearLatest: false,
         movedAway: true,
-        gesture,
+        byReader: true,
         anchorKey: 'event:$a',
         anchorTop: 40,
-      });
-    expect(read('autoscroll')).toEqual(read('wheel'));
-    expect(read('autoscroll').kind).toBe('anchored');
+      })
+    ).toEqual({ kind: 'anchored', key: 'event:$a', top: 40 });
   });
 
   test('it cannot unpin without moving away', () => {
@@ -341,7 +354,7 @@ describe('autoscroll is a scrolling gesture', () => {
         timelineMode: 'live',
         nearLatest: true,
         movedAway: false,
-        gesture: 'autoscroll',
+        byReader: true,
         anchorKey: 'event:$a',
         anchorTop: 40,
       })

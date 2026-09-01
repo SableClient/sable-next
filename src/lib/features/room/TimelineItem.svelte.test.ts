@@ -216,6 +216,10 @@ test('edits an own image caption without dropping its media details', async () =
   });
   await tick();
 
+  document
+    .querySelector('.message')
+    ?.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await tick();
   document.querySelector<HTMLButtonElement>('.message-actions button')?.click();
 
   expect(onEdit).toHaveBeenCalledWith('$item', 'caption', null, {
@@ -359,6 +363,34 @@ test('provides a formatted reaction attribution tooltip', async () => {
 
   expect(document.querySelector('.reaction-tooltip')?.textContent).toBe('Alice reacted with 👍');
   vi.useRealTimers();
+  await unmount(instance);
+});
+
+test('mounts the action bar on hover and keeps it while its menu is open', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: { item: item(false), collapsed: false, onReply: vi.fn(), onCopyLink: vi.fn() },
+    },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+  expect(document.querySelector('.message-actions')).toBeNull();
+
+  message.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await tick();
+  expect(document.querySelector('.message-actions')).not.toBeNull();
+
+  document
+    .querySelector<HTMLButtonElement>('.message-actions [data-dropdown-menu-trigger]')
+    ?.click();
+  await tick();
+  message.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true, pointerType: 'mouse' }));
+  await tick();
+  expect(document.querySelector('.message-actions')).not.toBeNull();
+
   await unmount(instance);
 });
 

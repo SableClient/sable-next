@@ -62,6 +62,11 @@ export class TimelineAnchor {
     return null;
   }
 
+  shift(delta: number): void {
+    this.#candidates = this.#candidates.map(({ key, top }) => ({ key, top: top + delta }));
+    if (this.#resolved) this.#resolved = { ...this.#resolved, top: this.#resolved.top + delta };
+  }
+
   release(): void {
     this.#candidates = [];
     this.#resolved = null;

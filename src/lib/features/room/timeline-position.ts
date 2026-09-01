@@ -17,7 +17,7 @@ export type TimelineEvent =
       nearLatest: boolean;
       /** The offset moved back through the timeline. */
       movedAway: boolean;
-      gesture: Gesture;
+      byReader: boolean;
       anchorKey: string | null;
       anchorTop: number;
     }
@@ -63,14 +63,15 @@ export function nextPosition(current: TimelinePosition, event: TimelineEvent): T
       if (event.timelineMode !== 'live') return current;
       // The band that counts as the end is wide enough to read a message
       // inside, so reading back within it is not an arrival at the end.
-      if (event.nearLatest && !(event.movedAway && isScrolling(event.gesture))) {
+      if (event.nearLatest && !(event.movedAway && event.byReader)) {
         // The fill rescrolls to the end until it settles, so arriving there
         // proves nothing about the reader.
         if (current.kind === 'settling') return current;
-        if (current.kind === 'focused' && !isScrolling(event.gesture)) return current;
+        if (current.kind === 'focused' && !event.byReader) return current;
+        if (current.kind === 'anchored' && event.movedAway && !event.byReader) return current;
         return { kind: 'pinned' };
       }
-      if (!isScrolling(event.gesture)) return current;
+      if (!event.byReader) return current;
       return event.anchorKey === null
         ? current
         : { kind: 'anchored', key: event.anchorKey, top: event.anchorTop };

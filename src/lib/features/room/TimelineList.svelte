@@ -39,7 +39,6 @@
   import {
     initialPosition,
     isNearLatest,
-    isScrolling,
     nextPosition,
     type TimelinePosition,
   } from './timeline-position';
@@ -52,6 +51,7 @@
     visibleTimelineItems,
   } from './timeline-format';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import MessageContextMenu from './MessageContextMenu.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
   import TypingIndicator from './TypingIndicator.svelte';
 
@@ -217,8 +217,6 @@
 
   let anchorHolding = false;
   let anchorCorrecting = false;
-  /** Abandoning a hold still has to tear it down, so the id stays addressable. */
-  let anchorAbandoned = false;
   let anchorHoldSequence = 0;
   let activeHoldId: number | null = null;
   function anchorRolling(): boolean {
@@ -310,7 +308,6 @@
     const offset = instance.scrollOffset;
     if (offset === null || item.start >= offset) return false;
     if (instance.itemSizeCache.has(item.key) && item.end > offset) return false;
-    // `onScroll` abandons a held anchor for any offset it did not write itself.
     const from = viewport?.scrollTop ?? offset;
     expectedSelfOffset = from + delta;
     recordScroll('virtualizer:resize', from, expectedSelfOffset);
@@ -454,10 +451,9 @@
     const holdId = (anchorHoldSequence += 1);
     activeHoldId = holdId;
     anchorHolding = true;
-    anchorAbandoned = false;
     historyController.suspendForAnchor();
     void (async () => {
-      const owns = (): boolean => activeHoldId === holdId && !anchorAbandoned;
+      const owns = (): boolean => activeHoldId === holdId;
       await tick();
       if (!owns()) {
         finishHold(holdId, 0);
@@ -519,12 +515,6 @@
     } finally {
       anchorCorrecting = false;
     }
-  }
-
-  function releaseAnchor(): void {
-    if (!anchorHolding) return;
-    anchorAbandoned = true;
-    anchor.release();
   }
 
   let commitDeferred = false;
@@ -878,24 +868,21 @@
   let previousScrollTop = 0;
   function onScroll(): void {
     if (!viewport) return;
-    const wasSelfScroll =
-      expectedSelfOffset !== null &&
-      Math.abs(viewport.scrollTop - expectedSelfOffset) <= ANCHOR_EPSILON;
+    const userDelta = viewport.scrollTop - (expectedSelfOffset ?? previousScrollTop);
     expectedSelfOffset = null;
-    // Holding an anchor against the user is worse than losing it.
-    if (!wasSelfScroll && historyController.hasUserScrollPending) releaseAnchor();
+    if (anchorHolding && Math.abs(userDelta) > ANCHOR_EPSILON) anchor.shift(-userDelta);
     nearLatest = isNearLatest(viewport, nearLatestPx);
     refreshAtLatest();
-    const movedAway = viewport.scrollTop < previousScrollTop;
+    const byReader = Math.abs(userDelta) > ANCHOR_EPSILON;
+    const movedAway = !atLatest && viewport.scrollTop < previousScrollTop;
     previousScrollTop = viewport.scrollTop;
-    const gesture = historyController.gesture;
-    refreshRollingAnchor(movedAway && isScrolling(gesture));
+    refreshRollingAnchor(movedAway && byReader);
     const next = nextPosition(position, {
       kind: 'user-scrolled',
       timelineMode: timeline.mode.kind,
       nearLatest,
       movedAway,
-      gesture,
+      byReader,
       anchorKey: anchor.held?.key ?? null,
       anchorTop: anchor.held?.top ?? 0,
     });
@@ -997,6 +984,7 @@
 <svelte:window onvisibilitychange={refreshAfterVisibilityChange} />
 
 <TimelineReadReceipt {timeline} visibleEventId={readEventId} {onRead} />
+<MessageContextMenu />
 
 {#if timeline.error}
   <Alert class="timeline-error" variant="critical" role="alert"

@@ -302,7 +302,7 @@ test('does not read a viewport removed during initial positioning', async () => 
   await runAnimationFrames();
 });
 
-test('does not leave follow mode for a virtualizer scroll correction', async () => {
+test('leaves follow mode for a scroll it did not write, whatever produced it', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   roomTimeline.backwardPagination = 'end';
@@ -331,7 +331,7 @@ test('does not leave follow mode for a virtualizer scroll correction', async () 
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(document.querySelector('.jump-to-latest')).toBeNull();
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
   expect(history).not.toHaveBeenCalled();
   await unmount(instance);
 });
@@ -833,7 +833,7 @@ test('middle-button autoscroll leaves follow mode', async () => {
   await unmount(instance);
 });
 
-test('a plain left-button press does not leave follow mode', async () => {
+test('a scrollbar drag leaves follow mode like any other reading back', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element, end } = await mountLive(roomTimeline);
@@ -843,7 +843,7 @@ test('a plain left-button press does not leave follow mode', async () => {
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(anchored()).toBe(false);
+  expect(anchored()).toBe(true);
   await unmount(instance);
 });
 

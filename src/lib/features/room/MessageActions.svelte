@@ -17,6 +17,7 @@
     onViewReactions?: () => void;
     onReadReceipts?: () => void;
     onPickerOpenChange?: (open: boolean) => void;
+    onOverflowOpenChange?: (open: boolean) => void;
     onReply?: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
@@ -30,6 +31,7 @@
     onViewReactions,
     onReadReceipts,
     onPickerOpenChange,
+    onOverflowOpenChange,
     onReply,
     onEdit,
     onDelete,
@@ -80,7 +82,7 @@
     </IconButton>
   {/if}
   {#if hasOverflow}
-    <DropdownMenu.Root>
+    <DropdownMenu.Root onOpenChange={onOverflowOpenChange}>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
           <IconButton

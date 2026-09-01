@@ -91,6 +91,21 @@ describe('TimelineAnchor', () => {
     expect(viewport.topOf('row-8')).toBe(before);
   });
 
+  test('a hold keeps a scroll the reader made while the prepend was landing', () => {
+    const viewport = new FakeViewport(rows(20, 50), 400);
+    viewport.scrollTop = 300;
+    const anchor = new TimelineAnchor(() => viewport);
+    const before = viewport.topOf('row-8');
+
+    anchor.capture();
+    viewport.scrollBy(-120);
+    anchor.shift(120);
+    viewport.prepend(rows(25, 137, 'history'));
+
+    expect(anchor.restore()).toBe(0);
+    expect(viewport.topOf('row-8')).toBe((before ?? 0) + 120);
+  });
+
   test('a stationary correction puts back content that moved under the reader', () => {
     const viewport = new FakeViewport(rows(20, 50), 400);
     viewport.scrollTop = 300;

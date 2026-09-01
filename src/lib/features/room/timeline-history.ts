@@ -106,10 +106,6 @@ export class TimelineHistoryController {
     return this.activeGesture;
   }
 
-  get hasUserScrollPending(): boolean {
-    return this.activeGesture !== 'none';
-  }
-
   get isScrollGestureActive(): boolean {
     return isScrolling(this.activeGesture);
   }

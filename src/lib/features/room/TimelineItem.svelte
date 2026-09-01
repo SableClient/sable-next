@@ -1,6 +1,5 @@
 <script lang="ts">
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
-  import { ContextMenu } from 'bits-ui';
   import { onDestroy } from 'svelte';
 
   import type { MemberView } from '#src/generated/MemberView';
@@ -33,16 +32,13 @@
   import TimelineNotice from './TimelineNotice.svelte';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
-  import IconContext from 'phosphor-svelte/lib/IconContext';
 
-  import MessageQuickReactions from './MessageQuickReactions.svelte';
   import MessageForwardDialog from './MessageForwardDialog.svelte';
   import MessageReportDialog from './MessageReportDialog.svelte';
   import MessageSourceDialog from './MessageSourceDialog.svelte';
   import ReactionSheet from './ReactionSheet.svelte';
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import { useBookmarks } from './bookmarks.svelte.js';
-  import { messageMenuRows } from './message-menu-items';
   import { openMessageMenu } from './message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
   import PersonaProfile from './PersonaProfile.svelte';
@@ -427,9 +423,35 @@
     onPress: () => (sheetOpen = true),
   });
 
-  function suppressTouchContextMenu(event: MouseEvent): void {
-    if (!rowPress.touch) return;
+  let engaged = $state(false);
+  let actionsPinned = $state(false);
+
+  function engage(): void {
+    engaged = true;
+  }
+
+  function disengage(event: FocusEvent | PointerEvent): void {
+    if (event instanceof FocusEvent && event.relatedTarget instanceof Node) {
+      if (messageRow?.contains(event.relatedTarget)) return;
+    } else if (!(event instanceof FocusEvent) && messageRow?.matches(':focus-within')) {
+      return;
+    }
+    engaged = false;
+  }
+
+  function pinActions(open: boolean): void {
+    actionsPinned = open;
+    onPersonaOpenChange?.(open);
+  }
+
+  function openContextMenu(event: MouseEvent): void {
+    if (rowPress.touch) {
+      event.preventDefault();
+      return;
+    }
+    if (!actionable) return;
     event.preventDefault();
+    openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => actions);
   }
 
   $effect(() => {
@@ -492,121 +514,187 @@
     </div>
   </article>
 {:else if isMessageRow(item.content)}
-  <ContextMenu.Root
-    bind:open={
-      () => openMessageMenu.isOpen(item.id),
-      (open: boolean) => {
-        openMessageMenu.set(item.id, open);
-      }
-    }
+  <article
+    bind:this={messageRow}
+    class={[
+      'message',
+      `layout-${layout}`,
+      {
+        collapsed,
+        pending,
+        highlighted,
+        selected,
+        persona: personaTint,
+        own: item.is_own,
+        'mention-silent': item.mention === 'silent',
+        'mention-loud': item.mention === 'loud',
+      },
+    ]}
+    style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
+    style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
+    style:--name-color-on-light={nameColorLight ?? undefined}
+    style:--name-color-on-dark={nameColorDark ?? undefined}
+    style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
+    style:transition={swipe.dragging ? 'none' : undefined}
+    onpointerdown={rowPress.start}
+    onpointermove={rowPress.move}
+    onpointerup={rowPress.end}
+    onpointercancel={rowPress.end}
+    onpointerenter={engage}
+    onpointerleave={disengage}
+    onfocusin={engage}
+    onfocusout={disengage}
+    oncontextmenu={openContextMenu}
+    {@attach swipe.attach}
   >
-    <ContextMenu.Trigger disabled={!actionable || rowPress.touch}>
-      <article
-        bind:this={messageRow}
-        class={[
-          'message',
-          `layout-${layout}`,
-          {
-            collapsed,
-            pending,
-            highlighted,
-            selected,
-            persona: personaTint,
-            own: item.is_own,
-            'mention-silent': item.mention === 'silent',
-            'mention-loud': item.mention === 'loud',
-          },
-        ]}
-        style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
-        style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
-        style:--name-color-on-light={nameColorLight ?? undefined}
-        style:--name-color-on-dark={nameColorDark ?? undefined}
-        style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
-        style:transition={swipe.dragging ? 'none' : undefined}
-        onpointerdown={rowPress.start}
-        onpointermove={rowPress.move}
-        onpointerup={rowPress.end}
-        onpointercancel={rowPress.end}
-        oncontextmenu={suppressTouchContextMenu}
-        {@attach swipe.attach}
+    {#if swipe.offset > 0}
+      <div
+        class="swipe-action"
+        class:armed={swipe.action !== 'none'}
+        aria-hidden="true"
+        style:width={`${String(swipe.offset)}px`}
+        style:transform={`translateX(${String(swipe.offset)}px)`}
       >
-        {#if swipe.offset > 0}
-          <div
-            class="swipe-action"
-            class:armed={swipe.action !== 'none'}
-            aria-hidden="true"
-            style:width={`${String(swipe.offset)}px`}
-            style:transform={`translateX(${String(swipe.offset)}px)`}
+        {#if swipe.action === 'edit'}
+          <PencilSimpleIcon weight="bold" />
+        {:else}
+          <ReplyIcon weight="bold" />
+        {/if}
+      </div>
+    {/if}
+    {#if actionable && (engaged || actionsPinned)}
+      <MessageActions
+        {roomId}
+        onPickerOpenChange={pinActions}
+        onOverflowOpenChange={pinActions}
+        {...actions}
+      />
+    {/if}
+    {#if actionable}
+      {#if sourceOpen}
+        <MessageSourceDialog bind:open={sourceOpen} {source} />
+      {/if}
+      {#if reportOpen}
+        <MessageReportDialog bind:open={reportOpen} onReport={report} />
+      {/if}
+      {#if forwardOpen}
+        <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
+      {/if}
+      {#if reproxyOpen}
+        <MessageReproxyDialog
+          bind:open={reproxyOpen}
+          personas={personaStore.personas}
+          current={item.per_message_profile}
+          onChoose={(next) => void reproxy(next)}
+        />
+      {/if}
+      {#if emoteOpen}
+        <ReactionSheet
+          bind:open={emoteOpen}
+          {roomId}
+          onPick={(key: string) => {
+            onToggleReaction?.(item.event_id ?? '', key);
+          }}
+        />
+      {/if}
+      {#if sheetOpen}
+        <MessageActionSheet
+          bind:open={sheetOpen}
+          preview={item.content.kind === 'message' ? item.content.body : null}
+          {...actions}
+        />
+      {/if}
+      {#if deleteOpen}
+        <DeleteMessageDialog
+          bind:open={deleteOpen}
+          preview={item.content.kind === 'message' ? item.content.body : null}
+          onConfirm={confirmDelete}
+        />
+      {/if}
+      {#if reactionsOpen}
+        <ReactionsDialog
+          bind:open={reactionsOpen}
+          bind:active={reactionActive}
+          reactions={item.reactions}
+          {members}
+        />
+      {/if}
+      {#if receiptsOpen}
+        <ReceiptsDialog bind:open={receiptsOpen} readers={receiptReaders} {members} />
+      {/if}
+    {/if}
+    {#if layout === 'compact'}
+      <div class="compact-gutter">
+        <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time>
+        {#if onMentionUser && item.sender && !collapsed}
+          <button
+            class="compact-name name-button"
+            class:tinted={nameTinted}
+            style:color={nameTinted ? undefined : nameColor}
+            type="button"
+            aria-label={$i18n.t('timeline.mentionSender', { name: senderName })}
+            onclick={mentionSender}>{senderName}</button
           >
-            {#if swipe.action === 'edit'}
-              <PencilSimpleIcon weight="bold" />
-            {:else}
-              <ReplyIcon weight="bold" />
-            {/if}
-          </div>
+        {:else}
+          <span
+            class="compact-name"
+            class:tinted={nameTinted}
+            style:color={nameTinted ? undefined : nameColor}
+          >
+            {collapsed ? '' : senderName}
+          </span>
         {/if}
-        {#if actionable}
-          <MessageActions {roomId} onPickerOpenChange={onPersonaOpenChange} {...actions} />
-          {#if sourceOpen}
-            <MessageSourceDialog bind:open={sourceOpen} {source} />
-          {/if}
-          {#if reportOpen}
-            <MessageReportDialog bind:open={reportOpen} onReport={report} />
-          {/if}
-          {#if forwardOpen}
-            <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
-          {/if}
-          {#if reproxyOpen}
-            <MessageReproxyDialog
-              bind:open={reproxyOpen}
-              personas={personaStore.personas}
-              current={item.per_message_profile}
-              onChoose={(next) => void reproxy(next)}
-            />
-          {/if}
-          {#if emoteOpen}
-            <ReactionSheet
-              bind:open={emoteOpen}
-              {roomId}
-              onPick={(key: string) => {
-                onToggleReaction?.(item.event_id ?? '', key);
-              }}
-            />
-          {/if}
-          {#if sheetOpen}
-            <MessageActionSheet
-              bind:open={sheetOpen}
-              preview={item.content.kind === 'message' ? item.content.body : null}
-              {...actions}
-            />
-          {/if}
-          {#if deleteOpen}
-            <DeleteMessageDialog
-              bind:open={deleteOpen}
-              preview={item.content.kind === 'message' ? item.content.body : null}
-              onConfirm={confirmDelete}
-            />
-          {/if}
-          {#if reactionsOpen}
-            <ReactionsDialog
-              bind:open={reactionsOpen}
-              bind:active={reactionActive}
-              reactions={item.reactions}
-              {members}
-            />
-          {/if}
-          {#if receiptsOpen}
-            <ReceiptsDialog bind:open={receiptsOpen} readers={receiptReaders} {members} />
-          {/if}
-        {/if}
-        {#if layout === 'compact'}
-          <div class="compact-gutter">
-            <time datetime={new Date(item.timestamp).toISOString()}
-              >{formatTime(item.timestamp)}</time
-            >
-            {#if onMentionUser && item.sender && !collapsed}
+      </div>
+    {:else if !collapsed}
+      {#if persona && item.sender}
+        <PersonaProfile
+          profile={persona}
+          accountId={item.sender}
+          {accountName}
+          label={$i18n.t('timeline.personaProfile', { name: senderName })}
+          onOpenAccount={openAccountFromPersona}
+          onOpenChange={onPersonaOpenChange}
+        >
+          <Avatar
+            class="message-avatar"
+            src={senderAvatar}
+            size="small"
+            color={senderAvatar ? undefined : avatarColor}
+            name={senderName}
+          />
+        </PersonaProfile>
+      {:else if item.sender && onSenderProfile}
+        <button
+          class="avatar-button"
+          type="button"
+          aria-label={$i18n.t('timeline.senderProfile', { name: senderName })}
+          onclick={openSenderProfile}
+        >
+          <Avatar
+            class="message-avatar"
+            src={senderAvatar}
+            size="small"
+            color={senderAvatar ? undefined : avatarColor}
+            name={senderName}
+          />
+        </button>
+      {:else}
+        <Avatar
+          class="message-avatar"
+          src={senderAvatar}
+          size="small"
+          color={senderAvatar ? undefined : avatarColor}
+          name={senderName}
+        />
+      {/if}
+    {/if}
+    <div class="message-content">
+      {#if !collapsed && layout !== 'compact'}
+        <header>
+          {#if !emote}
+            {#if onMentionUser && item.sender}
               <button
-                class="compact-name name-button"
+                class="sender name-button"
                 class:tinted={nameTinted}
                 style:color={nameTinted ? undefined : nameColor}
                 type="button"
@@ -615,288 +703,192 @@
               >
             {:else}
               <span
-                class="compact-name"
+                class="sender"
                 class:tinted={nameTinted}
                 style:color={nameTinted ? undefined : nameColor}
               >
-                {collapsed ? '' : senderName}
+                {senderName}
               </span>
             {/if}
-          </div>
-        {:else if !collapsed}
-          {#if persona && item.sender}
-            <PersonaProfile
-              profile={persona}
-              accountId={item.sender}
-              {accountName}
-              label={$i18n.t('timeline.personaProfile', { name: senderName })}
-              onOpenAccount={openAccountFromPersona}
-              onOpenChange={onPersonaOpenChange}
-            >
-              <Avatar
-                class="message-avatar"
-                src={senderAvatar}
-                size="small"
-                color={senderAvatar ? undefined : avatarColor}
-                name={senderName}
-              />
-            </PersonaProfile>
-          {:else if item.sender && onSenderProfile}
-            <button
-              class="avatar-button"
-              type="button"
-              aria-label={$i18n.t('timeline.senderProfile', { name: senderName })}
-              onclick={openSenderProfile}
-            >
-              <Avatar
-                class="message-avatar"
-                src={senderAvatar}
-                size="small"
-                color={senderAvatar ? undefined : avatarColor}
-                name={senderName}
-              />
-            </button>
-          {:else}
-            <Avatar
-              class="message-avatar"
-              src={senderAvatar}
-              size="small"
-              color={senderAvatar ? undefined : avatarColor}
-              name={senderName}
-            />
           {/if}
+          {#each pronouns.visible as pronoun, index (index)}
+            <PronounPill
+              lang={pronoun.language ?? undefined}
+              class={['timeline-pronoun', { tinted: nameTinted }]}
+              style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
+              >{pronoun.summary}</PronounPill
+            >
+          {/each}
+          {#if pronouns.overflow.length > 0}
+            <PronounPill
+              class={['timeline-pronoun', { tinted: nameTinted }]}
+              style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
+              title={formatPronouns(pronouns.overflow)}
+              >{$i18n.t('timeline.morePronouns', {
+                count: pronouns.overflow.length,
+              })}</PronounPill
+            >
+          {/if}
+          <div class="message-details">
+            {#if item.sender}
+              <button
+                class={!persona ? 'via via-hidden' : 'via'}
+                type="button"
+                aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
+                onclick={openSenderProfile}>{persona ? accountName : item.sender}</button
+              >
+            {/if}
+            <time datetime={new Date(item.timestamp).toISOString()}
+              >{formatTime(item.timestamp)}</time
+            >
+          </div>
+        </header>
+      {/if}
+      <div class="message-main">
+        {#if item.in_reply_to}
+          {@const tint = personaWithColor(replyPersona)}
+          {@const target = item.in_reply_to.event_id}
+          <button
+            class={['reply-preview', { persona: tint }]}
+            type="button"
+            style:--pmp-on-light={tint?.color_on_light ?? undefined}
+            style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+            onclick={() => {
+              onJumpToEvent?.(target);
+            }}
+          >
+            <ReplyIcon class="reply-icon" />
+            <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
+          </button>
         {/if}
-        <div class="message-content">
-          {#if !collapsed && layout !== 'compact'}
-            <header>
-              {#if !emote}
-                {#if onMentionUser && item.sender}
-                  <button
-                    class="sender name-button"
-                    class:tinted={nameTinted}
-                    style:color={nameTinted ? undefined : nameColor}
-                    type="button"
-                    aria-label={$i18n.t('timeline.mentionSender', { name: senderName })}
-                    onclick={mentionSender}>{senderName}</button
-                  >
-                {:else}
-                  <span
-                    class="sender"
-                    class:tinted={nameTinted}
-                    style:color={nameTinted ? undefined : nameColor}
-                  >
-                    {senderName}
-                  </span>
-                {/if}
-              {/if}
-              {#each pronouns.visible as pronoun, index (index)}
-                <PronounPill
-                  lang={pronoun.language ?? undefined}
-                  class={['timeline-pronoun', { tinted: nameTinted }]}
-                  style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
-                  >{pronoun.summary}</PronounPill
-                >
-              {/each}
-              {#if pronouns.overflow.length > 0}
-                <PronounPill
-                  class={['timeline-pronoun', { tinted: nameTinted }]}
-                  style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
-                  title={formatPronouns(pronouns.overflow)}
-                  >{$i18n.t('timeline.morePronouns', {
-                    count: pronouns.overflow.length,
-                  })}</PronounPill
-                >
-              {/if}
-              <div class="message-details">
-                {#if item.sender}
-                  <button
-                    class={!persona ? 'via via-hidden' : 'via'}
-                    type="button"
-                    aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
-                    onclick={openSenderProfile}>{persona ? accountName : item.sender}</button
-                  >
-                {/if}
-                <time datetime={new Date(item.timestamp).toISOString()}
-                  >{formatTime(item.timestamp)}</time
-                >
-              </div>
-            </header>
-          {/if}
-          <div class="message-main">
-            {#if item.in_reply_to}
-              {@const tint = personaWithColor(replyPersona)}
-              {@const target = item.in_reply_to.event_id}
-              <button
-                class={['reply-preview', { persona: tint }]}
-                type="button"
-                style:--pmp-on-light={tint?.color_on_light ?? undefined}
-                style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
-                onclick={() => {
-                  onJumpToEvent?.(target);
-                }}
-              >
-                <ReplyIcon class="reply-icon" />
-                <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
-              </button>
-            {/if}
-            {#if item.content.kind === 'message' && item.content.emote}
-              <div class="emote">
-                <span
-                  class="sender"
-                  class:tinted={nameTinted}
-                  style:color={nameTinted ? undefined : nameColor}>* {senderName}</span
-                >
-                <FormattedBody html={item.content.html} {onMatrixLink} />
-              </div>
-            {:else if item.content.kind === 'message'}
-              <div
-                class={[
-                  jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
-                  { notice, 'has-edited': item.content.edited },
-                ]}
-              >
-                <FormattedBody html={item.content.html} {onMatrixLink} />
-                <!-- Trails the body, where the edit happened, not the header. -->
-                {#if item.content.edited}
-                  <span class="edited">{$i18n.t('timeline.edited')}</span>
-                {/if}
-              </div>
-              {@const previewUrl = firstPreviewableLink(item.content.html)}
-              {#if previewUrl}
-                <LinkPreviewCard url={previewUrl} />
-              {/if}
-            {:else}
-              <MessageBody
-                {item}
-                {members}
-                {canRedactOthers}
-                {onMatrixLink}
-                {onOpenMedia}
-                {onVotePoll}
-                {onEndPoll}
-              />
-            {/if}
-            {#if threadSummary && onOpenThread && threadTarget}
-              {@const target = threadTarget}
-              <button
-                type="button"
-                class="thread-summary"
-                onclick={() => {
-                  onOpenThread(target);
-                }}
-              >
-                <ThreadIcon size={14} aria-hidden="true" />
-                <span class="thread-count"
-                  >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
-                >
-                {#if threadSummary.latest_body}
-                  <span class="thread-latest">{threadSummary.latest_body}</span>
-                {/if}
-              </button>
-            {:else if item.thread_root && onOpenThread}
-              {@const target = item.thread_root}
-              <button
-                type="button"
-                class="thread-summary"
-                onclick={() => {
-                  onOpenThread(target);
-                }}
-              >
-                <ThreadIcon size={14} aria-hidden="true" />
-                <span class="thread-count">{$i18n.t('timeline.thread')}</span>
-              </button>
-            {/if}
-            {#if item.reactions.length > 0}
-              <MessageReactions
-                reactions={item.reactions}
-                eventId={item.event_id}
-                {currentUserId}
-                {members}
-                {roomId}
-                {actionable}
-                onReact={actions.onReact}
-                {onToggleReaction}
-                onViewReactions={(index: number) => {
-                  reactionActive = index;
-                  reactionsOpen = true;
-                }}
-              />
-            {/if}
-            {#if upload}
-              <progress
-                class="upload"
-                max={upload.total}
-                value={upload.current}
-                aria-label={$i18n.t('timeline.uploading')}
-              ></progress>
-            {/if}
-            {#if stalled}
-              <p class="send-failure">
-                <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
-                {#if item.transaction_id}
-                  {@const transactionId = item.transaction_id}
-                  <button
-                    type="button"
-                    onclick={() => {
-                      onRetrySend?.(transactionId);
-                    }}
-                  >
-                    {$i18n.t('timeline.retrySend')}
-                  </button>
-                  <button
-                    type="button"
-                    onclick={() => {
-                      onCancelSend?.(transactionId);
-                    }}
-                  >
-                    {$i18n.t('timeline.cancelSend')}
-                  </button>
-                {/if}
-              </p>
+        {#if item.content.kind === 'message' && item.content.emote}
+          <div class="emote">
+            <span
+              class="sender"
+              class:tinted={nameTinted}
+              style:color={nameTinted ? undefined : nameColor}>* {senderName}</span
+            >
+            <FormattedBody html={item.content.html} {onMatrixLink} />
+          </div>
+        {:else if item.content.kind === 'message'}
+          <div
+            class={[
+              jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
+              { notice, 'has-edited': item.content.edited },
+            ]}
+          >
+            <FormattedBody html={item.content.html} {onMatrixLink} />
+            <!-- Trails the body, where the edit happened, not the header. -->
+            {#if item.content.edited}
+              <span class="edited">{$i18n.t('timeline.edited')}</span>
             {/if}
           </div>
-          {#if actionable && showReceiptBadge}
-            <ReadReceiptStack
-              readers={receiptReaders}
-              {members}
-              expanded={receiptsOpen}
-              onOpen={() => {
-                receiptsOpen = true;
-              }}
-            />
+          {@const previewUrl = firstPreviewableLink(item.content.html)}
+          {#if previewUrl}
+            <LinkPreviewCard url={previewUrl} />
           {/if}
-        </div>
-      </article>
-    </ContextMenu.Trigger>
-    {#if actionable}
-      <ContextMenu.Portal>
-        <ContextMenu.Content class="sable-menu message-menu" loop collisionPadding={8}>
-          <IconContext values={{ 'aria-hidden': 'true' }}>
-            {#if actions.onReact}
-              {@const react = actions.onReact}
-              <MessageQuickReactions count={4} onReact={react} />
+        {:else}
+          <MessageBody
+            {item}
+            {members}
+            {canRedactOthers}
+            {onMatrixLink}
+            {onOpenMedia}
+            {onVotePoll}
+            {onEndPoll}
+          />
+        {/if}
+        {#if threadSummary && onOpenThread && threadTarget}
+          {@const target = threadTarget}
+          <button
+            type="button"
+            class="thread-summary"
+            onclick={() => {
+              onOpenThread(target);
+            }}
+          >
+            <ThreadIcon size={14} aria-hidden="true" />
+            <span class="thread-count"
+              >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
+            >
+            {#if threadSummary.latest_body}
+              <span class="thread-latest">{threadSummary.latest_body}</span>
             {/if}
-            {#each messageMenuRows(actions) as row (row.key)}
-              {@const RowIcon = row.icon}
-              {#if row.separated}
-                <ContextMenu.Separator class="sable-menu-separator" />
-              {/if}
-              <ContextMenu.Item
-                class={[
-                  'sable-menu-item sable-menu-item-trailing-icon',
-                  row.destructive && 'sable-menu-item-destructive',
-                ]}
-                onclick={row.run}
+          </button>
+        {:else if item.thread_root && onOpenThread}
+          {@const target = item.thread_root}
+          <button
+            type="button"
+            class="thread-summary"
+            onclick={() => {
+              onOpenThread(target);
+            }}
+          >
+            <ThreadIcon size={14} aria-hidden="true" />
+            <span class="thread-count">{$i18n.t('timeline.thread')}</span>
+          </button>
+        {/if}
+        {#if item.reactions.length > 0}
+          <MessageReactions
+            reactions={item.reactions}
+            eventId={item.event_id}
+            {currentUserId}
+            {members}
+            {roomId}
+            {actionable}
+            onReact={actions.onReact}
+            {onToggleReaction}
+            onViewReactions={(index: number) => {
+              reactionActive = index;
+              reactionsOpen = true;
+            }}
+          />
+        {/if}
+        {#if upload}
+          <progress
+            class="upload"
+            max={upload.total}
+            value={upload.current}
+            aria-label={$i18n.t('timeline.uploading')}
+          ></progress>
+        {/if}
+        {#if stalled}
+          <p class="send-failure">
+            <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
+            {#if item.transaction_id}
+              {@const transactionId = item.transaction_id}
+              <button
+                type="button"
+                onclick={() => {
+                  onRetrySend?.(transactionId);
+                }}
               >
-                <RowIcon />
-                <span>{$i18n.t(row.label)}</span>
-              </ContextMenu.Item>
-            {/each}
-          </IconContext>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    {/if}
-  </ContextMenu.Root>
+                {$i18n.t('timeline.retrySend')}
+              </button>
+              <button
+                type="button"
+                onclick={() => {
+                  onCancelSend?.(transactionId);
+                }}
+              >
+                {$i18n.t('timeline.cancelSend')}
+              </button>
+            {/if}
+          </p>
+        {/if}
+      </div>
+      {#if actionable && showReceiptBadge}
+        <ReadReceiptStack
+          readers={receiptReaders}
+          {members}
+          expanded={receiptsOpen}
+          onOpen={() => {
+            receiptsOpen = true;
+          }}
+        />
+      {/if}
+    </div>
+  </article>
 {:else}
   <TimelineNotice {item} {unreadCount} {onSenderProfile} />
 {/if}
