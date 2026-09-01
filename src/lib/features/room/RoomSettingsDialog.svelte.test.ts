@@ -13,6 +13,7 @@ const coreStub = vi.hoisted(() => {
     roomStateEvent: vi.fn(),
     roomAliases: vi.fn(),
     roomDirectoryVisibility: vi.fn(),
+    roomHasSpaceParent: vi.fn(),
   };
 
   return Object.assign(stub, { commands: stub });
@@ -46,7 +47,8 @@ const room: RoomSummary = {
   is_tombstoned: false,
   is_voice: false,
   call_participants: [],
-  has_space_parent: false,
+  room_type: null,
+  notification_mode: null,
   supports_knock: true,
   supports_restricted: true,
   supports_knock_restricted: true,
@@ -93,11 +95,12 @@ async function render(
   coreStub.roomStateEvent.mockResolvedValue(null);
   coreStub.roomAliases.mockResolvedValue([]);
   coreStub.roomDirectoryVisibility.mockResolvedValue(false);
+  coreStub.roomHasSpaceParent.mockResolvedValue(hasSpaceParent);
   const instance = mount(RoomSettingsDialog, {
     target: document.body,
     props: {
       open: true,
-      room: { ...room, has_space_parent: hasSpaceParent },
+      room,
       onOpenChange: () => {},
     },
   });

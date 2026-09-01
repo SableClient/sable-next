@@ -116,7 +116,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_tombstoned: false,
       is_voice: false,
       call_participants: [],
-      has_space_parent: false,
+      room_type: null,
+      notification_mode: null,
       supports_knock: false,
       supports_restricted: false,
       supports_knock_restricted: false,
@@ -785,6 +786,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           events: content ? [{ state_key: WIDGET_STATE_KEY, content }] : [],
         };
       },
+      room_has_space_parent: () => ({
+        type: 'room_has_space_parent',
+        has_space_parent: false,
+      }),
       url_preview: (command) => ({
         type: 'url_preview',
         preview:

@@ -9,7 +9,9 @@ use matrix_sdk_ui::room_list_service::filters::{
     new_filter_all, new_filter_deduplicate_versions, new_filter_non_left,
 };
 
-use crate::protocol::{CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView};
+use crate::protocol::{
+    CommandErr, CommandOk, CoreEvent, SpaceChildEdge, SubscriptionId, TimelineFocusView,
+};
 
 use crate::timelines::{build_room_timeline, fill_sender_profiles};
 use crate::view;
@@ -35,15 +37,6 @@ impl Core {
         let subscription = self.allocate_subscription();
         let core = self.clone();
 
-        let client = {
-            let guard = self.session.read().await;
-            guard
-                .as_ref()
-                .ok_or(CommandErr::NotLoggedIn)?
-                .client
-                .clone()
-        };
-
         let task = spawn(async move {
             let room_list = match sync_service.room_list_service().all_rooms().await {
                 Ok(room_list) => room_list,
@@ -60,8 +53,7 @@ impl Core {
                 Box::new(new_filter_deduplicate_versions()),
             ])));
 
-            // Stable over a stream's life, so resolved once per room.
-            let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();
+            let mut space_children: HashMap<OwnedRoomId, Vec<SpaceChildEdge>> = HashMap::new();
 
             let mut stream = Box::pin(stream);
             let mut grown_to = 0;
@@ -79,14 +71,14 @@ impl Core {
 
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
-                    view::enrich_room_fields(&client, diff, &mut room_cache).await;
+                    view::refresh_space_children(diff, &mut space_children).await;
                 }
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
                     diffs: diffs
                         .into_iter()
                         .map(|diff| {
-                            view::map_diff(diff, |item| view::room_summary(item, &room_cache))
+                            view::map_diff(diff, |item| view::room_summary(item, &space_children))
                         })
                         .collect(),
                 });
