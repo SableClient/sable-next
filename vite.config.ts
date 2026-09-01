@@ -12,6 +12,16 @@ export default defineConfig({
       '#src/generated/wasm': resolve(wasmOutput),
     },
   },
+  worker: {
+    rolldownOptions: {
+      output: {
+        entryFileNames: '_app/immutable/workers/[name]-[hash].js',
+        chunkFileNames: '_app/immutable/workers/chunks/[hash].js',
+        assetFileNames: '_app/immutable/workers/assets/[name]-[hash][extname]',
+        hoistTransitiveImports: false,
+      },
+    },
+  },
   server: {
     // Keep the frontend endpoint aligned with src-tauri/tauri.conf.json.
     port: 3000,
