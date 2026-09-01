@@ -87,7 +87,7 @@
         {$i18n.t('settings.compareEmoji')}
       </Dialog.Description>
       <div class="emoji" aria-label={$i18n.t('settings.verificationEmoji')}>
-        {#each core.verification.state.emojis as emoji (emoji.symbol)}
+        {#each core.verification.state.emojis as emoji, index (index)}
           <div class="emoji-item">
             <span>{emoji.symbol}</span>
             <small>{emoji.description}</small>
