@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-only"
 
+[features]
+unoptimized-build = []
+
 [dependencies]
 matrix-sdk = { workspace = true }
 matrix-sdk-ui = { workspace = true }

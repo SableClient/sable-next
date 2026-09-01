@@ -82,12 +82,19 @@ infallible_try_from = "deny"
 # and wasm-opt then drops.
 # The SDK and serde_json unoptimised were 70% of the CPU on a phone, measured
 # with simpleperf against a debug APK. Dependencies get the release treatment so
-# an on-device debug build is usable; our own crates stay unoptimised.
+# an on-device debug build is usable. `sable-core` is optimised too, but for a
+# different reason: its build script refuses opt-level 0.
 [profile.dev.package."*"]
 opt-level = 3
 debug-assertions = false
 # Their symbols are what took the debug APK past 2 GB; ours are untouched.
 debug = false
+
+[profile.dev.package.sable-core]
+opt-level = 1
+
+[profile.test.package.sable-core]
+opt-level = 1
 
 [profile.wasm-release]
 inherits = "release"
