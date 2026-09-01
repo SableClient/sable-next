@@ -204,7 +204,6 @@ test('reveals a short timeline at once and pads it out behind the reader', async
   await tick();
   await runAnimationFrames();
 
-  // Nothing to land on, so the reader sees the latest message while the fill runs.
   expect(timelineViewport().classList.contains('initial')).toBe(false);
   expect(history).toHaveBeenCalledTimes(1);
 
@@ -243,7 +242,6 @@ test('keeps a timeline with an unread marker hidden until it has landed on it', 
   await tick();
   await runAnimationFrames();
 
-  // The fill is needed, and revealing now would show the end then jump up.
   expect(history).toHaveBeenCalledTimes(1);
   expect(timelineViewport().classList.contains('initial')).toBe(true);
 

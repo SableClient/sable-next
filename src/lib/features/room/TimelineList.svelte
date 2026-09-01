@@ -187,7 +187,6 @@
   let viewport = $state<HTMLDivElement | null>(null);
   let initialFillState: 'idle' | 'running' | 'done' = 'idle';
   let revealedBeforeFill = false;
-  // `getComputedStyle` flushes style, so it is read per font scale, not per diff.
   let cachedRootFontSize = $state(rootFontSize());
   let initialFillPages = 0;
   let emptyRefillPages = 0;
@@ -574,11 +573,6 @@
     return position.kind === 'settling';
   }
 
-  /**
-   * The fill outlives the reveal: a room with nothing to land on is shown pinned
-   * to the end and pads itself out behind the reader, whose rows the prepend's
-   * own anchor hold keeps still. It stops once the reader takes over the offset.
-   */
   function fillOwnsPosition(): boolean {
     return isSettling() || (revealedBeforeFill && position.kind === 'pinned');
   }

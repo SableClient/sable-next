@@ -45,19 +45,20 @@ use crate::matrix_html::{
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
-    MembershipView, MentionView, PerMessageProfileView, PollAnswerView, PollView, PublicRoomView,
-    ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
-    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
-    SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
+    MembershipView, MentionView, NotificationModeView, PerMessageProfileView, PollAnswerView,
+    PollView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
+    RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView,
+    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
     TimelineItemContentView, TimelineItemView, UploadProgressView, UtdCauseView, VectorDiff,
 };
 
 pub type SpaceChildCache<S> = HashMap<OwnedRoomId, Vec<SpaceChildEdge>, S>;
 
 #[must_use]
-pub fn room_summary<S: BuildHasher>(
+pub fn room_summary<S: BuildHasher, N: BuildHasher>(
     item: &RoomListItem,
     children: &SpaceChildCache<S>,
+    notification_modes: &HashMap<OwnedRoomId, NotificationModeView, N>,
 ) -> RoomSummary {
     let (unread, highlight) = unread_counts(item);
     let (supports_knock, supports_restricted, supports_knock_restricted) = join_rule_support(item);
@@ -96,7 +97,7 @@ pub fn room_summary<S: BuildHasher>(
         is_space: item.is_space(),
         is_tombstoned: item.is_tombstoned(),
         room_type: item.room_type().map(|kind| kind.to_string()),
-        notification_mode: item.cached_user_defined_notification_mode().map(Into::into),
+        notification_mode: notification_modes.get(item.room_id()).copied(),
         is_voice: item.is_call(),
         call_participants: call_participants(item.active_room_call_participants()),
         supports_knock,
@@ -211,6 +212,28 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
         AnyMessageLikeEventContent::RoomMessage(message) => Some(message.body().to_owned()),
         _ => None,
     }
+}
+
+pub async fn room_notification_modes(
+    settings: &matrix_sdk::notification_settings::NotificationSettings,
+    diffs: &[eyeball_im::VectorDiff<RoomListItem>],
+) -> HashMap<OwnedRoomId, NotificationModeView> {
+    let rooms: Vec<OwnedRoomId> = diffs
+        .iter()
+        .flat_map(diff_values)
+        .map(|item| item.room_id().to_owned())
+        .collect();
+
+    let mut modes = HashMap::new();
+    for room_id in rooms {
+        if let Some(mode) = settings
+            .get_user_defined_room_notification_mode(&room_id)
+            .await
+        {
+            modes.insert(room_id, mode.into());
+        }
+    }
+    modes
 }
 
 pub async fn refresh_space_children<S: BuildHasher>(

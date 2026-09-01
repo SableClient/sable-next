@@ -1589,7 +1589,6 @@ pub struct RoomSummary {
     pub is_space: bool,
     pub is_tombstoned: bool,
     pub room_type: Option<String>,
-    /// `null` means the room follows the default for its kind.
     pub notification_mode: Option<NotificationModeView>,
     /// An `m.room.create` with the MSC3417 call type.
     pub is_voice: bool,

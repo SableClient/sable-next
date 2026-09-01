@@ -37,6 +37,15 @@ impl Core {
         let subscription = self.allocate_subscription();
         let core = self.clone();
 
+        let client = {
+            let guard = self.session.read().await;
+            guard
+                .as_ref()
+                .ok_or(CommandErr::NotLoggedIn)?
+                .client
+                .clone()
+        };
+
         let task = spawn(async move {
             let room_list = match sync_service.room_list_service().all_rooms().await {
                 Ok(room_list) => room_list,
@@ -73,12 +82,17 @@ impl Core {
                 for diff in &diffs {
                     view::refresh_space_children(diff, &mut space_children).await;
                 }
+                let notification_modes =
+                    view::room_notification_modes(&client.notification_settings().await, &diffs)
+                        .await;
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
                     diffs: diffs
                         .into_iter()
                         .map(|diff| {
-                            view::map_diff(diff, |item| view::room_summary(item, &space_children))
+                            view::map_diff(diff, |item| {
+                                view::room_summary(item, &space_children, &notification_modes)
+                            })
                         })
                         .collect(),
                 });
