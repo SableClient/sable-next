@@ -4,19 +4,11 @@ const MAX_LOCAL_ECHO_IDS = 512;
 
 export class TimelineIdentityTracker {
   private readonly localEchoItemIds = new Set<string>();
+  private readonly keysByItems = new WeakMap<readonly TimelineItemView[], readonly string[]>();
 
   key(items: readonly TimelineItemView[], index: number): string {
     if (index < 0 || index >= items.length) return 'missing';
-    const item = items[index];
-    const eventKey = this.eventKey(item);
-    if (eventKey) return eventKey;
-    if (item.content.kind === 'date_divider' || item.content.kind === 'timeline_start') {
-      for (let nextIndex = index + 1; nextIndex < items.length; nextIndex += 1) {
-        const nextEventKey = this.eventKey(items[nextIndex]);
-        if (nextEventKey) return `boundary:${item.id}:${nextEventKey}`;
-      }
-    }
-    return `item:${item.id}`;
+    return this.keysFor(items)[index];
   }
 
   reconcile(items: readonly TimelineItemView[]): void {
@@ -33,6 +25,34 @@ export class TimelineIdentityTracker {
 
   size(): number {
     return this.localEchoItemIds.size;
+  }
+
+  private keysFor(items: readonly TimelineItemView[]): readonly string[] {
+    const cached = this.keysByItems.get(items);
+    if (cached) return cached;
+    const seen = new Set<string>();
+    const keys = items.map((_item, index) => {
+      const base = this.baseKey(items, index);
+      let key = base;
+      for (let attempt = 1; seen.has(key); attempt += 1) key = `${base}#${attempt}`;
+      seen.add(key);
+      return key;
+    });
+    this.keysByItems.set(items, keys);
+    return keys;
+  }
+
+  private baseKey(items: readonly TimelineItemView[], index: number): string {
+    const item = items[index];
+    const eventKey = this.eventKey(item);
+    if (eventKey) return eventKey;
+    if (item.content.kind === 'date_divider' || item.content.kind === 'timeline_start') {
+      for (let nextIndex = index + 1; nextIndex < items.length; nextIndex += 1) {
+        const nextEventKey = this.eventKey(items[nextIndex]);
+        if (nextEventKey) return `boundary:${item.id}:${nextEventKey}`;
+      }
+    }
+    return `item:${item.id}`;
   }
 
   private eventKey(item: TimelineItemView | undefined): string | null {

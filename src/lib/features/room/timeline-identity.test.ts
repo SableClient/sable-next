@@ -52,4 +52,11 @@ describe('TimelineIdentityTracker', () => {
     });
     expect(tracker.key([divider, item('message')], 0)).toBe('boundary:divider:event:$message');
   });
+
+  test('disambiguates a repeated event id', () => {
+    const tracker = new TimelineIdentityTracker();
+    const items = [item('a'), item('b', { event_id: '$a' }), item('c', { event_id: '$a' })];
+    const keys = items.map((_row, index) => tracker.key(items, index));
+    expect(keys).toStrictEqual(['event:$a', 'event:$a#1', 'event:$a#2']);
+  });
 });
