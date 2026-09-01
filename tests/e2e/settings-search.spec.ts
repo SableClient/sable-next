@@ -6,7 +6,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/settings');
+  await page.goto('/home');
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
 });
 
 function searchField(page: import('@playwright/test').Page) {
@@ -53,11 +55,22 @@ test('a query matching nothing says so', async ({ page }) => {
   await expect(page.getByText('No settings match')).toBeVisible();
 });
 
-test('activating a result lands in the right category', async ({ page }) => {
-  await searchField(page).fill('operating system');
+test('activating a result lands in the right category and highlights the setting', async ({
+  page,
+}) => {
+  await searchField(page).fill('clear notifications');
 
-  await resultsList(page).getByRole('link').filter({ hasText: 'System notifications' }).click();
+  await resultsList(page)
+    .getByRole('link')
+    .filter({ hasText: 'Clear notifications when read' })
+    .click();
 
-  await expect(page).toHaveURL(/\/settings\/notifications$/);
-  await expect(page.getByRole('switch', { name: 'System notifications' })).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/notifications\?focus=clear-notifications-on-read/);
+  await expect(page.getByRole('switch', { name: 'Clear notifications when read' })).toBeVisible();
+  await expect(page.locator('[data-settings-focus="clear-notifications-on-read"]')).toHaveClass(
+    /highlighted/
+  );
+  await expect
+    .poll(() => page.locator('.settings-scroll').evaluate((node) => node.scrollTop))
+    .toBeGreaterThan(0);
 });

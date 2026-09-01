@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
-
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
@@ -13,6 +11,7 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';
+  import { findSettingRow, scrollSettingRowIntoView } from './settings-focus.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import { settingFocusId } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
@@ -21,9 +20,10 @@
 
   interface Props {
     category: SettingsCategory;
+    focus?: string | null;
   }
 
-  let { category }: Props = $props();
+  let { category, focus = null }: Props = $props();
 
   const items = $derived(category.items.filter((setting) => setting.supported?.() !== false));
 
@@ -36,7 +36,7 @@
     );
   }
 
-  let focusId = $derived(page.url.searchParams.get('focus'));
+  let focusId = $derived(focus ?? null);
   let highlighted = $state<string | null>(null);
   let copied = $state<string | null>(null);
   /** Sentry reads its consent once, at boot. */
@@ -52,17 +52,27 @@
 
   $effect(() => {
     const id = focusId;
+    highlighted = null;
     if (id === null || !items.some((setting) => settingFocusId(setting.key) === id)) {
       return;
     }
 
-    document.getElementById(id)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    highlighted = id;
-    const timer = setTimeout(() => {
-      highlighted = null;
-    }, 3000);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    void findSettingRow(id).then((row) => {
+      if (cancelled || row === null) return;
+
+      scrollSettingRowIntoView(row);
+      highlighted = id;
+      timer = setTimeout(() => {
+        if (!cancelled) highlighted = null;
+      }, 3000);
+    });
+
     return () => {
-      clearTimeout(timer);
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
     };
   });
 </script>
@@ -163,8 +173,9 @@
 </AppPageShell>
 
 <style>
-  :global(.app-page-shell.settings-category) {
-    max-width: 56rem;
+  :global(.settings-scroll .app-page-shell.settings-category) {
+    max-width: none;
+    overflow: visible;
   }
 
   .settings-stack {

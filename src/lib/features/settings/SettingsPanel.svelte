@@ -9,10 +9,11 @@
   interface Props {
     section: string | null;
     shallow?: boolean;
+    focus?: string | null;
     children?: Snippet;
   }
 
-  let { section, shallow = false, children }: Props = $props();
+  let { section, shallow = false, focus = null, children }: Props = $props();
 
   function close(): void {
     if (shallow) {
@@ -22,16 +23,17 @@
     void goto(resolve('home'));
   }
 
-  function select(nextSection: string): void {
+  function select(nextSection: string, focus?: string): void {
+    const query = focus === undefined ? '' : `?focus=${encodeURIComponent(focus)}`;
     if (shallow) {
-      void goto(resolve(`settings/${nextSection}`), {
+      void goto(resolve(`settings/${nextSection}${query}`), {
         shallow: true,
         replace: true,
-        state: { settings: { section: nextSection } },
+        state: { settings: { section: nextSection, focus } },
       });
       return;
     }
-    void goto(resolve(`settings/${nextSection}`));
+    void goto(resolve(`settings/${nextSection}${query}`));
   }
 
   function back(): void {
@@ -40,7 +42,11 @@
 </script>
 
 {#snippet content(activeSection: string)}
-  {#if shallow}<SettingsSectionContent section={activeSection} />{:else}{@render children?.()}{/if}
+  {#if shallow}
+    <SettingsSectionContent section={activeSection} {focus} />
+  {:else}
+    {@render children?.()}
+  {/if}
 {/snippet}
 
 <DialogFrame

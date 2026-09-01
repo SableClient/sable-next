@@ -24,7 +24,7 @@
 
   interface Props {
     section: string | null;
-    onSelect: (section: string) => void;
+    onSelect: (section: string, focus?: string) => void;
     onBack: () => void;
     onClose: () => void;
     content: Snippet<[string]>;
@@ -56,11 +56,11 @@
     trimmedQuery ? searchSettings(trimmedQuery, settingsCategories, $i18n.t) : []
   );
 
-  function select(event: MouseEvent, nextSection: string): void {
+  function select(event: MouseEvent, nextSection: string, focus?: string): void {
     if (event.shiftKey || event.metaKey || event.ctrlKey || event.button !== 0) return;
 
     event.preventDefault();
-    onSelect(nextSection);
+    onSelect(nextSection, focus);
   }
 </script>
 
@@ -91,7 +91,7 @@
             autocomplete="off"
           />
         </div>
-        <p class="search-summary" aria-live="polite">
+        <p class="search-summary" class:active={trimmedQuery !== ''} aria-live="polite">
           {#if trimmedQuery}
             {results.length > 0
               ? $i18n.t('settings.searchResultsCount', { count: results.length })
@@ -103,12 +103,13 @@
       {#if trimmedQuery}
         <ul class="search-results" role="list" aria-label={$i18n.t('settings.searchLabel')}>
           {#each results as hit (`${hit.category.id}:${hit.setting.key}`)}
+            {@const focus = settingFocusId(hit.setting.key)}
             <li>
               <a
                 class="sable-selection-layer"
-                href={`${resolve(`settings/${hit.category.id}`)}?focus=${settingFocusId(hit.setting.key)}`}
+                href={`${resolve(`settings/${hit.category.id}`)}?focus=${encodeURIComponent(focus)}`}
                 onclick={(event) => {
-                  select(event, hit.category.id);
+                  select(event, hit.category.id, focus);
                 }}
               >
                 <span class="icon" aria-hidden="true"><hit.setting.icon /></span>
@@ -145,7 +146,6 @@
         </nav>
       {/if}
       <Button
-        block
         class="settings-logout"
         variant="danger"
         onclick={() => void logoutWithPush(core, pushOverride())}
@@ -188,8 +188,10 @@
     background: var(--sable-surface-container);
     border-right: var(--border-width) solid var(--sable-surface-container-line);
     display: flex;
-    flex: 0 0 13.5rem;
+    flex: 0 0 16rem;
     flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
     padding-bottom: var(--space-400);
   }
 
@@ -210,13 +212,26 @@
 
   nav,
   .search-results {
+    align-content: start;
     display: grid;
+    flex: 1;
     gap: 0;
     list-style: none;
     margin: 0;
     min-height: 0;
-    overflow-y: auto;
+    min-width: 0;
+    overflow: hidden auto;
     padding: 0;
+    scrollbar-gutter: stable;
+  }
+
+  .search-results li {
+    min-width: 0;
+  }
+
+  .settings-nav .label {
+    flex: 1;
+    min-width: 0;
   }
 
   .settings-search {
@@ -254,14 +269,15 @@
   }
 
   .search-summary {
-    color: var(--sable-surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: var(--space-200) 0 0;
-    min-height: 1lh;
+    margin: 0;
+    min-height: 0;
   }
 
-  .search-summary:empty {
-    display: none;
+  .search-summary.active {
+    color: var(--sable-surface-var-on-container);
+    margin: var(--space-200) 0 0;
+    min-height: 1lh;
   }
 
   .result-name,
@@ -313,6 +329,7 @@
   }
 
   :global(.settings-logout) {
+    flex: 0 0 auto;
     justify-content: flex-start;
     margin: auto var(--space-400) 0;
     min-height: var(--control-height-medium);
@@ -363,19 +380,9 @@
     min-height: var(--control-height-large);
   }
 
-  .paged nav,
-  .paged .search-results {
-    flex: 1;
-  }
-
   .paged a {
     border-left: 0;
     min-height: var(--control-height-large);
-  }
-
-  .paged .label {
-    flex: 1;
-    min-width: 0;
   }
 
   .paged .chevron {
@@ -388,9 +395,7 @@
     background: var(--sable-surface-container-hover);
   }
 
-  @media (width >= 28rem) {
-    :global(.settings-logout) {
-      min-height: auto;
-    }
+  .paged :global(.settings-logout) {
+    min-height: var(--control-height-large);
   }
 </style>

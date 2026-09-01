@@ -10,23 +10,27 @@
 
   let { open = $bindable(false) }: Props = $props();
   let section: string | null = $state(null);
+  let focus: string | null = $state(null);
 
   function close(): void {
     open = false;
     section = null;
+    focus = null;
   }
 
-  function select(nextSection: string): void {
+  function select(nextSection: string, nextFocus?: string): void {
     section = nextSection;
+    focus = nextFocus ?? null;
   }
 
   function back(): void {
     section = null;
+    focus = null;
   }
 </script>
 
 {#snippet content(activeSection: string)}
-  <SettingsSectionContent section={activeSection} />
+  <SettingsSectionContent section={activeSection} {focus} />
 {/snippet}
 
 <BottomSheet

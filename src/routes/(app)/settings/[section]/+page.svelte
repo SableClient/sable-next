@@ -3,4 +3,7 @@
   import SettingsSectionContent from '#lib/features/settings/SettingsSectionContent.svelte';
 </script>
 
-<SettingsSectionContent section={page.params.section ?? null} />
+<SettingsSectionContent
+  section={page.params.section ?? null}
+  focus={page.url.searchParams.get('focus')}
+/>

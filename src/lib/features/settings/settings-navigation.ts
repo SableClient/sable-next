@@ -47,7 +47,7 @@ export function followSettingsLink(
   if (shallow) {
     void goto(resolve(`settings/${section}${query}`), {
       shallow: true,
-      state: { settings: { section } },
+      state: { settings: { section, focus } },
     });
     return;
   }

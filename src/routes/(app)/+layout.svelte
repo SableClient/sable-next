@@ -489,7 +489,11 @@
       onDecline={(call: IncomingCall) => void incomingCalls.decline(call)}
     />
     {#if page.state.settings}
-      <SettingsPanel shallow section={page.state.settings.section} />
+      <SettingsPanel
+        shallow
+        section={page.state.settings.section}
+        focus={page.state.settings.focus}
+      />
     {/if}
     {#if page.state.inbox}
       <InboxPanel />

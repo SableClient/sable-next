@@ -2,7 +2,7 @@ declare global {
   namespace App {
     interface PageState {
       /** Settings opened as a shallow route over the page it was opened from. */
-      settings?: { section: string };
+      settings?: { section: string; focus?: string };
       /** Inbox opened as a shallow route over the page it was opened from. */
       inbox?: true;
       /** Phone room-list drawer state, kept in history for native back gestures. */

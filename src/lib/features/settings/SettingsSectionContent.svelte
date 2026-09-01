@@ -6,9 +6,10 @@
 
   interface Props {
     section: string | null;
+    focus?: string | null;
   }
 
-  let { section }: Props = $props();
+  let { section, focus = null }: Props = $props();
   let category = $derived(findCategory(section ?? undefined));
   let standalone = $derived(
     findStandaloneSection(section) ??
@@ -19,5 +20,5 @@
 {#if standalone}
   <standalone.component />
 {:else if category}
-  <SettingsCategoryView {category} />
+  <SettingsCategoryView {category} {focus} />
 {/if}
