@@ -18,11 +18,7 @@ console_error_panic_hook = "0.1"
 tokio = { version = "1", default-features = false, features = ["sync"] }
 tracing.workspace = true
 tracing-web = "0.1.3"
-tracing-subscriber = { version = "0.3.23", default-features = false, features = [
-  "fmt",
-  "registry",
-  "env-filter",
-] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

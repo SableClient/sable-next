@@ -60,7 +60,7 @@ const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::l
 /// Without this the core's `tracing` output is discarded and a
 /// `Failed { log_id }` names a line that was never written.
 fn init_tracing(filter: &str) {
-    use tracing_subscriber::{EnvFilter, prelude::*};
+    use tracing_subscriber::{filter::Targets, prelude::*};
 
     let console_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)
@@ -71,11 +71,15 @@ fn init_tracing(filter: &str) {
         .without_time()
         .with_writer(MakeJsLogWriter);
 
+    let targets = filter
+        .parse::<Targets>()
+        .unwrap_or_else(|_| Targets::new().with_default(tracing::Level::INFO));
+
     // A second call fails, so a reconnecting port must stay harmless.
     let _ = tracing_subscriber::registry()
         .with(console_layer)
         .with(debug_layer)
-        .with(EnvFilter::new(filter))
+        .with(targets)
         .try_init();
 }
 
@@ -210,7 +214,7 @@ impl SableCore {
     pub async fn submit_command(&self, command: String) -> Result<String, String> {
         let command: Command = serde_json::from_str(&command).map_err(err_json)?;
 
-        match self.core.dispatch(command).await {
+        match Box::pin(self.core.dispatch(command)).await {
             Ok(response) => serde_json::to_string(&response).map_err(err_json),
             Err(error) => Err(serde_json::to_string(&error).unwrap_or_else(err_json)),
         }
