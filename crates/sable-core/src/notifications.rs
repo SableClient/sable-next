@@ -10,7 +10,7 @@ use matrix_sdk::ruma::push::{
     Action, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule, PushFormat,
     RuleKind, SoundTweakValue, Tweak,
 };
-use matrix_sdk::ruma::{EventId, OwnedUserId, RoomId};
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
     NotificationStatus,
@@ -276,6 +276,23 @@ pub async fn remove_keyword(client: &Client, keyword: String) -> Result<(), Stri
     Ok(())
 }
 
+const BACKFILL_GRACE_MS: u64 = 60_000;
+
+#[must_use]
+pub fn is_backfill(
+    session_start: MilliSecondsSinceUnixEpoch,
+    origin_server_ts: MilliSecondsSinceUnixEpoch,
+) -> bool {
+    let start: u64 = session_start.get().into();
+    let sent: u64 = origin_server_ts.get().into();
+    sent < start.saturating_sub(BACKFILL_GRACE_MS)
+}
+
+#[must_use]
+pub fn is_read(room: &matrix_sdk::Room) -> bool {
+    room.unread_notification_counts().notification_count == 0
+}
+
 #[must_use]
 pub fn notifies(actions: &[Action]) -> bool {
     actions
@@ -354,9 +371,14 @@ fn room_message_body(content: &RoomMessageEventContent) -> String {
 mod tests {
     use matrix_sdk::ruma::events::AnySyncTimelineEvent;
     use matrix_sdk::ruma::serde::Raw;
+    use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, UInt};
     use serde_json::json;
 
-    use super::{gateway, timeline_body};
+    use super::{gateway, is_backfill, timeline_body};
+
+    fn ts(millis: u32) -> MilliSecondsSinceUnixEpoch {
+        MilliSecondsSinceUnixEpoch(UInt::from(millis))
+    }
 
     fn event(value: &serde_json::Value) -> AnySyncTimelineEvent {
         Raw::<AnySyncTimelineEvent>::from_json_string(value.to_string())
@@ -444,6 +466,16 @@ mod tests {
             ))),
             "Lunch?"
         );
+    }
+
+    #[test]
+    fn a_replayed_event_is_backfill_and_a_recent_one_is_not() {
+        let start = ts(120_000);
+        assert!(is_backfill(start, ts(1_000)));
+        assert!(!is_backfill(start, ts(120_000)));
+        assert!(!is_backfill(start, ts(200_000)));
+        assert!(!is_backfill(start, ts(61_000)));
+        assert!(is_backfill(start, ts(59_000)));
     }
 
     #[test]

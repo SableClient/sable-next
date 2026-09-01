@@ -3,6 +3,7 @@ use std::sync::Arc;
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::encryption::recovery::RecoveryState;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
 use matrix_sdk::ruma::events::AnyGlobalAccountDataEvent;
 use matrix_sdk::ruma::events::presence::PresenceEvent;
 use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
@@ -81,6 +82,7 @@ impl Core {
     ) {
         let core = self.clone();
         let client = client.clone();
+        let session_start = MilliSecondsSinceUnixEpoch::now();
         self.track_session_task(
             spawn(async move {
                 let Ok(sync_service) = core.sync_service().await else {
@@ -106,6 +108,11 @@ impl Core {
                                 return;
                             }
                             if !notifications::notifies(&actions) {
+                                return;
+                            }
+                            if notifications::is_backfill(session_start, event.origin_server_ts)
+                                || notifications::is_read(&room)
+                            {
                                 return;
                             }
 
