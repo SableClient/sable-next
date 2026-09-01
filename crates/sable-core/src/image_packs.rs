@@ -322,14 +322,13 @@ impl Core {
             ));
         }
 
-        let rooms = client.joined_rooms();
-        let mut found = stream::iter(rooms.iter())
+        let mut found = stream::iter(client.joined_rooms())
             .map(|room| {
                 let client = client.clone();
                 async move {
                     (
                         room.room_id().to_owned(),
-                        Self::room_packs(&client, room, ImagePackOriginView::Room, None, true)
+                        Self::room_packs(&client, &room, ImagePackOriginView::Room, None, true)
                             .await,
                     )
                 }
