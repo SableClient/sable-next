@@ -188,6 +188,7 @@
           alt=""
           width={56}
           height={56}
+          original
         />
         {#if canEdit}
           <Button size="small" disabled={busy} onclick={() => avatarInput?.click()}>
@@ -257,7 +258,13 @@
         {#each current.images as image (image.shortcode)}
           <SettingsRow title=":{image.shortcode}:">
             {#snippet before()}
-              <MediaImage source={image.url} alt={image.shortcode} width={24} height={24} />
+              <MediaImage
+                source={image.url}
+                alt={image.shortcode}
+                width={24}
+                height={24}
+                original
+              />
             {/snippet}
             {#if renaming === image.shortcode}
               <TextInput

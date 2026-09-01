@@ -94,6 +94,7 @@
               alt={reaction.key}
               width={64}
               height={64}
+              original
             />
           {:else}
             <em>{reaction.key}</em>

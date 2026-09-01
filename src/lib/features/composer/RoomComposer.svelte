@@ -62,8 +62,6 @@
   import VoiceRecorder from './VoiceRecorder.svelte';
   import { isVoiceRecordingSupported } from './voice-recorder-support';
 
-  const emoteSize = 24;
-
   interface Props {
     roomId: string;
     onSend: (
@@ -198,9 +196,9 @@
   );
 
   const media: EmoteMedia = {
-    cached: (url) => cachedMediaUrl(core, url, emoteSize, emoteSize),
-    load: (url) => loadMediaUrl(core, url, emoteSize, emoteSize),
-    hold: (url) => holdMediaUrl(core, url, emoteSize, emoteSize),
+    cached: (url) => cachedMediaUrl(core, url, 0, 0),
+    load: (url) => loadMediaUrl(core, url, 0, 0),
+    hold: (url) => holdMediaUrl(core, url, 0, 0),
   };
 
   const editor = new ComposerEditor({

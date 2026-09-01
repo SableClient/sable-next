@@ -209,6 +209,7 @@
                         alt=""
                         width={24}
                         height={24}
+                        original
                       />
                     {/snippet}
                     <Button

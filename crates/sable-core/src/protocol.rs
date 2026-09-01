@@ -2582,6 +2582,7 @@ pub enum ImagePackOriginView {
     Room,
     /// Another room, subscribed to account-wide.
     Global,
+    Space,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]

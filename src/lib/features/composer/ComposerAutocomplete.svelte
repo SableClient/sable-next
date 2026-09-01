@@ -52,7 +52,7 @@
             }}
           >
             {#if suggestion.imageUrl}
-              <MediaImage source={suggestion.imageUrl} alt="" width={24} height={24} />
+              <MediaImage source={suggestion.imageUrl} alt="" width={24} height={24} original />
             {:else}
               <Avatar size="small" src={suggestion.avatarUrl} name={suggestion.label} />
             {/if}

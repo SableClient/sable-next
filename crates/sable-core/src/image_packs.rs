@@ -14,6 +14,10 @@ pub const ROOM_EMOTES: &str = "im.ponies.room_emotes";
 pub const ROOM_IMAGE_PACK: &str = "m.room.image_pack";
 pub const EMOTE_ROOMS: &str = "im.ponies.emote_rooms";
 pub const IMAGE_PACK_ROOMS: &str = "m.image_pack.rooms";
+pub const SPACE_PARENT: &str = "m.space.parent";
+
+const MAX_SPACE_CHAIN: usize = 4;
+const STATE_FETCH_CONCURRENCY: usize = 4;
 
 #[derive(Debug, Deserialize)]
 pub struct PackContent {
@@ -66,6 +70,21 @@ pub struct RoomPackEvent {
     #[serde(default)]
     pub state_key: String,
     pub content: PackContent,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SpaceParentEvent {
+    #[serde(rename = "type", default)]
+    pub event_type: String,
+    #[serde(default)]
+    pub state_key: String,
+    pub content: SpaceParentContent,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SpaceParentContent {
+    #[serde(default)]
+    pub canonical: bool,
 }
 
 /// `im.ponies.emote_rooms`: room id → state key → selection object.
@@ -134,6 +153,9 @@ pub fn pack_view(
     }
 }
 
+use std::collections::BTreeSet;
+
+use futures_util::{StreamExt, stream};
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::events::{GlobalAccountDataEventType, StateEventType};
@@ -141,6 +163,23 @@ use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 
 use crate::Core;
 use crate::protocol::{CommandErr, CommandOk};
+
+struct RoomPacks {
+    packs: Vec<ImagePackView>,
+    canonical_parents: Vec<OwnedRoomId>,
+}
+
+fn push_canonical(parents: &mut Vec<OwnedRoomId>, event: &SpaceParentEvent) {
+    if !event.content.canonical {
+        return;
+    }
+    let Ok(parent) = RoomId::parse(&event.state_key) else {
+        return;
+    };
+    if !parents.contains(&parent) {
+        parents.push(parent);
+    }
+}
 
 impl Core {
     pub(crate) async fn image_packs(&self, room_id: OwnedRoomId) -> Result<CommandOk, CommandErr> {
@@ -164,11 +203,10 @@ impl Core {
         }
 
         let room = self.room(&room_id).await?;
-        packs.extend(
-            Self::room_packs(&client, &room, ImagePackOriginView::Room, None, true)
-                .await
-                .map_err(|error| self.failed("image_packs_room", error))?,
-        );
+        let own_room = Self::room_packs(&client, &room, ImagePackOriginView::Room, None, true)
+            .await
+            .map_err(|error| self.failed("image_packs_room", error))?;
+        packs.extend(own_room.packs);
 
         let mut subscribed = client
             .account()
@@ -205,13 +243,63 @@ impl Core {
                         true,
                     )
                     .await
-                    .map_err(|error| self.failed("image_packs_global_room", error))?,
+                    .map_err(|error| self.failed("image_packs_global_room", error))?
+                    .packs,
                 );
             }
         }
 
-        packs.retain(|pack| !pack.images.is_empty());
+        packs.extend(
+            self.space_packs(&client, &room_id, own_room.canonical_parents)
+                .await,
+        );
+
+        let mut seen = BTreeSet::new();
+        packs.retain(|pack| {
+            !pack.images.is_empty() && seen.insert((pack.room_id.clone(), pack.id.clone()))
+        });
         Ok(CommandOk::ImagePacks { packs })
+    }
+
+    async fn space_packs(
+        &self,
+        client: &matrix_sdk::Client,
+        room_id: &RoomId,
+        parents: Vec<OwnedRoomId>,
+    ) -> Vec<ImagePackView> {
+        let mut packs = Vec::new();
+        let mut seen: BTreeSet<OwnedRoomId> = BTreeSet::from([room_id.to_owned()]);
+        let mut frontier = parents;
+
+        for _ in 0..MAX_SPACE_CHAIN {
+            if frontier.is_empty() {
+                break;
+            }
+            let mut next = Vec::new();
+            for parent_id in frontier {
+                if !seen.insert(parent_id.clone()) {
+                    continue;
+                }
+                let Some(space) = client.get_room(&parent_id) else {
+                    continue;
+                };
+                if space.state() != matrix_sdk::RoomState::Joined {
+                    continue;
+                }
+                match Self::room_packs(client, &space, ImagePackOriginView::Space, None, true).await
+                {
+                    Ok(found) => {
+                        packs.extend(found.packs);
+                        next.extend(found.canonical_parents);
+                    }
+                    Err(error) => {
+                        tracing::warn!(space = %parent_id, %error, "space image packs unreadable");
+                    }
+                }
+            }
+            frontier = next;
+        }
+        packs
     }
 
     pub(crate) async fn all_image_packs(&self) -> Result<CommandOk, CommandErr> {
@@ -234,12 +322,26 @@ impl Core {
             ));
         }
 
-        for room in client.joined_rooms() {
-            let room_packs =
-                Self::room_packs(&client, &room, ImagePackOriginView::Room, None, false)
-                    .await
-                    .map_err(|error| self.failed("all_image_packs", error))?;
-            packs.extend(room_packs);
+        let rooms = client.joined_rooms();
+        let mut found = stream::iter(rooms.iter())
+            .map(|room| {
+                let client = client.clone();
+                async move {
+                    (
+                        room.room_id().to_owned(),
+                        Self::room_packs(&client, room, ImagePackOriginView::Room, None, true)
+                            .await,
+                    )
+                }
+            })
+            .buffer_unordered(STATE_FETCH_CONCURRENCY);
+        while let Some((room_id, result)) = found.next().await {
+            match result {
+                Ok(room_packs) => packs.extend(room_packs.packs),
+                Err(error) => {
+                    tracing::warn!(room = %room_id, %error, "room image packs unreadable");
+                }
+            }
         }
 
         packs.retain(|pack| pack.origin == ImagePackOriginView::Account || !pack.images.is_empty());
@@ -257,7 +359,7 @@ impl Core {
         origin: ImagePackOriginView,
         wanted: Option<&[String]>,
         network_fallback: bool,
-    ) -> Result<Vec<ImagePackView>, matrix_sdk::Error> {
+    ) -> Result<RoomPacks, matrix_sdk::Error> {
         let mut parsed: BTreeMap<String, RoomPackEvent> = BTreeMap::new();
         for event_type in [ROOM_EMOTES, ROOM_IMAGE_PACK] {
             let stored = room
@@ -274,20 +376,39 @@ impl Core {
             }
         }
 
+        let mut canonical_parents = Vec::new();
+        for event in &room.get_state_events(StateEventType::SpaceParent).await? {
+            let json = match event {
+                RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
+                RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
+            };
+            if let Ok(parent) = serde_json::from_str::<SpaceParentEvent>(json.get()) {
+                push_canonical(&mut canonical_parents, &parent);
+            }
+        }
+
         if parsed.is_empty() && network_fallback {
             let response = client
                 .send(get_state_events::v3::Request::new(
                     room.room_id().to_owned(),
                 ))
                 .await?;
-            for event_type in [ROOM_EMOTES, ROOM_IMAGE_PACK] {
-                for raw in &response.room_state {
-                    let Ok(pack) = serde_json::from_str::<RoomPackEvent>(raw.json().get()) else {
-                        continue;
-                    };
-                    if pack.event_type == event_type {
+            for raw in &response.room_state {
+                let json = raw.json();
+                if let Ok(pack) = serde_json::from_str::<RoomPackEvent>(json.get()) {
+                    if pack.event_type == ROOM_IMAGE_PACK {
                         parsed.insert(pack.state_key.clone(), pack);
+                        continue;
                     }
+                    if pack.event_type == ROOM_EMOTES {
+                        parsed.entry(pack.state_key.clone()).or_insert(pack);
+                        continue;
+                    }
+                }
+                if let Ok(parent) = serde_json::from_str::<SpaceParentEvent>(json.get())
+                    && parent.event_type == SPACE_PARENT
+                {
+                    push_canonical(&mut canonical_parents, &parent);
                 }
             }
         }
@@ -297,14 +418,24 @@ impl Core {
             if wanted.is_some_and(|keys| !keys.contains(&state_key)) {
                 continue;
             }
-            packs.push(pack_view(
+            let mut view = pack_view(
                 event.content,
                 state_key,
                 origin,
                 Some(room.room_id().to_string()),
-            ));
+            );
+            if view.name.is_none() {
+                view.name = room.cached_display_name().map(|name| name.to_string());
+            }
+            if view.avatar_url.is_none() {
+                view.avatar_url = room.avatar_url().map(|url| url.to_string());
+            }
+            packs.push(view);
         }
-        Ok(packs)
+        Ok(RoomPacks {
+            packs,
+            canonical_parents,
+        })
     }
 }
 
@@ -422,6 +553,39 @@ mod tests {
             let uri = matrix_sdk::ruma::OwnedMxcUri::from(url);
             assert!(uri.parts().is_ok(), "{url} rejected by the sticker guard");
         }
+    }
+
+    #[test]
+    fn only_a_canonical_parent_is_walked() {
+        let canonical: SpaceParentEvent = serde_json::from_str(
+            r#"{"type":"m.space.parent","state_key":"!space:example.org","content":{"canonical":true,"via":["example.org"]}}"#,
+        )
+        .expect("space parent");
+        let secondary: SpaceParentEvent = serde_json::from_str(
+            r#"{"type":"m.space.parent","state_key":"!other:example.org","content":{"via":["example.org"]}}"#,
+        )
+        .expect("space parent");
+
+        let mut parents = Vec::new();
+        push_canonical(&mut parents, &canonical);
+        push_canonical(&mut parents, &secondary);
+        push_canonical(&mut parents, &canonical);
+
+        assert_eq!(parents.len(), 1);
+        assert_eq!(parents[0].as_str(), "!space:example.org");
+    }
+
+    #[test]
+    fn a_parent_that_is_not_a_room_id_is_dropped() {
+        let broken: SpaceParentEvent = serde_json::from_str(
+            r#"{"type":"m.space.parent","state_key":"","content":{"canonical":true}}"#,
+        )
+        .expect("space parent");
+
+        let mut parents = Vec::new();
+        push_canonical(&mut parents, &broken);
+
+        assert!(parents.is_empty());
     }
 
     #[test]

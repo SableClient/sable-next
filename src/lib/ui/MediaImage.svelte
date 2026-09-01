@@ -32,6 +32,7 @@
     onfailed?: () => void;
     retryable?: boolean;
     uniform?: boolean;
+    original?: boolean;
   }
 
   let {
@@ -48,6 +49,7 @@
     onfailed,
     retryable = false,
     uniform = false,
+    original = false,
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
@@ -131,10 +133,9 @@
     let active = true;
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
-    // A server's GIF thumbnail is a still frame; only the original moves.
-    const original = mime === 'image/svg+xml' || animatedGif;
-    const requestWidth = original ? 0 : width;
-    const requestHeight = original ? 0 : height;
+    const asIs = original || mime === 'image/svg+xml' || animatedGif;
+    const requestWidth = asIs ? 0 : width;
+    const requestHeight = asIs ? 0 : height;
     const release = holdMediaUrl(core, source, requestWidth, requestHeight);
     const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {

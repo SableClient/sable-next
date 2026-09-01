@@ -151,6 +151,7 @@
     account: $i18n.t('composer.packMine'),
     room: $i18n.t('composer.packRoom'),
     global: $i18n.t('composer.packGlobal'),
+    space: $i18n.t('composer.packSpace'),
   });
 
   function packName(pack: ImagePackView): string {
@@ -296,7 +297,7 @@
   {:else}
     <div class="board-body">
       <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
-        {#each ['account', 'room', 'global'] as const as origin (origin)}
+        {#each ['account', 'room', 'global', 'space'] as const as origin (origin)}
           {@const group = sections.filter((section) => section.pack.origin === origin)}
           {#if group.length > 0}
             <span class="rail-label">{originLabels[origin]}</span>
@@ -323,6 +324,7 @@
                     alt={packName(section.pack)}
                     width={32}
                     height={32}
+                    original
                   />
                 {/if}
               </button>
@@ -377,6 +379,7 @@
                       alt={image.body ?? image.shortcode}
                       width={32}
                       height={32}
+                      original
                     />
                   </button>
                 </li>
@@ -403,6 +406,7 @@
                       alt={image.body ?? image.shortcode}
                       width={32}
                       height={32}
+                      original
                     />
                   </button>
                 </li>
@@ -449,6 +453,7 @@
                         alt={image.body ?? image.shortcode}
                         width={32}
                         height={32}
+                        original
                       />
                     {/if}
                   </button>
@@ -506,6 +511,7 @@
           width={28}
           height={28}
           class="preview-image"
+          original
         />
         <code>:{preview.image.shortcode}:</code>
         <span class="preview-pack">{packName(preview.pack)}</span>
