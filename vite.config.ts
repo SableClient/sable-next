@@ -72,6 +72,9 @@ export default defineConfig({
       prerender: {
         handleUnseenRoutes: 'ignore',
       },
+      serviceWorker: {
+        register: false,
+      },
       adapter: adapter({
         assets: 'dist',
         pages: 'dist',

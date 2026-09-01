@@ -19,6 +19,7 @@
   import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
+  import { registerServiceWorker } from '#lib/platform/service-worker.js';
   import {
     applyDesktopWindowSettings,
     titleBarKind,
@@ -51,6 +52,7 @@
     }
 
     const stopTrackingKeyboard = trackKeyboardInset();
+    void registerServiceWorker();
     void core.start();
     return () => {
       stopListening();
