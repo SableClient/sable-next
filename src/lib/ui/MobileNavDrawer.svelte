@@ -183,7 +183,9 @@
       : `translate3d(${String(position)}px, 0, 0)`}
   >
     <section class="drawer-panel navigation-panel" inert={!open || appLayout.matches}>
-      <SidebarNav mobile />
+      {#if !appLayout.matches}
+        <SidebarNav mobile />
+      {/if}
     </section>
     <section class="drawer-panel content-panel" inert={open && !appLayout.matches}>
       <div id="main-content" class="content" tabindex="-1">

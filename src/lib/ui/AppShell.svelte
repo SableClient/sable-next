@@ -16,9 +16,11 @@
 </script>
 
 <div class="app-shell" style:--room-nav-width={String(roomNavWidth) + 'px'}>
-  <div class="desktop-navigation" inert={!appLayout.matches}>
-    <SidebarNav bind:roomNavWidth />
-  </div>
+  {#if appLayout.matches}
+    <div class="desktop-navigation">
+      <SidebarNav bind:roomNavWidth />
+    </div>
+  {/if}
   <MobileNavDrawer>
     {@render children()}
   </MobileNavDrawer>

@@ -2,6 +2,8 @@ import emojibaseShortcodes from 'emojibase-data/en/shortcodes/emojibase.json';
 import joypixelsShortcodes from 'emojibase-data/en/shortcodes/joypixels.json';
 import compact from 'emojibase-data/en/compact.json';
 
+export { QUICK_REACTIONS } from './quick-reactions';
+
 export interface ReactionEmoji {
   emoji: string;
   shortcode: string;
@@ -22,8 +24,6 @@ export interface EmojiGroup {
   id: EmojiGroupId;
   emojis: ReactionEmoji[];
 }
-
-export const QUICK_REACTIONS = ['🎉', '👀', '✅', '🙏', '🔥', '💜'];
 
 // Group 2 (component) has no bucket, so a miss here is expected.
 const groupOf: Partial<Record<number, EmojiGroupId>> = {

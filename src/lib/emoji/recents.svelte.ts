@@ -1,4 +1,4 @@
-import { QUICK_REACTIONS } from './emoji';
+import { QUICK_REACTIONS } from './quick-reactions';
 
 export interface RecentReaction {
   emoji: string;

@@ -36,7 +36,6 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
-  import CallView from '#lib/features/call/CallView.svelte';
   import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
   import JumpToTimeDialog from './JumpToTimeDialog.svelte';
@@ -696,7 +695,9 @@
       {/snippet}
     </RoomHeader>
     {#if call.roomId === resolvedRoomId && (call.active || call.failure)}
-      <CallView session={call} members={memberLoader.members} />
+      {#await import('#lib/features/call/CallView.svelte') then { default: CallView }}
+        <CallView session={call} members={memberLoader.members} />
+      {/await}
     {/if}
     {#key resolvedRoomId}
       <TimelineList

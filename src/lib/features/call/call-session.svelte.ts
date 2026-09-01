@@ -7,9 +7,8 @@ import type { CallGrant, CoreClient } from '#lib/core/client.svelte.js';
 import type { CallEncryptionKey, CallTransport, CallTransportState } from './call-transport';
 import { decodeCallKey, idleTransportState, ignoreError } from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
-import { createLivekitTransport, type LivekitTransport } from './livekit-transport';
+import type { LivekitTransport } from './livekit-transport';
 import { createNativeTransport } from './native-transport';
-import { isCallE2eeSupported } from './key-provider';
 import { commandErrorCode } from './command-error';
 
 export type CallLifecycle = 'idle' | 'joining' | 'connecting' | 'active' | 'leaving' | 'failed';
@@ -99,7 +98,8 @@ export class CallSession {
       const grant = await this.#client.commands.joinCall(roomId, serviceUrl);
       this.#session = grant.session;
 
-      const supported = this.#deps.e2eeSupported ?? isCallE2eeSupported;
+      const supported =
+        this.#deps.e2eeSupported ?? (await import('./key-provider')).isCallE2eeSupported;
       if (grant.encryptMedia && !supported()) {
         await this.#teardown();
         this.#fail('e2ee-unsupported');
@@ -109,7 +109,9 @@ export class CallSession {
       const transport =
         this.#deps.createTransport?.(grant.encryptMedia) ??
         (await createNativeTransport(String(grant.session))) ??
-        createLivekitTransport({ encryptMedia: grant.encryptMedia });
+        (await import('./livekit-transport')).createLivekitTransport({
+          encryptMedia: grant.encryptMedia,
+        });
       this.#media = transport;
       this.#livekit = isLivekit(transport) ? transport : undefined;
       this.#unsubscribeTransport = transport.subscribe((state) => {
