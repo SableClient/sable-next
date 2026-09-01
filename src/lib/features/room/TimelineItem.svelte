@@ -140,7 +140,12 @@
   const core = useCoreClient();
   const personaStore = usePersonaStore();
   let profile = $state<ProfileView | null>(null);
-  let senderMember = $derived(findMember(members, item.sender));
+  // Only a fallback: the core fills both fields, so most rows never scan.
+  let senderMember = $derived(
+    item.sender_name === null || item.sender_avatar === null
+      ? findMember(members, item.sender)
+      : undefined
+  );
   let accountName = $derived(
     item.sender_name ??
       senderMember?.display_name ??
