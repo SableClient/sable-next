@@ -131,6 +131,11 @@ jobs:
           export CHROMEDRIVER="${CHROMEWEBDRIVER:?chromedriver comes from the runner image}/chromedriver"
           cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
+      - name: Run WASM-target tests on Firefox
+        run: |
+          export GECKODRIVER="${GECKOWEBDRIVER:?geckodriver comes from the runner image}/geckodriver"
+          cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
+
       - name: Check Rust documentation
         env:
           RUSTDOCFLAGS: -D warnings

@@ -325,7 +325,7 @@ mod tests {
 
     use super::{SableCore, err_json};
 
-    wasm_bindgen_test_configure!(run_in_browser);
+    wasm_bindgen_test_configure!(run_in_shared_worker);
 
     /// `CommandErr` is serialize-only, so the page's decoding is mirrored here
     /// rather than reused.
