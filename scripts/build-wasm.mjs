@@ -9,6 +9,8 @@ import {
 } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const release = process.argv.includes('--release');
 const profile = release ? 'wasm-release' : 'wasm-dev';
@@ -23,10 +25,41 @@ const cargoArgs = [
   profile,
 ];
 
-function run(command, args) {
-  const result = spawnSync(command, args, { stdio: 'inherit' });
+const MAX_RELEASE_WASM_BYTES = 16_500_000;
+
+function run(command, args, env) {
+  const result = spawnSync(command, args, { stdio: 'inherit', env: env ?? process.env });
 
   if (result.status !== 0) throw new Error(`${command} failed with status ${result.status}`);
+}
+
+function capture(command, args) {
+  const result = spawnSync(command, args, { encoding: 'utf8' });
+
+  if (result.status !== 0) throw new Error(`${command} failed with status ${result.status}`);
+  return result.stdout;
+}
+
+function releaseEnvironment() {
+  const config = readFileSync('.cargo/config.toml', 'utf8');
+  const declared = config.match(
+    /\[target\.wasm32-unknown-unknown\][\s\S]*?rustflags\s*=\s*\[([\s\S]*?)\]/
+  )?.[1];
+
+  if (!declared) throw new Error('.cargo/config.toml declares no wasm32 rustflags');
+
+  const flags = [...declared.matchAll(/'([^']*)'|"((?:[^"\\]|\\.)*)"/g)].map((match) =>
+    match[1] === undefined ? match[2].replaceAll('\\"', '"') : match[1]
+  );
+  const cargoHome = process.env.CARGO_HOME ?? join(homedir(), '.cargo');
+
+  flags.push(
+    `--remap-path-prefix=${cargoHome}=/cargo`,
+    `--remap-path-prefix=${capture('rustc', ['--print', 'sysroot']).trim()}=/rust`,
+    `--remap-path-prefix=${process.cwd()}=/sable`
+  );
+
+  return { ...process.env, CARGO_ENCODED_RUSTFLAGS: flags.join('\x1f') };
 }
 
 function targetDirectory() {
@@ -77,7 +110,7 @@ if (!version || cli.status !== 0 || cli.stdout.trim() !== `wasm-bindgen ${versio
   throw new Error(`wasm-bindgen-cli must match Cargo.lock's wasm-bindgen ${version ?? 'version'}`);
 }
 
-run('cargo', cargoArgs);
+run('cargo', cargoArgs, release ? releaseEnvironment() : undefined);
 
 const wasm = `${targetDirectory()}/wasm32-unknown-unknown/${profile}/sable_wasm.wasm`;
 const output = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
@@ -86,17 +119,26 @@ const unlockOutput = lockOutput(output);
 
 try {
   if (release) bindgenArgs.push('--remove-name-section', '--remove-producers-section');
+  else bindgenArgs.push('--debug');
 
   bindgenArgs.push(wasm);
   run('wasm-bindgen', bindgenArgs);
+
+  const features = capture('wasm-opt', ['--print-features', `${output}/sable_wasm_bg.wasm`]);
+
+  for (const required of ['reference-types', 'multivalue', 'bulk-memory']) {
+    if (!features.includes(`--enable-${required}`)) {
+      throw new Error(`the target_features section does not declare ${required}`);
+    }
+  }
 
   if (release) {
     const optimized = `${output}/sable_wasm_bg.optimized.wasm`;
 
     run('wasm-opt', [
-      '-Oz',
-      '--enable-bulk-memory',
-      '--enable-nontrapping-float-to-int',
+      '-O3',
+      '--gufa',
+      '-O3',
       `${output}/sable_wasm_bg.wasm`,
       '--output',
       optimized,
@@ -107,6 +149,12 @@ try {
 
   const generated = readFileSync(`${output}/sable_wasm_bg.wasm`);
   await WebAssembly.compile(generated);
+
+  if (release && generated.byteLength > MAX_RELEASE_WASM_BYTES) {
+    throw new Error(
+      `the release wasm is ${generated.byteLength} bytes, over the ${MAX_RELEASE_WASM_BYTES} budget`
+    );
+  }
   writeFileSync(
     `${output}/sable_wasm_version.js`,
     `export default '${createHash('sha256').update(generated).digest('hex')}';\n`
