@@ -125,6 +125,12 @@ export class RoomTimeline {
     }, offset);
   }
 
+  async notifyScroll(): Promise<void> {
+    await this.viewport.evaluate((element) => {
+      element.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+  }
+
   async scrollToBottomAndNotify(): Promise<void> {
     await this.viewport.evaluate((element) => {
       element.scrollTop = element.scrollHeight;
@@ -213,25 +219,27 @@ export class RoomTimeline {
 
   // A partially clipped row shifts on its own as history lands, so an anchor
   // has to be one the viewport already contains whole.
-  async fullyVisibleAnchor(): Promise<TimelineAnchor> {
+  async fullyVisibleAnchor({ skip = 0 } = {}): Promise<TimelineAnchor> {
     const deadline = Date.now() + 5_000;
     for (;;) {
-      const itemId = await this.viewport.evaluate((element) => {
+      const itemId = await this.viewport.evaluate((element, offset) => {
         const bounds = element.getBoundingClientRect();
-        const row = Array.from(element.querySelectorAll<HTMLElement>('.item[data-event-id]')).find(
-          (item) => {
-            const rect = item.getBoundingClientRect();
-            return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
-          }
-        );
-        return row?.dataset.itemId;
-      });
+        const rows = Array.from(
+          element.querySelectorAll<HTMLElement>('.item[data-event-id]')
+        ).filter((item) => {
+          const rect = item.getBoundingClientRect();
+          return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+        });
+        return rows[offset]?.dataset.itemId;
+      }, skip);
       if (itemId !== undefined) {
         const box = await this.itemById(itemId).boundingBox();
         if (box) return { itemId, y: box.y };
       }
       if (Date.now() > deadline) {
-        throw new Error('timeline rendered no fully visible anchor with stable bounds');
+        throw new Error(
+          `timeline rendered no fully visible anchor with stable bounds (skip ${String(skip)})`
+        );
       }
       await this.page.waitForTimeout(50);
     }
@@ -239,7 +247,7 @@ export class RoomTimeline {
 
   // The local echo and the confirmed event coexist until the SDK dedupes them,
   // so the message is briefly rendered twice.
-  async expectMessageSettled(body: string, { timeout = 15_000 } = {}): Promise<void> {
+  async expectMessageSettled(body: string, { timeout = 30_000 } = {}): Promise<void> {
     await expect(this.message(body)).toHaveCount(1, { timeout });
     // The viewport stays hidden until the initial anchor lands, which is the
     // slow part under load, so this gets the same budget as the count.

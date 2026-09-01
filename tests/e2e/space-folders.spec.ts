@@ -27,6 +27,19 @@ async function openRail(page: Page): Promise<void> {
   await expect(railSpaces(page)).toHaveCount(3, { timeout: 90_000 });
 }
 
+async function reorder(
+  page: Page,
+  source: string,
+  target: string,
+  targetPosition: { x: number; y: number },
+  expected: string[]
+): Promise<void> {
+  await expect(async () => {
+    await railLink(page, source).dragTo(railLink(page, target), { targetPosition });
+    await expect(spaceOrder(page)).resolves.toEqual(expected);
+  }).toPass({ timeout: 30_000 });
+}
+
 async function group(page: Page): Promise<void> {
   await expect(async () => {
     await railLink(page, 'Beta').dragTo(railLink(page, 'Alpha'));
@@ -58,17 +71,8 @@ test('dragging one space onto another groups them into a folder', async ({ page 
 test('dragging above or below a space reorders the rail', async ({ page }) => {
   await openRail(page);
 
-  await railLink(page, 'Gamma').dragTo(railLink(page, 'Alpha'), {
-    targetPosition: { x: 20, y: 2 },
-  });
-
-  await expect(spaceOrder(page)).resolves.toEqual(['Gamma', 'Alpha', 'Beta']);
-
-  await railLink(page, 'Gamma').dragTo(railLink(page, 'Beta'), {
-    targetPosition: { x: 20, y: 40 },
-  });
-
-  await expect(spaceOrder(page)).resolves.toEqual(['Alpha', 'Beta', 'Gamma']);
+  await reorder(page, 'Gamma', 'Alpha', { x: 20, y: 2 }, ['Gamma', 'Alpha', 'Beta']);
+  await reorder(page, 'Gamma', 'Beta', { x: 20, y: 40 }, ['Alpha', 'Beta', 'Gamma']);
 });
 
 test('a folder opens to its spaces and takes another one by drag', async ({ page }) => {

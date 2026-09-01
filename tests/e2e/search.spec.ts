@@ -21,6 +21,13 @@ function searchField(page: Page) {
   return page.getByRole('combobox', { name: SEARCH_FIELD });
 }
 
+async function awaitIndexed(page: Page): Promise<void> {
+  await searchField(page).fill('welcome');
+  await expect(page.getByRole('button', { name: /Welcome to/ }).first()).toBeVisible({
+    timeout: 60_000,
+  });
+}
+
 test('the room header search button opens the search page scoped to that room', async ({
   page,
   app,
@@ -198,6 +205,8 @@ test('escape dismisses the suggestions without clearing the query', async ({ pag
 
 test('matched terms are marked in the result body', async ({ page }) => {
   await page.goto('/search');
+
+  await awaitIndexed(page);
 
   await searchField(page).fill('welcome');
 
@@ -482,6 +491,8 @@ test('a chip is built character by character in front of existing text', async (
 test('a negated room filter drops that room instead of matching its text', async ({ page }) => {
   await page.goto('/search');
 
+  await awaitIndexed(page);
+
   await searchField(page).fill('message -in:Random ');
 
   await expect(anyGroup(page, 'General')).toBeVisible(INDEXED);
@@ -531,6 +542,8 @@ test('the operator cheat-sheet does not reopen on refocus', async ({ page }) => 
 
 test('a quoted phrase is marked whole in the result body', async ({ page }) => {
   await page.goto('/search');
+
+  await awaitIndexed(page);
 
   await searchField(page).fill('"General message 1"');
 

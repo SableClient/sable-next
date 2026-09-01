@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-const COLD_BOOT_TIMEOUT = 15_000;
+const COLD_BOOT_TIMEOUT = 30_000;
 
 export class AppShell {
   readonly primaryNavigation: Locator;

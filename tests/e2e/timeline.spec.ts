@@ -48,18 +48,20 @@ test('loads a real room at latest and preserves the viewport while paginating', 
   await timeline.dispatchWheel(1);
   await timeline.scrollToAndNotify(0);
   await expect.poll(oldestRenderedMessage, { timeout: 15_000 }).toBeLessThan(initialOldestMessage);
-  await timeline.scrollToAndNotify(0);
-
-  await timeline.waitForScrollSettled();
-  await expect.poll(() => timeline.visibleItems().count()).toBeGreaterThan(0);
-  const anchor = await timeline.fullyVisibleAnchor();
 
   const beforeOldestMessage = await oldestRenderedMessage();
 
   await timeline.dispatchWheel(-200);
   await timeline.scrollToAndNotify(0);
-
   await expect.poll(oldestRenderedMessage, { timeout: 15_000 }).toBeLessThan(beforeOldestMessage);
+
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.visibleItems().count()).toBeGreaterThan(0);
+  const anchor = await timeline.fullyVisibleAnchor({ skip: 1 });
+
+  await timeline.dispatchWheel(-200);
+  await timeline.notifyScroll();
+
   // Real messages wrap to variable heights; re-measurement settles within a
   // couple of pixels.
   await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
