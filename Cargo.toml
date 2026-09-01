@@ -12,8 +12,12 @@ matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9
   "experimental-send-custom-to-device",
   "federation-api",
 ] }
-matrix-sdk-ui = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a", features = ["unstable-msc4274"] }
-matrix-sdk-base = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a", default-features = false, features = ["e2e-encryption"] }
+matrix-sdk-ui = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a", features = [
+  "unstable-msc4274",
+] }
+matrix-sdk-base = { git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "cf9ae6a921472c8bd945727c3b84f7cc8b1ce72a", default-features = false, features = [
+  "e2e-encryption",
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "fs"] }
