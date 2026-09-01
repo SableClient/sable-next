@@ -16,7 +16,7 @@ export class RoomTimeline {
     this.viewport = page.locator('.timeline-viewport .viewport');
     this.items = page.locator('.timeline-viewport .item');
     this.initial = page.locator('.timeline-viewport.initial');
-    this.skeleton = page.locator('.timeline-skeleton');
+    this.skeleton = page.locator('.timeline-placeholder.initial');
     this.empty = page.locator('.timeline-empty');
     this.loading = page.locator('.timeline-content > .loading');
     this.jumpToLatest = page.locator('.jump-to-latest');

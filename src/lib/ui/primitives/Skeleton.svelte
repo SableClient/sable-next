@@ -17,13 +17,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     :global(.sable-skeleton) {
-      animation: skeleton-pulse 1.8s ease-in-out infinite;
-    }
-  }
-
-  @keyframes skeleton-pulse {
-    50% {
-      opacity: 0.55;
+      animation: sable-skeleton-pulse 1.8s ease-in-out infinite;
     }
   }
 </style>

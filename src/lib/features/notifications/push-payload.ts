@@ -57,11 +57,12 @@ function line(
   sender: string | null,
   showContent: boolean
 ): ConversationLine {
+  const eventId = notification.event_id ?? null;
   const said = notification.content?.body;
   if (showContent && !invites(notification) && said !== undefined && said !== '') {
-    return { sender, body: said };
+    return { sender, body: said, eventId };
   }
-  return { sender: null, body: body(notification, sender, showContent) };
+  return { sender: null, body: body(notification, sender, showContent), eventId };
 }
 
 function invites(notification: NonNullable<PushPayload['notification']>): boolean {

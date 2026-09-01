@@ -19,6 +19,12 @@ const requiredCalls = [
 
 const forbidden = [
   {
+    label: 'paddingStart',
+    pattern: /paddingStart\s*:/g,
+    reason:
+      'puts the history placeholder into the content size, so every appearance and removal runs correctRollingAnchor and writes the reader offset — three scroll writes and three layout passes for one page of history',
+  },
+  {
     label: 'virtualizer.measure()',
     pattern: /(?<![A-Za-z])measure\(\)/g,
     reason:

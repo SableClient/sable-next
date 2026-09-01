@@ -243,9 +243,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           const shell = new AppShell(page);
           for (const roomId of [generalId, randomId]) {
             await shell.openRoom(roomId);
-            await expect(page.locator('.timeline-viewport .item').first()).toBeVisible({
-              timeout: 30_000,
-            });
+            await expect(
+              page.locator('.timeline-viewport .item[data-event-id]').first()
+            ).toBeVisible({ timeout: 30_000 });
           }
         }
       );

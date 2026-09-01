@@ -921,13 +921,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .placeholder-copy {
-      animation: placeholder-copy-pulse 1.8s ease-in-out infinite;
-    }
-  }
-
-  @keyframes placeholder-copy-pulse {
-    50% {
-      opacity: 0.55;
+      animation: sable-skeleton-pulse 1.8s ease-in-out infinite;
     }
   }
 

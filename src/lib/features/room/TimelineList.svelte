@@ -128,7 +128,6 @@
   /* The paginate call's own answer, as well as the store's: that only settles to
      `end` on a two-second timeout when a page moves no boundary. */
   let historyExhausted = $state(false);
-  let historyRequestPending = $state(false);
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
   );
@@ -190,8 +189,6 @@
   let initialFillPages = 0;
   let emptyRefillPages = 0;
   let emptyRefillPending = false;
-  let openingBackfillState = $state<'idle' | 'running' | 'done'>('idle');
-  let openingBackfillGeneration = 0;
   let hadVisibleItems = false;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
@@ -200,27 +197,6 @@
   // Only the mount-time target picks the mode; later ones go through the effect.
   // svelte-ignore state_referenced_locally
   let position = $state<TimelinePosition>(initialPosition(focusEventId));
-  const HISTORY_PLACEHOLDER_REM = 14;
-  const HISTORY_PLACEHOLDER_VIEWPORT_RATIO = 1 / 3;
-  let measuredHistoryPlaceholderHeight = $state(0);
-  let historyLoading = $derived(
-    position.kind !== 'settling' &&
-      visibleItems.length > 0 &&
-      (openingBackfillState === 'running' ||
-        historyRequestPending ||
-        timeline.backwardPagination === 'loading')
-  );
-  let historyPlaceholderTargetHeight = $derived(
-    historyLoading
-      ? Math.max(
-          HISTORY_PLACEHOLDER_REM * rootFontSize(),
-          (viewport?.clientHeight ?? virtualizerViewportSize) * HISTORY_PLACEHOLDER_VIEWPORT_RATIO
-        )
-      : 0
-  );
-  let historyPlaceholderHeight = $derived(
-    historyLoading ? Math.max(historyPlaceholderTargetHeight, measuredHistoryPlaceholderHeight) : 0
-  );
   function setPosition(next: TimelinePosition): void {
     position = next;
     followingLive = next.kind === 'pinned';
@@ -324,15 +300,6 @@
     onChange: handleVirtualizerChange,
   });
 
-  $effect(() => {
-    if (!historyLoading) measuredHistoryPlaceholderHeight = 0;
-  });
-
-  function setHistoryPlaceholderHeight(height: number): void {
-    if (!historyLoading || Math.abs(height - measuredHistoryPlaceholderHeight) < 1) return;
-    measuredHistoryPlaceholderHeight = height;
-  }
-
   // A row above the reader is measured after Svelte has positioned it, so the
   // DOM anchor can only correct the shift a frame after it is painted. The
   // virtualiser knows the delta first. Unlike `followOnAppend`, the adjustment
@@ -348,20 +315,11 @@
     return true;
   };
 
-  async function requestHistory(): Promise<boolean> {
-    historyRequestPending = true;
-    try {
-      return await onRequestHistory();
-    } finally {
-      historyRequestPending = false;
-    }
-  }
-
   historyController = new TimelineHistoryController({
     getBackwardPagination: () => timeline.backwardPagination,
     isNearOldest: () => viewport !== null && viewport.scrollTop < viewport.clientHeight * 2,
     isVirtualizerScrolling: () => get(virtualizer).isScrolling,
-    requestHistory,
+    requestHistory: () => onRequestHistory(),
     onGestureSettled: () => {
       if (!commitDeferred) return;
       commitDeferred = false;
@@ -622,14 +580,12 @@
    * holds `loading` until the boundary moves. Bounded: a lost diff must not leave
    * the timeline hidden. False only when the fill was cancelled.
    */
-  async function awaitPaginationSettled(
-    cancelled: () => boolean = initialFillCancelled
-  ): Promise<boolean> {
+  async function awaitPaginationSettled(): Promise<boolean> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
     while (timeline.backwardPagination === 'loading') {
       if (performance.now() >= deadline) return true;
       await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval));
-      if (cancelled()) return false;
+      if (initialFillCancelled()) return false;
     }
     return true;
   }
@@ -652,7 +608,7 @@
       const contentHeight = get(virtualizer).getTotalSize();
       if (contentHeight >= node.clientHeight * TIMELINE_LAYOUT.initialFillViewports) return;
       initialFillPages += 1;
-      const reachedStart = await requestHistory();
+      const reachedStart = await onRequestHistory();
       historyExhausted = reachedStart;
       // The last page has to settle too, or the handover finds `loading` and declines.
       if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
@@ -675,8 +631,6 @@
       historyExhausted = false;
       emptyRefillPages = 0;
       initialFillPages = 0;
-      openingBackfillGeneration += 1;
-      openingBackfillState = 'idle';
     }
     if (
       timeline.loading ||
@@ -694,7 +648,7 @@
     emptyRefillPending = true;
     void (async () => {
       try {
-        const reachedStart = await requestHistory();
+        const reachedStart = await onRequestHistory();
         historyExhausted = reachedStart && visibleItems.length > 0;
       } finally {
         emptyRefillPending = false;
@@ -715,64 +669,6 @@
       scheduleInitialEndReconciliation();
     });
   }
-
-  function startOpeningBackfill(): void {
-    if (openingBackfillState !== 'idle') return;
-    const generation = (openingBackfillGeneration += 1);
-    const cancelled = (): boolean =>
-      generation !== openingBackfillGeneration || viewport === null || position.kind === 'settling';
-    openingBackfillState = 'running';
-    void (async () => {
-      try {
-        for (let page = 0; page < TIMELINE_LAYOUT.emptyFillMaxPages; page += 1) {
-          const node = currentViewport();
-          if (cancelled() || node === null) return;
-          if (historyExhausted || timeline.backwardPagination === 'end') return;
-          if (timeline.backwardPagination === 'loading') {
-            if (!(await awaitPaginationSettled(cancelled))) return;
-            page -= 1;
-            continue;
-          }
-          const messageHeight = Math.max(
-            0,
-            get(virtualizer).getTotalSize() - historyPlaceholderHeight
-          );
-          if (messageHeight >= node.clientHeight) return;
-
-          const reachedStart = await requestHistory();
-          if (cancelled()) return;
-          historyExhausted = reachedStart;
-          if (!(await awaitPaginationSettled(cancelled))) return;
-          await tick();
-          await new Promise(requestAnimationFrame);
-          if (reachedStart) return;
-          await new Promise((resolve) =>
-            setTimeout(resolve, TIMELINE_LAYOUT.historyRequestMinInterval)
-          );
-        }
-      } finally {
-        if (generation === openingBackfillGeneration) openingBackfillState = 'done';
-      }
-    })();
-  }
-
-  $effect(() => {
-    const viewportHeight = virtualizerViewportSize || viewport?.clientHeight || 0;
-    const messageHeight = Math.max(0, virtualizerTotalSize - historyPlaceholderHeight);
-    if (
-      position.kind === 'settling' ||
-      initialFillState !== 'done' ||
-      viewportHeight <= 0 ||
-      messageHeight >= viewportHeight ||
-      visibleItems.length === 0 ||
-      historyExhausted ||
-      timeline.backwardPagination === 'end' ||
-      openingBackfillState !== 'idle'
-    ) {
-      return;
-    }
-    startOpeningBackfill();
-  });
 
   function scheduleInitialEndReconciliation(): void {
     if (position.kind !== 'settling' || initialEndReconciliationPending) return;
@@ -889,7 +785,6 @@
       getItemKey: (index) => identityTracker.key(items, index),
       anchorTo: 'start',
       followOnAppend: false,
-      paddingStart: historyPlaceholderHeight,
       scrollEndThreshold: 0,
       useScrollendEvent: true,
       overscan: 8,
@@ -980,13 +875,7 @@
     refreshAtLatest();
     const movedAway = viewport.scrollTop < previousScrollTop;
     previousScrollTop = viewport.scrollTop;
-    const gesture =
-      !wasSelfScroll &&
-      movedAway &&
-      position.kind === 'pinned' &&
-      !isScrolling(historyController.gesture)
-        ? 'wheel'
-        : historyController.gesture;
+    const gesture = historyController.gesture;
     refreshRollingAnchor(movedAway && isScrolling(gesture));
     const next = nextPosition(position, {
       kind: 'user-scrolled',
@@ -1154,14 +1043,6 @@
           class={['items', `layout-${preferences.layout}`]}
           style:height={String($virtualizer.getTotalSize()) + 'px'}
         >
-          {#if historyLoading}
-            <TimelineSkeleton
-              mode="history"
-              layout={preferences.layout}
-              targetHeight={historyPlaceholderTargetHeight}
-              onHeightChange={setHistoryPlaceholderHeight}
-            />
-          {/if}
           {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
             {@const item = visibleItems[virtualItem.index]}
             {#if item}
