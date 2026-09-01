@@ -630,7 +630,9 @@
     {/if}
     {#if layout === 'compact'}
       <div class="compact-gutter">
-        <time datetime={new Date(item.timestamp).toISOString()}>{formatMessageTimestamp(item.timestamp)}</time>
+        <time datetime={new Date(item.timestamp).toISOString()}
+          >{formatMessageTimestamp(item.timestamp)}</time
+        >
         {#if onMentionUser && item.sender && !collapsed}
           <SenderName
             displayName={senderName}
@@ -708,9 +710,7 @@
                 class={!persona
                   ? 'via via-hidden'
                   : ['via', 'sender-identity-via', { tinted: accountColors.tinted }]}
-                style:color={persona && !accountColors.tinted
-                  ? accountColors.nameColor
-                  : undefined}
+                style:color={persona && !accountColors.tinted ? accountColors.nameColor : undefined}
                 style:--name-color-on-light={persona
                   ? (accountColors.nameColorLight ?? undefined)
                   : undefined}

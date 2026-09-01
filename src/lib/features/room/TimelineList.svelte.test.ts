@@ -108,6 +108,7 @@ function viewport(): HTMLDivElement {
   if (!(element instanceof HTMLDivElement)) throw new Error('timeline viewport not found');
   Object.defineProperties(element, {
     clientHeight: { configurable: true, value: 100 },
+    offsetHeight: { configurable: true, value: 100 },
     scrollHeight: { configurable: true, value: 100 },
   });
   return element;
@@ -169,6 +170,7 @@ test('continues filling an underfilled room after the opening handoff', async ()
 
   viewport();
   await tick();
+  await runAnimationFrames();
   await runAnimationFrames();
   await runAnimationFrames();
 

@@ -348,7 +348,7 @@
     padding: 0;
   }
 
-  :global(.member) {
+  :global(.member-identity-row.member) {
     min-height: 3rem;
     padding: 0 var(--space-200);
   }

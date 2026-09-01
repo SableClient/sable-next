@@ -89,7 +89,7 @@
     padding: var(--space-100) var(--space-200) var(--space-200);
   }
 
-  :global(.member-user-list .member) {
+  :global(.member-user-list .member-identity-row.member) {
     min-height: 3rem;
     padding: 0 var(--space-200);
   }

@@ -195,7 +195,7 @@
     viewport?.scrollTo({ top: offset, behavior: 'smooth' });
   });
   let viewport = $state<HTMLDivElement | null>(null);
-  let initialFillState: 'idle' | 'running' | 'done' = 'idle';
+  let initialFillState = $state<'idle' | 'running' | 'done'>('idle');
   let revealedBeforeFill = false;
   let cachedRootFontSize = $state(rootFontSize());
   let initialFillPages = 0;
@@ -768,7 +768,7 @@
 
   $effect(() => {
     const viewportHeight = virtualizerViewportSize || viewport?.clientHeight || 0;
-    const messageHeight = Math.max(0, virtualizerTotalSize - historyPlaceholderHeight);
+    const messageHeight = Math.max(0, get(virtualizer).getTotalSize() - historyPlaceholderHeight);
     if (
       position.kind === 'settling' ||
       initialFillState !== 'done' ||
