@@ -29,7 +29,7 @@ test('an event_id_only push names the room from what the app cached', () => {
   expect(showing).toEqual({
     title: 'Design crew',
     body: 'New message',
-    line: { sender: null, body: 'New message' },
+    line: { sender: null, body: 'New message', eventId: '$event' },
     tag: '@me:example.org !room:example.org',
     roomId: '!room:example.org',
     eventId: '$event',

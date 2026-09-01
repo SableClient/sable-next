@@ -37,8 +37,12 @@ export function body(view: NotificationView): string {
 }
 
 export function line(view: NotificationView): ConversationLine {
-  if (!showsContent(view)) return { sender: null, body: body(view) };
-  return { sender: view.is_direct ? null : sender(view), body: view.body };
+  if (!showsContent(view)) return { sender: null, body: body(view), eventId: view.event_id };
+  return {
+    sender: view.is_direct ? null : sender(view),
+    body: view.body,
+    eventId: view.event_id,
+  };
 }
 
 function sender(view: NotificationView): string {
