@@ -117,6 +117,8 @@ export const handleError: HandleClientError = (input) => {
   if (input.kind !== 'unknown') return;
   if (reloadForStaleDynamicImport(input.error)) return;
 
+  console.error('[sable] unhandled error', input.error);
+
   Sentry.captureException(input.error, {
     mechanism: {
       type: 'auto.function.sveltekit.handle_error',
