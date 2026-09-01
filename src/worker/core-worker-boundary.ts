@@ -101,18 +101,28 @@ export function createCoreWorkerBoundary(
 
   /** `json` is a `CoreEvent[]`: the core batches whatever had queued up. */
   function handleEvent(json: string): void {
+    const shared: CoreEvent[] = [];
+    const routed = new Map<WorkerPort, CoreEvent[]>();
+
     for (const event of JSON.parse(json) as CoreEvent[]) {
       if (event.type === 'timeline_diff' || event.type === 'timeline_pagination') {
         const owner = timelineEvents.route(event);
         if (!owner) continue;
-        try {
-          owner.postMessage({ event });
-        } catch {
-          closePort(owner);
-        }
+        const batch = routed.get(owner);
+        if (batch) batch.push(event);
+        else routed.set(owner, [event]);
         continue;
       }
-      broadcast({ event });
+      shared.push(event);
+    }
+
+    if (shared.length > 0) broadcast({ events: shared });
+    for (const [owner, events] of routed) {
+      try {
+        owner.postMessage({ events });
+      } catch {
+        closePort(owner);
+      }
     }
   }
 
@@ -214,7 +224,7 @@ export function createCoreWorkerBoundary(
             return;
           }
           port.postMessage({ id, ok });
-          for (const event of events) port.postMessage({ event });
+          if (events.length > 0) port.postMessage({ events });
           return;
         }
         if (request.command.type === 'unsubscribe') {

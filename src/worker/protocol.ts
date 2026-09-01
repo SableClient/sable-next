@@ -33,6 +33,7 @@ export type WorkerMessage =
   | { id: number; bytes: Uint8Array<ArrayBuffer> }
   /** An `mxc:` URI from `uploadMedia`, or nothing from `sendAttachment`. */
   | { id: number; uri: string | null }
-  | { event: CoreEvent }
+  /** One message per core batch, so a sync tick costs one render pass. */
+  | { events: CoreEvent[] }
   | { logs: string[] }
   | { panic: { message: string } };

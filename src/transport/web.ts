@@ -122,8 +122,10 @@ export function createWebTransport(): Transport {
     nextWorker.port.onmessage = (message: MessageEvent<WorkerMessage>) => {
       const data = message.data;
 
-      if ('event' in data) {
-        for (const listener of listeners) listener(data.event);
+      if ('events' in data) {
+        for (const event of data.events) {
+          for (const listener of listeners) listener(event);
+        }
         return;
       }
 

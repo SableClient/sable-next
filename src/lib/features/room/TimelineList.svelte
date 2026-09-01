@@ -187,6 +187,8 @@
   let viewport = $state<HTMLDivElement | null>(null);
   let initialFillState: 'idle' | 'running' | 'done' = 'idle';
   let revealedBeforeFill = false;
+  // `getComputedStyle` flushes style, so it is read per font scale, not per diff.
+  let cachedRootFontSize = $state(rootFontSize());
   let initialFillPages = 0;
   let emptyRefillPages = 0;
   let emptyRefillPending = false;
@@ -727,6 +729,11 @@
     });
   }
 
+  $effect(() => {
+    void preferences.fontScale;
+    cachedRootFontSize = rootFontSize();
+  });
+
   $effect.pre(() => {
     const items = visibleItems;
     const instance = get(virtualizer);
@@ -774,8 +781,7 @@
     ) {
       holdAnchorThroughUpdate();
     }
-    // `getComputedStyle` flushes style and the estimator runs per row.
-    const rem = rootFontSize();
+    const rem = cachedRootFontSize;
     nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * rem;
     const layout = preferences.layout;
     instance.setOptions({
