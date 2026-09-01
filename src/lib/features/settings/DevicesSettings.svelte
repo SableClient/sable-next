@@ -333,15 +333,19 @@
                 />
               </dd>
             </div>
-            {#if status.verification !== 'verified'}
+            {#if status.verification !== 'verified' || status.recovery === 'incomplete'}
               <Button variant="primary" onclick={() => (verificationOpen = true)}>
-                {$i18n.t('settings.verifyDevice')}
+                {$i18n.t(
+                  status.verification === 'verified'
+                    ? 'settings.recoveryIncompleteAction'
+                    : 'settings.verifyDevice'
+                )}
               </Button>
             {/if}
           </div>
         </dl>
 
-        {#if status.verification === 'verified'}
+        {#if status.verification === 'verified' && status.recovery !== 'incomplete'}
           <div class="setting-row">
             <span class="row-icon" aria-hidden="true"><KeyIcon /></span>
             <div class="row-copy">

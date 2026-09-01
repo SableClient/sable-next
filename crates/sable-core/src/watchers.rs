@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
-use matrix_sdk::encryption::recovery::RecoveryState;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
 use matrix_sdk::ruma::events::AnyGlobalAccountDataEvent;
@@ -185,45 +184,13 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 pin_mut!(recovery);
-                let mut previous = watched.encryption().recovery().state();
-                while let Some(state) = recovery.next().await {
+                while recovery.next().await.is_some() {
                     core.emit_if_current(
                         generation,
                         CoreEvent::EncryptionStatus {
                             status: crate::verification::encryption_status(&watched).await,
                         },
                     );
-                    if state == RecoveryState::Enabled && previous != RecoveryState::Enabled {
-                        core.warm_backup_keys(&watched, generation);
-                    }
-                    previous = state;
-                }
-            })
-            .abort_on_drop(),
-        );
-    }
-
-    fn warm_backup_keys(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
-        let core = self.clone();
-        let client = client.clone();
-        self.track_session_task(
-            spawn(async move {
-                let backups = client.encryption().backups();
-                for room in client.joined_rooms() {
-                    if core
-                        .session_generation
-                        .load(std::sync::atomic::Ordering::SeqCst)
-                        != generation
-                    {
-                        return;
-                    }
-                    if let Err(error) = backups.download_room_keys_for_room(room.room_id()).await {
-                        tracing::warn!(
-                            room_id = %room.room_id(),
-                            %error,
-                            "backup warm-up failed for room"
-                        );
-                    }
                 }
             })
             .abort_on_drop(),
