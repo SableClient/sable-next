@@ -214,20 +214,27 @@ export class RoomTimeline {
   // A partially clipped row shifts on its own as history lands, so an anchor
   // has to be one the viewport already contains whole.
   async fullyVisibleAnchor(): Promise<TimelineAnchor> {
-    const itemId = await this.viewport.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      const anchor = Array.from(element.querySelectorAll<HTMLElement>('.item[data-event-id]')).find(
-        (item) => {
-          const rect = item.getBoundingClientRect();
-          return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
-        }
-      );
-      return anchor?.dataset.itemId;
-    });
-    if (!itemId) throw new Error('timeline rendered no fully visible anchor');
-    const box = await this.itemById(itemId).boundingBox();
-    if (!box) throw new Error(`timeline item ${itemId} has no bounds`);
-    return { itemId, y: box.y };
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      const itemId = await this.viewport.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const row = Array.from(element.querySelectorAll<HTMLElement>('.item[data-event-id]')).find(
+          (item) => {
+            const rect = item.getBoundingClientRect();
+            return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+          }
+        );
+        return row?.dataset.itemId;
+      });
+      if (itemId !== undefined) {
+        const box = await this.itemById(itemId).boundingBox();
+        if (box) return { itemId, y: box.y };
+      }
+      if (Date.now() > deadline) {
+        throw new Error('timeline rendered no fully visible anchor with stable bounds');
+      }
+      await this.page.waitForTimeout(50);
+    }
   }
 
   // The local echo and the confirmed event coexist until the SDK dedupes them,
