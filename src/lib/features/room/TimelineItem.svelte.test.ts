@@ -79,6 +79,33 @@ function imageItem(): TimelineItemView {
   };
 }
 
+test('renders placeholders through the standard message layout', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: {
+        item: item(false),
+        collapsed: false,
+        placeholder: true,
+        placeholderCharacters: 24,
+      },
+    },
+  });
+  await tick();
+
+  const message = document.querySelector('.message.placeholder-message');
+  expect(message).toBeInstanceOf(HTMLElement);
+  expect(message?.querySelector('.sable-avatar.message-avatar')).toBeInstanceOf(HTMLElement);
+  expect(
+    message?.querySelector<HTMLElement>('.message-content .formatted-body .placeholder-copy')
+      ?.textContent
+  ).toBe('x'.repeat(24));
+  expect(message?.getAttribute('aria-hidden')).toBe('true');
+
+  await unmount(instance);
+});
+
 test('reads an emote as one sentence, with the name only in the action', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

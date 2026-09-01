@@ -147,7 +147,7 @@ test('fills a short live timeline until the server reports the timeline start', 
   await unmount(instance);
 });
 
-test('bounds the opening fill when the viewport never fills', async () => {
+test('continues filling an underfilled room after the opening handoff', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
@@ -168,7 +168,10 @@ test('bounds the opening fill when the viewport never fills', async () => {
   await runAnimationFrames();
   await runAnimationFrames();
 
-  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.initialFillMaxPages);
+  expect(history.mock.calls.length).toBeGreaterThan(TIMELINE_LAYOUT.initialFillMaxPages);
+  const placeholder = document.querySelector('.timeline-placeholder.history');
+  expect(placeholder).toBeInstanceOf(HTMLElement);
+  expect(placeholder?.querySelector('.message.placeholder-message')).toBeInstanceOf(HTMLElement);
   await unmount(instance);
 });
 
@@ -702,6 +705,25 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   };
 }
 
+test('reserves placeholder space without counter-scrolling the reader', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element } = await mountLive(roomTimeline);
+  Object.defineProperty(element, 'clientHeight', { configurable: true, value: 900 });
+  const beforeScroll = element.scrollTop;
+
+  roomTimeline.backwardPagination = 'loading';
+  await tick();
+  await runAnimationFrames();
+
+  const placeholder = document.querySelector('.timeline-placeholder.history');
+  expect(placeholder?.parentElement?.classList.contains('items')).toBe(true);
+  expect(placeholder?.querySelector('.message.placeholder-message')).toBeInstanceOf(HTMLElement);
+  expect(element.scrollTop).toBe(beforeScroll);
+
+  await unmount(instance);
+});
+
 async function dragTo(element: HTMLDivElement, from: number, to: number): Promise<void> {
   touch(element, 'touchstart', from < to ? 200 : 100);
   element.dispatchEvent(new Event('scroll'));
@@ -823,6 +845,20 @@ test('a wheel notch inside the band also leaves follow mode', async () => {
 
   element.dispatchEvent(new WheelEvent('wheel', { deltaY: -30 }));
   element.scrollTop = end - 30;
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(anchored()).toBe(true);
+  await unmount(instance);
+});
+
+test('middle-button autoscroll leaves follow mode', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  element.dispatchEvent(new Event('pointerdown'));
+  element.scrollTop = end - 900;
   element.dispatchEvent(new Event('scroll'));
   await tick();
 

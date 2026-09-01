@@ -1,126 +1,176 @@
 <script lang="ts">
+  import type { TimelineItemView } from '#src/generated/TimelineItemView';
   import { i18n } from '#lib/i18n.js';
-  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
-  import { prefersReducedMotion } from 'svelte/motion';
+  import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
+  import { onMount } from 'svelte';
   import { innerHeight } from 'svelte/reactivity/window';
-  import { fade } from 'svelte/transition';
-  import type { TransitionConfig } from 'svelte/transition';
 
-  /* Held rather than delayed: a fast open would flash the rows for a few
-     milliseconds instead, which reads as a fade. */
-  const MIN_VISIBLE = 400;
-  const FADE_OUT = 200;
-  const ROW_HEIGHT = 40;
-  const shownAt = Date.now();
-  const WIDTHS = [62, 44, 71, 38, 55, 48, 66, 40, 58, 33];
-  const GROUPED = [false, true, true, false, true, false, false, true, true, false];
+  import TimelineItem from './TimelineItem.svelte';
 
-  /* Counted off the window, not measured: the box is never taller, and a
-     measurement lands a frame late. The surplus clips off the top. */
+  interface Props {
+    mode?: 'initial' | 'history';
+    layout?: TimelineLayout;
+    targetHeight?: number;
+    onHeightChange?: (height: number) => void;
+  }
+
+  let { mode = 'initial', layout = 'modern', targetHeight = 0, onHeightChange }: Props = $props();
+
+  const APPROXIMATE_ROW_HEIGHT = 52;
+  let seed = $state(0x6d2b79f5);
+
+  onMount(() => {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    seed = values[0] ?? seed;
+  });
+
+  function random(index: number, salt: number): number {
+    let value = (seed + Math.imul(index + 1, 0x9e3779b1) + Math.imul(salt, 0x85ebca6b)) >>> 0;
+    value ^= value >>> 16;
+    value = Math.imul(value, 0x7feb352d);
+    value ^= value >>> 15;
+    value = Math.imul(value, 0x846ca68b);
+    value ^= value >>> 16;
+    return (value >>> 0) / 0x1_0000_0000;
+  }
+
+  function characterCount(index: number, collapsed: boolean): number {
+    const value = random(index, 3);
+    if (!collapsed && value < 0.12) return 0;
+    if (value < 0.35) return 6 + Math.round((value / 0.35) * 18);
+    if (value < 0.7) return 24 + Math.round(((value - 0.35) / 0.35) * 52);
+    if (value < 0.9) return 76 + Math.round(((value - 0.7) / 0.2) * 94);
+    return 170 + Math.round(((value - 0.9) / 0.1) * 180);
+  }
+
+  let availableHeight = $derived(
+    mode === 'initial' ? Math.max(targetHeight, innerHeight.current ?? 0) : targetHeight
+  );
   let rows = $derived(
-    Array.from({ length: Math.ceil((innerHeight.current ?? 0) / ROW_HEIGHT) + 1 }, (_, index) => ({
-      id: index,
-      collapsed: GROUPED[index % GROUPED.length] ?? false,
-      width: `${String(WIDTHS[index % WIDTHS.length] ?? 50)}%`,
-    }))
+    (() => {
+      const count = Math.max(6, Math.ceil(availableHeight / APPROXIMATE_ROW_HEIGHT) + 1);
+      let messagesLeftInGroup = 0;
+      return Array.from({ length: count }, (_, index) => {
+        const groupStart = messagesLeftInGroup === 0;
+        if (groupStart) messagesLeftInGroup = 1 + Math.floor(random(index, 1) * 4);
+        else messagesLeftInGroup -= 1;
+        const collapsed = !groupStart;
+        return {
+          id: index,
+          collapsed,
+          groupStart: index > 0 && groupStart,
+          characters: characterCount(index, collapsed),
+        };
+      });
+    })()
   );
 
-  function holdThenFade(node: Element): TransitionConfig {
-    return fade(node, {
-      delay: Math.max(0, MIN_VISIBLE - (Date.now() - shownAt)),
-      duration: prefersReducedMotion.current ? 0 : FADE_OUT,
-    });
+  function measureHeight(node: HTMLDivElement): () => void {
+    if (!onHeightChange) return () => {};
+    let frame = 0;
+    const report = (): void => {
+      const measured = Math.max(node.scrollHeight, node.getBoundingClientRect().height);
+      if (measured > 0) onHeightChange?.(measured);
+    };
+    const observer = new ResizeObserver(report);
+    observer.observe(node);
+    frame = requestAnimationFrame(report);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }
+
+  function placeholderItem(id: number): TimelineItemView {
+    return {
+      id: `placeholder-${String(id)}`,
+      event_id: null,
+      transaction_id: null,
+      send_state: null,
+      sender: null,
+      sender_name: null,
+      sender_avatar: null,
+      timestamp: 0,
+      content: {
+        kind: 'message',
+        body: '',
+        html: '',
+        emote: false,
+        notice: false,
+        edited: false,
+      },
+      in_reply_to: null,
+      thread_root: null,
+      thread_summary: null,
+      reactions: [],
+      is_own: false,
+      read_by: [],
+      per_message_profile: null,
+      mention: 'none',
+    };
   }
 </script>
 
-<!-- Opaque, above the settled viewport: fading out uncovers the messages. -->
 <div
-  class="timeline-skeleton"
+  class={['timeline-placeholder', mode, 'items', `layout-${layout}`]}
   aria-label={$i18n.t('timeline.loading')}
   role="status"
-  out:holdThenFade
+  {@attach measureHeight}
 >
   {#each rows as row (row.id)}
     <div
-      class={['timeline-skeleton-row', { collapsed: row.collapsed }]}
-      style:--skeleton-body-width={row.width}
-      aria-hidden="true"
+      class={[
+        'placeholder-item',
+        'item',
+        { collapsed: row.collapsed, 'group-start': row.groupStart },
+      ]}
     >
-      {#if !row.collapsed}<Skeleton class="timeline-skeleton-avatar" />{/if}
-      <div class="timeline-skeleton-copy">
-        {#if !row.collapsed}
-          <div class="timeline-skeleton-header">
-            <Skeleton class="timeline-skeleton-sender" />
-            <Skeleton class="timeline-skeleton-time" />
-          </div>
-        {/if}
-        <Skeleton class="timeline-skeleton-body" />
-      </div>
+      <TimelineItem
+        item={placeholderItem(row.id)}
+        collapsed={row.collapsed}
+        {layout}
+        placeholder
+        placeholderCharacters={row.characters}
+      />
     </div>
   {/each}
 </div>
 
 <style>
-  .timeline-skeleton {
-    background: var(--sable-bg-container);
+  .timeline-placeholder {
+    background: transparent;
     display: flex;
     flex-direction: column;
+    pointer-events: none;
+  }
+
+  .timeline-placeholder.initial {
     inset: 0;
     justify-content: flex-end;
     overflow: hidden;
-    padding: 0 var(--page-gutter) var(--space-400);
-    pointer-events: none;
     position: absolute;
     z-index: 1;
   }
 
-  .timeline-skeleton-row {
-    display: flex;
+  .timeline-placeholder.history {
+    inset: 0 0 auto;
+    overflow: visible;
+    position: absolute;
+  }
+
+  .placeholder-item {
+    box-sizing: border-box;
     flex: 0 0 auto;
-    gap: var(--timeline-row-gap);
-    padding: var(--timeline-row-padding) 0;
+    padding: var(--timeline-row-padding) var(--page-gutter);
+    width: 100%;
   }
 
-  .timeline-skeleton-row.collapsed {
-    padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap));
+  .placeholder-item.collapsed {
+    padding-top: 0;
   }
 
-  .timeline-skeleton-copy {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: var(--space-150);
-    justify-content: center;
-    min-width: 0;
-  }
-
-  .timeline-skeleton-header {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    height: 1rem;
-  }
-
-  :global(.sable-skeleton.timeline-skeleton-avatar) {
-    border-radius: var(--radius-pill);
-    flex: 0 0 var(--avatar-size-small);
-    height: var(--avatar-size-small);
-    width: var(--avatar-size-small);
-  }
-
-  :global(.sable-skeleton.timeline-skeleton-sender) {
-    height: 0.625rem;
-    width: 6.5rem;
-  }
-
-  :global(.sable-skeleton.timeline-skeleton-time) {
-    height: 0.5rem;
-    width: 3rem;
-  }
-
-  :global(.sable-skeleton.timeline-skeleton-body) {
-    height: 0.75rem;
-    max-width: 28rem;
-    width: var(--skeleton-body-width);
+  .placeholder-item.group-start {
+    padding-top: calc(var(--timeline-row-padding) + var(--timeline-group-gap));
   }
 </style>

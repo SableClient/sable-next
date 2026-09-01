@@ -22,6 +22,7 @@
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 
@@ -100,6 +101,8 @@
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     onPersonaOpenChange?: (open: boolean) => void;
+    placeholder?: boolean;
+    placeholderCharacters?: number;
   }
 
   let {
@@ -131,6 +134,8 @@
     onVotePoll,
     onEndPoll,
     onPersonaOpenChange,
+    placeholder = false,
+    placeholderCharacters = 35,
   }: Props = $props();
   const core = useCoreClient();
   const personaStore = usePersonaStore();
@@ -453,7 +458,36 @@
   }
 </script>
 
-{#if isMessageRow(item.content)}
+{#if placeholder}
+  <article
+    class={['message', 'placeholder-message', `layout-${layout}`, { collapsed }]}
+    aria-hidden="true"
+  >
+    {#if layout === 'compact'}
+      <div class="compact-gutter">
+        <time><Skeleton class="placeholder-time" /></time>
+        {#if !collapsed}<Skeleton class="compact-name placeholder-name" />{/if}
+      </div>
+    {:else if !collapsed}
+      <Skeleton class="sable-avatar sable-avatar-small message-avatar placeholder-avatar" />
+    {/if}
+    <div class="message-content">
+      {#if !collapsed && layout !== 'compact'}
+        <header>
+          <Skeleton class="sender placeholder-name" />
+          <div class="message-details">
+            <time><Skeleton class="placeholder-time" /></time>
+          </div>
+        </header>
+      {/if}
+      {#if placeholderCharacters > 0}
+        <div class="formatted-body placeholder-body">
+          <span class="placeholder-copy">{'x'.repeat(placeholderCharacters)}</span>
+        </div>
+      {/if}
+    </div>
+  </article>
+{:else if isMessageRow(item.content)}
   <ContextMenu.Root
     bind:open={
       () => openMessageMenu.isOpen(item.id),
@@ -864,6 +898,54 @@
 {/if}
 
 <style>
+  .placeholder-message {
+    pointer-events: none;
+  }
+
+  .placeholder-message :global(.sable-skeleton) {
+    background: color-mix(in srgb, var(--sable-bg-on-container) 18%, var(--sable-bg-container));
+  }
+
+  .placeholder-body {
+    line-height: var(--line-height-body);
+  }
+
+  .placeholder-copy {
+    background: color-mix(in srgb, var(--sable-bg-on-container) 18%, var(--sable-bg-container));
+    border-radius: var(--radius);
+    box-decoration-break: clone;
+    color: transparent;
+    overflow-wrap: anywhere;
+    user-select: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .placeholder-copy {
+      animation: placeholder-copy-pulse 1.8s ease-in-out infinite;
+    }
+  }
+
+  @keyframes placeholder-copy-pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+
+  :global(.sable-skeleton.placeholder-avatar) {
+    background: color-mix(in srgb, var(--sable-bg-on-container) 24%, var(--sable-bg-container));
+    border-radius: var(--radii-400);
+  }
+
+  :global(.sable-skeleton.placeholder-name) {
+    height: var(--font-size-body);
+    width: 6.5rem;
+  }
+
+  :global(.sable-skeleton.placeholder-time) {
+    height: var(--font-size-small);
+    width: 3rem;
+  }
+
   .thread-summary {
     align-items: center;
     background: none;
