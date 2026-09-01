@@ -79,6 +79,10 @@ function item(id: string): TimelineItemView {
   };
 }
 
+function readMarker(id: string): TimelineItemView {
+  return { ...item(id), event_id: null, content: { kind: 'read_marker' } };
+}
+
 function hiddenItem(id: string): TimelineItemView {
   return {
     ...item(id),
@@ -172,84 +176,7 @@ test('bounds the opening fill when the viewport never fills', async () => {
   await unmount(instance);
 });
 
-test('waits for a terminal page to settle before revealing the timeline', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
-  try {
-    const roomTimeline = timeline();
-    roomTimeline.items = [item('latest')];
-    // Production ordering: `paginate` resolves before the diff that settles it.
-    const history = vi.fn(() => {
-      roomTimeline.backwardPagination = 'loading';
-      return Promise.resolve(true);
-    });
-    const instance = mount(TimelineListHarness, {
-      target: document.body,
-      props: {
-        list: {
-          timeline: roomTimeline,
-          onRequestHistory: history,
-          onRequestFuture: async () => {},
-          onRead: async () => {},
-        },
-      },
-    });
-
-    viewport();
-    await tick();
-    await runAnimationFrames();
-
-    expect(history).toHaveBeenCalledTimes(1);
-    expect(timelineViewport().classList.contains('initial')).toBe(true);
-
-    roomTimeline.backwardPagination = 'end';
-    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.initialFillPollInterval);
-    await runAnimationFrames();
-
-    expect(history).toHaveBeenCalledTimes(1);
-    expect(timelineViewport().classList.contains('initial')).toBe(false);
-    await unmount(instance);
-  } finally {
-    vi.useRealTimers();
-  }
-});
-
-test('reveals the timeline when a page never settles', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
-  try {
-    const roomTimeline = timeline();
-    roomTimeline.items = [item('latest')];
-    const history = vi.fn(() => {
-      roomTimeline.backwardPagination = 'loading';
-      return Promise.resolve(false);
-    });
-    const instance = mount(TimelineListHarness, {
-      target: document.body,
-      props: {
-        list: {
-          timeline: roomTimeline,
-          onRequestHistory: history,
-          onRequestFuture: async () => {},
-          onRead: async () => {},
-        },
-      },
-    });
-
-    viewport();
-    await tick();
-    await runAnimationFrames();
-    expect(timelineViewport().classList.contains('initial')).toBe(true);
-
-    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.initialFillSettleTimeout);
-    await runAnimationFrames();
-
-    expect(timelineViewport().classList.contains('initial')).toBe(false);
-    await unmount(instance);
-  } finally {
-    vi.useRealTimers();
-  }
-});
-
-test('keeps the timeline hidden until the opening fill settles', async () => {
+test('reveals a short timeline at once and pads it out behind the reader', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   let releaseHistory = (): void => {};
@@ -277,6 +204,46 @@ test('keeps the timeline hidden until the opening fill settles', async () => {
   await tick();
   await runAnimationFrames();
 
+  // Nothing to land on, so the reader sees the latest message while the fill runs.
+  expect(timelineViewport().classList.contains('initial')).toBe(false);
+  expect(history).toHaveBeenCalledTimes(1);
+
+  releaseHistory();
+  await runAnimationFrames();
+
+  expect(timelineViewport().classList.contains('initial')).toBe(false);
+  await unmount(instance);
+});
+
+test('keeps a timeline with an unread marker hidden until it has landed on it', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  let releaseHistory = (): void => {};
+  const history = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        releaseHistory = () => {
+          resolve(true);
+        };
+      })
+  );
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  Object.defineProperty(viewport(), 'clientHeight', { configurable: true, value: 10_000 });
+  await tick();
+  await runAnimationFrames();
+
+  // The fill is needed, and revealing now would show the end then jump up.
   expect(history).toHaveBeenCalledTimes(1);
   expect(timelineViewport().classList.contains('initial')).toBe(true);
 

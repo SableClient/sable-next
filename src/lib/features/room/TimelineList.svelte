@@ -186,6 +186,7 @@
   });
   let viewport = $state<HTMLDivElement | null>(null);
   let initialFillState: 'idle' | 'running' | 'done' = 'idle';
+  let revealedBeforeFill = false;
   let initialFillPages = 0;
   let emptyRefillPages = 0;
   let emptyRefillPending = false;
@@ -571,8 +572,17 @@
     return position.kind === 'settling';
   }
 
+  /**
+   * The fill outlives the reveal: a room with nothing to land on is shown pinned
+   * to the end and pads itself out behind the reader, whose rows the prepend's
+   * own anchor hold keeps still. It stops once the reader takes over the offset.
+   */
+  function fillOwnsPosition(): boolean {
+    return isSettling() || (revealedBeforeFill && position.kind === 'pinned');
+  }
+
   function initialFillCancelled(): boolean {
-    return currentViewport() === null || !isSettling();
+    return currentViewport() === null || !fillOwnsPosition();
   }
 
   /**
@@ -590,11 +600,10 @@
     return true;
   }
 
-  /** Pads out a snapshot too short to fill the viewport, while it is still hidden. */
   async function fillInitialHistory(): Promise<void> {
     while (initialFillPages < fillPageLimit()) {
       const node = currentViewport();
-      if (node === null || !isSettling()) return;
+      if (node === null || !fillOwnsPosition()) return;
       // `end` is the server reporting the start of the timeline.
       if (timeline.backwardPagination === 'end') return;
       if (timeline.backwardPagination === 'loading') {
@@ -834,6 +843,10 @@
         await new Promise(requestAnimationFrame);
         if (initialAnchorCancelled()) return;
         if (currentViewport() === null) return;
+        if (unreadLandingKey() === null && visibleItems.length > 0) {
+          revealedBeforeFill = true;
+          setPosition(nextPosition(position, { kind: 'fill-finished', unreadKey: null }));
+        }
         // The fill re-enters the reconciliation once it is done.
         if (initialFillState === 'idle') {
           startInitialHistoryFill();
