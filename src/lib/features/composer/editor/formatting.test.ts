@@ -255,3 +255,47 @@ test('activeMarks reports a link mark covering the selection', () => {
 
   expect(activeMarks(editor.state)).toContain('link');
 });
+
+test('a typed address becomes a link once it is finished', () => {
+  open();
+  type('see https://example.org/a_b ');
+
+  const marks = marksOn('https://example.org/a_b');
+  expect(marks).toEqual(['link']);
+  expect(view?.state.doc.textContent).toBe('see https://example.org/a_b ');
+});
+
+test('a bare host is linked with a scheme it can be opened with', () => {
+  open();
+  type('www.example.org ');
+
+  let href: string | null = null;
+  view?.state.doc.descendants((node) => {
+    const mark = node.marks.find((candidate) => candidate.type.name === 'link');
+    if (mark) href = mark.attrs.href as string;
+  });
+  expect(href).toBe('https://www.example.org');
+});
+
+test('an address inside a code span is left alone', () => {
+  open();
+  type('`https://example.org` ');
+
+  expect(marksOn('https://example.org')).toEqual(['code']);
+});
+
+test('a fence carries its language into the block', () => {
+  open();
+  type('```rust ');
+
+  const block = view?.state.doc.firstChild;
+  expect(block?.type.name).toBe('code_block');
+  expect(block?.attrs.language).toBe('rust');
+});
+
+test('three dashes become a rule rather than a paragraph of dashes', () => {
+  open();
+  type('---');
+
+  expect(view?.state.doc.firstChild?.type.name).toBe('horizontal_rule');
+});

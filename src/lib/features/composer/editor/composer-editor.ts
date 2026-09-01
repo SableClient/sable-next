@@ -2,6 +2,7 @@ import {
   baseKeymap,
   chainCommands,
   createParagraphNear,
+  exitCode,
   liftEmptyBlock,
   newlineInCode,
   splitBlockKeepMarks,
@@ -11,8 +12,8 @@ import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
 import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
-import { DOMParser, type Node as ProseMirrorNode } from 'prosemirror-model';
-import { EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
+import { Slice, type Node as ProseMirrorNode } from 'prosemirror-model';
+import { Plugin, EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
 
@@ -40,7 +41,14 @@ import { composerNodeViews } from './node-views';
 import { hasAndroidCompositionQuirk } from '#lib/platform/input.js';
 
 import { queryKey, queryPlugin } from './query-plugin';
-import { composerSchema } from './schema';
+import { composerSchema, parseMatrixHtml } from './schema';
+import {
+  markdownFromSlice,
+  markdownSlice,
+  richFromPlain,
+  serializeComposer,
+  textSlice,
+} from './serialize';
 import { shortcodeInputRule } from './shortcodes';
 
 const androidBackspaceKeyEvent = (): KeyboardEvent =>
@@ -77,6 +85,85 @@ const insertHardBreak: Command = (state, dispatch) => {
   return true;
 };
 
+const exitEmptyCodeLine: Command = (state, dispatch) => {
+  const { $from } = state.selection;
+  if (!state.selection.empty || $from.parent.type !== composerSchema.nodes.code_block) {
+    return false;
+  }
+
+  const text = $from.parent.textContent;
+  const lineStart = text.lastIndexOf('\n', $from.parentOffset - 1) + 1;
+  if (text.slice(lineStart, $from.parentOffset) !== '') return false;
+  return exitCode(state, dispatch);
+};
+
+function escapeCodeBlock(direction: -1 | 1): Command {
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    if (!state.selection.empty || $from.parent.type !== composerSchema.nodes.code_block) {
+      return false;
+    }
+
+    const text = $from.parent.textContent;
+    const onBoundaryLine =
+      direction < 0
+        ? text.lastIndexOf('\n', $from.parentOffset - 1) < 0
+        : text.indexOf('\n', $from.parentOffset) < 0;
+    if (!onBoundaryLine) return false;
+
+    const parent = $from.node(-1);
+    const index = $from.index(-1);
+    const adjacent = direction < 0 ? index - 1 : index + 1;
+    const position = direction < 0 ? $from.before() : $from.after();
+    if (adjacent >= 0 && adjacent < parent.childCount) {
+      if (dispatch) {
+        dispatch(
+          state.tr
+            .setSelection(Selection.near(state.doc.resolve(position), direction))
+            .scrollIntoView()
+        );
+      }
+      return true;
+    }
+
+    if (direction > 0) return exitCode(state, dispatch);
+    if (dispatch) {
+      const tr = state.tr.insert(position, composerSchema.nodes.paragraph.create());
+      tr.setSelection(TextSelection.create(tr.doc, position + 1));
+      dispatch(tr.scrollIntoView());
+    }
+    return true;
+  };
+}
+
+function enterCodeBlock(direction: -1 | 1): Command {
+  return (state, dispatch, view) => {
+    const { $from, empty } = state.selection;
+    const codeBlock = composerSchema.nodes.code_block;
+    if (!empty || !$from.parent.isTextblock || $from.parent.type === codeBlock) return false;
+
+    const atEdge = view
+      ? view.endOfTextblock(direction < 0 ? 'up' : 'down')
+      : $from.parentOffset === (direction < 0 ? 0 : $from.parent.content.size);
+    if (!atEdge) return false;
+
+    const parent = $from.node(-1);
+    const adjacent = $from.index(-1) + direction;
+    if (adjacent < 0 || adjacent >= parent.childCount) return false;
+    if (parent.child(adjacent).type !== codeBlock) return false;
+
+    if (dispatch) {
+      const position = direction < 0 ? $from.before() - 1 : $from.after() + 1;
+      dispatch(
+        state.tr
+          .setSelection(TextSelection.near(state.doc.resolve(position), direction))
+          .scrollIntoView()
+      );
+    }
+    return true;
+  };
+}
+
 /** Shift+Enter: stay in the paragraph so the marks survive serialization. */
 const softBreak: Command = chainCommands(newlineInCode, insertHardBreak);
 
@@ -89,7 +176,27 @@ const splitEntry: Command = chainCommands(
   splitBlockKeepMarks
 );
 
+function trailingParagraph(): Plugin {
+  return new Plugin({
+    appendTransaction: (transactions, _old, state) => {
+      if (!transactions.some((tr) => tr.docChanged)) return null;
+      const last = state.doc.lastChild;
+      if (!last || last.type === composerSchema.nodes.paragraph) return null;
+      return state.tr.insert(state.doc.content.size, composerSchema.nodes.paragraph.create());
+    },
+  });
+}
+
+const URL_ONLY = /^(?:https?:\/\/|mailto:)\S+$/;
+
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape';
+
+export interface ComposerChange {
+  empty: boolean;
+  placeholder: boolean;
+  active: FormatAction[];
+  docChanged: boolean;
+}
 
 export interface ComposerEditorOptions {
   media: EmoteMedia;
@@ -100,11 +207,13 @@ export interface ComposerEditorOptions {
   activeOptionId: () => string | null;
   editable: () => boolean;
   onSubmit: () => void;
-  onChange: (empty: boolean, active: FormatAction[], docChanged: boolean) => void;
+  onChange: (change: ComposerChange) => void;
   onQuery: (query: AutocompleteQuery | null) => void;
   onNavigate: (key: NavigationKey) => boolean;
   onFiles: (files: File[]) => void;
   onLinkRequest: () => void;
+  onSpoilerRequest: () => void;
+  onSourceToggle: (source: boolean) => void;
 }
 
 function filesFrom(transfer: DataTransfer | null): File[] {
@@ -123,10 +232,30 @@ function isDocEmpty(doc: ProseMirrorNode): boolean {
   return !atom;
 }
 
+function isPlaceholderDoc(doc: ProseMirrorNode): boolean {
+  const first = doc.firstChild;
+  return (
+    doc.childCount === 1 &&
+    first !== null &&
+    first.type === composerSchema.nodes.paragraph &&
+    first.content.size === 0
+  );
+}
+
 export class ComposerEditor {
   private view: EditorView | undefined;
+  private source = false;
 
   constructor(private options: ComposerEditorOptions) {}
+
+  private report(state: EditorState, docChanged: boolean): void {
+    this.options.onChange({
+      empty: isDocEmpty(state.doc),
+      placeholder: isPlaceholderDoc(state.doc),
+      active: activeMarks(state),
+      docChanged,
+    });
+  }
 
   private submit(): boolean {
     this.options.onSubmit();
@@ -135,8 +264,7 @@ export class ComposerEditor {
 
   private enter: Command = (state, dispatch, view) => {
     if (this.options.onNavigate('Enter')) return true;
-    /* A code block owns Enter whichever way the preference is set, or a
-       multi-line snippet sends itself one line at a time. */
+    if (exitEmptyCodeLine(state, dispatch, view)) return true;
     if (newlineInCode(state, dispatch, view)) return true;
     return preferences.enterForNewline ? splitEntry(state, dispatch, view) : this.submit();
   };
@@ -186,6 +314,7 @@ export class ComposerEditor {
           : []),
         gapCursor(),
         dropCursor(),
+        trailingParagraph(),
         keymap({
           'Mod-z': undo,
           'Mod-y': redo,
@@ -193,6 +322,8 @@ export class ComposerEditor {
           Backspace: undoInputRule,
           ArrowUp: () => this.options.onNavigate('ArrowUp'),
           ArrowDown: () => this.options.onNavigate('ArrowDown'),
+          'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
+          'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),
           Tab: (state, dispatch, view) =>
             this.options.onNavigate('Tab') || sinkListEntry(state, dispatch, view),
           Escape: () => this.options.onNavigate('Escape'),
@@ -200,6 +331,10 @@ export class ComposerEditor {
           'Shift-Enter': (state, dispatch, view) =>
             preferences.enterForNewline ? this.submit() : softBreak(state, dispatch, view),
           'Mod-Enter': () => this.submit(),
+          'Mod-Shift-m': () => {
+            this.options.onSourceToggle(this.toggleSource());
+            return true;
+          },
         }),
         keymap(baseKeymap),
       ],
@@ -210,7 +345,7 @@ export class ComposerEditor {
     const view = this.view;
     if (!view) return;
     view.updateState(this.createState(view.state.doc, view.state.selection));
-    this.options.onChange(isDocEmpty(view.state.doc), activeMarks(view.state), false);
+    this.report(view.state, false);
     this.options.onQuery(queryKey.getState(view.state) ?? null);
   }
 
@@ -230,7 +365,12 @@ export class ComposerEditor {
           editable: () => this.options.editable(),
           nodeViews: composerNodeViews(this.options.media),
           attributes: () => this.domAttributes(),
-          handlePaste: (_view, event) => this.handleFiles(filesFrom(event.clipboardData)),
+          handlePaste: (pasteView, event, slice) =>
+            this.handleFiles(filesFrom(event.clipboardData)) ||
+            this.linkSelection(pasteView, slice),
+          clipboardTextParser: (text, _context, plain) =>
+            plain || !preferences.richTextComposer ? textSlice(text) : markdownSlice(text),
+          clipboardTextSerializer: (slice) => markdownFromSlice(slice),
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
             beforeinput: (view, event) => {
@@ -255,7 +395,7 @@ export class ComposerEditor {
           dispatchTransaction: (tr) => {
             const next = view.state.apply(tr);
             view.updateState(next);
-            this.options.onChange(isDocEmpty(next.doc), activeMarks(next), tr.docChanged);
+            this.report(next, tr.docChanged);
             this.options.onQuery(queryKey.getState(next) ?? null);
           },
         })
@@ -327,9 +467,47 @@ export class ComposerEditor {
   }
 
   setHtml(html: string): void {
-    const holder = document.createElement('div');
-    holder.innerHTML = html;
-    this.setDoc(DOMParser.fromSchema(composerSchema).parse(holder));
+    this.setDoc(parseMatrixHtml(html));
+  }
+
+  toggleSource(): boolean {
+    const doc = this.doc();
+    if (!doc) return false;
+
+    if (this.source) {
+      this.source = false;
+      this.setDoc(richFromPlain(doc));
+    } else {
+      this.source = true;
+      this.setSource(serializeComposer(doc).body);
+    }
+    return this.source;
+  }
+
+  leaveSource(): boolean {
+    this.source = false;
+    return false;
+  }
+
+  private linkSelection(view: EditorView, slice: Slice): boolean {
+    const text = slice.content.textBetween(0, slice.content.size).trim();
+    if (!URL_ONLY.test(text) || view.state.selection.empty) return false;
+
+    const { from, to } = view.state.selection;
+    view.dispatch(
+      view.state.tr.addMark(from, to, composerSchema.marks.link.create({ href: text }))
+    );
+    return true;
+  }
+
+  private setSource(text: string): void {
+    const { paragraph, hard_break: hardBreak } = composerSchema.nodes;
+    const content: ProseMirrorNode[] = [];
+    for (const [index, line] of text.split('\n').entries()) {
+      if (index > 0) content.push(hardBreak.create());
+      if (line !== '') content.push(composerSchema.text(line));
+    }
+    this.setDoc(composerSchema.node('doc', null, paragraph.create(null, content)));
   }
 
   setText(text: string): void {
@@ -391,7 +569,21 @@ export class ComposerEditor {
       this.options.onLinkRequest();
       return;
     }
+    if (action === 'spoiler' && !activeMarks(view.state).includes('spoiler')) {
+      this.options.onSpoilerRequest();
+      return;
+    }
     formatCommands[action](view.state, view.dispatch, view);
+    view.focus();
+  }
+
+  applySpoiler(reason: string): void {
+    const view = this.view;
+    if (!view) return;
+    const { from, to, empty } = view.state.selection;
+    const mark = composerSchema.marks.spoiler.create({ reason });
+    if (empty) view.dispatch(view.state.tr.addStoredMark(mark));
+    else view.dispatch(view.state.tr.addMark(from, to, mark));
     view.focus();
   }
 

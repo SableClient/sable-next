@@ -9,13 +9,14 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { activeQuery } from '../autocomplete';
 import { ComposerEditor, type ComposerEditorOptions } from './composer-editor';
 import { composerSchema } from './schema';
-import { serializeComposer } from './serialize';
+import { serializeComposer, serializePlain } from './serialize';
 
 let dispose: (() => void) | undefined;
 const defaultUserAgent = navigator.userAgent;
 
 afterEach(() => {
   preferences.enterForNewline = false;
+  preferences.richTextComposer = true;
   dispose?.();
   dispose = undefined;
   document.body.replaceChildren();
@@ -39,6 +40,8 @@ function openWith(overrides: Partial<ComposerEditorOptions> = {}): ComposerEdito
     onNavigate: () => false,
     onFiles: () => {},
     onLinkRequest: () => {},
+    onSpoilerRequest: () => {},
+    onSourceToggle: () => {},
     ...overrides,
   });
   dispose = editor.mount(host);
@@ -317,6 +320,8 @@ test('the active option is written straight onto the editor node', () => {
     onNavigate: () => false,
     onFiles: vi.fn(),
     onLinkRequest: () => {},
+    onSpoilerRequest: () => {},
+    onSourceToggle: () => {},
   });
   dispose = editor.mount(host);
   const surface = host.querySelector('[contenteditable]');
@@ -332,10 +337,17 @@ test('the active option is written straight onto the editor node', () => {
   expect(surface?.getAttribute('aria-expanded')).toBe('false');
 });
 
-function press(editor: ComposerEditor, key: string, shift = false): void {
+function press(
+  editor: ComposerEditor,
+  key: string,
+  modifiers: boolean | { shift?: boolean; mod?: boolean } = false
+): void {
+  const { shift = false, mod = false } =
+    typeof modifiers === 'boolean' ? { shift: modifiers } : modifiers;
   const event = new KeyboardEvent('keydown', {
     key,
     shiftKey: shift,
+    ctrlKey: mod,
     bubbles: true,
     cancelable: true,
   });
@@ -371,34 +383,219 @@ describe('block editing', () => {
   test('enter inside a code block adds a newline rather than a second block', () => {
     const editor = open();
     editor.setHtml('<pre>a</pre>');
+    const code = view(editor).state.doc.firstChild;
+    if (!code) throw new Error('code block not found');
     view(editor).dispatch(
-      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+      view(editor).state.tr.setSelection(
+        TextSelection.create(view(editor).state.doc, code.nodeSize - 1)
+      )
     );
     press(editor, 'Enter');
 
     const doc = editor.doc();
-    expect(doc?.childCount).toBe(1);
     expect(doc?.firstChild?.type.name).toBe('code_block');
     expect(doc?.firstChild?.textContent).toBe('a\n');
+  });
+
+  test('enter on an empty line inside a code block exits into a paragraph', () => {
+    const editor = open();
+    editor.setHtml('<pre>a\n</pre>');
+    const block = view(editor).state.doc.firstChild;
+    if (!block) throw new Error('code block not found');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(
+        TextSelection.create(view(editor).state.doc, block.nodeSize - 1)
+      )
+    );
+    press(editor, 'Enter');
+
+    expect(editor.doc()?.firstChild?.textContent).toBe('a\n');
+    expect(view(editor).state.selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  test('shift+arrowdown exits a code block from its final line', () => {
+    const editor = open();
+    editor.setHtml('<pre>a</pre>');
+    const block = view(editor).state.doc.firstChild;
+    if (!block) throw new Error('code block not found');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(
+        TextSelection.create(view(editor).state.doc, block.nodeSize - 1)
+      )
+    );
+    press(editor, 'ArrowDown', true);
+
+    const selection = view(editor).state.selection;
+    expect(selection.empty).toBe(true);
+    expect(selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  test('shift+arrowup exits a code block from its first line', () => {
+    const editor = open();
+    editor.setHtml('<pre>a</pre>');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atStart(view(editor).state.doc))
+    );
+    press(editor, 'ArrowUp', true);
+
+    const doc = editor.doc();
+    expect(doc?.firstChild?.type.name).toBe('paragraph');
+    expect(doc?.child(1).type.name).toBe('code_block');
+  });
+
+  test('shift+arrow keys escape from any position on the first or last code line', () => {
+    const editor = open();
+    editor.setHtml('<pre>first\nlast</pre>');
+    const editorView = view(editor);
+
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, 3))
+    );
+    press(editor, 'ArrowUp', true);
+    expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
+
+    const code = editor.doc()?.child(1);
+    if (!code) throw new Error('code block not found');
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, code.nodeSize + 1)
+      )
+    );
+    press(editor, 'ArrowDown', true);
+    expect(editor.doc()?.lastChild?.type.name).toBe('paragraph');
+  });
+
+  test('mod+enter sends from inside a code block', () => {
+    const submit = vi.fn();
+    const editor = openWith({ onSubmit: submit });
+    editor.setHtml('<pre>a</pre>');
+    press(editor, 'Enter', { mod: true });
+
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
+
+  test('shift+arrow keys traverse into adjacent blocks without adding paragraphs', () => {
+    const editor = open();
+    editor.setHtml('<p>before</p><pre>code</pre><p>after</p>');
+    const editorView = view(editor);
+    let codePosition = -1;
+    editorView.state.doc.descendants((node, position) => {
+      if (node.type === composerSchema.nodes.code_block) codePosition = position;
+    });
+    if (codePosition < 0) throw new Error('code block not found');
+
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, codePosition + 1))
+    );
+    press(editor, 'ArrowUp', true);
+    expect(editor.doc()?.childCount).toBe(3);
+    expect(editorView.state.selection.$from.parent.type.name).toBe('paragraph');
+
+    const code = editor.doc()?.child(1);
+    if (!code) throw new Error('code block not found');
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, codePosition + code.nodeSize - 1)
+      )
+    );
+    press(editor, 'ArrowDown', true);
+    expect(editor.doc()?.childCount).toBe(3);
+    expect(editorView.state.selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  test('shift+arrow keys put a caret back inside an adjacent code block', () => {
+    const editor = open();
+    editor.setHtml('<p>before</p><pre>alpha</pre>');
+    const editorView = view(editor);
+    const paragraph = editorView.state.doc.child(0);
+
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, paragraph.nodeSize - 1)
+      )
+    );
+    press(editor, 'ArrowDown', true);
+
+    let selection = editorView.state.selection;
+    expect(selection.empty).toBe(true);
+    expect(selection.$from.parent.type.name).toBe('code_block');
+    expect(selection.$from.parentOffset).toBe(0);
+
+    editorView.dispatch(editorView.state.tr.setSelection(Selection.atEnd(editorView.state.doc)));
+    press(editor, 'ArrowUp', true);
+
+    selection = editorView.state.selection;
+    expect(selection.empty).toBe(true);
+    expect(selection.$from.parent.type.name).toBe('code_block');
+    expect(selection.$from.parentOffset).toBe('alpha'.length);
+  });
+
+  test('escaping a nested code block lands the caret in the paragraph it made', () => {
+    const editor = open();
+    editor.setHtml('<p>before</p><blockquote><pre>one</pre></blockquote>');
+    const editorView = view(editor);
+    let codePosition = -1;
+    editorView.state.doc.descendants((node, position) => {
+      if (node.type === composerSchema.nodes.code_block) codePosition = position;
+    });
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, codePosition + 1))
+    );
+    press(editor, 'ArrowUp', true);
+
+    const selection = editorView.state.selection;
+    expect(selection.$from.parent.type.name).toBe('paragraph');
+    expect(selection.$from.parent.content.size).toBe(0);
+    expect(selection.$from.node(-1).type.name).toBe('blockquote');
+  });
+
+  test('escape leaves the selection alone when no autocomplete is open', () => {
+    const editor = open();
+    editor.setHtml('<pre>a</pre>');
+    const before = view(editor).state.selection.from;
+    press(editor, 'Escape');
+
+    expect(view(editor).state.selection).toBeInstanceOf(TextSelection);
+    expect(view(editor).state.selection.from).toBe(before);
+  });
+
+  test('a block that cannot be typed after gains a trailing paragraph', () => {
+    const editor = open();
+    editor.setHtml('<pre>a</pre>');
+
+    expect(editor.doc()?.childCount).toBe(2);
+    expect(editor.doc()?.lastChild?.type.name).toBe('paragraph');
+  });
+
+  test('a document already ending in a paragraph gains nothing', () => {
+    const editor = open();
+    editor.setText('hi');
+
+    expect(editor.doc()?.childCount).toBe(1);
   });
 
   test('enter on an empty line inside a quote lifts out of it', () => {
     preferences.enterForNewline = true;
     const editor = open();
     editor.setHtml('<blockquote><p>a</p><p></p></blockquote>');
+    const quote = view(editor).state.doc.firstChild;
+    if (!quote) throw new Error('blockquote not found');
     view(editor).dispatch(
-      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+      view(editor).state.tr.setSelection(
+        TextSelection.create(view(editor).state.doc, quote.nodeSize - 2)
+      )
     );
     press(editor, 'Enter');
 
     const doc = editor.doc();
-    expect(doc?.childCount).toBe(2);
-    expect(doc?.child(1).type.name).toBe('paragraph');
+    expect(doc?.child(0).type.name).toBe('blockquote');
+    expect(doc?.child(0).childCount).toBe(1);
+    expect(view(editor).state.selection.$from.depth).toBe(1);
   });
 
   test('a selection-only transaction does not report a document change', () => {
     const changes: boolean[] = [];
-    const editor = openWith({ onChange: (_empty, _marks, docChanged) => changes.push(docChanged) });
+    const editor = openWith({ onChange: (change) => changes.push(change.docChanged) });
     editor.setText('hello');
     changes.length = 0;
 
@@ -444,7 +641,7 @@ describe('rebuilding the plugin stack', () => {
     const changes: boolean[] = [];
     const queries: (string | null)[] = [];
     const editor = openWith({
-      onChange: (empty) => changes.push(empty),
+      onChange: (change) => changes.push(change.empty),
       onQuery: (next) => queries.push(next?.query ?? null),
     });
     editor.setText('hi @amp');
@@ -498,5 +695,168 @@ describe('link', () => {
     expect(doc && serializeComposer(doc).formatted).toBe(
       '<a href="https://example.org">https://example.org</a>'
     );
+  });
+});
+
+describe('pasting', () => {
+  function pasteRich(editor: ComposerEditor, text: string): void {
+    const editorView = view(editor);
+    const slice = editorView.someProp('clipboardTextParser', (parse) =>
+      parse(text, editorView.state.selection.$from, false, editorView)
+    );
+    if (!slice) throw new Error('no clipboard parser');
+    editorView.dispatch(editorView.state.tr.replaceSelection(slice));
+  }
+
+  test('markdown pasted as text arrives with its marks', () => {
+    preferences.richTextComposer = true;
+    const editor = open();
+    pasteRich(editor, 'a **bold** word');
+
+    const marks: string[] = [];
+    editor.doc()?.descendants((node) => {
+      if (node.text === 'bold') marks.push(...node.marks.map((mark) => mark.type.name));
+    });
+    expect(editor.doc()?.textContent).toBe('a bold word');
+    expect(marks).toEqual(['strong']);
+  });
+
+  test('a plain paste keeps the characters it was given', () => {
+    const editor = open();
+    view(editor).pasteText('a **bold** word');
+
+    expect(editor.doc()?.textContent).toBe('a **bold** word');
+  });
+
+  test('markdown is left alone with the rich composer off', () => {
+    preferences.richTextComposer = false;
+    const editor = open();
+    pasteRich(editor, 'a **bold** word');
+
+    expect(editor.doc()?.textContent).toBe('a **bold** word');
+    preferences.richTextComposer = true;
+  });
+
+  test('an address pasted over a selection links it instead of replacing it', () => {
+    const editor = open();
+    editor.setText('the docs');
+    const editorView = view(editor);
+    editorView.dispatch(editorView.state.tr.setSelection(Selection.atStart(editorView.state.doc)));
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, 1, editorView.state.doc.content.size - 1)
+      )
+    );
+    editorView.pasteText('https://example.org');
+
+    expect(editor.doc()?.textContent).toBe('the docs');
+    const hrefs: string[] = [];
+    editor.doc()?.descendants((node) => {
+      for (const mark of node.marks) {
+        if (mark.type.name === 'link') hrefs.push(mark.attrs.href as string);
+      }
+    });
+    expect(hrefs).toEqual(['https://example.org']);
+  });
+});
+
+describe('the placeholder', () => {
+  test('is reported for an untouched composer and after it is cleared', () => {
+    const seen: boolean[] = [];
+    const editor = openWith({ onChange: (change) => seen.push(change.placeholder) });
+    editor.setText('hi');
+    expect(seen.at(-1)).toBe(false);
+
+    editor.clear();
+    expect(seen.at(-1)).toBe(true);
+  });
+
+  test('is withheld from an empty block that is not a paragraph', () => {
+    const seen: boolean[] = [];
+    const editor = openWith({ onChange: (change) => seen.push(change.placeholder) });
+    editor.setHtml('<pre></pre>');
+
+    expect(editor.isEmpty()).toBe(true);
+    expect(seen.at(-1)).toBe(false);
+  });
+});
+
+describe('the markdown source toggle', () => {
+  test('swaps the document for its source and back', () => {
+    preferences.richTextComposer = true;
+    const editor = open();
+    editor.setHtml('<p>a <strong>bold</strong> word</p>');
+
+    expect(editor.toggleSource()).toBe(true);
+    expect(editor.doc()?.textContent).toBe('a **bold** word');
+
+    expect(editor.toggleSource()).toBe(false);
+    const marks: string[] = [];
+    editor.doc()?.descendants((node) => {
+      if (node.text === 'bold') marks.push(...node.marks.map((mark) => mark.type.name));
+    });
+    expect(marks).toEqual(['strong']);
+  });
+});
+
+describe('the markdown source toggle round trip', () => {
+  test('a code block keeps its line breaks through source and back', () => {
+    preferences.richTextComposer = true;
+    const editor = open();
+    editor.setHtml('<pre><code>const a = 1;\nconst b = 2;</code></pre>');
+
+    editor.toggleSource();
+    const source = editor.doc();
+    if (!source) throw new Error('no doc');
+    expect(serializePlain(source).body).toBe('```\nconst a = 1;\nconst b = 2;\n```');
+
+    editor.toggleSource();
+    const block = editor.doc()?.firstChild;
+    expect(block?.type.name).toBe('code_block');
+    expect(block?.textContent).toBe('const a = 1;\nconst b = 2;');
+  });
+
+  test('the keyboard shortcut reports the mode it left the editor in', () => {
+    const modes: boolean[] = [];
+    const editor = openWith({ onSourceToggle: (source) => modes.push(source) });
+    editor.setText('hi');
+    press(editor, 'm', { mod: true, shift: true });
+    press(editor, 'm', { mod: true, shift: true });
+
+    expect(modes).toEqual([true, false]);
+  });
+});
+
+describe('spoilers', () => {
+  test('applying one from the toolbar asks for a reason first', () => {
+    const onSpoilerRequest = vi.fn();
+    const editor = openWith({ onSpoilerRequest });
+    editor.setText('secret');
+    editor.format('spoiler');
+
+    expect(onSpoilerRequest).toHaveBeenCalledTimes(1);
+
+    const editorView = view(editor);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, 1, editorView.state.doc.content.size - 1)
+      )
+    );
+    editor.applySpoiler('ending');
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializeComposer(doc).formatted).toBe('<span data-mx-spoiler="ending">secret</span>');
+  });
+
+  test('an empty selection carries the reason into what is typed next', () => {
+    const editor = openWith({ onSpoilerRequest: () => {} });
+    editor.applySpoiler('ending');
+    const editorView = view(editor);
+    editorView.dispatch(editorView.state.tr.insertText('later'));
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializeComposer(doc).formatted).toBe('<span data-mx-spoiler="ending">later</span>');
   });
 });

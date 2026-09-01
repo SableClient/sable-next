@@ -1,6 +1,6 @@
 import { lift, setBlockType, toggleMark } from 'prosemirror-commands';
 import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
-import type { MarkType, NodeType } from 'prosemirror-model';
+import type { MarkType, Node as ProseMirrorNode, NodeType } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
 import type { Command, EditorState } from 'prosemirror-state';
 import { wrapIn } from 'prosemirror-commands';
@@ -33,6 +33,8 @@ function markRule(pattern: RegExp, type: MarkType): InputRule {
   );
 }
 
+const URL_PATTERN = /(?:^|[\s(])((?:https?:\/\/|www\.)[^\s<>()]*[^\s<>().,;:!?'"])([\s)])$/;
+
 export const formattingInputRules: readonly InputRule[] = [
   markRule(/\*\*([^*]+)\*\*$/, marks.strong),
   markRule(/(?<!\*)\*([^*]+)\*$/, marks.em),
@@ -51,7 +53,47 @@ export const formattingInputRules: readonly InputRule[] = [
     (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
   ),
   textblockTypeInputRule(/^```$/, nodes.code_block),
+  fenceLanguageRule(),
+  new InputRule(/^(?:---|\*\*\*|___)$/, (state, _match, start, end) =>
+    state.tr.replaceRangeWith(start, end, nodes.horizontal_rule.create()).scrollIntoView()
+  ),
+  autolinkRule(),
 ];
+
+function fenceLanguageRule(): InputRule {
+  return new InputRule(
+    /^([\w-]+) $/,
+    (state, match, start, end) => {
+      const { $from } = state.selection;
+      const block = $from.parent;
+      if (block.type !== nodes.code_block || block.attrs.language !== '') return null;
+      if (block.textContent !== match[1]) return null;
+
+      return state.tr.delete(start, end).setNodeMarkup($from.before(), undefined, {
+        language: match[1],
+      });
+    },
+    { inCode: 'only' }
+  );
+}
+
+function autolinkRule(): InputRule {
+  return new InputRule(
+    URL_PATTERN,
+    (state, match, _start, end) => {
+      const text = match[1];
+      const from = end - text.length;
+      if (from < 0 || marks.link.isInSet(state.doc.resolve(from).marks())) return null;
+
+      const href = text.startsWith('www.') ? `https://${text}` : text;
+      return state.tr
+        .addMark(from, end, marks.link.create({ href }))
+        .removeStoredMark(marks.link)
+        .insertText(match[2], end);
+    },
+    { inCodeMark: false }
+  );
+}
 
 function isInside(state: EditorState, type: NodeType): boolean {
   const { $from } = state.selection;
@@ -103,6 +145,48 @@ function toggleList(type: NodeType): Command {
   };
 }
 
+function canInsert(state: EditorState, type: NodeType): boolean {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth >= 0; depth -= 1) {
+    const index = $from.index(depth);
+    if ($from.node(depth).canReplaceWith(index, index, type)) return true;
+  }
+  return false;
+}
+
+function insertNode(type: NodeType, build: () => ProseMirrorNode | null): Command {
+  return (state, dispatch) => {
+    if (!canInsert(state, type)) return false;
+    const node = build();
+    if (!node) return false;
+    dispatch?.(state.tr.replaceSelectionWith(node).scrollIntoView());
+    return true;
+  };
+}
+
+const horizontalRuleCommand = insertNode(nodes.horizontal_rule, () =>
+  nodes.horizontal_rule.create()
+);
+
+const TABLE_COLUMNS = 2;
+const TABLE_ROWS = 2;
+
+function tableRow(cell: NodeType): ProseMirrorNode | null {
+  const cells = Array.from({ length: TABLE_COLUMNS }, () => cell.createAndFill()).filter(
+    (node): node is ProseMirrorNode => node !== null
+  );
+  return cells.length === TABLE_COLUMNS ? nodes.table_row.create(null, cells) : null;
+}
+
+const tableCommand = insertNode(nodes.table, () => {
+  const header = tableRow(nodes.table_header);
+  const body = Array.from({ length: TABLE_ROWS }, () => tableRow(nodes.table_cell));
+  if (!header || body.some((row) => row === null)) return null;
+  return nodes.table.create(null, [header, ...(body as ProseMirrorNode[])]);
+});
+
+const detailsCommand = insertNode(nodes.details, () => nodes.details.createAndFill());
+
 const bulletListCommand = toggleList(nodes.bullet_list);
 const orderedListCommand = toggleList(nodes.ordered_list);
 const blockquoteCommand = toggleWrap(nodes.blockquote);
@@ -113,6 +197,8 @@ export const formattingKeymap: Record<string, Command> = {
   'Mod-u': toggleMark(marks.underline),
   'Mod-Shift-x': toggleMark(marks.strike),
   'Mod-e': toggleMark(marks.code),
+  'Mod-,': toggleMark(marks.sub),
+  'Mod-.': toggleMark(marks.sup),
   'Mod-h': toggleMark(marks.spoiler),
   'Mod-Shift-8': bulletListCommand,
   'Mod-Shift-9': orderedListCommand,
@@ -134,6 +220,8 @@ export type FormatAction =
   | 'strike'
   | 'code'
   | 'spoiler'
+  | 'sub'
+  | 'sup'
   | 'bullet_list'
   | 'ordered_list'
   | 'blockquote'
@@ -141,6 +229,9 @@ export type FormatAction =
   | 'heading1'
   | 'heading2'
   | 'heading3'
+  | 'horizontal_rule'
+  | 'table'
+  | 'details'
   | 'link';
 
 export const formatCommands: Record<Exclude<FormatAction, 'link'>, Command> = {
@@ -150,6 +241,8 @@ export const formatCommands: Record<Exclude<FormatAction, 'link'>, Command> = {
   strike: toggleMark(marks.strike),
   code: toggleMark(marks.code),
   spoiler: toggleMark(marks.spoiler),
+  sub: toggleMark(marks.sub),
+  sup: toggleMark(marks.sup),
   bullet_list: bulletListCommand,
   ordered_list: orderedListCommand,
   blockquote: blockquoteCommand,
@@ -157,11 +250,24 @@ export const formatCommands: Record<Exclude<FormatAction, 'link'>, Command> = {
   heading1: headingCommand(1),
   heading2: headingCommand(2),
   heading3: headingCommand(3),
+  horizontal_rule: horizontalRuleCommand,
+  table: tableCommand,
+  details: detailsCommand,
 };
 
 export function activeMarks(state: EditorState): FormatAction[] {
   const { from, $from, to, empty } = state.selection;
-  const names = ['strong', 'em', 'underline', 'strike', 'code', 'spoiler', 'link'] as const;
+  const names = [
+    'strong',
+    'em',
+    'underline',
+    'strike',
+    'code',
+    'spoiler',
+    'sub',
+    'sup',
+    'link',
+  ] as const;
 
   const active: FormatAction[] = names.filter((name) => {
     const type = marks[name];
@@ -173,6 +279,8 @@ export function activeMarks(state: EditorState): FormatAction[] {
   if (isInside(state, nodes.bullet_list)) active.push('bullet_list');
   if (isInside(state, nodes.ordered_list)) active.push('ordered_list');
   if (isInside(state, nodes.blockquote)) active.push('blockquote');
+  if (isInside(state, nodes.table)) active.push('table');
+  if (isInside(state, nodes.details)) active.push('details');
   if ($from.parent.type === nodes.code_block) active.push('code_block');
   if (isHeading(state, 1)) active.push('heading1');
   if (isHeading(state, 2)) active.push('heading2');

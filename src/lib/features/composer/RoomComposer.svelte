@@ -37,6 +37,7 @@
   import PollComposer from './PollComposer.svelte';
   import ComposerFormatting from './ComposerFormatting.svelte';
   import ComposerLinkDialog from './ComposerLinkDialog.svelte';
+  import ComposerSpoilerDialog from './ComposerSpoilerDialog.svelte';
   import LocationComposer from './LocationComposer.svelte';
   import ScheduleComposer from './ScheduleComposer.svelte';
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
@@ -162,11 +163,15 @@
   let locationOpen = $state(false);
   let scheduleOpen = $state(false);
   let linkDialogOpen = $state(false);
+  let spoilerDialogOpen = $state(false);
+  let sourceMode = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
+  let showPlaceholder = $state(true);
   let activeFormats = $state.raw<FormatAction[]>([]);
   let formattingOpen = $derived(preferences.formattingToolbar);
   let richText = $derived(preferences.richTextComposer);
+  let richSend = $derived(richText && !sourceMode);
   let configuredRich = preferences.richTextComposer;
   let dragging = $state(false);
   let dropTarget = $derived(roomName ?? $i18n.t('timeline.thisRoom'));
@@ -212,11 +217,12 @@
     onSubmit: () => {
       void send();
     },
-    onChange: (next, marks, docChanged) => {
-      empty = next;
-      activeFormats = marks;
+    onChange: (change) => {
+      empty = change.empty;
+      showPlaceholder = change.placeholder;
+      activeFormats = change.active;
       activeIndex = 0;
-      if (docChanged) updateTyping();
+      if (change.docChanged) updateTyping();
     },
     onQuery: (next) => {
       if (!next) dismissedAt = null;
@@ -228,6 +234,12 @@
     onFiles: stage,
     onLinkRequest: () => {
       linkDialogOpen = true;
+    },
+    onSpoilerRequest: () => {
+      spoilerDialogOpen = true;
+    },
+    onSourceToggle: (source: boolean) => {
+      sourceMode = source;
     },
   });
 
@@ -242,6 +254,7 @@
     const next = richText;
     if (next === configuredRich) return;
     configuredRich = next;
+    sourceMode = editor.leaveSource();
     editor.reconfigure();
   });
 
@@ -366,11 +379,13 @@
     if (!hasContent || readOnly) return;
 
     const doc = editor.doc();
+    const rich = richSend;
     let unsent = staged;
 
     inFlight += 1;
     error = null;
     editor.clear();
+    sourceMode = editor.leaveSource();
     staged = [];
     if (typingTimeout) clearTimeout(typingTimeout);
     stopTyping();
@@ -378,7 +393,7 @@
     try {
       await queue.enqueue(async () => {
         const message = doc
-          ? richText
+          ? rich
             ? serializeComposer(doc)
             : serializePlain(doc)
           : { body: '', formatted: null, mentions: { userIds: [], room: false } };
@@ -414,7 +429,7 @@
 
     const doc = editor.doc();
     if (!doc) return;
-    const message = richText ? serializeComposer(doc) : serializePlain(doc);
+    const message = richSend ? serializeComposer(doc) : serializePlain(doc);
     if (message.body === '') return;
 
     editor.clear();
@@ -563,7 +578,7 @@
     if (sigil === '/') return composerSchema.text(suggestion.insert);
 
     if (sigil === '@') {
-      if (suggestion.id === ROOM_MENTION) return composerSchema.text(ROOM_MENTION);
+      if (suggestion.id === ROOM_MENTION) return composerSchema.nodes.room_ping.create();
       return composerSchema.nodes.mention.create({
         userId: suggestion.id,
         name: suggestion.label,
@@ -679,8 +694,12 @@
         {#if formattingOpen && richText}
           <ComposerFormatting
             active={activeFormats}
+            source={sourceMode}
             onFormat={(action: FormatAction) => {
               editor.format(action);
+            }}
+            onToggleSource={() => {
+              sourceMode = editor.toggleSource();
             }}
           />
         {/if}
@@ -736,7 +755,7 @@
               onchange={stageFromInput}
             />
             <div class="composer-field">
-              <ComposerEditorView {editor} {empty} {placeholder} />
+              <ComposerEditorView {editor} {showPlaceholder} {placeholder} />
               {#if panelOpen && query}
                 <ComposerAutocomplete
                   id={listboxId}
@@ -865,6 +884,13 @@
   bind:open={linkDialogOpen}
   onApply={(href: string) => {
     editor.applyLink(href);
+  }}
+/>
+
+<ComposerSpoilerDialog
+  bind:open={spoilerDialogOpen}
+  onApply={(reason: string) => {
+    editor.applySpoiler(reason);
   }}
 />
 

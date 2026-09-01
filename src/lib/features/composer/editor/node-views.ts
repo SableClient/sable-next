@@ -36,6 +36,54 @@ class MentionNodeView extends AtomNodeView {
   }
 }
 
+abstract class MediaNodeView extends AtomNodeView {
+  private destroyed = false;
+  private release: () => void;
+
+  constructor(tag: string, className: string, url: string, alt: string, media: EmoteMedia) {
+    super(tag, className);
+    this.release = media.hold(url);
+
+    const cached = media.cached(url);
+    if (cached) {
+      this.paint(cached, alt);
+      return;
+    }
+
+    this.dom.textContent = alt;
+    void media.load(url).then(
+      (src) => {
+        if (!this.destroyed) this.paint(src, alt);
+      },
+      () => {}
+    );
+  }
+
+  protected paint(src: string, alt: string): void {
+    const image = document.createElement('img');
+    image.src = src;
+    image.alt = alt;
+    this.dom.replaceChildren(image);
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+    this.release();
+  }
+}
+
+class ImageNodeView extends MediaNodeView {
+  constructor(node: ProseMirrorNode, media: EmoteMedia) {
+    super(
+      'span',
+      'composer-image',
+      node.attrs.src as string,
+      (node.attrs.alt as string) || (node.attrs.src as string),
+      media
+    );
+  }
+}
+
 class EmoticonNodeView extends AtomNodeView {
   private destroyed = false;
   private release: () => void;
@@ -81,5 +129,6 @@ export function composerNodeViews(media: EmoteMedia): Record<string, NodeViewCon
   return {
     mention: (node) => new MentionNodeView(node),
     emoticon: (node) => new EmoticonNodeView(node, media),
+    image: (node) => new ImageNodeView(node, media),
   };
 }

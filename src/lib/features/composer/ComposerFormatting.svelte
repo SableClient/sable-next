@@ -1,11 +1,18 @@
 <script lang="ts">
+  import ArticleNyTimesIcon from 'phosphor-svelte/lib/ArticleNyTimesIcon';
+  import CaretCircleDownIcon from 'phosphor-svelte/lib/CaretCircleDownIcon';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import CodeBlockIcon from 'phosphor-svelte/lib/CodeBlockIcon';
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import ListNumbersIcon from 'phosphor-svelte/lib/ListNumbersIcon';
+  import MarkdownLogoIcon from 'phosphor-svelte/lib/MarkdownLogoIcon';
+  import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
   import QuotesIcon from 'phosphor-svelte/lib/QuotesIcon';
+  import TableIcon from 'phosphor-svelte/lib/TableIcon';
+  import TextSubscriptIcon from 'phosphor-svelte/lib/TextSubscriptIcon';
+  import TextSuperscriptIcon from 'phosphor-svelte/lib/TextSuperscriptIcon';
   import TextBIcon from 'phosphor-svelte/lib/TextBIcon';
   import TextHOneIcon from 'phosphor-svelte/lib/TextHOneIcon';
   import TextHTwoIcon from 'phosphor-svelte/lib/TextHTwoIcon';
@@ -22,10 +29,12 @@
 
   interface Props {
     active: readonly FormatAction[];
+    source: boolean;
     onFormat: (action: FormatAction) => void;
+    onToggleSource: () => void;
   }
 
-  let { active, onFormat }: Props = $props();
+  let { active, source, onFormat, onToggleSource }: Props = $props();
 
   const buttons: { action: FormatAction; label: string; icon: Component }[] = [
     { action: 'strong', label: 'composer.bold', icon: TextBIcon },
@@ -34,6 +43,8 @@
     { action: 'strike', label: 'composer.strike', icon: TextStrikethroughIcon },
     { action: 'code', label: 'composer.code', icon: CodeIcon },
     { action: 'spoiler', label: 'composer.spoiler', icon: EyeSlashIcon },
+    { action: 'sub', label: 'composer.subscript', icon: TextSubscriptIcon },
+    { action: 'sup', label: 'composer.superscript', icon: TextSuperscriptIcon },
     { action: 'link', label: 'composer.link', icon: LinkSimpleIcon },
     { action: 'bullet_list', label: 'composer.bulletList', icon: ListBulletsIcon },
     { action: 'ordered_list', label: 'composer.orderedList', icon: ListNumbersIcon },
@@ -42,6 +53,9 @@
     { action: 'heading1', label: 'composer.heading1', icon: TextHOneIcon },
     { action: 'heading2', label: 'composer.heading2', icon: TextHTwoIcon },
     { action: 'heading3', label: 'composer.heading3', icon: TextHThreeIcon },
+    { action: 'horizontal_rule', label: 'composer.horizontalRule', icon: MinusIcon },
+    { action: 'table', label: 'composer.table', icon: TableIcon },
+    { action: 'details', label: 'composer.details', icon: CaretCircleDownIcon },
   ];
 </script>
 
@@ -60,6 +74,20 @@
       <button.icon />
     </IconButton>
   {/each}
+  <IconButton
+    variant="ghost"
+    size="small"
+    class="format-button"
+    label={$i18n.t('composer.markdownSource')}
+    aria-pressed={source}
+    onclick={onToggleSource}
+  >
+    {#if source}
+      <ArticleNyTimesIcon />
+    {:else}
+      <MarkdownLogoIcon />
+    {/if}
+  </IconButton>
 </div>
 
 <style>
