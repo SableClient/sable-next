@@ -33,6 +33,7 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      - path: ../../icons/ios/AppIcons.xcassets
       - path: Externals
       - path: {{app.name}}_iOS
       - path: {{app.asset-dir}}
@@ -96,6 +97,7 @@ targets:
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       groups: [app]
     dependencies:
       - framework: {{ lib-output-file-name }}
