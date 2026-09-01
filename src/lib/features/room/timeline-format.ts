@@ -1,8 +1,19 @@
+import i18next from 'i18next';
+
 import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
 import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
 import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import { t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
+
+function locale(): string {
+  return i18next.resolvedLanguage ?? i18next.language;
+}
+
+function isSameCalendarDay(a: Date, b: Date): boolean {
+  return a.toDateString() === b.toDateString();
+}
 
 const MESSAGE_ROW_KINDS = [
   'message',
@@ -223,7 +234,7 @@ export function readReceiptEventId(
 }
 
 export function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString(undefined, {
+  return new Date(timestamp).toLocaleTimeString(locale(), {
     hour: '2-digit',
     minute: '2-digit',
     ...(preferences.hour24Clock ? { hour12: false } : {}),
@@ -234,12 +245,37 @@ function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+function formatMessageDatePart(date: Date, includeYear: boolean): string {
+  return date.toLocaleDateString(locale(), {
+    day: 'numeric',
+    month: 'long',
+    ...(includeYear ? { year: 'numeric' } : {}),
+  });
+}
+
+export function formatMessageTimestamp(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const time = formatTime(timestamp);
+
+  if (isSameCalendarDay(date, now)) return time;
+
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (isSameCalendarDay(date, yesterday)) {
+    return t('timeline.messageTimestamp', { date: t('timeline.yesterday'), time });
+  }
+
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const datePart = formatMessageDatePart(date, !sameYear);
+  return t('timeline.messageTimestamp', { date: datePart, time });
+}
+
 export function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'Today';
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  if (isSameCalendarDay(date, today)) return t('timeline.today');
+  if (isSameCalendarDay(date, yesterday)) return t('timeline.yesterday');
 
   const day = pad(date.getDate());
   const month = pad(date.getMonth() + 1);
@@ -252,7 +288,11 @@ export function formatDate(timestamp: number): string {
     case 'ymd':
       return `${year}-${month}-${day}`;
     default:
-      return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+      return date.toLocaleDateString(locale(), {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
   }
 }
 

@@ -6,7 +6,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
   import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
@@ -52,11 +52,6 @@
     if (!latest) return null;
     if (room.is_direct || !latest.sender) return latest.body;
     return `${senderName(latest.sender)}: ${latest.body}`;
-  }
-
-  function when(timestamp: number): string {
-    const sameDay = new Date(timestamp).toDateString() === new Date().toDateString();
-    return sameDay ? formatTime(timestamp) : formatDate(timestamp);
   }
 
   async function markRead(room: RoomSummary, eventId: string): Promise<void> {
@@ -109,7 +104,7 @@
               <span class="head">
                 <span class="name">{name}</span>
                 {#if room.latest_event?.timestamp}
-                  <span class="when">{when(room.latest_event.timestamp)}</span>
+                  <span class="when">{formatMessageTimestamp(room.latest_event.timestamp)}</span>
                 {/if}
               </span>
               <span class="foot">

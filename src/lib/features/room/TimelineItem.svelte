@@ -50,7 +50,7 @@
   import type { MatrixLink } from './matrix-link';
   import './avatar-button.css';
   import {
-    formatTime,
+    formatMessageTimestamp,
     canRedact,
     isMessageRow,
     jumboEmojiLevel,
@@ -625,7 +625,7 @@
     {/if}
     {#if layout === 'compact'}
       <div class="compact-gutter">
-        <time datetime={new Date(item.timestamp).toISOString()}>{formatTime(item.timestamp)}</time>
+        <time datetime={new Date(item.timestamp).toISOString()}>{formatMessageTimestamp(item.timestamp)}</time>
         {#if onMentionUser && item.sender && !collapsed}
           <button
             class="compact-name name-button"
@@ -739,7 +739,7 @@
               >
             {/if}
             <time datetime={new Date(item.timestamp).toISOString()}
-              >{formatTime(item.timestamp)}</time
+              >{formatMessageTimestamp(item.timestamp)}</time
             >
           </div>
         </header>
@@ -1517,7 +1517,7 @@
   .compact-gutter {
     align-items: baseline;
     display: flex;
-    flex: 0 0 clamp(6rem, 20%, 10.625rem);
+    flex: 0 0 clamp(7.5rem, 20%, 10.625rem);
     gap: var(--space-200);
     justify-content: flex-end;
     min-width: 0;

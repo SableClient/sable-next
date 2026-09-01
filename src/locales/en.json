@@ -534,6 +534,9 @@
     "manyTyping": "{{name1}}, {{name2}} and {{count}} others are typing...",
     "unknownTyping": "Someone is typing...",
     "unknownSender": "Unknown sender",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "messageTimestamp": "{{date}} {{time}}",
     "membership": {
       "joined": "{{user}} joined the room",
       "left": "{{user}} left the room",

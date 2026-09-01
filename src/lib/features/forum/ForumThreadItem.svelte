@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
@@ -41,7 +41,7 @@
     <span class="forum-thread-body">
       <span class="forum-thread-top">
         <span class="forum-thread-sender">{displayName}</span>
-        <span class="forum-thread-time">{formatTime(thread.lastActivityAt)}</span>
+        <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
       </span>
       <span class="forum-thread-preview">{thread.preview}</span>
       <span class="forum-thread-meta">

@@ -18,7 +18,7 @@
     unreadPinCount,
     type PinReadMarker,
   } from './pin-marker';
-  import { formatTime } from './timeline-format';
+  import { formatMessageTimestamp } from './timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { memberAvatar, memberName } from './members.js';
 
@@ -245,7 +245,7 @@
                   <span class="pin-meta">
                     <span class="pin-sender">{senderName(entry.sender)}</span>
                     {#if entry.timestamp !== null}
-                      <span class="pin-time">{formatTime(entry.timestamp)}</span>
+                      <span class="pin-time">{formatMessageTimestamp(entry.timestamp)}</span>
                     {/if}
                   </span>
                   <span class="pin-body">{entry.body ?? $i18n.t('room.pinsUnreadable')}</span>

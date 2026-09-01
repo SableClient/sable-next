@@ -3,7 +3,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { useBookmarks } from '#lib/features/room/bookmarks.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -30,11 +30,6 @@
 
   function roomAvatarUrl(roomId: string): string | null {
     return roomList.rooms.find((room) => room.room_id === roomId)?.avatar_url ?? null;
-  }
-
-  function when(timestamp: number): string {
-    const sameDay = new Date(timestamp).toDateString() === new Date().toDateString();
-    return sameDay ? formatTime(timestamp) : formatDate(timestamp);
   }
 
   function remove(roomId: string, eventId: string): void {
@@ -78,7 +73,7 @@
             <span class="body">
               <span class="head">
                 <span class="name">{name}</span>
-                <span class="when">{when(bookmark.bookmarked_ts)}</span>
+                <span class="when">{formatMessageTimestamp(bookmark.bookmarked_ts)}</span>
               </span>
               <span class="preview">
                 {#if from}<span class="sender">{from}: </span>{/if}{bookmark.body_preview ??
