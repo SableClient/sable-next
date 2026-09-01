@@ -7,6 +7,7 @@ unmaintained = "workspace"
 ignore = [
   { id = "RUSTSEC-2026-0194", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
   { id = "RUSTSEC-2026-0195", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
+  { id = "RUSTSEC-2024-0415", reason = "Tauri 2's Linux backend is GTK3; gtk-rs archived the bindings and no GTK4 path exists until Tauri migrates" },
 ]
 
 [licenses]
@@ -37,6 +38,14 @@ deny = []
 # These exact older versions are pulled by transitive crates with incompatible
 # semver requirements. Keep the duplicate check strict for any new versions.
 skip = [
+  { crate = "block-buffer@0.10.4", reason = "sha1/sha2 0.10 pull the digest 0.10 line while vodozemac uses digest 0.11" },
+  { crate = "cfg-if@0.1.10", reason = "typed-generational-arena, via probly-search, has not adopted cfg-if 1.x" },
+  { crate = "crypto-common@0.1.7", reason = "paired with the digest 0.10 line above" },
+  { crate = "digest@0.10.7", reason = "ruma's headers dependency requires sha1 0.10 while vodozemac requires digest 0.11" },
+  { crate = "sha2@0.10.9", reason = "oauth2 and tauri-codegen require sha2 0.10 while the Matrix crypto stack uses 0.11" },
+  { crate = "gloo-timers@0.3.0", reason = "backon requires gloo-timers 0.3 while matrix-sdk uses 0.4" },
+  { crate = "itertools@0.14.0", reason = "prost-derive requires itertools 0.14 while matrix-sdk uses 0.15" },
+  { crate = "libloading@0.7.4", reason = "libappindicator-sys requires libloading 0.7 while the app uses 0.9" },
   { crate = "base64@0.21.7", reason = "swift-rs has not adopted base64 0.22 yet" },
   { crate = "jni@0.21.1", reason = "Tauri and reqwest require jni 0.21 while the Android app uses jni 0.22" },
   { crate = "jni@0.22.4", reason = "The Android app uses jni 0.22 while Tauri and reqwest require jni 0.21" },
@@ -46,7 +55,6 @@ skip = [
   { crate = "nix@0.30.1", reason = "wl-clipboard-rs has not adopted nix 0.31 yet" },
   { crate = "quick-xml@0.38.4", reason = "Tauri's plist pins quick-xml 0.38; wayland-scanner uses 0.41" },
   { crate = "bitflags@1.3.2", reason = "legacy GTK/WebKit bindings require bitflags 1.x" },
-  { crate = "chacha20@0.9.1", reason = "chacha20poly1305 has an incompatible 0.9 requirement" },
   { crate = "cpufeatures@0.2.17", reason = "AES and digest transitive dependencies have incompatible requirements" },
   { crate = "cssparser@0.36.0", reason = "Tauri dom_query has not adopted the cssparser 0.37 line used by ammonia" },
   { crate = "ctor@0.2.9", reason = "matrix-sdk-test requires ctor 0.2 while Tauri requires ctor 0.8" },
@@ -63,7 +71,6 @@ skip = [
   { crate = "heck@0.4.1", reason = "glib-macros has an incompatible heck requirement" },
   { crate = "html5ever@0.38.0", reason = "dom_query has an incompatible html5ever requirement" },
   { crate = "indexmap@1.9.3", reason = "schemars has an incompatible indexmap requirement" },
-  { crate = "itertools@0.10.5", reason = "aquamarine has an incompatible itertools requirement" },
   { crate = "markup5ever@0.38.0", reason = "html5ever 0.38 requires its matching markup5ever release" },
   { crate = "png@0.17.16", reason = "Tauri's ico dependency has not adopted png 0.18" },
   { crate = "proc-macro-crate@1.3.1", reason = "legacy proc-macro dependencies require proc-macro-crate 1.x" },
@@ -118,7 +125,11 @@ unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
-  "https://github.com/eleboucher/matrix-rust-sdk",
-  "https://github.com/eleboucher/tauri-plugin-notifications",
+  "https://github.com/matrix-org/matrix-rust-sdk",
+  "https://github.com/matrix-org/vodozemac",
+  "https://github.com/ruma/ruma",
   "https://github.com/SableClient/tauri-plugin-edge-to-edge",
+  "https://github.com/SableClient/tauri-plugin-livekit-mobile",
+  "https://github.com/SableClient/tauri-plugin-notifications",
+  "https://github.com/SableClient/tauri-runtime-cef",
 ]

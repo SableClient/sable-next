@@ -76,7 +76,7 @@ tauri-plugin-android-fs = "=29.0.0"
 tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "628f99df7a7634eed423388392ad995f13e2d08c", default-features = false, features = [
   "push-notifications",
 ] }
-tauri-plugin-livekit-mobile = { git = "https://github.com/SableClient/tauri-plugin-livekit-mobile.git", rev = "c6f0d02ab3da1174535bc1dc8e598a2e6873f977" }
+tauri-plugin-livekit-mobile = { version = "0.2.0", git = "https://github.com/SableClient/tauri-plugin-livekit-mobile.git", rev = "c6f0d02ab3da1174535bc1dc8e598a2e6873f977" }
 # Injects the --safe-area-inset-* custom properties: Android reports the system
 # bars to nobody, and `env()` there only covers a display cutout.
 tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }
@@ -85,7 +85,7 @@ tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/Sable
 # target directory, where scripts/cef/copy-libs.sh looks for it.
 [target."cfg(target_os = \"linux\")".dependencies]
 gtk = "0.18"
-tauri-runtime-cef = { git = "https://github.com/SableClient/tauri-runtime-cef", rev = "4e9d7a4fbdf8f246c06a141a87618d8557381c27", optional = true }
+tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "4e9d7a4fbdf8f246c06a141a87618d8557381c27", optional = true }
 cef = { version = "=150.2.1", optional = true }
 libloading = "0.9"
 zbus = "5"
