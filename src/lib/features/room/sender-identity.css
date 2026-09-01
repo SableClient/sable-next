@@ -1,0 +1,65 @@
+.sender-identity {
+  align-items: baseline;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-200);
+  min-width: 0;
+}
+
+.sender-identity-name {
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.005em;
+  max-width: 24ch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sender-identity-name.state-subject {
+  font-weight: var(--font-weight-medium);
+  letter-spacing: normal;
+  max-width: none;
+}
+
+.name-button {
+  all: unset;
+  cursor: pointer;
+  font: inherit;
+}
+
+.name-button:hover {
+  text-decoration: underline;
+}
+
+.name-button:focus-visible {
+  border-radius: 0.125rem;
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline-offset: 0.15rem;
+}
+
+:is(.sender-identity-name, .sender-identity-via, .sender-identity-pronoun).tinted {
+  color: var(--name-color-on-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light)
+    :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronoun).tinted,
+  :root.dark :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronoun).tinted {
+    color: var(--name-color-on-dark);
+  }
+}
+
+@supports (color: oklch(from red l c h)) {
+  :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronoun).tinted {
+    color: oklch(from var(--name-color-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light)
+      :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronoun).tinted,
+    :root.dark :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronoun).tinted {
+      color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
+    }
+  }
+}

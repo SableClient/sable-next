@@ -1,5 +1,4 @@
 <script lang="ts">
-  import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import { onDestroy } from 'svelte';
 
   import type { MemberView } from '#src/generated/MemberView';
@@ -11,13 +10,18 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { LongPress } from './long-press.svelte.js';
-  import { findMember, personaWithColor, stripReplyFallback } from './members.js';
+  import {
+    findMember,
+    personaWithColor,
+    senderDisplayColors,
+    stripReplyFallback,
+  } from './members.js';
   import { firstPreviewableLink } from './link-preview.js';
   import LinkPreviewCard from './LinkPreviewCard.svelte';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { projectPersona } from '#lib/personas/persona.js';
-  import { formatPronouns, pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
+  import { pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -45,10 +49,11 @@
   import ReactionsDialog from './ReactionsDialog.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
   import ReceiptsDialog from './ReceiptsDialog.svelte';
+  import SenderName from './SenderName.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import MessageReproxyDialog from './MessageReproxyDialog.svelte';
   import type { MatrixLink } from './matrix-link';
-  import './avatar-button.css';
+  import './sender-identity.css';
   import {
     formatMessageTimestamp,
     canRedact,
@@ -200,16 +205,10 @@
     onEdit: () => actions.onEdit?.(),
   });
   let avatarColor = $derived(personaTint || item.is_own ? undefined : senderColor(item.sender));
-  let nameColor = $derived(
-    item.is_own ? 'var(--sable-primary-on-container)' : senderColor(item.sender)
+  let senderColors = $derived(
+    senderDisplayColors(item.sender ?? '', profile, persona, item.is_own)
   );
-  let nameColorLight = $derived(
-    personaTint?.color_on_light ?? profile?.name_color_light ?? profile?.name_color_dark ?? null
-  );
-  let nameColorDark = $derived(
-    personaTint?.color_on_dark ?? profile?.name_color_dark ?? profile?.name_color_light ?? null
-  );
-  let nameTinted = $derived(nameColorLight !== null || nameColorDark !== null);
+  let accountColors = $derived(senderDisplayColors(item.sender ?? '', profile, null, item.is_own));
 
   $effect(() => {
     const userId = item.sender;
@@ -532,8 +531,8 @@
     ]}
     style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
     style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
-    style:--name-color-on-light={nameColorLight ?? undefined}
-    style:--name-color-on-dark={nameColorDark ?? undefined}
+    style:--name-color-on-light={senderColors.nameColorLight ?? undefined}
+    style:--name-color-on-dark={senderColors.nameColorDark ?? undefined}
     style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
     style:transition={swipe.dragging ? 'none' : undefined}
     onpointerdown={rowPress.start}
@@ -617,32 +616,36 @@
           bind:active={reactionActive}
           reactions={item.reactions}
           {members}
+          onMemberProfile={onSenderProfile}
         />
       {/if}
       {#if receiptsOpen}
-        <ReceiptsDialog bind:open={receiptsOpen} readers={receiptReaders} {members} />
+        <ReceiptsDialog
+          bind:open={receiptsOpen}
+          readers={receiptReaders}
+          {members}
+          onMemberProfile={onSenderProfile}
+        />
       {/if}
     {/if}
     {#if layout === 'compact'}
       <div class="compact-gutter">
         <time datetime={new Date(item.timestamp).toISOString()}>{formatMessageTimestamp(item.timestamp)}</time>
         {#if onMentionUser && item.sender && !collapsed}
-          <button
-            class="compact-name name-button"
-            class:tinted={nameTinted}
-            style:color={nameTinted ? undefined : nameColor}
-            type="button"
-            aria-label={$i18n.t('timeline.mentionSender', { name: senderName })}
-            onclick={mentionSender}>{senderName}</button
-          >
-        {:else}
-          <span
-            class="compact-name"
-            class:tinted={nameTinted}
-            style:color={nameTinted ? undefined : nameColor}
-          >
-            {collapsed ? '' : senderName}
-          </span>
+          <SenderName
+            displayName={senderName}
+            colors={senderColors}
+            {pronouns}
+            nameClass="compact-name"
+            onMention={mentionSender}
+          />
+        {:else if !collapsed}
+          <SenderName
+            displayName={senderName}
+            colors={senderColors}
+            {pronouns}
+            nameClass="compact-name"
+          />
         {/if}
       </div>
     {:else if !collapsed}
@@ -692,47 +695,28 @@
       {#if !collapsed && layout !== 'compact'}
         <header>
           {#if !emote}
-            {#if onMentionUser && item.sender}
-              <button
-                class="sender name-button"
-                class:tinted={nameTinted}
-                style:color={nameTinted ? undefined : nameColor}
-                type="button"
-                aria-label={$i18n.t('timeline.mentionSender', { name: senderName })}
-                onclick={mentionSender}>{senderName}</button
-              >
-            {:else}
-              <span
-                class="sender"
-                class:tinted={nameTinted}
-                style:color={nameTinted ? undefined : nameColor}
-              >
-                {senderName}
-              </span>
-            {/if}
-          {/if}
-          {#each pronouns.visible as pronoun, index (index)}
-            <PronounPill
-              lang={pronoun.language ?? undefined}
-              class={['timeline-pronoun', { tinted: nameTinted }]}
-              style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
-              >{pronoun.summary}</PronounPill
-            >
-          {/each}
-          {#if pronouns.overflow.length > 0}
-            <PronounPill
-              class={['timeline-pronoun', { tinted: nameTinted }]}
-              style={nameTinted ? undefined : nameColor ? `color: ${nameColor};` : undefined}
-              title={formatPronouns(pronouns.overflow)}
-              >{$i18n.t('timeline.morePronouns', {
-                count: pronouns.overflow.length,
-              })}</PronounPill
-            >
+            <SenderName
+              displayName={senderName}
+              colors={senderColors}
+              {pronouns}
+              onMention={onMentionUser && item.sender ? mentionSender : undefined}
+            />
           {/if}
           <div class="message-details">
             {#if item.sender}
               <button
-                class={!persona ? 'via via-hidden' : 'via'}
+                class={!persona
+                  ? 'via via-hidden'
+                  : ['via', 'sender-identity-via', { tinted: accountColors.tinted }]}
+                style:color={persona && !accountColors.tinted
+                  ? accountColors.nameColor
+                  : undefined}
+                style:--name-color-on-light={persona
+                  ? (accountColors.nameColorLight ?? undefined)
+                  : undefined}
+                style:--name-color-on-dark={persona
+                  ? (accountColors.nameColorDark ?? undefined)
+                  : undefined}
                 type="button"
                 aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
                 onclick={openSenderProfile}>{persona ? accountName : item.sender}</button
@@ -764,9 +748,9 @@
         {#if item.content.kind === 'message' && item.content.emote}
           <div class="emote">
             <span
-              class="sender"
-              class:tinted={nameTinted}
-              style:color={nameTinted ? undefined : nameColor}>* {senderName}</span
+              class={['sender', 'sender-identity-name', { tinted: senderColors.tinted }]}
+              style:color={senderColors.tinted ? undefined : senderColors.nameColor}
+              >* {senderName}</span
             >
             <FormattedBody html={item.content.html} {onMatrixLink} />
           </div>
@@ -796,6 +780,7 @@
             {onOpenMedia}
             {onVotePoll}
             {onEndPoll}
+            {onSenderProfile}
           />
         {/if}
         {#if threadSummary && onOpenThread && threadTarget}
@@ -1185,74 +1170,6 @@
     justify-content: end;
   }
 
-  .sender {
-    font-weight: var(--font-weight-bold);
-    letter-spacing: -0.005em;
-    max-width: 24ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .name-button {
-    all: unset;
-    cursor: pointer;
-    font: inherit;
-    font-weight: var(--font-weight-bold);
-    letter-spacing: -0.005em;
-    max-width: 24ch;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .name-button:hover {
-    text-decoration: underline;
-  }
-
-  .name-button:focus-visible {
-    border-radius: 0.125rem;
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: 0.15rem;
-  }
-
-  .sender.tinted,
-  .compact-name.tinted,
-  :global(.timeline-pronoun.tinted) {
-    color: var(--name-color-on-light);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not(.light) .sender.tinted,
-    :root:not(.light) .compact-name.tinted,
-    :root:not(.light) :global(.timeline-pronoun.tinted),
-    :root.dark .sender.tinted,
-    :root.dark .compact-name.tinted,
-    :root.dark :global(.timeline-pronoun.tinted) {
-      color: var(--name-color-on-dark);
-    }
-  }
-
-  @supports (color: oklch(from red l c h)) {
-    .sender.tinted,
-    .compact-name.tinted,
-    :global(.timeline-pronoun.tinted) {
-      color: oklch(from var(--name-color-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not(.light) .sender.tinted,
-      :root:not(.light) .compact-name.tinted,
-      :root:not(.light) :global(.timeline-pronoun.tinted),
-      :root.dark .sender.tinted,
-      :root.dark .compact-name.tinted,
-      :root.dark :global(.timeline-pronoun.tinted) {
-        color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
-      }
-    }
-  }
-
   .persona {
     --pmp-ink: var(--pmp-on-light, var(--sable-sec-on-container));
   }
@@ -1530,14 +1447,6 @@
     flex: none;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
-  }
-
-  .compact-name {
-    font-weight: var(--font-weight-bold);
-    letter-spacing: -0.005em;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .message.layout-bubble .message-main {

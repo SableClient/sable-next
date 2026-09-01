@@ -14,9 +14,10 @@
     members?: readonly MemberView[];
     onVote?: (eventId: string, answers: string[]) => void;
     onEnd?: (eventId: string) => void;
+    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { poll, eventId, canEnd, members = [], onVote, onEnd }: Props = $props();
+  let { poll, eventId, canEnd, members = [], onVote, onEnd, onSenderProfile }: Props = $props();
   let ended = $derived(poll.ended_at !== null);
   let multiple = $derived(poll.max_selections > 1);
   let selected = $derived(
@@ -136,6 +137,7 @@
     answers={votersAnswers}
     {members}
     bind:active={votersActive}
+    onMemberProfile={onSenderProfile}
   />
 {/if}
 

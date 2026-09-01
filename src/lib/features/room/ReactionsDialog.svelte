@@ -5,25 +5,27 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
 
-  import { senderColor } from './timeline-format';
-  import { memberAvatar, memberName } from './members.js';
+  import MemberIdentityRow from './MemberIdentityRow.svelte';
 
   interface Props {
     open?: boolean;
     reactions: readonly ReactionGroup[];
     members: readonly MemberView[];
     active?: number;
+    onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { open = $bindable(false), reactions, members, active = $bindable(0) }: Props = $props();
+  let {
+    open = $bindable(false),
+    reactions,
+    members,
+    active = $bindable(0),
+    onMemberProfile,
+  }: Props = $props();
   let group = $derived<ReactionGroup | undefined>(
     reactions[Math.min(active, reactions.length - 1)]
   );
-
-  const name = (userId: string): string => memberName(members, userId);
-  const avatar = (userId: string): string | null => memberAvatar(members, userId);
 </script>
 
 <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.viewReactions')}>
@@ -50,11 +52,7 @@
       <ul>
         {#each group.senders as sender (sender)}
           <li>
-            <IdentityRow
-              displayName={name(sender)}
-              avatarUrl={avatar(sender)}
-              color={senderColor(sender)}
-            />
+            <MemberIdentityRow userId={sender} {members} onProfile={onMemberProfile} />
           </li>
         {/each}
       </ul>
@@ -112,11 +110,5 @@
     max-height: 16rem;
     overflow-y: auto;
     padding: 0;
-  }
-
-  li {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
   }
 </style>

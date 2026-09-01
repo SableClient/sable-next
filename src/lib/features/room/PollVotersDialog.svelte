@@ -5,23 +5,25 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
 
-  import { senderColor } from './timeline-format';
-  import { memberAvatar, memberName } from './members.js';
+  import MemberIdentityRow from './MemberIdentityRow.svelte';
 
   interface Props {
     open?: boolean;
     answers: readonly PollAnswerView[];
     members: readonly MemberView[];
     active?: number;
+    onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
-  let { open = $bindable(false), answers, members, active = $bindable(0) }: Props = $props();
+  let {
+    open = $bindable(false),
+    answers,
+    members,
+    active = $bindable(0),
+    onMemberProfile,
+  }: Props = $props();
   let answer = $derived<PollAnswerView | undefined>(answers[Math.min(active, answers.length - 1)]);
-
-  const name = (userId: string): string => memberName(members, userId);
-  const avatar = (userId: string): string | null => memberAvatar(members, userId);
 </script>
 
 <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.pollVoters')}>
@@ -48,11 +50,7 @@
       <ul>
         {#each answer.voters ?? [] as voter (voter)}
           <li>
-            <IdentityRow
-              displayName={name(voter)}
-              avatarUrl={avatar(voter)}
-              color={senderColor(voter)}
-            />
+            <MemberIdentityRow userId={voter} {members} onProfile={onMemberProfile} />
           </li>
         {/each}
       </ul>
@@ -110,11 +108,5 @@
     max-height: 16rem;
     overflow-y: auto;
     padding: 0;
-  }
-
-  li {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
   }
 </style>

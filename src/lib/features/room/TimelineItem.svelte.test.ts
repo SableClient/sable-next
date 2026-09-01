@@ -288,6 +288,10 @@ test('opens an image from a mobile pointer interaction', async () => {
 });
 
 test('a per-message profile takes the sender position and names the account behind it', async () => {
+  core.userProfile.mockResolvedValue({
+    name_color_light: '#2244aa',
+    name_color_dark: '#88aaff',
+  });
   const persona = {
     ...item(false),
     per_message_profile: {
@@ -310,6 +314,7 @@ test('a per-message profile takes the sender position and names the account behi
   expect(document.querySelector('header .sable-pronoun-pill')?.textContent).toBe('they/them');
   expect(document.querySelector('header .via')?.textContent).toContain('Alice');
   expect(document.querySelector('header .via')?.textContent).not.toContain('@alice:example.org');
+  expect(document.querySelector('header .via')?.classList.contains('tinted')).toBe(true);
   await unmount(instance);
 });
 

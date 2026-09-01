@@ -738,7 +738,6 @@
               bind:open={receiptsOpen}
               readers={latestReadBy}
               members={receiptMembers}
-              loading={memberLoader.loading}
               visible={timelineAtBottom}
               onMemberProfile={openProfile}
             />

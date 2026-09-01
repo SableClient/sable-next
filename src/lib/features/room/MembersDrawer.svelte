@@ -8,9 +8,9 @@
   import { i18n } from '#lib/i18n.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import MemberIdentityRow from './MemberIdentityRow.svelte';
   import {
     MEMBERSHIP_FILTERS,
     MEMBERSHIP_FILTER_LABELS,
@@ -24,7 +24,6 @@
   } from './member-listing';
   import { powerTag } from './power-tags';
   import type { PowerLevelTagMap } from './settings/power-level-tags';
-  import { senderColor } from './timeline-format';
 
   import '#lib/ui/primitives/menu.css';
 
@@ -89,13 +88,6 @@
         if (run === generation) fetching = false;
       });
   });
-
-  function openMemberProfile(
-    member: MemberView,
-    event: MouseEvent & { currentTarget: HTMLButtonElement }
-  ): void {
-    onMemberProfile(member.user_id, event.currentTarget);
-  }
 </script>
 
 <aside class={['members-drawer', { compact }]} aria-label={title}>
@@ -192,15 +184,11 @@
           <ul>
             {#each group.members as member (member.user_id)}
               <li>
-                <IdentityRow
+                <MemberIdentityRow
                   class="member"
-                  displayName={memberName(member)}
-                  avatarUrl={member.avatar_url}
-                  color={senderColor(member.user_id)}
-                  ariaLabel={$i18n.t('timeline.senderProfile', { name: memberName(member) })}
-                  onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
-                    openMemberProfile(member, event);
-                  }}
+                  userId={member.user_id}
+                  {members}
+                  onProfile={onMemberProfile}
                 />
               </li>
             {/each}
@@ -360,26 +348,9 @@
     padding: 0;
   }
 
-  li {
-    min-height: 3rem;
-  }
-
   :global(.member) {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    color: inherit;
-    cursor: pointer;
-    display: flex;
-    gap: var(--space-250);
     min-height: 3rem;
     padding: 0 var(--space-200);
-    text-align: left;
-    width: 100%;
-  }
-
-  :global(.member:hover) {
-    background: var(--sable-surface-container);
   }
 
   @media (width >= 48rem) {

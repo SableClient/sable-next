@@ -3,6 +3,12 @@
 import { mount, tick, unmount } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
+vi.mock('#lib/core/context.js', () => ({
+  useCoreClient: () => ({
+    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
+  }),
+}));
+
 import type { PollView } from '#src/generated/PollView';
 
 import TimelinePoll from './TimelinePoll.svelte';

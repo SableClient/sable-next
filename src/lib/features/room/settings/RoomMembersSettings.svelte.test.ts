@@ -10,6 +10,7 @@ import type { RoomSummary } from '#src/generated/RoomSummary';
 const core = vi.hoisted(() => {
   const stub = {
     roomMembers: vi.fn<() => Promise<MemberView[]>>(),
+    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
     kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
     banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
     unbanUser: vi.fn<() => Promise<void>>(),

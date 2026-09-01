@@ -7,13 +7,12 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
 
-  import MembersDrawer from './MembersDrawer.svelte';
+  import MemberUserList from './MemberUserList.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
 
   interface Props {
     readers: readonly string[];
     members: readonly MemberView[];
-    loading: boolean;
     visible?: boolean;
     open?: boolean;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
@@ -22,7 +21,6 @@
   let {
     readers,
     members,
-    loading,
     visible = true,
     open = $bindable(false),
     onMemberProfile,
@@ -56,16 +54,15 @@
   <Popover.Root bind:open>
     <Popover.Portal>
       <Popover.Content class="read-receipts-popover" customAnchor={anchor} side="top" align="end">
-        <MembersDrawer
-          {members}
-          {loading}
-          compact
-          searchable={false}
+        <MemberUserList
           title={$i18n.t('timeline.seenBy')}
+          userIds={readers}
+          {members}
+          {onMemberProfile}
+          closeLabel={$i18n.t('timeline.closeReadReceipts')}
           onClose={() => {
             open = false;
           }}
-          {onMemberProfile}
         />
       </Popover.Content>
     </Popover.Portal>
@@ -76,16 +73,15 @@
     label={$i18n.t('timeline.readReceipts')}
     closeLabel={$i18n.t('timeline.closeReadReceipts')}
   >
-    <MembersDrawer
-      {members}
-      {loading}
-      compact
-      searchable={false}
+    <MemberUserList
       title={$i18n.t('timeline.seenBy')}
+      userIds={readers}
+      {members}
+      {onMemberProfile}
+      closeLabel={$i18n.t('timeline.closeReadReceipts')}
       onClose={() => {
         open = false;
       }}
-      {onMemberProfile}
     />
   </BottomSheet>
 {/if}
@@ -110,7 +106,7 @@
     z-index: var(--layer-popover);
   }
 
-  :global(.read-receipts-popover .members-drawer) {
+  :global(.read-receipts-popover .member-user-list) {
     max-height: 100%;
     min-height: 0;
   }

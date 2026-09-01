@@ -12,15 +12,13 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
-  import IdentityRow from '#lib/ui/primitives/IdentityRow.svelte';
+  import MemberIdentityRow from '../MemberIdentityRow.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import '#lib/ui/primitives/settings-row.css';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-
-  import { senderColor } from '../timeline-format';
 
   interface Props {
     room: RoomSummary | null;
@@ -223,13 +221,8 @@
         {#each shown as member (member.user_id)}
           {@const presence = presenceStore.get(member.user_id)}
           <li class="settings-row">
-            <IdentityRow
-              class="member"
-              displayName={memberName(member)}
-              avatarUrl={member.avatar_url}
-              color={senderColor(member.user_id)}
-            >
-              {#snippet meta()}
+            <MemberIdentityRow class="member" userId={member.user_id} members={shown}>
+              {#snippet trailing()}
                 {#if presence}
                   <span class="member-presence">
                     <PresenceDot
@@ -240,7 +233,7 @@
                 {/if}
                 <span class="user-id">{member.user_id}</span>
               {/snippet}
-            </IdentityRow>
+            </MemberIdentityRow>
             <div class="settings-row-control">
               {#if tab === 'ban'}
                 {#if permissions?.can_ban}
@@ -390,7 +383,7 @@
     text-align: center;
   }
 
-  .settings-row :global(.identity-row.member) {
+  .settings-row :global(.member-identity-row.member) {
     flex: 1;
     min-width: 0;
   }

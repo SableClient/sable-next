@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 
 import { mount, tick, unmount } from 'svelte';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+
+vi.mock('#lib/core/context.js', () => ({
+  useCoreClient: () => ({
+    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
+  }),
+}));
 
 import RoomReadReceipts from './RoomReadReceipts.svelte';
 
@@ -32,7 +38,6 @@ test('shows a face stack and opens the seen-by list', async () => {
     props: {
       readers: ['@bob:example.org', '@carol:example.org'],
       members,
-      loading: false,
       onMemberProfile: () => {},
     },
   });
@@ -49,9 +54,9 @@ test('shows a face stack and opens the seen-by list', async () => {
   trigger.click();
   await tick();
   expect(document.querySelector('button')?.getAttribute('aria-expanded')).toBe('true');
-  expect(document.querySelector('.members-drawer')?.textContent).toContain('Bob');
-  expect(document.querySelector('.members-drawer')?.textContent).toContain('Carol');
-  (document.querySelector('[aria-label="Close members"]') as HTMLButtonElement).click();
+  expect(document.querySelector('.member-user-list')?.textContent).toContain('Bob');
+  expect(document.querySelector('.member-user-list')?.textContent).toContain('Carol');
+  (document.querySelector('[aria-label="Close read receipts"]') as HTMLButtonElement).click();
   await tick();
 
   await unmount(instance);
@@ -72,7 +77,6 @@ test('caps the stack at three faces and keeps the row reserved when empty', asyn
         member_ts: null,
         kicked: false,
       })),
-      loading: false,
       onMemberProfile: () => {},
     },
   });
@@ -85,7 +89,7 @@ test('caps the stack at three faces and keeps the row reserved when empty', asyn
 
   const empty = mount(RoomReadReceipts, {
     target: document.body,
-    props: { readers: [], members: [], loading: false, onMemberProfile: () => {} },
+    props: { readers: [], members: [], onMemberProfile: () => {} },
   });
   await tick();
 
@@ -100,7 +104,6 @@ test('hides the trigger when not visible but keeps the row reserved', async () =
     props: {
       readers: ['@bob:example.org'],
       members,
-      loading: false,
       visible: false,
       onMemberProfile: () => {},
     },

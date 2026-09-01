@@ -3,6 +3,12 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+vi.mock('#lib/core/context.js', () => ({
+  useCoreClient: () => ({
+    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
+  }),
+}));
+
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import MembersDrawer from './MembersDrawer.svelte';
@@ -53,8 +59,10 @@ test('sorts members by power then name and opens their profile', async () => {
   });
   await tick();
 
-  const members = [...document.querySelectorAll<HTMLButtonElement>('.member')];
-  expect(members.map((member) => member.querySelector('.name')?.textContent)).toEqual([
+  const members = [
+    ...document.querySelectorAll<HTMLButtonElement>('.member.member-identity-button'),
+  ];
+  expect(members.map((member) => member.querySelector('.member-name')?.textContent)).toEqual([
     'Amy',
     'Bob',
     'Zoe',
@@ -98,7 +106,9 @@ test('honours the sort preference and fetches the membership a filter names', as
   });
   await tick();
 
-  const names = [...document.querySelectorAll('.member .name')].map((node) => node.textContent);
+  const names = [...document.querySelectorAll('.member .member-name')].map(
+    (node) => node.textContent
+  );
   expect(names).toEqual(['Zoe', 'Amy']);
   expect(loadMembership).not.toHaveBeenCalled();
   await unmount(instance);

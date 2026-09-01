@@ -1,5 +1,32 @@
 import type { MemberView } from '#src/generated/MemberView';
 import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+import type { ProfileView } from '#src/generated/ProfileView';
+
+import { senderColor } from './timeline-format';
+
+export interface SenderDisplayColors {
+  nameColor: string;
+  nameColorLight: string | null;
+  nameColorDark: string | null;
+  tinted: boolean;
+}
+
+export function senderDisplayColors(
+  userId: string,
+  profile: ProfileView | null,
+  persona: PerMessageProfileView | null = null,
+  isOwn = false
+): SenderDisplayColors {
+  const personaTint = personaWithColor(persona);
+  const nameColorLight =
+    personaTint?.color_on_light ?? profile?.name_color_light ?? profile?.name_color_dark ?? null;
+  const nameColorDark =
+    personaTint?.color_on_dark ?? profile?.name_color_dark ?? profile?.name_color_light ?? null;
+  const tinted = nameColorLight !== null || nameColorDark !== null;
+  const nameColor = isOwn ? 'var(--sable-primary-on-container)' : senderColor(userId);
+
+  return { nameColor, nameColorLight, nameColorDark, tinted };
+}
 
 export function findMember(
   members: readonly MemberView[],

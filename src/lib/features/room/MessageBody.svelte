@@ -25,6 +25,7 @@
     onOpenMedia?: (eventId: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
+    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
   }
 
   let {
@@ -35,6 +36,7 @@
     onOpenMedia,
     onVotePoll,
     onEndPoll,
+    onSenderProfile,
   }: Props = $props();
   let previewLink = $derived(
     item.content.kind === 'gallery' ? firstPreviewableLink(item.content.html) : null
@@ -94,6 +96,7 @@
     {members}
     onVote={onVotePoll}
     onEnd={onEndPoll}
+    {onSenderProfile}
   />
 {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
   <MediaContent
