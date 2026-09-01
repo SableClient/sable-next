@@ -633,26 +633,18 @@
                 >
                   {#if showIcons}
                     <span class="room-avatar">
-                      <span
-                        class="room-icon"
-                        class:glyph={!room?.avatar_url}
-                        class:voice={room?.is_voice}
-                        aria-hidden="true"
+                      <Avatar
+                        class={[
+                          'room-avatar-icon',
+                          { glyph: !room?.avatar_url, voice: room?.is_voice },
+                        ]}
+                        src={room?.avatar_url ?? null}
+                        size="small"
+                        uniform
                       >
-                        {#if room?.avatar_url}
-                          <MediaImage
-                            source={room.avatar_url}
-                            alt=""
-                            width={56}
-                            height={56}
-                            uniform
-                            class="room-image"
-                          />
-                        {:else}
-                          {@const Glyph = roomGlyph(room)}
-                          <Glyph />
-                        {/if}
-                      </span>
+                        {@const Glyph = roomGlyph(room)}
+                        <Glyph />
+                      </Avatar>
                       {#if peerPresence && peerPresence.presence !== 'offline'}
                         <PresenceDot
                           presence={peerPresence.presence}
@@ -1076,34 +1068,29 @@
     width: 1.5rem;
   }
 
+  :global(.room-avatar-icon) {
+    --avatar-size: 1.5rem;
+  }
+
   :global(.room-avatar .room-presence) {
     bottom: -0.125rem;
     position: absolute;
     right: -0.125rem;
   }
 
-  .room-icon.glyph {
+  :global(.room-avatar-icon.glyph) {
     opacity: var(--opacity-p300);
   }
 
-  .room-row.unread .room-icon.glyph,
-  .room-row.active .room-icon.glyph {
+  .room-row.unread :global(.room-avatar-icon.glyph),
+  .room-row.active :global(.room-avatar-icon.glyph) {
     opacity: var(--opacity-p500);
   }
 
-  .room-icon :global(svg) {
+  .room-icon :global(svg),
+  :global(.room-avatar-icon svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
-  }
-
-  :global(.room-image) {
-    height: 100%;
-    width: 100%;
-  }
-
-  :global(.room-image .media-image-content) {
-    object-fit: cover;
-    object-position: center;
   }
 
   .room-category {
@@ -1188,7 +1175,7 @@
     width: var(--size-x200);
   }
 
-  .room-icon.voice {
+  :global(.room-avatar-icon.voice) {
     font-size: var(--font-size-body);
   }
 

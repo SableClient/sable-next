@@ -96,8 +96,11 @@
   :global(.sable-avatar.invite-icon) {
     --avatar-size: 1.75rem;
 
-    background: var(--sable-surface-var-container);
     font-size: var(--font-size-small);
+  }
+
+  :global(.sable-avatar.invite-icon .sable-avatar-fallback) {
+    background: var(--sable-surface-var-container);
   }
 
   .invite-name {

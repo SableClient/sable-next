@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Avatar } from 'bits-ui';
+  import type { Snippet } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -17,6 +18,7 @@
     decorative?: boolean;
     uniform?: boolean;
     class?: ClassValue;
+    children?: Snippet;
   };
 
   let {
@@ -29,18 +31,20 @@
     decorative = alt === undefined,
     uniform = false,
     class: className = '',
+    children,
   }: Props = $props();
 
   let fallback = $derived(initials ?? toInitials(name));
   let accessibleLabel = $derived(alt ?? name ?? fallback);
   let isMxc = $derived(src?.startsWith('mxc://') ?? false);
   let loadingStatus = $derived<Avatar.RootProps['loadingStatus']>(isMxc ? 'loaded' : 'loading');
+  let background = $derived(!src || loadingStatus === 'error' ? color : undefined);
 </script>
 
 <Avatar.Root
   bind:loadingStatus
   class={['sable-avatar', `sable-avatar-${size}`, className]}
-  style={color ? `background: ${color}` : undefined}
+  style={background ? `background: ${background}` : undefined}
   aria-hidden={decorative ? 'true' : undefined}
   role={decorative ? undefined : 'img'}
   aria-label={decorative ? undefined : accessibleLabel}
@@ -58,7 +62,9 @@
   {:else if src}
     <Avatar.Image {src} alt="" class="sable-avatar-image" />
   {/if}
-  <Avatar.Fallback class="sable-avatar-fallback">{fallback}</Avatar.Fallback>
+  <Avatar.Fallback class="sable-avatar-fallback">
+    {#if children}{@render children()}{:else}{fallback}{/if}
+  </Avatar.Fallback>
 </Avatar.Root>
 
 <style>

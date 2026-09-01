@@ -1301,8 +1301,11 @@
   }
 
   .message.persona :global(.message-avatar) {
-    background: color-mix(in oklab, var(--pmp-ink) 18%, var(--sable-surface-var-container));
     color: var(--pmp-ink);
+  }
+
+  .message.persona :global(.message-avatar .sable-avatar-fallback) {
+    background: color-mix(in oklab, var(--pmp-ink) 18%, var(--sable-surface-var-container));
   }
 
   .via {

@@ -208,9 +208,12 @@
   }
 
   :global(.sable-avatar.room-avatar) {
-    background: var(--sable-primary-main);
     color: var(--sable-primary-on-main);
     display: none;
+  }
+
+  :global(.sable-avatar.room-avatar .sable-avatar-fallback) {
+    background: var(--sable-primary-main);
   }
 
   .voice-chip {
