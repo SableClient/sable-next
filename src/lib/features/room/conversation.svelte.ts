@@ -14,7 +14,12 @@ import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
-import { projectPersona, resolvePersona, resolveProxy } from '#lib/personas/persona.js';
+import {
+  projectPersona,
+  resolvePersona,
+  resolveProxy,
+  stripProxyHtml,
+} from '#lib/personas/persona.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -336,7 +341,7 @@ export class Conversation {
 
     return {
       body: proxied?.body ?? body,
-      formatted: proxied ? null : formatted,
+      formatted: proxied ? stripProxyHtml(formatted, proxied.trigger) : formatted,
       persona: projectPersona(persona, preferences.personaFallback),
     };
   }

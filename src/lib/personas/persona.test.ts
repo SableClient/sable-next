@@ -1,9 +1,17 @@
+// @vitest-environment happy-dom
+
 import { describe, expect, it } from 'vitest';
 
 import type { PersonaTriggerView } from '#src/generated/PersonaTriggerView';
 import type { PersonaView } from '#src/generated/PersonaView';
 
-import { projectPersona, resolvePersona, resolveProxy, triggerLabel } from './persona';
+import {
+  projectPersona,
+  resolvePersona,
+  resolveProxy,
+  stripProxyHtml,
+  triggerLabel,
+} from './persona';
 
 function persona(id: string, triggers: PersonaTriggerView[] = []): PersonaView {
   return {
@@ -29,7 +37,11 @@ function trigger(
 describe('resolveProxy', () => {
   it('strips a prefix trigger', () => {
     const kris = persona('Kris', [trigger('k:')]);
-    expect(resolveProxy([kris], 'k:hello')).toEqual({ persona: kris, body: 'hello' });
+    expect(resolveProxy([kris], 'k:hello')).toEqual({
+      persona: kris,
+      body: 'hello',
+      trigger: trigger('k:'),
+    });
   });
 
   it('strips both ends of a circumfix', () => {
@@ -59,6 +71,22 @@ describe('resolveProxy', () => {
 
   it('returns nothing when no trigger matches', () => {
     expect(resolveProxy([persona('Kris', [trigger('k:')])], 'hello')).toBeUndefined();
+  });
+});
+
+describe('stripProxyHtml', () => {
+  it('retains formatting after removing a prefix trigger', () => {
+    expect(stripProxyHtml('k:<code>const answer = 42</code>', trigger('k:'))).toBe(
+      '<code>const answer = 42</code>'
+    );
+  });
+
+  it('retains formatting after removing a circumfix trigger', () => {
+    expect(stripProxyHtml('[<em>test</em>]', trigger('[', ']'))).toBe('<em>test</em>');
+  });
+
+  it('does not strip HTML that does not contain the trigger as text', () => {
+    expect(stripProxyHtml('<em>test</em>', trigger('k:'))).toBeNull();
   });
 });
 
