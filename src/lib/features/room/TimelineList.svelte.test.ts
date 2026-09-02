@@ -108,7 +108,6 @@ function viewport(): HTMLDivElement {
   if (!(element instanceof HTMLDivElement)) throw new Error('timeline viewport not found');
   Object.defineProperties(element, {
     clientHeight: { configurable: true, value: 100 },
-    offsetHeight: { configurable: true, value: 100 },
     scrollHeight: { configurable: true, value: 100 },
   });
   return element;
@@ -152,7 +151,7 @@ test('fills a short live timeline until the server reports the timeline start', 
   await unmount(instance);
 });
 
-test('continues filling an underfilled room after the opening handoff', async () => {
+test('bounds the opening fill when the viewport never fills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
@@ -172,15 +171,8 @@ test('continues filling an underfilled room after the opening handoff', async ()
   await tick();
   await runAnimationFrames();
   await runAnimationFrames();
-  await runAnimationFrames();
 
-  expect(history.mock.calls.length).toBeGreaterThan(TIMELINE_LAYOUT.initialFillMaxPages);
-  const placeholder = document.querySelector('.timeline-placeholder.history');
-  expect(placeholder).toBeInstanceOf(HTMLElement);
-  expect(placeholder?.classList.contains('items')).toBe(true);
-  expect(placeholder?.querySelector('.item .message.placeholder-message')).toBeInstanceOf(
-    HTMLElement
-  );
+  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.initialFillMaxPages);
   await unmount(instance);
 });
 
@@ -527,18 +519,13 @@ test('rate limits and bounds sparse history fill', async () => {
     element.dispatchEvent(new WheelEvent('wheel', { deltaY: -200 }));
     await tick();
     await Promise.resolve();
-    await runAnimationFrames();
     expect(history).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(299);
     expect(history).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
     expect(history).toHaveBeenCalledTimes(2);
-    await runAnimationFrames();
-    await vi.advanceTimersByTimeAsync(300);
-    expect(history).toHaveBeenCalledTimes(3);
-    await runAnimationFrames();
-    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(600);
     expect(history).toHaveBeenCalledTimes(4);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(history).toHaveBeenCalledTimes(4);
@@ -682,35 +669,27 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   };
 }
 
-test('a backward pagination adds a scrollable history placeholder', async () => {
+test('a backward pagination shows a loading pill and adds no content of its own', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element } = await mountLive(roomTimeline);
-  element.scrollTop = 0;
-  element.dispatchEvent(new Event('scroll'));
-  await tick();
-  await runAnimationFrames();
   const beforeScroll = element.scrollTop;
   const beforeHeight = contentHeight();
+  expect(document.querySelector('.history-loading')).toBeNull();
 
   roomTimeline.backwardPagination = 'loading';
   await tick();
   await runAnimationFrames();
 
-  expect(contentHeight()).toBeGreaterThan(beforeHeight);
-  expect(contentHeight() - beforeHeight).toBeGreaterThanOrEqual(100 / 3);
-  const placeholder = document.querySelector('.timeline-placeholder.history');
-  expect(placeholder).toBeInstanceOf(HTMLElement);
-  expect(placeholder?.classList.contains('items')).toBe(true);
-  expect(placeholder?.querySelector('.item .message.placeholder-message')).toBeInstanceOf(
-    HTMLElement
-  );
+  expect(document.querySelector('.history-loading')).not.toBeNull();
+  expect(contentHeight()).toBe(beforeHeight);
   expect(element.scrollTop).toBe(beforeScroll);
 
   roomTimeline.backwardPagination = 'idle';
   await tick();
   await runAnimationFrames();
 
+  expect(document.querySelector('.history-loading')).toBeNull();
   expect(contentHeight()).toBe(beforeHeight);
   expect(element.scrollTop).toBe(beforeScroll);
 
@@ -851,27 +830,7 @@ test('middle-button autoscroll leaves follow mode', async () => {
   const { instance, element, end } = await mountLive(roomTimeline);
 
   element.dispatchEvent(new PointerEvent('pointerdown', { button: 1 }));
-  element.scrollTop = end - 30;
-  element.dispatchEvent(new Event('scroll'));
-  await tick();
-
-  expect(anchored()).toBe(true);
-
-  element.scrollTop = end - 60;
-  element.dispatchEvent(new Event('scroll'));
-  await tick();
-
-  expect(anchored()).toBe(true);
-  expect(element.scrollTop).toBe(end - 60);
-  await unmount(instance);
-});
-
-test('an upward browser scroll without an input event leaves follow mode', async () => {
-  const roomTimeline = timeline();
-  roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
-
-  element.scrollTop = end - 30;
+  element.scrollTop = end - 900;
   element.dispatchEvent(new Event('scroll'));
   await tick();
 

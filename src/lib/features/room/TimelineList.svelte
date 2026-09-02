@@ -10,6 +10,7 @@
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import TimelineItem from './TimelineItem.svelte';
   import type { MatrixLink } from './matrix-link';
@@ -89,12 +90,6 @@
     footTrailing?: Snippet;
   }
 
-  type TimelineRenderRow =
-    | { kind: 'history' }
-    | { kind: 'item'; item: TimelineItemView; itemIndex: number };
-
-  const HISTORY_ROW_KEY = 'history-placeholder';
-
   let {
     timeline,
     focusEventId = null,
@@ -149,8 +144,7 @@
     let seen: string | null = null;
     for (const row of $virtualizer.getVirtualItems()) {
       if (row.end > bottom) break;
-      const rendered = renderRows[row.index];
-      if (rendered?.kind === 'item') seen = rendered.item.event_id ?? seen;
+      seen = visibleItems[row.index]?.event_id ?? seen;
     }
     return seen;
   });
@@ -160,9 +154,7 @@
   let readMarker = $derived.by(() => {
     const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
 
-    return index === -1
-      ? null
-      : { index: index + historyRowOffset, unread: unreadCountAfter(visibleItems, index) };
+    return index === -1 ? null : { index, unread: unreadCountAfter(visibleItems, index) };
   });
 
   let stuckUnreadCount = $derived.by(() => {
@@ -186,7 +178,7 @@
     if (target === smoothTarget) return;
     const index = visibleItems.findIndex((item) => item.event_id === target);
     if (index < 0) return;
-    const offset = offsetOfIndex(index + historyRowOffset, 'center');
+    const offset = offsetOfIndex(index, 'center');
     if (offset === null) return;
     smoothTarget = target;
     setPosition({ kind: 'focused', eventId: target });
@@ -195,15 +187,13 @@
     viewport?.scrollTo({ top: offset, behavior: 'smooth' });
   });
   let viewport = $state<HTMLDivElement | null>(null);
-  let initialFillState = $state<'idle' | 'running' | 'done'>('idle');
+  let initialFillState: 'idle' | 'running' | 'done' = 'idle';
   let revealedBeforeFill = false;
   // `getComputedStyle` flushes style, so it is read per font scale, not per diff.
   let cachedRootFontSize = $state(rootFontSize());
   let initialFillPages = 0;
   let emptyRefillPages = 0;
   let emptyRefillPending = false;
-  let openingBackfillState = $state<'idle' | 'running' | 'done'>('idle');
-  let openingBackfillGeneration = 0;
   let hadVisibleItems = false;
   let virtualizerWasScrolling = false;
   let virtualizerTotalSize = 0;
@@ -212,32 +202,11 @@
   // Only the mount-time target picks the mode; later ones go through the effect.
   // svelte-ignore state_referenced_locally
   let position = $state<TimelinePosition>(initialPosition(focusEventId));
-  const HISTORY_PLACEHOLDER_REM = 14;
-  const HISTORY_PLACEHOLDER_VIEWPORT_RATIO = 1 / 3;
-  let measuredHistoryPlaceholderHeight = $state(0);
   let historyLoading = $derived(
     position.kind !== 'settling' &&
       visibleItems.length > 0 &&
-      (openingBackfillState === 'running' ||
-        historyRequestPending ||
-        timeline.backwardPagination === 'loading')
+      (historyRequestPending || timeline.backwardPagination === 'loading')
   );
-  let historyPlaceholderTargetHeight = $derived(
-    historyLoading
-      ? Math.max(
-          HISTORY_PLACEHOLDER_REM * rootFontSize(),
-          (viewport?.clientHeight ?? virtualizerViewportSize) * HISTORY_PLACEHOLDER_VIEWPORT_RATIO
-        )
-      : 0
-  );
-  let historyPlaceholderHeight = $derived(
-    historyLoading ? Math.max(historyPlaceholderTargetHeight, measuredHistoryPlaceholderHeight) : 0
-  );
-  let historyRowOffset = $derived(historyLoading ? 1 : 0);
-  let renderRows = $derived<TimelineRenderRow[]>([
-    ...(historyLoading ? ([{ kind: 'history' }] as const) : []),
-    ...visibleItems.map((item, itemIndex) => ({ kind: 'item' as const, item, itemIndex })),
-  ]);
   function setPosition(next: TimelinePosition): void {
     position = next;
     followingLive = next.kind === 'pinned';
@@ -252,7 +221,6 @@
   const timelineDebugEnabledForView = timelineDebugEnabled();
   let historyController: TimelineHistoryController;
   let configuredItems: readonly TimelineItemView[] = initialItems;
-  let configuredRows: readonly TimelineRenderRow[] = [];
   let historyDebugChange = 0;
 
   let anchorHolding = false;
@@ -345,23 +313,14 @@
   // virtualiser knows the delta first. Unlike `followOnAppend`, the adjustment
   // sets no `scrollState`, so nothing arms `reconcileScroll`.
   get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
-    const offset = instance.scrollOffset;
-    if (offset === null || item.start >= offset) return false;
+    const node = viewport;
+    if (!node || instance.scrollOffset === null) return false;
+    const offset = node.scrollTop;
+    if (item.start >= offset) return false;
     if (instance.itemSizeCache.has(item.key) && item.end > offset) return false;
-    const from = viewport?.scrollTop ?? offset;
-    expectedSelfOffset = from + delta;
-    recordScroll('virtualizer:resize', from, expectedSelfOffset);
-    return true;
+    scrollToOffsetNow(offset + delta, 'virtualizer:resize');
+    return false;
   };
-
-  $effect(() => {
-    if (!historyLoading) measuredHistoryPlaceholderHeight = 0;
-  });
-
-  function setHistoryPlaceholderHeight(height: number): void {
-    if (!historyLoading || Math.abs(height - measuredHistoryPlaceholderHeight) < 1) return;
-    measuredHistoryPlaceholderHeight = height;
-  }
 
   async function requestHistory(): Promise<boolean> {
     historyRequestPending = true;
@@ -540,7 +499,7 @@
       visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
     );
     if (!target || view.topOf(target.snapshot.key) !== null) return;
-    const offset = offsetOfIndex(target.index + historyRowOffset, 'start');
+    const offset = offsetOfIndex(target.index, 'start');
     if (offset === null) return;
     scrollToOffsetNow(Math.max(0, offset - target.snapshot.top), 'bringAnchorIntoView');
     await new Promise(requestAnimationFrame);
@@ -602,7 +561,7 @@
   function landOn(key: string): void {
     const index = visibleItems.findIndex((item) => anchorKeyForItem(item) === key);
     if (index < 0) return;
-    const offset = offsetOfIndex(index + historyRowOffset, 'start');
+    const offset = offsetOfIndex(index, 'start');
     if (offset === null) return;
     scrollToOffsetNow(offset, 'landOn');
     refreshRollingAnchor();
@@ -639,14 +598,12 @@
    * holds `loading` until the boundary moves. Bounded: a lost diff must not leave
    * the timeline hidden. False only when the fill was cancelled.
    */
-  async function awaitPaginationSettled(
-    cancelled: () => boolean = initialFillCancelled
-  ): Promise<boolean> {
+  async function awaitPaginationSettled(): Promise<boolean> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
     while (timeline.backwardPagination === 'loading') {
       if (performance.now() >= deadline) return true;
       await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval));
-      if (cancelled()) return false;
+      if (initialFillCancelled()) return false;
     }
     return true;
   }
@@ -691,8 +648,6 @@
       historyExhausted = false;
       emptyRefillPages = 0;
       initialFillPages = 0;
-      openingBackfillGeneration += 1;
-      openingBackfillState = 'idle';
     }
     if (
       timeline.loading ||
@@ -731,64 +686,6 @@
       scheduleInitialEndReconciliation();
     });
   }
-
-  function startOpeningBackfill(): void {
-    if (openingBackfillState !== 'idle') return;
-    const generation = (openingBackfillGeneration += 1);
-    const cancelled = (): boolean =>
-      generation !== openingBackfillGeneration || viewport === null || position.kind === 'settling';
-    openingBackfillState = 'running';
-    void (async () => {
-      try {
-        for (let page = 0; page < TIMELINE_LAYOUT.emptyFillMaxPages; page += 1) {
-          const node = currentViewport();
-          if (cancelled() || node === null) return;
-          if (historyExhausted || timeline.backwardPagination === 'end') return;
-          if (timeline.backwardPagination === 'loading') {
-            if (!(await awaitPaginationSettled(cancelled))) return;
-            page -= 1;
-            continue;
-          }
-          const messageHeight = Math.max(
-            0,
-            get(virtualizer).getTotalSize() - historyPlaceholderHeight
-          );
-          if (messageHeight >= node.clientHeight) return;
-
-          const reachedStart = await requestHistory();
-          if (cancelled()) return;
-          historyExhausted = reachedStart;
-          if (!(await awaitPaginationSettled(cancelled))) return;
-          await tick();
-          await new Promise(requestAnimationFrame);
-          if (reachedStart || cancelled()) return;
-          await new Promise((resolve) =>
-            setTimeout(resolve, TIMELINE_LAYOUT.historyRequestMinInterval)
-          );
-        }
-      } finally {
-        if (generation === openingBackfillGeneration) openingBackfillState = 'done';
-      }
-    })();
-  }
-
-  $effect(() => {
-    const viewportHeight = virtualizerViewportSize || viewport?.clientHeight || 0;
-    const messageHeight = Math.max(0, get(virtualizer).getTotalSize() - historyPlaceholderHeight);
-    if (
-      position.kind === 'settling' ||
-      initialFillState !== 'done' ||
-      viewportHeight <= 0 ||
-      messageHeight >= viewportHeight ||
-      visibleItems.length === 0 ||
-      historyExhausted ||
-      timeline.backwardPagination === 'end' ||
-      openingBackfillState !== 'idle'
-    ) {
-      return;
-    }
-    startOpeningBackfill();
-  });
 
   function scheduleInitialEndReconciliation(): void {
     if (position.kind !== 'settling' || initialEndReconciliationPending) return;
@@ -843,39 +740,18 @@
     cachedRootFontSize = rootFontSize();
   });
 
-  function renderRowKey(
-    rows: readonly TimelineRenderRow[],
-    items: readonly TimelineItemView[],
-    index: number
-  ): string {
-    const row = rows[index];
-    if (!row) return 'missing';
-    return row.kind === 'history' ? HISTORY_ROW_KEY : identityTracker.key(items, row.itemIndex);
-  }
-
   $effect.pre(() => {
     const items = visibleItems;
-    const rows = renderRows;
     const instance = get(virtualizer);
     const previousItems = configuredItems;
-    const previousRows = configuredRows;
     configuredItems = items;
-    configuredRows = rows;
     identityTracker.reconcile(items);
-    const itemEdgesChanged =
+    const edgesChanged =
       previousItems.length !== items.length ||
       identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0) ||
       identityTracker.key(previousItems, previousItems.length - 1) !==
         identityTracker.key(items, items.length - 1);
     const prepended = identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0);
-    const edgesChanged =
-      itemEdgesChanged ||
-      previousRows.length !== rows.length ||
-      renderRowKey(previousRows, previousItems, 0) !== renderRowKey(rows, items, 0) ||
-      renderRowKey(previousRows, previousItems, previousRows.length - 1) !==
-        renderRowKey(rows, items, rows.length - 1);
-    const rowPrepended =
-      renderRowKey(previousRows, previousItems, 0) !== renderRowKey(rows, items, 0);
     historyController.resetForNewItems(prepended);
     const change = edgesChanged ? (historyDebugChange += 1) : historyDebugChange;
     if (edgesChanged) {
@@ -905,7 +781,7 @@
     if (
       edgesChanged &&
       !sent &&
-      (rowPrepended || !pinnedToEnd) &&
+      (prepended || !pinnedToEnd) &&
       position.kind !== 'settling' &&
       position.kind !== 'focused'
     ) {
@@ -915,24 +791,19 @@
     nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * rem;
     const layout = preferences.layout;
     instance.setOptions({
-      count: rows.length,
+      count: items.length,
       getScrollElement: () => viewport,
-      estimateSize: (index) => {
-        const row = rows[index];
-        if (!row) return 0;
-        return row.kind === 'history'
-          ? historyPlaceholderTargetHeight
-          : estimateTimelineItemSize(
-              items,
-              row.itemIndex,
-              viewport?.clientWidth ?? TIMELINE_LAYOUT.mediaMaxRem * rem,
-              rem,
-              layout
-            );
-      },
+      estimateSize: (index) =>
+        estimateTimelineItemSize(
+          items,
+          index,
+          viewport?.clientWidth ?? TIMELINE_LAYOUT.mediaMaxRem * rem,
+          rem,
+          layout
+        ),
       // TanStack compares the previous and next key functions during prepends.
       // Each function must retain the item ordering it was created for.
-      getItemKey: (index) => renderRowKey(rows, items, index),
+      getItemKey: (index) => identityTracker.key(items, index),
       anchorTo: 'start',
       followOnAppend: false,
       scrollEndThreshold: 0,
@@ -974,7 +845,7 @@
         ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
         : -1;
       if (focusIndex >= 0 && !focusAnchored) {
-        const offset = offsetOfIndex(focusIndex + historyRowOffset, 'center');
+        const offset = offsetOfIndex(focusIndex, 'center');
         if (offset !== null) scrollToOffsetNow(offset, 'focus');
         focusAnchored = true;
       } else if (position.kind === 'settling') {
@@ -1040,11 +911,7 @@
     if (next !== position) setPosition(next);
     if (position.kind !== 'settling') historyController.observeScroll(movedAway, nearLatest);
     historyController.clearUserScrollPending();
-    let newestVisibleIndex: number | undefined;
-    for (const virtualItem of get(virtualizer).getVirtualItems()) {
-      const row = renderRows[virtualItem.index];
-      if (row?.kind === 'item') newestVisibleIndex = row.itemIndex;
-    }
+    const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
     if (
       position.kind === 'focused' &&
       timeline.forwardPagination === 'idle' &&
@@ -1181,6 +1048,12 @@
   {/if}
 
   <div class="timeline-stage">
+    {#if historyLoading}
+      <div class="history-loading" role="status">
+        <Spinner small />
+        <span>{$i18n.t('timeline.loadingHistory')}</span>
+      </div>
+    {/if}
     <div class={['timeline-viewport', { initial: position.kind === 'settling' }]}>
       <!-- A scrollable region has to be keyboard-operable. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -1200,26 +1073,10 @@
           style:height={String($virtualizer.getTotalSize()) + 'px'}
         >
           {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
-            {@const row = renderRows[virtualItem.index]}
-            {#if row?.kind === 'history'}
-              <div
-                class="item history-placeholder-row"
-                data-index={virtualItem.index}
-                style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
-                {@attach measure}
-              >
-                <TimelineSkeleton
-                  mode="history"
-                  layout={preferences.layout}
-                  targetHeight={historyPlaceholderTargetHeight}
-                  onHeightChange={setHistoryPlaceholderHeight}
-                />
-              </div>
-            {:else if row?.kind === 'item'}
-              {@const item = row.item}
-              {@const itemIndex = row.itemIndex}
-              {@const collapsed = isCollapsed(visibleItems, itemIndex)}
-              {@const groupStart = itemIndex > 0 && !collapsed}
+            {@const item = visibleItems[virtualItem.index]}
+            {#if item}
+              {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
+              {@const groupStart = virtualItem.index > 0 && !collapsed}
               <div
                 class={['item', { collapsed, 'group-start': groupStart }]}
                 data-event-id={item.event_id ?? undefined}
@@ -1232,7 +1089,7 @@
                   {item}
                   {collapsed}
                   unreadCount={item.content.kind === 'read_marker'
-                    ? unreadCountAfter(visibleItems, itemIndex)
+                    ? unreadCountAfter(visibleItems, virtualItem.index)
                     : 0}
                   replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
@@ -1348,6 +1205,25 @@
     min-height: 0;
   }
 
+  .history-loading {
+    align-items: center;
+    background: var(--sable-surface-container);
+    border: var(--border-width) solid var(--sable-bg-container-line);
+    border-radius: var(--radii-pill);
+    box-shadow: var(--shadow-e200);
+    color: var(--sable-bg-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-200);
+    inset-block-start: var(--space-200);
+    inset-inline-start: 50%;
+    padding: var(--space-100) var(--space-300);
+    pointer-events: none;
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 1;
+  }
+
   /* No fade back in: the skeleton is opaque and uncovers a laid-out viewport. */
   .timeline-viewport.initial {
     visibility: hidden;
@@ -1432,10 +1308,6 @@
     right: 0;
     top: 0;
     width: 100%;
-  }
-
-  .item.history-placeholder-row {
-    padding: 0;
   }
 
   .item.collapsed {

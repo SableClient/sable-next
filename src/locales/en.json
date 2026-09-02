@@ -518,6 +518,7 @@
     "label": "Timeline",
     "back": "Back to rooms",
     "loading": "Loading messages...",
+    "loadingHistory": "Loading older messages...",
     "loadFailed": "Unable to load messages. Your session may have expired.",
     "messagePlaceholder": "Send a message...",
     "sendMessage": "Send message",

@@ -8,13 +8,11 @@
   import TimelineItem from './TimelineItem.svelte';
 
   interface Props {
-    mode?: 'initial' | 'history';
     layout?: TimelineLayout;
     targetHeight?: number;
-    onHeightChange?: (height: number) => void;
   }
 
-  let { mode = 'initial', layout = 'modern', targetHeight = 0, onHeightChange }: Props = $props();
+  let { layout = 'modern', targetHeight = 0 }: Props = $props();
 
   const APPROXIMATE_ROW_HEIGHT = 52;
   let seed = $state(0x6d2b79f5);
@@ -44,9 +42,7 @@
     return 170 + Math.round(((value - 0.9) / 0.1) * 180);
   }
 
-  let availableHeight = $derived(
-    mode === 'initial' ? Math.max(targetHeight, innerHeight.current ?? 0) : targetHeight
-  );
+  let availableHeight = $derived(Math.max(targetHeight, innerHeight.current ?? 0));
   let rows = $derived(
     (() => {
       const count = Math.max(6, Math.ceil(availableHeight / APPROXIMATE_ROW_HEIGHT) + 1);
@@ -65,21 +61,6 @@
       });
     })()
   );
-
-  function measureHeight(node: HTMLDivElement): () => void {
-    if (!onHeightChange) return () => {};
-    const report = (): void => {
-      const height = Math.max(node.scrollHeight, node.getBoundingClientRect().height);
-      if (height > 0) onHeightChange?.(height);
-    };
-    const observer = new ResizeObserver(report);
-    observer.observe(node);
-    const frame = requestAnimationFrame(report);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }
 
   function placeholderItem(id: number): TimelineItemView {
     return {
@@ -112,20 +93,12 @@
 </script>
 
 <div
-  class={['timeline-placeholder', mode, 'items', `layout-${layout}`]}
-  style:min-height={mode === 'history' ? `${String(targetHeight)}px` : undefined}
+  class={['timeline-placeholder', 'initial', `layout-${layout}`]}
   aria-label={$i18n.t('timeline.loading')}
   role="status"
-  {@attach measureHeight}
 >
   {#each rows as row (row.id)}
-    <div
-      class={[
-        'placeholder-item',
-        'item',
-        { collapsed: row.collapsed, 'group-start': row.groupStart },
-      ]}
-    >
+    <div class={['placeholder-item', { collapsed: row.collapsed, 'group-start': row.groupStart }]}>
       <TimelineItem
         item={placeholderItem(row.id)}
         collapsed={row.collapsed}
@@ -138,17 +111,14 @@
 </div>
 
 <style>
-  .timeline-placeholder {
-    background: transparent;
+  .timeline-placeholder.initial {
+    background: var(--sable-bg-container);
     display: flex;
     flex-direction: column;
-    pointer-events: none;
-  }
-
-  .timeline-placeholder.initial {
     inset: 0;
     justify-content: flex-end;
     overflow: hidden;
+    pointer-events: none;
     position: absolute;
     z-index: 1;
   }
