@@ -221,7 +221,7 @@
         (room) =>
           room.state === 'joined' &&
           !room.is_space &&
-          !room.is_direct &&
+          !(unspacedSection && room.is_direct) &&
           !claimedByJoinedSpace.has(room.room_id)
       )
       .map(roomRow)

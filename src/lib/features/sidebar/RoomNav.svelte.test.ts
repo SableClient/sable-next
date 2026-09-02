@@ -134,7 +134,7 @@ test('home lists every joined room, including the children of joined spaces', as
   ];
 
   const instance = await mountNav();
-  expect(roomNames()).toEqual(['Plain', 'Child']);
+  expect(roomNames()).toEqual(['Plain', 'Direct', 'Child']);
   await unmount(instance);
 });
 

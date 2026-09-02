@@ -63,15 +63,12 @@
   let homeRooms = $derived(
     roomList.rooms.filter(
       (room) =>
-        room.state === 'joined' &&
-        !room.is_space &&
-        !room.is_direct &&
-        !roomList.mutedRoomIds.has(room.room_id)
+        room.state === 'joined' && !room.is_space && !roomList.mutedRoomIds.has(room.room_id)
     )
   );
   let homeUnread = $derived(unreadCounts(homeRooms));
   let unspacedUnread = $derived(
-    unreadCounts(homeRooms.filter((room) => !claimed.has(room.room_id)))
+    unreadCounts(homeRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id)))
   );
   let allDirectRooms = $derived(
     roomList.rooms.filter(
