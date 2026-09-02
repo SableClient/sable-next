@@ -995,14 +995,6 @@ impl Core {
                 Ok(CommandOk::RoomStateEvent { content })
             }
 
-            Command::RoomHasSpaceParent { room_id } => {
-                let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
-                Ok(CommandOk::RoomHasSpaceParent {
-                    has_space_parent: crate::view::has_space_parent(&room).await,
-                })
-            }
-
             Command::TimestampToEvent {
                 room_id,
                 ts,

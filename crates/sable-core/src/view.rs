@@ -3,18 +3,18 @@ use std::hash::BuildHasher;
 use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
+use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{ParentSpace, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
+use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::directory::PublicRoomsChunk;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
-use matrix_sdk::ruma::events::room::message::{
-    GalleryItemType, MessageType, RoomMessageEventContent, UnstableAmplitude,
-};
+use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, UnstableAmplitude};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
@@ -36,7 +36,9 @@ use matrix_sdk_ui::{
 };
 
 use matrix_sdk::latest_events::{LatestEventValue, LocalLatestEventValue, RemoteLatestEventValue};
-use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
+use matrix_sdk::ruma::events::{
+    AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
+};
 
 use crate::matrix_html::{
     display_html, has_profile_fallback_html, strip_profile_fallback_body,
@@ -45,26 +47,37 @@ use crate::matrix_html::{
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
     DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
-    MembershipView, MentionView, NotificationModeView, PerMessageProfileView, PollAnswerView,
-    PollView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
-    RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView,
-    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
+    MembershipView, MentionView, PerMessageProfileView, PollAnswerView, PollView, PublicRoomView,
+    ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
+    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
+    SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
     TimelineItemContentView, TimelineItemView, UploadProgressView, UtdCauseView, VectorDiff,
 };
 
-pub type SpaceChildCache<S> = HashMap<OwnedRoomId, Vec<SpaceChildEdge>, S>;
+// These are independent room capabilities, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
+pub struct RoomInfo {
+    pub is_space: bool,
+    pub is_tombstoned: bool,
+    pub has_space_parent: bool,
+    pub supports_knock: bool,
+    pub supports_restricted: bool,
+    pub supports_knock_restricted: bool,
+    pub canonical_alias: Option<String>,
+    pub children: Vec<SpaceChildEdge>,
+    pub tags: Vec<RoomTag>,
+}
 
 #[must_use]
-pub fn room_summary<S: BuildHasher, N: BuildHasher>(
+pub fn room_summary<S: BuildHasher>(
     item: &RoomListItem,
-    children: &SpaceChildCache<S>,
-    notification_modes: &HashMap<OwnedRoomId, NotificationModeView, N>,
+    room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
 ) -> RoomSummary {
+    let info = room_cache.get(item.room_id());
     let (unread, highlight) = unread_counts(item);
-    let (supports_knock, supports_restricted, supports_knock_restricted) = join_rule_support(item);
     RoomSummary {
         room_id: item.room_id().to_owned(),
-        canonical_alias: item.canonical_alias().map(|alias| alias.to_string()),
+        canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
         // Only `display_name()` fills this cache, so `prime_display_names` must
         // have run. `name()` covers an explicit `m.room.name` until then.
         name: item
@@ -80,7 +93,7 @@ pub fn room_summary<S: BuildHasher, N: BuildHasher>(
             .filter_map(|target| OwnedUserId::try_from(target.as_str()).ok())
             .collect(),
         join_rule: join_rule_view(item.join_rule().as_ref()),
-        tags: room_tags(item),
+        tags: info.map(|i| i.tags.clone()).unwrap_or_default(),
         encrypted: match item.encryption_state() {
             EncryptionState::Encrypted => Some(true),
             EncryptionState::NotEncrypted => Some(false),
@@ -94,16 +107,15 @@ pub fn room_summary<S: BuildHasher, N: BuildHasher>(
             RoomState::Left => RoomStateView::Left,
             RoomState::Banned => RoomStateView::Banned,
         },
-        is_space: item.is_space(),
-        is_tombstoned: item.is_tombstoned(),
-        room_type: item.room_type().map(|kind| kind.to_string()),
-        notification_mode: notification_modes.get(item.room_id()).copied(),
+        is_space: info.is_some_and(|i| i.is_space),
+        is_tombstoned: info.is_some_and(|i| i.is_tombstoned),
         is_voice: item.is_call(),
         call_participants: call_participants(item.active_room_call_participants()),
-        supports_knock,
-        supports_restricted,
-        supports_knock_restricted,
-        space_children: children.get(item.room_id()).cloned().unwrap_or_default(),
+        has_space_parent: info.is_some_and(|i| i.has_space_parent),
+        supports_knock: info.is_some_and(|i| i.supports_knock),
+        supports_restricted: info.is_some_and(|i| i.supports_restricted),
+        supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
+        space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
         unread,
         highlight,
         marked_unread: item.is_marked_unread(),
@@ -194,15 +206,17 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
 }
 
 fn remote_preview(event: &RemoteLatestEventValue) -> Option<String> {
-    let raw = event.raw();
-    if raw.get_field::<String>("type").ok().flatten()? != "m.room.message" {
-        return None;
-    }
+    let any = event.raw().deserialize().ok()?;
 
-    raw.get_field::<RoomMessageEventContent>("content")
-        .ok()
-        .flatten()
-        .map(|content| content.body().to_owned())
+    let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = any
+    else {
+        return None;
+    };
+
+    match message {
+        SyncMessageLikeEvent::Original(original) => Some(original.content.body().to_owned()),
+        SyncMessageLikeEvent::Redacted(_) => None,
+    }
 }
 
 fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
@@ -214,31 +228,12 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
     }
 }
 
-pub async fn room_notification_modes(
-    settings: &matrix_sdk::notification_settings::NotificationSettings,
-    diffs: &[eyeball_im::VectorDiff<RoomListItem>],
-) -> HashMap<OwnedRoomId, NotificationModeView> {
-    let rooms: Vec<OwnedRoomId> = diffs
-        .iter()
-        .flat_map(diff_values)
-        .map(|item| item.room_id().to_owned())
-        .collect();
-
-    let mut modes = HashMap::new();
-    for room_id in rooms {
-        if let Some(mode) = settings
-            .get_user_defined_room_notification_mode(&room_id)
-            .await
-        {
-            modes.insert(room_id, mode.into());
-        }
-    }
-    modes
-}
-
-pub async fn refresh_space_children<S: BuildHasher>(
+/// `Room::get_state_events_static` hits the state store, so this runs once per
+/// room per subscription.
+pub async fn enrich_room_fields<S: BuildHasher>(
+    client: &Client,
     diff: &eyeball_im::VectorDiff<RoomListItem>,
-    children: &mut SpaceChildCache<S>,
+    room_cache: &mut HashMap<OwnedRoomId, RoomInfo, S>,
 ) {
     use eyeball_im::VectorDiff as In;
 
@@ -251,20 +246,97 @@ pub async fn refresh_space_children<S: BuildHasher>(
         _ => Vec::new(),
     };
 
-    let stale = items.into_iter().filter(|item| {
-        item.is_space()
-            && (!children.contains_key(item.room_id()) || matches!(diff, In::Set { .. }))
+    let stale = items
+        .into_iter()
+        .filter(|item| !room_cache.contains_key(item.room_id()) || matches!(diff, In::Set { .. }));
+
+    let lookups = stale.map(|item| {
+        let room_id = item.room_id().to_owned();
+        let room = client.get_room(&room_id);
+        async move {
+            match room {
+                Some(room) => (room_id, room_info(client, &room).await),
+                None => (room_id, RoomInfo::absent()),
+            }
+        }
     });
 
-    let lookups =
-        stale.map(|item| async move { (item.room_id().to_owned(), space_children(item).await) });
-
-    for (room_id, edges) in futures_util::future::join_all(lookups).await {
-        children.insert(room_id, edges);
+    for (room_id, info) in futures_util::future::join_all(lookups).await {
+        room_cache.insert(room_id, info);
     }
 }
 
-pub async fn has_space_parent(room: &Room) -> bool {
+impl RoomInfo {
+    const fn absent() -> Self {
+        Self {
+            is_space: false,
+            is_tombstoned: false,
+            has_space_parent: false,
+            supports_knock: false,
+            supports_restricted: false,
+            supports_knock_restricted: false,
+            canonical_alias: None,
+            children: Vec::new(),
+            tags: Vec::new(),
+        }
+    }
+}
+
+async fn room_info(client: &Client, room: &Room) -> RoomInfo {
+    let is_space = room.is_space();
+    let is_tombstoned = is_tombstoned(client, room, is_space).await;
+    let children = async {
+        if is_space {
+            space_children(room).await
+        } else {
+            Vec::new()
+        }
+    };
+
+    let (has_space_parent, join_rules, children) = futures_util::future::join3(
+        has_space_parent(room),
+        crate::rooms::join_rule_support(room),
+        children,
+    )
+    .await;
+    let (supports_knock, supports_restricted, supports_knock_restricted) = join_rules;
+
+    RoomInfo {
+        is_space,
+        is_tombstoned,
+        has_space_parent,
+        supports_knock,
+        supports_restricted,
+        supports_knock_restricted,
+        canonical_alias: room.canonical_alias().map(|alias| alias.to_string()),
+        children,
+        tags: room_tags(room),
+    }
+}
+
+async fn is_tombstoned(client: &Client, room: &Room, is_space: bool) -> bool {
+    if room
+        .get_state_event(StateEventType::RoomTombstone, "")
+        .await
+        .is_ok_and(|event| event.is_some())
+    {
+        return true;
+    }
+    if !is_space {
+        return false;
+    }
+
+    client
+        .send(get_state_event_for_key::v3::Request::new(
+            room.room_id().to_owned(),
+            StateEventType::RoomTombstone.to_string().into(),
+            String::new(),
+        ))
+        .await
+        .is_ok()
+}
+
+async fn has_space_parent(room: &Room) -> bool {
     let Ok(parents) = room.parent_spaces().await else {
         return false;
     };
@@ -279,17 +351,6 @@ pub async fn has_space_parent(room: &Room) -> bool {
     }
 
     false
-}
-
-fn join_rule_support(room: &Room) -> (bool, bool, bool) {
-    let Some(rules) = room.version().and_then(|version| version.rules()) else {
-        return (false, false, false);
-    };
-    (
-        rules.authorization.knocking,
-        rules.authorization.restricted_join_rule,
-        rules.authorization.knock_restricted_join_rule,
-    )
 }
 
 #[must_use]
@@ -1387,14 +1448,13 @@ fn diff_values<T>(diff: &eyeball_im::VectorDiff<T>) -> Vec<&T> {
 /// Computed lazily: until something awaits `display_name()` every unnamed room
 /// crosses the wire as `null`.
 pub async fn prime_display_names(diffs: &[eyeball_im::VectorDiff<RoomListItem>]) {
-    let pending = diffs
-        .iter()
-        .flat_map(diff_values)
-        .filter(|item| item.cached_display_name().is_none())
-        .map(|item| async move {
-            let _ = item.display_name().await;
-        });
-    futures_util::future::join_all(pending).await;
+    for diff in diffs {
+        for item in diff_values(diff) {
+            if item.cached_display_name().is_none() {
+                let _ = item.display_name().await;
+            }
+        }
+    }
 }
 
 pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {

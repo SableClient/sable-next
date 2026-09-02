@@ -276,14 +276,6 @@ export function createCommands(transport: () => Transport) {
       return response.events;
     },
 
-    async roomHasSpaceParent(roomId: string): Promise<boolean> {
-      const response = await transport().send({
-        type: 'room_has_space_parent',
-        room_id: roomId,
-      });
-      return response.has_space_parent;
-    },
-
     async urlPreview(url: string): Promise<UrlPreviewView | null> {
       const response = await transport().send({ type: 'url_preview', url });
       return response.preview;
