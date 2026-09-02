@@ -90,6 +90,7 @@
           {roomId}
           bind:tab
           bind:query
+          resizable
           unicode
           {gifs}
           onPick={pick}

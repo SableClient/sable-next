@@ -11,6 +11,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
+  import { readBoardSize, trackBoardSize } from '#lib/ui/primitives/board-size.svelte.js';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import { SvelteSet } from 'svelte/reactivity';
@@ -24,6 +25,7 @@
     tab?: BoardTab;
     query?: string;
     variant?: 'popover' | 'sheet';
+    resizable?: boolean;
     /** Reactions can be plain unicode, so the board offers both on one surface. */
     unicode?: boolean;
     /** A reaction key cannot be a sticker. */
@@ -39,6 +41,7 @@
     tab = $bindable<BoardTab>('emoticon'),
     query = $bindable(''),
     variant = 'popover',
+    resizable = false,
     unicode = false,
     stickers = true,
     gifs = null,
@@ -81,6 +84,12 @@
   });
 
   let gifTab = $derived(tab === 'gif');
+  let cellSize = $derived(tab === 'sticker' ? 72 : 32);
+
+  let boardStyle = $derived.by(() => {
+    const size = resizable ? readBoardSize() : null;
+    return size ? `width: ${String(size.width)}px; height: ${String(size.height)}px;` : undefined;
+  });
 
   let sections = $derived.by(() => {
     if (gifTab) return [];
@@ -224,13 +233,21 @@
     onPickUnicode(best ?? text);
   }
 
+  function attachSize(element: HTMLElement): (() => void) | undefined {
+    return resizable ? trackBoardSize(element) : undefined;
+  }
+
   function pick(image: PackImageView): void {
     rememberEmote(image.shortcode);
     onPick(image, tab as ImageUsageView);
   }
 </script>
 
-<div class={['board', { sheet: variant === 'sheet' }]}>
+<div
+  class={['board', { sheet: variant === 'sheet', resizable }]}
+  style={boardStyle}
+  {@attach attachSize}
+>
   <div class="board-head">
     {#if stickers || gifs}
       <div class="tabs" role="group" aria-label={$i18n.t('composer.emotesAndStickers')}>
@@ -347,7 +364,7 @@
         {/if}
       </nav>
 
-      <div class="grids">
+      <div class={['grids', { sticker: tab === 'sticker' }]}>
         {#if onPickUnicode && query.trim() !== ''}
           {@const text = query.trim()}
           <button
@@ -377,8 +394,8 @@
                     <MediaImage
                       source={image.url}
                       alt={image.body ?? image.shortcode}
-                      width={32}
-                      height={32}
+                      width={cellSize}
+                      height={cellSize}
                       original
                     />
                   </button>
@@ -404,8 +421,8 @@
                     <MediaImage
                       source={image.url}
                       alt={image.body ?? image.shortcode}
-                      width={32}
-                      height={32}
+                      width={cellSize}
+                      height={cellSize}
                       original
                     />
                   </button>
@@ -451,8 +468,8 @@
                       <MediaImage
                         source={image.url}
                         alt={image.body ?? image.shortcode}
-                        width={32}
-                        height={32}
+                        width={cellSize}
+                        height={cellSize}
                         original
                       />
                     {/if}
@@ -533,6 +550,15 @@
     flex-direction: column;
     height: min(22rem, 60dvh);
     width: min(24rem, calc(100vw - 2rem));
+  }
+
+  .board.resizable {
+    max-height: 85dvh;
+    max-width: calc(100vw - 2rem);
+    min-height: 14rem;
+    min-width: 18rem;
+    overflow: hidden;
+    resize: both;
   }
 
   .board.sheet {
@@ -648,6 +674,10 @@
     padding: 0;
   }
 
+  .grids.sticker {
+    --emote-cell: 5rem;
+  }
+
   .grids li button,
   .grids .unicode button {
     align-items: center;
@@ -656,10 +686,10 @@
     border-radius: var(--radius);
     cursor: pointer;
     display: flex;
-    height: 2.5rem;
+    height: var(--emote-cell, 2.5rem);
     justify-content: center;
     padding: var(--space-100);
-    width: 2.5rem;
+    width: var(--emote-cell, 2.5rem);
   }
 
   /* Sized to the 32px custom emote beside it, not to the surrounding type. */
