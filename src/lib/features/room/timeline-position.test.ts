@@ -259,6 +259,20 @@ describe('properties', () => {
     ).toEqual(anchored);
   });
 
+  test('a self-written offset keeps a focused context inside the band', () => {
+    expect(
+      nextPosition(focused, {
+        kind: 'user-scrolled',
+        timelineMode: 'live',
+        nearLatest: true,
+        movedAway: false,
+        byReader: false,
+        anchorKey: 'event:$a',
+        anchorTop: 0,
+      })
+    ).toEqual(focused);
+  });
+
   test("a permalink's own end is not the live end", () => {
     fc.assert(
       fc.property(position, fc.boolean(), fc.boolean(), (from, byReader, nearLatest) => {
