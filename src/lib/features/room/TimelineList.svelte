@@ -313,13 +313,13 @@
   // virtualiser knows the delta first. Unlike `followOnAppend`, the adjustment
   // sets no `scrollState`, so nothing arms `reconcileScroll`.
   get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
-    const node = viewport;
-    if (!node || instance.scrollOffset === null) return false;
-    const offset = node.scrollTop;
+    if (instance.scrollOffset === null) return false;
+    const offset = instance.scrollOffset + instance.scrollAdjustments;
     if (item.start >= offset) return false;
     if (instance.itemSizeCache.has(item.key) && item.end > offset) return false;
-    scrollToOffsetNow(offset + delta, 'virtualizer:resize');
-    return false;
+    expectedSelfOffset = offset + delta;
+    recordScroll('virtualizer:resize', offset, expectedSelfOffset);
+    return true;
   };
 
   async function requestHistory(): Promise<boolean> {
