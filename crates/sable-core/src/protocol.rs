@@ -294,10 +294,6 @@ pub enum Command {
         room_id: OwnedRoomId,
         event_type: String,
     },
-    RoomHasSpaceParent {
-        #[ts(type = "string")]
-        room_id: OwnedRoomId,
-    },
     UrlPreview {
         url: String,
     },
@@ -1018,9 +1014,6 @@ pub enum CommandOk {
     RoomStateEvents {
         events: Vec<RoomStateEventView>,
     },
-    RoomHasSpaceParent {
-        has_space_parent: bool,
-    },
     UrlPreview {
         preview: Option<UrlPreviewView>,
     },
@@ -1588,14 +1581,13 @@ pub struct RoomSummary {
     pub encrypted: Option<bool>,
     pub is_space: bool,
     pub is_tombstoned: bool,
-    pub room_type: Option<String>,
-    pub notification_mode: Option<NotificationModeView>,
     /// An `m.room.create` with the MSC3417 call type.
     pub is_voice: bool,
     /// Members in the room's call, oldest first and one entry per user however
     /// many devices they joined with.
     #[ts(type = "string[]")]
     pub call_participants: Vec<OwnedUserId>,
+    pub has_space_parent: bool,
     pub supports_knock: bool,
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,

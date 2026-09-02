@@ -680,11 +680,7 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
         .await;
 
     let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
-    let summary = super::view::room_summary(
-        &item,
-        &std::collections::HashMap::new(),
-        &std::collections::HashMap::new(),
-    );
+    let summary = super::view::room_summary(&item, &std::collections::HashMap::new());
 
     assert_eq!(item.num_unread_messages(), 2);
     assert_eq!(summary.unread, 0);
@@ -1482,60 +1478,4 @@ async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<
         .filter(|item| item.as_event().is_some())
         .map(|item| crate::view::timeline_item(item, None, &BTreeSet::new()).sender_name)
         .collect()
-}
-
-#[tokio::test]
-async fn a_muted_room_reports_mute_without_the_sdk_having_cached_it() {
-    let server = MatrixMockServer::new().await;
-    let client = server.client_builder().build().await;
-    let room_id = room_id!("!muted:example.org");
-
-    let room = server
-        .sync_room(&client, JoinedRoomBuilder::new(room_id))
-        .await;
-
-    for kind in [
-        matrix_sdk::ruma::push::RuleKind::Override,
-        matrix_sdk::ruma::push::RuleKind::Room,
-    ] {
-        server
-            .mock_set_push_rules(
-                kind.clone(),
-                matrix_sdk::test_utils::mocks::PushRuleIdSpec::Any,
-            )
-            .ok()
-            .mount()
-            .await;
-        server
-            .mock_delete_push_rules(kind, matrix_sdk::test_utils::mocks::PushRuleIdSpec::Any)
-            .ok()
-            .mount()
-            .await;
-    }
-
-    let settings = client.notification_settings().await;
-    settings
-        .set_room_notification_mode(
-            room_id,
-            matrix_sdk::notification_settings::RoomNotificationMode::Mute,
-        )
-        .await
-        .expect("the mute rule is written");
-    room.clear_user_defined_notification_mode();
-    let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
-    assert_eq!(item.cached_user_defined_notification_mode(), None);
-
-    let modes = super::view::room_notification_modes(
-        &settings,
-        &[matrix_sdk_ui::eyeball_im::VectorDiff::PushBack {
-            value: item.clone(),
-        }],
-    )
-    .await;
-    let summary = super::view::room_summary(&item, &std::collections::HashMap::new(), &modes);
-
-    assert_eq!(
-        summary.notification_mode,
-        Some(crate::protocol::NotificationModeView::Mute)
-    );
 }

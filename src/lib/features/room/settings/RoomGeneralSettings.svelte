@@ -51,35 +51,11 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let topic = $derived(room?.topic ?? '');
-  let hasSpaceParent = $state(false);
-
-  $effect(() => {
-    const target = roomId;
-    if (target === null) {
-      hasSpaceParent = false;
-      return;
-    }
-
-    let cancelled = false;
-    core.commands
-      .roomHasSpaceParent(target)
-      .then((value) => {
-        if (!cancelled) hasSpaceParent = value;
-      })
-      .catch(() => {
-        if (!cancelled) hasSpaceParent = false;
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  });
-
   let settableRules = $derived.by(() => {
     const rules: JoinRuleView[] = ['public', 'invite'];
     if (room?.supports_knock) rules.push('knock');
-    if (hasSpaceParent && room?.supports_restricted) rules.push('restricted');
-    if (hasSpaceParent && room?.supports_knock_restricted) {
+    if (room?.has_space_parent && room.supports_restricted) rules.push('restricted');
+    if (room?.has_space_parent && room.supports_knock_restricted) {
       rules.push('knock_restricted');
     }
     return rules;
@@ -347,7 +323,7 @@
                   },
                 ]
               : []),
-            ...(hasSpaceParent && room?.supports_restricted
+            ...(room?.has_space_parent && room.supports_restricted
               ? [
                   {
                     value: 'restricted' as const,
@@ -357,7 +333,7 @@
                   },
                 ]
               : []),
-            ...(hasSpaceParent && room?.supports_knock_restricted
+            ...(room?.has_space_parent && room.supports_knock_restricted
               ? [
                   {
                     value: 'knock_restricted' as const,

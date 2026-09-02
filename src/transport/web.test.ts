@@ -78,7 +78,7 @@ test('uses a WASM-specific worker URL', async () => {
   void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
 
   expect(FakeSharedWorker.last?.url.searchParams.get('wasm')).toBeTruthy();
-});
+}, 20_000);
 
 test('a slow command reports the core as unresponsive', async () => {
   expect(

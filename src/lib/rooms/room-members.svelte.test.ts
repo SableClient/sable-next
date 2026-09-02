@@ -93,12 +93,14 @@ test('a revisited room paints its cached members before the refetch lands', asyn
   expect(loader.members).toEqual([]);
 
   const revisit = loader.load('!room:example.org', fetchMembers);
+  // Cached, so names are on screen without waiting for the request.
   expect(loader.members.map((entry) => entry.display_name)).toEqual(['Alice']);
   expect(loader.loading).toBe(false);
 
   refetch.resolve([member('@a:b', 'Alice Renamed')]);
   await revisit;
 
+  // No core event reports a membership change, so the refetch still replaces them.
   expect(loader.members.map((entry) => entry.display_name)).toEqual(['Alice Renamed']);
   expect(calls).toBe(2);
 });
@@ -117,11 +119,13 @@ test('the member cache is bounded', async () => {
   }
   expect(calls).toBe(12);
 
+  // The earliest rooms were evicted, so nothing is painted before the fetch.
   loader.reset();
   const evicted = loader.load('!room-0:example.org', fetchMembers);
   expect(loader.loading).toBe(true);
   await evicted;
 
+  // A recent one is still cached, so it paints at once.
   loader.reset();
   const kept = loader.load('!room-11:example.org', fetchMembers);
   expect(loader.loading).toBe(false);

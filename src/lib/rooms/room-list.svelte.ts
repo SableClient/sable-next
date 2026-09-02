@@ -1,5 +1,5 @@
 import { createContext } from 'svelte';
-import { SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type { CoreEvent } from '#src/generated/CoreEvent';
 import type { NotificationModeView } from '#src/generated/NotificationModeView';
@@ -12,7 +12,8 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 
-type DefaultNotificationModes = { direct: NotificationModeView; group: NotificationModeView };
+type RoomNotificationModes = { room: NotificationModeView | null; fallback: NotificationModeView };
+const NOTIFICATION_MODE_LOAD_CONCURRENCY = 8;
 
 export function roomPathId(room: RoomSummary): string {
   return room.canonical_alias ?? room.room_id;
@@ -36,19 +37,8 @@ export function findRoomByPathId(
 
 export class RoomList {
   rooms = $state.raw<RoomSummary[]>([]);
+  mutedRoomIds = $state.raw<ReadonlySet<string>>(new SvelteSet());
   typingRoomIds = $state.raw<ReadonlySet<string>>(new SvelteSet());
-
-  private defaultModes = $state.raw<DefaultNotificationModes>({
-    direct: 'all',
-    group: 'all',
-  });
-
-  mutedRoomIds: ReadonlySet<string> = $derived(
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    new Set(
-      this.rooms.filter((room) => this.effectiveMode(room) === 'mute').map((room) => room.room_id)
-    )
-  );
 
   private subscription: SubscriptionId | null = null;
   private unsubscribeEvents: (() => void) | null = null;
@@ -56,28 +46,13 @@ export class RoomList {
   private unsubscribeTyping: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
+  private notificationModes = new SvelteMap<string, RoomNotificationModes>();
+  private loadingNotificationModes = new SvelteSet<string>();
 
   constructor(private readonly core: CoreClient) {}
 
   notificationOverride(roomId: string): NotificationModeView | null {
-    return this.rooms.find((room) => room.room_id === roomId)?.notification_mode ?? null;
-  }
-
-  private effectiveMode(room: RoomSummary): NotificationModeView {
-    return (
-      room.notification_mode ??
-      (room.is_direct ? this.defaultModes.direct : this.defaultModes.group)
-    );
-  }
-
-  private async loadDefaultModes(): Promise<void> {
-    const generation = this.generation;
-    try {
-      const modes = await this.core.commands.defaultNotificationModes();
-      if (generation === this.generation) this.defaultModes = modes;
-    } catch {
-      this.defaultModes = { direct: 'all', group: 'all' };
-    }
+    return this.notificationModes.get(roomId)?.room ?? null;
   }
 
   async start(): Promise<void> {
@@ -98,8 +73,10 @@ export class RoomList {
     this.generation += 1;
     this.startPromise = null;
     this.rooms = [];
+    this.mutedRoomIds = new SvelteSet();
     this.typingRoomIds = new SvelteSet();
-    this.defaultModes = { direct: 'all', group: 'all' };
+    this.notificationModes.clear();
+    this.loadingNotificationModes.clear();
     this.unsubscribeEvents?.();
     this.unsubscribeEvents = null;
     this.unsubscribeNotificationSettings?.();
@@ -140,9 +117,9 @@ export class RoomList {
     this.subscription = response.subscription;
     this.setRooms(buffered.activate(response.subscription, response.rooms));
     this.unsubscribeEvents = buffered.stop;
-    void this.loadDefaultModes();
     this.unsubscribeNotificationSettings = this.core.subscribeEvents((event) => {
-      if (event.type === 'notification_settings_changed') void this.loadDefaultModes();
+      if (event.type === 'notification_settings_changed')
+        void this.loadNotificationModes(this.rooms);
     });
     this.unsubscribeTyping = this.core.subscribeEvents((event) => {
       if (event.type !== 'typing') return;
@@ -156,6 +133,43 @@ export class RoomList {
 
   private setRooms(rooms: RoomSummary[]): void {
     this.rooms = rooms;
+    const roomIds = new SvelteSet(rooms.map((room) => room.room_id));
+    for (const roomId of this.notificationModes.keys()) {
+      if (!roomIds.has(roomId)) this.notificationModes.delete(roomId);
+    }
+    void this.loadNotificationModes(
+      rooms.filter((room) => !this.notificationModes.has(room.room_id))
+    );
+  }
+
+  private async loadNotificationModes(rooms: readonly RoomSummary[]): Promise<void> {
+    const generation = this.generation;
+    const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
+    for (const room of pending) this.loadingNotificationModes.add(room.room_id);
+    const modes: { roomId: string; mode: RoomNotificationModes }[] = [];
+    for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_LOAD_CONCURRENCY) {
+      const results = await Promise.allSettled(
+        pending.slice(index, index + NOTIFICATION_MODE_LOAD_CONCURRENCY).map(async (room) => {
+          const settings = await this.core.commands.notificationSettings(room.room_id);
+          return {
+            roomId: room.room_id,
+            mode: { room: settings.room, fallback: settings.default },
+          };
+        })
+      );
+      for (const result of results) {
+        if (result.status === 'fulfilled') modes.push(result.value);
+      }
+    }
+    for (const room of pending) this.loadingNotificationModes.delete(room.room_id);
+    if (generation !== this.generation) return;
+
+    for (const { roomId, mode } of modes) this.notificationModes.set(roomId, mode);
+    this.mutedRoomIds = new SvelteSet(
+      [...this.notificationModes]
+        .filter(([, mode]) => (mode.room ?? mode.fallback) === 'mute')
+        .map(([roomId]) => roomId)
+    );
   }
 }
 
