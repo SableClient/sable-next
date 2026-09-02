@@ -59,7 +59,6 @@ describe('nextHistoryDecision', () => {
     requestPending: false,
     anchorSuppressed: false,
     anchorFailing: false,
-    pagesRequested: 0,
     msSinceRequest: Number.POSITIVE_INFINITY,
   };
 
@@ -72,25 +71,24 @@ describe('nextHistoryDecision', () => {
     [{ requestPending: true }, 'wait'],
     [{ anchorSuppressed: true }, 'defer'],
     [{ anchorFailing: true }, 'stop'],
-    [{ pagesRequested: TIMELINE_LAYOUT.historyFillMaxPages }, 'stop'],
-    [{ msSinceRequest: 0 }, 'request'],
-    [{ pagesRequested: 1, msSinceRequest: 0 }, 'wait'],
+    [{ msSinceRequest: 0 }, 'wait'],
   ] as const)('%o decides %s', ([overrides, decision]) => {
     expect(nextHistoryDecision({ ...base, ...overrides })).toBe(decision);
   });
 });
 
 describe('TimelineHistoryController', () => {
-  test('rate limits sparse fills and stops at the page limit', async () => {
+  test('rate limits sparse fills and continues until the server reports the end', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
-    const requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    let pages = 0;
+    const requestHistory = vi.fn<() => Promise<boolean>>(() => Promise.resolve((pages += 1) >= 25));
     const { controller } = setup(requestHistory);
 
     controller.markWheelScroll(wheel(-1));
     expect(requestHistory).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.historyRequestMinInterval * 4);
-    expect(requestHistory).toHaveBeenCalledTimes(TIMELINE_LAYOUT.historyFillMaxPages);
+    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.historyRequestMinInterval * 30);
+    expect(requestHistory).toHaveBeenCalledTimes(25);
   });
 
   test('cancels a sparse fill when input moves toward latest', async () => {

@@ -151,10 +151,41 @@ test('fills a short live timeline until the server reports the timeline start', 
   await unmount(instance);
 });
 
-test('bounds the opening fill when the viewport never fills', async () => {
+test('continues the opening fill past twenty pages until the server reports the start', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
-  const history = vi.fn(() => Promise.resolve(false));
+  const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  for (let page = 0; page < 30; page += 1) {
+    await runAnimationFrames();
+  }
+
+  expect(history).toHaveBeenCalledTimes(25);
+  await unmount(instance);
+});
+
+test('fills past several filtered pages until the opening viewport has enough messages', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('latest')];
+  const history = vi.fn(() => {
+    if (history.mock.calls.length === 5) {
+      roomTimeline.items = [item('older'), ...roomTimeline.items];
+    }
+    return Promise.resolve(false);
+  });
   const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
@@ -172,7 +203,7 @@ test('bounds the opening fill when the viewport never fills', async () => {
   await runAnimationFrames();
   await runAnimationFrames();
 
-  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.initialFillMaxPages);
+  expect(history).toHaveBeenCalledTimes(5);
   await unmount(instance);
 });
 
@@ -488,12 +519,12 @@ test('a fresh upward input requests the next settled history page', async () => 
   await unmount(instance);
 });
 
-test('rate limits and bounds sparse history fill', async () => {
+test('rate limits sparse history fill and continues until the server reports the end', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   try {
     const roomTimeline = timeline();
     roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
-    const history = vi.fn(() => Promise.resolve(false));
+    const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
     const instance = mount(TimelineListHarness, {
       target: document.body,
       props: {
@@ -527,8 +558,8 @@ test('rate limits and bounds sparse history fill', async () => {
     expect(history).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(600);
     expect(history).toHaveBeenCalledTimes(4);
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(history).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.historyRequestMinInterval * 30);
+    expect(history).toHaveBeenCalledTimes(25);
 
     await unmount(instance);
   } finally {
@@ -669,7 +700,7 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   };
 }
 
-test('a backward pagination shows a loading pill and adds no content of its own', async () => {
+test('a backward pagination keeps its loading pill between pages, then fades it away', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element } = await mountLive(roomTimeline);
@@ -682,6 +713,9 @@ test('a backward pagination shows a loading pill and adds no content of its own'
   await runAnimationFrames();
 
   expect(document.querySelector('.history-loading')).not.toBeNull();
+  expect(document.querySelector('.history-loading')?.textContent).toContain(
+    'Loading older messages'
+  );
   expect(contentHeight()).toBe(beforeHeight);
   expect(element.scrollTop).toBe(beforeScroll);
 
@@ -689,9 +723,20 @@ test('a backward pagination shows a loading pill and adds no content of its own'
   await tick();
   await runAnimationFrames();
 
-  expect(document.querySelector('.history-loading')).toBeNull();
+  expect(document.querySelector('.history-loading')).not.toBeNull();
   expect(contentHeight()).toBe(beforeHeight);
   expect(element.scrollTop).toBe(beforeScroll);
+
+  roomTimeline.backwardPagination = 'loading';
+  await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.historyLoadingLinger));
+  await tick();
+  expect(document.querySelector('.history-loading')).not.toBeNull();
+
+  roomTimeline.backwardPagination = 'idle';
+  await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.historyLoadingLinger + 50));
+  await tick();
+  await runAnimationFrames();
+  expect(document.querySelector('.history-loading')?.hasAttribute('inert')).toBe(true);
 
   await unmount(instance);
 });
@@ -855,7 +900,7 @@ test('a scrollbar drag leaves follow mode like any other reading back', async ()
 test('keeps filling past a window of events the settings hide', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [hiddenItem('renamed')];
-  const history = vi.fn(() => Promise.resolve(false));
+  const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
   const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
@@ -870,11 +915,11 @@ test('keeps filling past a window of events the settings hide', async () => {
 
   viewport();
   await tick();
-  for (let round = 0; round < TIMELINE_LAYOUT.emptyFillMaxPages; round += 1) {
+  for (let round = 0; round < 30; round += 1) {
     await runAnimationFrames();
   }
 
-  expect(history).toHaveBeenCalledTimes(TIMELINE_LAYOUT.emptyFillMaxPages);
+  expect(history).toHaveBeenCalledTimes(25);
   await unmount(instance);
 });
 
@@ -969,7 +1014,7 @@ test('a cleared timeline is not held back by the start it reached before', async
   await unmount(instance);
 });
 
-test('an empty timeline keeps asking when a page brings nothing but claims the start', async () => {
+test('an empty timeline stops when its refill reports the timeline start', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(true));
@@ -1002,6 +1047,6 @@ test('an empty timeline keeps asking when a page brings nothing but claims the s
   await tick();
   await runAnimationFrames();
 
-  expect(history.mock.calls.length).toBeGreaterThan(afterClear);
+  expect(history).toHaveBeenCalledTimes(afterClear);
   await unmount(instance);
 });

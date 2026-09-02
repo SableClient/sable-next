@@ -27,7 +27,6 @@ export interface HistoryDecisionInput {
   requestPending: boolean;
   anchorSuppressed: boolean;
   anchorFailing: boolean;
-  pagesRequested: number;
   msSinceRequest: number;
 }
 
@@ -37,14 +36,10 @@ export function nextHistoryDecision(input: HistoryDecisionInput): HistoryDecisio
   if (!input.wanted) return 'wait';
   if (input.pagination === 'end') return 'stop';
   if (input.anchorFailing) return 'stop';
-  if (input.pagesRequested >= TIMELINE_LAYOUT.historyFillMaxPages) return 'stop';
   if (input.anchorSuppressed) return 'defer';
   if (!input.nearOldest) return 'stop';
   if (input.requestPending || input.pagination !== 'idle') return 'wait';
-  if (
-    input.pagesRequested > 0 &&
-    input.msSinceRequest < TIMELINE_LAYOUT.historyRequestMinInterval
-  ) {
+  if (input.msSinceRequest < TIMELINE_LAYOUT.historyRequestMinInterval) {
     return 'wait';
   }
   return 'request';
@@ -59,7 +54,6 @@ export class TimelineHistoryController {
   private anchorFailures = 0;
   private historyInputArmed = true;
   private historyFillActive = false;
-  private historyFillPages = 0;
   private historyFillTimer: ReturnType<typeof setTimeout> | null = null;
   private historyLastRequestStartedAt = Number.NEGATIVE_INFINITY;
   private wheelGestureTimer: ReturnType<typeof setTimeout> | null = null;
@@ -183,7 +177,6 @@ export class TimelineHistoryController {
     if (this.destroyed) return;
     this.cancelHistoryFillTimer();
     this.historyFillActive = true;
-    this.historyFillPages = 0;
     this.historyInputArmed = false;
   }
 
@@ -191,7 +184,6 @@ export class TimelineHistoryController {
     if (this.destroyed) return;
     this.cancelHistoryFillTimer();
     this.historyFillActive = false;
-    this.historyFillPages = 0;
     this.anchorFailures = 0;
     this.historyInputArmed = true;
   }
@@ -217,7 +209,6 @@ export class TimelineHistoryController {
       requestPending: this.historyRequestPending,
       anchorSuppressed: this.anchorSuppressed,
       anchorFailing: this.isAnchorFailing,
-      pagesRequested: this.historyFillActive ? this.historyFillPages : 0,
       msSinceRequest: performance.now() - this.historyLastRequestStartedAt,
     };
   }
@@ -393,7 +384,6 @@ export class TimelineHistoryController {
     this.historyRequestPending = false;
     this.historyWanted = false;
     this.historyFillActive = false;
-    this.historyFillPages = 0;
     this.wheelGestureActive = false;
     this.autoscrollActive = false;
     this.activeGesture = 'none';
@@ -418,7 +408,6 @@ export class TimelineHistoryController {
       return;
     this.historyWanted = false;
     this.historyRequestPending = true;
-    this.historyFillPages += 1;
     this.historyLastRequestStartedAt = performance.now();
     this.options.debugLog('request:start', {
       pagination: this.options.getBackwardPagination(),

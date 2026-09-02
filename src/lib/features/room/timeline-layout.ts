@@ -9,15 +9,14 @@ export const TIMELINE_LAYOUT = {
      has that much left to read. At 10 the request only started once they were
      almost at the top, and a slow page left them waiting there. */
   historyPrefetchItems: 25,
-  historyFillMaxPages: 4,
-  initialFillMaxPages: 4,
-  emptyFillMaxPages: 20,
   /* One screenful: the fill removes empty space, it does not prefetch. */
   initialFillViewports: 1,
   /* A lost diff must still reveal the timeline rather than leave it hidden. */
   initialFillSettleTimeout: 3_000,
   initialFillPollInterval: 25,
   historyRequestMinInterval: 300,
+  historyLoadingLinger: 500,
+  historyLoadingFade: 180,
   jumpToLatestRem: 5,
   wheelGestureEndDelay: 150,
   mediaMaxRem: 25,

@@ -93,12 +93,18 @@
 </script>
 
 <div
-  class={['timeline-placeholder', 'initial', `layout-${layout}`]}
+  class={['timeline-placeholder', 'initial', 'items', `layout-${layout}`]}
   aria-label={$i18n.t('timeline.loading')}
   role="status"
 >
   {#each rows as row (row.id)}
-    <div class={['placeholder-item', { collapsed: row.collapsed, 'group-start': row.groupStart }]}>
+    <div
+      class={[
+        'placeholder-item',
+        'item',
+        { collapsed: row.collapsed, 'group-start': row.groupStart },
+      ]}
+    >
       <TimelineItem
         item={placeholderItem(row.id)}
         collapsed={row.collapsed}
@@ -111,14 +117,17 @@
 </div>
 
 <style>
-  .timeline-placeholder.initial {
-    background: var(--sable-bg-container);
+  .timeline-placeholder {
+    background: transparent;
     display: flex;
     flex-direction: column;
+    pointer-events: none;
+  }
+
+  .timeline-placeholder.initial {
     inset: 0;
     justify-content: flex-end;
     overflow: hidden;
-    pointer-events: none;
     position: absolute;
     z-index: 1;
   }

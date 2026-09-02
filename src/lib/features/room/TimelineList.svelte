@@ -1,6 +1,8 @@
 <script lang="ts">
   import { tick, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { fade } from 'svelte/transition';
   import { get } from 'svelte/store';
   import { createVirtualizer } from '@tanstack/svelte-virtual';
 
@@ -191,8 +193,7 @@
   let revealedBeforeFill = false;
   // `getComputedStyle` flushes style, so it is read per font scale, not per diff.
   let cachedRootFontSize = $state(rootFontSize());
-  let initialFillPages = 0;
-  let emptyRefillPages = 0;
+  let initialFillRequested = false;
   let emptyRefillPending = false;
   let hadVisibleItems = false;
   let virtualizerWasScrolling = false;
@@ -207,6 +208,18 @@
       visibleItems.length > 0 &&
       (historyRequestPending || timeline.backwardPagination === 'loading')
   );
+  let historyLoadingVisible = $state(false);
+  $effect(() => {
+    if (historyLoading) {
+      historyLoadingVisible = true;
+      return;
+    }
+    if (!historyLoadingVisible) return;
+    const timer = setTimeout(() => {
+      historyLoadingVisible = false;
+    }, TIMELINE_LAYOUT.historyLoadingLinger);
+    return () => clearTimeout(timer);
+  });
   function setPosition(next: TimelinePosition): void {
     position = next;
     followingLive = next.kind === 'pinned';
@@ -609,14 +622,14 @@
   }
 
   async function fillInitialHistory(): Promise<void> {
-    while (initialFillPages < fillPageLimit()) {
+    while (true) {
       const node = currentViewport();
       if (node === null || !fillOwnsPosition()) return;
       // `end` is the server reporting the start of the timeline.
       if (timeline.backwardPagination === 'end') return;
       if (timeline.backwardPagination === 'loading') {
-        if (initialFillPages > 0) return;
-        initialFillPages += 1;
+        if (initialFillRequested) return;
+        initialFillRequested = true;
         if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
         continue;
       }
@@ -624,7 +637,7 @@
       // half-full snapshot from an exactly-full one.
       const contentHeight = get(virtualizer).getTotalSize();
       if (contentHeight >= node.clientHeight * TIMELINE_LAYOUT.initialFillViewports) return;
-      initialFillPages += 1;
+      initialFillRequested = true;
       const reachedStart = await requestHistory();
       historyExhausted = reachedStart;
       // The last page has to settle too, or the handover finds `loading` and declines.
@@ -640,14 +653,12 @@
   $effect(() => {
     if (visibleItems.length > 0) {
       hadVisibleItems = true;
-      emptyRefillPages = 0;
       return;
     }
     if (hadVisibleItems) {
       hadVisibleItems = false;
       historyExhausted = false;
-      emptyRefillPages = 0;
-      initialFillPages = 0;
+      initialFillRequested = false;
     }
     if (
       timeline.loading ||
@@ -656,28 +667,20 @@
       historyExhausted ||
       timeline.backwardPagination !== 'idle' ||
       initialFillState === 'running' ||
-      emptyRefillPending ||
-      initialFillPages + emptyRefillPages >= TIMELINE_LAYOUT.emptyFillMaxPages
+      emptyRefillPending
     ) {
       return;
     }
-    emptyRefillPages += 1;
     emptyRefillPending = true;
     void (async () => {
       try {
         const reachedStart = await requestHistory();
-        historyExhausted = reachedStart && visibleItems.length > 0;
+        historyExhausted = reachedStart;
       } finally {
         emptyRefillPending = false;
       }
     })();
   });
-
-  function fillPageLimit(): number {
-    return visibleItems.length === 0
-      ? TIMELINE_LAYOUT.emptyFillMaxPages
-      : TIMELINE_LAYOUT.initialFillMaxPages;
-  }
 
   function startInitialHistoryFill(): void {
     initialFillState = 'running';
@@ -1048,8 +1051,14 @@
   {/if}
 
   <div class="timeline-stage">
-    {#if historyLoading}
-      <div class="history-loading" role="status">
+    {#if historyLoadingVisible}
+      <div
+        class="history-loading"
+        role="status"
+        out:fade={{
+          duration: prefersReducedMotion.current ? 0 : TIMELINE_LAYOUT.historyLoadingFade,
+        }}
+      >
         <Spinner small />
         <span>{$i18n.t('timeline.loadingHistory')}</span>
       </div>
