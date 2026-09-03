@@ -75,6 +75,27 @@ mkdir -p "$APPDIR/usr/bin"
 cp -a "$WORK/stage/runtime/." "$APPDIR/usr/bin/"
 cp -f "$BIN_PATH" "$APPDIR/usr/bin/sable-next"
 chmod 755 "$APPDIR/usr/bin/sable-next"
+stage_appindicator() {
+  local dest="$1" main dep
+  main="$(ldconfig -p 2>/dev/null | awk '$1 == "libayatana-appindicator3.so.1" { v = $NF } END { print v }')"
+  [ -n "$main" ] || main="$(find /usr/lib /usr/lib64 /lib -name libayatana-appindicator3.so.1 2>/dev/null | sort | tail -n1)"
+  if [ -z "$main" ] || [ ! -e "$main" ]; then
+    echo "warning: libayatana-appindicator3.so.1 not found; the AppImage ships without a tray" >&2
+    return 0
+  fi
+  {
+    echo "$main"
+    ldd "$main" 2>/dev/null | awk '/=>/ { print $3 }' | grep -iE 'ayatana|dbusmenu|indicator|ido' || true
+  } | sort -u | while read -r dep; do
+    if [ -e "$dep" ]; then
+      cp -Lf "$dep" "$dest/$(basename "$dep")"
+    fi
+  done
+}
+stage_appindicator "$APPDIR/usr/bin"
+
+rm -f "$APPDIR/usr/bin/chrome-sandbox"
+
 cp -f "$WORK/stage/share/applications/sable-next.desktop" "$APPDIR/sable-next.desktop"
 cp -f src-tauri/icons/128x128.png "$APPDIR/sable-next.png"
 cat > "$APPDIR/AppRun" <<'EOF'

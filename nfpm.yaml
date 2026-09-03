@@ -43,6 +43,7 @@ overrides:
       - libcups2
       - xdg-utils
       - xwayland
+      - libayatana-appindicator3-1
   rpm:
     depends:
       - gtk3
@@ -55,3 +56,4 @@ overrides:
       - cups-libs
       - xdg-utils
       - xorg-x11-server-Xwayland
+      - libayatana-appindicator3.so.1()(64bit)
