@@ -81,6 +81,7 @@
   <div class="toggles">
     <IconButton
       variant="ghost"
+      class="sable-choice"
       label={media.microphone ? $i18n.t('call.microphoneOn') : $i18n.t('call.microphoneOff')}
       aria-pressed={media.microphone}
       onclick={() => {
@@ -96,6 +97,7 @@
 
     <IconButton
       variant="ghost"
+      class="sable-choice"
       label={media.camera ? $i18n.t('call.cameraOn') : $i18n.t('call.cameraOff')}
       aria-pressed={media.camera}
       onclick={() => {

@@ -1,0 +1,72 @@
+.sable-choice.sable-choice[aria-selected='true'],
+.sable-choice.sable-choice[aria-pressed='true'],
+.sable-choice.sable-choice[data-state='checked'],
+.sable-choice.sable-choice[data-selected='true'] {
+  background: var(--sable-primary-container);
+  border-color: var(--sable-primary-container-line);
+  color: var(--sable-primary-on-container);
+}
+
+.sable-choice[aria-selected='true']:focus-visible,
+.sable-choice[aria-pressed='true']:focus-visible,
+.sable-choice[data-state='checked']:focus-visible,
+.sable-choice[data-selected='true']:focus-visible {
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.sable-choice[aria-selected='true']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]),
+.sable-choice[aria-pressed='true']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]),
+.sable-choice[data-state='checked']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]),
+.sable-choice[data-selected='true']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]) {
+  background: var(--sable-primary-container-hover);
+  color: var(--sable-primary-on-container);
+}
+
+.sable-current.sable-current[aria-current='page'],
+.sable-current.sable-current[data-current='true'],
+.sable-open.sable-open[data-state='open'],
+.sable-open.sable-open[aria-expanded='true'] {
+  background: var(--sable-surface-container-active);
+  color: var(--sable-surface-on-container);
+}
+
+.sable-current[aria-current='page']:focus-visible,
+.sable-current[data-current='true']:focus-visible,
+.sable-open[data-state='open']:focus-visible,
+.sable-open[aria-expanded='true']:focus-visible {
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.sable-current[aria-current='page']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]),
+.sable-current[data-current='true']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]),
+.sable-open[data-state='open']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]),
+.sable-open[aria-expanded='true']:hover:not(:disabled, [aria-disabled='true'], [data-disabled]) {
+  background: var(--sable-surface-container-hover);
+  color: var(--sable-surface-on-container);
+}
+
+.sable-highlight:hover,
+.sable-highlight[data-highlighted],
+.sable-highlight[aria-selected='true'] {
+  background: var(--sable-bg-container-hover);
+  color: var(--sable-bg-on-container);
+}
+
+.sable-highlight:focus-visible {
+  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sable-choice,
+  .sable-current,
+  .sable-open,
+  .sable-highlight {
+    transition:
+      background-color var(--motion-normal) var(--motion-easing-standard),
+      border-color var(--motion-normal) var(--motion-easing-standard),
+      color var(--motion-normal) var(--motion-easing-standard);
+  }
+}

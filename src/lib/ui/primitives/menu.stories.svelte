@@ -52,6 +52,9 @@
   <div class="sable-menu demo-menu">
     <IconContext values={decorative}>
       <button class="sable-menu-item" type="button"><StarIcon />Rest</button>
+      <button class="sable-menu-item" type="button" role="menuitemcheckbox" aria-checked={true}>
+        <StarIcon />Checked
+      </button>
       <button class="sable-menu-item" type="button" data-highlighted><LinkIcon />Highlighted</button
       >
       <button class="sable-menu-item" type="button" disabled><GearIcon />Disabled</button>

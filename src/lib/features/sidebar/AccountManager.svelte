@@ -112,7 +112,7 @@
     {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
     {#each core.accounts as account (account.account_id)}
       {@const active = account.account_id === activeAccountId}
-      <article class:active class="account-row">
+      <article class="account-row sable-choice" data-selected={active ? 'true' : undefined}>
         <button
           class="account-select"
           type="button"
@@ -226,11 +226,6 @@
     padding: var(--space-300);
   }
 
-  .account-row.active {
-    background: var(--sable-bg-container);
-    border-color: var(--sable-bg-container-line);
-  }
-
   .account-select {
     align-items: center;
     background: transparent;
@@ -249,7 +244,7 @@
     cursor: default;
   }
 
-  .account-select:not(:disabled):hover {
+  .account-row:not([data-selected='true']) .account-select:not(:disabled):hover {
     color: var(--sable-primary-main);
   }
 

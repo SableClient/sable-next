@@ -312,9 +312,9 @@
                 onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
               >
               <button
-                class:active={pixelated}
-                class="pixel-toggle desktop-control"
+                class="pixel-toggle desktop-control sable-choice"
                 type="button"
+                aria-pressed={pixelated}
                 onclick={() => (pixelated = !pixelated)}
               >
                 Pixelate
@@ -528,12 +528,6 @@
     cursor: pointer;
     font: inherit;
     padding: var(--space-250);
-  }
-
-  .pixel-toggle.active {
-    background: var(--sable-surface-container-hover);
-    border-radius: 0.5rem;
-    color: var(--sable-surface-on-container);
   }
 
   .pixel-toggle:hover,

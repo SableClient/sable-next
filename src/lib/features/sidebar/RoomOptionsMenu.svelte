@@ -165,7 +165,10 @@
   }}
 >
   {#if !anchor}
-    <DropdownMenu.Trigger class="room-options-trigger" aria-label={$i18n.t('room.menuLabel')}>
+    <DropdownMenu.Trigger
+      class="room-options-trigger sable-open"
+      aria-label={$i18n.t('room.menuLabel')}
+    >
       <DotsThreeVerticalIcon />
     </DropdownMenu.Trigger>
   {/if}
@@ -299,10 +302,9 @@
     width: 1.5rem;
   }
 
-  :global(.room-options-trigger:hover),
-  :global(.room-options-trigger[data-state='open']) {
-    background: var(--sable-surface-var-container);
-    color: var(--sable-bg-on-container);
+  :global(.room-options-trigger:hover) {
+    background: var(--sable-surface-container-hover);
+    color: var(--sable-surface-on-container);
   }
 
   :global(.room-options-trigger:focus-visible) {

@@ -114,6 +114,8 @@
           <Button
             variant={selected === type ? 'primary' : 'ghost'}
             size="small"
+            class="sable-choice"
+            aria-pressed={selected === type}
             block
             onclick={() => void open(type)}
           >

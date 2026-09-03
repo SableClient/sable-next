@@ -37,7 +37,7 @@
 </script>
 
 <Popover.Root bind:open onOpenChange={handleOpenChange}>
-  <Popover.Trigger class={triggerClass} aria-label={label}>
+  <Popover.Trigger class={['sable-open', triggerClass]} aria-label={label}>
     {@render children()}
   </Popover.Trigger>
   <Popover.Portal>

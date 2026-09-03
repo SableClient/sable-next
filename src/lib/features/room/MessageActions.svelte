@@ -89,7 +89,7 @@
             {...props}
             size="small"
             variant="ghost"
-            class="message-action-button"
+            class="message-action-button sable-open"
             label={$i18n.t('timeline.moreActions')}
           >
             <MoreIcon />
@@ -173,11 +173,6 @@
   .message-actions :global(button:focus-visible) {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: -1px;
-  }
-
-  .message-actions :global(button[aria-expanded='true']) {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
   }
 
   @media (prefers-reduced-motion: no-preference) {

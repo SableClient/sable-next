@@ -112,7 +112,6 @@
       <div class="mobile-tool-slot">
         <a
           class="quick-tool mobile-tool"
-          class:active={toolActive}
           href={item.href}
           onclick={(event) => {
             activateTool(event, item.href);
@@ -141,8 +140,7 @@
         <a
           {...props}
           class="quick-tool compact-tool sable-nav-tab sable-nav-tab-side sable-nav-tab-outlined
-          sable-selection-layer"
-          class:active={toolActive}
+          sable-current sable-selection-layer"
           href={item.href}
           onclick={(event) => {
             activateTool(event, item.href);
@@ -170,8 +168,7 @@
           <a
             {...props}
             class="quick-tool desktop-tool sable-nav-tab sable-nav-tab-bottom
-            sable-nav-tab-outlined sable-selection-layer"
-            class:active={toolActive}
+            sable-nav-tab-outlined sable-current sable-selection-layer"
             href={item.href}
             onclick={(event) => {
               activateTool(event, item.href);
@@ -248,8 +245,9 @@
   }
 
   .mobile-tools::before {
-    background: var(--sable-bg-container-active);
+    background: var(--sable-surface-container-active);
     border-radius: var(--radius-pill);
+    box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-main);
     content: '';
     height: var(--control-height-large);
     left: var(--mobile-selected-position);

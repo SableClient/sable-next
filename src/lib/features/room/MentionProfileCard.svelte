@@ -360,7 +360,7 @@
 
 {#snippet actionRow()}
   <DropdownMenu.Root>
-    <DropdownMenu.Trigger class="profile-action">
+    <DropdownMenu.Trigger class="profile-action sable-open">
       <ShareNetworkIcon size={14} />
       {$i18n.t('timeline.profileShare')}
     </DropdownMenu.Trigger>
@@ -382,8 +382,7 @@
   </DropdownMenu.Root>
   {#if sharedRooms.length > 0}
     <button
-      class="profile-action"
-      class:pressed={shared === 'rooms'}
+      class="profile-action sable-open"
       type="button"
       aria-expanded={shared === 'rooms'}
       onclick={() => {
@@ -396,8 +395,7 @@
   {/if}
   {#if sharedSpaces.length > 0}
     <button
-      class="profile-action"
-      class:pressed={shared === 'spaces'}
+      class="profile-action sable-open"
       type="button"
       aria-expanded={shared === 'spaces'}
       onclick={() => {
@@ -410,7 +408,7 @@
   {/if}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger
-      class="profile-action profile-action-overflow"
+      class="profile-action profile-action-overflow sable-open"
       aria-label={$i18n.t('timeline.profileMoreActions')}
     >
       <DotsThreeIcon size={14} />
@@ -691,18 +689,13 @@
     flex: none;
   }
 
-  :global(.profile-action:hover) {
+  :global(.profile-action:hover:not([aria-expanded='true'])) {
     background: color-mix(in oklab, var(--sable-bg-on-container) 7%, transparent);
   }
 
   :global(.profile-action:focus-visible) {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
-  }
-
-  :global(.profile-action.pressed) {
-    background: var(--sable-surface-var-container);
-    border-color: var(--sable-sec-main);
   }
 
   :global(.profile-action-overflow) {

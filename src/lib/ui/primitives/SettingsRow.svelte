@@ -133,7 +133,6 @@
 
   .setting-row.highlighted {
     background: var(--sable-primary-container);
-    box-shadow: inset 0.1875rem 0 0 var(--sable-primary-main);
   }
 
   @media (prefers-reduced-motion: no-preference) {

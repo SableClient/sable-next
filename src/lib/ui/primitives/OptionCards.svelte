@@ -30,7 +30,8 @@
     <RadioGroup.Item
       value={option.value}
       disabled={disabled || option.disabled}
-      class={['option-card', { selected: option.value === value }]}
+      class="option-card sable-choice"
+      data-selected={option.value === value ? 'true' : undefined}
     >
       {#if Icon}<span class="option-card-icon" aria-hidden="true"><Icon /></span>{/if}
       <span class="option-card-text">
@@ -76,12 +77,6 @@
     background: var(--sable-bg-container-hover);
   }
 
-  :global(.option-card.selected) {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-main);
-    color: var(--sable-primary-on-container);
-  }
-
   :global(.option-card-icon) {
     align-items: center;
     display: inline-flex;
@@ -109,7 +104,7 @@
     line-height: var(--line-height-small);
   }
 
-  :global(.option-card.selected .option-card-hint) {
+  :global(.option-card[data-selected='true'] .option-card-hint) {
     color: inherit;
   }
 </style>

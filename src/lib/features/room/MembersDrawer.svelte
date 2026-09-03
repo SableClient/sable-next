@@ -120,7 +120,10 @@
       <div class="filters">
         {#if loadMembership}
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger class="chip" aria-label={$i18n.t('timeline.memberFilter')}>
+            <DropdownMenu.Trigger
+              class="chip sable-open"
+              aria-label={$i18n.t('timeline.memberFilter')}
+            >
               <FunnelIcon aria-hidden="true" />
               <span>{$i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
             </DropdownMenu.Trigger>
@@ -143,7 +146,7 @@
           </DropdownMenu.Root>
         {/if}
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger class="chip" aria-label={$i18n.t('timeline.memberSort')}>
+          <DropdownMenu.Trigger class="chip sable-open" aria-label={$i18n.t('timeline.memberSort')}>
             <span>{$i18n.t(MEMBER_SORT_LABELS[sort])}</span>
             <ArrowsDownUpIcon aria-hidden="true" />
           </DropdownMenu.Trigger>

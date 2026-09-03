@@ -32,7 +32,7 @@
 
 {#if readers.length > 0}
   <button
-    class="read-receipt-stack"
+    class="read-receipt-stack sable-open"
     type="button"
     aria-label={$i18n.t('timeline.seenByNames', { names })}
     aria-haspopup="dialog"
@@ -115,10 +115,6 @@
 
   button[aria-expanded='true'] {
     --stack-ring: var(--sable-surface-container);
-
-    background: var(--sable-surface-container);
-    border-color: var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
   }
 
   button:focus-visible {

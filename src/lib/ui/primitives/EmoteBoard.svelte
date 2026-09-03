@@ -253,6 +253,7 @@
       <div class="tabs" role="group" aria-label={$i18n.t('composer.emotesAndStickers')}>
         <button
           type="button"
+          class="sable-choice"
           aria-pressed={tab === 'emoticon'}
           onclick={() => {
             tab = 'emoticon';
@@ -263,6 +264,7 @@
         {#if stickers}
           <button
             type="button"
+            class="sable-choice"
             aria-pressed={tab === 'sticker'}
             onclick={() => {
               tab = 'sticker';
@@ -274,6 +276,7 @@
         {#if gifs}
           <button
             type="button"
+            class="sable-choice"
             aria-pressed={gifTab}
             onclick={() => {
               tab = 'gif';
@@ -582,17 +585,12 @@
 
   .tabs button {
     background: transparent;
-    border: 0;
+    border: var(--border-width) solid transparent;
     border-radius: var(--radius);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
     font-size: var(--font-size-small);
     padding: var(--space-150) var(--space-200);
-  }
-
-  .tabs button[aria-pressed='true'] {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
   }
 
   .board :global(.board-search) {

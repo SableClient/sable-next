@@ -108,8 +108,7 @@
   background: var(--button-container-hover);
 }
 
-.sable-button:active:not(:disabled, [aria-disabled='true']),
-.sable-button[aria-pressed='true'] {
+.sable-button:active:not(:disabled, [aria-disabled='true']) {
   background: var(--button-container-active);
 }
 

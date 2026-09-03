@@ -42,7 +42,7 @@
   />
 
   <button
-    class="password-toggle"
+    class="password-toggle sable-choice"
     type="button"
     {disabled}
     aria-label={showPassword ? $i18n.t('auth.hidePassword') : $i18n.t('auth.showPassword')}

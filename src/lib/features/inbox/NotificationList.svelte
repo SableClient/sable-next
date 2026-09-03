@@ -75,7 +75,7 @@
         <Button
           variant="ghost"
           size="small"
-          class={['filter', { active: value === filter }]}
+          class="filter sable-choice"
           aria-pressed={value === filter}
           onclick={() => {
             onFilter(value);
@@ -181,17 +181,6 @@
   :global(.filter:hover:not(:disabled)) {
     background: var(--sable-surface-var-container-hover);
     color: var(--sable-bg-on-container);
-  }
-
-  :global(.filter.active) {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
-    font-weight: var(--font-weight-medium);
-  }
-
-  :global(.filter.active:hover:not(:disabled)) {
-    background: var(--sable-primary-container-hover);
-    color: var(--sable-primary-on-container);
   }
 
   .feed {

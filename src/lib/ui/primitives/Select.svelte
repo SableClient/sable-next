@@ -52,7 +52,7 @@
             value={item.value}
             label={item.label}
             disabled={item.disabled}
-            class="sable-menu-item"
+            class="sable-menu-item sable-choice"
           >
             {#snippet children({ selected })}
               <span>{item.label}</span>

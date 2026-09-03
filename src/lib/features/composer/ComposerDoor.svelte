@@ -39,7 +39,11 @@
 
 {#if desktop}
   <DropdownMenu.Root>
-    <DropdownMenu.Trigger class="composer-door" {disabled} aria-label={$i18n.t('composer.insert')}>
+    <DropdownMenu.Trigger
+      class="composer-door sable-open"
+      {disabled}
+      aria-label={$i18n.t('composer.insert')}
+    >
       <PlusIcon />
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
@@ -91,8 +95,9 @@
 {:else}
   <button
     type="button"
-    class="composer-door"
+    class="composer-door sable-open"
     {disabled}
+    data-state={open ? 'open' : 'closed'}
     aria-label={$i18n.t('composer.insert')}
     onpointerdown={onBeforeOpen}
     onclick={() => {
@@ -225,10 +230,6 @@
 
   :global(.composer-door:hover) {
     background: var(--sable-surface-container-hover);
-  }
-
-  :global(.composer-door[data-state='open']) {
-    background: var(--sable-surface-container-active);
   }
 
   :global(.composer-door:disabled) {

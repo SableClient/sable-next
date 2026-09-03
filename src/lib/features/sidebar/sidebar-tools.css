@@ -37,10 +37,13 @@
   width: var(--icon-size-medium);
 }
 
-.compact-tool.active,
-.desktop-tool.active,
-.mobile-tool.active {
-  color: var(--sable-bg-on-container);
+.compact-tool[aria-current='page'],
+.desktop-tool[aria-current='page'] {
+  color: var(--sable-surface-on-container);
+}
+
+.mobile-tool[aria-current='page'] {
+  color: var(--sable-surface-on-container);
 }
 
 .mobile-tool {

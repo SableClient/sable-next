@@ -76,6 +76,17 @@
   background: var(--sable-bg-container-active);
 }
 
+.sable-menu-item[aria-checked='true'] {
+  background: var(--sable-primary-container);
+  color: var(--sable-primary-on-container);
+}
+
+.sable-menu-item[aria-checked='true']:hover,
+.sable-menu-item[aria-checked='true'][data-highlighted] {
+  background: var(--sable-primary-container-hover);
+  color: var(--sable-primary-on-container);
+}
+
 .sable-menu-item:focus-visible {
   outline: var(--focus-ring-width) solid var(--sable-focus-ring);
   outline-offset: calc(var(--focus-ring-width) * -1);

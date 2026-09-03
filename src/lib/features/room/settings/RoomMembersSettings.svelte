@@ -186,7 +186,7 @@
         type="button"
         role="tab"
         aria-selected={tab === entry.id}
-        class:active={tab === entry.id}
+        class="sable-choice"
         onclick={() => {
           tab = entry.id;
           search = '';
@@ -356,8 +356,8 @@
 
   .tabs button {
     background: transparent;
-    border: 0;
-    border-bottom: var(--border-width-500) solid transparent;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-pill);
     color: var(--sable-surface-var-on-container);
     cursor: pointer;
     font: inherit;
@@ -366,14 +366,14 @@
     padding: var(--space-200) var(--space-300);
   }
 
-  .tabs button.active {
-    border-bottom-color: var(--sable-primary-main);
-    color: var(--sable-bg-on-container);
-  }
-
   .tabs button:focus-visible {
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  .tabs button:hover:not(:disabled, [aria-selected='true']) {
+    background: var(--sable-surface-var-container-hover);
+    color: var(--sable-bg-on-container);
   }
 
   .status {

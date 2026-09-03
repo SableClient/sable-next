@@ -86,7 +86,7 @@
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         {...props}
-        class="quick-tool sable-nav-tab sable-nav-tab-outlined sable-selection-layer {mode ===
+        class="quick-tool sable-nav-tab sable-nav-tab-outlined sable-open sable-selection-layer {mode ===
         'compact'
           ? 'compact-tool sable-nav-tab-side'
           : 'desktop-tool sable-nav-tab-bottom'}"

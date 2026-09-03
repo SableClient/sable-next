@@ -307,6 +307,7 @@
         <Button
           variant={search.order === option.value ? 'primary' : 'ghost'}
           size="small"
+          class="sable-choice"
           aria-pressed={search.order === option.value}
           onclick={() => {
             chooseOrder(option.value);
@@ -326,10 +327,14 @@
           chooseScope(next as 'all' | 'space');
         }}
       >
-        <RadioGroup.Item value="all" class="scope-option">
+        <RadioGroup.Item value="all" class="scope-option sable-choice">
           {$i18n.t('search.scopeAll')}
         </RadioGroup.Item>
-        <RadioGroup.Item value="space" class="scope-option" disabled={spaces.length === 0}>
+        <RadioGroup.Item
+          value="space"
+          class="scope-option sable-choice"
+          disabled={spaces.length === 0}
+        >
           {$i18n.t('search.scopeSpace')}
         </RadioGroup.Item>
       </RadioGroup.Root>
@@ -691,14 +696,8 @@
     padding: var(--space-150) var(--space-200);
   }
 
-  :global(.scope-option:hover:not([data-disabled])) {
+  :global(.scope-option:hover:not([data-disabled], [data-state='checked'])) {
     background: var(--sable-bg-container-hover);
-  }
-
-  :global(.scope-option[data-state='checked']) {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-main);
-    color: var(--sable-primary-on-container);
   }
 
   :global(.scope-option[data-disabled]) {

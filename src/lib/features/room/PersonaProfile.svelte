@@ -60,7 +60,7 @@
 
 {#if desktop}
   <Popover.Root bind:open onOpenChange={handleOpenChange}>
-    <Popover.Trigger bind:ref={trigger} class="avatar-button" aria-label={label}>
+    <Popover.Trigger bind:ref={trigger} class="avatar-button sable-open" aria-label={label}>
       {@render children()}
     </Popover.Trigger>
     <Popover.Portal>
@@ -75,7 +75,15 @@
     </Popover.Portal>
   </Popover.Root>
 {:else}
-  <button class="avatar-button" type="button" aria-label={label} onclick={openSheet}>
+  <button
+    class="avatar-button sable-open"
+    type="button"
+    aria-label={label}
+    aria-haspopup="dialog"
+    aria-expanded={open}
+    data-state={open ? 'open' : 'closed'}
+    onclick={openSheet}
+  >
     {@render children()}
   </button>
   <BottomSheet

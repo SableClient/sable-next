@@ -83,7 +83,10 @@
   {:else}
     <div class="widgets-tabs" role="tablist">
       {#each widgets as widget (widget.id)}
-        <div class="widgets-tab" class:active={widget.id === activeWidget?.id}>
+        <div
+          class="widgets-tab sable-choice"
+          data-selected={widget.id === activeWidget?.id ? 'true' : undefined}
+        >
           <button
             type="button"
             role="tab"
@@ -193,12 +196,6 @@
     flex-shrink: 0;
     gap: var(--space-100);
     padding-inline-end: var(--space-100);
-  }
-
-  .widgets-tab.active {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
   }
 
   .widgets-tab button {

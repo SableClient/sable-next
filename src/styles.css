@@ -1,4 +1,6 @@
 @import url('@fontsource-variable/nunito');
+@import url('./lib/ui/primitives/selection.css');
+@import url('./lib/ui/primitives/settings-nav.css');
 
 /* Palette lifted verbatim from Sable's src/app/styles/themes.css so the two
    apps read as the same product. These stay plain CSS rather than a generated
@@ -568,7 +570,7 @@ label[for],
 }
 
 .sable-selection-layer::after {
-  background: var(--sable-bg-container-active);
+  background: var(--sable-surface-container-active);
   border-radius: inherit;
   content: '';
   inset: 0;
@@ -578,7 +580,6 @@ label[for],
   z-index: 0;
 }
 
-.sable-selection-layer.active::after,
 .sable-selection-layer:active::after {
   opacity: 1;
 }

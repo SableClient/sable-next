@@ -71,8 +71,7 @@
       <li class="answer-row">
         <button
           type="button"
-          class="answer"
-          class:selected={answer.selected}
+          class="answer sable-choice"
           aria-pressed={answer.selected}
           disabled={ended || !eventId}
           onclick={() => {
@@ -202,11 +201,7 @@
     cursor: default;
   }
 
-  .answer:not(:disabled):hover {
-    border-color: var(--sable-primary-main);
-  }
-
-  .answer.selected {
+  .answer:not(:disabled, [aria-pressed='true']):hover {
     border-color: var(--sable-primary-main);
   }
 

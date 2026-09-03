@@ -70,7 +70,7 @@
     {#snippet child({ props })}
       <IconButton
         {...props}
-        class="room-menu-button"
+        class="room-menu-button sable-open"
         variant="ghost"
         size="small"
         label={$i18n.t('room.menuMoreOptions')}

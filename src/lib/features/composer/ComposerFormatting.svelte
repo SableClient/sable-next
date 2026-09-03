@@ -64,7 +64,7 @@
     <IconButton
       variant="ghost"
       size="small"
-      class="format-button"
+      class="format-button sable-choice"
       label={$i18n.t(button.label)}
       aria-pressed={active.includes(button.action)}
       onclick={() => {
@@ -77,7 +77,7 @@
   <IconButton
     variant="ghost"
     size="small"
-    class="format-button"
+    class="format-button sable-choice"
     label={$i18n.t('composer.markdownSource')}
     aria-pressed={source}
     onclick={onToggleSource}
@@ -112,11 +112,6 @@
     height: var(--target);
     min-height: var(--target);
     width: var(--target);
-  }
-
-  :global(.format-button[aria-pressed='true']) {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
   }
 
   :global(.format-button svg) {

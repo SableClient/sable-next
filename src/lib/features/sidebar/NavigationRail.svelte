@@ -354,10 +354,9 @@
   {@const active = isActive(item)}
   <a
     {...props}
-    class="rail-item sable-nav-tab sable-nav-tab-side sable-selection-layer"
+    class="rail-item sable-nav-tab sable-nav-tab-side sable-current sable-selection-layer"
     class:sable-nav-tab-outlined={outlined(item)}
     class:space-item={Boolean(item.initial)}
-    class:active
     href={item.navigateHref ?? item.href}
     draggable={held ? 'false' : undefined}
     onclick={mobile
@@ -506,8 +505,8 @@
     {...props}
     type="button"
     class="rail-item folder-preview sable-nav-tab sable-nav-tab-side sable-nav-tab-outlined
-    sable-selection-layer"
-    class:active={folderActive(folder)}
+    sable-current sable-selection-layer"
+    data-current={folderActive(folder) ? 'true' : undefined}
     aria-expanded="false"
     aria-label={$i18n.t('nav.folderExpand', { name: folderLabel(folder) })}
     onclick={() => {
@@ -569,7 +568,7 @@
             <button
               {...props}
               type="button"
-              class="folder-collapse"
+              class="folder-collapse sable-open"
               aria-expanded="true"
               aria-label={$i18n.t('nav.folderCollapse', { name: folderLabel(folder) })}
               onclick={() => {

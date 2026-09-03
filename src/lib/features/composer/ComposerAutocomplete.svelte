@@ -36,8 +36,7 @@
         <li role="presentation">
           <button
             type="button"
-            class="sable-menu-item option"
-            class:active={index === active}
+            class="sable-menu-item option sable-highlight"
             id={optionId(index)}
             role="option"
             tabindex="-1"
@@ -114,10 +113,6 @@
     max-height: 13rem;
     overflow-y: auto;
     padding: var(--space-100);
-  }
-
-  :global(.option.active) {
-    background: var(--sable-bg-container-hover);
   }
 
   .text {

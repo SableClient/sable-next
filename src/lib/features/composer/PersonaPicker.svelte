@@ -67,7 +67,7 @@
   <Popover.Root {open} onOpenChange={handleOpenChange}>
     <Popover.Trigger>
       {#snippet child({ props })}
-        <IconButton {...props} variant="ghost" size="small" {label}>
+        <IconButton {...props} variant="ghost" size="small" class="sable-open" {label}>
           {#if active}
             <Avatar src={active.avatar_url} name={active.display_name} size="small" />
           {:else}
@@ -94,7 +94,16 @@
     </Popover.Portal>
   </Popover.Root>
 {:else}
-  <IconButton variant="ghost" size="small" {label} onclick={openSheet}>
+  <IconButton
+    variant="ghost"
+    size="small"
+    class="sable-open"
+    {label}
+    aria-haspopup="dialog"
+    aria-expanded={open}
+    data-state={open ? 'open' : 'closed'}
+    onclick={openSheet}
+  >
     {#if active}
       <Avatar src={active.avatar_url} name={active.display_name} size="small" />
     {:else}

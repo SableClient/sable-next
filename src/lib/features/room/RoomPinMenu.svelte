@@ -188,7 +188,7 @@
     {#snippet child({ props })}
       <IconButton
         {...props}
-        class="pin-button"
+        class="pin-button sable-open"
         variant="ghost"
         size="small"
         label={$i18n.t('room.pinsTitle')}

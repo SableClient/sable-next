@@ -36,7 +36,7 @@
         <Button
           size="small"
           variant="ghost"
-          class={['tab', { active: reaction.key === group?.key }]}
+          class="tab sable-choice"
           role="tab"
           aria-selected={reaction.key === group?.key}
           onclick={() => {
@@ -90,12 +90,6 @@
     font-size: var(--font-size-small);
     gap: var(--space-100);
     padding: var(--space-050) var(--space-200);
-  }
-
-  :global(.tab.active) {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
   }
 
   :global(.tab em) {

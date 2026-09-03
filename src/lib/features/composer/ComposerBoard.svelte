@@ -78,7 +78,7 @@
 {#if desktop}
   <Popover.Root bind:open>
     <Popover.Trigger
-      class="composer-board-trigger"
+      class="composer-board-trigger sable-open"
       {disabled}
       aria-label={$i18n.t('composer.emotesAndStickers')}
     >
@@ -103,8 +103,9 @@
 {:else}
   <button
     type="button"
-    class="composer-board-trigger"
+    class="composer-board-trigger sable-open"
     {disabled}
+    data-state={open ? 'open' : 'closed'}
     aria-label={$i18n.t('composer.emotesAndStickers')}
     onpointerdown={onBeforeOpen}
     onclick={() => {
@@ -156,11 +157,6 @@
 
   :global(.composer-board-trigger:hover) {
     background: var(--sable-surface-container-hover);
-  }
-
-  :global(.composer-board-trigger[data-state='open']) {
-    background: var(--sable-surface-container-active);
-    color: var(--sable-primary-main);
   }
 
   :global(.composer-board-trigger:disabled) {

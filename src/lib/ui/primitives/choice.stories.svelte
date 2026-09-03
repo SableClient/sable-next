@@ -53,10 +53,97 @@
   </div>
 </Story>
 
+<Story name="Selection state matrix" asChild>
+  <div class="state-matrix">
+    <section class="state-card">
+      <div>
+        <strong>Chosen value</strong>
+        <span>Persistent choice, such as a tab, filter, or toggle.</span>
+      </div>
+      <button class="state-sample sable-choice" type="button" aria-pressed={true}>
+        Selected
+      </button>
+    </section>
+
+    <section class="state-card">
+      <div>
+        <strong>Current location</strong>
+        <span>Where navigation is currently positioned.</span>
+      </div>
+      <a class="state-sample sable-current" href="#selection-state-matrix" aria-current="page">
+        Current page
+      </a>
+    </section>
+
+    <section class="state-card">
+      <div>
+        <strong>Open</strong>
+        <span>A menu, popover, or disclosure is currently open.</span>
+      </div>
+      <button class="state-sample sable-open" type="button" data-state="open" aria-expanded={true}>
+        Open menu
+      </button>
+    </section>
+
+    <section class="state-card">
+      <div>
+        <strong>Keyboard highlight</strong>
+        <span>The next item to activate; it is not committed yet.</span>
+      </div>
+      <button class="state-sample sable-highlight" type="button" data-highlighted={true}>
+        Highlighted option
+      </button>
+    </section>
+  </div>
+</Story>
+
 <style>
   .stack {
     display: grid;
     gap: var(--space-200);
     max-width: 24rem;
+  }
+
+  .state-matrix {
+    display: grid;
+    gap: var(--space-200);
+    max-width: 42rem;
+  }
+
+  .state-card {
+    align-items: center;
+    background: var(--sable-surface-container);
+    border: var(--border-width) solid var(--sable-surface-container-line);
+    border-radius: var(--radii-400);
+    display: grid;
+    gap: var(--space-300);
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--space-300);
+  }
+
+  .state-card > div {
+    display: grid;
+    gap: var(--space-050);
+  }
+
+  .state-card span {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+  }
+
+  .state-sample {
+    align-items: center;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-pill);
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-weight: var(--font-weight-600);
+    justify-content: center;
+    min-height: var(--control-height-400);
+    padding: 0 var(--space-300);
+    text-decoration: none;
+    white-space: nowrap;
   }
 </style>

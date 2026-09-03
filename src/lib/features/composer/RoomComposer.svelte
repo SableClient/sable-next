@@ -792,8 +792,9 @@
               <IconButton
                 variant="ghost"
                 size="small"
-                class="composer-format"
+                class="composer-format sable-open"
                 aria-pressed={formattingOpen}
+                data-state={formattingOpen ? 'open' : 'closed'}
                 label={$i18n.t('composer.formatting')}
                 onclick={() => {
                   setPreference('formattingToolbar', !formattingOpen);
@@ -1026,11 +1027,6 @@
     min-height: var(--target);
     position: relative;
     width: var(--target);
-  }
-
-  :global(.composer-format[aria-pressed='true']) {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
   }
 
   :global(.composer-format)::after {

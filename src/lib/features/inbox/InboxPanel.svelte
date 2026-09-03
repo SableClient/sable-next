@@ -15,9 +15,9 @@
   $effect(() => {
     void tick().then(() => {
       anchor =
-        Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href="/inbox"].active')).find(
-          (element) => element.getClientRects().length > 0
-        ) ?? null;
+        Array.from(
+          document.querySelectorAll<HTMLAnchorElement>('a[href="/inbox"][aria-current="page"]')
+        ).find((element) => element.getClientRects().length > 0) ?? null;
     });
   });
 

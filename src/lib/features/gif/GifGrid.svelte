@@ -84,8 +84,7 @@
           </button>
           <button
             type="button"
-            class="gif-star"
-            class:kept
+            class="gif-star sable-choice"
             aria-pressed={kept}
             aria-label={kept ? $i18n.t('composer.gifUnfavorite') : $i18n.t('composer.gifFavorite')}
             onclick={(event) => {
@@ -172,10 +171,6 @@
     position: absolute;
     right: 0.25rem;
     top: 0.25rem;
-  }
-
-  .gif-star.kept {
-    color: var(--sable-primary-main);
   }
 
   .gif-star :global(svg) {

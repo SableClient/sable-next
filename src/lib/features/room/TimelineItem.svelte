@@ -518,18 +518,19 @@
     bind:this={messageRow}
     class={[
       'message',
+      'sable-choice',
       `layout-${layout}`,
       {
         collapsed,
         pending,
         highlighted,
-        selected,
         persona: personaTint,
         own: item.is_own,
         'mention-silent': item.mention === 'silent',
         'mention-loud': item.mention === 'loud',
       },
     ]}
+    data-selected={selected ? 'true' : undefined}
     style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
     style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
     style:--name-color-on-light={senderColors.nameColorLight ?? undefined}
@@ -1012,11 +1013,15 @@
 
   /* The sheet pairs multi-select with keyboard focus; focus is the half that
      exists today, and it survives on touch where hover does not. */
-  .message.selected,
-  .message:has(:focus-visible) {
+  .message[data-selected='true'] {
     background: var(--sable-primary-container);
     border-radius: var(--radius);
     box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-container-line);
+  }
+
+  .message:has(:focus-visible):not([data-selected='true']) {
+    background: var(--sable-bg-container-hover);
+    border-radius: var(--radius);
   }
 
   .message.collapsed {
@@ -1416,8 +1421,8 @@
     color: var(--sable-warn-on-container);
   }
 
-  .message.selected .body,
-  .message.selected time {
+  .message[data-selected='true'] .body,
+  .message[data-selected='true'] time {
     color: var(--sable-primary-on-container);
   }
 

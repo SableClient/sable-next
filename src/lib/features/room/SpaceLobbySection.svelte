@@ -93,7 +93,7 @@
   <div class="section-header">
     <Button
       variant="ghost"
-      class="section-toggle"
+      class="section-toggle sable-open"
       aria-expanded={!closed}
       onclick={() => {
         onToggle(section.key);
@@ -111,7 +111,10 @@
     {#if section.space}
       {@const sectionSpace = section.space}
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger class="room-menu-trigger" aria-label={$i18n.t('room.menuLabel')}>
+        <DropdownMenu.Trigger
+          class="room-menu-trigger sable-open"
+          aria-label={$i18n.t('room.menuLabel')}
+        >
           <DotsThreeVerticalIcon />
         </DropdownMenu.Trigger>
         <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
@@ -210,7 +213,7 @@
               {/if}
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger
-                  class="room-menu-trigger"
+                  class="room-menu-trigger sable-open"
                   aria-label={$i18n.t('room.menuLabel')}
                 >
                   <DotsThreeVerticalIcon />
@@ -460,10 +463,9 @@
     width: var(--control-height-small);
   }
 
-  :global(.room-menu-trigger:hover),
-  :global(.room-menu-trigger[data-state='open']) {
-    background: var(--sable-surface-var-container);
-    color: var(--sable-bg-on-container);
+  :global(.room-menu-trigger:hover) {
+    background: var(--sable-surface-container-hover);
+    color: var(--sable-surface-on-container);
   }
 
   :global(.room-menu-trigger:focus-visible) {

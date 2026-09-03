@@ -451,7 +451,10 @@
       <h2 aria-label={collapsed ? title : undefined}>
         {#if collapsed}
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger class="room-nav-badge" aria-label={$i18n.t('nav.listOptions')}>
+            <DropdownMenu.Trigger
+              class="room-nav-badge sable-open"
+              aria-label={$i18n.t('nav.listOptions')}
+            >
               {#if activeSpace}
                 <Avatar src={activeSpace.avatar_url} name={title} size="small" />
               {:else}
@@ -478,7 +481,10 @@
             </span>
           {/if}
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger class="room-nav-menu" aria-label={$i18n.t('nav.listOptions')}>
+            <DropdownMenu.Trigger
+              class="room-nav-menu sable-open"
+              aria-label={$i18n.t('nav.listOptions')}
+            >
               <DotsThreeVerticalIcon />
             </DropdownMenu.Trigger>
             <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
@@ -523,13 +529,17 @@
     <div class="room-nav-actions" class:collapsed>
       {#snippet action(href: string, label: string, icon: Component)}
         {@const Icon = icon}
+        {@const active = page.url.pathname === href}
         <a
-          class="nav-action sable-selection-layer"
+          class="nav-action sable-current sable-selection-layer"
           {href}
           onclick={() => onNavigate?.(href)}
           aria-label={collapsed ? label : undefined}
+          aria-current={active ? 'page' : undefined}
         >
-          <span class="room-icon" aria-hidden="true"><Icon /></span>
+          <span class="room-icon" aria-hidden="true"
+            ><Icon weight={active ? 'fill' : 'regular'} /></span
+          >
           {#if !collapsed}<span class="room-text"><span class="room-name">{label}</span></span>{/if}
         </a>
       {/snippet}
@@ -547,8 +557,9 @@
     {#if !collapsed}
       <button
         type="button"
-        class="rooms-heading sable-selection-layer"
+        class="rooms-heading sable-open sable-selection-layer"
         aria-expanded={!roomsClosed}
+        data-state={roomsClosed ? 'closed' : 'open'}
         aria-controls={roomListId}
         onclick={() => {
           roomsClosed = !roomsClosed;
@@ -577,7 +588,7 @@
               <div class="room-row-wrap">
                 <button
                   type="button"
-                  class="room-category sable-selection-layer"
+                  class="room-category sable-open sable-selection-layer"
                   class:collapsed
                   oncontextmenu={(event) => {
                     openContextMenu(event, item.room, null);
@@ -585,6 +596,7 @@
                   style:--room-depth={collapsed ? 0 : item.depth}
                   aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
                   aria-expanded={!isClosed}
+                  data-state={isClosed ? 'closed' : 'open'}
                   onclick={() => {
                     toggleCategory(item.key);
                   }}
@@ -602,6 +614,7 @@
               {@const room = item.room}
               {@const name = room ? roomName(room) : item.roomId}
               {@const href = roomHref(item)}
+              {@const active = page.url.pathname === href}
               {@const muted = !room || roomList.mutedRoomIds.has(room.room_id)}
               {@const mentions = muted ? 0 : room.highlight}
               {@const unread = muted ? 0 : room.unread}
@@ -622,14 +635,13 @@
                   oncontextmenu={(event) => {
                     if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
                   }}
-                  class="room-row sable-selection-layer"
-                  class:active={page.url.pathname === href}
+                  class="room-row sable-current sable-selection-layer"
                   class:unread={mentions > 0 || unread > 0 || marked}
                   {href}
                   style:--room-depth={collapsed ? 0 : item.depth}
                   onclick={() => onNavigate?.(href)}
                   aria-label={collapsed ? name : undefined}
-                  aria-current={page.url.pathname === href ? 'page' : undefined}
+                  aria-current={active ? 'page' : undefined}
                 >
                   {#if showIcons}
                     <span class="room-avatar">
@@ -643,7 +655,7 @@
                         uniform
                       >
                         {@const Glyph = roomGlyph(room)}
-                        <Glyph />
+                        <Glyph weight={active ? 'fill' : 'regular'} />
                       </Avatar>
                       {#if peerPresence && peerPresence.presence !== 'offline'}
                         <PresenceDot
@@ -867,10 +879,9 @@
     width: 1.75rem;
   }
 
-  :global(.room-nav-menu:hover),
-  :global(.room-nav-menu[data-state='open']) {
-    background: var(--sable-bg-container-hover);
-    color: var(--sable-bg-on-container);
+  :global(.room-nav-menu:hover) {
+    background: var(--sable-surface-container-hover);
+    color: var(--sable-surface-on-container);
   }
 
   :global(.room-nav-menu:focus-visible) {
@@ -1043,8 +1054,24 @@
     text-decoration: none;
   }
 
-  .room-row.active {
-    color: var(--sable-bg-on-container);
+  .room-row[aria-current='page'] {
+    background: var(--sable-surface-container-active);
+    color: var(--sable-surface-on-container);
+  }
+
+  .room-row[aria-current='page']:hover {
+    background: var(--sable-surface-container-hover);
+    color: var(--sable-surface-on-container);
+  }
+
+  .nav-action[aria-current='page'] {
+    background: var(--sable-surface-container-active);
+    color: var(--sable-surface-on-container);
+  }
+
+  .nav-action[aria-current='page']:hover {
+    background: var(--sable-surface-container-hover);
+    color: var(--sable-surface-on-container);
   }
 
   .room-row.unread {
@@ -1083,8 +1110,12 @@
   }
 
   .room-row.unread :global(.room-avatar-icon.glyph),
-  .room-row.active :global(.room-avatar-icon.glyph) {
+  .room-row[aria-current='page'] :global(.room-avatar-icon.glyph) {
     opacity: var(--opacity-p500);
+  }
+
+  .room-row[aria-current='page'] :global(.room-avatar-icon) {
+    box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-main);
   }
 
   .room-icon :global(svg),

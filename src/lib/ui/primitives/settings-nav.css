@@ -1,0 +1,30 @@
+.sable-settings-nav {
+  background: var(--sable-surface-container);
+  border-right: var(--border-width) solid var(--sable-surface-container-line);
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 16rem;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding-bottom: var(--space-400);
+}
+
+.sable-settings-nav-paged {
+  border-right: 0;
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.sable-settings-nav-header {
+  align-items: center;
+  background: var(--sable-surface-container);
+  border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-300);
+  justify-content: space-between;
+  min-height: var(--control-height-large);
+  padding: 0 var(--space-300);
+}

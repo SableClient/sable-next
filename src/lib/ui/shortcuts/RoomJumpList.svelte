@@ -77,8 +77,7 @@
         <li role="presentation">
           <button
             type="button"
-            class="sable-menu-item option"
-            class:active={index === active}
+            class="sable-menu-item option sable-highlight"
             id={optionId(index)}
             role="option"
             tabindex="-1"
@@ -114,11 +113,6 @@
 
   .option {
     --menu-item-height: var(--control-height-500);
-  }
-
-  .option.active,
-  .option[aria-selected='true'] {
-    background: var(--sable-bg-container-hover);
   }
 
   .name {

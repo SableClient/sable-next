@@ -61,10 +61,14 @@
     padding: var(--space-050);
   }
 
-  .tooltip-trigger-icon:hover,
+  .tooltip-trigger-icon:hover {
+    background: var(--sable-surface-container-hover);
+    color: var(--sable-surface-on-container);
+  }
+
   .tooltip-trigger-icon[data-state='open'] {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+    background: var(--sable-surface-container-active);
+    color: var(--sable-surface-on-container);
   }
 
   .tooltip-trigger-icon :global(svg) {
@@ -86,7 +90,7 @@
 
   .tooltip-trigger-inline:hover,
   .tooltip-trigger-inline[data-state='open'] {
-    color: var(--sable-bg-on-container);
+    color: var(--sable-surface-on-container);
   }
 
   .tooltip-trigger:focus-visible {

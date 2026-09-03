@@ -61,7 +61,7 @@
       {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
         <button
           {...props}
-          class={['reaction', { mine }]}
+          class="reaction sable-choice"
           type="button"
           aria-pressed={mine}
           aria-label={$i18n.t('timeline.toggleReaction', {
@@ -184,12 +184,6 @@
     line-height: 1;
   }
 
-  .reaction.mine {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
-  }
-
   .reaction:disabled {
     cursor: default;
   }
@@ -208,12 +202,8 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .reaction:hover:not(:disabled) {
+    .reaction:hover:not(:disabled, [aria-pressed='true']) {
       background: var(--sable-surface-var-container-hover);
-    }
-
-    .reaction.mine:hover:not(:disabled) {
-      background: var(--sable-primary-container-hover);
     }
   }
 </style>

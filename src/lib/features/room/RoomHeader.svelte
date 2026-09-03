@@ -130,11 +130,12 @@
     {/if}
     {@render widgets?.()}
     <IconButton
-      class="members-button"
+      class="members-button sable-open"
       variant="ghost"
       size="small"
       label={$i18n.t('timeline.members')}
       aria-pressed={membersOpen}
+      data-state={membersOpen ? 'open' : 'closed'}
       onclick={onMembers}
     >
       <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />

@@ -3,7 +3,6 @@
   import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
-  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -17,6 +16,7 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { sectionsAfterCategories, sectionsBeforeCategories } from './sections.js';
   import { defaultSettingsSection } from './settings-navigation';
@@ -70,8 +70,12 @@
   </Dialog.Description>
 
   {#if showList}
-    <aside class="settings-nav" aria-label={$i18n.t('settings.title')}>
-      <div class="settings-title">
+    <aside
+      class="settings-nav sable-settings-nav"
+      class:sable-settings-nav-paged={!desktop}
+      aria-label={$i18n.t('settings.title')}
+    >
+      <div class="settings-title sable-settings-nav-header">
         <Dialog.Title class="settings-heading">{$i18n.t('settings.title')}</Dialog.Title>
         <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={onClose}
           ><XIcon /></IconButton
@@ -126,24 +130,15 @@
           {/each}
         </ul>
       {:else}
-        <nav aria-label={$i18n.t('settings.sections')}>
-          {#each sections as entry (entry.id)}
-            {@const active = openSection === entry.id}
-            <a
-              class="sable-selection-layer"
-              href={resolve(`settings/${entry.id}`)}
-              class:active
-              aria-current={active ? 'page' : undefined}
-              onclick={(event) => {
-                select(event, entry.id);
-              }}
-            >
-              <span class="icon" aria-hidden="true"><entry.icon /></span>
-              <span class="label">{$i18n.t(entry.label)}</span>
-              <span class="chevron" aria-hidden="true"><CaretRightIcon /></span>
-            </a>
-          {/each}
-        </nav>
+        <SettingsNav
+          entries={sections.map((entry) => ({ ...entry, label: $i18n.t(entry.label) }))}
+          activeId={openSection}
+          ariaLabel={$i18n.t('settings.sections')}
+          onSelect={select}
+          href={(entry) => resolve(`settings/${entry.id}`)}
+          showChevron={!desktop}
+          large={!desktop}
+        />
       {/if}
       <Button
         class="settings-logout"
@@ -159,7 +154,7 @@
   {#if showContent && openSection}
     <div class="settings-content">
       {#if !desktop}
-        <div class="settings-title section-bar">
+        <div class="settings-title section-bar sable-settings-nav-header">
           <IconButton variant="ghost" size="small" label={$i18n.t('settings.back')} onclick={onBack}
             ><ArrowLeftIcon /></IconButton
           >
@@ -184,25 +179,6 @@
     width: 100%;
   }
 
-  .settings-nav {
-    background: var(--sable-surface-container);
-    border-right: var(--border-width) solid var(--sable-surface-container-line);
-    display: flex;
-    flex: 0 0 16rem;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-    padding-bottom: var(--space-400);
-  }
-
-  .settings-title {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    min-height: 4rem;
-    padding: var(--space-300) var(--space-400);
-  }
-
   :global(.settings-heading) {
     font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
@@ -210,7 +186,6 @@
     padding: 0;
   }
 
-  nav,
   .search-results {
     align-content: start;
     display: grid;
@@ -221,7 +196,7 @@
     min-height: 0;
     min-width: 0;
     overflow: hidden auto;
-    padding: 0;
+    padding: var(--space-200);
     scrollbar-gutter: stable;
   }
 
@@ -229,7 +204,7 @@
     min-width: 0;
   }
 
-  .settings-nav .label {
+  .search-results .label {
     flex: 1;
     min-width: 0;
   }
@@ -295,7 +270,14 @@
     font-weight: var(--font-weight-normal);
   }
 
-  a {
+  .search-results .icon {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: center;
+  }
+
+  .search-results a {
     align-items: center;
     border-left: calc(var(--border-width) * 3) solid transparent;
     color: inherit;
@@ -303,27 +285,15 @@
     font-weight: var(--font-weight-medium);
     gap: var(--space-300);
     min-height: var(--control-height-medium);
-    padding: 0 var(--space-400);
+    padding: 0 var(--space-300);
     text-decoration: none;
   }
 
-  a:hover {
+  .search-results a:hover {
     background: var(--sable-surface-container-hover);
   }
 
-  a.active {
-    border-left-color: var(--sable-primary-main);
-    color: var(--sable-bg-on-container);
-  }
-
-  .icon {
-    align-items: center;
-    display: flex;
-    flex: 0 0 auto;
-    justify-content: center;
-  }
-
-  a :global(svg) {
+  .search-results a :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
@@ -334,10 +304,6 @@
     margin: auto var(--space-400) 0;
     min-height: var(--control-height-medium);
     width: auto;
-  }
-
-  .chevron {
-    display: none;
   }
 
   .settings-content {
@@ -358,7 +324,7 @@
     background: var(--sable-surface-container);
     border-bottom: var(--border-width) solid var(--sable-surface-container-line);
     flex: 0 0 auto;
-    gap: var(--space-200);
+    gap: var(--space-300);
     justify-content: flex-start;
   }
 
@@ -371,28 +337,9 @@
     white-space: nowrap;
   }
 
-  .paged .settings-nav {
-    border-right: 0;
-    flex: 1;
-  }
-
-  .paged .settings-title {
-    min-height: var(--control-height-large);
-  }
-
-  .paged a {
+  .paged .search-results a {
     border-left: 0;
     min-height: var(--control-height-large);
-  }
-
-  .paged .chevron {
-    color: var(--sable-surface-var-on-container);
-    display: flex;
-    flex: 0 0 auto;
-  }
-
-  .paged a.active {
-    background: var(--sable-surface-container-hover);
   }
 
   .paged :global(.settings-logout) {
