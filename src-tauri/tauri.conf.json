@@ -13,11 +13,12 @@
     "windows": [
       {
         "title": "Sable",
-        "width": 800,
-        "height": 600,
+        "width": 1280,
+        "height": 720,
         "resizable": true,
         "fullscreen": false,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "backgroundColor": "#24232c"
       }
     ],
     "security": {

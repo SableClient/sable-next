@@ -114,14 +114,23 @@ fn install_permission_policy() {
 fn cef_command_line_args() -> Vec<(String, Option<String>)> {
     let mut args: Vec<(String, Option<String>)> = vec![
         ("--disable-gpu-sandbox".into(), None),
+        ("--disable-font-subpixel-positioning".into(), None),
+        ("--enable-font-antialiasing".into(), None),
         ("--disable-background-timer-throttling".into(), None),
+        ("--skia-resource-cache-limit-mb".into(), Some("64".into())),
+        ("--renderer-process-limit".into(), Some("2".into())),
         (
             "autoplay-policy".into(),
             Some("no-user-gesture-required".into()),
         ),
         (
             "disable-features".into(),
-            Some("SpareRendererForSitePerProcess,IntensiveWakeUpThrottling".into()),
+            Some(
+                "SpareRendererForSitePerProcess,IntensiveWakeUpThrottling,AutofillActorMode,\
+                 GlicActorUi,LensOverlay,LocalNetworkAccessChecks,\
+                 LocalNetworkAccessChecksWebSocket,LocalNetworkAccessChecksWebRTC"
+                    .into(),
+            ),
         ),
     ];
 
@@ -167,6 +176,7 @@ fn main() {
     {
         tauri_runtime_cef::configure(tauri_runtime_cef::CefConfig {
             identifier: "moe.sable.next".into(),
+            custom_schemes: vec!["tauri".into(), "ipc".into(), "asset".into()],
             deep_link_schemes: vec!["moe.sable.next".into(), "sable".into()],
             command_line_args: cef_command_line_args(),
             ..Default::default()
