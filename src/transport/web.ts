@@ -53,7 +53,6 @@ export function createWebTransport(): Transport {
   const crashListeners = new Set<(message: string) => void>();
   const stallListeners = new Set<(stalled: boolean) => void>();
   const overdue = new Set<number>();
-  let healthProbeId: number | null = null;
   let healthProbeTimer: ReturnType<typeof setTimeout> | undefined;
   let stalled = false;
   let nextId = 1;
@@ -74,7 +73,6 @@ export function createWebTransport(): Transport {
   function clearHealthProbe(): void {
     if (healthProbeTimer !== undefined) clearTimeout(healthProbeTimer);
     healthProbeTimer = undefined;
-    healthProbeId = null;
   }
 
   function scheduleHealthProbe(delay = 0): void {
@@ -86,11 +84,9 @@ export function createWebTransport(): Transport {
       if (closed || overdue.size === 0) return;
 
       const id = nextId++;
-      healthProbeId = id;
       connect().port.postMessage({ id, ping: true });
       healthProbeTimer = setTimeout(() => {
         healthProbeTimer = undefined;
-        healthProbeId = null;
         reportStall(true);
         scheduleHealthProbe(healthProbeIntervalMs);
       }, healthProbeTimeoutMs);
@@ -108,6 +104,13 @@ export function createWebTransport(): Transport {
     if (overdue.size > 0) return;
     clearHealthProbe();
     reportStall(false);
+  }
+
+  function markWorkerResponsive(): void {
+    if (overdue.size === 0) return;
+    clearHealthProbe();
+    reportStall(false);
+    scheduleHealthProbe(healthProbeIntervalMs);
   }
 
   function rejectPending(logId: string): void {
@@ -162,6 +165,7 @@ export function createWebTransport(): Transport {
 
     nextWorker.port.onmessage = (message: MessageEvent<WorkerMessage>) => {
       const data = message.data;
+      markWorkerResponsive();
 
       if ('event' in data) {
         for (const listener of listeners) listener(data.event);
@@ -183,15 +187,7 @@ export function createWebTransport(): Transport {
         return;
       }
 
-      if ('pong' in data) {
-        if (data.id !== healthProbeId) return;
-        if (healthProbeTimer !== undefined) clearTimeout(healthProbeTimer);
-        healthProbeTimer = undefined;
-        healthProbeId = null;
-        reportStall(false);
-        scheduleHealthProbe(healthProbeIntervalMs);
-        return;
-      }
+      if ('pong' in data) return;
 
       const waiting = pending.get(data.id);
       if (!waiting) return;
