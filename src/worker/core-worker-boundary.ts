@@ -149,6 +149,10 @@ export function createCoreWorkerBoundary(
         }
         return;
       }
+      if ('ping' in request) {
+        port.postMessage({ id: request.id, pong: true });
+        return;
+      }
       const { id } = request;
 
       if (panic !== null) {

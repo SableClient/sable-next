@@ -53,20 +53,61 @@ export function createWebTransport(): Transport {
   const crashListeners = new Set<(message: string) => void>();
   const stallListeners = new Set<(stalled: boolean) => void>();
   const overdue = new Set<number>();
+  let healthProbeId: number | null = null;
+  let healthProbeTimer: ReturnType<typeof setTimeout> | undefined;
+  let stalled = false;
   let nextId = 1;
   let worker: SharedWorker | null = null;
   let debugLogs = false;
   let closed = false;
 
   const stallAfterMs = 20_000;
+  const healthProbeTimeoutMs = 2_000;
+  const healthProbeIntervalMs = 5_000;
 
-  function setOverdue(id: number, stalled: boolean): void {
-    const before = overdue.size > 0;
-    if (stalled) overdue.add(id);
-    else overdue.delete(id);
-    const after = overdue.size > 0;
-    if (before === after) return;
-    for (const listener of stallListeners) listener(after);
+  function reportStall(next: boolean): void {
+    if (stalled === next) return;
+    stalled = next;
+    for (const listener of stallListeners) listener(next);
+  }
+
+  function clearHealthProbe(): void {
+    if (healthProbeTimer !== undefined) clearTimeout(healthProbeTimer);
+    healthProbeTimer = undefined;
+    healthProbeId = null;
+  }
+
+  function scheduleHealthProbe(delay = 0): void {
+    if (closed || overdue.size === 0 || healthProbeTimer !== undefined) {
+      return;
+    }
+    healthProbeTimer = setTimeout(() => {
+      healthProbeTimer = undefined;
+      if (closed || overdue.size === 0) return;
+
+      const id = nextId++;
+      healthProbeId = id;
+      connect().port.postMessage({ id, ping: true });
+      healthProbeTimer = setTimeout(() => {
+        healthProbeTimer = undefined;
+        healthProbeId = null;
+        reportStall(true);
+        scheduleHealthProbe(healthProbeIntervalMs);
+      }, healthProbeTimeoutMs);
+    }, delay);
+  }
+
+  function setOverdue(id: number, isOverdue: boolean): void {
+    if (isOverdue) {
+      overdue.add(id);
+      scheduleHealthProbe();
+      return;
+    }
+
+    overdue.delete(id);
+    if (overdue.size > 0) return;
+    clearHealthProbe();
+    reportStall(false);
   }
 
   function rejectPending(logId: string): void {
@@ -142,6 +183,16 @@ export function createWebTransport(): Transport {
         return;
       }
 
+      if ('pong' in data) {
+        if (data.id !== healthProbeId) return;
+        if (healthProbeTimer !== undefined) clearTimeout(healthProbeTimer);
+        healthProbeTimer = undefined;
+        healthProbeId = null;
+        reportStall(false);
+        scheduleHealthProbe(healthProbeIntervalMs);
+        return;
+      }
+
       const waiting = pending.get(data.id);
       if (!waiting) return;
       pending.delete(data.id);
@@ -171,6 +222,7 @@ export function createWebTransport(): Transport {
     listeners.clear();
     crashListeners.clear();
     stallListeners.clear();
+    clearHealthProbe();
     overdue.clear();
     rejectPending(reason);
     worker?.port.postMessage(farewell);

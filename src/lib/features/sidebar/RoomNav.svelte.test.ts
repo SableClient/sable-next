@@ -160,6 +160,44 @@ test('home links a room to its own section', async () => {
   await unmount(instance);
 });
 
+test('expanded room disclosures do not use the active-route surface', async () => {
+  pageState.url.pathname = '/space/!root%3Aexample.org/!room%3Aexample.org';
+  pageState.params = { spaceId: '!root:example.org' };
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      is_space: true,
+      space_children: [
+        { room_id: '!nested:example.org', order: null, origin_server_ts: 1, suggested: false },
+      ],
+    }),
+    makeRoom({
+      room_id: '!nested:example.org',
+      name: 'Nested',
+      is_space: true,
+      space_children: [
+        { room_id: '!room:example.org', order: null, origin_server_ts: 1, suggested: false },
+      ],
+    }),
+    makeRoom({ room_id: '!room:example.org', name: 'Current room' }),
+  ];
+
+  const instance = await mountNav();
+  const current = document.querySelectorAll('.sable-current[aria-current="page"]');
+  const expandedDisclosures = document.querySelectorAll(
+    ':is(.rooms-heading, .room-category)[aria-expanded="true"]'
+  );
+
+  expect(current).toHaveLength(1);
+  expect(current[0]?.classList.contains('room-row')).toBe(true);
+  expect(expandedDisclosures).toHaveLength(2);
+  expect(
+    Array.from(expandedDisclosures).every((node) => !node.classList.contains('sable-open'))
+  ).toBe(true);
+  await unmount(instance);
+});
+
 test('home leaves out invited and knocked rooms', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!joined:example.org', name: 'Joined' }),
