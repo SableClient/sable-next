@@ -34,7 +34,7 @@ test('a push shows a notification naming the room the app cached', async ({
   const roomId = await admin.createRoom({ name: roomName });
   const eventId = await admin.sendMessage(roomId, 'A message worth pushing.');
 
-  await app.openHome();
+  await app.openRooms();
   await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
 
   const session = await context.newCDPSession(page);

@@ -14,7 +14,7 @@ const RAIL_DESTINATIONS = [
 
 for (const { link, path } of RAIL_DESTINATIONS) {
   test(`reaches ${path} from the primary navigation`, async ({ page, app }) => {
-    await app.openHome();
+    await app.openRooms();
 
     await app.primaryNavigation.getByRole('link', { name: link, exact: true }).click();
 
@@ -72,34 +72,34 @@ test('keeps the mobile quick tools visible on inbox', async ({ page }) => {
 });
 
 test('dismissing the inbox popover returns to the previous page', async ({ page, app }) => {
-  await app.openHome();
+  await app.openRooms();
 
   await page.getByRole('link', { name: 'Inbox' }).first().click();
   const inbox = page.getByRole('region', { name: 'Inbox' });
   await expect(inbox).toBeVisible();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 
   await page.keyboard.press('Escape');
 
   await expect(inbox).toBeHidden();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 });
 
 test('closing the inbox sheet returns to the previous page', async ({ page, app }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await app.openHome();
+  await app.openRooms();
   const dismiss = page.getByRole('button', { name: 'Dismiss' });
   if (await dismiss.isVisible()) await dismiss.click();
 
   await page.getByRole('link', { name: 'Inbox' }).first().click();
   const inbox = page.getByRole('region', { name: 'Inbox' });
   await expect(inbox).toBeVisible();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 
   await page.getByRole('button', { name: 'Close' }).click();
 
   await expect(inbox).toBeHidden();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 });
 
 test('opens a settings section over the app shell', async ({ page, app }) => {

@@ -53,11 +53,13 @@ vi.mock('#lib/core/context.js', () => ({
 vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
 import NavigationRail from './NavigationRail.svelte';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 
 afterEach(() => {
   document.body.replaceChildren();
   localStorage.clear();
+  setPreference('showHome', false);
 });
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
@@ -90,6 +92,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
 }
 
 test('badges unread direct chats but leaves home alone', async () => {
+  setPreference('showHome', true);
   const instance = mount(NavigationRail, {
     target: document.body,
     props: {
@@ -110,6 +113,7 @@ test('badges unread direct chats but leaves home alone', async () => {
 });
 
 test('badges the unspaced section, which home no longer repeats', async () => {
+  setPreference('showHome', true);
   const instance = mount(NavigationRail, {
     target: document.body,
     props: {
@@ -125,6 +129,24 @@ test('badges the unspaced section, which home no longer repeats', async () => {
   expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-count')?.textContent).toBe(
     '2'
   );
+
+  await unmount(instance);
+});
+
+test('home is absent until the preference asks for it', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [], mobile: true },
+  });
+  await tick();
+
+  expect(document.querySelector('a[href="/home"]')).toBeNull();
+  expect(document.querySelector('a[href="/rooms"]')).not.toBeNull();
+
+  setPreference('showHome', true);
+  await tick();
+
+  expect(document.querySelector('a[href="/home"]')).not.toBeNull();
 
   await unmount(instance);
 });
@@ -215,7 +237,7 @@ test('outlines every tab but a space avatar', async () => {
   await tick();
 
   expect(
-    document.querySelector('a[href="/home"]')?.classList.contains('sable-nav-tab-outlined')
+    document.querySelector('a[href="/rooms"]')?.classList.contains('sable-nav-tab-outlined')
   ).toBe(true);
   expect(
     document.querySelector('a[aria-label="Alpha"]')?.classList.contains('sable-nav-tab-outlined')

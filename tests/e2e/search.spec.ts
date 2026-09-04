@@ -32,7 +32,7 @@ test('the room header search button opens the search page scoped to that room', 
   page,
   app,
 }) => {
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
 
   await page.getByRole('button', { name: 'Search messages' }).click();

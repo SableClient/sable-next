@@ -288,7 +288,7 @@ test('a matrix.to link redirects into the room it names', async ({
   await app.openMatrixToLink(homeserver.timelineRoomId, eventId);
 
   await expect(page).toHaveURL(
-    `/home/${encodeURIComponent(homeserver.timelineRoomId)}?event=${encodeURIComponent(eventId)}`
+    `/rooms/${encodeURIComponent(homeserver.timelineRoomId)}?event=${encodeURIComponent(eventId)}`
   );
   await expect(timeline.message('Timeline message 10')).toBeInViewport();
 });

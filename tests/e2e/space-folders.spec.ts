@@ -23,7 +23,7 @@ async function spaceOrder(page: Page): Promise<(string | null)[]> {
 }
 
 async function openRail(page: Page): Promise<void> {
-  await page.goto('/home');
+  await page.goto('/rooms');
   await expect(railSpaces(page)).toHaveCount(3, { timeout: 90_000 });
 }
 

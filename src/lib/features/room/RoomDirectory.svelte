@@ -7,11 +7,11 @@
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
 
   import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
-  import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -55,7 +55,7 @@
   }
 
   async function open(room: PublicRoomView): Promise<void> {
-    await goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(room.room_id) }));
+    await goto(roomSectionPath(roomList.rooms, room.room_id));
   }
 
   async function join(room: PublicRoomView): Promise<void> {
@@ -73,7 +73,7 @@
       }
 
       const roomId = await core.commands.joinRoom(address);
-      await goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(roomId) }));
+      await goto(roomSectionPath(roomList.rooms, roomId));
     } catch (error) {
       console.warn('[sable directory] join failed', error);
       failedJoin = joinErrorMessage(error);

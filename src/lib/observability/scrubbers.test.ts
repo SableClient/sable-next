@@ -150,6 +150,9 @@ describe('scrubMatrixUrl', () => {
   });
 
   it("scrubs the app's own route segments", () => {
+    expect(scrubMatrixUrl('/rooms/!roomid:example.com')).toBe('/rooms/![ROOM_ID]');
+    expect(scrubMatrixUrl('/rooms/!roomid%3Aexample.com')).toBe('/rooms/![ROOM_ID]');
+    expect(scrubMatrixUrl('/rooms/#general:example.com')).toBe('/rooms/[ROOM_ALIAS]');
     expect(scrubMatrixUrl('/home/!roomid:example.com')).toBe('/home/![ROOM_ID]');
     expect(scrubMatrixUrl('/home/!roomid%3Aexample.com')).toBe('/home/![ROOM_ID]');
     expect(scrubMatrixUrl('/direct/@alice:example.com')).toBe('/direct/@[USER_ID]');

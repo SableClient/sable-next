@@ -19,7 +19,7 @@ test('loads a real room at latest and preserves the viewport while paginating', 
   await signIn();
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
   await app.openRoomFromList(TIMELINE_ROOM_NAME);
-  await expect(page).toHaveURL(`/home/${encodeURIComponent(homeserver.timelineRoomId)}`);
+  await expect(page).toHaveURL(`/rooms/${encodeURIComponent(homeserver.timelineRoomId)}`);
 
   const latest = timeline.message(`Timeline message ${String(TIMELINE_MESSAGE_COUNT - 1)}`);
   await expect(latest).toBeInViewport({ timeout: 15_000 });
@@ -83,7 +83,7 @@ test('keeps the live subscription when another tab restores the shared session',
   await expect(timeline.loading).toHaveCount(0);
 
   const secondPage = await context.newPage();
-  await secondPage.goto('/home');
+  await secondPage.goto('/rooms');
   await expect(secondPage.getByRole('link', { name: TIMELINE_ROOM_NAME })).toBeVisible({
     timeout: 15_000,
   });

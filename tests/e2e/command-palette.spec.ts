@@ -9,7 +9,7 @@ const test = base.extend<{ palette: Palette }>({
     const secondName = `Palette omega ${stamp}`;
     const firstRoomId = await app.createRoom(firstName);
     await app.createRoom(secondName);
-    await app.openHome();
+    await app.openRooms();
     await expect(app.primaryNavigation).toBeVisible();
     await use({ firstName, secondName, firstRoomId });
   },

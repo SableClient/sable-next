@@ -20,7 +20,7 @@
       history.back();
       return;
     }
-    void goto(resolve('home'));
+    void goto(resolve('/(app)/rooms'));
   }
 
   function select(nextSection: string, focus?: string): void {

@@ -35,7 +35,7 @@
   });
 
   const mobileTools = [
-    { href: '/home', icon: ChatsIcon, label: 'nav.messages' },
+    { href: '/rooms', icon: ChatsIcon, label: 'nav.messages' },
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
   ] as const;
   const mobileSlotCount = mobileTools.length + 1;

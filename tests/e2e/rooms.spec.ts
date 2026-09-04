@@ -16,7 +16,7 @@ test('creates a room and opens it', async ({ page, app, signIn }) => {
   await app.createRoomName.fill(name);
   await app.createRoomSubmit.click();
 
-  await expect(page).toHaveURL(/\/home\/.+/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/rooms\/.+/, { timeout: 15_000 });
   await expect(app.roomHeading(name)).toBeVisible();
   await expect(app.roomLink(name)).toBeVisible();
   await expect(page).toHaveTitle(`${name} - Sable`);

@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test('renders a startup state while the core is restoring', async ({ app, installEmptyCore }) => {
   await installEmptyCore('loading');
-  await app.openHome();
+  await app.openRooms();
 
   await expect(app.startupStatus).toContainText('Starting Sable');
   await expect(app.startupHeading).toBeVisible();
@@ -20,14 +20,14 @@ test('renders a recoverable error when the core cannot start', async ({
   installEmptyCore,
 }) => {
   await installEmptyCore('error');
-  await app.openHome();
+  await app.openRooms();
 
   await expect(app.startupError).toContainText('Sable could not start');
   await expect(app.retryButton).toBeVisible();
 });
 
 test('redirects signed-out protected routes to login', async ({ page }) => {
-  await page.goto('/home');
+  await page.goto('/rooms');
 
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

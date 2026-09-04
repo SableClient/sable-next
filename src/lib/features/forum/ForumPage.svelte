@@ -97,7 +97,7 @@
       );
       return;
     }
-    void goto(resolve('home'));
+    void goto(resolve('/(app)/rooms'));
   }
 
   function openSearch(): void {

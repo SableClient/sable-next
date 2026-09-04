@@ -6,7 +6,7 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
 
   function close(): void {
-    void goto(resolve('home'));
+    void goto(resolve('/(app)/rooms'));
   }
 </script>
 

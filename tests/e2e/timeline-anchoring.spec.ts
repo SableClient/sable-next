@@ -40,7 +40,7 @@ test('switches the active timeline to the selected room', async ({
   installRoomCore,
 }) => {
   await installRoomCore('ready');
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await expect(page.getByText('Welcome to General')).toBeVisible();
   await app.openRoomFromList('Random');
@@ -65,7 +65,7 @@ test('keeps a visible event fixed while history prepends', async ({
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
 
   await expect(timeline.container).not.toHaveClass(/initial/, { timeout: 20_000 });
@@ -100,7 +100,7 @@ test('falls back to a surviving visible anchor when the first row is replaced', 
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
 
@@ -131,7 +131,7 @@ test('anchors a large reset by surviving event identity', async ({
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await expect(timeline.message(LATEST)).toBeVisible();
   await timeline.expectRevealed();
@@ -194,7 +194,7 @@ test('keeps a visible event fixed when a prepended image loads', async ({
 }) => {
   await installRoomCore('delayed_media');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
 
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
@@ -229,7 +229,7 @@ test('keeps a visible event fixed while a prepend is measured during backward sc
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
 
   const subscription = await core.subscription();
@@ -266,7 +266,7 @@ test('keeps the first loaded message fixed when it becomes a continuation', asyn
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
 
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
@@ -301,7 +301,7 @@ test('only follows appended events while pinned at latest', async ({
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
 
   const subscription = await core.subscription();
@@ -333,7 +333,7 @@ test('keeps a local echo and the visible position stable through confirmation', 
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await expect(timeline.container).not.toHaveClass(/initial/, { timeout: 20_000 });
 
@@ -420,7 +420,7 @@ test('anchors at latest after delayed initial history arrives', async ({
 }) => {
   await installRoomCore('delayed_history');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   // The short snapshot needs another history page. Do not reveal it at its
   // intermediate position before the landing can anchor the complete page.
@@ -440,7 +440,7 @@ test('anchors delayed history inserted after a stable date divider', async ({
 }) => {
   await installRoomCore('delayed_pagination');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
 
@@ -467,7 +467,7 @@ test('anchors delayed history from a nonzero oldest-threshold offset', async ({
 }) => {
   await installRoomCore('delayed_pagination');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
 
@@ -498,7 +498,7 @@ test('stays at the newest message when history lands in a room that fits', async
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 1200 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await expect.poll(() => timeline.scrollableHeight()).toBe(0);
@@ -528,7 +528,7 @@ test('opens at the first unread message rather than the newest', async ({
 }) => {
   await installRoomCore('unread');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
 
@@ -546,7 +546,7 @@ test('follows an appended event while a pointer rests on the timeline', async ({
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 500 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await expect.poll(() => timeline.scrollableHeight()).toBeGreaterThan(100);
@@ -574,7 +574,7 @@ test('follows a sent message from a room opened on its first unread', async ({
 }) => {
   await installRoomCore('unread');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await expect(timeline.jumpToLatest).toBeVisible();
@@ -606,7 +606,7 @@ test('follows a sent message after a wheel that could not scroll', async ({
 }) => {
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 420 });
-  await app.openHome();
+  await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);

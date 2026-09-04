@@ -9,6 +9,8 @@
      decision has to wait for the status to settle rather than sample it once. */
   $effect(() => {
     if (core.status === 'idle' || core.status === 'starting') return;
-    void goto(core.status === 'ready' ? resolve('home') : resolve('login'), { replaceState: true });
+    void goto(core.status === 'ready' ? resolve('/(app)/rooms') : resolve('login'), {
+      replaceState: true,
+    });
   });
 </script>

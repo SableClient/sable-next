@@ -31,5 +31,5 @@ test('signs in with a password', async ({ auth, page }) => {
   await auth.nextStageButton.click();
   await expect(page).toHaveURL(/\/login\/verify$/);
   await auth.leaveVerificationButton.click();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 });
