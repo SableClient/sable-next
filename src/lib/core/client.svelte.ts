@@ -646,7 +646,7 @@ export class CoreClient {
       if (generation !== this.generation) return;
 
       this.replaceSession(null);
-      this.status = 'error';
+      this.status = 'signed-out';
       this.cleanupTransport();
     }
   }
