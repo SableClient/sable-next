@@ -68,7 +68,7 @@
   <section class="scheduled" aria-label={$i18n.t('composer.scheduledCount', { count: total })}>
     <button
       type="button"
-      class="summary sable-open"
+      class="summary"
       aria-expanded={expanded}
       onclick={() => {
         expanded = !expanded;

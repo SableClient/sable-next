@@ -421,6 +421,7 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
   const collapse = document.querySelector<HTMLButtonElement>('.folder-collapse');
   expect(collapse?.getAttribute('aria-label')).toBe('nav.folderCollapse:Work');
   expect(collapse?.getAttribute('aria-expanded')).toBe('true');
+  expect(collapse?.classList.contains('sable-open')).toBe(false);
   collapse?.click();
   expect(toggled).toEqual(['f']);
 

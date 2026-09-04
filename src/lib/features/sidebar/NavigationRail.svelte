@@ -568,7 +568,7 @@
             <button
               {...props}
               type="button"
-              class="folder-collapse sable-open"
+              class="folder-collapse"
               aria-expanded="true"
               aria-label={$i18n.t('nav.folderCollapse', { name: folderLabel(folder) })}
               onclick={() => {

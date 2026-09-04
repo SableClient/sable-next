@@ -93,7 +93,7 @@
   <div class="section-header">
     <Button
       variant="ghost"
-      class="section-toggle sable-open"
+      class="section-toggle"
       aria-expanded={!closed}
       onclick={() => {
         onToggle(section.key);

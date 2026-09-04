@@ -17,7 +17,7 @@
 <Button
   variant="ghost"
   size="small"
-  class="method-toggle sable-open"
+  class="method-toggle"
   aria-expanded={expanded}
   aria-controls={controls}
   {disabled}
