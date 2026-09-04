@@ -19,6 +19,7 @@
   import { matrixToUrl } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
@@ -116,6 +117,7 @@
 
   function report(error: unknown): void {
     console.warn('[sable room] room action failed', error);
+    toasts.error($i18n.t('errors.actionFailed'));
   }
 
   function toggleTag(tag: RoomTag, current: boolean): void {
@@ -152,6 +154,7 @@
       await navigator.clipboard.writeText(matrixToUrl(room.canonical_alias ?? room.room_id, via));
     } catch (error) {
       console.debug('[sable room] clipboard unavailable', error);
+      toasts.error($i18n.t('errors.copyFailed'));
     }
   }
 </script>

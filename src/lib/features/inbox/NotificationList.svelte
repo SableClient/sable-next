@@ -5,6 +5,7 @@
 
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
@@ -61,6 +62,7 @@
       await core.commands.markRead(room.room_id, eventId, readReceiptIsPrivate());
     } catch (error) {
       console.warn('[sable inbox] marking the room read failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     } finally {
       marking.delete(room.room_id);
     }

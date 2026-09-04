@@ -34,6 +34,7 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
@@ -446,6 +447,7 @@
       widgets = await loadWidgets(activeRoomId);
     } catch (error) {
       console.warn('[sable room] remove widget failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 
@@ -518,6 +520,7 @@
       await navigator.clipboard.writeText(matrixToUrl(alias ?? resolvedRoomId, via, eventId));
     } catch (error) {
       console.debug('[sable room] copy link failed', error);
+      toasts.error($i18n.t('errors.copyFailed'));
     }
   }
 

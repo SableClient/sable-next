@@ -12,6 +12,7 @@
   import type { RoomSummary } from '#src/generated/RoomSummary';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { matrixToUrl } from '#lib/rooms/permalink.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -56,6 +57,7 @@
       await navigator.clipboard.writeText(matrixToUrl(room.canonical_alias ?? room.room_id, via));
     } catch (error) {
       console.debug('[sable room] clipboard unavailable', error);
+      toasts.error($i18n.t('errors.copyFailed'));
     }
   }
 </script>
