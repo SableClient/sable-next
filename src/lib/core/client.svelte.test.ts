@@ -67,14 +67,14 @@ test('a restore that returns no session reports signed out, not an error', async
   expect(core.session).toBeNull();
 });
 
-test('a transport that refuses to restore leaves the client in error', async () => {
+test('a transport that refuses to restore leaves the client signed out for relogin', async () => {
   const fake = fakeTransport();
   fake.transport.send = vi.fn(() => Promise.reject(new Error('worker gone')));
   const core = createCoreClient(() => fake.transport);
 
   await core.start();
 
-  expect(core.status).toBe('error');
+  expect(core.status).toBe('signed-out');
   expect(core.session).toBeNull();
 });
 
