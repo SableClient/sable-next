@@ -9,12 +9,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import {
-    findRoomByPathId,
-    provideRoomList,
-    RoomList,
-    roomPathParamFromId,
-  } from '#lib/rooms/room-list.svelte.js';
+  import { findRoomByPathId, provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -139,7 +134,7 @@
 
   function acceptIncoming(call: IncomingCall): void {
     incomingCalls.accept(call);
-    void goto(resolve('/(app)/home/[roomId]', { roomId: roomPathParamFromId(call.roomId) }));
+    void goto(roomSectionPath(roomList.rooms, call.roomId));
     void callSession.join(call.roomId, { microphone: true, camera: false });
   }
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
@@ -200,7 +195,7 @@
 
   $effect(() => {
     if (core.status !== 'ready') return;
-    ensureAndroidHistoryRoot(resolve('/(app)/home'));
+    ensureAndroidHistoryRoot(resolve('/(app)/rooms'));
   });
 
   $effect(() => {
@@ -472,11 +467,7 @@
           roomName={callRoom?.name ?? $i18n.t('call.title')}
           onReturn={() => {
             if (callSession.roomId === null) return;
-            void goto(
-              resolve('/(app)/home/[roomId]', {
-                roomId: roomPathParamFromId(callSession.roomId),
-              })
-            );
+            void goto(roomSectionPath(roomList.rooms, callSession.roomId));
           }}
         />
       </div>

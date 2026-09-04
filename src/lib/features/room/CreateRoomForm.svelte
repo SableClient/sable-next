@@ -186,7 +186,7 @@
           })
         );
       } else {
-        await goto(resolve('/(app)/home/[roomId]', { roomId: target }));
+        await goto(resolve('/(app)/rooms/[roomId]', { roomId: target }));
       }
     } catch (error) {
       console.warn('[sable room] create failed', error);

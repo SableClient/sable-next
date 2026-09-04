@@ -30,8 +30,8 @@ test('signs in through the OIDC redirect flow', async ({ auth, page }) => {
 
   await auth.nextStageButton.click();
   await auth.leaveVerificationButton.click();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 
   await page.reload();
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/rooms$/);
 });

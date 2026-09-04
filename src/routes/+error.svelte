@@ -6,7 +6,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
 
   function reloadApp(): void {
-    void goto(resolve('home'));
+    void goto(resolve('/(app)/rooms'));
   }
 </script>
 

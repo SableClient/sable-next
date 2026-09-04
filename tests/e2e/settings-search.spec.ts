@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/home');
+  await page.goto('/rooms');
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
 });

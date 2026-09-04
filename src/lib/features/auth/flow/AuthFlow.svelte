@@ -119,7 +119,7 @@
   const profile = new ProfileController({
     core,
     getUserId: () => core.session?.user_id ?? '',
-    onNavigateHome: () => goto(resolve('home')),
+    onNavigateHome: () => goto(resolve('/(app)/rooms')),
   });
 
   const login = new LoginController({
@@ -246,7 +246,7 @@
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     const rawMarker = localStorage.getItem(profileOnboardingMarker(userId));
     if (!rawMarker) {
-      void goto(resolve('home'));
+      void goto(resolve('/(app)/rooms'));
       return;
     }
     if (restoredMarkerFor === userId) return;
@@ -287,7 +287,7 @@
   function finishLoginVerification(): void {
     loginVerificationActive = false;
     loginVerificationPending = false;
-    void goto(resolve('home'));
+    void goto(resolve('/(app)/rooms'));
   }
 
   function finishRecoveryOnboarding(): void {

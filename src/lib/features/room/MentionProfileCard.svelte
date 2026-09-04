@@ -23,8 +23,9 @@
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
 
   import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
   import type { MutualRoomView } from '#src/generated/MutualRoomView';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { preferredPronouns } from '#lib/personas/pronouns.js';
@@ -66,6 +67,7 @@
     variant = 'popover',
   }: Props = $props();
   const core = useCoreClient();
+  const roomList = useRoomList();
   const presenceStore = usePresenceStore();
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
   let presence = $derived(presenceStore.get(userId));
@@ -308,7 +310,7 @@
   }
 
   function openRoom(target: string): void {
-    void goto(resolve('/(app)/home/[roomId]', { roomId: target }));
+    void goto(roomSectionPath(roomList.rooms, target));
   }
 
   async function sendDirectMessage(event: SubmitEvent): Promise<void> {

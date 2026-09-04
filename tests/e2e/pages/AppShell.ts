@@ -40,8 +40,8 @@ export class AppShell {
     this.deviceBanner = page.getByRole('status', { name: /not verified/i });
   }
 
-  async openHome(): Promise<void> {
-    await this.page.goto('/home');
+  async openRooms(): Promise<void> {
+    await this.page.goto('/rooms');
   }
 
   async openInbox(): Promise<void> {
@@ -67,7 +67,7 @@ export class AppShell {
       await this.page.getByRole('option', { name: parentSpace, exact: true }).click();
     }
     await this.createRoomSubmit.click();
-    await expect(this.page).toHaveURL(/\/(home|space)\/[^/]+/, { timeout: COLD_BOOT_TIMEOUT });
+    await expect(this.page).toHaveURL(/\/(rooms|space)\/[^/]+/, { timeout: COLD_BOOT_TIMEOUT });
     return this.currentRoomId();
   }
 
@@ -79,7 +79,7 @@ export class AppShell {
   }
 
   async openRoom(roomId: string, { settled = true } = {}): Promise<void> {
-    await this.page.goto(`/home/${encodeURIComponent(roomId)}`);
+    await this.page.goto(`/rooms/${encodeURIComponent(roomId)}`);
     if (settled) await this.awaitTimelineSettled();
   }
 
@@ -92,7 +92,7 @@ export class AppShell {
 
   async openPermalink(roomId: string, eventId: string): Promise<void> {
     await this.page.goto(
-      `/home/${encodeURIComponent(roomId)}?event=${encodeURIComponent(eventId)}`
+      `/rooms/${encodeURIComponent(roomId)}?event=${encodeURIComponent(eventId)}`
     );
     await this.awaitTimelineSettled();
   }

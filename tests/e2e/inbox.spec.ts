@@ -116,7 +116,7 @@ test.describe('on a pristine account', () => {
     });
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await app.openHome();
+    await app.openRooms();
 
     await expect(page.getByRole('link', { name: 'Inbox, 2 waiting' }).first()).toBeVisible({
       timeout: 20_000,

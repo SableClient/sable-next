@@ -3,13 +3,13 @@
   import { SvelteSet } from 'svelte/reactivity';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
 
-  import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
-  import { roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -38,10 +38,7 @@
   let visibleRooms = $derived(limit === undefined ? rooms : rooms.slice(0, limit));
 
   function roomHref(room: RoomSummary): string {
-    const param = roomPathParam(room);
-    return room.is_direct
-      ? resolve('/(app)/direct/[roomId]', { roomId: param })
-      : resolve('/(app)/home/[roomId]', { roomId: param });
+    return roomSectionPath(roomList.rooms, room.room_id);
   }
 
   function roomName(room: RoomSummary): string {

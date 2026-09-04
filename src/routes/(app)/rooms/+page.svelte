@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RoutePlaceholder from '#lib/ui/RoutePlaceholder.svelte';
+  import HomeLanding from '#lib/features/home/HomeLanding.svelte';
 </script>
 
-<RoutePlaceholder titleKey="nav.unspaced" />
+<HomeLanding titleKey="nav.unspaced" />

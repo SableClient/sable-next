@@ -129,7 +129,7 @@ async function signInThroughUi(page: Page, homeserverUrl: string, username: stri
   await auth.signInWithPassword(username, LOGIN_PASSWORD);
   await expect(page).toHaveURL(/\/login\/verify$/, { timeout: 30_000 });
   await auth.leaveVerificationButton.click();
-  await expect(page).toHaveURL(/\/home$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/rooms$/, { timeout: 30_000 });
 }
 
 async function saveSignedInState(
@@ -441,7 +441,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         refusedId,
       };
     })();
-    await page.goto('/home');
+    await page.goto('/rooms');
     await expect(
       page
         .getByRole('navigation', { name: 'Primary navigation' })
@@ -457,7 +457,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       await auth.signInWithPassword(LOGIN_USERNAME, LOGIN_PASSWORD);
       await expect(page).toHaveURL(/\/login\/verify$/);
       await auth.leaveVerificationButton.click();
-      await expect(page).toHaveURL(/\/home$/);
+      await expect(page).toHaveURL(/\/rooms$/);
     });
   },
 });

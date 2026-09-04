@@ -33,7 +33,7 @@ async function storedOverride(page: import('@playwright/test').Page) {
 }
 
 test('the deployment default holds until all three fields are applied', async ({ page, app }) => {
-  await app.openHome();
+  await app.openRooms();
   await expect(app.primaryNavigation).toBeVisible();
   await page.goto('/settings/notifications');
 
@@ -71,7 +71,7 @@ test('the deployment default holds until all three fields are applied', async ({
 });
 
 test('an address the core would refuse cannot be applied', async ({ page, app }) => {
-  await app.openHome();
+  await app.openRooms();
   await expect(app.primaryNavigation).toBeVisible();
   await page.goto('/settings/notifications');
 
@@ -97,7 +97,7 @@ test('an address the core would refuse cannot be applied', async ({ page, app })
 });
 
 test('the default comes back on reset', async ({ page, app }) => {
-  await app.openHome();
+  await app.openRooms();
   await expect(app.primaryNavigation).toBeVisible();
   await page.goto('/settings/notifications');
 

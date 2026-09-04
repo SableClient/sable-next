@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test('defaults to on when the OS prefers reduced motion', async ({ page, app }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await app.openHome();
+  await app.openRooms();
 
   await expect(app.primaryNavigation).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'on');
@@ -15,7 +15,7 @@ test('defaults to on when the OS prefers reduced motion', async ({ page, app }) 
 
 test('defaults to off when the OS has no preference', async ({ page, app }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await app.openHome();
+  await app.openRooms();
 
   await expect(app.primaryNavigation).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'off');
@@ -26,7 +26,7 @@ test('enabling it in settings sets the attribute on the document element', async
   app,
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await app.openHome();
+  await app.openRooms();
   await page.goto('/settings/accessibility');
 
   const toggle = page.getByRole('switch', { name: 'Reduce motion' });

@@ -35,7 +35,7 @@ function sectionPath(
 
   // An unknown room still resolves: the timeline reports the failure with more
   // context than a redirect to nowhere would.
-  return resolve('/(app)/home/[roomId]', { roomId: roomParam });
+  return resolve('/(app)/rooms/[roomId]', { roomId: roomParam });
 }
 
 export function roomSectionPath(

@@ -49,7 +49,7 @@
     switching = true;
     try {
       await core.switchAccount(accountId);
-      await goto(resolve('home'));
+      await goto(resolve('/(app)/rooms'));
     } finally {
       switching = false;
     }

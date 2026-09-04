@@ -102,15 +102,19 @@
   let dropState = $state<DropState<LayoutRef> | null>(null);
 
   let items = $derived<readonly RailItem[]>([
-    {
-      href: resolve('home'),
-      activePrefix: '/home',
-      icon: HouseIcon,
-      label: 'nav.home',
-      unread: homeUnread,
-      section: 'home',
-      badge: false,
-    },
+    ...(preferences.showHome
+      ? [
+          {
+            href: resolve('/(app)/home'),
+            activePrefix: '/home',
+            icon: HouseIcon,
+            label: 'nav.home',
+            unread: homeUnread,
+            section: 'home',
+            badge: false,
+          } satisfies RailItem,
+        ]
+      : []),
     {
       href: resolve('/(app)/rooms'),
       activePrefix: '/rooms',
@@ -192,7 +196,10 @@
     { key: 'badgeCountDMsOnly', label: 'settings.badgeCountDMsOnly' },
     { key: 'showPingCounts', label: 'settings.showPingCounts' },
   ] as const;
-  const iconToggles = [{ key: 'uniformIcons', label: 'settings.uniformIcons' }] as const;
+  const viewToggles = [
+    { key: 'showHome', label: 'settings.showHome' },
+    { key: 'uniformIcons', label: 'settings.uniformIcons' },
+  ] as const;
 
   let contextSpace = $state<RoomSummary | null>(null);
   let contextAnchor = $state.raw<CursorAnchor | null>(null);
@@ -656,7 +663,7 @@
 
       <DropdownMenu.Separator class="sable-menu-separator" />
 
-      {#each iconToggles as toggle (toggle.key)}
+      {#each viewToggles as toggle (toggle.key)}
         {@const on = preferences[toggle.key]}
         <DropdownMenu.Item
           class="sable-menu-item"

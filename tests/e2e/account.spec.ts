@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.beforeEach(async ({ app }) => {
-  await app.openHome();
+  await app.openRooms();
 });
 
 test('keeps account settings in profile order', async ({ page }) => {

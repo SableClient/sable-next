@@ -55,11 +55,11 @@ test.fixme('shows what the core resolved, once the reader has opted in', async (
   const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
   await admin.join(roomId);
 
-  await app.openHome();
+  await app.openRooms();
   await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
   await turnOn(page, 'System notifications');
   await turnOn(page, 'Show message content');
-  await app.openHome();
+  await app.openRooms();
   await page.reload();
   await expect(app.primaryNavigation).toBeVisible();
   await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
@@ -83,7 +83,7 @@ test('stays quiet until the switch is on', async ({ page, app, admin, guest }) =
   const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
   await admin.join(roomId);
 
-  await app.openHome();
+  await app.openRooms();
   await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
 
   await guest.sendMessage(roomId, `unheard ${String(Date.now())}`, {

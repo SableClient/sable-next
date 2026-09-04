@@ -16,7 +16,7 @@
 
   $effect(() => {
     if (core.status === 'ready' && !authEntry && !page.url.searchParams.has('addAccount')) {
-      void goto(resolve('home'), { replaceState: true });
+      void goto(resolve('/(app)/rooms'), { replaceState: true });
     }
   });
 </script>

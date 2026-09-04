@@ -50,7 +50,7 @@
     error = null;
     try {
       await core.switchAccount(accountId);
-      await goto(resolve('home'));
+      await goto(resolve('/(app)/rooms'));
     } catch {
       error = $i18n.t('nav.switchAccount');
     } finally {

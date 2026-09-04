@@ -15,6 +15,11 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
 
+  interface Props {
+    titleKey?: string;
+  }
+
+  let { titleKey = 'nav.home' }: Props = $props();
   let hasLoggedInBefore = $state(false);
 
   const startCards = [
@@ -44,7 +49,7 @@
 </script>
 
 <svelte:head>
-  <title>{$i18n.t('nav.home')} - Sable</title>
+  <title>{$i18n.t(titleKey)} - Sable</title>
 </svelte:head>
 
 <main class="home-page" aria-labelledby="home-title">

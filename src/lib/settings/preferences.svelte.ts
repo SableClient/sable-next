@@ -22,6 +22,7 @@ export interface Preferences {
   alwaysShowAltText: boolean;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
+  showHome: boolean;
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
   showPingCounts: boolean;
@@ -138,6 +139,7 @@ const DEFAULTS: Preferences = {
   alwaysShowAltText: false,
   showRoomIcon: 'always',
   showRoomBanners: true,
+  showHome: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,
   showPingCounts: true,

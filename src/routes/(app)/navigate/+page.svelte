@@ -16,7 +16,7 @@
   }
 
   function back(): void {
-    void goto(resolve('home'));
+    void goto(resolve('/(app)/rooms'));
   }
 </script>
 

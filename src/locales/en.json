@@ -1145,6 +1145,8 @@
     "alwaysShowAltTextHint": "Shows the description of an image below it, even when it is only a filename.",
     "showRoomBanners": "Room banners",
     "showRoomBannersHint": "Show a room or space banner image above its room list.",
+    "showHome": "Show Home",
+    "showHomeHint": "Keep the Home entry at the top of the sidebar, listing every room.",
     "showUnreadCounts": "Room unread counts",
     "showUnreadCountsHint": "Badge rooms with a number instead of a dot.",
     "badgeCountDMsOnly": "Direct message counts",

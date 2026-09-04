@@ -45,5 +45,5 @@ function roomHref(room: RoomSummary, roomId: string): string {
   const param = roomPathParamFromId(roomId);
   if (room.is_space) return resolve('/(app)/space/[spaceId]', { spaceId: param });
   if (room.is_direct) return resolve('/(app)/direct/[roomId]', { roomId: param });
-  return resolve('/(app)/home/[roomId]', { roomId: param });
+  return resolve('/(app)/rooms/[roomId]', { roomId: param });
 }
