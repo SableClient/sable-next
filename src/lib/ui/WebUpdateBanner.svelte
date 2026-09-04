@@ -16,8 +16,16 @@
   }
 
   function refresh(): void {
-    registration?.waiting?.postMessage({ type: 'sable:skip-waiting' });
-    location.reload();
+    const waiting = registration?.waiting;
+    if (!waiting) {
+      location.reload();
+      return;
+    }
+
+    on(navigator.serviceWorker, 'controllerchange', () => location.reload(), {
+      once: true,
+    });
+    waiting.postMessage({ type: 'sable:skip-waiting' });
   }
 
   onMount(() => {
