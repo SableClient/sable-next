@@ -21,7 +21,7 @@ class FakePort {
     ) {
       const { id } = message;
       queueMicrotask(() => {
-        this.portMessage({ id, pong: true });
+        this.receive({ id, pong: true });
       });
       return;
     }
@@ -34,12 +34,12 @@ class FakePort {
     ) {
       const { id } = message;
       queueMicrotask(() => {
-        this.portMessage({ id, uri: null });
+        this.receive({ id, uri: null });
       });
     }
   }
 
-  private portMessage(message: unknown): void {
+  receive(message: unknown): void {
     this.onmessage?.({ data: message } as MessageEvent);
   }
 
@@ -114,6 +114,20 @@ test('a slow command does not report a responsive worker as unresponsive', async
       void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
     }, true)
   ).toBe(false);
+});
+
+test('a command response clears an unresponsive report while other commands remain pending', async () => {
+  const transport = await load();
+  const stalls: boolean[] = [];
+  transport.subscribeStall((stalled) => stalls.push(stalled));
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never).catch(() => {});
+  void transport.send({ type: 'user_profile', user_id: '@u:example.org' }).catch(() => {});
+
+  await vi.advanceTimersByTimeAsync(23_000);
+  expect(stalls).toEqual([true]);
+
+  FakeSharedWorker.last?.port.receive({ id: 1, err: { code: 'failed' } });
+  expect(stalls).toEqual([true, false]);
 });
 
 test('a slow media fetch does not report the core as unresponsive', async () => {
