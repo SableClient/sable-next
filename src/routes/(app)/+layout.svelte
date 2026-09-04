@@ -61,6 +61,7 @@
   import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
+  import ToastRegion from '#lib/ui/ToastRegion.svelte';
   import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
   import { ShareInbox, watchSharedContent } from '#lib/features/share/share-inbox.svelte.js';
   import ShortcutsHelpDialog from '#lib/ui/shortcuts/ShortcutsHelpDialog.svelte';
@@ -501,6 +502,7 @@
     <CommandPalette bind:open={paletteState.open} />
     <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />
     <ShareTargetSheet inbox={shareInbox} />
+    <ToastRegion dismissLabel={$i18n.t('errors.dismissToast')} />
   {/key}
 {:else if core.status === 'error'}
   <main class="app-status" aria-labelledby="app-status-title">

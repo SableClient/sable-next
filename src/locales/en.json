@@ -1334,7 +1334,10 @@
     "coreError": "Unable to sign in due to a core or homeserver error.",
     "coreCrashed": "Sable hit an internal error and stopped syncing.",
     "coreUnresponsive": "Sable is not responding.",
-    "syncFailed": "Sync failed: {{message}}"
+    "syncFailed": "Sync failed: {{message}}",
+    "actionFailed": "Could not complete that action. Try again.",
+    "copyFailed": "Could not copy the link.",
+    "dismissToast": "Dismiss"
   },
   "bugReport": {
     "eyebrow": "Feedback",

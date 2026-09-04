@@ -9,6 +9,7 @@
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { LongPress } from './long-press.svelte.js';
   import {
     findMember,
@@ -336,6 +337,7 @@
       await pinnedEvents.toggle(roomId, eventId);
     } catch (error) {
       console.warn('[sable timeline] pin failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 
@@ -344,6 +346,7 @@
       await bookmarks.toggle(roomId, eventId);
     } catch (error) {
       console.warn('[sable timeline] bookmark failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 
@@ -353,6 +356,7 @@
       sourceOpen = true;
     } catch (error) {
       console.warn('[sable timeline] source unavailable', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 
@@ -361,6 +365,7 @@
     if (!eventId) return;
     void core.commands.reportMessage(roomId, eventId, reason).catch((error: unknown) => {
       console.warn('[sable timeline] report failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     });
   }
 
@@ -370,6 +375,7 @@
     for (const toRoomId of toRoomIds) {
       void core.commands.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
         console.warn('[sable timeline] forward failed', error);
+        toasts.error($i18n.t('errors.actionFailed'));
       });
     }
   }
@@ -392,6 +398,7 @@
       });
     } catch (error) {
       console.warn('[sable timeline] reproxy failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 
