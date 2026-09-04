@@ -29,6 +29,22 @@ function fakeCore(submitCommand: WorkerCore['submitCommand']): WorkerCore {
   };
 }
 
+test('answers a health probe while a core command is pending', async () => {
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(fakeCore(() => new Promise<string>(() => {})))
+  );
+  const port = new FakePort();
+  boundary.connect(port);
+
+  void port.send({
+    id: 1,
+    command: { type: 'room_members', room_id: '!room', memberships: [] },
+  });
+  await port.send({ id: 2, ping: true });
+
+  expect(port.messages).toEqual([{ id: 2, pong: true }]);
+});
+
 test('sends the subscription snapshot before startup events buffered for its port', async () => {
   let emit = (() => {}) as (json: string) => void;
   const core = fakeCore((command) => {

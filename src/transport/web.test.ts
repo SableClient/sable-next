@@ -7,9 +7,24 @@ class FakePort {
   onmessage: ((message: MessageEvent) => void) | null = null;
   onmessageerror: (() => void) | null = null;
   posted: unknown[] = [];
+  respondToPings = false;
 
   postMessage(message: unknown): void {
     this.posted.push(message);
+    if (
+      this.respondToPings &&
+      message &&
+      typeof message === 'object' &&
+      'ping' in message &&
+      'id' in message &&
+      typeof message.id === 'number'
+    ) {
+      const { id } = message;
+      queueMicrotask(() => {
+        this.portMessage({ id, pong: true });
+      });
+      return;
+    }
     if (
       message &&
       typeof message === 'object' &&
@@ -48,6 +63,7 @@ class FakeSharedWorker {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  FakeSharedWorker.last = null;
   vi.stubGlobal('SharedWorker', FakeSharedWorker);
   vi.stubGlobal('self', { location: new URL('https://sable.test/room') });
 });
@@ -57,13 +73,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function stalledFor(send: (transport: Awaited<ReturnType<typeof load>>) => void) {
+async function stalledFor(
+  send: (transport: Awaited<ReturnType<typeof load>>) => void,
+  respondToPings = false
+) {
   const transport = await load();
   let stalled = false;
   transport.subscribeStall((next: boolean) => {
     stalled = next;
   });
   send(transport);
+  if (FakeSharedWorker.last) FakeSharedWorker.last.port.respondToPings = respondToPings;
   await vi.advanceTimersByTimeAsync(60_000);
   return stalled;
 }
@@ -80,12 +100,20 @@ test('uses a WASM-specific worker URL', async () => {
   expect(FakeSharedWorker.last?.url.searchParams.get('wasm')).toBeTruthy();
 }, 20_000);
 
-test('a slow command reports the core as unresponsive', async () => {
+test('a slow command reports an unresponsive worker', async () => {
   expect(
     await stalledFor((transport) => {
       void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
     })
   ).toBe(true);
+});
+
+test('a slow command does not report a responsive worker as unresponsive', async () => {
+  expect(
+    await stalledFor((transport) => {
+      void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
+    }, true)
+  ).toBe(false);
 });
 
 test('a slow media fetch does not report the core as unresponsive', async () => {

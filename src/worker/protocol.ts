@@ -15,9 +15,9 @@ export type AttachmentRequest = {
   threadRoot: string | null;
 };
 
-/** Page → worker. `id` correlates the reply; the worker never reorders. */
 export type WorkerRequest =
   | { id: number; command: Command }
+  | { id: number; ping: true }
   | { disconnect: true }
   | { id: number; reset: true }
   | { debugLogs: boolean }
@@ -28,6 +28,7 @@ export type WorkerRequest =
 /** Worker → page. Events carry no id because they answer nothing. */
 export type WorkerMessage =
   | { id: number; ok: CommandOk }
+  | { id: number; pong: true }
   | { id: number; err: CommandErr }
   // Transferred, not copied, so a thumbnail crosses once.
   | { id: number; bytes: Uint8Array<ArrayBuffer> }

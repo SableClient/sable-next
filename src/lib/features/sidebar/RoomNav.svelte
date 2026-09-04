@@ -557,7 +557,7 @@
     {#if !collapsed}
       <button
         type="button"
-        class="rooms-heading sable-open sable-selection-layer"
+        class="rooms-heading sable-selection-layer"
         aria-expanded={!roomsClosed}
         data-state={roomsClosed ? 'closed' : 'open'}
         aria-controls={roomListId}
@@ -588,7 +588,7 @@
               <div class="room-row-wrap">
                 <button
                   type="button"
-                  class="room-category sable-open sable-selection-layer"
+                  class="room-category sable-selection-layer"
                   class:collapsed
                   oncontextmenu={(event) => {
                     openContextMenu(event, item.room, null);
