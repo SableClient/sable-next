@@ -18,7 +18,8 @@ test('offers to refresh when a worker is waiting', async () => {
     waiting: { postMessage },
     update: vi.fn(() => Promise.resolve()),
   }) as unknown as ServiceWorkerRegistration;
-  vi.stubGlobal('navigator', { serviceWorker: { ready: Promise.resolve(registration) } });
+  const serviceWorker = Object.assign(new EventTarget(), { ready: Promise.resolve(registration) });
+  vi.stubGlobal('navigator', { serviceWorker });
   vi.stubGlobal('location', { reload });
 
   const instance = mount(WebUpdateBanner, { target: document.body });
@@ -28,6 +29,9 @@ test('offers to refresh when a worker is waiting', async () => {
   document.querySelector<HTMLButtonElement>('.sable-button-primary')?.click();
 
   expect(postMessage).toHaveBeenCalledWith({ type: 'sable:skip-waiting' });
+  expect(reload).not.toHaveBeenCalled();
+
+  serviceWorker.dispatchEvent(new Event('controllerchange'));
   expect(reload).toHaveBeenCalledOnce();
   await unmount(instance);
 });
