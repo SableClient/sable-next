@@ -688,6 +688,11 @@
     justify-content: center;
     padding: var(--space-100);
     width: var(--emote-cell, 2.5rem);
+
+    span {
+        max-width: 100%;
+        max-height: 100%;
+      }
   }
 
   /* Sized to the 32px custom emote beside it, not to the surrounding type. */
