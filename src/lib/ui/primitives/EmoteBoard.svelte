@@ -669,6 +669,7 @@
     gap: var(--space-100);
     list-style: none;
     margin: 0 0 var(--space-300);
+    justify-content: center;
     padding: 0;
   }
 
