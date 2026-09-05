@@ -768,6 +768,7 @@
 
   .rail-slot {
     position: relative;
+    margin: -1px 0; /* when in open folders, makes all gaps equal (4px at 100% scaling) */
   }
 
   .rail-slot.dragged {
@@ -834,6 +835,7 @@
 
   .folder-open {
     position: relative;
+    width: var(--avatar-size-400);
   }
 
   .folder-card {
