@@ -84,7 +84,11 @@
   });
 
   let gifTab = $derived(tab === 'gif');
-  let cellSize = $derived(tab === 'sticker' ? 72 : 32);
+  let cellSize = $derived(
+    tab === 'sticker' ? 72 :
+    tab === 'emoticon' ? 48 :
+    32
+  );
 
   let boardStyle = $derived.by(() => {
     const size = resizable ? readBoardSize() : null;
@@ -367,7 +371,9 @@
         {/if}
       </nav>
 
-      <div class={['grids', { sticker: tab === 'sticker' }]}>
+      <div class={['grids', {
+        sticker: tab === 'sticker',
+        emoji: tab === 'emoticon'}]}>
         {#if onPickUnicode && query.trim() !== ''}
           {@const text = query.trim()}
           <button
@@ -672,9 +678,8 @@
     padding: 0;
   }
 
-  .grids.sticker {
-    --emote-cell: 5rem;
-  }
+.board-body {
+  --emote-cell: 2.5rem;
 
   .grids li button,
   .grids .unicode button {
@@ -684,11 +689,18 @@
     border-radius: var(--radius);
     cursor: pointer;
     display: flex;
-    height: var(--emote-cell, 2.5rem);
     justify-content: center;
     padding: var(--space-100);
-    width: var(--emote-cell, 2.5rem);
+
+    height: var(--emote-cell);
+    width: var(--emote-cell);
   }
+
+  .grids.sticker button {
+    height: calc(var(--emote-cell) * 2);
+    width: calc(var(--emote-cell) * 2);
+  }
+}
 
   /* Sized to the 32px custom emote beside it, not to the surrounding type. */
   .grids .unicode button {
