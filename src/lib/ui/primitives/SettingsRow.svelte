@@ -74,6 +74,10 @@
     gap: var(--space-400);
     min-height: calc(var(--control-height-medium) + var(--space-300));
     padding: var(--space-300) var(--space-400);
+
+    img {
+        max-height: var(--space-900);
+      }
   }
 
   :global(.setting-row + .setting-row) {
