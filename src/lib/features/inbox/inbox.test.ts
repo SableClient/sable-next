@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { BookmarkView } from '#src/generated/BookmarkView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { BookmarkView, RoomSummary } from '#src/generated/protocol';
 
 import {
   countInvites,

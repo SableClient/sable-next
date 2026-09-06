@@ -8,8 +8,7 @@
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
   import { SvelteSet } from 'svelte/reactivity';
 
-  import type { DeviceView } from '#src/generated/DeviceView';
-  import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+  import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
   import { CoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
   import { buildSettingsLink } from '#lib/features/room/settings-link.js';

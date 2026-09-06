@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { ImagePackView } from '#src/generated/ImagePackView';
+import type { ImagePackView } from '#src/generated/protocol';
 
 import {
   emptyDraft,

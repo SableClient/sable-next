@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { UrlPreviewView } from '#src/generated/UrlPreviewView';
+import type { UrlPreviewView } from '#src/generated/protocol';
 
 const core = vi.hoisted(() => {
   const urlPreview = vi.fn<() => Promise<UrlPreviewView | null>>();

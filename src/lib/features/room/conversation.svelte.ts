@@ -1,7 +1,9 @@
-import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
-import type { MessageKind } from '#src/generated/MessageKind';
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type {
+  PackImageInfoView,
+  MessageKind,
+  PerMessageProfileView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';

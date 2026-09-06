@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 import { claimedRoomIds, isActiveSpace, markRoomsRead } from './nav-rooms.js';
 

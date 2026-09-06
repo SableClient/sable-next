@@ -1,10 +1,12 @@
 import { createContext } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-import type { CoreEvent } from '#src/generated/CoreEvent';
-import type { NotificationModeView } from '#src/generated/NotificationModeView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SubscriptionId } from '#src/generated/SubscriptionId';
+import type {
+  CoreEvent,
+  NotificationModeView,
+  RoomSummary,
+  SubscriptionId,
+} from '#src/generated/protocol';
 import { applyDiffs } from '#src/transport';
 
 import { bufferSubscription } from '#lib/core/buffered-subscription.js';

@@ -1,7 +1,9 @@
 <script lang="ts">
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-  import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type {
+    RoomPermissionsView,
+    RoomPowerLevelsView,
+    RoomSummary,
+  } from '#src/generated/protocol';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import { useCoreClient } from '#lib/core/context.js';

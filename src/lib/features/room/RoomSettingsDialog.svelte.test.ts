@@ -3,8 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
 
 const coreStub = vi.hoisted(() => {
   const stub = {

@@ -1,4 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
+import type { MemberView } from '#src/generated/protocol';
 
 const MAX_CACHED_ROOMS = 8;
 

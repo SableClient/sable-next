@@ -1,6 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
-import type { PackImageView } from '#src/generated/PackImageView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { MemberView, PackImageView, RoomSummary } from '#src/generated/protocol';
 import { expect, test } from 'vitest';
 
 import type { AutocompleteQuery } from './autocomplete';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import type { TimelineItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
 

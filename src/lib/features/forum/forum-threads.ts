@@ -1,5 +1,4 @@
-import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
 
 export interface ForumThread {
   id: string;

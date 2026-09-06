@@ -1,7 +1,5 @@
 <script lang="ts">
-  import type { ImagePackView } from '#src/generated/ImagePackView';
-  import type { ImageUsageView } from '#src/generated/ImageUsageView';
-  import type { PackImageView } from '#src/generated/PackImageView';
+  import type { ImagePackView, ImageUsageView, PackImageView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import GifGrid from '#lib/features/gif/GifGrid.svelte';
   import type { GifProviderSetting, GifResult, GifsConfig } from '#lib/features/gif/providers.js';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
   import { Dialog, DropdownMenu } from 'bits-ui';
   import ArrowsDownUpIcon from 'phosphor-svelte/lib/ArrowsDownUpIcon';
   import FunnelIcon from 'phosphor-svelte/lib/FunnelIcon';

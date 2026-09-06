@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { ProfileView } from '#src/generated/ProfileView';
+  import type { MemberView, ProfileView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

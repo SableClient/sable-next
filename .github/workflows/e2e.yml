@@ -31,6 +31,9 @@ jobs:
         with:
           build: 'false'
 
+      - name: Generate TypeScript protocol
+        run: mise run generate:types
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium webkit
 

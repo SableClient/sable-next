@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import type { RoomPermissionsView } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';

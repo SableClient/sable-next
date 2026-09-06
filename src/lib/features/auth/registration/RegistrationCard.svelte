@@ -1,8 +1,10 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
-  import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
-  import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+  import type {
+    LoginFlowsView,
+    RegistrationFlowsView,
+    RegistrationResultView,
+  } from '#src/generated/protocol';
   import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AuthField from '../shared/AuthField.svelte';

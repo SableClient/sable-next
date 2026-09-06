@@ -1,46 +1,48 @@
-import type { BookmarkView } from '#src/generated/BookmarkView';
-import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
-import type { PersonaView } from '#src/generated/PersonaView';
-import type { DeviceView } from '#src/generated/DeviceView';
-import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
-import type { SyncStatus } from '#src/generated/SyncStatus';
-import type { HomeserverSoftwareView } from '#src/generated/HomeserverSoftwareView';
-import type { ImagePackView } from '#src/generated/ImagePackView';
-import type { JoinRuleView } from '#src/generated/JoinRuleView';
-import type { MemberView } from '#src/generated/MemberView';
-import type { MembershipView } from '#src/generated/MembershipView';
-import type { MessageKind } from '#src/generated/MessageKind';
-import type { NotificationModeView } from '#src/generated/NotificationModeView';
-import type { NotificationSettingsView } from '#src/generated/NotificationSettingsView';
-import type { PresenceView } from '#src/generated/PresenceView';
-import type { PublicRoomView } from '#src/generated/PublicRoomView';
-import type { PusherView } from '#src/generated/PusherView';
-import type { RoomTag } from '#src/generated/RoomTag';
-import type { OpenIdTokenView } from '#src/generated/OpenIdTokenView';
-import type { ScheduledMessageView } from '#src/generated/ScheduledMessageView';
-import type { UserDirectoryEntryView } from '#src/generated/UserDirectoryEntryView';
-import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-import type { CallSupportView } from '#src/generated/CallSupportView';
-import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
-import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
-import type { SearchFilter } from '#src/generated/SearchFilter';
-import type { SearchHitView } from '#src/generated/SearchHitView';
-import type { SearchOrder } from '#src/generated/SearchOrder';
-import type { RoomPreviewView } from '#src/generated/RoomPreviewView';
-import type { RoomStateEventView } from '#src/generated/RoomStateEventView';
-import type { UrlPreviewView } from '#src/generated/UrlPreviewView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SidebarItemView } from '#src/generated/SidebarItemView';
-import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
-import type { SubscriptionId } from '#src/generated/SubscriptionId';
-import type { PaginationDirection } from '#src/generated/PaginationDirection';
-import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
-import type { CreateJoinRuleView } from '#src/generated/CreateJoinRuleView';
-import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
-import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+import type {
+  BookmarkView,
+  PackImageInfoView,
+  PerMessageProfileView,
+  PersonaCatalogView,
+  PersonaView,
+  DeviceView,
+  EncryptionStatusView,
+  SyncStatus,
+  HomeserverSoftwareView,
+  ImagePackView,
+  JoinRuleView,
+  MemberView,
+  MembershipView,
+  MessageKind,
+  NotificationModeView,
+  NotificationSettingsView,
+  PresenceView,
+  PublicRoomView,
+  PusherView,
+  RoomTag,
+  OpenIdTokenView,
+  ScheduledMessageView,
+  UserDirectoryEntryView,
+  RoomPermissionsView,
+  CallSupportView,
+  RoomPowerLevelsView,
+  RoomVersionsView,
+  SearchFilter,
+  SearchHitView,
+  SearchOrder,
+  RoomPreviewView,
+  RoomStateEventView,
+  UrlPreviewView,
+  RoomSummary,
+  SidebarItemView,
+  SpaceHierarchyRoomView,
+  SubscriptionId,
+  PaginationDirection,
+  CreateRoomKind,
+  CreateJoinRuleView,
+  TimelineFocusView,
+  TimelineItemView,
+  RegistrationResultView,
+} from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
 import { maxAttachmentBytes } from './limits';
 import type { Transport } from '../../transport';

@@ -3,7 +3,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { CoreEvent } from '#src/generated/protocol';
 
 import type { SidebarItem } from './sidebar-layout.js';
 import { SpaceSidebar } from './sidebar-layout.svelte.js';

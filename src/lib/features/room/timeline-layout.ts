@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/protocol';
 
 import type { TimelineLayout } from '#lib/settings/preferences.svelte.js';
 

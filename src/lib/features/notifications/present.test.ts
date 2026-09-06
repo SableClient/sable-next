@@ -2,7 +2,7 @@
 
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import type { NotificationView } from '#src/generated/NotificationView';
+import type { NotificationView } from '#src/generated/protocol';
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 

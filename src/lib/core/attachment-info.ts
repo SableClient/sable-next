@@ -1,5 +1,5 @@
 import { encodeBlurhash } from '#lib/ui/blurhash.js';
-import type { AttachmentInfoView } from '#src/generated/AttachmentInfoView';
+import type { AttachmentInfoView } from '#src/generated/protocol';
 
 const MEASURE_TIMEOUT_MS = 5_000;
 

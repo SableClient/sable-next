@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PublicRoomView } from '#src/generated/PublicRoomView';
+  import type { PublicRoomView } from '#src/generated/protocol';
   import { SvelteSet } from 'svelte/reactivity';
 
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';

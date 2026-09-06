@@ -9,7 +9,7 @@
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';

@@ -1,4 +1,4 @@
-import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
+import type { RoomPowerLevelsView } from '#src/generated/protocol';
 
 export type PermissionLocation =
   | { kind: 'event'; eventType: string }

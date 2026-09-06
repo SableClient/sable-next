@@ -1,4 +1,4 @@
-import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
+import type { TimelineItemContentView } from '#src/generated/protocol';
 
 export function replyPreviewBody(content: TimelineItemContentView): string {
   switch (content.kind) {

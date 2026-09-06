@@ -4,7 +4,7 @@
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

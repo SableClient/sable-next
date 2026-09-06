@@ -1,4 +1,4 @@
-import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
+import type { PackImageInfoView } from '#src/generated/protocol';
 
 export async function readImageInfo(file: File): Promise<PackImageInfoView | null> {
   const base: PackImageInfoView = {

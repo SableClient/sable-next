@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 import { filterRoomsByQuery, roomDisplayName, unreadRoomsByPriority } from './room-jump';
 

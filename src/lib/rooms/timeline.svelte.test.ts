@@ -1,8 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
-import type { CoreEvent } from '#src/generated/CoreEvent';
-import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { CoreEvent, TimelineFocusView, TimelineItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { RoomTimeline } from './timeline.svelte';

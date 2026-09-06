@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
 
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { MessageKind } from '#src/generated/MessageKind';
-  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-  import type { PersonaView } from '#src/generated/PersonaView';
-  import type { ProfileView } from '#src/generated/ProfileView';
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import type {
+    MemberView,
+    MessageKind,
+    PerMessageProfileView,
+    PersonaView,
+    ProfileView,
+    TimelineItemView,
+  } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';

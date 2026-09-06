@@ -2,7 +2,7 @@
   import { isTauri } from '@tauri-apps/api/core';
   import { resolve } from '$app/paths';
 
-  import type { HomeserverSoftwareView } from '#src/generated/HomeserverSoftwareView';
+  import type { HomeserverSoftwareView } from '#src/generated/protocol';
   import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/config/links.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

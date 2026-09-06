@@ -9,8 +9,7 @@ import {
   stripReplyFallback,
 } from './members.js';
 
-import type { MemberView } from '#src/generated/MemberView';
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+import type { MemberView, PerMessageProfileView } from '#src/generated/protocol';
 
 const members = [
   { user_id: '@erwan:example.org', display_name: 'Erwan', avatar_url: 'mxc://a' },

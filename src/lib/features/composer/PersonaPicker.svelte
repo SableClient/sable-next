@@ -2,7 +2,7 @@
   import { Popover } from 'bits-ui';
   import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 
-  import type { PersonaView } from '#src/generated/PersonaView';
+  import type { PersonaView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';

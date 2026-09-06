@@ -1,8 +1,10 @@
-import type { AttachmentInfoView } from '#src/generated/AttachmentInfoView';
-import type { Command } from '#src/generated/Command';
-import type { CommandErr } from '#src/generated/CommandErr';
-import type { CommandOk } from '#src/generated/CommandOk';
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type {
+  AttachmentInfoView,
+  Command,
+  CommandErr,
+  CommandOk,
+  CoreEvent,
+} from '#src/generated/protocol';
 
 export type AttachmentRequest = {
   roomId: string;

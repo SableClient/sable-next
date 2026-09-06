@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/protocol';
   import { onMount } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';

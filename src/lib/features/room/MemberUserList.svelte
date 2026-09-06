@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';

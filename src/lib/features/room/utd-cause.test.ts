@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { UtdCauseView } from '#src/generated/UtdCauseView';
+import type { UtdCauseView } from '#src/generated/protocol';
 
 import { utdCauseKey, utdIsRecoverable } from './utd-cause.js';
 

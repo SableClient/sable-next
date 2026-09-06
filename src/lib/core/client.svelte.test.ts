@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
-import type { CoreEvent } from '#src/generated/CoreEvent';
-import type { SessionInfo } from '#src/generated/SessionInfo';
+import type { CoreEvent, SessionInfo } from '#src/generated/protocol';
 import type { Transport } from '#src/transport';
 
 import { createCoreClient } from './client.svelte.js';

@@ -1,5 +1,5 @@
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
-import type { UrlPreviewView } from '#src/generated/UrlPreviewView';
+import type { UrlPreviewView } from '#src/generated/protocol';
 
 const previews = new Map<string, Promise<UrlPreviewView | null>>();
 

@@ -1,8 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { expect, test as base, type Page } from '@playwright/test';
-import type { Command } from '#src/generated/Command';
-import type { CommandOk } from '#src/generated/CommandOk';
+import type { Command, CommandOk } from '#src/generated/protocol';
 import { AuthFlow } from '../pages/AuthFlow';
 import { AppShell } from '../pages/AppShell';
 import { RoomTimeline } from '../pages/RoomTimeline';

@@ -1,7 +1,9 @@
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-import type { PersonaSelectionView } from '#src/generated/PersonaSelectionView';
-import type { PersonaTriggerView } from '#src/generated/PersonaTriggerView';
-import type { PersonaView } from '#src/generated/PersonaView';
+import type {
+  PerMessageProfileView,
+  PersonaSelectionView,
+  PersonaTriggerView,
+  PersonaView,
+} from '#src/generated/protocol';
 
 export function projectPersona(persona: PersonaView, fallback: boolean): PerMessageProfileView {
   return {

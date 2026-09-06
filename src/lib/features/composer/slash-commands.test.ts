@@ -2,9 +2,7 @@
 
 import { expect, test, vi } from 'vitest';
 
-import type { MemberView } from '#src/generated/MemberView';
-import type { PersonaCatalogView } from '#src/generated/PersonaCatalogView';
-import type { PersonaView } from '#src/generated/PersonaView';
+import type { MemberView, PersonaCatalogView, PersonaView } from '#src/generated/protocol';
 
 import {
   descriptionKey,

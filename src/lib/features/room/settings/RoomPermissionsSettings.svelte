@@ -1,7 +1,9 @@
 <script lang="ts">
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-  import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type {
+    RoomPermissionsView,
+    RoomPowerLevelsView,
+    RoomSummary,
+  } from '#src/generated/protocol';
   import PencilIcon from 'phosphor-svelte/lib/PencilIcon';
 
   import { useCoreClient } from '#lib/core/context.js';

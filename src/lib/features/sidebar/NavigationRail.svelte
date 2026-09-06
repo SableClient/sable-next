@@ -5,7 +5,7 @@
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
   import { ContextMenu, DropdownMenu } from 'bits-ui';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/protocol';
   import { resolve } from '$app/paths';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';

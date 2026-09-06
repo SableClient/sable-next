@@ -1,7 +1,9 @@
 <script lang="ts">
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
-  import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
+  import type {
+    RoomPermissionsView,
+    RoomSummary,
+    SpaceHierarchyRoomView,
+  } from '#src/generated/protocol';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 

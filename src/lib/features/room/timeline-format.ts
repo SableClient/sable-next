@@ -1,8 +1,10 @@
 import i18next from 'i18next';
 
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type {
+  PerMessageProfileView,
+  TimelineItemContentView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 import { t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';

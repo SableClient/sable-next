@@ -2,7 +2,7 @@
   import { DropdownMenu } from 'bits-ui';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
-  import type { NotificationModeView } from '#src/generated/NotificationModeView';
+  import type { NotificationModeView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { settingsChanges } from '#lib/features/notifications/notifications.svelte.js';

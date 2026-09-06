@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { PollAnswerView } from '#src/generated/PollAnswerView';
+  import type { MemberView, PollAnswerView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';

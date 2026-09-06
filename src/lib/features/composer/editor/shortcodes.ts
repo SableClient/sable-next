@@ -1,7 +1,7 @@
 import { InputRule } from 'prosemirror-inputrules';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 
-import type { PackImageView } from '#src/generated/PackImageView';
+import type { PackImageView } from '#src/generated/protocol';
 
 import { emojiForShortcode } from '#lib/emoji/emoji.js';
 

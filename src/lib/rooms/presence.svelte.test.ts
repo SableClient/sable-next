@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { lastSeenBucket, lastSeenMs, PresenceStore } from './presence.svelte.js';

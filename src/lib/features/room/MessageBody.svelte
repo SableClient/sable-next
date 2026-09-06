@@ -1,9 +1,7 @@
 <script lang="ts">
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import type { TimelineItemView, MemberView } from '#src/generated/protocol';
 
   import type { MatrixLink } from './matrix-link.js';
-
-  import type { MemberView } from '#src/generated/MemberView';
 
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';

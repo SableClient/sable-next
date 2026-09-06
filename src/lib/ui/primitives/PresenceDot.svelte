@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
 
-  import type { PresenceView } from '#src/generated/PresenceView';
+  import type { PresenceView } from '#src/generated/protocol';
 
   interface Props {
     presence: PresenceView;

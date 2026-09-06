@@ -1,4 +1,4 @@
-import type { NotificationView } from '#src/generated/NotificationView';
+import type { NotificationView } from '#src/generated/protocol';
 
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';

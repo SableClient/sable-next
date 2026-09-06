@@ -1,7 +1,10 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { ProfileView } from '#src/generated/ProfileView';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import type {
+    MemberView,
+    ProfileView,
+    RoomPermissionsView,
+    MutualRoomView,
+  } from '#src/generated/protocol';
   import { DropdownMenu } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
@@ -23,7 +26,6 @@
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
 
   import { goto } from '$app/navigation';
-  import type { MutualRoomView } from '#src/generated/MutualRoomView';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';

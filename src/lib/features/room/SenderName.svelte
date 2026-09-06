@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
-  import type { PronounView } from '#src/generated/PronounView';
+  import type { PronounView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import { formatPronouns } from '#lib/personas/pronouns.js';

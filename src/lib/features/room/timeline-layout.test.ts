@@ -1,8 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { GalleryItemView } from '#src/generated/GalleryItemView';
-import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type {
+  GalleryItemView,
+  TimelineItemContentView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 
 import {
   codeBlockHeight,

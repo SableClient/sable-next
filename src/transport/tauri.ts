@@ -1,8 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 
-import type { Command } from '#src/generated/Command';
-import type { CommandErr } from '#src/generated/CommandErr';
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { Command, CommandErr, CoreEvent } from '#src/generated/protocol';
 import { CoreError, type ResponseFor, type Transport } from './index';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
 import { resetWebStorage } from '#lib/platform/session-storage.js';

@@ -1,6 +1,6 @@
 <script lang="ts">
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
-  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
+  import type { PerMessageProfileView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import { preferredPronouns } from '#lib/personas/pronouns.js';

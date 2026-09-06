@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+  import type { EncryptionStatusView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { verificationErrorMessage } from '#lib/core/verification-errors.js';
   import { i18n } from '#lib/i18n.js';

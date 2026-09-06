@@ -1,7 +1,7 @@
 import { createContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
-import type { PresenceView } from '#src/generated/PresenceView';
+import type { PresenceView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 export interface PresenceEntry {

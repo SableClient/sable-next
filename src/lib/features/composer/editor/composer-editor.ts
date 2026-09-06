@@ -23,7 +23,7 @@ import { untrack } from 'svelte';
 import 'prosemirror-view/style/prosemirror.css';
 import 'prosemirror-gapcursor/style/gapcursor.css';
 
-import type { PackImageView } from '#src/generated/PackImageView';
+import type { PackImageView } from '#src/generated/protocol';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { AutocompleteQuery } from '../autocomplete';

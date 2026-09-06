@@ -1,9 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
-  import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
+  import type { RoomPermissionsView, RoomSummary, RoomVersionsView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

@@ -1,15 +1,17 @@
 import type { Page } from '@playwright/test';
-import type { BookmarkView } from '#src/generated/BookmarkView';
-import type { Command } from '#src/generated/Command';
-import type { CommandOk } from '#src/generated/CommandOk';
-import type { CoreEvent } from '#src/generated/CoreEvent';
-import type { ProfileView } from '#src/generated/ProfileView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SessionInfo } from '#src/generated/SessionInfo';
-import type { SidebarItemView } from '#src/generated/SidebarItemView';
-import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
-import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type {
+  BookmarkView,
+  Command,
+  CommandOk,
+  CoreEvent,
+  ProfileView,
+  RoomSummary,
+  SessionInfo,
+  SidebarItemView,
+  SpaceChildEdge,
+  SpaceHierarchyRoomView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 
 export type RoomCoreMode =
   | 'ready'
@@ -46,7 +48,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     type CommandFor<T extends CommandType> = Extract<Command, { type: T }>;
     type OkFor<T extends CommandType> = Extract<CommandOk, { type: T }>;
     type BareCommandType = {
-      [T in CommandType]: keyof OkFor<T> extends 'type' ? T : never;
+      [T in CommandType]: { type: T } extends OkFor<T> ? T : never;
     }[CommandType];
     type RichCommandType = Exclude<CommandType, BareCommandType>;
     type Handler<T extends CommandType> = (

@@ -1,8 +1,10 @@
 import { expect, test, vi } from 'vitest';
 
-import type { MembershipChangeView } from '#src/generated/MembershipChangeView';
-import type { StateChangeView } from '#src/generated/StateChangeView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type {
+  MembershipChangeView,
+  StateChangeView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 
 import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';

@@ -1,5 +1,4 @@
-import type { StateChangeView } from '#src/generated/StateChangeView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
 

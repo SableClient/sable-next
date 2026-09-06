@@ -1,7 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { ProfileView } from '#src/generated/ProfileView';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import type { MemberView, ProfileView, RoomPermissionsView } from '#src/generated/protocol';
   import { Popover } from 'bits-ui';
 
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';

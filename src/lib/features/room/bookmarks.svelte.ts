@@ -1,7 +1,7 @@
 import { createContext } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
-import type { BookmarkView } from '#src/generated/BookmarkView';
+import type { BookmarkView } from '#src/generated/protocol';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
 export type BookmarkCommands = Pick<CoreCommands, 'bookmarks' | 'setBookmark'>;

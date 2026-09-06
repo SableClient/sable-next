@@ -1,6 +1,8 @@
-import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
-import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
-import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+import type {
+  LoginFlowsView,
+  RegistrationFlowsView,
+  RegistrationResultView,
+} from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
 import { CoreError } from '#src/transport';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';

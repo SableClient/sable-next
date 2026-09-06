@@ -1,5 +1,4 @@
-import type { SearchHitView } from '#src/generated/SearchHitView';
-import type { SearchOrder } from '#src/generated/SearchOrder';
+import type { SearchHitView, SearchOrder } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 

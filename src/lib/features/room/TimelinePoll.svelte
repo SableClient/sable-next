@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { PollView } from '#src/generated/PollView';
+  import type { MemberView, PollView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
 

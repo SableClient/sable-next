@@ -2,8 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { PersonaTriggerView } from '#src/generated/PersonaTriggerView';
-import type { PersonaView } from '#src/generated/PersonaView';
+import type { PersonaTriggerView, PersonaView } from '#src/generated/protocol';
 
 import {
   projectPersona,

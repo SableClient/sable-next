@@ -1,8 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
-import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
+import type { RoomSummary, SpaceChildEdge, SpaceHierarchyRoomView } from '#src/generated/protocol';
 
 import {
   applyChildOverrides,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { UrlPreviewView } from '#src/generated/UrlPreviewView';
+  import type { UrlPreviewView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';

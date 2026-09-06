@@ -1,4 +1,4 @@
-import type { PronounView } from '#src/generated/PronounView';
+import type { PronounView } from '#src/generated/protocol';
 
 import type { PronounPillLimit } from '#lib/settings/preferences.svelte.js';
 

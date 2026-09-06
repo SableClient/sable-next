@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
   import { onDestroy, untrack } from 'svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 

@@ -3,8 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { DeviceView } from '#src/generated/DeviceView';
-import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
+import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
 
 const core = vi.hoisted(() => {
   const stub = {
