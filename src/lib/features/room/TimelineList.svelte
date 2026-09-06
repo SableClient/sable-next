@@ -1219,11 +1219,11 @@
   }
 
   .timeline-content.spacing-compact {
-    --timeline-row-gap: var(--space-100);
+    --timeline-row-padding: var(--space-050);
   }
 
   .timeline-content.spacing-roomy {
-    --timeline-row-gap: var(--space-300);
+    --timeline-row-padding: var(--space-200);
   }
 
   /* Desktop chat leads tighter; the type size is the same as everywhere else. */
