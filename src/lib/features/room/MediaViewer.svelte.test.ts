@@ -194,3 +194,30 @@ test('arrow keys pan when zoomed and navigate otherwise', async () => {
   });
   await unmount(instance);
 });
+
+test('takes a typed zoom percentage', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaViewer, {
+    target: document.body,
+    props: { items: [imageItem], selectedEventId: '$image', onClose: () => {} },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img')).not.toBeNull();
+  });
+
+  document.querySelector<HTMLButtonElement>('button.zoom-level')?.click();
+  await tick();
+
+  const input = document.querySelectorAll<HTMLInputElement>('.zoom-level input')[0];
+  expect(input.value).toBe('100');
+  input.value = '250';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await tick();
+
+  expect(document.querySelector('img')?.style.transform).toContain('scale(2.5)');
+  expect(document.querySelector('button.zoom-level')?.textContent).toBe('250%');
+  await unmount(instance);
+});
