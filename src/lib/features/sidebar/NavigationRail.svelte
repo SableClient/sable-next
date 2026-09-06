@@ -511,7 +511,7 @@
   <button
     {...props}
     type="button"
-    class="rail-item folder-preview sable-nav-tab sable-nav-tab-side sable-nav-tab-outlined
+    class="rail-item folder-preview sable-nav-tab sable-nav-tab-side
     sable-current sable-selection-layer"
     data-current={folderActive(folder) ? 'true' : undefined}
     aria-expanded="false"
@@ -812,8 +812,11 @@
   }
 
   .folder-preview {
+    border: 0;
     height: auto;
     min-height: 2.625rem;
+    outline: var(--border-width) solid var(--sable-bg-container-line);
+    outline-offset: calc(var(--border-width) * -1);
     padding: var(--space-100);
   }
 
