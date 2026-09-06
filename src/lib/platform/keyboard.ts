@@ -5,6 +5,9 @@ function keyboardInset(viewport: VisualViewport): number {
 }
 
 export function trackKeyboardInset(): () => void {
+  const os = document.documentElement.dataset.tauriOs;
+  if (os === 'ios' || os === 'android') return () => {};
+
   const viewport = window.visualViewport;
   if (!viewport) return () => {};
 
