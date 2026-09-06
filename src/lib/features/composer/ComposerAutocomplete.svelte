@@ -51,7 +51,14 @@
             }}
           >
             {#if suggestion.imageUrl}
-              <MediaImage source={suggestion.imageUrl} alt="" width={24} height={24} original />
+              <MediaImage
+                class="emote"
+                source={suggestion.imageUrl}
+                alt=""
+                width={24}
+                height={24}
+                original
+              />
             {:else}
               <Avatar size="small" src={suggestion.avatarUrl} name={suggestion.label} />
             {/if}
@@ -113,6 +120,17 @@
     max-height: 13rem;
     overflow-y: auto;
     padding: var(--space-100);
+  }
+
+  .option :global(.emote) {
+    aspect-ratio: 1;
+    flex: 0 0 auto;
+    height: var(--avatar-size-300);
+    width: var(--avatar-size-300);
+  }
+
+  .option :global(.emote .media-image-content) {
+    object-fit: contain;
   }
 
   .text {
