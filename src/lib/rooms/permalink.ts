@@ -1,6 +1,6 @@
 import { resolve } from '$app/paths';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 import { splitVia } from '#lib/features/room/join-address.js';
 import { parseMatrixLink } from '#lib/features/room/matrix-link.js';

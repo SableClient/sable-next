@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { MemberView } from '#src/generated/MemberView';
+import type { MemberView } from '#src/generated/protocol';
 
 import { RoomMemberLoader } from './room-members.svelte';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { UtdCauseView } from '#src/generated/UtdCauseView';
+  import type { UtdCauseView } from '#src/generated/protocol';
 
   import { resolve } from '$app/paths';
 

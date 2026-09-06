@@ -1,7 +1,7 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { SearchHitView } from '#src/generated/SearchHitView';
+import type { SearchHitView } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';

@@ -1,6 +1,6 @@
 import { SvelteSet } from 'svelte/reactivity';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';

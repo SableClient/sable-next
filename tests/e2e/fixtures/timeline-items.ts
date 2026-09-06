@@ -1,4 +1,4 @@
-// These shapes must track src/generated/TimelineItemContentView.ts; the app
+// These shapes must track TimelineItemContentView in src/generated/protocol.ts; the app
 // reads content.html, so a body-only override renders the previous text.
 
 export function timelineItem(id: string, body: string) {

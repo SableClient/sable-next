@@ -1,6 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
-import type { PackImageView } from '#src/generated/PackImageView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { MemberView, PackImageView, RoomSummary } from '#src/generated/protocol';
 
 import { searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { t } from '#lib/i18n.js';

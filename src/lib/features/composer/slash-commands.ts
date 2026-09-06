@@ -1,5 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
-import type { MessageKind } from '#src/generated/MessageKind';
+import type { MemberView, MessageKind } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import { parseJoinAddress } from '#lib/features/room/join-address.js';

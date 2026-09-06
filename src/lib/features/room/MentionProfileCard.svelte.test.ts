@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { ProfileView } from '#src/generated/ProfileView';
+import type { ProfileView } from '#src/generated/protocol';
 
 const core = vi.hoisted(() => {
   const stub = {

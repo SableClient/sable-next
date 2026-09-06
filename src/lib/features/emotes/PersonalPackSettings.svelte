@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ImagePackView } from '#src/generated/ImagePackView';
+  import type { ImagePackView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';

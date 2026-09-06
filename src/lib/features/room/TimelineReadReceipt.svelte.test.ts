@@ -1,7 +1,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 

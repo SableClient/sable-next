@@ -3,8 +3,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import { onDestroy } from 'svelte';
 
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';

@@ -1,4 +1,4 @@
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 export type SpaceChildrenLeaveOrder = {
   order: string[];

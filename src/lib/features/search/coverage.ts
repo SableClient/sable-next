@@ -1,4 +1,4 @@
-import type { SearchCoverageView } from '#src/generated/SearchCoverageView';
+import type { SearchCoverageView } from '#src/generated/protocol';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 

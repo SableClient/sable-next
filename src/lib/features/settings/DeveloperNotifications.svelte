@@ -1,7 +1,7 @@
 <script lang="ts">
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
 
-  import type { NotificationView } from '#src/generated/NotificationView';
+  import type { NotificationView } from '#src/generated/protocol';
 
   import { useNotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
   import { permission, requestPermission } from '#lib/features/notifications/present.js';

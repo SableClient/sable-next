@@ -1,8 +1,10 @@
-import type { AttachmentInfoView } from '#src/generated/AttachmentInfoView';
-import type { Command } from '#src/generated/Command';
-import type { CommandOk } from '#src/generated/CommandOk';
-import type { CommandErr } from '#src/generated/CommandErr';
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type {
+  AttachmentInfoView,
+  Command,
+  CommandOk,
+  CommandErr,
+  CoreEvent,
+} from '#src/generated/protocol';
 
 /** Resolves a command's response from its tag, so `send` is typed end to end. */
 export type ResponseFor<T extends Command['type']> = Extract<CommandOk, { type: T }>;

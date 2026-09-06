@@ -1,5 +1,5 @@
 import type { DropInstruction } from '#lib/ui/drag-list.js';
-import type { SidebarItemView } from '#src/generated/SidebarItemView';
+import type { SidebarItemView } from '#src/generated/protocol';
 
 export type SidebarItem = SidebarItemView;
 export type SidebarFolder = Extract<SidebarItemView, { kind: 'folder' }>;

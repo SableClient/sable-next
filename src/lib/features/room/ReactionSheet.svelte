@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PackImageView } from '#src/generated/PackImageView';
+  import type { PackImageView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import { rememberReaction } from '#lib/emoji/recents.svelte.js';

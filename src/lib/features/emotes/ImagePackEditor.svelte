@@ -3,8 +3,7 @@
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
-  import type { ImagePackView } from '#src/generated/ImagePackView';
-  import type { ImageUsageView } from '#src/generated/ImageUsageView';
+  import type { ImagePackView, ImageUsageView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

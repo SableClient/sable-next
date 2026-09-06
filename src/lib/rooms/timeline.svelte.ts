@@ -1,6 +1,4 @@
-import type { SubscriptionId } from '#src/generated/SubscriptionId';
-import type { TimelineFocusView } from '#src/generated/TimelineFocusView';
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { SubscriptionId, TimelineFocusView, TimelineItemView } from '#src/generated/protocol';
 import { applyDiffs } from '#src/transport';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';

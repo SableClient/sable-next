@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { CallSession } from './call-session.svelte.js';

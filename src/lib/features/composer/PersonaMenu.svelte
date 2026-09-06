@@ -1,8 +1,7 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
-  import type { PersonaSelectionView } from '#src/generated/PersonaSelectionView';
-  import type { PersonaView } from '#src/generated/PersonaView';
+  import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';

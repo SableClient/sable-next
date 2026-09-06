@@ -1,4 +1,4 @@
-import type { PublicRoomView } from '#src/generated/PublicRoomView';
+import type { PublicRoomView } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 

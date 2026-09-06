@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type { RoomSummary } from '#src/generated/protocol';
   import { SvelteSet } from 'svelte/reactivity';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
 

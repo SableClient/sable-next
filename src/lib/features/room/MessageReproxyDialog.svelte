@@ -1,8 +1,7 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
-  import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-  import type { PersonaView } from '#src/generated/PersonaView';
+  import type { PerMessageProfileView, PersonaView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';

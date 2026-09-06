@@ -1,7 +1,9 @@
-import type { RoomJoinRuleView } from '#src/generated/RoomJoinRuleView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
-import type { SpaceHierarchyRoomView } from '#src/generated/SpaceHierarchyRoomView';
+import type {
+  RoomJoinRuleView,
+  RoomSummary,
+  SpaceChildEdge,
+  SpaceHierarchyRoomView,
+} from '#src/generated/protocol';
 
 export type HierarchyRoomView = Omit<SpaceHierarchyRoomView, 'num_joined_members'> & {
   num_joined_members: number | null;

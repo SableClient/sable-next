@@ -1,4 +1,4 @@
-import type { SessionInfo } from '#src/generated/SessionInfo';
+import type { SessionInfo } from '#src/generated/protocol';
 
 import { deliversNativePush } from '#lib/platform/notifications.js';
 import { registerNativePushConfig } from '#lib/platform/push.js';

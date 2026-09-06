@@ -1,6 +1,6 @@
 <script lang="ts">
   import '#lib/ui/primitives/menu.css';
-  import type { SessionInfo } from '#src/generated/SessionInfo';
+  import type { SessionInfo } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import { DropdownMenu } from 'bits-ui';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';

@@ -1,7 +1,7 @@
 import i18next from 'i18next';
 import { expect, test } from 'vitest';
 
-import type { SearchCoverageView } from '#src/generated/SearchCoverageView';
+import type { SearchCoverageView } from '#src/generated/protocol';
 import en from '../../../locales/en.json';
 
 import { coverageMessage } from './coverage';

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
-import type { BookmarkView } from '#src/generated/BookmarkView';
+import type { BookmarkView } from '#src/generated/protocol';
 
 import { Bookmarks, type BookmarkCommands } from './bookmarks.svelte.js';
 

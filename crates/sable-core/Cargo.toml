@@ -6,6 +6,11 @@ license = "AGPL-3.0-only"
 
 [features]
 unoptimized-build = []
+typegen = ["dep:specta", "dep:specta-serde", "dep:specta-typescript"]
+
+[[example]]
+name = "generate-types"
+required-features = ["typegen"]
 
 [dependencies]
 matrix-sdk = { workspace = true }
@@ -16,7 +21,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 futures-util = { workspace = true }
 tracing = { workspace = true }
-ts-rs = { workspace = true }
+specta = { workspace = true, optional = true }
+specta-serde = { workspace = true, optional = true }
+specta-typescript = { workspace = true, optional = true }
 url = { workspace = true }
 ammonia = "4"
 async-trait = "0.1"

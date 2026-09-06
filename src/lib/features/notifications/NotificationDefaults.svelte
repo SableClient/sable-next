@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NotificationModeView } from '#src/generated/NotificationModeView';
+  import type { NotificationModeView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

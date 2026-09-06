@@ -1,5 +1,4 @@
-import type { SearchAttachment } from '#src/generated/SearchAttachment';
-import type { SearchFilter } from '#src/generated/SearchFilter';
+import type { SearchAttachment, SearchFilter } from '#src/generated/protocol';
 
 export type SearchOperator =
   | 'in'

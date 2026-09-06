@@ -1,4 +1,4 @@
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { ignoreError } from './call-transport';

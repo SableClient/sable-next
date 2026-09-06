@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
 
-  import type { ProfileView } from '#src/generated/ProfileView';
+  import type { ProfileView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import LockIcon from 'phosphor-svelte/lib/LockSimpleIcon';
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
 
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';

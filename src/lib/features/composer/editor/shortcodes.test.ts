@@ -5,7 +5,7 @@ import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { PackImageView } from '#src/generated/PackImageView';
+import type { PackImageView } from '#src/generated/protocol';
 
 import { composerSchema } from './schema';
 import { shortcodeInputRule } from './shortcodes';

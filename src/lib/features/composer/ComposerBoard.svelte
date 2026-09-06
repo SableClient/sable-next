@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { ImageUsageView } from '#src/generated/ImageUsageView';
-  import type { PackImageView } from '#src/generated/PackImageView';
+  import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
   import { Popover } from 'bits-ui';
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 

@@ -9,7 +9,7 @@ vi.mock('#lib/core/context.js', () => ({
   }),
 }));
 
-import type { PollView } from '#src/generated/PollView';
+import type { PollView } from '#src/generated/protocol';
 
 import TimelinePoll from './TimelinePoll.svelte';
 

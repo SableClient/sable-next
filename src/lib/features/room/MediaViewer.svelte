@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import type { TimelineItemView } from '#src/generated/protocol';
   import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
   import { tick, untrack } from 'svelte';

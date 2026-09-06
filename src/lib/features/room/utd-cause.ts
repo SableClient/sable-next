@@ -1,4 +1,4 @@
-import type { UtdCauseView } from '#src/generated/UtdCauseView';
+import type { UtdCauseView } from '#src/generated/protocol';
 
 const KEYS: Record<UtdCauseView, string> = {
   unknown: 'timeline.utdUnknown',

@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 const pageState = vi.hoisted(() => ({ url: { pathname: '/home', search: '', hash: '' } }));
 const navigation = vi.hoisted(() => ({ afterNavigate: null as (() => void) | null }));

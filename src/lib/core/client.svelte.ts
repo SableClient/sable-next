@@ -1,16 +1,18 @@
-import type { CoreEvent } from '#src/generated/CoreEvent';
-import type { DeviceView } from '#src/generated/DeviceView';
-import type { EncryptionStatusView } from '#src/generated/EncryptionStatusView';
-import type { SearchCoverageView } from '#src/generated/SearchCoverageView';
-import type { AuthIntent } from '#src/generated/AuthIntent';
-import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
-import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
-import type { SessionInfo } from '#src/generated/SessionInfo';
-import type { SyncStatus } from '#src/generated/SyncStatus';
-import type { MutualRoomView } from '#src/generated/MutualRoomView';
-import type { ProfileView } from '#src/generated/ProfileView';
-import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
-import type { VerificationView } from '#src/generated/VerificationView';
+import type {
+  CoreEvent,
+  DeviceView,
+  EncryptionStatusView,
+  SearchCoverageView,
+  AuthIntent,
+  LoginFlowsView,
+  RegistrationFlowsView,
+  SessionInfo,
+  SyncStatus,
+  MutualRoomView,
+  ProfileView,
+  RegistrationResultView,
+  VerificationView,
+} from '#src/generated/protocol';
 
 import { createCommands } from './commands.svelte.js';
 import { createTransport } from '../../transport/create';

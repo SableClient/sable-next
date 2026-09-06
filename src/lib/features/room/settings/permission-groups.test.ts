@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
+import type { RoomPowerLevelsView } from '#src/generated/protocol';
 
 import { levelAt, permissionGroups, toEventContent, withLevel } from './permission-groups';
 

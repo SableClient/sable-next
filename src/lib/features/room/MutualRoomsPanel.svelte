@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MutualRoomView } from '#src/generated/MutualRoomView';
+  import type { MutualRoomView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
 

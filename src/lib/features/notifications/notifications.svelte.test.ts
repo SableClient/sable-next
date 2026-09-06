@@ -2,7 +2,7 @@
 
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 
 const mocks = vi.hoisted(() => ({ retire: vi.fn().mockResolvedValue(undefined) }));
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
   import type { Snippet } from 'svelte';
-  import type { PackImageView } from '#src/generated/PackImageView';
+  import type { PackImageView } from '#src/generated/protocol';
 
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
 

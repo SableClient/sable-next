@@ -1,4 +1,4 @@
-import type { CommandErr } from '#src/generated/CommandErr';
+import type { CommandErr } from '#src/generated/protocol';
 
 export function commandErrorCode(cause: unknown): CommandErr['code'] | null {
   if (!(cause instanceof Error) || !('detail' in cause)) return null;

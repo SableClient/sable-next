@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { RoomSummary } from '#src/generated/RoomSummary';
-  import type { RoomTag } from '#src/generated/RoomTag';
+  import type { RoomSummary, RoomTag } from '#src/generated/protocol';
   import { DropdownMenu } from 'bits-ui';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';

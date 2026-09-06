@@ -1,4 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
+import type { MemberView } from '#src/generated/protocol';
 
 import { memberName } from './members.js';
 

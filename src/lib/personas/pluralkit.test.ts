@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PersonaView } from '#src/generated/PersonaView';
+import type { PersonaView } from '#src/generated/protocol';
 
 import { matchImported, personaFromPluralkit, systemIdFromInput } from './pluralkit';
 

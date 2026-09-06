@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { ProfileView } from '#src/generated/ProfileView';
+  import type { ProfileView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';

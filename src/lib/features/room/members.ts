@@ -1,6 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
-import type { PerMessageProfileView } from '#src/generated/PerMessageProfileView';
-import type { ProfileView } from '#src/generated/ProfileView';
+import type { MemberView, PerMessageProfileView, ProfileView } from '#src/generated/protocol';
 
 import { senderColor } from './timeline-format';
 

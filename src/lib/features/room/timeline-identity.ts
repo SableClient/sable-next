@@ -1,4 +1,4 @@
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/protocol';
 
 const MAX_LOCAL_ECHO_IDS = 512;
 

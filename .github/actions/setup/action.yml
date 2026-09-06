@@ -52,6 +52,12 @@ runs:
       working-directory: ${{ github.workspace }}
       run: pnpm install --frozen-lockfile
 
+    - name: Generate TypeScript protocol
+      if: ${{ inputs.build == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: mise run generate:types
+
     - name: Build app
       if: ${{ inputs.build == 'true' }}
       shell: bash

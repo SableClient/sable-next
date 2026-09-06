@@ -1,8 +1,10 @@
 <script lang="ts">
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { MembershipView } from '#src/generated/MembershipView';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type {
+    MemberView,
+    MembershipView,
+    RoomPermissionsView,
+    RoomSummary,
+  } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

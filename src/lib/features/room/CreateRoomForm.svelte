@@ -10,9 +10,11 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import type { CreateJoinRuleView } from '#src/generated/CreateJoinRuleView';
-  import type { CreateRoomKind } from '#src/generated/CreateRoomKind';
-  import type { RoomVersionsView } from '#src/generated/RoomVersionsView';
+  import type {
+    CreateJoinRuleView,
+    CreateRoomKind,
+    RoomVersionsView,
+  } from '#src/generated/protocol';
   import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';

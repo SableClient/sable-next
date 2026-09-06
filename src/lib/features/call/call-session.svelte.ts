@@ -1,7 +1,6 @@
 import { createContext } from 'svelte';
 
-import type { CallMemberView } from '#src/generated/CallMemberView';
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { CallMemberView, CoreEvent } from '#src/generated/protocol';
 import type { CallGrant, CoreClient } from '#lib/core/client.svelte.js';
 
 import type { CallEncryptionKey, CallTransport, CallTransportState } from './call-transport';

@@ -1,7 +1,7 @@
 <script lang="ts">
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
 
-  import type { ImagePackView } from '#src/generated/ImagePackView';
+  import type { ImagePackView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';

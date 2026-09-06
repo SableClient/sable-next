@@ -3,7 +3,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
-  import type { PersonaView } from '#src/generated/PersonaView';
+  import type { PersonaView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';

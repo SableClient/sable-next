@@ -1,5 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
-import type { MembershipView } from '#src/generated/MembershipView';
+import type { MemberView, MembershipView } from '#src/generated/protocol';
 
 export type MemberSort = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
 export type MembershipFilter = 'join' | 'invite' | 'leave' | 'kick' | 'ban';

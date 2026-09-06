@@ -1,8 +1,10 @@
 <script lang="ts">
-  import type { ImageUsageView } from '#src/generated/ImageUsageView';
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
-  import type { PackImageView } from '#src/generated/PackImageView';
+  import type {
+    ImageUsageView,
+    MemberView,
+    PackImageInfoView,
+    PackImageView,
+  } from '#src/generated/protocol';
   import { Portal } from 'bits-ui';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
   import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';

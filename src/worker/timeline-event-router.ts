@@ -1,5 +1,4 @@
-import type { CoreEvent } from '#src/generated/CoreEvent';
-import type { SubscriptionId } from '#src/generated/SubscriptionId';
+import type { CoreEvent, SubscriptionId } from '#src/generated/protocol';
 
 type TimelineEvent = Extract<CoreEvent, { type: 'timeline_diff' | 'timeline_pagination' }>;
 const MAX_PENDING_EVENTS = 100;

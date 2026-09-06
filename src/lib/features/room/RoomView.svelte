@@ -1,14 +1,15 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
-  import type { MemberView } from '#src/generated/MemberView';
-  import type { MembershipView } from '#src/generated/MembershipView';
-  import type { ProfileView } from '#src/generated/ProfileView';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import type {
+    MemberView,
+    MembershipView,
+    ProfileView,
+    RoomPermissionsView,
+    CallSupportView,
+  } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-
-  import type { CallSupportView } from '#src/generated/CallSupportView';
 
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
 

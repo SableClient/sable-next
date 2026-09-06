@@ -1,5 +1,4 @@
-import type { NotificationView } from '#src/generated/NotificationView';
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 
 import { createContext } from 'svelte';
 

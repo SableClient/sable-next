@@ -2,8 +2,7 @@
   import { untrack } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import { i18n } from '#lib/i18n.js';
-  import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
-  import type { RegistrationFlowsView } from '#src/generated/RegistrationFlowsView';
+  import type { LoginFlowsView, RegistrationFlowsView } from '#src/generated/protocol';
   import Button from '#lib/ui/primitives/Button.svelte';
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
   import LoginMethod from '../login/LoginMethod.svelte';

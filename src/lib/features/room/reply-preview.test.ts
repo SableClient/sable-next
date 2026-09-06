@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { TimelineItemContentView } from '#src/generated/TimelineItemContentView';
+import type { TimelineItemContentView } from '#src/generated/protocol';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
 
 const video: TimelineItemContentView = {

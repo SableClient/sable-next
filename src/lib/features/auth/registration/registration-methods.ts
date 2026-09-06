@@ -1,4 +1,4 @@
-import type { LoginFlowsView } from '#src/generated/LoginFlowsView';
+import type { LoginFlowsView } from '#src/generated/protocol';
 
 export type RegistrationMethod = 'oidc' | 'sso' | 'password';
 

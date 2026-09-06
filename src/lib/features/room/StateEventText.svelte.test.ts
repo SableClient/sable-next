@@ -11,7 +11,7 @@ vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
 
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/protocol';
 
 import StateEventText from './StateEventText.svelte';
 

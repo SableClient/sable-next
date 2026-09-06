@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
-import type { PublicRoomView } from '#src/generated/PublicRoomView';
+import type { PublicRoomView } from '#src/generated/protocol';
 
 import { RoomDirectory, type RoomDirectoryApi } from './room-directory.svelte.js';
 

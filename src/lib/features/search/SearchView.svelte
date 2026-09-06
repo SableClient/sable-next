@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { SearchHitView } from '#src/generated/SearchHitView';
-  import type { SearchOrder } from '#src/generated/SearchOrder';
+  import type { SearchHitView, SearchOrder } from '#src/generated/protocol';
   import { onDestroy, onMount } from 'svelte';
   import { RadioGroup } from 'bits-ui';
   import { goto } from '$app/navigation';

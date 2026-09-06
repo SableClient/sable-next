@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import type { RegistrationResultView } from '#src/generated/RegistrationResultView';
+  import type { RegistrationResultView } from '#src/generated/protocol';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';

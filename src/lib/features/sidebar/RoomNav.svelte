@@ -2,8 +2,11 @@
   import type { Component } from 'svelte';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import type { NotificationModeView } from '#src/generated/NotificationModeView';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
+  import type {
+    NotificationModeView,
+    RoomPermissionsView,
+    RoomSummary,
+  } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import {
@@ -12,7 +15,6 @@
     roomPathParamFromId,
     useRoomList,
   } from '#lib/rooms/room-list.svelte.js';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
   import { SvelteSet } from 'svelte/reactivity';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';

@@ -1,6 +1,4 @@
-import type { PersonaTriggerView } from '#src/generated/PersonaTriggerView';
-import type { PersonaView } from '#src/generated/PersonaView';
-import type { PronounView } from '#src/generated/PronounView';
+import type { PersonaTriggerView, PersonaView, PronounView } from '#src/generated/protocol';
 
 export interface PluralkitMember {
   id: string;

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/TimelineItemView';
+import type { TimelineItemView } from '#src/generated/protocol';
 
 import { collectForumThreads } from './forum-threads';
 

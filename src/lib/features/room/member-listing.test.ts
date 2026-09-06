@@ -1,4 +1,4 @@
-import type { MemberView } from '#src/generated/MemberView';
+import type { MemberView } from '#src/generated/protocol';
 import { describe, expect, it } from 'vitest';
 
 import { groupMembers, matchesFilter, membershipFor } from './member-listing';

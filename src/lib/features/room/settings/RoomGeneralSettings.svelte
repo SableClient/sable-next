@@ -1,9 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { JoinRuleView } from '#src/generated/JoinRuleView';
-  import type { RoomPermissionsView } from '#src/generated/RoomPermissionsView';
-  import type { RoomPowerLevelsView } from '#src/generated/RoomPowerLevelsView';
-  import type { RoomSummary } from '#src/generated/RoomSummary';
+  import type {
+    JoinRuleView,
+    RoomPermissionsView,
+    RoomPowerLevelsView,
+    RoomSummary,
+  } from '#src/generated/protocol';
   import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
   import HandIcon from 'phosphor-svelte/lib/HandIcon';
   import LockIcon from 'phosphor-svelte/lib/LockIcon';

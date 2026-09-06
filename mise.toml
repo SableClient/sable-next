@@ -61,6 +61,7 @@ run = [
   "cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings",
   "cargo clippy --locked -p app --all-targets -- -D warnings",
   "cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings",
+  "cargo run --locked -p sable-core --example generate-types --features typegen -- --check",
   "cargo deny check",
 ]
 
@@ -94,8 +95,12 @@ alias = "f"
 run = ["pnpm lint:fix", "pnpm stylelint:fix", "cargo fmt --all"]
 
 [tasks."generate:types"]
-description = "Regenerate TypeScript bindings from Rust (ts-rs)"
-run = "cargo test -p sable-core export_bindings -- --nocapture"
+description = "Regenerate TypeScript bindings from Rust (Specta)"
+run = "cargo run --locked -p sable-core --example generate-types --features typegen"
+
+[tasks."check:types"]
+description = "Check that generated protocol types match Rust"
+run = "cargo run --locked -p sable-core --example generate-types --features typegen -- --check"
 
 [tasks."wasm:build"]
 description = "Build the WASM core for the web client"

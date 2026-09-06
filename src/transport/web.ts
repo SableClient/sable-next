@@ -1,8 +1,6 @@
 import * as Sentry from '@sentry/sveltekit';
 
-import type { Command } from '#src/generated/Command';
-import type { CommandOk } from '#src/generated/CommandOk';
-import type { CoreEvent } from '#src/generated/CoreEvent';
+import type { Command, CommandOk, CoreEvent } from '#src/generated/protocol';
 import type { WorkerMessage, WorkerRequest } from '#src/worker/protocol';
 import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';

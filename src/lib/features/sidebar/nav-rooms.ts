@@ -1,4 +1,4 @@
-import type { RoomSummary } from '#src/generated/RoomSummary';
+import type { RoomSummary } from '#src/generated/protocol';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
 export function claimedRoomIds(rooms: readonly RoomSummary[]): Set<string> {

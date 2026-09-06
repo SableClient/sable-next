@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Collapsible } from 'bits-ui';
 
-  import type { TimelineItemView } from '#src/generated/TimelineItemView';
+  import type { TimelineItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
 

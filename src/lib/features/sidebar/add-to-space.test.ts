@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { RoomSummary } from '#src/generated/RoomSummary';
-import type { SpaceChildEdge } from '#src/generated/SpaceChildEdge';
+import type { RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
 
 import { wouldCreateCycle } from './add-to-space';
 

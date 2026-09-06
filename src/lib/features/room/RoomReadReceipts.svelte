@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
-  import type { MemberView } from '#src/generated/MemberView';
+  import type { MemberView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';

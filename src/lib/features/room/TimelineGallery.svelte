@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { GalleryItemView } from '#src/generated/GalleryItemView';
+  import type { GalleryItemView } from '#src/generated/protocol';
 
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';

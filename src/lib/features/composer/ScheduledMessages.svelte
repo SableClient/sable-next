@@ -3,7 +3,7 @@
   import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
-  import type { ScheduledMessageView } from '#src/generated/ScheduledMessageView';
+  import type { ScheduledMessageView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';

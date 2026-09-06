@@ -1,6 +1,4 @@
-import type { ImagePackView } from '#src/generated/ImagePackView';
-import type { ImageUsageView } from '#src/generated/ImageUsageView';
-import type { PackImageInfoView } from '#src/generated/PackImageInfoView';
+import type { ImagePackView, ImageUsageView, PackImageInfoView } from '#src/generated/protocol';
 
 export const ALL_USAGES: ImageUsageView[] = ['emoticon', 'sticker'];
 

@@ -1,4 +1,4 @@
-import type { CommandErr } from '#src/generated/CommandErr';
+import type { CommandErr } from '#src/generated/protocol';
 
 import { SlashError } from './slash-commands';
 
