@@ -75,6 +75,38 @@ export async function saveImageToPhotos(
   return 'failed';
 }
 
+export async function sharesNatively(): Promise<boolean> {
+  if (!isTauri()) return false;
+  const { type } = await import('@tauri-apps/plugin-os');
+  const os = type();
+  return os === 'android' || os === 'ios' || os === 'macos' || os === 'windows';
+}
+
+export async function shareFile(
+  url: string,
+  filename: string,
+  mime = mimeFromName(filename)
+): Promise<SaveOutcome> {
+  try {
+    const name = filename.split(/[\\/]/).pop() || 'attachment';
+    const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const [{ appCacheDir, join }, { writeFile }, { shareFile: shareNative }] = await Promise.all([
+      import('@tauri-apps/api/path'),
+      import('@tauri-apps/plugin-fs'),
+      import('@choochmeque/tauri-plugin-sharekit-api'),
+    ]);
+
+    const path = await join(await appCacheDir(), name);
+    await writeFile(path, bytes);
+
+    await shareNative(`file://${path}`, { mimeType: mime, title: name });
+    return 'saved';
+  } catch (error) {
+    console.debug('[sable files] share failed', error);
+    return 'failed';
+  }
+}
+
 async function saveAndroidFile(
   directory: 'Download' | 'Pictures',
   filename: string,

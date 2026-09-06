@@ -16,6 +16,8 @@
     saveFile,
     saveImageToPhotos,
     savesNatively,
+    shareFile,
+    sharesNatively,
     supportsPhotoLibrary,
   } from '#lib/platform/files.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -424,11 +426,26 @@
     editingZoom = false;
   }
 
-  const canShare = typeof navigator.share === 'function';
+  let nativeShare = $state(false);
+  let canShare = $derived(nativeShare || typeof navigator.share === 'function');
+
+  $effect(() => {
+    let active = true;
+    void sharesNatively().then((supported) => {
+      if (active) nativeShare = supported;
+    });
+    return () => {
+      active = false;
+    };
+  });
 
   async function shareMedia(): Promise<void> {
     if (!url) return;
     const name = item.body || 'image';
+    if (nativeShare) {
+      await shareFile(url, name, item.mime ?? undefined);
+      return;
+    }
     try {
       const blob = await (await fetch(url)).blob();
       const file = new File([blob], name, {

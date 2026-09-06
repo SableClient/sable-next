@@ -81,6 +81,11 @@ tauri-plugin-livekit-mobile = { version = "0.2.0", git = "https://github.com/Sab
 # bars to nobody, and `env()` there only covers a display cutout.
 tauri-plugin-edge-to-edge = { version = "0.3.3", git = "https://github.com/SableClient/tauri-plugin-edge-to-edge.git", rev = "33c6116c27be28c06df5a9d02231ecc5fdeb93c5" }
 
+# `navigator.share` reaches no webview we ship, so the system share sheet only
+# comes from the native side. The plugin covers every platform but Linux.
+[target."cfg(any(target_os = \"android\", target_os = \"ios\", target_os = \"macos\", target_os = \"windows\"))".dependencies]
+tauri-plugin-sharekit = "=0.4.0-rc.7"
+
 # `cef` is named here too so its build script unpacks the runtime into this
 # target directory, where scripts/cef/copy-libs.sh looks for it.
 [target."cfg(target_os = \"linux\")".dependencies]

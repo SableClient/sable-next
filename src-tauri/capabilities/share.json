@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "share-capability",
+  "description": "hands a media file to the system share sheet",
+  "platforms": ["android", "iOS", "macOS", "windows"],
+  "windows": ["main"],
+  "permissions": [
+    "sharekit:default",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "$APPCACHE/*" }]
+    }
+  ]
+}
