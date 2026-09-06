@@ -768,7 +768,6 @@
 
   .rail-slot {
     position: relative;
-    margin: -1px 0; /* when in open folders, makes all gaps equal (4px at 100% scaling) */
   }
 
   .rail-slot.dragged {
@@ -848,7 +847,7 @@
     border-radius: var(--radii-500);
     display: flex;
     flex-direction: column;
-    gap: var(--space-200);
+    gap: var(--space-100);
     padding: var(--space-100) 0;
   }
 
