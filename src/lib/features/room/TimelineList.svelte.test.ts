@@ -869,6 +869,20 @@ test('a wheel notch inside the band also leaves follow mode', async () => {
   await unmount(instance);
 });
 
+test('a repeated scroll notification near latest preserves the reading position', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 30);
+  expect(anchored()).toBe(true);
+  element.dispatchEvent(new Event('scroll'));
+  await tick();
+
+  expect(anchored()).toBe(true);
+  await unmount(instance);
+});
+
 test('middle-button autoscroll leaves follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);

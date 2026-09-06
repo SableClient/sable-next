@@ -4,7 +4,7 @@
   import { prefersReducedMotion } from 'svelte/motion';
   import { fade } from 'svelte/transition';
   import { get } from 'svelte/store';
-  import { createVirtualizer } from '@tanstack/svelte-virtual';
+  import { createVirtualizer, defaultRangeExtractor } from '@tanstack/svelte-virtual';
 
   import type { MemberView } from '#src/generated/MemberView';
   import type { TimelineItemView } from '#src/generated/TimelineItemView';
@@ -46,7 +46,6 @@
     type TimelinePosition,
   } from './timeline-position';
   import {
-    hasNewLocalEcho,
     isCollapsed,
     latestEventId,
     personaLookup,
@@ -226,6 +225,7 @@
   }
   const initialItems: readonly TimelineItemView[] = [];
   const INITIAL_END_RECONCILIATION_LIMIT = 60;
+  const HOLD_FRAME_LIMIT = 12;
   let initialEndReconciliationAttempts = 0;
   let initialEndReconciliationPending = false;
   let timelineDebugSample = $state<TimelineDebugSample | null>(null);
@@ -321,19 +321,26 @@
     onChange: handleVirtualizerChange,
   });
 
-  // A row above the reader is measured after Svelte has positioned it, so the
-  // DOM anchor can only correct the shift a frame after it is painted. The
-  // virtualiser knows the delta first. Unlike `followOnAppend`, the adjustment
-  // sets no `scrollState`, so nothing arms `reconcileScroll`.
-  get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = (item, delta, instance) => {
-    if (instance.scrollOffset === null) return false;
-    const offset = instance.scrollOffset + instance.scrollAdjustments;
-    if (item.start >= offset) return false;
-    if (instance.itemSizeCache.has(item.key) && item.end > offset) return false;
-    expectedSelfOffset = offset + delta;
-    recordScroll('virtualizer:resize', offset, expectedSelfOffset);
-    return true;
-  };
+  get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = () => false;
+
+  $effect(() => {
+    void $virtualizer.getTotalSize();
+    syncRenderedRowSizes();
+    if (anchorHolding) anchor.restore();
+    else if (position.kind === 'pinned') commit();
+    else correctRollingAnchor();
+  });
+
+  function syncRenderedRowSizes(): void {
+    if (!viewport) return;
+    const instance = get(virtualizer);
+    for (const node of viewport.querySelectorAll<HTMLElement>('.item[data-index]')) {
+      const index = Number(node.dataset.index);
+      if (!Number.isInteger(index)) continue;
+      const size = Math.round(node.getBoundingClientRect().height);
+      if (size > 0) instance.resizeItem(index, size);
+    }
+  }
 
   async function requestHistory(): Promise<boolean> {
     historyRequestPending = true;
@@ -460,7 +467,6 @@
     virtualizerViewportSize = viewportSize;
     refreshAtLatest();
     if (contentSizeChanged) measurementRevision += 1;
-    if (contentSizeChanged) correctRollingAnchor();
     // `settling` is driven by the landing loop below, which commits and measures
     // in step; a second committer racing it re-enters mid-measurement.
     if (position.kind === 'pinned' && (contentSizeChanged || viewportSizeChanged)) {
@@ -484,24 +490,46 @@
     historyController.suspendForAnchor();
     void (async () => {
       const owns = (): boolean => activeHoldId === holdId;
-      await tick();
-      if (!owns()) {
-        finishHold(holdId, 0);
-        return;
+      let stableFrames = 0;
+      let residual: number | null = null;
+      for (let frame = 0; frame < HOLD_FRAME_LIMIT && stableFrames < 2; frame += 1) {
+        await tick();
+        if (!owns()) return;
+        if (!viewport) {
+          finishHold(holdId, null);
+          return;
+        }
+        if (
+          anchor.locate((key) =>
+            visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
+          ) === null
+        ) {
+          finishHold(holdId, null);
+          return;
+        }
+        await bringAnchorIntoView();
+        if (!owns()) return;
+        if (!viewport) {
+          finishHold(holdId, null);
+          return;
+        }
+        residual = anchor.restore();
+        const correctedAt = measurementRevision;
+        await new Promise(requestAnimationFrame);
+        if (!owns()) return;
+        if (!viewport) {
+          finishHold(holdId, null);
+          return;
+        }
+        const offset = get(virtualizer).scrollOffset ?? 0;
+        const settled =
+          measurementRevision === correctedAt &&
+          residual !== null &&
+          Math.abs(residual) < ANCHOR_EPSILON &&
+          Math.abs(offset - viewport.scrollTop) < ANCHOR_EPSILON;
+        stableFrames = settled ? stableFrames + 1 : 0;
       }
-      await bringAnchorIntoView();
-      if (!owns()) {
-        finishHold(holdId, 0);
-        return;
-      }
-      anchor.restore();
-      const correctedAt = measurementRevision;
-      await new Promise(requestAnimationFrame);
-      if (!owns()) {
-        finishHold(holdId, 0);
-        return;
-      }
-      finishHold(holdId, measurementRevision === correctedAt ? 0 : anchor.restore());
+      finishHold(holdId, residual);
     })();
   }
 
@@ -526,11 +554,12 @@
     anchorHolding = false;
     historyController.resumeAfterAnchor(residual);
     refreshRollingAnchor();
+    if (position.kind === 'pinned') scheduleCommit();
   }
 
   function refreshRollingAnchor(readingBack = false): void {
     if (anchorHolding || !viewport) return;
-    if (!readingBack && isNearLatest(viewport, nearLatestPx)) {
+    if (!readingBack && isNearLatest(viewport, ANCHOR_EPSILON)) {
       anchor.release();
       return;
     }
@@ -768,13 +797,6 @@
         viewport: historyDebugSnapshot(),
       });
     }
-    const sent = hasNewLocalEcho(previousItems, items);
-    if (sent && position.kind !== 'pinned') {
-      setPosition(nextPosition(position, { kind: 'jump-to-latest' }));
-      // The virtualiser does not report the append as a size change here, so the
-      // offset cannot wait on `handleVirtualizerChange` to schedule it.
-      scheduleCommit();
-    }
     // `position` goes stale: a programmatic scroll raises no gesture and a
     // wheel at offset zero raises no scroll event.
     const pinnedToEnd = viewport !== null && isNearLatest(viewport, nearLatestPx);
@@ -783,7 +805,6 @@
     // the end-follow declines, stranding the newest message out of view.
     if (
       edgesChanged &&
-      !sent &&
       (prepended || !pinnedToEnd) &&
       position.kind !== 'settling' &&
       position.kind !== 'focused'
@@ -793,6 +814,9 @@
     const rem = cachedRootFontSize;
     nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * rem;
     const layout = preferences.layout;
+    const heldRangeSize = instance.range
+      ? instance.range.endIndex - instance.range.startIndex + 1
+      : 1;
     instance.setOptions({
       count: items.length,
       getScrollElement: () => viewport,
@@ -812,6 +836,18 @@
       scrollEndThreshold: 0,
       useScrollendEvent: true,
       overscan: 8,
+      rangeExtractor: (range) => {
+        const indexes = defaultRangeExtractor(range);
+        if (!anchorHolding) return indexes;
+        const held = anchor.locate((key) =>
+          items.findIndex((item) => anchorKeyForItem(item) === key)
+        );
+        if (!held) return indexes;
+        const start = Math.max(0, held.index - range.overscan);
+        const end = Math.min(items.length - 1, held.index + heldRangeSize + range.overscan);
+        for (let index = start; index <= end; index += 1) indexes.push(index);
+        return [...new Set(indexes)].sort((left, right) => left - right);
+      },
       onChange: handleVirtualizerChange,
     });
     if (edgesChanged) {
@@ -905,7 +941,7 @@
     const next = nextPosition(position, {
       kind: 'user-scrolled',
       timelineMode: timeline.mode.kind,
-      nearLatest,
+      nearLatest: atLatest,
       movedAway,
       byReader,
       anchorKey: anchor.held?.key ?? null,
