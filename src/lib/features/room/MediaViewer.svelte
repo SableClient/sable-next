@@ -59,6 +59,14 @@
   let canSaveToPhotos = $state(false);
   let stageEl: HTMLElement | null = $state(null);
   let imageEl: HTMLImageElement | null = $state(null);
+  let fitRatio = $state(1);
+  let fitsWindow = $state(true);
+  let dragging = $state(false);
+  let instant = $state(false);
+  let instantTimer: ReturnType<typeof setTimeout> | null = null;
+  let imageReady = $state(false);
+  let editingZoom = $state(false);
+  let zoomInput = $state('100');
   const touches = new SvelteMap<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let pinchZoom = 1;
@@ -90,7 +98,24 @@
       pan = { x: 0, y: 0 };
       pdfPage = 1;
       pdfPages = 0;
+      fitRatio = 1;
+      fitsWindow = true;
+      imageReady = false;
+      editingZoom = false;
     });
+  });
+
+  $effect(() => {
+    const stage = stageEl;
+    if (!stage) return;
+    const observer = new ResizeObserver(() => {
+      if (fitsWindow && isImage) fitToStage();
+    });
+    observer.observe(stage);
+    return () => {
+      observer.disconnect();
+      if (instantTimer !== null) clearTimeout(instantTimer);
+    };
   });
 
   $effect(() => {
@@ -133,9 +158,49 @@
     if (index < items.length - 1) index += 1;
   }
 
-  function setZoom(next: number): void {
-    zoom = Math.min(5, Math.max(0.25, next));
+  const MIN_ZOOM = 0.1;
+  const ZOOM_STEP = 0.2;
+  let maxZoom = $derived(isPdf ? 5 : 500);
+  let pannable = $derived(zoom > fitRatio * 1.001 || rotation % 360 !== 0);
+
+  function applyZoom(next: number): void {
+    zoom = Math.min(maxZoom, Math.max(MIN_ZOOM, next));
     void reclampPan();
+  }
+
+  function setZoom(next: number): void {
+    fitsWindow = false;
+    applyZoom(next);
+  }
+
+  function fitZoom(): number {
+    if (!stageEl || !imageEl?.naturalWidth || !imageEl.naturalHeight) return 1;
+    const style = getComputedStyle(stageEl);
+    const width =
+      stageEl.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const height =
+      stageEl.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    return Math.min(width / imageEl.naturalWidth, height / imageEl.naturalHeight, 1);
+  }
+
+  function fitToStage(): void {
+    fitRatio = fitZoom();
+    withoutTransition();
+    applyZoom(fitRatio);
+  }
+
+  function onImageLoad(): void {
+    fitToStage();
+    imageReady = true;
+  }
+
+  function withoutTransition(): void {
+    instant = true;
+    if (instantTimer !== null) clearTimeout(instantTimer);
+    instantTimer = setTimeout(() => {
+      instant = false;
+      instantTimer = null;
+    }, 15);
   }
 
   function rotateBy(degrees: number): void {
@@ -145,7 +210,7 @@
 
   async function reclampPan(): Promise<void> {
     await tick();
-    pan = zoom > 1 || rotation % 360 !== 0 ? clampCurrentPan(pan) : { x: 0, y: 0 };
+    pan = pannable ? clampCurrentPan(pan) : { x: 0, y: 0 };
   }
 
   const PAN_STEP = 40;
@@ -156,7 +221,7 @@
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') onClose();
-    if (isImage && zoom > 1.001) {
+    if (isImage && pannable) {
       if (event.key === 'ArrowLeft') return panBy(PAN_STEP, 0);
       if (event.key === 'ArrowRight') return panBy(-PAN_STEP, 0);
       if (event.key === 'ArrowUp') return panBy(0, PAN_STEP);
@@ -164,14 +229,14 @@
     }
     if (event.key === 'ArrowLeft') previous();
     if (event.key === 'ArrowRight') next();
-    if (event.key === '+' || event.key === '=') setZoom(zoom + 0.25);
-    if (event.key === '-') setZoom(zoom - 0.25);
+    if (event.key === '+' || event.key === '=') setZoom(zoom * (1 + ZOOM_STEP));
+    if (event.key === '-') setZoom(zoom / (1 + ZOOM_STEP));
   }
 
   function handleWheel(event: WheelEvent): void {
     if (!isImage) return;
     event.preventDefault();
-    setZoom(zoom - event.deltaY * 0.001);
+    setZoom(zoom * (1 - event.deltaY * 0.001));
   }
 
   function distance(): number {
@@ -191,6 +256,7 @@
         pinchDistance = distance();
         pinchZoom = zoom;
         panPointerId = null;
+        dragging = true;
         return;
       }
       if (touches.size > 1) return;
@@ -199,6 +265,7 @@
     panPointerId = event.pointerId;
     panOrigin = { ...pan };
     panStartPointer = { x: event.clientX, y: event.clientY };
+    dragging = true;
   }
 
   function movePan(event: PointerEvent): void {
@@ -222,6 +289,18 @@
     touches.delete(event.pointerId);
     if (touches.size < 2) pinchDistance = 0;
     if (panPointerId === event.pointerId) panPointerId = null;
+    if (panPointerId === null && touches.size === 0) dragging = false;
+  }
+
+  function beginZoomEdit(): void {
+    zoomInput = String(Math.round(zoom * 100));
+    editingZoom = true;
+  }
+
+  function commitZoomEdit(): void {
+    const next = Number.parseInt(zoomInput, 10);
+    if (!Number.isNaN(next)) setZoom(next / 100);
+    editingZoom = false;
   }
 
   async function copyImage(): Promise<void> {
@@ -362,12 +441,14 @@
               <img
                 bind:this={imageEl}
                 class:pixelated
+                class:dragging
+                class:instant
                 src={url}
                 alt={item.body || 'Image'}
-                width={item.width ?? undefined}
-                height={item.height ?? undefined}
                 draggable="false"
+                style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x)}px, ${String(pan.y)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
+                onload={onImageLoad}
               />
             {/if}
           {:else if failed}
@@ -411,14 +492,36 @@
                 label="Zoom out"
                 size="small"
                 variant="ghost"
-                onclick={() => setZoom(zoom - 0.25)}><MinusIcon /></IconButton
+                onclick={() => setZoom(zoom / (1 + ZOOM_STEP))}><MinusIcon /></IconButton
               >
-              <span>{Math.round(zoom * 100)}%</span>
+              {#if editingZoom}
+                <span class="zoom-level">
+                  <!-- svelte-ignore a11y_autofocus -->
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    aria-label="Set zoom level"
+                    autofocus
+                    bind:value={zoomInput}
+                    onblur={commitZoomEdit}
+                    onkeydown={(event) => {
+                      if (event.key === 'Enter') commitZoomEdit();
+                    }}
+                  />%
+                </span>
+              {:else}
+                <button
+                  class="zoom-level"
+                  type="button"
+                  title="Set zoom level"
+                  onclick={beginZoomEdit}>{Math.round(zoom * 100)}%</button
+                >
+              {/if}
               <IconButton
                 label="Zoom in"
                 size="small"
                 variant="ghost"
-                onclick={() => setZoom(zoom + 0.25)}><PlusIcon /></IconButton
+                onclick={() => setZoom(zoom * (1 + ZOOM_STEP))}><PlusIcon /></IconButton
               >
             </div>
           {/if}
@@ -428,9 +531,11 @@
               class="reset"
               type="button"
               onclick={() => {
-                zoom = 1;
                 rotation = 0;
                 pan = { x: 0, y: 0 };
+                fitsWindow = true;
+                if (isImage) fitToStage();
+                else zoom = 1;
               }}>Reset view</button
             >
           {/if}
@@ -481,6 +586,23 @@
     display: flex;
     gap: var(--space-150);
     min-width: 0;
+  }
+
+  .zoom-level {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: text;
+    font: inherit;
+    min-width: 4em;
+    padding: 0;
+    text-align: center;
+  }
+
+  .zoom-level input {
+    all: unset;
+    field-sizing: content;
+    text-align: center;
   }
 
   .heading {
@@ -560,10 +682,29 @@
   }
 
   .stage img {
-    max-height: 100%;
-    max-width: 100%;
-    object-fit: contain;
+    cursor: grab;
+    display: block;
+    height: auto;
+    max-height: none;
+    max-width: none;
     user-select: none;
+    width: auto;
+    will-change: transform;
+  }
+
+  .stage img.dragging {
+    cursor: grabbing;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .stage img {
+      transition: transform 100ms linear;
+    }
+
+    .stage img.dragging,
+    .stage img.instant {
+      transition: none;
+    }
   }
 
   .stage img.pixelated {
