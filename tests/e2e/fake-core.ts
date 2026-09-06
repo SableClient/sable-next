@@ -36,6 +36,7 @@ declare global {
     __e2eTimelineSubscriptions: number[];
     __e2eEmitTimelineEvent: (event: unknown) => void;
     __e2eTimelineRebuilds: number;
+    __e2eSelfWrites: number;
   }
 }
 
@@ -495,7 +496,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         case 'endless_history':
           return Array.from({ length: 20 }, (_, index) => ({
             op: 'insert',
-            index: index + 1,
+            index,
             value: {
               ...first,
               id: `endless-${String(page)}-${String(index)}`,
