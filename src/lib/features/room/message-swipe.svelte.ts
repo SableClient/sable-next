@@ -1,3 +1,4 @@
+import { hapticFeedback } from '#lib/platform/haptics.js';
 import { startSwipeGesture, updateSwipeGesture, type SwipeGesture } from '#lib/ui/swipe-gesture.js';
 
 import { swipeAction, swipeOffset, type SwipeAction } from './message-swipe';
@@ -8,12 +9,6 @@ export interface MessageSwipeOptions {
   canEdit: () => boolean;
   onReply: () => void;
   onEdit: () => void;
-}
-
-const HAPTIC_MS: Record<Exclude<SwipeAction, 'none'>, number> = { reply: 5, edit: 12 };
-
-interface Vibrates {
-  vibrate?: (pattern: number) => boolean;
 }
 
 function scrollsSideways(target: EventTarget | null, root: HTMLElement): boolean {
@@ -94,7 +89,7 @@ export class MessageSwipe {
     if (next === this.action) return;
     this.action = next;
     if (next === 'none') return;
-    (navigator as Vibrates).vibrate?.(HAPTIC_MS[next]);
+    hapticFeedback(next === 'edit' ? 'medium' : 'light');
   }
 
   #release(commit: boolean): void {

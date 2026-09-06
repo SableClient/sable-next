@@ -1,6 +1,11 @@
-import { expect, test, vi } from 'vitest';
+import { hapticFeedback } from '#lib/platform/haptics.js';
+import { beforeEach, expect, test, vi } from 'vitest';
 
 import { LongPress } from './long-press.svelte.js';
+
+vi.mock('#lib/platform/haptics.js', () => ({ hapticFeedback: vi.fn() }));
+
+beforeEach(() => vi.mocked(hapticFeedback).mockClear());
 
 function pointer(overrides: Partial<PointerEvent> = {}): PointerEvent {
   return {
@@ -19,10 +24,12 @@ test('a held press fires once the delay elapses', () => {
 
   press.start(pointer());
   expect(onPress).not.toHaveBeenCalled();
+  expect(hapticFeedback).not.toHaveBeenCalled();
 
   vi.advanceTimersByTime(450);
 
   expect(onPress).toHaveBeenCalledOnce();
+  expect(hapticFeedback).toHaveBeenCalledExactlyOnceWith('medium');
   expect(press.fired).toBe(true);
   vi.useRealTimers();
 });
@@ -36,6 +43,7 @@ test('a mouse press never fires, but still reports the pointer kind', () => {
   vi.advanceTimersByTime(1000);
 
   expect(onPress).not.toHaveBeenCalled();
+  expect(hapticFeedback).not.toHaveBeenCalled();
   expect(press.touch).toBe(false);
   vi.useRealTimers();
 });
@@ -50,6 +58,7 @@ test('sliding past the slop cancels the press', () => {
   vi.advanceTimersByTime(1000);
 
   expect(onPress).not.toHaveBeenCalled();
+  expect(hapticFeedback).not.toHaveBeenCalled();
   vi.useRealTimers();
 });
 
@@ -63,6 +72,7 @@ test('staying within the slop keeps the press alive', () => {
   vi.advanceTimersByTime(450);
 
   expect(onPress).toHaveBeenCalledOnce();
+  expect(hapticFeedback).toHaveBeenCalledExactlyOnceWith('medium');
   vi.useRealTimers();
 });
 
@@ -75,6 +85,7 @@ test('a disabled press never arms', () => {
   vi.advanceTimersByTime(1000);
 
   expect(onPress).not.toHaveBeenCalled();
+  expect(hapticFeedback).not.toHaveBeenCalled();
   vi.useRealTimers();
 });
 
@@ -88,6 +99,7 @@ test('cancelling drops a timer that a virtualised row would otherwise leave runn
   vi.advanceTimersByTime(1000);
 
   expect(onPress).not.toHaveBeenCalled();
+  expect(hapticFeedback).not.toHaveBeenCalled();
   vi.useRealTimers();
 });
 

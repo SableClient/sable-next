@@ -1,7 +1,10 @@
+import { hapticFeedback } from '#lib/platform/haptics.js';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { editThreshold, replyThreshold } from './message-swipe';
 import { MessageSwipe } from './message-swipe.svelte.js';
+
+vi.mock('#lib/platform/haptics.js', () => ({ hapticFeedback: vi.fn() }));
 
 const WIDTH = 800;
 const PAST_REPLY = replyThreshold(WIDTH) + 10;
@@ -10,6 +13,7 @@ const PAST_EDIT = editThreshold(WIDTH, true) + 10;
 let node: HTMLElement;
 
 beforeEach(() => {
+  vi.mocked(hapticFeedback).mockClear();
   node = document.createElement('div');
   Object.defineProperty(node, 'clientWidth', { value: WIDTH, configurable: true });
   document.body.append(node);
@@ -164,4 +168,18 @@ test('detaching stops the gesture from firing', async () => {
   fire('touchend', 0);
 
   expect(onReply).not.toHaveBeenCalled();
+});
+
+test('feedback fires only when an action threshold changes, not on movement or release', async () => {
+  await harness({ canEdit: true });
+  fire('touchstart', 0);
+  fire('touchmove', -12);
+  expect(hapticFeedback).not.toHaveBeenCalled();
+  fire('touchmove', -PAST_REPLY);
+  fire('touchmove', -PAST_REPLY - 5);
+  expect(hapticFeedback).toHaveBeenCalledExactlyOnceWith('light');
+  fire('touchmove', -PAST_EDIT);
+  expect(hapticFeedback).toHaveBeenLastCalledWith('medium');
+  fire('touchend', 0);
+  expect(hapticFeedback).toHaveBeenCalledTimes(2);
 });

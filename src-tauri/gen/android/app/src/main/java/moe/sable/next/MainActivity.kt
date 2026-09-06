@@ -115,6 +115,17 @@ class MainActivity : TauriActivity() {
   companion object {
     private var instance: MainActivity? = null
 
+    @JvmStatic
+    fun hapticFeedbackNative(strong: Boolean) {
+      val activity = instance ?: return
+      activity.runOnUiThread {
+        activity.window.decorView.performHapticFeedback(
+          if (strong) android.view.HapticFeedbackConstants.LONG_PRESS
+          else android.view.HapticFeedbackConstants.CLOCK_TICK
+        )
+      }
+    }
+
     // The bars stay transparent under edge-to-edge and the webview paints them,
     // so only the icon contrast is left. setStatusBarColor is a no-op from API 35.
     @JvmStatic

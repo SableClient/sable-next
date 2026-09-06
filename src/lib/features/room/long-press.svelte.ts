@@ -1,3 +1,5 @@
+import { hapticFeedback } from '#lib/platform/haptics.js';
+
 const LONG_PRESS_MS = 450;
 const LONG_PRESS_SLOP_PX = 10;
 
@@ -28,6 +30,7 @@ export class LongPress {
       this.#timer = undefined;
       this.#origin = null;
       this.fired = true;
+      hapticFeedback('medium');
       this.options.onPress();
     }, LONG_PRESS_MS);
   };

@@ -35,22 +35,27 @@ pub extern "system" fn Java_moe_sable_next_MainActivity_nativeInitSystemBars(
 /// `light` asks for the icon treatment a light background needs: dark icons.
 #[tauri::command]
 pub fn set_status_bar_light(light: bool) -> Result<(), String> {
-    call_bar_light("setStatusBarLightNative", light)
+    call_activity_bool("setStatusBarLightNative", light)
 }
 
 #[tauri::command]
 pub fn set_navigation_bar_light(light: bool) -> Result<(), String> {
-    call_bar_light("setNavigationBarLightNative", light)
+    call_activity_bool("setNavigationBarLightNative", light)
 }
 
-fn call_bar_light(method: &str, light: bool) -> Result<(), String> {
+#[tauri::command]
+pub fn haptic_feedback(strong: bool) -> Result<(), String> {
+    call_activity_bool("hapticFeedbackNative", strong)
+}
+
+fn call_activity_bool(method: &str, value: bool) -> Result<(), String> {
     let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
     vm.attach_current_thread(|env| {
         let result = env.call_static_method(
             jni_str!("moe/sable/next/MainActivity"),
             JNIString::new(method),
             jni_sig!("(Z)V"),
-            &[JValue::Bool(light)],
+            &[JValue::Bool(value)],
         );
         if result.is_err() {
             env.exception_clear();

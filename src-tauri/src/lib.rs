@@ -393,6 +393,10 @@ pub fn run() {
             sentry::set_native_sentry_enabled,
             #[cfg(target_os = "ios")]
             ios::save_media_to_photos,
+            #[cfg(target_os = "ios")]
+            ios::haptic_feedback,
+            #[cfg(target_os = "android")]
+            mobile::haptic_feedback,
             #[cfg(target_os = "android")]
             mobile::set_status_bar_light,
             #[cfg(target_os = "android")]

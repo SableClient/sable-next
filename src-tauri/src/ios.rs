@@ -159,3 +159,15 @@ pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
         }
     });
 }
+
+#[tauri::command]
+pub fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(), String> {
+    app.run_on_main_thread(move || unsafe {
+        let allocated: objc2::rc::Allocated<AnyObject> =
+            msg_send![objc2::class!(UIImpactFeedbackGenerator), alloc];
+        let generator: objc2::rc::Retained<AnyObject> =
+            msg_send![allocated, initWithStyle: isize::from(strong)];
+        let _: () = msg_send![&*generator, impactOccurred];
+    })
+    .map_err(|error| error.to_string())
+}
