@@ -286,10 +286,58 @@ test('sharing writes the media to the cache and hands over a file URL', async ()
 
   expect(await shareFile('blob:media', 'holiday.png')).toBe('saved');
   expect(mocks.fsWriteFile).toHaveBeenCalledWith('/cache/holiday.png', new Uint8Array([1, 2, 3]));
-  expect(mocks.shareNative).toHaveBeenCalledWith('file:///cache/holiday.png', {
+  expect(mocks.shareNative).toHaveBeenCalledWith('/cache/holiday.png', {
     mimeType: 'image/png',
     title: 'holiday.png',
+    position: undefined,
   });
+});
+
+test('a name iOS could not parse as a URL is reduced to one that it can', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1]))));
+
+  await shareFile('blob:media', 'Screenshot 2026 09 06 at 14.32.png');
+  expect(mocks.fsWriteFile).toHaveBeenCalledWith(
+    '/cache/Screenshot-2026-09-06-at-14.32.png',
+    expect.anything()
+  );
+  expect(mocks.shareNative).toHaveBeenCalledWith(
+    '/cache/Screenshot-2026-09-06-at-14.32.png',
+    expect.objectContaining({ title: 'Screenshot 2026 09 06 at 14.32.png' })
+  );
+});
+
+test('the sheet anchors from the top on iPad and from the bottom on macOS', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response(new Uint8Array([1]))))
+  );
+  vi.stubGlobal('window', { innerHeight: 800 });
+  const anchor: DOMRect = {
+    x: 20,
+    y: 60,
+    left: 20,
+    top: 60,
+    right: 60,
+    bottom: 100,
+    width: 40,
+    height: 40,
+    toJSON: () => ({}),
+  };
+
+  mocks.osType.mockReturnValue('ios');
+  await shareFile('blob:media', 'holiday.png', 'image/png', anchor);
+  expect(mocks.shareNative).toHaveBeenLastCalledWith(
+    '/cache/holiday.png',
+    expect.objectContaining({ position: { x: 20, y: 60 } })
+  );
+
+  mocks.osType.mockReturnValue('macos');
+  expect(await shareFile('blob:media', 'holiday.png', 'image/png', anchor)).toBe('saved');
+  expect(mocks.shareNative).toHaveBeenLastCalledWith(
+    '/cache/holiday.png',
+    expect.objectContaining({ position: { x: 20, y: 700 } })
+  );
 });
 
 test('a body carrying a path cannot write outside the cache directory', async () => {

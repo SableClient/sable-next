@@ -85,26 +85,42 @@ export async function sharesNatively(): Promise<boolean> {
 export async function shareFile(
   url: string,
   filename: string,
-  mime = mimeFromName(filename)
+  mime = mimeFromName(filename),
+  anchor?: DOMRect
 ): Promise<SaveOutcome> {
   try {
     const name = filename.split(/[\\/]/).pop() || 'attachment';
     const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
-    const [{ appCacheDir, join }, { writeFile }, { shareFile: shareNative }] = await Promise.all([
-      import('@tauri-apps/api/path'),
-      import('@tauri-apps/plugin-fs'),
-      import('@choochmeque/tauri-plugin-sharekit-api'),
-    ]);
+    const [{ type }, { appCacheDir, join }, { writeFile }, { shareFile: shareNative }] =
+      await Promise.all([
+        import('@tauri-apps/plugin-os'),
+        import('@tauri-apps/api/path'),
+        import('@tauri-apps/plugin-fs'),
+        import('@choochmeque/tauri-plugin-sharekit-api'),
+      ]);
 
-    const path = await join(await appCacheDir(), name);
+    const path = await join(await appCacheDir(), cacheName(name));
     await writeFile(path, bytes);
 
-    await shareNative(`file://${path}`, { mimeType: mime, title: name });
+    await shareNative(path, {
+      mimeType: mime,
+      title: name,
+      position: anchor && sharePosition(anchor, type() === 'macos'),
+    });
     return 'saved';
   } catch (error) {
     console.debug('[sable files] share failed', error);
     return 'failed';
   }
+}
+
+function cacheName(name: string): string {
+  const safe = name.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[.-]+/, '');
+  return safe || 'attachment';
+}
+
+function sharePosition(anchor: DOMRect, fromBottom: boolean): { x: number; y: number } {
+  return { x: anchor.left, y: fromBottom ? window.innerHeight - anchor.bottom : anchor.top };
 }
 
 async function saveAndroidFile(
