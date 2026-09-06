@@ -197,6 +197,7 @@ test('keeps a visible event fixed when a prepended image loads', async ({
   await app.openRooms();
   await app.openRoomFromList('General');
 
+  await timeline.expectRevealed();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   const subscription = await core.subscription();
@@ -348,6 +349,7 @@ test('keeps a local echo and the visible position stable through confirmation', 
     send_state: { status: 'sending' as const },
   };
 
+  const readingAnchor = await timeline.fullyVisibleAnchor();
   await core.emitTimelineDiff(subscription, [{ op: 'push_back', value: localEcho }]);
   const echo = timeline.itemById('local-echo');
   await expect(echo).toHaveCount(1);
@@ -355,6 +357,8 @@ test('keeps a local echo and the visible position stable through confirmation', 
     element.setAttribute('data-confirmation-marker', 'stable');
   });
 
+  await timeline.expectAnchorHeld(readingAnchor);
+  await timeline.scrollToBottomAndNotify();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
   const anchor = await timeline.fullyVisibleAnchor();
 
@@ -563,9 +567,7 @@ test('follows an appended event while a pointer rests on the timeline', async ({
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 });
 
-// A room opened on its first unread is anchored, not pinned, so the message just
-// sent lands below the fold unless sending goes to the newest event.
-test('follows a sent message from a room opened on its first unread', async ({
+test('keeps the reader in place when they send from a room opened on its first unread', async ({
   page,
   app,
   timeline,
@@ -578,6 +580,7 @@ test('follows a sent message from a room opened on its first unread', async ({
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await expect(timeline.jumpToLatest).toBeVisible();
+  const anchor = await timeline.fullyVisibleAnchor();
 
   const subscription = await core.subscription();
   await core.emitTimelineDiff(subscription, [
@@ -592,9 +595,10 @@ test('follows a sent message from a room opened on its first unread', async ({
     },
   ]);
 
-  // Promptly: following on the next frame is the point, not eventually.
-  await expect.poll(() => timeline.distanceFromBottom(), { timeout: 1_000 }).toBe(0);
-  await expect(timeline.itemById('echo')).toBeInViewport();
+  await expect(timeline.itemById('echo')).toHaveCount(1);
+  await timeline.expectAnchorHeld(anchor);
+  await expect(timeline.jumpToLatest).toBeVisible();
+  expect(await timeline.distanceFromBottom()).toBeGreaterThan(0);
 });
 
 test('follows a sent message after a wheel that could not scroll', async ({

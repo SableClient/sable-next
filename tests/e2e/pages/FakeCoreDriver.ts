@@ -85,7 +85,7 @@ export class FakeCoreDriver {
         const positions: number[] = [];
         const sample = (): void => {
           const anchor = document.querySelector<HTMLElement>(`[data-item-id="${itemId}"]`);
-          if (anchor) positions.push(anchor.getBoundingClientRect().top);
+          positions.push(anchor ? anchor.getBoundingClientRect().top : Number.POSITIVE_INFINITY);
         };
         sample();
         window.__e2eEmitTimelineEvent({ type: 'timeline_diff', subscription, diffs });
