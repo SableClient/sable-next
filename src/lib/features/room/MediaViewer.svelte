@@ -394,7 +394,9 @@
     const settled = { x: swipeX, y: swipeY };
     endSwipe();
     if (axis === 'vertical') {
-      if (Math.abs(settled.y) > SWIPE_THRESHOLD || Math.abs(velocityY) > VELOCITY_THRESHOLD) {
+      const travelled = Math.abs(settled.y);
+      const flicked = Math.abs(velocityY) > VELOCITY_THRESHOLD && travelled > SWIPE_THRESHOLD / 2;
+      if (travelled > SWIPE_THRESHOLD || flicked) {
         onClose();
         return true;
       }
