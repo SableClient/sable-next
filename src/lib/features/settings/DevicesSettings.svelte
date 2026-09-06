@@ -506,9 +506,9 @@
                     </span>
                   {/if}
                 </div>
-                {#if !device.is_own && editing !== device.device_id && deleting !== device.device_id}
+                {#if editing !== device.device_id && deleting !== device.device_id}
                   <div class="device-actions">
-                    {#if !device.is_verified && status?.verification === 'verified'}
+                    {#if !device.is_own && !device.is_verified && status?.verification === 'verified'}
                       <Button
                         variant="ghost"
                         size="small"
@@ -529,15 +529,17 @@
                     >
                       {$i18n.t('settings.rename')}
                     </Button>
-                    <Button
-                      variant="danger"
-                      size="small"
-                      onclick={() => {
-                        beginRemoval(device.device_id);
-                      }}
-                    >
-                      {$i18n.t('settings.remove')}
-                    </Button>
+                    {#if !device.is_own}
+                      <Button
+                        variant="danger"
+                        size="small"
+                        onclick={() => {
+                          beginRemoval(device.device_id);
+                        }}
+                      >
+                        {$i18n.t('settings.remove')}
+                      </Button>
+                    {/if}
                   </div>
                 {/if}
               </div>

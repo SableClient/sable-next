@@ -11,6 +11,7 @@ const core = vi.hoisted(() => {
     encryptionStatus: vi.fn<() => Promise<EncryptionStatusView>>(),
     devices: vi.fn<() => Promise<{ devices: DeviceView[]; accountManagement: boolean }>>(),
     deleteDevice: vi.fn<(deviceId: string, password: string | null) => Promise<string | null>>(),
+    renameDevice: vi.fn<(deviceId: string, displayName: string) => Promise<void>>(),
     subscribeEvents: vi.fn(() => () => {}),
   };
 
@@ -108,6 +109,30 @@ test('reports which devices failed instead of a blanket success', async () => {
   document.querySelector<HTMLButtonElement>('.bulk-remove-form .sable-button-danger')?.click();
   await vi.waitFor(() => {
     expect(document.querySelector('.settings-error')?.textContent).toContain('Tablet');
+  });
+
+  await unmount(instance);
+});
+
+test('renames the current device', async () => {
+  core.encryptionStatus.mockResolvedValue(status);
+  core.devices.mockResolvedValue({ devices: [own, other1, other2], accountManagement: false });
+  const instance = mount(DevicesSettings, { target: document.body });
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('.device').length).toBe(3);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.device-actions .sable-button')[0].click();
+  await tick();
+
+  const input = document.querySelectorAll<HTMLInputElement>('#device-OWN')[0];
+  input.value = 'Laptop';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+
+  document.querySelectorAll<HTMLFormElement>('.device-form')[0].requestSubmit();
+  await vi.waitFor(() => {
+    expect(core.renameDevice).toHaveBeenCalledWith('OWN', 'Laptop');
   });
 
   await unmount(instance);
