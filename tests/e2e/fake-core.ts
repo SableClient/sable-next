@@ -38,7 +38,6 @@ declare global {
     __e2eTimelineSubscriptions: number[];
     __e2eEmitTimelineEvent: (event: unknown) => void;
     __e2eTimelineRebuilds: number;
-    __e2eSelfWrites: number;
   }
 }
 
