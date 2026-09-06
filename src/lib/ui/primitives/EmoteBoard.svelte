@@ -82,7 +82,7 @@
   });
 
   let gifTab = $derived(tab === 'gif');
-  let cellSize = $derived(tab === 'sticker' ? 72 : 32);
+  let cellSize = $derived(tab === 'sticker' ? 72 : tab === 'emoticon' ? 48 : 32);
 
   let boardStyle = $derived.by(() => {
     const size = resizable ? readBoardSize() : null;
@@ -365,7 +365,7 @@
         {/if}
       </nav>
 
-      <div class={['grids', { sticker: tab === 'sticker' }]}>
+      <div class={['grids', { sticker: tab === 'sticker', emoji: tab === 'emoticon' }]}>
         {#if onPickUnicode && query.trim() !== ''}
           {@const text = query.trim()}
           <button
@@ -665,14 +665,18 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-100);
+    justify-content: center;
     list-style: none;
     margin: 0 0 var(--space-300);
-    justify-content: center;
     padding: 0;
   }
 
   .grids.sticker {
     --emote-cell: 5rem;
+  }
+
+  .grids.emoji {
+    --emote-cell: 3.5rem;
   }
 
   .grids li button,
@@ -688,10 +692,10 @@
     padding: var(--space-100);
     width: var(--emote-cell, 2.5rem);
 
-    span {
-        max-width: 100%;
-        max-height: 100%;
-      }
+    :global(span) {
+      max-height: 100%;
+      max-width: 100%;
+    }
   }
 
   /* Sized to the 32px custom emote beside it, not to the surrounding type. */
