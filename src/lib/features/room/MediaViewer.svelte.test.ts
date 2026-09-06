@@ -260,3 +260,90 @@ test('double click zooms in, and again returns to the fitted size', async () => 
   expect(document.querySelector('img')?.style.transform).toContain('scale(1)');
   await unmount(instance);
 });
+
+test('a downward swipe past the threshold dismisses the viewer', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  const instance = mount(MediaViewer, {
+    target: document.body,
+    props: { items: [imageItem], selectedEventId: '$image', onClose },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img')).not.toBeNull();
+  });
+  const stage = document.querySelectorAll('.stage')[0];
+
+  stage.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      pointerId: 1,
+      pointerType: 'touch',
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+  );
+  stage.dispatchEvent(
+    new PointerEvent('pointermove', {
+      pointerId: 1,
+      pointerType: 'touch',
+      clientX: 100,
+      clientY: 220,
+      bubbles: true,
+    })
+  );
+  await tick();
+
+  expect(document.querySelector('img')?.style.transform).toContain('translate(0px, 120px)');
+
+  stage.dispatchEvent(
+    new PointerEvent('pointerup', { pointerId: 1, pointerType: 'touch', bubbles: true })
+  );
+  expect(onClose).toHaveBeenCalled();
+
+  await unmount(instance);
+});
+
+test('a short swipe springs back instead of dismissing', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  const instance = mount(MediaViewer, {
+    target: document.body,
+    props: { items: [imageItem], selectedEventId: '$image', onClose },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img')).not.toBeNull();
+  });
+  const stage = document.querySelectorAll('.stage')[0];
+
+  stage.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      pointerId: 1,
+      pointerType: 'touch',
+      clientX: 100,
+      clientY: 100,
+      bubbles: true,
+    })
+  );
+  stage.dispatchEvent(
+    new PointerEvent('pointermove', {
+      pointerId: 1,
+      pointerType: 'touch',
+      clientX: 100,
+      clientY: 130,
+      bubbles: true,
+    })
+  );
+  stage.dispatchEvent(
+    new PointerEvent('pointerup', { pointerId: 1, pointerType: 'touch', bubbles: true })
+  );
+  await tick();
+
+  expect(onClose).not.toHaveBeenCalled();
+  expect(document.querySelector('img')?.style.transform).toContain('translate(0px, 0px)');
+
+  await unmount(instance);
+});

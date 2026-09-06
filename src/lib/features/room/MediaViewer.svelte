@@ -8,6 +8,11 @@
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
   import {
+    AXIS_LOCK_THRESHOLD,
+    SWIPE_THRESHOLD,
+    VELOCITY_THRESHOLD,
+  } from '#lib/ui/swipe-gesture.js';
+  import {
     saveFile,
     saveImageToPhotos,
     savesNatively,
@@ -20,6 +25,7 @@
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
+  import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PdfViewer from '#lib/ui/PdfViewer.svelte';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
@@ -68,6 +74,17 @@
   let imageReady = $state(false);
   let editingZoom = $state(false);
   let zoomInput = $state('100');
+  let swipeX = $state(0);
+  let swipeY = $state(0);
+  let swipe: {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    lastY: number;
+    lastTime: number;
+    velocityY: number;
+    axis: 'pending' | 'horizontal' | 'vertical';
+  } | null = null;
   const touches = new SvelteMap<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let pinchZoom = 1;
@@ -301,9 +318,21 @@
         pinchZoom = zoom;
         panPointerId = null;
         dragging = true;
+        endSwipe();
         return;
       }
       if (touches.size > 1) return;
+      if (!pannable) {
+        swipe = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          lastY: event.clientY,
+          lastTime: event.timeStamp,
+          velocityY: 0,
+          axis: 'pending',
+        };
+      }
     }
     if (panPointerId !== null) return;
     panPointerId = event.pointerId;
@@ -321,6 +350,10 @@
         return;
       }
     }
+    if (swipe?.pointerId === event.pointerId) {
+      trackSwipe(event);
+      return;
+    }
     if (panPointerId !== event.pointerId) return;
     pan = clampCurrentPan({
       x: panOrigin.x + (event.clientX - panStartPointer.x),
@@ -328,8 +361,52 @@
     });
   }
 
+  function trackSwipe(event: PointerEvent): void {
+    if (!swipe) return;
+    const dx = event.clientX - swipe.startX;
+    const dy = event.clientY - swipe.startY;
+    if (swipe.axis === 'pending') {
+      if (Math.abs(dx) > AXIS_LOCK_THRESHOLD || Math.abs(dy) > AXIS_LOCK_THRESHOLD) {
+        swipe.axis = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+      }
+    }
+    const elapsed = event.timeStamp - swipe.lastTime;
+    if (elapsed >= 1) {
+      swipe.velocityY = (event.clientY - swipe.lastY) / elapsed;
+      swipe.lastY = event.clientY;
+      swipe.lastTime = event.timeStamp;
+    }
+    if (swipe.axis === 'vertical') swipeY = dy;
+    if (swipe.axis === 'horizontal') swipeX = dx;
+  }
+
+  function endSwipe(): void {
+    swipe = null;
+    swipeX = 0;
+    swipeY = 0;
+  }
+
+  function releaseSwipe(pointerId: number): boolean {
+    if (swipe?.pointerId !== pointerId) return false;
+    const { axis, velocityY } = swipe;
+    const settled = { x: swipeX, y: swipeY };
+    endSwipe();
+    if (axis === 'vertical') {
+      if (Math.abs(settled.y) > SWIPE_THRESHOLD || Math.abs(velocityY) > VELOCITY_THRESHOLD) {
+        onClose();
+        return true;
+      }
+    }
+    if (axis === 'horizontal' && Math.abs(settled.x) > SWIPE_THRESHOLD) {
+      if (settled.x > 0) previous();
+      else next();
+    }
+    return true;
+  }
+
   function endPan(event: PointerEvent): void {
     if (!isImage) return;
+    releaseSwipe(event.pointerId);
     touches.delete(event.pointerId);
     if (touches.size < 2) pinchDistance = 0;
     if (panPointerId === event.pointerId) panPointerId = null;
@@ -345,6 +422,26 @@
     const next = Number.parseInt(zoomInput, 10);
     if (!Number.isNaN(next)) setZoom(next / 100);
     editingZoom = false;
+  }
+
+  const canShare = typeof navigator.share === 'function';
+
+  async function shareMedia(): Promise<void> {
+    if (!url) return;
+    const name = item.body || 'image';
+    try {
+      const blob = await (await fetch(url)).blob();
+      const file = new File([blob], name, {
+        type: blob.type || item.mime || 'application/octet-stream',
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return;
+      }
+      await navigator.share({ title: name, text: name });
+    } catch (error) {
+      console.debug('[sable viewer] share dismissed', error);
+    }
   }
 
   async function copyImage(): Promise<void> {
@@ -389,7 +486,7 @@
     <Dialog.Portal>
       <Dialog.Content
         class="viewer"
-        style="height: 100dvh; inset: 0; position: fixed; width: 100vw;"
+        style={`height: 100dvh; inset: 0; opacity: ${String(1 - Math.min(0.75, Math.abs(swipeY) / 400))}; position: fixed; width: 100vw;`}
         aria-label={$i18n.t('viewer.title')}
       >
         <header class="toolbar">
@@ -413,6 +510,14 @@
                 size="medium"
                 variant="ghost"
                 onclick={() => void copyImage()}><CopyIcon /></IconButton
+              >
+            {/if}
+            {#if canShare}
+              <IconButton
+                label={$i18n.t('viewer.share')}
+                size="medium"
+                variant="ghost"
+                onclick={() => void shareMedia()}><ShareNetworkIcon /></IconButton
               >
             {/if}
             <IconButton
@@ -507,7 +612,7 @@
                 alt={item.body || $i18n.t('viewer.imageAlt')}
                 draggable="false"
                 style:opacity={imageReady ? undefined : 0}
-                style:transform={`translate(${String(pan.x)}px, ${String(pan.y)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
+                style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
                 onload={onImageLoad}
               />
             {/if}
