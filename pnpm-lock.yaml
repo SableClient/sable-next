@@ -16,6 +16,9 @@ importers:
       '@arborium/arborium':
         specifier: ^2.18.1
         version: 2.18.1
+      '@choochmeque/tauri-plugin-sharekit-api':
+        specifier: 0.4.0-rc.7
+        version: 0.4.0-rc.7
       '@fontsource-variable/nunito':
         specifier: 5.3.0
         version: 5.3.0
@@ -359,6 +362,9 @@ packages:
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
+
+  '@choochmeque/tauri-plugin-sharekit-api@0.4.0-rc.7':
+    resolution: {integrity: sha512-GO8J5BfbBgV90gWp2o9419p9Xin8RdXIE1n5ICy4uzhuETga+TcIsnz+k6ZjXu3BOMdZpP0QqbNXkJtPiwYurw==}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
@@ -4908,6 +4914,10 @@ snapshots:
     dependencies:
       hashery: 1.5.1
       keyv: 5.6.0
+
+  '@choochmeque/tauri-plugin-sharekit-api@0.4.0-rc.7':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 

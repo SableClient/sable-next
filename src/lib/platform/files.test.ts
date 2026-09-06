@@ -8,6 +8,8 @@ import {
   saveFile,
   saveImageToPhotos,
   savesNatively,
+  shareFile,
+  sharesNatively,
 } from './files';
 
 const mocks = vi.hoisted(() => ({
@@ -30,6 +32,9 @@ const mocks = vi.hoisted(() => ({
   isTauri: vi.fn(),
   invoke: vi.fn(),
   osType: vi.fn(),
+  fsWriteFile: vi.fn(),
+  appCacheDir: vi.fn(),
+  shareNative: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
@@ -37,7 +42,13 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.dialogOpen }));
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readFile: mocks.fsReadFile,
   remove: mocks.fsRemove,
+  writeFile: mocks.fsWriteFile,
 }));
+vi.mock('@tauri-apps/api/path', () => ({
+  appCacheDir: mocks.appCacheDir,
+  join: (...parts: string[]) => Promise.resolve(parts.join('/')),
+}));
+vi.mock('@choochmeque/tauri-plugin-sharekit-api', () => ({ shareFile: mocks.shareNative }));
 vi.mock('@tauri-apps/plugin-os', () => ({ type: mocks.osType }));
 vi.mock('tauri-plugin-android-fs-api', () => mocks.androidFs);
 
@@ -62,6 +73,11 @@ beforeEach(() => {
   mocks.androidFs.writeFile.mockResolvedValue(undefined);
   mocks.androidFs.setPublicFilePending.mockResolvedValue(undefined);
   mocks.androidFs.scanPublicFile.mockResolvedValue(undefined);
+  mocks.fsWriteFile.mockReset();
+  mocks.fsWriteFile.mockResolvedValue(undefined);
+  mocks.appCacheDir.mockResolvedValue('/cache');
+  mocks.shareNative.mockReset();
+  mocks.shareNative.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -249,4 +265,43 @@ test('iOS carries a non-ASCII filename a header value cannot hold', async () => 
   const { headers } = options;
   expect(headers.filename).toBe(encodeURIComponent('été 😂.png'));
   for (const value of Object.values(headers)) expect(value).toMatch(/^[ -~]*$/);
+});
+
+test('the share sheet is native everywhere it exists, and nowhere on the web', async () => {
+  mocks.isTauri.mockReturnValue(false);
+  expect(await sharesNatively()).toBe(false);
+
+  mocks.isTauri.mockReturnValue(true);
+  for (const os of ['android', 'ios', 'macos', 'windows']) {
+    mocks.osType.mockReturnValue(os);
+    expect(await sharesNatively()).toBe(true);
+  }
+
+  mocks.osType.mockReturnValue('linux');
+  expect(await sharesNatively()).toBe(false);
+});
+
+test('sharing writes the media to the cache and hands over a file URL', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
+
+  expect(await shareFile('blob:media', 'holiday.png')).toBe('saved');
+  expect(mocks.fsWriteFile).toHaveBeenCalledWith('/cache/holiday.png', new Uint8Array([1, 2, 3]));
+  expect(mocks.shareNative).toHaveBeenCalledWith('file:///cache/holiday.png', {
+    mimeType: 'image/png',
+    title: 'holiday.png',
+  });
+});
+
+test('a body carrying a path cannot write outside the cache directory', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1]))));
+
+  await shareFile('blob:media', '../../etc/passwd', 'image/png');
+  expect(mocks.fsWriteFile).toHaveBeenCalledWith('/cache/passwd', expect.anything());
+});
+
+test('a refused share reports the failure rather than throwing', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1]))));
+  mocks.shareNative.mockRejectedValue(new Error('cancelled'));
+
+  expect(await shareFile('blob:media', 'holiday.png')).toBe('failed');
 });
