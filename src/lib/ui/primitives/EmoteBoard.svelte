@@ -640,6 +640,8 @@
   }
 
   .grids {
+    --emote-cell: 2.5rem;
+
     flex: 1;
     min-width: 0;
     overflow-y: auto;
@@ -687,10 +689,10 @@
     border-radius: var(--radius);
     cursor: pointer;
     display: flex;
-    height: var(--emote-cell, 2.5rem);
+    height: var(--emote-cell);
     justify-content: center;
     padding: var(--space-100);
-    width: var(--emote-cell, 2.5rem);
+    width: var(--emote-cell);
 
     :global(span) {
       max-height: 100%;
@@ -698,9 +700,13 @@
     }
   }
 
-  /* Sized to the 32px custom emote beside it, not to the surrounding type. */
+  /* The 8-column rows own their width, so a wider emote cell must not stretch them. */
+  .grids .unicode {
+    --emote-cell: 2.5rem;
+  }
+
   .grids .unicode button {
-    font-size: var(--font-size-heading);
+    font-size: calc(var(--emote-cell) * 0.5);
     line-height: 1;
     width: 100%;
   }

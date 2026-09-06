@@ -75,8 +75,10 @@
     min-height: calc(var(--control-height-medium) + var(--space-300));
     padding: var(--space-300) var(--space-400);
 
-    :global(img) {
+    :global(img),
+    :global(.media-image) {
       max-height: var(--space-900);
+      max-width: var(--space-900);
     }
   }
 
