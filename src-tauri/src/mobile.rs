@@ -12,11 +12,11 @@ use std::sync::OnceLock;
 
 use jni::objects::{JObject, JValue};
 use jni::strings::JNIString;
-use jni::{jni_sig, jni_str, EnvUnowned, JavaVM};
+use jni::{EnvUnowned, JavaVM, jni_sig, jni_str};
 
 static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[expect(
     unsafe_code,
     reason = "the export symbol is fixed by the JNI naming convention"

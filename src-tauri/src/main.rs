@@ -5,7 +5,7 @@
 fn prompt_for_permission(message: &str, answer: std::sync::mpsc::Sender<bool>) {
     use gtk::prelude::*;
     use gtk::{
-        glib, ButtonsType, DialogFlags, MessageDialog, MessageType, ResponseType, WindowPosition,
+        ButtonsType, DialogFlags, MessageDialog, MessageType, ResponseType, WindowPosition, glib,
     };
 
     let message = message.to_owned();

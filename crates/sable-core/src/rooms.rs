@@ -22,6 +22,18 @@ const HIERARCHY_MAX_DEPTH: u32 = 1;
 const DIRECTORY_PAGE_SIZE: u32 = 30;
 
 impl Core {
+    pub(crate) async fn room_is_encrypted(&self, room: &Room) -> Result<bool, CommandErr> {
+        match room
+            .latest_encryption_state()
+            .await
+            .map_err(|error| self.room_error("room_encryption_state", error))?
+        {
+            matrix_sdk::EncryptionState::Encrypted => Ok(true),
+            matrix_sdk::EncryptionState::NotEncrypted => Ok(false),
+            matrix_sdk::EncryptionState::Unknown => Err(CommandErr::Unavailable),
+        }
+    }
+
     /// Without a `via` server the edge is ignored.
     pub(crate) async fn add_to_space(
         &self,

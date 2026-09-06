@@ -51,45 +51,47 @@ fn inbox_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-pub fn share_inbox_drain<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ShareBatch>, String> {
+pub async fn share_inbox_drain<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ShareBatch>, String> {
     let root = inbox_root(&app)?;
-    let entries = match std::fs::read_dir(&root) {
-        Ok(entries) => entries,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(err) => return Err(err.to_string()),
-    };
-
-    let mut batches = Vec::new();
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        let Some(batch_id) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
+    tauri::async_runtime::spawn_blocking(move || {
+        let entries = match std::fs::read_dir(&root) {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(err) => return Err(err.to_string()),
         };
-        let manifest = std::fs::read_to_string(path.join("share.json"))
-            .map_err(|err| err.to_string())
-            .and_then(|json| parse_manifest(&json));
-        match manifest {
-            Ok(items) => batches.push(ShareBatch {
-                batch_id: batch_id.to_owned(),
-                items,
-            }),
-            Err(err) => {
-                log::warn!("dropping unreadable share batch {batch_id}: {err}");
-                let _ = std::fs::remove_dir_all(&path);
+
+        let mut batches = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let Some(batch_id) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            let manifest = std::fs::read_to_string(path.join("share.json"))
+                .map_err(|err| err.to_string())
+                .and_then(|json| parse_manifest(&json));
+            match manifest {
+                Ok(items) => batches.push(ShareBatch {
+                    batch_id: batch_id.to_owned(),
+                    items,
+                }),
+                Err(err) => {
+                    log::warn!("dropping unreadable share batch {batch_id}: {err}");
+                    let _ = std::fs::remove_dir_all(&path);
+                }
             }
         }
-    }
-    batches.sort_by(|a, b| a.batch_id.cmp(&b.batch_id));
-    Ok(batches)
+        batches.sort_by(|a, b| a.batch_id.cmp(&b.batch_id));
+        Ok(batches)
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-pub fn share_inbox_read<R: Runtime>(
+pub async fn share_inbox_read<R: Runtime>(
     app: AppHandle<R>,
     batch_id: String,
     file_name: String,
@@ -97,27 +99,45 @@ pub fn share_inbox_read<R: Runtime>(
     validate_component(&batch_id)?;
     validate_component(&file_name)?;
     let root = inbox_root(&app)?;
-    let path = root.join(&batch_id).join(&file_name);
-    let canonical = path.canonicalize().map_err(|err| err.to_string())?;
-    let canonical_root = root.canonicalize().map_err(|err| err.to_string())?;
-    if !canonical.starts_with(&canonical_root) {
-        return Err("path escapes share inbox".to_owned());
-    }
-    std::fs::read(&canonical)
+    read_inbox_file(root, batch_id, file_name)
+        .await
         .map(Response::new)
-        .map_err(|err| err.to_string())
+}
+
+async fn read_inbox_file(
+    root: PathBuf,
+    batch_id: String,
+    file_name: String,
+) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = root.join(&batch_id).join(&file_name);
+        let canonical = path.canonicalize().map_err(|err| err.to_string())?;
+        let canonical_root = root.canonicalize().map_err(|err| err.to_string())?;
+        if !canonical.starts_with(&canonical_root) {
+            return Err("path escapes share inbox".to_owned());
+        }
+        std::fs::read(&canonical).map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]
-#[allow(clippy::needless_pass_by_value)]
-pub fn share_inbox_clear<R: Runtime>(app: AppHandle<R>, batch_id: String) -> Result<(), String> {
+pub async fn share_inbox_clear<R: Runtime>(
+    app: AppHandle<R>,
+    batch_id: String,
+) -> Result<(), String> {
     validate_component(&batch_id)?;
     let root = inbox_root(&app)?;
-    match std::fs::remove_dir_all(root.join(&batch_id)) {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(err.to_string()),
-    }
+    tauri::async_runtime::spawn_blocking(move || {
+        match std::fs::remove_dir_all(root.join(&batch_id)) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.to_string()),
+        }
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[cfg(test)]
@@ -148,5 +168,44 @@ mod tests {
     #[test]
     fn parse_manifest_rejects_garbage() {
         assert!(parse_manifest("not json").is_err());
+    }
+
+    #[tokio::test]
+    async fn inbox_reads_preserve_bytes_and_report_missing_files() {
+        let root = std::env::temp_dir().join(format!("sable-share-read-{}", std::process::id()));
+        let batch = root.join("batch");
+        std::fs::create_dir_all(&batch).unwrap();
+        let bytes = vec![0, 127, 128, 255];
+        std::fs::write(batch.join("file.bin"), &bytes).unwrap();
+
+        assert_eq!(
+            read_inbox_file(root.clone(), "batch".to_owned(), "file.bin".to_owned())
+                .await
+                .unwrap(),
+            bytes
+        );
+        let error = read_inbox_file(root.clone(), "batch".to_owned(), "missing.bin".to_owned())
+            .await
+            .expect_err("missing file is reported");
+        assert!(!error.is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn inbox_reads_reject_symlinks_outside_the_inbox() {
+        let directory =
+            std::env::temp_dir().join(format!("sable-share-symlink-{}", std::process::id()));
+        let root = directory.join("inbox");
+        std::fs::create_dir_all(root.join("batch")).unwrap();
+        let secret = directory.join("secret");
+        std::fs::write(&secret, "private").unwrap();
+        std::os::unix::fs::symlink(&secret, root.join("batch/link")).unwrap();
+
+        assert_eq!(
+            read_inbox_file(root, "batch".to_owned(), "link".to_owned()).await,
+            Err("path escapes share inbox".to_owned())
+        );
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

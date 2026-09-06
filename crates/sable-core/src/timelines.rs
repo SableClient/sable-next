@@ -29,8 +29,12 @@ impl Core {
         &self,
         room_id: &OwnedRoomId,
     ) -> Result<Arc<Timeline>, CommandErr> {
-        if let Some(cached) = self.timelines.lock().await.get(room_id) {
-            return Ok(cached.timeline.clone());
+        {
+            let session = self.session.read().await;
+            session.as_ref().ok_or(CommandErr::NotLoggedIn)?;
+            if let Some(cached) = self.timelines.lock().await.get(room_id) {
+                return Ok(cached.timeline.clone());
+            }
         }
         self.live_timeline(room_id, false).await
     }
@@ -43,6 +47,13 @@ impl Core {
         room_id: &OwnedRoomId,
         hidden_events: bool,
     ) -> Result<Arc<Timeline>, CommandErr> {
+        let session = self.session.read().await;
+        let room = session
+            .as_ref()
+            .ok_or(CommandErr::NotLoggedIn)?
+            .client
+            .get_room(room_id)
+            .ok_or(CommandErr::UnknownRoom)?;
         {
             let mut timelines = self.timelines.lock().await;
             if let Some(cached) = timelines.get_mut(room_id)
@@ -53,7 +64,6 @@ impl Core {
             }
         }
 
-        let room = self.room(room_id).await?;
         let timeline = Arc::new(
             build_room_timeline(&room, &TimelineFocusView::Live, hidden_events)
                 .await
@@ -122,6 +132,13 @@ impl Core {
         room_id: &OwnedRoomId,
         root_event_id: &OwnedEventId,
     ) -> Result<Arc<Timeline>, CommandErr> {
+        let session = self.session.read().await;
+        let room = session
+            .as_ref()
+            .ok_or(CommandErr::NotLoggedIn)?
+            .client
+            .get_room(room_id)
+            .ok_or(CommandErr::UnknownRoom)?;
         let key: ThreadKey = (room_id.clone(), root_event_id.clone());
         {
             let mut threads = self.thread_timelines.lock().await;
@@ -131,7 +148,6 @@ impl Core {
             }
         }
 
-        let room = self.room(room_id).await?;
         let focus = TimelineFocusView::Thread {
             root_event_id: root_event_id.clone(),
         };

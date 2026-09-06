@@ -166,10 +166,7 @@ impl Core {
         now_ms: u64,
     ) -> Result<Value, CommandErr> {
         let room = self.room(room_id).await?;
-        let encrypted = room
-            .latest_encryption_state()
-            .await
-            .is_ok_and(|state| state.is_encrypted());
+        let encrypted = self.room_is_encrypted(&room).await?;
         let event = room
             .event(event_id, None)
             .await

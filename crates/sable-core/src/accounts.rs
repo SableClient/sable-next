@@ -359,15 +359,19 @@ impl Core {
         if let Some(client) = client {
             self.flush_search_index(&client).await;
         }
+        let mut session = self.session.write().await;
         self.session_tasks
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
         self.subscriptions.lock().await.clear();
         self.timelines.lock().await.clear();
+        self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
         *self.search_index.lock().await = search::MessageIndex::new();
-        self.session.write().await.take()
+        self.search_crawl.lock().await.reset();
+        self.server_search.lock().await.reset();
+        session.take()
     }
 
     pub(crate) async fn start_session(
@@ -519,12 +523,10 @@ impl Core {
                         })
                         .map(|account| account.store_id.clone())
                 };
-                let Some(store_id) = store_id else {
-                    return;
-                };
-                if let Err(error) = core
-                    .persist(&account_id, &store_id, &persisted, generation)
-                    .await
+                if let Some(store_id) = store_id
+                    && let Err(error) = core
+                        .persist(&account_id, &store_id, &persisted, generation)
+                        .await
                 {
                     tracing::error!("could not persist refreshed session: {error:?}");
                 }
@@ -601,5 +603,155 @@ impl Core {
             });
         }));
         true
+    }
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[allow(clippy::large_futures)]
+mod regression_tests {
+    use std::sync::Arc;
+
+    use matrix_sdk::{
+        Room,
+        ruma::{event_id, events::room::message::RoomMessageEventContent, room_id},
+        test_utils::mocks::MatrixMockServer,
+    };
+    use matrix_sdk_ui::sync_service::SyncService;
+    use wiremock::ResponseTemplate;
+
+    use crate::{
+        CachedTimeline, Core, protocol::CommandErr, session::Session, store::MemorySessionStore,
+    };
+
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    async fn core_with_room() -> (MatrixMockServer, Arc<Core>, Room) {
+        let server = MatrixMockServer::new().await;
+        server
+            .mock_versions()
+            .with_feature("org.matrix.msc4140", true)
+            .ok()
+            .mount()
+            .await;
+        let client = server.client_builder().no_server_versions().build().await;
+        client.event_cache().subscribe().unwrap();
+        let room = server
+            .sync_joined_room(&client, room_id!("!regression:example.org"))
+            .await;
+        let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+        let (core, _events) = Core::new("regression", Box::new(MemorySessionStore::default()));
+        *core.session.write().await = Some(Session {
+            account_id: "first".to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        (server, core, room)
+    }
+
+    #[tokio::test]
+    async fn session_teardown_removes_thread_timelines() {
+        let (server, core, room) = core_with_room().await;
+        server.mock_room_state_encryption().plain().mount().await;
+        let room_id = room.room_id().to_owned();
+        let thread_root = event_id!("$thread").to_owned();
+        let timeline = core.timeline(&room_id).await.unwrap();
+        core.thread_timelines.lock().await.insert(
+            (room_id.clone(), thread_root.clone()),
+            CachedTimeline {
+                timeline: timeline.clone(),
+                hidden_events: false,
+                last_access: 0,
+            },
+        );
+        assert!(Arc::ptr_eq(
+            &core.thread_timeline(&room_id, &thread_root).await.unwrap(),
+            &timeline
+        ));
+
+        core.take_session().await;
+
+        assert!(core.thread_timelines.lock().await.is_empty());
+        assert!(matches!(
+            core.thread_timeline(&room_id, &thread_root).await,
+            Err(CommandErr::NotLoggedIn)
+        ));
+    }
+
+    #[tokio::test]
+    async fn session_teardown_waits_for_in_flight_timeline_builders() {
+        let (server, core, room) = core_with_room().await;
+        server.mock_room_state_encryption().plain().mount().await;
+        let room_id = room.room_id().to_owned();
+        let cache = core.timelines.lock().await;
+        let mut build = std::pin::pin!(core.live_timeline(&room_id, false));
+        assert!(futures_util::poll!(build.as_mut()).is_pending());
+        drop(cache);
+
+        let mut teardown = std::pin::pin!(core.take_session());
+        assert!(futures_util::poll!(teardown.as_mut()).is_pending());
+        build.await.unwrap();
+        assert!(teardown.await.is_some());
+        assert!(core.timelines.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn confirmed_unencrypted_rooms_still_allow_plaintext_operations() {
+        let (server, core, room) = core_with_room().await;
+        server.mock_room_state_encryption().plain().mount().await;
+        assert!(!core.room_is_encrypted(&room).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn encryption_lookup_failure_prevents_plaintext_operations() {
+        let (server, core, room) = core_with_room().await;
+        let room_id = room.room_id().to_owned();
+        assert!(room.encryption_state().is_unknown());
+        server
+            .mock_room_state_encryption()
+            .respond_with(ResponseTemplate::new(403).set_body_json(
+                serde_json::json!({"errcode":"M_FORBIDDEN", "error":"state unavailable"}),
+            ))
+            .expect(3)
+            .mount()
+            .await;
+
+        let scheduled = core
+            .schedule_message(
+                &room_id,
+                RoomMessageEventContent::text_plain("secret"),
+                1000,
+            )
+            .await;
+        assert!(
+            matches!(scheduled, Err(CommandErr::Denied)),
+            "{scheduled:?}"
+        );
+        assert!(matches!(
+            core.set_bookmark(&room_id, &event_id!("$secret").to_owned(), true, 1000)
+                .await,
+            Err(CommandErr::Denied)
+        ));
+        assert!(matches!(
+            core.join_call(room_id, Some("https://focus.example.org".to_owned()))
+                .await,
+            Err(CommandErr::Denied)
+        ));
+
+        let requests = server.server().received_requests().await.unwrap();
+        let writes: Vec<_> = requests
+            .iter()
+            .filter(|request| matches!(request.method.as_str(), "PUT" | "POST"))
+            .map(|request| request.url.path())
+            .filter(|path| {
+                path.contains("/rooms/")
+                    || path.contains("/account_data/")
+                    || path.ends_with("/openid/request_token")
+            })
+            .collect();
+        assert!(
+            writes.is_empty(),
+            "unexpected plaintext operation: {writes:?}"
+        );
     }
 }

@@ -1,8 +1,8 @@
 use std::{
     ffi::{CString, OsStr},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Mutex,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -19,7 +19,7 @@ use objc2_photos::{
 };
 
 #[link(name = "Photos", kind = "framework")]
-extern "C" {}
+unsafe extern "C" {}
 
 fn allowed(status: PHAuthorizationStatus) -> bool {
     status == PHAuthorizationStatus::Authorized || status == PHAuthorizationStatus::Limited
@@ -38,10 +38,10 @@ fn authorize_blocking() -> Result<(), String> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let sender = Mutex::new(Some(sender));
     let handler: RcBlock<dyn Fn(PHAuthorizationStatus)> = RcBlock::new(move |status| {
-        if let Ok(mut sender) = sender.lock() {
-            if let Some(sender) = sender.take() {
-                let _ = sender.send(status);
-            }
+        if let Ok(mut sender) = sender.lock()
+            && let Some(sender) = sender.take()
+        {
+            let _ = sender.send(status);
         }
     });
     unsafe {

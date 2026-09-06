@@ -4,7 +4,9 @@
 //! except to move bytes or to reach something only this process has: the push
 //! registration, the system browser, the crash reporter.
 
-#[cfg(all(feature = "cef", target_os = "linux"))]
+#[cfg(any(all(feature = "cef", target_os = "linux"), test))]
+mod deep_link_delivery;
+#[cfg(any(all(feature = "cef", target_os = "linux"), all(test, unix)))]
 pub mod deep_link_ipc;
 #[cfg(target_os = "ios")]
 // Objective-C bindings expose PhotoKit calls as unsafe; keep that exception out
@@ -22,12 +24,12 @@ mod tray;
 use std::sync::{Arc, Mutex};
 
 use sable_core::{
-    protocol::{Command, CommandErr, CommandOk, CoreEvent},
     Core,
+    protocol::{Command, CommandErr, CommandOk, CoreEvent},
 };
 use tauri::{
-    ipc::{Channel, InvokeBody, Request, Response},
     AppHandle, Manager, State,
+    ipc::{Channel, InvokeBody, Request, Response},
 };
 use tauri_plugin_opener::OpenerExt;
 

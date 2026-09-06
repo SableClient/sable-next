@@ -93,6 +93,7 @@ impl Core {
     ) -> Result<CommandOk, CommandErr> {
         let generation = self.session_generation.load(Ordering::SeqCst);
         let room = self.room(&room_id).await?;
+        let encrypt_media = self.room_is_encrypted(&room).await?;
         let client = room.client();
         let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
         let device_id = client
@@ -134,10 +135,6 @@ impl Core {
             }
         };
 
-        let encrypt_media = room
-            .latest_encryption_state()
-            .await
-            .is_ok_and(|state| state.is_encrypted());
         let session = CallSessionId(self.allocate_subscription().0);
 
         let distributor = encrypt_media.then(|| {

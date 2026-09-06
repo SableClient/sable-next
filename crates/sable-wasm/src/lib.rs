@@ -305,10 +305,9 @@ impl SableCore {
             while events.recv_many(&mut batch, EVENT_BATCH_LIMIT).await > 0 {
                 let encoded = encode_batch(&batch);
                 batch.clear();
-                let Some(json) = encoded else {
-                    continue;
-                };
-                if let Err(error) = on_event.call1(&JsValue::NULL, &JsValue::from_str(&json)) {
+                if let Some(json) = encoded
+                    && let Err(error) = on_event.call1(&JsValue::NULL, &JsValue::from_str(&json))
+                {
                     tracing::error!(?error, "the event callback threw; keeping the stream open");
                 }
             }

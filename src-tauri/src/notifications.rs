@@ -23,11 +23,7 @@ fn java_hash(text: &str) -> i32 {
 /// notification, or a warm alert stacks beside it instead of replacing it.
 pub fn room_notification_id(user_id: &str, room_id: &str) -> i32 {
     let hash = java_hash(&format!("{user_id}\0{room_id}"));
-    if hash == i32::MIN {
-        0
-    } else {
-        hash.abs()
-    }
+    if hash == i32::MIN { 0 } else { hash.abs() }
 }
 
 fn conversation_key(user_id: &str, room_id: &str) -> String {
@@ -93,6 +89,11 @@ fn remember(view: &NotificationView, content: bool) -> Vec<Line> {
             view.room_id.as_str(),
         ))
         .or_default();
+    if !content {
+        for line in lines.iter_mut() {
+            "New message".clone_into(&mut line.body);
+        }
+    }
     lines.push(fresh);
     if lines.len() > MAX_CONVERSATION_LINES {
         lines.drain(..lines.len() - MAX_CONVERSATION_LINES);
@@ -376,8 +377,8 @@ mod tests {
     use sable_core::protocol::NotificationView;
 
     use super::{
-        body, collapsed, forget, java_hash, pusher, remember, room_notification_id, shows_content,
-        Line, Registration, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS,
+        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, Registration, body, collapsed, forget,
+        java_hash, pusher, remember, room_notification_id, shows_content,
     };
 
     fn view(is_direct: bool) -> NotificationView {
@@ -446,16 +447,18 @@ mod tests {
 
     #[test]
     fn a_build_without_the_matching_app_id_registers_nothing() {
-        assert!(pusher(
-            Registration {
-                token: "fcm-token".to_owned(),
-                p256dh: None,
-                auth: None,
-            },
-            None,
-            Some("moe.sable.app.sygnal"),
-        )
-        .is_none());
+        assert!(
+            pusher(
+                Registration {
+                    token: "fcm-token".to_owned(),
+                    p256dh: None,
+                    auth: None,
+                },
+                None,
+                Some("moe.sable.app.sygnal"),
+            )
+            .is_none()
+        );
     }
 
     fn in_room(room: &str) -> NotificationView {
@@ -495,6 +498,24 @@ mod tests {
 
         assert_eq!(collapsed(&lines), "Ada: New message");
         forget(view.user_id.as_str(), view.room_id.as_str());
+    }
+
+    #[test]
+    fn disabling_previews_scrubs_previous_conversation_messages() {
+        for (room, encrypted) in [
+            ("!privacy:example.org", false),
+            ("!encrypted-privacy:example.org", true),
+        ] {
+            let mut view = in_room(room);
+            view.encrypted = encrypted;
+            remember(&view, true);
+            let content = shows_content(encrypted, encrypted, false);
+            let lines = remember(&view, content);
+            assert!(lines.iter().all(|line| line.body == "New message"));
+            let lines = remember(&view, true);
+            assert_eq!(lines[0].body, "New message");
+            forget(view.user_id.as_str(), view.room_id.as_str());
+        }
     }
 
     #[test]

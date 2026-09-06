@@ -16,6 +16,8 @@ use std::{
     time::Duration,
 };
 
+use crate::deep_link_delivery::Delivery;
+
 const SCHEMES: &[&str] = &["moe.sable.next:", "sable:"];
 const SOCKET_NAME: &str = "moe.sable.next-deeplink.sock";
 const NEW_URL_EVENT: &str = "deep-link://new-url";
@@ -76,17 +78,10 @@ pub fn try_forward_deep_links() -> ForwardResult {
     ForwardResult::Forwarded
 }
 
-type LiveHandler = Box<dyn Fn(String) + Send + Sync>;
+static DELIVERY: OnceLock<Mutex<Delivery>> = OnceLock::new();
 
-static PENDING_URLS: OnceLock<Arc<Mutex<Vec<String>>>> = OnceLock::new();
-static LIVE_HANDLER: OnceLock<Mutex<Option<LiveHandler>>> = OnceLock::new();
-
-fn pending_queue() -> &'static Arc<Mutex<Vec<String>>> {
-    PENDING_URLS.get_or_init(|| Arc::new(Mutex::new(Vec::new())))
-}
-
-fn live_handler() -> &'static Mutex<Option<LiveHandler>> {
-    LIVE_HANDLER.get_or_init(|| Mutex::new(None))
+fn delivery() -> &'static Mutex<Delivery> {
+    DELIVERY.get_or_init(|| Mutex::new(Delivery::default()))
 }
 
 /// The query and fragment carry OIDC tokens.
@@ -95,14 +90,12 @@ fn redact_for_log(url: &str) -> &str {
 }
 
 fn dispatch_url(url: String) {
-    if let Ok(guard) = live_handler().lock() {
-        if let Some(handler) = guard.as_ref() {
-            handler(url);
-            return;
-        }
-    }
-    if let Ok(mut pending) = pending_queue().lock() {
-        pending.push(url);
+    let live = delivery()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(url);
+    if let Some((handler, url)) = live {
+        handler(url);
     }
 }
 
@@ -179,21 +172,22 @@ pub fn install_handler<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     use tauri::Emitter;
 
     let emitter = app.clone();
-    if let Ok(mut guard) = live_handler().lock() {
-        *guard = Some(Box::new(move |url: String| {
+    delivery()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .install(Arc::new(move |url: String| {
             if let Err(error) = emitter.emit(NEW_URL_EVENT, vec![url]) {
                 log::warn!("could not deliver a deep link: {error}");
             }
         }));
-    }
 }
 
 #[must_use]
 pub fn take_pending_urls() -> Vec<String> {
-    pending_queue()
+    delivery()
         .lock()
-        .map(|mut queue| std::mem::take(&mut *queue))
-        .unwrap_or_default()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take_pending()
 }
 
 #[cfg(test)]

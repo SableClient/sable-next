@@ -170,13 +170,10 @@ struct RoomPacks {
 }
 
 fn push_canonical(parents: &mut Vec<OwnedRoomId>, event: &SpaceParentEvent) {
-    if !event.content.canonical {
-        return;
-    }
-    let Ok(parent) = RoomId::parse(&event.state_key) else {
-        return;
-    };
-    if !parents.contains(&parent) {
+    if event.content.canonical
+        && let Ok(parent) = RoomId::parse(&event.state_key)
+        && !parents.contains(&parent)
+    {
         parents.push(parent);
     }
 }

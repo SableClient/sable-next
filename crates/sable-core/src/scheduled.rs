@@ -54,11 +54,7 @@ impl Core {
             return Err(CommandErr::DelayedEventsUnsupported);
         }
         let room = self.room(room_id).await?;
-        if room
-            .latest_encryption_state()
-            .await
-            .is_ok_and(|state| state.is_encrypted())
-        {
+        if self.room_is_encrypted(&room).await? {
             return Err(CommandErr::EncryptedScheduleUnsupported);
         }
 
