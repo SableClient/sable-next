@@ -25,6 +25,7 @@
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
+  import ImageSquareIcon from 'phosphor-svelte/lib/ImageSquareIcon';
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 
   export type MediaItem = Extract<
@@ -79,10 +80,10 @@
   let pdfPage = $state(1);
   let downloadLabel = $derived(
     item.kind === 'video'
-      ? 'Download video'
+      ? $i18n.t('viewer.downloadVideo')
       : item.kind === 'audio'
-        ? 'Download audio'
-        : 'Download image'
+        ? $i18n.t('viewer.downloadAudio')
+        : $i18n.t('viewer.downloadImage')
   );
 
   function clampCurrentPan(next: Vector2): Vector2 {
@@ -233,10 +234,52 @@
     if (event.key === '-') setZoom(zoom / (1 + ZOOM_STEP));
   }
 
+  function offsetFromImageCentre(event: { clientX: number; clientY: number }): Vector2 {
+    if (!stageEl) return { x: 0, y: 0 };
+    const stage = stageEl.getBoundingClientRect();
+    return {
+      x: stage.width / 2 - (event.clientX - stage.x - pan.x),
+      y: stage.height / 2 - (event.clientY - stage.y - pan.y),
+    };
+  }
+
+  function zoomTowards(event: { clientX: number; clientY: number }, next: number): void {
+    const target = Math.min(maxZoom, Math.max(MIN_ZOOM, next));
+    const offset = offsetFromImageCentre(event);
+    const growth = target / zoom - 1;
+    pan = { x: pan.x + offset.x * growth, y: pan.y + offset.y * growth };
+    setZoom(target);
+  }
+
   function handleWheel(event: WheelEvent): void {
     if (!isImage) return;
     event.preventDefault();
-    setZoom(zoom * (1 - event.deltaY * 0.001));
+    zoomTowards(event, zoom * (1 - event.deltaY * 0.001));
+  }
+
+  const DOUBLE_TAP_MS = 300;
+  const TAP_DEBOUNCE_MS = 30;
+  let lastTap = 0;
+
+  function handleDoubleTap(event: PointerEvent): boolean {
+    if (touches.size > 0) return false;
+
+    const now = Date.now();
+    const elapsed = now - lastTap;
+    if (elapsed >= DOUBLE_TAP_MS || elapsed <= TAP_DEBOUNCE_MS) {
+      lastTap = now;
+      return false;
+    }
+
+    lastTap = 0;
+    if (pannable || pan.x !== 0 || pan.y !== 0) {
+      pan = { x: 0, y: 0 };
+      fitsWindow = true;
+      fitToStage();
+      return true;
+    }
+    zoomTowards(event, fitRatio * 2);
+    return true;
   }
 
   function distance(): number {
@@ -250,6 +293,7 @@
 
   function startPan(event: PointerEvent): void {
     if (!isImage) return;
+    if (handleDoubleTap(event)) return;
     if (event.pointerType === 'touch') {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size === 2) {
@@ -346,23 +390,26 @@
       <Dialog.Content
         class="viewer"
         style="height: 100dvh; inset: 0; position: fixed; width: 100vw;"
-        aria-label="Media viewer"
+        aria-label={$i18n.t('viewer.title')}
       >
         <header class="toolbar">
           <div class="heading">
-            <IconButton label="Close" size="medium" variant="ghost" onclick={onClose}
-              ><XIcon /></IconButton
+            <IconButton
+              label={$i18n.t('viewer.close')}
+              size="medium"
+              variant="ghost"
+              onclick={onClose}><XIcon /></IconButton
             >
             <div>
               <strong>{item.sender}</strong>
-              <span>{index + 1} of {items.length}</span>
+              <span>{$i18n.t('viewer.position', { index: index + 1, total: items.length })}</span>
             </div>
           </div>
           <div class="actions">
             {#if isImage}
               <IconButton
                 class="desktop-control"
-                label="Copy image"
+                label={$i18n.t('viewer.copyImage')}
                 size="medium"
                 variant="ghost"
                 onclick={() => void copyImage()}><CopyIcon /></IconButton
@@ -376,7 +423,7 @@
             >
             {#if canSaveToPhotos && isImage}
               <IconButton
-                label="Save to photos"
+                label={$i18n.t('viewer.saveToPhotos')}
                 size="medium"
                 variant="ghost"
                 onclick={() => void saveToPhotos()}><DownloadSimpleIcon /></IconButton
@@ -385,7 +432,7 @@
             {#if isImage}
               <IconButton
                 class="desktop-control"
-                label="Rotate image"
+                label={$i18n.t('viewer.rotate')}
                 size="medium"
                 variant="ghost"
                 onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
@@ -396,7 +443,7 @@
                 aria-pressed={pixelated}
                 onclick={() => (pixelated = !pixelated)}
               >
-                Pixelate
+                {$i18n.t('viewer.pixelate')}
               </button>
             {/if}
           </div>
@@ -412,19 +459,32 @@
           onpointercancel={endPan}
         >
           {#if index > 0}
-            <IconButton class="nav previous" label="Previous image" size="large" onclick={previous}
-              ><ArrowLeftIcon /></IconButton
+            <IconButton
+              class="nav previous"
+              label={$i18n.t('viewer.previous')}
+              size="large"
+              onclick={previous}><ArrowLeftIcon /></IconButton
             >
           {/if}
           {#if url}
             {#if item.kind === 'video'}
               <!-- Matrix carries no caption track for an attachment. -->
               <!-- svelte-ignore a11y_media_has_caption -->
-              <video class="media-player" controls src={url} aria-label={item.body || 'Video'}>
+              <video
+                class="media-player"
+                controls
+                src={url}
+                aria-label={item.body || $i18n.t('timeline.videoAttachment')}
+              >
                 {item.body}
               </video>
             {:else if item.kind === 'audio'}
-              <audio class="media-player" controls src={url} aria-label={item.body || 'Audio'}>
+              <audio
+                class="media-player"
+                controls
+                src={url}
+                aria-label={item.body || $i18n.t('timeline.audioAttachment')}
+              >
                 {item.body}
               </audio>
             {:else if item.kind === 'file'}
@@ -444,7 +504,7 @@
                 class:dragging
                 class:instant
                 src={url}
-                alt={item.body || 'Image'}
+                alt={item.body || $i18n.t('viewer.imageAlt')}
                 draggable="false"
                 style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x)}px, ${String(pan.y)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
@@ -460,7 +520,7 @@
             <Spinner />
           {/if}
           {#if index < items.length - 1}
-            <IconButton class="nav next" label="Next image" size="large" onclick={next}
+            <IconButton class="nav next" label={$i18n.t('viewer.next')} size="large" onclick={next}
               ><ArrowRightIcon /></IconButton
             >
           {/if}
@@ -488,8 +548,16 @@
           {/if}
           {#if isImage || isPdf}
             <div class="zoom-controls">
+              {#if isImage && fitRatio !== 1 && zoom !== 1}
+                <IconButton
+                  label={$i18n.t('viewer.originalSize')}
+                  size="small"
+                  variant="ghost"
+                  onclick={() => setZoom(1)}><ImageSquareIcon /></IconButton
+                >
+              {/if}
               <IconButton
-                label="Zoom out"
+                label={$i18n.t('viewer.zoomOut')}
                 size="small"
                 variant="ghost"
                 onclick={() => setZoom(zoom / (1 + ZOOM_STEP))}><MinusIcon /></IconButton
@@ -500,7 +568,7 @@
                   <input
                     type="text"
                     inputmode="numeric"
-                    aria-label="Set zoom level"
+                    aria-label={$i18n.t('viewer.setZoom')}
                     autofocus
                     bind:value={zoomInput}
                     onblur={commitZoomEdit}
@@ -513,19 +581,19 @@
                 <button
                   class="zoom-level"
                   type="button"
-                  title="Set zoom level"
+                  title={$i18n.t('viewer.setZoom')}
                   onclick={beginZoomEdit}>{Math.round(zoom * 100)}%</button
                 >
               {/if}
               <IconButton
-                label="Zoom in"
+                label={$i18n.t('viewer.zoomIn')}
                 size="small"
                 variant="ghost"
                 onclick={() => setZoom(zoom * (1 + ZOOM_STEP))}><PlusIcon /></IconButton
               >
             </div>
           {/if}
-          <p>{item.body || 'Shared media'}</p>
+          <p>{item.body || $i18n.t('viewer.untitled')}</p>
           {#if isImage || isPdf}
             <button
               class="reset"
@@ -536,7 +604,7 @@
                 fitsWindow = true;
                 if (isImage) fitToStage();
                 else zoom = 1;
-              }}>Reset view</button
+              }}>{$i18n.t('viewer.reset')}</button
             >
           {/if}
         </footer>

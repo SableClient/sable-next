@@ -98,7 +98,7 @@ test('renders a video attachment with a player and no zoom controls', async () =
   expect(document.querySelector('video')).not.toBeNull();
   expect(document.querySelector('.zoom-controls')).toBeNull();
   expect(document.querySelector('.reset')).toBeNull();
-  expect(document.querySelector('[aria-label="Download video"]')).not.toBeNull();
+  expect(document.querySelector('[aria-label="viewer.downloadVideo"]')).not.toBeNull();
   await unmount(instance);
 });
 
@@ -114,7 +114,7 @@ test('renders an audio attachment with a player', async () => {
   await tick();
 
   expect(document.querySelector('audio')).not.toBeNull();
-  expect(document.querySelector('[aria-label="Download audio"]')).not.toBeNull();
+  expect(document.querySelector('[aria-label="viewer.downloadAudio"]')).not.toBeNull();
   await unmount(instance);
 });
 
@@ -133,7 +133,7 @@ test('clamps pointer drag panning to the zoomed overflow', async () => {
   const stage = document.querySelector('.stage');
   expect(stage).not.toBeNull();
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')?.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="viewer.zoomIn"]')?.click();
   await tick();
 
   stage?.dispatchEvent(
@@ -175,7 +175,7 @@ test('arrow keys pan when zoomed and navigate otherwise', async () => {
     expect(document.querySelector('img')).not.toBeNull();
   });
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Zoom in"]')?.click();
+  document.querySelector<HTMLButtonElement>('[aria-label="viewer.zoomIn"]')?.click();
   await tick();
 
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
@@ -219,5 +219,44 @@ test('takes a typed zoom percentage', async () => {
 
   expect(document.querySelector('img')?.style.transform).toContain('scale(2.5)');
   expect(document.querySelector('button.zoom-level')?.textContent).toBe('250%');
+  await unmount(instance);
+});
+
+test('double click zooms in, and again returns to the fitted size', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const clock = vi.spyOn(Date, 'now');
+  clock.mockReturnValue(1_000);
+  const instance = mount(MediaViewer, {
+    target: document.body,
+    props: { items: [imageItem], selectedEventId: '$image', onClose: () => {} },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img')).not.toBeNull();
+  });
+  const stage = document.querySelectorAll('.stage')[0];
+
+  const tap = (): void => {
+    stage.dispatchEvent(
+      new PointerEvent('pointerdown', { pointerId: 1, clientX: 400, clientY: 300, bubbles: true })
+    );
+    stage.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
+  };
+
+  tap();
+  clock.mockReturnValue(1_100);
+  tap();
+  await tick();
+
+  expect(document.querySelector('img')?.style.transform).toContain('scale(2)');
+
+  clock.mockReturnValue(2_000);
+  tap();
+  clock.mockReturnValue(2_100);
+  tap();
+  await tick();
+
+  expect(document.querySelector('img')?.style.transform).toContain('scale(1)');
   await unmount(instance);
 });
