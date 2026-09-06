@@ -117,6 +117,241 @@ test('latest stays at the bottom on every frame as message heights settle', asyn
   expect(Math.max(...gaps)).toBeLessThanOrEqual(1);
 });
 
+test('a bounded timeline window reaches old messages without losing the reader', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 900, height: 600 });
+  await app.openRoom('!room:example.test');
+  const values = historyItems({
+    idPrefix: 'window',
+    label: 'Window',
+    count: 1_000,
+    timestampBase: 1_699_999_000_000,
+  });
+  await core.emitTimelineDiff(await core.subscription(), [{ op: 'reset', values }]);
+  await expect(timeline.itemById('window-999')).toBeInViewport();
+  for (let page = 0; page < 30; page += 1) {
+    const first = Number(await timeline.items.first().getAttribute('data-index'));
+    if (first === 0) break;
+    await timeline.scrollToAndNotify(0);
+    const anchor = await timeline.fullyVisibleAnchor();
+    await expect
+      .poll(async () => Number(await timeline.items.first().getAttribute('data-index')))
+      .toBeLessThan(first);
+    await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
+    expect(await timeline.items.count()).toBeLessThanOrEqual(120);
+  }
+  await expect(timeline.items.first()).toHaveAttribute('data-index', '0');
+  await timeline.scrollToAndNotify(0);
+  await expect(timeline.itemById('window-0')).toBeInViewport();
+  await timeline.jumpToLatest.click();
+  await expect(timeline.itemById('window-999')).toBeInViewport();
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+  expect(await timeline.items.count()).toBeLessThanOrEqual(120);
+});
+
+test('continuous touch scrolling crosses window boundaries without offset writes', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 900, height: 600 });
+  await app.openRoom('!room:example.test');
+  await timeline.expectRevealed();
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'reset',
+      values: historyItems({
+        idPrefix: 'continuous',
+        label: 'Continuous',
+        count: 1000,
+        timestampBase: 1_699_999_000_000,
+      }),
+    },
+  ]);
+  await expect(timeline.itemById('continuous-999')).toBeInViewport();
+  await timeline.waitForScrollSettled();
+  const result = await timeline.viewport.evaluate(async (viewport) => {
+    const touch = new Event('touchstart', { bubbles: true });
+    Object.defineProperty(touch, 'touches', {
+      value: { length: 1, item: () => ({ clientY: 100 }) },
+    });
+    viewport.dispatchEvent(touch);
+    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    if (!descriptor?.get || !descriptor.set) throw new Error('missing scrollTop descriptor');
+    const read = descriptor.get.bind(viewport);
+    const write = descriptor.set.bind(viewport);
+    let writes = 0;
+    Object.defineProperty(viewport, 'scrollTop', {
+      configurable: true,
+      get: () => Number(read.call(viewport)),
+      set: (value: number) => {
+        writes++;
+        write.call(viewport, value);
+      },
+    });
+    const first = Number(viewport.querySelector<HTMLElement>('.item')?.dataset.index);
+    let clamped = false;
+    let blank = false;
+    let drift = 0;
+    let maxRows = 0;
+    const step = async (delta: number): Promise<void> => {
+      const bounds = viewport.getBoundingClientRect();
+      const anchor = Array.from(viewport.querySelectorAll('.item')).find((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+      });
+      const content = anchor?.firstElementChild ?? anchor;
+      const top = content?.getBoundingClientRect().top;
+      const previous = viewport.scrollTop;
+      write.call(viewport, previous + delta);
+      viewport.dispatchEvent(new Event('scroll'));
+      await new Promise(requestAnimationFrame);
+      if (content && top !== undefined) {
+        drift = Math.max(
+          drift,
+          content.isConnected
+            ? Math.abs(content.getBoundingClientRect().top - top + delta)
+            : Number.POSITIVE_INFINITY
+        );
+      }
+      maxRows = Math.max(maxRows, viewport.querySelectorAll('.item').length);
+      blank ||= !Array.from(viewport.querySelectorAll('.item')).some((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > bounds.top && rect.top < bounds.bottom;
+      });
+      clamped ||= Math.abs(viewport.scrollTop - previous - delta) > 1;
+    };
+    for (let frame = 0; frame < 160; frame++) await step(-120);
+    const last = Number(viewport.querySelector<HTMLElement>('.item')?.dataset.index);
+    for (let frame = 0; frame < 160; frame++) await step(120);
+    const end = new Event('touchend', { bubbles: true });
+    Object.defineProperty(end, 'touches', { value: { length: 0, item: () => null } });
+    viewport.dispatchEvent(end);
+    return { first, last, writes, clamped, blank, drift, maxRows };
+  });
+  expect(result.clamped).toBe(false);
+  expect(result.blank).toBe(false);
+  expect(result.writes).toBe(0);
+  expect(result.drift).toBeLessThanOrEqual(2);
+  expect(result.maxRows).toBeLessThanOrEqual(120);
+  expect(result.last).toBeLessThan(result.first - 80);
+});
+
+test('touch scrolling reaches latest after a distant jump and taller messages', async ({
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'reset',
+      values: historyItems({
+        idPrefix: 'resized',
+        label: 'Resized',
+        count: 1000,
+        timestampBase: 1_699_999_000_000,
+      }),
+    },
+  ]);
+  await expect(timeline.itemById('resized-999')).toBeInViewport();
+  await timeline.scrollToAndNotify(0);
+  await expect(timeline.itemById('resized-0')).toBeInViewport();
+  await timeline.waitForScrollSettled();
+  await timeline.viewport.evaluate(instrumentSelfWrites);
+  const result = await timeline.viewport.evaluate(async (viewport) => {
+    const touch = new Event('touchstart', { bubbles: true });
+    Object.defineProperty(touch, 'touches', {
+      value: { length: 1, item: () => ({ clientY: 100 }) },
+    });
+    viewport.dispatchEvent(touch);
+    const style = document.createElement('style');
+    style.textContent = '.item { min-height: 120px; }';
+    document.head.append(style);
+    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    if (!descriptor?.set) throw new Error('missing native scrollTop setter');
+    const write = descriptor.set.bind(viewport);
+    let blank = false;
+    let maxRows = 0;
+    for (let frame = 0; frame < 400; frame++) {
+      write(viewport.scrollTop + 400);
+      viewport.dispatchEvent(new Event('scroll'));
+      await new Promise(requestAnimationFrame);
+      const bounds = viewport.getBoundingClientRect();
+      const rows = Array.from(viewport.querySelectorAll('.item'));
+      maxRows = Math.max(maxRows, rows.length);
+      blank ||= !rows.some((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > bounds.top && rect.top < bounds.bottom;
+      });
+    }
+    return { blank, maxRows, writes: window.__e2eSelfWriteCount };
+  });
+  await expect(timeline.itemById('resized-999')).toBeInViewport();
+  expect(result.blank).toBe(false);
+  expect(result.writes).toBe(0);
+  expect(result.maxRows).toBeLessThanOrEqual(120);
+});
+
+test('mobile native momentum crosses the original rendered window', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Native touch input is driven through CDP');
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await timeline.expectRevealed();
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'reset',
+      values: historyItems({
+        idPrefix: 'fling',
+        label: 'Fling',
+        count: 1000,
+        timestampBase: 1_699_999_000_000,
+      }),
+    },
+  ]);
+  await expect(timeline.itemById('fling-999')).toBeInViewport();
+  await timeline.waitForScrollSettled();
+  const initialExtent = await timeline.viewport
+    .locator('.window-rows')
+    .evaluate((node) => node.getBoundingClientRect().height);
+  const initialOffset = await timeline.scrollTop();
+  const box = await timeline.viewport.boundingBox();
+  if (!box) throw new Error('missing timeline bounds');
+  await timeline.viewport.evaluate(instrumentSelfWrites);
+  const client = await page.context().newCDPSession(page);
+  await client.send('Input.synthesizeScrollGesture', {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 3,
+    yDistance: initialExtent + box.height * 2,
+    speed: 4000,
+    preventFling: false,
+    gestureSourceType: 'touch',
+  });
+  expect(initialOffset - (await timeline.scrollTop())).toBeGreaterThan(initialExtent);
+  expect(await page.evaluate(() => window.__e2eSelfWriteCount)).toBe(0);
+  await timeline.fullyVisibleAnchor();
+  expect(await timeline.items.count()).toBeLessThanOrEqual(120);
+  await client.detach();
+});
+
 test('late row measurements above the reader never move the visible message', async ({
   page,
   app,
@@ -424,7 +659,115 @@ test('the reveal is final: nothing moves in the first second after the room open
 test.describe('touch', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-  test('a finger drag through unmeasured history moves the reader by exactly the drag', async ({
+  test('mobile native momentum control', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
+    await page.setContent(PROBE_HTML);
+    const viewport = page.locator('#probe');
+    const client = await page.context().newCDPSession(page);
+    const box = await viewport.boundingBox();
+    if (!box) throw new Error('missing viewport');
+    for (let drag = 0; drag < 4; drag += 1) {
+      await viewport.evaluate((node) => {
+        node.scrollTop = 1000;
+      });
+      const x = box.x + box.width / 2;
+      const y = box.y + 60;
+      await client.send('Input.synthesizeScrollGesture', {
+        x,
+        y,
+        yDistance: 96,
+        speed: 1000,
+        preventFling: false,
+        gestureSourceType: 'touch',
+      });
+      await page.waitForTimeout(500);
+      expect(await viewport.evaluate((node) => node.scrollTop)).toBeLessThan(888);
+    }
+  });
+
+  for (const momentum of [false, true]) {
+    test(
+      momentum
+        ? 'a mobile flick stays stable while history loads during momentum'
+        : 'a finger drag through unmeasured history moves the reader by exactly the drag',
+      async ({ page, app, timeline, core, installRoomCore, browserName }) => {
+        test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
+        await installRoomCore('endless_history');
+        await app.openRoom('!room:example.test');
+        await timeline.expectRevealed();
+        await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+        const box = await timeline.viewport.boundingBox();
+        if (!box) throw new Error('viewport has no bounds');
+        const x = box.x + box.width / 2;
+        const startY = box.y + box.height * 0.3;
+        const client = await page.context().newCDPSession(page);
+
+        await timeline.viewport.evaluate(instrumentSelfWrites);
+
+        const STEP = momentum ? 16 : 24;
+        const STEPS = momentum ? 6 : 12;
+        const DRAGS = 8;
+        const misses: object[] = [];
+        let worstFrame = 0;
+        for (let drag = 0; drag < DRAGS; drag += 1) {
+          const sampling = await startGestureSample(timeline.viewport, {
+            frames: 300,
+            quietFrames: 12,
+          });
+
+          if (momentum) {
+            await client.send('Input.synthesizeScrollGesture', {
+              x,
+              y: startY,
+              yDistance: STEP * STEPS,
+              speed: 1000,
+              preventFling: false,
+              gestureSourceType: 'touch',
+            });
+          } else {
+            await client.send('Input.dispatchTouchEvent', {
+              type: 'touchStart',
+              touchPoints: [{ x, y: startY }],
+            });
+            for (let step = 1; step <= STEPS; step += 1) {
+              await client.send('Input.dispatchTouchEvent', {
+                type: 'touchMove',
+                touchPoints: [{ x, y: startY + step * STEP }],
+              });
+              await page.waitForTimeout(16);
+            }
+            await page.waitForTimeout(120);
+            await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          }
+
+          const result = await sampling.finish();
+          expect(result.unexpectedScrolls, 'smooth commands must not fight the finger').toEqual([]);
+          worstFrame = Math.max(worstFrame, result.frameError);
+          const missed = momentum
+            ? result.readerMovement > -STEP * (STEPS + 1)
+            : Math.abs(result.readerMovement + STEP * STEPS) > STEP;
+          if ((!result.clamped && missed) || result.frameError > 2) {
+            misses.push({ drag, pages: await core.paginateCount(), ...result });
+          }
+        }
+
+        expect(misses, 'drags the reader did not receive in full').toEqual([]);
+        expect(
+          worstFrame,
+          'a row moved on screen by more than the finger dragged'
+        ).toBeLessThanOrEqual(2);
+        expect(await core.paginateCount()).toBeGreaterThanOrEqual(2);
+      }
+    );
+  }
+});
+
+test.describe('mobile', () => {
+  test.beforeEach(({ isMobile }) => {
+    test.skip(!isMobile, 'Requires a mobile browser profile');
+  });
+
+  test('iOS history updates never write scroll offsets during touch or momentum', async ({
     page,
     app,
     timeline,
@@ -432,63 +775,42 @@ test.describe('touch', () => {
     installRoomCore,
     browserName,
   }) => {
-    test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
-    await installRoomCore('endless_history');
+    test.skip(browserName !== 'webkit', 'iOS scroll-write contract');
+    await installRoomCore('ready');
     await app.openRoom('!room:example.test');
-    await timeline.expectRevealed();
-    await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
-    const box = await timeline.viewport.boundingBox();
-    if (!box) throw new Error('viewport has no bounds');
-    const x = box.x + box.width / 2;
-    const startY = box.y + box.height * 0.3;
-    const client = await page.context().newCDPSession(page);
-
+    await loadScrollableHistory(core, timeline);
+    await timeline.scrollAboveBottomAndNotify(200);
+    await timeline.waitForScrollSettled();
+    const anchor = await timeline.fullyVisibleAnchor();
     await timeline.viewport.evaluate(instrumentSelfWrites);
-
-    const STEP = 24;
-    const STEPS = 12;
-    const DRAGS = 8;
-    const misses: object[] = [];
-    let worstFrame = 0;
-    for (let drag = 0; drag < DRAGS; drag += 1) {
-      const sampling = await startGestureSample(timeline.viewport, {
-        frames: 300,
-        quietFrames: 12,
+    const index = Number(await timeline.itemById(anchor.itemId).getAttribute('data-index'));
+    await timeline.viewport.dispatchEvent('touchstart', {
+      touches: [{ identifier: 1, clientX: 100, clientY: 300 }],
+    });
+    await core.emitTimelineDiff(await core.subscription(), [
+      { op: 'push_front', value: timelineItem('ios-older', 'Older iOS history') },
+    ]);
+    await page.waitForTimeout(250);
+    expect(await page.evaluate(() => window.__e2eSelfWriteCount)).toBe(0);
+    await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
+    await timeline.viewport.dispatchEvent('touchend', { touches: [] });
+    for (let frame = 0; frame < 5; frame += 1) {
+      await timeline.viewport.evaluate((node) => {
+        const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+        if (!descriptor?.set) throw new Error('missing native scrollTop setter');
+        descriptor.set.call(node, node.scrollTop - 6);
       });
-
-      await client.send('Input.dispatchTouchEvent', {
-        type: 'touchStart',
-        touchPoints: [{ x, y: startY }],
-      });
-      for (let step = 1; step <= STEPS; step += 1) {
-        await client.send('Input.dispatchTouchEvent', {
-          type: 'touchMove',
-          touchPoints: [{ x, y: startY + step * STEP }],
-        });
-        await page.waitForTimeout(16);
+      await timeline.viewport.dispatchEvent('scroll');
+      if (frame === 2) {
+        await core.emitTimelineDiff(await core.subscription(), [
+          { op: 'push_front', value: timelineItem('ios-older-again', 'More iOS history') },
+        ]);
       }
-      await page.waitForTimeout(120);
-      await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-
-      const result = await sampling.finish();
-      expect(result.unexpectedScrolls, 'smooth commands must not fight the finger').toEqual([]);
-      worstFrame = Math.max(worstFrame, result.frameError);
-      if (!result.clamped && Math.abs(result.readerMovement + STEP * STEPS) > STEP) {
-        misses.push({ drag, pages: await core.paginateCount(), ...result });
-      }
+      await page.waitForTimeout(60);
+      expect(await page.evaluate(() => window.__e2eSelfWriteCount)).toBe(0);
     }
-
-    expect(misses, 'drags the reader did not receive in full').toEqual([]);
-    expect(worstFrame, 'a row moved on screen by more than the finger dragged').toBeLessThanOrEqual(
-      2
-    );
-    expect(await core.paginateCount()).toBeGreaterThanOrEqual(2);
-  });
-});
-
-test.describe('mobile', () => {
-  test.beforeEach(({ isMobile }) => {
-    test.skip(!isMobile, 'Requires a mobile browser profile');
+    await expect(timeline.itemById(anchor.itemId)).toHaveAttribute('data-index', String(index + 2));
+    await timeline.expectAnchorHeld({ ...anchor, y: anchor.y + 30 }, { tolerance: 2 });
   });
 
   test('jump to latest respects reduced motion', async ({

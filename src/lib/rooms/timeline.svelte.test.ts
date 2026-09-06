@@ -86,8 +86,10 @@ test('requests live context as part of its snapshot subscription', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
 
+  expect(timeline.hasSnapshot).toBe(false);
   await timeline.start('!room:example.org');
 
+  expect(timeline.hasSnapshot).toBe(true);
   expect(core.paginateCalls).toBe(0);
   expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', focus: { kind: 'live' } }]);
   expect(timeline.items.map((entry) => entry.id)).toEqual(['initial']);
@@ -99,6 +101,8 @@ test('requests live context as part of its snapshot subscription', async () => {
   });
 
   expect(timeline.items.map((entry) => entry.id)).toEqual(['initial', 'live']);
+  await timeline.stop();
+  expect(timeline.hasSnapshot).toBe(false);
 });
 
 test('opens a permalink as a focused timeline without live pagination', async () => {

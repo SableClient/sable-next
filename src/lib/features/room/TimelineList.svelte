@@ -3,47 +3,28 @@
   import { on } from 'svelte/events';
   import { prefersReducedMotion } from 'svelte/motion';
   import { fade } from 'svelte/transition';
-  import { get } from 'svelte/store';
-  import { createVirtualizer, defaultRangeExtractor } from '@tanstack/svelte-virtual';
 
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import {
+    TimelineWindow,
+    type TimelineEntry,
+    type TimelineRow,
+    type TimelineWindowState,
+  } from '#lib/timeline/timeline-window.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
+  import MessageContextMenu from './MessageContextMenu.svelte';
   import TimelineItem from './TimelineItem.svelte';
-  import type { MatrixLink } from './matrix-link';
-  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
+  import TimelineReadReceipt from './TimelineReadReceipt.svelte';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
-  import { TimelineHistoryController } from './timeline-history';
-  import { TimelineIdentityTracker } from './timeline-identity';
-  import {
-    ANCHOR_EPSILON,
-    anchorKeyForItem,
-    domAnchorViewport,
-    TimelineAnchor,
-    type AnchorViewport,
-  } from './timeline-anchor';
-  import {
-    estimateTimelineItemSize,
-    rootFontSize,
-    TIMELINE_LAYOUT,
-    TIMELINE_LAYOUT_STYLE,
-  } from './timeline-layout';
-  import {
-    TimelineDebugRecorder,
-    timelineDebugEnabled,
-    timelineDebugSnapshot,
-    type TimelineDebugSample,
-  } from './timeline-debug';
-  import {
-    initialPosition,
-    isNearLatest,
-    nextPosition,
-    type TimelinePosition,
-  } from './timeline-position';
+  import TypingIndicator from './TypingIndicator.svelte';
+  import type { MatrixLink } from './matrix-link';
   import {
     isCollapsed,
     latestEventId,
@@ -51,10 +32,9 @@
     unreadCountAfter,
     visibleTimelineItems,
   } from './timeline-format';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
-  import MessageContextMenu from './MessageContextMenu.svelte';
-  import TimelineReadReceipt from './TimelineReadReceipt.svelte';
-  import TypingIndicator from './TypingIndicator.svelte';
+  import { TimelineHistoryController } from './timeline-history';
+  import { TimelineIdentityTracker } from './timeline-identity';
+  import { TIMELINE_LAYOUT, TIMELINE_LAYOUT_STYLE } from './timeline-layout';
 
   interface Props {
     timeline: RoomTimeline;
@@ -119,90 +99,81 @@
     canRedactOthers = false,
     scrollLocked = false,
     nearLatest = $bindable(true),
-    /* The parent reads this through its binding, which eslint cannot see. */
     /* eslint-disable-next-line no-useless-assignment */
     followingLive = $bindable(false),
     typingLabel = null,
     footTrailing,
   }: Props = $props();
+
+  interface RowValue {
+    item: TimelineItemView;
+    collapsed: boolean;
+    groupStart: boolean;
+    unreadCount: number;
+  }
+  const identity = new TimelineIdentityTracker();
   let visibleItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
-  /* The paginate call's own answer, as well as the store's: that only settles to
-     `end` on a two-second timeout when a page moves no boundary. */
+  let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
+    identity.reconcile(visibleItems);
+    return visibleItems.map((item, index) => {
+      const collapsed = isCollapsed(visibleItems, index);
+      return {
+        key: identity.key(visibleItems, index),
+        value: {
+          item,
+          collapsed,
+          groupStart: index > 0 && !collapsed,
+          unreadCount:
+            item.content.kind === 'read_marker' ? unreadCountAfter(visibleItems, index) : 0,
+        },
+      };
+    });
+  });
+  let rows = $state.raw<readonly TimelineRow<RowValue>[]>([]);
+  let windowState = $state.raw<TimelineWindowState>({
+    start: 0,
+    end: 0,
+    firstVisible: null,
+    lastVisible: null,
+    pinned: true,
+    scrolling: false,
+  });
+  let controller = $state.raw<TimelineWindow<RowValue> | null>(null);
+  let viewport = $state<HTMLDivElement | null>(null);
+  let revealed = $state(false);
+  let opening = false;
+  let filling = $state(false);
+  let disposed = false;
   let historyExhausted = $state(false);
   let historyRequestPending = $state(false);
+  let historyTask: Promise<boolean> | null = null;
+  let emptyRefillPending = false;
+  let hadVisibleItems = false;
+  let personas = $derived(personaLookup(timeline.items));
+  let personaOpen = $state(false);
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
   );
-  let personas = $derived(personaLookup(timeline.items));
-  let personaOpen = $state(false);
-
-  // Reading down through unread history marks what has gone past the fold, not
-  // only what is on screen when the reader reaches the end.
+  let atLatest = $derived(windowState.pinned);
   let readEventId = $derived.by(() => {
-    if (position.kind === 'pinned') return latestEventId(timeline.items);
-    const bottom = ($virtualizer.scrollOffset ?? 0) + (viewport?.clientHeight ?? 0);
+    if (!revealed || !viewport) return null;
+    if (windowState.pinned) return latestEventId(rows.map((row) => row.value.item));
+    const bottom = viewport.getBoundingClientRect().bottom;
     let seen: string | null = null;
-    for (const row of $virtualizer.getVirtualItems()) {
-      if (row.end > bottom) break;
-      seen = visibleItems[row.index]?.event_id ?? seen;
+    for (const row of viewport.querySelectorAll<HTMLElement>('.item[data-event-id]')) {
+      if (row.getBoundingClientRect().bottom > bottom) break;
+      seen = row.dataset.eventId ?? seen;
     }
     return seen;
   });
-
-  // Virtual rows are absolutely positioned, so the separator cannot be sticky
-  // in flow; it is mirrored above once its own row has scrolled past the top.
-  let readMarker = $derived.by(() => {
-    const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
-
-    return index === -1 ? null : { index, unread: unreadCountAfter(visibleItems, index) };
-  });
-
   let stuckUnreadCount = $derived.by(() => {
-    const marker = readMarker;
-    if (marker === null) return 0;
-    const top = $virtualizer.getVirtualItemForOffset($virtualizer.scrollOffset ?? 0);
-
-    return top === undefined || marker.index >= top.index ? 0 : marker.unread;
+    const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
+    return index >= 0 && windowState.firstVisible !== null && index < windowState.firstVisible
+      ? unreadCountAfter(visibleItems, index)
+      : 0;
   });
-
-  // The mount-time target belongs to the anchoring effect below, so it starts
-  // here as already handled.
-  // svelte-ignore state_referenced_locally
-  let smoothTarget: string | null = focusEventId;
-  $effect(() => {
-    const target = focusEventId;
-    if (target === null) {
-      smoothTarget = null;
-      return;
-    }
-    if (target === smoothTarget) return;
-    const index = visibleItems.findIndex((item) => item.event_id === target);
-    if (index < 0) return;
-    const offset = offsetOfIndex(index, 'center');
-    if (offset === null) return;
-    smoothTarget = target;
-    setPosition({ kind: 'focused', eventId: target });
-    focusAnchored = true;
-    recordScroll('focus:smooth', viewport?.scrollTop ?? -1);
-    viewport?.scrollTo({ top: offset, behavior: 'smooth' });
-  });
-  let viewport = $state<HTMLDivElement | null>(null);
-  let initialFillState: 'idle' | 'running' | 'done' = 'idle';
-  let revealedBeforeFill = false;
-  // `getComputedStyle` flushes style, so it is read per font scale, not per diff.
-  let cachedRootFontSize = $state(rootFontSize());
-  let initialFillRequested = false;
-  let emptyRefillPending = false;
-  let hadVisibleItems = false;
-  let virtualizerWasScrolling = false;
-  let virtualizerTotalSize = 0;
-  let virtualizerViewportSize = 0;
-  let focusAnchored = false;
-  // Only the mount-time target picks the mode; later ones go through the effect.
-  // svelte-ignore state_referenced_locally
-  let position = $state<TimelinePosition>(initialPosition(focusEventId));
   let historyLoading = $derived(
-    position.kind !== 'settling' &&
+    revealed &&
       visibleItems.length > 0 &&
       (historyRequestPending || timeline.backwardPagination === 'loading')
   );
@@ -218,466 +189,139 @@
     }, TIMELINE_LAYOUT.historyLoadingLinger);
     return () => clearTimeout(timer);
   });
-  function setPosition(next: TimelinePosition): void {
-    position = next;
-    followingLive = next.kind === 'pinned';
-  }
-  const initialItems: readonly TimelineItemView[] = [];
-  const INITIAL_END_RECONCILIATION_LIMIT = 60;
-  const HOLD_FRAME_LIMIT = 12;
-  let initialEndReconciliationAttempts = 0;
-  let initialEndReconciliationPending = false;
-  let timelineDebugSample = $state<TimelineDebugSample | null>(null);
-  const timelineDebugRecorder = new TimelineDebugRecorder();
-  const identityTracker = new TimelineIdentityTracker();
-  const timelineDebugEnabledForView = timelineDebugEnabled();
-  let historyController: TimelineHistoryController;
-  let configuredItems: readonly TimelineItemView[] = initialItems;
-  let historyDebugChange = 0;
-
-  let anchorHolding = false;
-  let anchorCorrecting = false;
-  let anchorHoldSequence = 0;
-  let activeHoldId: number | null = null;
-  function anchorRolling(): boolean {
-    return !anchorHolding && anchor.held !== null;
-  }
-  let measurementRevision = 0;
-  let anchorCorrection: { by: string; delta: number; key: string | null } | null = null;
-  let selfWrite: { by: string; from: number; to: number; at: number } | null = null;
-  function recordScroll(by: string, from: number, to?: number): void {
-    if (!timelineDebugEnabledForView) return;
-    selfWrite = { by, from, to: to ?? viewport?.scrollTop ?? -1, at: performance.now() };
-  }
-  let anchorResidual: number | null = 0;
-  let expectedSelfOffset: number | null = null;
-  function recordSelfWrite(): void {
-    expectedSelfOffset = viewport?.scrollTop ?? null;
-  }
-  let anchorViewportCache: { node: HTMLDivElement; view: AnchorViewport } | null = null;
-  function anchorViewport(): AnchorViewport | null {
-    const node = viewport;
-    if (!node) return null;
-    if (anchorViewportCache?.node !== node) {
-      const base = domAnchorViewport(node);
-      anchorViewportCache = {
-        node,
-        view: {
-          ...base,
-          scrollBy: (delta) => {
-            anchorCorrection = {
-              by: anchorHolding ? 'hold' : 'rolling',
-              delta,
-              key: anchor.held?.key ?? null,
-            };
-            base.scrollBy(delta);
-            recordSelfWrite();
-          },
-        },
-      };
-    }
-    return anchorViewportCache.view;
-  }
-  const anchor = new TimelineAnchor(anchorViewport);
-  let nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * 16;
-  let atLatest = $state(true);
-
-  function refreshAtLatest(): void {
-    atLatest = viewport !== null && isNearLatest(viewport, ANCHOR_EPSILON);
-  }
-
-  // The virtualiser's helpers arm `reconcileScroll`, which forces the offset back
-  // to its own target for five seconds.
-  function scrollToOffsetNow(offset: number, by: string): void {
-    if (!viewport) return;
-    const from = viewport.scrollTop;
-    viewport.scrollTop = offset;
-    recordSelfWrite();
-    recordScroll(by, from);
-  }
-
-  function offsetOfIndex(index: number, align: 'start' | 'center' | 'end'): number | null {
-    return get(virtualizer).getOffsetForIndex(index, align)?.[0] ?? null;
-  }
-
-  function currentViewport(): HTMLDivElement | null {
-    return viewport;
-  }
-
-  const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
-    count: 0,
-    getScrollElement: () => viewport,
-    estimateSize: (index) =>
-      estimateTimelineItemSize(initialItems, index, TIMELINE_LAYOUT.mediaMaxRem * 16, 16),
-    getItemKey: (index) => identityTracker.key(initialItems, index),
-    // `followOnAppend` only arms `reconcileScroll`, which forces the virtualiser's
-    // own stale target back for five seconds.
-    anchorTo: 'start',
-    followOnAppend: false,
-    scrollEndThreshold: 0,
-    useScrollendEvent: true,
-    overscan: 24,
-    onChange: handleVirtualizerChange,
-  });
-
-  get(virtualizer).shouldAdjustScrollPositionOnItemSizeChange = () => false;
-
   $effect(() => {
-    void $virtualizer.getTotalSize();
-    syncRenderedRowSizes();
-    if (anchorHolding) anchor.restore();
-    else if (position.kind === 'pinned') commit();
-    else correctRollingAnchor();
+    followingLive = revealed && windowState.pinned;
   });
 
-  function syncRenderedRowSizes(): void {
-    if (!viewport) return;
-    const instance = get(virtualizer);
-    for (const node of viewport.querySelectorAll<HTMLElement>('.item[data-index]')) {
-      const index = Number(node.dataset.index);
-      if (!Number.isInteger(index)) continue;
-      const size = Math.round(node.getBoundingClientRect().height);
-      if (size > 0) instance.resizeItem(index, size);
-    }
-  }
-
-  async function requestHistory(): Promise<boolean> {
+  function requestHistory(): Promise<boolean> {
+    if (historyTask) return historyTask;
     historyRequestPending = true;
-    try {
-      return await onRequestHistory();
-    } finally {
+    historyTask = onRequestHistory().finally(() => {
       historyRequestPending = false;
-    }
-  }
-
-  historyController = new TimelineHistoryController({
-    getBackwardPagination: () => timeline.backwardPagination,
-    isNearOldest: () => viewport !== null && viewport.scrollTop < viewport.clientHeight * 2,
-    isVirtualizerScrolling: () => get(virtualizer).isScrolling,
-    requestHistory,
-    onGestureSettled: () => {
-      if (!commitDeferred) return;
-      commitDeferred = false;
-      scheduleCommit();
-    },
-    debugLog: historyDebugLog,
-    debugSnapshot: () => timelineDebugSnapshot(viewport, get(virtualizer), position.kind),
-  });
-
-  $effect(() => {
-    if (!timelineDebugEnabledForView) return;
-    let previousScrollTop: number | null = null;
-    let previousScrollHeight: number | null = null;
-    let previousTime: number | null = null;
-    let previousAnchorKey: string | null = null;
-    let previousAnchorTop: number | null = null;
-    let maxFrameDuration = 0;
-    let maxFrameDelta = 0;
-    let maxVisualDelta = 0;
-    let maxAnchorResidual = 0;
-    let lastHudUpdate = 0;
-    let frame = 0;
-    const sample = (): void => {
-      const activeViewport = viewport;
-      if (activeViewport) {
-        const time = performance.now();
-        const instance = get(virtualizer);
-        const virtualItems = instance.getVirtualItems();
-        const scrollTop = activeViewport.scrollTop;
-        const scrollHeight = activeViewport.scrollHeight;
-        const viewportEnd = scrollTop + activeViewport.clientHeight;
-        const anchor =
-          virtualItems.find((item) => item.start >= scrollTop && item.end <= viewportEnd) ??
-          virtualItems.find((item) => item.end > scrollTop);
-        const anchorKey = anchor ? String(anchor.key) : null;
-        const anchorTop = anchor ? anchor.start - scrollTop : null;
-        const frameDuration = previousTime === null ? 0 : time - previousTime;
-        const frameDelta = previousScrollTop === null ? 0 : scrollTop - previousScrollTop;
-        const contentDelta =
-          previousScrollHeight === null ? 0 : scrollHeight - previousScrollHeight;
-        // A correction moves `scrollTop` on purpose, so requiring a still frame
-        // blinded this to the only frames worth measuring.
-        const visualDelta =
-          (frameDelta === 0 || anchorHolding) &&
-          anchorKey !== null &&
-          anchorKey === previousAnchorKey &&
-          previousAnchorTop !== null
-            ? (anchorTop ?? previousAnchorTop) - previousAnchorTop
-            : 0;
-        previousTime = time;
-        previousScrollTop = scrollTop;
-        previousScrollHeight = scrollHeight;
-        previousAnchorKey = anchorKey;
-        previousAnchorTop = anchorTop;
-        maxFrameDuration = Math.max(maxFrameDuration, frameDuration);
-        maxFrameDelta = Math.max(maxFrameDelta, Math.abs(frameDelta));
-        maxVisualDelta = Math.max(maxVisualDelta, Math.abs(visualDelta));
-        maxAnchorResidual = Math.max(maxAnchorResidual, Math.abs(anchorResidual ?? 0));
-        const nextSample: TimelineDebugSample = {
-          time,
-          scrollTop,
-          scrollHeight,
-          contentDelta,
-          distanceFromEnd: scrollHeight - scrollTop - activeViewport.clientHeight,
-          frameDuration,
-          maxFrameDuration,
-          frameDelta,
-          maxFrameDelta,
-          anchorKey,
-          anchorTop,
-          visualDelta,
-          maxVisualDelta,
-          anchorResidual,
-          maxAnchorResidual,
-          anchorGuard: anchorHolding ? 'hold' : anchorRolling() ? 'rolling' : 'none',
-          anchorCorrection,
-          selfWrite,
-          firstVirtualIndex: virtualItems[0]?.index ?? null,
-          lastVirtualIndex: virtualItems.at(-1)?.index ?? null,
-          isScrolling: instance.isScrolling,
-          scrollMode: position.kind,
-          backwardPagination: timeline.backwardPagination,
-        };
-        timelineDebugRecorder.add(nextSample);
-        if (time - lastHudUpdate >= 100) {
-          lastHudUpdate = time;
-          timelineDebugSample = timelineDebugRecorder.latest();
-        }
-      }
-      frame = requestAnimationFrame(sample);
-    };
-    frame = requestAnimationFrame(sample);
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  });
-
-  async function copyTimelineDebug(): Promise<void> {
-    await timelineDebugRecorder.copyTrace();
-  }
-
-  function handleVirtualizerChange(): void {
-    const instance = get(virtualizer);
-    const totalSize = instance.getTotalSize();
-    const viewportSize = instance.scrollRect?.height ?? 0;
-    const contentSizeChanged = totalSize !== virtualizerTotalSize;
-    const viewportSizeChanged = viewportSize !== virtualizerViewportSize;
-    virtualizerTotalSize = totalSize;
-    virtualizerViewportSize = viewportSize;
-    refreshAtLatest();
-    if (contentSizeChanged) measurementRevision += 1;
-    // `settling` is driven by the landing loop below, which commits and measures
-    // in step; a second committer racing it re-enters mid-measurement.
-    if (position.kind === 'pinned' && (contentSizeChanged || viewportSizeChanged)) {
-      scheduleCommit();
-    }
-    scheduleInitialEndReconciliation();
-    const isScrolling = instance.isScrolling;
-    const scrollingEnded = virtualizerWasScrolling && !isScrolling;
-    virtualizerWasScrolling = isScrolling;
-    if (scrollingEnded) historyController.onVirtualizerScrollSettled();
-  }
-
-  function holdAnchorThroughUpdate(): void {
-    if (anchorHolding) return;
-    anchor.capture();
-    if (anchor.held === null) return;
-    commitDeferred = false;
-    const holdId = (anchorHoldSequence += 1);
-    activeHoldId = holdId;
-    anchorHolding = true;
-    historyController.suspendForAnchor();
-    void (async () => {
-      const owns = (): boolean => activeHoldId === holdId;
-      let stableFrames = 0;
-      let residual: number | null = null;
-      for (let frame = 0; frame < HOLD_FRAME_LIMIT && stableFrames < 2; frame += 1) {
-        await tick();
-        if (!owns()) return;
-        if (!viewport) {
-          finishHold(holdId, null);
-          return;
-        }
-        if (
-          anchor.locate((key) =>
-            visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
-          ) === null
-        ) {
-          finishHold(holdId, null);
-          return;
-        }
-        await bringAnchorIntoView();
-        if (!owns()) return;
-        if (!viewport) {
-          finishHold(holdId, null);
-          return;
-        }
-        residual = anchor.restore();
-        const correctedAt = measurementRevision;
-        await new Promise(requestAnimationFrame);
-        if (!owns()) return;
-        if (!viewport) {
-          finishHold(holdId, null);
-          return;
-        }
-        const offset = get(virtualizer).scrollOffset ?? 0;
-        const settled =
-          measurementRevision === correctedAt &&
-          residual !== null &&
-          Math.abs(residual) < ANCHOR_EPSILON &&
-          Math.abs(offset - viewport.scrollTop) < ANCHOR_EPSILON;
-        stableFrames = settled ? stableFrames + 1 : 0;
-      }
-      finishHold(holdId, residual);
-    })();
-  }
-
-  async function bringAnchorIntoView(): Promise<void> {
-    const view = anchorViewport();
-    if (!view) return;
-    const target = anchor.locate((key) =>
-      visibleItems.findIndex((item) => anchorKeyForItem(item) === key)
-    );
-    if (!target || view.topOf(target.snapshot.key) !== null) return;
-    const offset = offsetOfIndex(target.index, 'start');
-    if (offset === null) return;
-    scrollToOffsetNow(Math.max(0, offset - target.snapshot.top), 'bringAnchorIntoView');
-    await new Promise(requestAnimationFrame);
-  }
-
-  function finishHold(holdId: number, residual: number | null): void {
-    if (activeHoldId !== holdId) return;
-    activeHoldId = null;
-    anchorResidual = residual;
-    anchor.release();
-    anchorHolding = false;
-    historyController.resumeAfterAnchor(residual);
-    refreshRollingAnchor();
-    if (position.kind === 'pinned') scheduleCommit();
-  }
-
-  function refreshRollingAnchor(readingBack = false): void {
-    if (anchorHolding || !viewport) return;
-    if (!readingBack && isNearLatest(viewport, ANCHOR_EPSILON)) {
-      anchor.release();
-      return;
-    }
-    anchor.capture();
-  }
-
-  function correctRollingAnchor(): void {
-    if (anchorCorrecting || !anchorRolling()) return;
-    anchorCorrecting = true;
-    try {
-      anchorResidual = anchor.restoreStationary();
-    } finally {
-      anchorCorrecting = false;
-    }
-  }
-
-  let commitDeferred = false;
-  let commitScheduled = false;
-
-  function commit(): void {
-    const node = currentViewport();
-    if (!node || anchorHolding) return;
-    if (position.kind === 'anchored' || position.kind === 'focused') return;
-    // The gesture's scroll event has not landed, so the position it will produce
-    // is unknown. Committing now would take the reader to the end.
-    if (historyController.isScrollGestureActive) {
-      commitDeferred = true;
-      return;
-    }
-    scrollToOffsetNow(node.scrollHeight, 'commit');
-    nearLatest = true;
-    atLatest = true;
-  }
-
-  function unreadLandingKey(): string | null {
-    const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
-    if (index === -1 || index >= visibleItems.length - 1) return null;
-    return anchorKeyForItem(visibleItems[index]);
-  }
-
-  function landOn(key: string): void {
-    const index = visibleItems.findIndex((item) => anchorKeyForItem(item) === key);
-    if (index < 0) return;
-    const offset = offsetOfIndex(index, 'start');
-    if (offset === null) return;
-    scrollToOffsetNow(offset, 'landOn');
-    refreshRollingAnchor();
-  }
-
-  function scheduleCommit(): void {
-    if (commitScheduled) return;
-    commitScheduled = true;
-    requestAnimationFrame(() => {
-      commitScheduled = false;
-      commit();
+      historyTask = null;
     });
+    return historyTask;
   }
-
-  function isSettling(): boolean {
-    return position.kind === 'settling';
+  const historyController = new TimelineHistoryController({
+    getBackwardPagination: () => timeline.backwardPagination,
+    isNearOldest: () =>
+      viewport !== null &&
+      windowState.start === 0 &&
+      viewport.scrollTop < viewport.clientHeight * 2,
+    isScrolling: () => windowState.scrolling,
+    requestHistory,
+  });
+  function windowChanged(state: TimelineWindowState): void {
+    const wasScrolling = windowState.scrolling;
+    windowState = state;
+    const node = viewport;
+    nearLatest =
+      state.end === entries.length &&
+      node !== null &&
+      node.scrollHeight - node.clientHeight - node.scrollTop <=
+        TIMELINE_LAYOUT.jumpToLatestRem * 16;
+    if (wasScrolling && !state.scrolling) historyController.onScrollSettled();
   }
-
-  /**
-   * The fill outlives the reveal: a room with nothing to land on is shown pinned
-   * to the end and pads itself out behind the reader, whose rows the prepend's
-   * own anchor hold keeps still. It stops once the reader takes over the offset.
-   */
-  function fillOwnsPosition(): boolean {
-    return isSettling() || (revealedBeforeFill && position.kind === 'pinned');
+  function readerScrolled(delta: number): void {
+    historyController.clearUserScrollPending();
+    if (!revealed) return;
+    historyController.observeScroll(delta < 0, nearLatest);
+    if (
+      timeline.mode.kind !== 'live' &&
+      timeline.forwardPagination === 'idle' &&
+      windowState.lastVisible !== null &&
+      windowState.lastVisible >= entries.length - TIMELINE_LAYOUT.historyPrefetchItems
+    ) {
+      void onRequestFuture();
+    }
   }
-
-  function initialFillCancelled(): boolean {
-    return currentViewport() === null || !fillOwnsPosition();
+  function mountWindow(node: HTMLDivElement): () => void {
+    const canvas = node.querySelector<HTMLElement>('.items');
+    const content = node.querySelector<HTMLElement>('.window-rows');
+    if (!canvas || !content) throw new Error('Timeline window elements are missing');
+    const engine = new TimelineWindow<RowValue>({
+      viewport: node,
+      canvas,
+      content,
+      render: async (next) => {
+        rows = next;
+        await tick();
+      },
+      onChange: windowChanged,
+      onScroll: readerScrolled,
+      isAnchor: ({ item }) => item.event_id !== null,
+    });
+    controller = engine;
+    return () => {
+      disposed = true;
+      engine.destroy();
+      controller = null;
+    };
   }
-
-  /**
-   * `paginateBackward` resolves before the diff carrying its events, so the store
-   * holds `loading` until the boundary moves. Bounded: a lost diff must not leave
-   * the timeline hidden. False only when the fill was cancelled.
-   */
-  async function awaitPaginationSettled(): Promise<boolean> {
+  $effect(() => {
+    const engine = controller;
+    const next = entries;
+    const loading = timeline.loading || (!timeline.hasSnapshot && !timeline.error);
+    if (!engine) return;
+    void engine.update(next).then(() => {
+      if (!loading && !disposed) void openTimeline(engine);
+    });
+  });
+  async function awaitPagination(): Promise<void> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
-    while (timeline.backwardPagination === 'loading') {
-      if (performance.now() >= deadline) return true;
+    while (!disposed && timeline.backwardPagination === 'loading' && performance.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval));
-      if (initialFillCancelled()) return false;
     }
-    return true;
+    await tick();
   }
-
-  async function fillInitialHistory(): Promise<void> {
-    while (true) {
-      const node = currentViewport();
-      if (node === null || !fillOwnsPosition()) return;
-      // `end` is the server reporting the start of the timeline.
-      if (timeline.backwardPagination === 'end') return;
-      if (timeline.backwardPagination === 'loading') {
-        if (initialFillRequested) return;
-        initialFillRequested = true;
-        if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
-        continue;
+  async function openTimeline(engine: TimelineWindow<RowValue>): Promise<void> {
+    if (opening || disposed) return;
+    opening = true;
+    await tick();
+    await new Promise(requestAnimationFrame);
+    if (disposed) return;
+    if (timeline.loading || (!timeline.hasSnapshot && !timeline.error)) {
+      opening = false;
+      return;
+    }
+    await engine.update(entries);
+    if (focusEventId) {
+      const entry = entries.find(({ value }) => value.item.event_id === focusEventId);
+      if (entry) {
+        await engine.jumpTo(entry.key);
+        handledFocus = focusEventId;
       }
-      // `scrollHeight` never reports less than the viewport, so it cannot tell a
-      // half-full snapshot from an exactly-full one.
-      const contentHeight = get(virtualizer).getTotalSize();
-      if (contentHeight >= node.clientHeight * TIMELINE_LAYOUT.initialFillViewports) return;
-      initialFillRequested = true;
-      const reachedStart = await requestHistory();
-      historyExhausted = reachedStart;
-      // The last page has to settle too, or the handover finds `loading` and declines.
-      if (!(await awaitPaginationSettled()) || initialFillCancelled()) return;
-      await tick();
-      await new Promise(requestAnimationFrame);
-      if (initialFillCancelled()) return;
-      commit();
-      if (reachedStart) return;
+      revealed = true;
+      return;
+    }
+    const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
+    if (!unread) revealed = true;
+    filling = true;
+    try {
+      while (!disposed && engine.state.pinned && timeline.backwardPagination !== 'end') {
+        const node = viewport;
+        if (!node || timeline.items.length === 0) break;
+        if (engine.contentHeight >= node.clientHeight || node.scrollHeight > node.clientHeight)
+          break;
+        if (timeline.backwardPagination === 'loading') {
+          await awaitPagination();
+          if (timeline.backwardPagination === 'loading') break;
+        } else {
+          historyExhausted = await requestHistory();
+          await awaitPagination();
+          await engine.update(entries);
+          await new Promise(requestAnimationFrame);
+          if (historyExhausted) break;
+        }
+      }
+      if (unread && !disposed && engine.state.pinned) await engine.jumpTo(unread.key, 'start');
+    } catch {
+      historyExhausted = false;
+    } finally {
+      filling = false;
+      if (!disposed) revealed = true;
     }
   }
-
   $effect(() => {
     if (visibleItems.length > 0) {
       hadVisibleItems = true;
@@ -686,335 +330,48 @@
     if (hadVisibleItems) {
       hadVisibleItems = false;
       historyExhausted = false;
-      initialFillRequested = false;
     }
     if (
       timeline.loading ||
-      viewport === null ||
-      position.kind === 'settling' ||
+      !controller ||
+      !revealed ||
       historyExhausted ||
       timeline.backwardPagination !== 'idle' ||
-      initialFillState === 'running' ||
+      historyRequestPending ||
+      filling ||
       emptyRefillPending
-    ) {
+    )
       return;
-    }
     emptyRefillPending = true;
-    void (async () => {
-      try {
-        const reachedStart = await requestHistory();
-        historyExhausted = reachedStart;
-      } finally {
+    void requestHistory()
+      .then((end) => {
+        historyExhausted = end;
+      })
+      .catch(() => {})
+      .finally(() => {
         emptyRefillPending = false;
-      }
-    })();
-  });
-
-  function startInitialHistoryFill(): void {
-    initialFillState = 'running';
-    void fillInitialHistory().finally(() => {
-      initialFillState = 'done';
-      scheduleInitialEndReconciliation();
-    });
-  }
-
-  function scheduleInitialEndReconciliation(): void {
-    if (position.kind !== 'settling' || initialEndReconciliationPending) return;
-    // Handing over mid-fill reveals the timeline between pages. An empty timeline
-    // never starts a fill, so it must not wait for one.
-    if (initialFillState !== 'done' && visibleItems.length > 0) return;
-    // It reschedules itself until the end settles, and runs while hidden, so an
-    // unbounded list would spin for as long as the room stayed open.
-    if (initialEndReconciliationAttempts >= INITIAL_END_RECONCILIATION_LIMIT) {
-      const landed = nextPosition(position, {
-        kind: 'fill-finished',
-        unreadKey: unreadLandingKey(),
       });
-      setPosition(landed);
-      if (landed.kind === 'anchored') landOn(landed.key);
-      else scheduleCommit();
+  });
+  let handledFocus: string | null = null;
+  $effect(() => {
+    const target = focusEventId;
+    const engine = controller;
+    if (!engine || !revealed || target === handledFocus) return;
+    if (target === null) {
+      handledFocus = null;
       return;
     }
-    initialEndReconciliationAttempts += 1;
-
-    initialEndReconciliationPending = true;
-    void tick().then(async () => {
-      initialEndReconciliationPending = false;
-      if (position.kind !== 'settling' || !viewport) return;
-
-      commit();
-      await new Promise(requestAnimationFrame);
-      const activeViewport = currentViewport();
-      // A frame has passed, so the position has to be read afresh. Through a
-      // call, which the narrowing from the check above does not reach into.
-      if (!isSettling() || !activeViewport) return;
-      const distance =
-        activeViewport.scrollHeight - activeViewport.scrollTop - activeViewport.clientHeight;
-      if (distance > 1 || get(virtualizer).isScrolling) {
-        scheduleInitialEndReconciliation();
-        return;
-      }
-      // The fill already waited out its pages; one landing after the deadline is
-      // a plain prepend, which the anchor hold covers.
-      const landed = nextPosition(position, {
-        kind: 'fill-finished',
-        unreadKey: unreadLandingKey(),
-      });
-      setPosition(landed);
-      if (landed.kind === 'anchored') landOn(landed.key);
-      else scheduleCommit();
-    });
-  }
-
-  $effect(() => {
-    void preferences.fontScale;
-    cachedRootFontSize = rootFontSize();
+    const entry = entries.find(({ value }) => value.item.event_id === target);
+    if (!entry) return;
+    handledFocus = target;
+    void engine.jumpTo(entry.key, 'center', !prefersReducedMotion.current);
   });
-
-  $effect.pre(() => {
-    const items = visibleItems;
-    const instance = get(virtualizer);
-    const previousItems = configuredItems;
-    configuredItems = items;
-    identityTracker.reconcile(items);
-    const edgesChanged =
-      previousItems.length !== items.length ||
-      identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0) ||
-      identityTracker.key(previousItems, previousItems.length - 1) !==
-        identityTracker.key(items, items.length - 1);
-    const prepended = identityTracker.key(previousItems, 0) !== identityTracker.key(items, 0);
-    historyController.resetForNewItems(prepended);
-    const change = edgesChanged ? (historyDebugChange += 1) : historyDebugChange;
-    if (edgesChanged) {
-      historyDebugLog('items:before', {
-        change,
-        previousCount: previousItems.length,
-        nextCount: items.length,
-        previousFirstKey: identityTracker.key(previousItems, 0),
-        nextFirstKey: identityTracker.key(items, 0),
-        pagination: timeline.backwardPagination,
-        viewport: historyDebugSnapshot(),
-      });
-    }
-    // `position` goes stale: a programmatic scroll raises no gesture and a
-    // wheel at offset zero raises no scroll event.
-    const pinnedToEnd = viewport !== null && isNearLatest(viewport, nearLatestPx);
-    const followingEnd = position.kind === 'pinned' && !historyController.isScrollGestureActive;
-    if (
-      edgesChanged &&
-      (prepended || !pinnedToEnd) &&
-      !followingEnd &&
-      position.kind !== 'settling' &&
-      position.kind !== 'focused'
-    ) {
-      holdAnchorThroughUpdate();
-    }
-    const rem = cachedRootFontSize;
-    nearLatestPx = TIMELINE_LAYOUT.jumpToLatestRem * rem;
-    const layout = preferences.layout;
-    const heldRangeSize = instance.range
-      ? instance.range.endIndex - instance.range.startIndex + 1
-      : 1;
-    instance.setOptions({
-      count: items.length,
-      getScrollElement: () => viewport,
-      estimateSize: (index) =>
-        estimateTimelineItemSize(
-          items,
-          index,
-          viewport?.clientWidth ?? TIMELINE_LAYOUT.mediaMaxRem * rem,
-          rem,
-          layout
-        ),
-      // TanStack compares the previous and next key functions during prepends.
-      // Each function must retain the item ordering it was created for.
-      getItemKey: (index) => identityTracker.key(items, index),
-      anchorTo: 'start',
-      followOnAppend: false,
-      scrollEndThreshold: 0,
-      useScrollendEvent: true,
-      overscan: 8,
-      rangeExtractor: (range) => {
-        const indexes = defaultRangeExtractor(range);
-        if (!anchorHolding) return indexes;
-        const held = anchor.locate((key) =>
-          items.findIndex((item) => anchorKeyForItem(item) === key)
-        );
-        if (!held) return indexes;
-        const start = Math.max(0, held.index - range.overscan);
-        const end = Math.min(items.length - 1, held.index + heldRangeSize + range.overscan);
-        for (let index = start; index <= end; index += 1) indexes.push(index);
-        return [...new Set(indexes)].sort((left, right) => left - right);
-      },
-      onChange: handleVirtualizerChange,
-    });
-    if (edgesChanged) {
-      void tick().then(() => {
-        historyDebugLog('items:after-tick', {
-          change,
-          viewport: historyDebugSnapshot(),
-        });
-        requestAnimationFrame(() => {
-          historyDebugLog('items:after-frame', {
-            change,
-            viewport: historyDebugSnapshot(),
-          });
-        });
-      });
-    }
-  });
-
-  $effect(() => {
-    // Read up front, so the landing re-runs for every page the fill prepends.
-    void visibleItems.length;
-    if (timeline.loading || !viewport) return;
-
-    const controller = new AbortController();
-    void (async () => {
-      await tick();
-      await new Promise(requestAnimationFrame);
-      // An empty snapshot is an empty room, not one still loading: `loading` is
-      // false only once it has been applied. Bailing here left such a room
-      // settling for as long as it stayed open.
-      if (controller.signal.aborted) return;
-      const focusedEventId = position.kind === 'focused' ? position.eventId : null;
-      const focusIndex = focusedEventId
-        ? visibleItems.findIndex((item) => item.event_id === focusedEventId)
-        : -1;
-      if (focusIndex >= 0 && !focusAnchored) {
-        const offset = offsetOfIndex(focusIndex, 'center');
-        if (offset !== null) scrollToOffsetNow(offset, 'focus');
-        focusAnchored = true;
-      } else if (position.kind === 'settling') {
-        const initialAnchorCancelled = (): boolean =>
-          controller.signal.aborted || position.kind !== 'settling';
-        commit();
-        await new Promise(requestAnimationFrame);
-        if (initialAnchorCancelled()) return;
-        if (currentViewport() === null) return;
-        if (unreadLandingKey() === null && visibleItems.length > 0) {
-          revealedBeforeFill = true;
-          setPosition(nextPosition(position, { kind: 'fill-finished', unreadKey: null }));
-        }
-        // The fill re-enters the reconciliation once it is done.
-        if (initialFillState === 'idle') {
-          startInitialHistoryFill();
-          return;
-        }
-        if (initialFillState === 'running') return;
-        if (historyController.isRequestPending || timeline.backwardPagination === 'loading') return;
-        scheduleInitialEndReconciliation();
-      }
-    })();
-    return () => {
-      controller.abort();
-    };
-  });
-
-  function measure(node: HTMLDivElement): void {
-    get(virtualizer).measureElement(node);
-  }
-
-  function historyDebugSnapshot(): object | null {
-    return timelineDebugSnapshot(viewport, get(virtualizer), position.kind);
-  }
-
-  function historyDebugLog(event: string, details: object): void {
-    if (!timelineDebugEnabledForView) return;
-    console.log(`[timeline-history] ${event} ${JSON.stringify(details)}`);
-  }
-
-  let previousScrollTop = 0;
-  function onScroll(): void {
-    if (!viewport) return;
-    const userDelta = viewport.scrollTop - (expectedSelfOffset ?? previousScrollTop);
-    expectedSelfOffset = null;
-    if (anchorHolding && Math.abs(userDelta) > ANCHOR_EPSILON) anchor.shift(-userDelta);
-    nearLatest = isNearLatest(viewport, nearLatestPx);
-    refreshAtLatest();
-    const byReader = Math.abs(userDelta) > ANCHOR_EPSILON;
-    const movedAway = !atLatest && viewport.scrollTop < previousScrollTop;
-    previousScrollTop = viewport.scrollTop;
-    refreshRollingAnchor(movedAway && byReader);
-    const next = nextPosition(position, {
-      kind: 'user-scrolled',
-      timelineMode: timeline.mode.kind,
-      nearLatest: atLatest,
-      movedAway,
-      byReader,
-      anchorKey: anchor.held?.key ?? null,
-      anchorTop: anchor.held?.top ?? 0,
-    });
-    if (next !== position) setPosition(next);
-    if (position.kind !== 'settling') historyController.observeScroll(movedAway, nearLatest);
-    historyController.clearUserScrollPending();
-    const newestVisibleIndex = get(virtualizer).getVirtualItems().at(-1)?.index;
-    if (
-      position.kind === 'focused' &&
-      timeline.forwardPagination === 'idle' &&
-      newestVisibleIndex !== undefined &&
-      newestVisibleIndex >= visibleItems.length - TIMELINE_LAYOUT.historyPrefetchItems
-    ) {
-      void onRequestFuture();
-    }
-  }
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
   }
-
-  /**
-   * A shrinking viewport leaves the offset where it was, so the newest event
-   * slides out of view. Nothing else recovers it: a resize raises no scroll event,
-   * so `position` never reaches `pinned`.
-   */
-  function keepPinnedThroughResize(node: HTMLDivElement): () => void {
-    let previousHeight: number | null = null;
-    const observer = new ResizeObserver(() => {
-      const height = node.clientHeight;
-      const shrank = previousHeight !== null && height < previousHeight;
-      previousHeight = height;
-      // Growing is handled by the browser's own clamp.
-      if (shrank) scheduleCommit();
-    });
-    observer.observe(node);
-    return () => {
-      observer.disconnect();
-    };
-  }
-
-  function remeasureRenderedRows(): void {
-    if (!viewport) return;
-    const instance = get(virtualizer);
-    for (const node of viewport.querySelectorAll<HTMLElement>('[data-index]')) {
-      const index = Number(node.dataset.index);
-      const height = node.offsetHeight;
-      if (!Number.isInteger(index) || index < 0 || height <= 0) continue;
-      instance.resizeItem(index, height);
-    }
-  }
-
-  function refreshAfterVisibilityChange(): void {
-    if (document.visibilityState !== 'visible' || position.kind === 'settling') return;
-    requestAnimationFrame(() => {
-      if (document.visibilityState !== 'visible' || !viewport || position.kind === 'settling')
-        return;
-      get(virtualizer).scrollRect = {
-        width: viewport.clientWidth,
-        height: viewport.clientHeight,
-      };
-      remeasureRenderedRows();
-      refreshAtLatest();
-      if (position.kind === 'pinned') scheduleCommit();
-    });
-  }
-
   function setPersonaOpen(open: boolean): void {
     personaOpen = open;
   }
-
-  // `overflow: hidden` would drop the scrollbar and reflow the messages, so the
-  // gestures are cancelled instead. Svelte makes `ontouchmove` passive, hence
-  // the explicit listeners.
   function scrollLock(locked: boolean) {
     return (node: HTMLElement) => {
       if (!locked) return;
@@ -1029,26 +386,11 @@
       };
     };
   }
-
   function jumpToLatest(): void {
-    const node = viewport;
-    if (!node) return;
     historyController.finishHistoryFill();
-    if (activeHoldId !== null) finishHold(activeHoldId, 0);
-    anchor.release();
-    if (prefersReducedMotion.current) {
-      setPosition({ kind: 'pinned' });
-      scrollToOffsetNow(node.scrollHeight, 'jumpToLatest');
-      nearLatest = true;
-      refreshAtLatest();
-      return;
-    }
-    recordScroll('jumpToLatest', node.scrollTop);
-    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+    void controller?.jumpTo(null, 'start', !prefersReducedMotion.current);
   }
 </script>
-
-<svelte:window onvisibilitychange={refreshAfterVisibilityChange} />
 
 <TimelineReadReceipt {timeline} visibleEventId={readEventId} {onRead} />
 <MessageContextMenu />
@@ -1063,29 +405,6 @@
   class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
   style={TIMELINE_LAYOUT_STYLE}
 >
-  {#if timelineDebugEnabledForView && timelineDebugSample}
-    <aside class="timeline-debug">
-      <strong>Timeline debug</strong>
-      <span>mode {timelineDebugSample.scrollMode}</span>
-      <span>history {timelineDebugSample.backwardPagination}</span>
-      <span>scroll {timelineDebugSample.scrollTop.toFixed(1)}</span>
-      <span>end distance {timelineDebugSample.distanceFromEnd.toFixed(1)}</span>
-      <span>frame time {timelineDebugSample.frameDuration.toFixed(1)}ms</span>
-      <span>max frame time {timelineDebugSample.maxFrameDuration.toFixed(1)}ms</span>
-      <span>frame delta {timelineDebugSample.frameDelta.toFixed(1)}</span>
-      <span>max delta {timelineDebugSample.maxFrameDelta.toFixed(1)}</span>
-      <span>visual delta {timelineDebugSample.visualDelta.toFixed(1)}</span>
-      <span>max visual delta {timelineDebugSample.maxVisualDelta.toFixed(1)}</span>
-      <span>anchor residual {timelineDebugSample.anchorResidual?.toFixed(1) ?? 'lost'}</span>
-      <span>max anchor residual {timelineDebugSample.maxAnchorResidual.toFixed(1)}</span>
-      <span>
-        range {timelineDebugSample.firstVirtualIndex ??
-          '-'}..{timelineDebugSample.lastVirtualIndex ?? '-'}
-      </span>
-      <span>scrolling {String(timelineDebugSample.isScrolling)}</span>
-      <Button size="small" variant="ghost" onclick={copyTimelineDebug}>Copy trace</Button>
-    </aside>
-  {/if}
   {#if stuckUnreadCount > 0}
     <p class="unread-pinned">
       <span>{$i18n.t('timeline.unreadCount', { count: stuckUnreadCount })}</span>
@@ -1105,79 +424,70 @@
         <span>{$i18n.t('timeline.loadingHistory')}</span>
       </div>
     {/if}
-    <div class={['timeline-viewport', { initial: position.kind === 'settling' }]}>
-      <!-- A scrollable region has to be keyboard-operable. -->
+    <div class={['timeline-viewport', { initial: !revealed }]}>
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div
         bind:this={viewport}
         class="viewport"
         aria-label={$i18n.t('timeline.label')}
         tabindex="0"
-        onscroll={onScroll}
+        {@attach mountWindow}
         {@attach userScrollMarker}
-        {@attach keepPinnedThroughResize}
         {@attach scrollLock(scrollLocked || personaOpen)}
         role="log"
       >
-        <div
-          class={['items', `layout-${preferences.layout}`]}
-          style:height={String($virtualizer.getTotalSize()) + 'px'}
-        >
-          {#each $virtualizer.getVirtualItems() as virtualItem (virtualItem.key)}
-            {@const item = visibleItems[virtualItem.index]}
-            {#if item}
-              {@const collapsed = isCollapsed(visibleItems, virtualItem.index)}
-              {@const groupStart = virtualItem.index > 0 && !collapsed}
-              <div
-                class={['item', { collapsed, 'group-start': groupStart }]}
-                data-event-id={item.event_id ?? undefined}
-                data-item-id={item.id}
-                data-index={virtualItem.index}
-                style:transform={'translateY(' + String(virtualItem.start) + 'px)'}
-                {@attach measure}
-              >
-                <TimelineItem
-                  {item}
-                  {collapsed}
-                  unreadCount={item.content.kind === 'read_marker'
-                    ? unreadCountAfter(visibleItems, virtualItem.index)
-                    : 0}
-                  replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
-                  highlighted={focusEventId !== null && item.event_id === focusEventId}
-                  {onMatrixLink}
-                  {onCopyLink}
-                  {onMarkUnread}
-                  {onSenderProfile}
-                  {onMentionUser}
-                  {onRetrySend}
-                  {onCancelSend}
-                  {currentUserId}
-                  {onToggleReaction}
-                  {onReply}
-                  {onOpenThread}
-                  {onEdit}
-                  {onDelete}
-                  {canRedactOthers}
-                  {members}
-                  layout={preferences.layout}
-                  {onJumpToEvent}
-                  {onOpenMedia}
-                  {onVotePoll}
-                  {onEndPoll}
-                  onPersonaOpenChange={setPersonaOpen}
-                  {roomId}
-                />
-              </div>
-            {/if}
-          {/each}
+        <div class={['items', `layout-${preferences.layout}`]}>
+          <div class="window-rows">
+            {#each rows as row (row.key)}
+              {@const { item, collapsed, groupStart } = row.value}
+              {#if item}
+                <div
+                  class={['item', { collapsed, 'group-start': groupStart }]}
+                  data-event-id={item.event_id ?? undefined}
+                  data-item-id={item.id}
+                  data-index={row.index}
+                  data-timeline-key={row.key}
+                >
+                  <TimelineItem
+                    {item}
+                    {collapsed}
+                    unreadCount={row.value.unreadCount}
+                    replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
+                    highlighted={focusEventId !== null && item.event_id === focusEventId}
+                    {onMatrixLink}
+                    {onCopyLink}
+                    {onMarkUnread}
+                    {onSenderProfile}
+                    {onMentionUser}
+                    {onRetrySend}
+                    {onCancelSend}
+                    {currentUserId}
+                    {onToggleReaction}
+                    {onReply}
+                    {onOpenThread}
+                    {onEdit}
+                    {onDelete}
+                    {canRedactOthers}
+                    {members}
+                    layout={preferences.layout}
+                    {onJumpToEvent}
+                    {onOpenMedia}
+                    {onVotePoll}
+                    {onEndPoll}
+                    onPersonaOpenChange={setPersonaOpen}
+                    {roomId}
+                  />
+                </div>
+              {/if}
+            {/each}
+          </div>
         </div>
       </div>
     </div>
 
-    {#if position.kind === 'settling' && !noHistory}
+    {#if !revealed && !noHistory}
       <TimelineSkeleton layout={preferences.layout} />
     {:else if visibleItems.length === 0}
-      <!-- A room can filter down to nothing; without this that is a blank void. -->
       <EmptyState
         class="timeline-empty"
         title={timeline.items.length > 0
@@ -1188,7 +498,7 @@
     {/if}
   </div>
 
-  {#if timeline.mode.kind === 'live' && position.kind === 'anchored' && !atLatest && visibleItems.length > 0}
+  {#if revealed && timeline.mode.kind === 'live' && !atLatest && visibleItems.length > 0}
     <Button
       type="button"
       class="jump-to-latest"
@@ -1232,15 +542,12 @@
     --timeline-row-padding: var(--space-200);
   }
 
-  /* Desktop chat leads tighter; the type size is the same as everywhere else. */
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
     .timeline-content {
       --line-height-body: 1.47;
     }
   }
 
-  /* The overlays measure against the message area alone: a skeleton row over the
-     foot below sits lower than any message ever will. */
   .timeline-stage {
     display: flex;
     flex: 1;
@@ -1275,29 +582,8 @@
     z-index: 1;
   }
 
-  /* No fade back in: the skeleton is opaque and uncovers a laid-out viewport. */
   .timeline-viewport.initial {
     visibility: hidden;
-  }
-
-  .timeline-debug {
-    background: color-mix(in srgb, var(--sable-bg-container) 92%, transparent);
-    border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
-    display: grid;
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-small);
-    gap: var(--space-050);
-    left: var(--space-200);
-    padding: var(--space-200);
-    pointer-events: auto;
-    position: absolute;
-    top: 0.5rem;
-    z-index: 3;
-  }
-
-  :global(.timeline-debug button) {
-    margin-top: var(--space-100);
   }
 
   .viewport {
@@ -1341,9 +627,6 @@
     background: var(--sable-surface-container-line);
   }
 
-  /* A history that fits the viewport would otherwise stack against the top. An
-     auto margin collapses to zero once the rows overflow; `justify-content` would
-     push the overflow past the unreachable start edge instead. */
   .items {
     flex: 0 0 auto;
     margin-top: auto;
@@ -1353,11 +636,7 @@
 
   .item {
     box-sizing: border-box;
-    left: 0;
     padding: var(--timeline-row-padding) var(--page-gutter);
-    position: absolute;
-    right: 0;
-    top: 0;
     width: 100%;
   }
 

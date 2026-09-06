@@ -133,14 +133,14 @@ export class RoomTimeline {
 
   async scrollToBottomAndNotify(): Promise<void> {
     await this.viewport.evaluate((element) => {
-      element.scrollTop = element.scrollHeight;
+      element.scrollTop = element.scrollHeight - element.clientHeight;
       element.dispatchEvent(new Event('scroll', { bubbles: true }));
     });
   }
 
   async scrollToMiddleAndNotify(): Promise<void> {
     await this.viewport.evaluate((element) => {
-      element.scrollTop = element.scrollHeight / 2;
+      element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
       element.dispatchEvent(new Event('scroll', { bubbles: true }));
     });
   }

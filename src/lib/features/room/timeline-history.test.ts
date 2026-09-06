@@ -19,18 +19,13 @@ function setup(requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValu
     nearOldest: true,
     scrolling: false,
   };
-  const debugLog = vi.fn<(event: string, details: object) => void>();
-  const gestureSettled = vi.fn<() => void>();
   const controller = new TimelineHistoryController({
     getBackwardPagination: () => state.pagination,
     isNearOldest: () => state.nearOldest,
-    isVirtualizerScrolling: () => state.scrolling,
+    isScrolling: () => state.scrolling,
     requestHistory,
-    onGestureSettled: gestureSettled,
-    debugLog,
-    debugSnapshot: () => ({ scrollTop: 0 }),
   });
-  return { controller, debugLog, gestureSettled, requestHistory, state };
+  return { controller, requestHistory, state };
 }
 
 function wheel(deltaY: number): WheelEvent {
@@ -57,8 +52,6 @@ describe('nextHistoryDecision', () => {
     pagination: 'idle' as BackwardPaginationState,
     nearOldest: true,
     requestPending: false,
-    anchorSuppressed: false,
-    anchorFailing: false,
     msSinceRequest: Number.POSITIVE_INFINITY,
   };
 
@@ -69,8 +62,6 @@ describe('nextHistoryDecision', () => {
     [{ pagination: 'loading' as BackwardPaginationState }, 'wait'],
     [{ nearOldest: false }, 'stop'],
     [{ requestPending: true }, 'wait'],
-    [{ anchorSuppressed: true }, 'defer'],
-    [{ anchorFailing: true }, 'stop'],
     [{ msSinceRequest: 0 }, 'wait'],
   ] as const)('%o decides %s', ([overrides, decision]) => {
     expect(nextHistoryDecision({ ...base, ...overrides })).toBe(decision);
@@ -161,24 +152,6 @@ describe('TimelineHistoryController', () => {
     expect(requestHistory).not.toHaveBeenCalled();
   });
 
-  test('anchor failures brake the fill they happened in, and no later one', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
-    const requestHistory = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
-    const { controller } = setup(requestHistory);
-
-    controller.markWheelScroll(wheel(-1));
-    await Promise.resolve();
-    controller.suspendForAnchor();
-    controller.resumeAfterAnchor(40);
-    controller.suspendForAnchor();
-    controller.resumeAfterAnchor(40);
-    await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.historyRequestMinInterval * 4);
-    expect(requestHistory).toHaveBeenCalledTimes(1);
-
-    controller.markWheelScroll(wheel(-1));
-    expect(requestHistory).toHaveBeenCalledTimes(2);
-  });
-
   test('detaches listeners and clears gesture timers', async () => {
     vi.useFakeTimers();
     const { controller, requestHistory } = setup();
@@ -202,7 +175,7 @@ describe('TimelineHistoryController', () => {
     vi.useFakeTimers();
     const request = deferred<boolean>();
     const requestHistory = vi.fn(() => request.promise);
-    const { controller, debugLog } = setup(requestHistory);
+    const { controller } = setup(requestHistory);
 
     controller.markWheelScroll(wheel(-1));
     controller.destroy();
@@ -211,7 +184,6 @@ describe('TimelineHistoryController', () => {
     await vi.runAllTimersAsync();
 
     expect(controller.isRequestPending).toBe(false);
-    expect(debugLog.mock.calls.map(([event]) => event)).not.toContain('request:settled');
     expect(requestHistory).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -247,15 +219,13 @@ describe('middle-button autoscroll', () => {
   });
 
   test('a second press ends it and settles the gesture', () => {
-    const { controller, gestureSettled } = setup();
+    const { controller } = setup();
     controller.markPointerStart(1);
     controller.clearUserScrollPending();
-    expect(gestureSettled).not.toHaveBeenCalled();
 
     controller.markPointerStart(1);
     expect(controller.gesture).toBe('none');
     expect(controller.isScrollGestureActive).toBe(false);
-    expect(gestureSettled).toHaveBeenCalledTimes(1);
   });
 
   test('a wheel notch ends it and takes over', () => {

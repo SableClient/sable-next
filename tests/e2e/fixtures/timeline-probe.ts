@@ -5,6 +5,7 @@ declare global {
     __e2eGestureReady: boolean;
     __e2eGestureActive: boolean;
     __e2eSelfWrites: number;
+    __e2eSelfWriteCount: number;
     __e2eUnexpectedScrolls: string[];
     __e2eRevealReport: Promise<{ gaps: number[]; readerTops: number[]; hiddenAgain: boolean }>;
   }
@@ -31,6 +32,7 @@ export async function startGestureSample(
 }
 
 export function instrumentSelfWrites(viewport: HTMLElement): void {
+  window.__e2eSelfWriteCount = 0;
   const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
   if (!descriptor?.get || !descriptor.set) throw new Error('scrollTop is not an accessor');
   const read = (element: Element): number => Number(descriptor.get?.call(element));
@@ -49,6 +51,7 @@ export function instrumentSelfWrites(viewport: HTMLElement): void {
       return read(this);
     },
     set(this: Element, value: number) {
+      window.__e2eSelfWriteCount += 1;
       const before = read(this);
       write(this, value);
       record.writes += read(this) - before;
@@ -58,6 +61,7 @@ export function instrumentSelfWrites(viewport: HTMLElement): void {
   for (const method of ['scroll', 'scrollTo', 'scrollBy'] as const) {
     const native = viewport[method].bind(viewport);
     viewport[method] = ((...args: [number, number] | [ScrollToOptions]) => {
+      window.__e2eSelfWriteCount += 1;
       const options = typeof args[0] === 'object' ? args[0] : null;
       if (options?.behavior === 'smooth') window.__e2eUnexpectedScrolls.push(method);
       const before = read(viewport);
@@ -88,7 +92,8 @@ export async function sampleGesture(
   let frameError = 0;
   let readerMovement = 0;
   let drift = 0;
-  let clamped = scrollTop === 0;
+  const atStart = (offset: number): boolean => Math.abs(offset) < 1;
+  let clamped = atStart(scrollTop);
   let moved = false;
   let quiet = 0;
   window.__e2eGestureReady = true;
@@ -98,7 +103,10 @@ export async function sampleGesture(
     frame += 1
   ) {
     await new Promise(requestAnimationFrame);
-    if (!anchor.isConnected) throw new Error('the row the reader was on was unmounted');
+    if (!anchor.isConnected)
+      throw new Error(
+        `Reader row ${anchor.dataset.timelineKey ?? 'unknown'} was unmounted at frame ${frame}`
+      );
     const nextTop = content.getBoundingClientRect().top;
     const nextScrollTop = viewport.scrollTop;
     const nextWrites = window.__e2eSelfWrites;
@@ -106,7 +114,7 @@ export async function sampleGesture(
     drift += nextTop - top + byReader;
     frameError = Math.max(frameError, Math.abs(drift));
     readerMovement += byReader;
-    if (nextScrollTop === 0) clamped = true;
+    if (atStart(nextScrollTop)) clamped = true;
     if (byReader !== 0) moved = true;
     quiet = byReader === 0 ? quiet + 1 : 0;
     top = nextTop;

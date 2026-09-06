@@ -76,6 +76,7 @@ export function activeRoomTimeline(core: CoreClient): ActiveRoomTimeline {
 export class RoomTimeline {
   items = $state.raw<TimelineItemView[]>([]);
   loading = $state(false);
+  hasSnapshot = $state(false);
   backwardPagination = $state<BackwardPaginationState>('idle');
   forwardPagination = $state<ForwardPaginationState>('idle');
   error = $state<string | null>(null);
@@ -229,6 +230,7 @@ export class RoomTimeline {
     this.state = 'stopped';
     this.startPromise = null;
     this.items = [];
+    this.hasSnapshot = false;
     this.loading = false;
     this.backwardPaginationPending = false;
     this.backwardPaginationCompletion = null;
@@ -317,6 +319,7 @@ export class RoomTimeline {
 
     this.subscription = response.subscription;
     this.items = response.items;
+    this.hasSnapshot = true;
     this.state = 'active';
     this.unsubscribeEvents = stopEvents;
   }

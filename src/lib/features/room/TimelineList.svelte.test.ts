@@ -34,6 +34,27 @@ beforeEach(() => {
       playState: 'finished',
     }) as unknown as Animation;
   animationFrames = [];
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      const viewport = document.querySelector<HTMLElement>('.viewport');
+      const content = document.querySelector<HTMLElement>('.window-rows');
+      const rows = Array.from(content?.children ?? []) as HTMLElement[];
+      const heights = rows.map((row) => row.offsetHeight || 72);
+      const total = heights.reduce((sum, height) => sum + height, 0);
+      if (this === content) return new DOMRect(0, 0, 300, total);
+      const index = rows.indexOf(this);
+      if (index >= 0) {
+        const top =
+          Number.parseFloat((content?.parentElement as HTMLElement | null)?.style.height ?? '0') -
+          Number.parseFloat(content?.style.bottom ?? '0') -
+          total +
+          heights.slice(0, index).reduce((sum, value) => sum + value, 0) -
+          (viewport?.scrollTop ?? 0);
+        return new DOMRect(0, top, 300, heights[index]);
+      }
+      return new DOMRect(0, 0, 300, viewport?.clientHeight ?? 100);
+    }
+  );
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     animationFrames.push(callback);
     return animationFrames.length;
@@ -41,6 +62,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
@@ -48,7 +70,9 @@ afterEach(() => {
 });
 
 function timeline(): RoomTimeline {
-  return new RoomTimeline({} as CoreClient);
+  const result = new RoomTimeline({} as CoreClient);
+  result.hasSnapshot = true;
+  return result;
 }
 
 async function finishWheelGesture(element?: HTMLElement): Promise<void> {
@@ -305,7 +329,7 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
   expect(element.getAttribute('tabindex')).toBe('0');
   Object.defineProperties(element, {
     scrollHeight: { configurable: true, value: 1_000 },
-    scrollTop: { configurable: true, writable: true, value: 900 },
+    scrollTop: { configurable: true, writable: true, value: 0 },
   });
   await tick();
   await runAnimationFrames();
@@ -355,7 +379,7 @@ test('leaves follow mode for a scroll it did not write, whatever produced it', a
   const element = viewport();
   Object.defineProperties(element, {
     scrollHeight: { configurable: true, value: 1_000 },
-    scrollTop: { configurable: true, writable: true, value: 900 },
+    scrollTop: { configurable: true, writable: true, value: 0 },
   });
   await tick();
   await runAnimationFrames();
@@ -389,7 +413,7 @@ test('requests one history page until the viewport leaves the top threshold', as
   const element = viewport();
   Object.defineProperties(element, {
     scrollHeight: { configurable: true, value: 1_000 },
-    scrollTop: { configurable: true, writable: true, value: 900 },
+    scrollTop: { configurable: true, writable: true, value: 0 },
   });
   await tick();
   await runAnimationFrames();
@@ -540,7 +564,7 @@ test('rate limits sparse history fill and continues until the server reports the
     const element = viewport();
     Object.defineProperties(element, {
       scrollHeight: { configurable: true, value: 1_000 },
-      scrollTop: { configurable: true, writable: true, value: 900 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
     });
     await tick();
     await runAnimationFrames();
@@ -568,7 +592,7 @@ test('rate limits sparse history fill and continues until the server reports the
 });
 
 test('cancels sparse history fill on downward input', async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   try {
     const roomTimeline = timeline();
     roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
@@ -588,7 +612,7 @@ test('cancels sparse history fill on downward input', async () => {
     const element = viewport();
     Object.defineProperties(element, {
       scrollHeight: { configurable: true, value: 1_000 },
-      scrollTop: { configurable: true, writable: true, value: 900 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
     });
     await tick();
     await runAnimationFrames();
@@ -608,7 +632,7 @@ test('cancels sparse history fill on downward input', async () => {
 });
 
 test('retries marking the latest event read after a failed request', async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   roomTimeline.backwardPagination = 'end';
@@ -645,12 +669,8 @@ test('retries marking the latest event read after a failed request', async () =>
 });
 
 const ROW = 100;
-const VIEWPORT = 100;
 
 function layOutRows(): void {
-  const rect = (): DOMRect =>
-    ({ top: 0, left: 0, right: 300, bottom: ROW, width: 300, height: ROW }) as DOMRect;
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(rect);
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: ROW });
 }
 
@@ -685,15 +705,13 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   });
   await tick();
   await runAnimationFrames();
-  // The virtualiser only learns an offset from a scroll event, and happy-dom's
-  // `scrollTop` setter dispatches none.
   element.dispatchEvent(new Event('scroll'));
   await tick();
   await runAnimationFrames();
   return {
     instance,
     element,
-    end: scrollHeight - VIEWPORT,
+    end: element.scrollHeight - element.clientHeight,
     setScrollHeight: (next) => {
       scrollHeight = next;
     },
@@ -806,7 +824,7 @@ test('hides the jump control when a content shrink clamps an anchored reader to 
   expect(anchored()).toBe(true);
 
   setScrollHeight(1_000);
-  element.scrollTop = 900;
+  element.scrollTop = element.scrollHeight - element.clientHeight;
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
