@@ -6,6 +6,123 @@ import type { RoomTimeline } from './pages/RoomTimeline';
 
 test.use({ storageState: SIGNED_OUT });
 
+test('touch navigation to a distant latest message never renders a blank frame', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'reset',
+      values: historyItems({
+        idPrefix: 'distant',
+        label: 'Distant',
+        count: 1000,
+        timestampBase: 1_699_999_000_000,
+      }),
+    },
+  ]);
+  await expect(timeline.itemById('distant-999')).toBeInViewport();
+  await timeline.scrollToAndNotify(0);
+  await expect(timeline.itemById('distant-0')).toBeInViewport();
+  await timeline.waitForScrollSettled();
+  await expect(timeline.jumpToLatest).toBeVisible();
+  const blankFrames = await timeline.jumpToLatest.evaluate(async (button) => {
+    const viewport = document.querySelector('.timeline-viewport .viewport');
+    if (!viewport) throw new Error('missing timeline viewport');
+    (button as HTMLElement).click();
+    let blank = 0;
+    for (let frame = 0; frame < 60; frame++) {
+      await new Promise(requestAnimationFrame);
+      const bounds = viewport.getBoundingClientRect();
+      if (
+        !Array.from(viewport.querySelectorAll('.item')).some((row) => {
+          const rect = row.getBoundingClientRect();
+          return rect.bottom > bounds.top && rect.top < bounds.bottom;
+        })
+      )
+        blank++;
+    }
+    return blank;
+  });
+  expect(blankFrames).toBe(0);
+  await expect(timeline.itemById('distant-999')).toBeInViewport();
+});
+
+test('continuous touch reaches taller older history without a false boundary', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await page.addStyleTag({ content: '.item[data-item-id^="tall-"] { min-height: 400px; }' });
+  const values = historyItems({
+    idPrefix: 'short',
+    label: 'History',
+    count: 1000,
+    timestampBase: 1_699_999_000_000,
+  });
+  for (let index = 0; index < 900; index++) values[index].id = `tall-${index}`;
+  await core.emitTimelineDiff(await core.subscription(), [{ op: 'reset', values }]);
+  await expect(timeline.itemById('short-999')).toBeInViewport();
+  await timeline.waitForScrollSettled();
+  const result = await timeline.viewport.evaluate(async (viewport) => {
+    const touch = new Event('touchstart', { bubbles: true });
+    Object.defineProperty(touch, 'touches', {
+      value: { length: 1, item: () => ({ clientY: 100 }) },
+    });
+    viewport.dispatchEvent(touch);
+    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    if (!descriptor?.set) throw new Error('missing native scrollTop setter');
+    let blank = false;
+    let drift = 0;
+    let maxRows = 0;
+    let reachedStart = false;
+    for (let frame = 0; frame < 500; frame++) {
+      const bounds = viewport.getBoundingClientRect();
+      descriptor.set.call(viewport, viewport.scrollTop - 1000);
+      const anchor = Array.from(viewport.querySelectorAll('.item')).find((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > bounds.top && rect.top < bounds.bottom;
+      });
+      const content = anchor?.firstElementChild ?? anchor;
+      const top = content?.getBoundingClientRect().top;
+      viewport.dispatchEvent(new Event('scroll'));
+      await new Promise(requestAnimationFrame);
+      if (content && top !== undefined)
+        drift = Math.max(
+          drift,
+          content.isConnected ? Math.abs(content.getBoundingClientRect().top - top) : Infinity
+        );
+      const rows = Array.from(viewport.querySelectorAll<HTMLElement>('.item'));
+      maxRows = Math.max(maxRows, rows.length);
+      const visible = rows.filter((row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.bottom > bounds.top && rect.top < bounds.bottom;
+      });
+      blank ||= visible.length === 0;
+      reachedStart = visible.some((row) => row.dataset.itemId === 'tall-0');
+      if (reachedStart) break;
+    }
+    const end = new Event('touchend', { bubbles: true });
+    Object.defineProperty(end, 'touches', { value: { length: 0, item: () => null } });
+    viewport.dispatchEvent(end);
+    return { blank, drift, maxRows, reachedStart };
+  });
+  expect(result.reachedStart).toBe(true);
+  expect(result.blank).toBe(false);
+  expect(result.drift).toBeLessThanOrEqual(2);
+  expect(result.maxRows).toBeLessThanOrEqual(120);
+});
+
 async function loadScrollableHistory(core: FakeCoreDriver, timeline: RoomTimeline): Promise<void> {
   await core.emitTimelineDiff(await core.subscription(), [
     {

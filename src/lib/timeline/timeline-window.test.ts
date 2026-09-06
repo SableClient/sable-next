@@ -17,8 +17,9 @@ function entries(count: number) {
   return Array.from({ length: count }, (_, value) => ({ key: String(value), value }));
 }
 
-function fixture() {
+function fixture(heightForRow?: (value: number) => number) {
   let rowHeight = 50;
+  const size = (value: number) => heightForRow?.(value) ?? rowHeight;
   const viewport = document.createElement('div');
   const canvas = document.createElement('div');
   const content = document.createElement('div');
@@ -30,11 +31,13 @@ function fixture() {
     scrollHeight: { get: () => Number.parseFloat(canvas.style.height) || 300 },
   });
   viewport.getBoundingClientRect = () => new DOMRect(0, 0, 300, 300);
-  content.getBoundingClientRect = () => new DOMRect(0, 0, 300, content.children.length * rowHeight);
+  let measuredHeight = 0;
+  const contentHeight = () => (heightForRow ? measuredHeight : content.children.length * rowHeight);
+  content.getBoundingClientRect = () => new DOMRect(0, 0, 300, contentHeight());
   const contentTop = () =>
     (Number.parseFloat(canvas.style.height) || 0) -
     Number.parseFloat(content.style.bottom || '0') -
-    content.children.length * rowHeight;
+    contentHeight();
   let pause: Promise<void> | undefined;
   const render = vi.fn(async (rows: readonly TimelineRow<number>[]) => {
     if (pause) await pause;
@@ -44,12 +47,20 @@ function fixture() {
         node as HTMLElement,
       ])
     );
+    measuredHeight = 0;
     const nodes = rows.map((row, index) => {
+      const measuredTop = measuredHeight;
+      measuredHeight += size(row.value);
       const node = existing.get(row.key) ?? document.createElement('button');
       if (!existing.has(row.key)) node.textContent = row.key;
       node.dataset.timelineKey = row.key;
       node.getBoundingClientRect = () =>
-        new DOMRect(0, contentTop() + index * rowHeight - viewport.scrollTop, 300, rowHeight);
+        new DOMRect(
+          0,
+          contentTop() + (heightForRow ? measuredTop : index * rowHeight) - viewport.scrollTop,
+          300,
+          size(row.value)
+        );
       return node;
     });
     for (const node of Array.from(content.children)) {
@@ -107,6 +118,59 @@ test('renders a bounded latest window and jumps to a stable key', async () => {
   await window.jumpTo(null);
   expect(keys().at(-1)).toBe('999');
   expect(window.state.pinned).toBe(true);
+});
+
+test('a distant jump requested as smooth moves directly to its rendered destination', async () => {
+  const { window, viewport } = fixture();
+  const animate = vi.spyOn(viewport, 'scrollTo').mockImplementation(() => {});
+  await window.update(entries(1000));
+  await window.jumpTo('20');
+  await window.jumpTo(null, 'start', true);
+  expect(animate).not.toHaveBeenCalled();
+  expect(window.state.lastVisible).toBe(999);
+});
+
+test('continuous upward scrolling reaches older rows whose measured heights exceed estimates', async () => {
+  const { window, viewport } = fixture((value) => (value < 900 ? 200 : 20));
+  await window.update(entries(1000));
+  viewport.dispatchEvent(new Event('touchstart'));
+  for (let step = 0; step < 800; step++) {
+    viewport.scrollTop = Math.max(0, viewport.scrollTop - 250);
+    viewport.dispatchEvent(new Event('scroll'));
+    await vi.advanceTimersByTimeAsync(0);
+    if (window.state.firstVisible === 0) break;
+  }
+  expect(window.state.firstVisible).toBe(0);
+});
+
+test('reversing upward after a resize restores older content without correcting the downward drag', async () => {
+  const { window, viewport, content, resize } = fixture();
+  await window.update(entries(100));
+  await window.jumpTo('0', 'start');
+  let offset = viewport.scrollTop;
+  const writes = vi.fn((value: number) => {
+    offset = value;
+  });
+  Object.defineProperty(viewport, 'scrollTop', { get: () => offset, set: writes });
+  const scroll = async (delta: number) => {
+    offset = Math.max(0, offset + delta);
+    viewport.dispatchEvent(new Event('scroll'));
+    await vi.advanceTimersByTimeAsync(0);
+  };
+  viewport.dispatchEvent(new Event('touchstart'));
+  await scroll(400);
+  resize(200);
+  expect(writes).not.toHaveBeenCalled();
+  const anchor = content.querySelector<HTMLElement>(
+    `[data-timeline-key="${window.state.firstVisible}"]`
+  );
+  if (!anchor) throw new Error('missing visible anchor');
+  const top = anchor.getBoundingClientRect().top;
+  await scroll(-100);
+  expect(writes).toHaveBeenCalled();
+  expect(anchor.getBoundingClientRect().top - top).toBe(100);
+  for (let step = 0; step < 20 && window.state.firstVisible !== 0; step++) await scroll(-200);
+  expect(window.state.firstVisible).toBe(0);
 });
 
 test('fractional row heights keep the pinned content exactly at the viewport bottom', async () => {

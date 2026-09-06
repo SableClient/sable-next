@@ -53,6 +53,7 @@ export class TimelineWindow<T> {
   private ready = false;
   private touching = false;
   private active = false;
+  private scrollingUp = false;
   private jumping = false;
   private rendering = false;
   private disposed = false;
@@ -170,6 +171,7 @@ export class TimelineWindow<T> {
       offset: this.offset,
     };
     if (index < this.start || index >= this.end) {
+      smooth = false;
       await this.renderRange(
         Math.max(0, index - PAGE),
         Math.min(this.items.length, index + PAGE + 1)
@@ -362,6 +364,7 @@ export class TimelineWindow<T> {
       this.height - this.contentHeight - Number.parseFloat(this.options.content.style.bottom);
     if (this.active) {
       const delta = viewport.scrollTop - this.offset;
+      if (Math.abs(delta) >= EPSILON) this.scrollingUp = delta < 0;
       for (const anchor of this.anchors) anchor.top -= delta;
       if (!this.jumping && delta < -EPSILON) this.pinned = false;
       this.offset = viewport.scrollTop;
@@ -387,7 +390,7 @@ export class TimelineWindow<T> {
           viewport.getBoundingClientRect().top;
         this.setTop(this.top + anchor.top - top);
       }
-      if (!this.active) {
+      if (!this.active || (this.scrollingUp && !this.jumping && this.top < -EPSILON)) {
         const top = Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight);
         const target = viewport.scrollTop + top - this.top;
         this.setTop(top);
@@ -430,6 +433,7 @@ export class TimelineWindow<T> {
     }
     this.scrollHeight = viewport.scrollHeight;
     if (Math.abs(delta) >= EPSILON) {
+      this.scrollingUp = delta < 0;
       for (const anchor of this.anchors) anchor.top -= delta;
       this.active = true;
       if (!this.jumping) {
@@ -440,8 +444,11 @@ export class TimelineWindow<T> {
       }
       this.scheduleSettle();
       if (!this.rendering) {
-        this.capture();
-        this.publish();
+        if (this.scrollingUp && !this.jumping && this.top < -EPSILON) this.layout();
+        else {
+          this.capture();
+          this.publish();
+        }
         if (!this.jumping) this.options.onScroll(delta);
         if (!this.jumping) void this.extendWindow();
       }
@@ -449,6 +456,7 @@ export class TimelineWindow<T> {
   }
 
   private interact(upward: boolean): void {
+    if (!this.active) this.scrollingUp = false;
     this.jumpVersion++;
     this.jumping = false;
     this.scrolled();
