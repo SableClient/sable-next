@@ -1479,3 +1479,109 @@ async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<
         .map(|item| crate::view::timeline_item(item, None, &BTreeSet::new()).sender_name)
         .collect()
 }
+
+#[tokio::test]
+async fn direct_room_summary_uses_the_other_members_avatar() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!dm-avatar:example.org");
+    let avatar = matrix_sdk::ruma::mxc_uri!("mxc://example.org/alice");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(
+                factory
+                    .direct()
+                    .add_user((*ALICE).to_owned().into(), room_id),
+            );
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .set_room_summary(json!({"m.heroes": [*ALICE], "m.joined_member_count": 2}))
+                    .add_state_event(
+                        factory
+                            .member(*ALICE)
+                            .display_name("Alice")
+                            .avatar_url(avatar),
+                    ),
+            );
+        })
+        .await;
+    let item =
+        matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
+    let mut cache = std::collections::HashMap::new();
+    super::view::enrich_room_fields(
+        &client,
+        &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+            index: 0,
+            value: item.clone(),
+        },
+        &mut cache,
+    )
+    .await;
+    let summary = super::view::room_summary(&item, &cache);
+    assert!(summary.is_direct);
+    assert_eq!(summary.avatar_url.as_deref(), Some(avatar.as_str()));
+
+    let updated = matrix_sdk::ruma::mxc_uri!("mxc://example.org/alice-new");
+    let explicit = matrix_sdk::ruma::mxc_uri!("mxc://example.org/room-picture");
+    for (update, expected) in [
+        (
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(*ALICE).avatar_url(updated)),
+            Some(updated.as_str()),
+        ),
+        (
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.room_avatar().url(explicit)),
+            Some(explicit.as_str()),
+        ),
+        (
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.room_avatar()),
+            Some(updated.as_str()),
+        ),
+        (
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.member(*ALICE)),
+            None,
+        ),
+    ] {
+        server.sync_room(&client, update).await;
+        super::view::enrich_room_fields(
+            &client,
+            &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+                index: 0,
+                value: item.clone(),
+            },
+            &mut cache,
+        )
+        .await;
+        assert_eq!(
+            super::view::room_summary(&item, &cache)
+                .avatar_url
+                .as_deref(),
+            expected
+        );
+    }
+
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(factory.direct());
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_event(factory.member(*ALICE).avatar_url(avatar)),
+            );
+        })
+        .await;
+    super::view::enrich_room_fields(
+        &client,
+        &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+            index: 0,
+            value: item.clone(),
+        },
+        &mut cache,
+    )
+    .await;
+    let summary = super::view::room_summary(&item, &cache);
+    assert!(!summary.is_direct);
+    assert_eq!(summary.avatar_url, None);
+}

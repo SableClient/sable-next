@@ -64,6 +64,7 @@ pub struct RoomInfo {
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,
     pub canonical_alias: Option<String>,
+    pub direct_avatar_url: Option<String>,
     pub children: Vec<SpaceChildEdge>,
     pub tags: Vec<RoomTag>,
 }
@@ -85,7 +86,10 @@ pub fn room_summary<S: BuildHasher>(
             .map(|name| name.to_string())
             .or_else(|| item.name()),
         topic: item.topic(),
-        avatar_url: item.avatar_url().map(|url| url.to_string()),
+        avatar_url: item
+            .avatar_url()
+            .map(|url| url.to_string())
+            .or_else(|| info.and_then(|info| info.direct_avatar_url.clone())),
         is_direct: !item.direct_targets().is_empty(),
         direct_targets: item
             .direct_targets()
@@ -276,6 +280,7 @@ impl RoomInfo {
             supports_restricted: false,
             supports_knock_restricted: false,
             canonical_alias: None,
+            direct_avatar_url: None,
             children: Vec::new(),
             tags: Vec::new(),
         }
@@ -309,9 +314,42 @@ async fn room_info(client: &Client, room: &Room) -> RoomInfo {
         supports_restricted,
         supports_knock_restricted,
         canonical_alias: room.canonical_alias().map(|alias| alias.to_string()),
+        direct_avatar_url: direct_avatar_url(room).await,
         children,
         tags: room_tags(room),
     }
+}
+
+/// Use synced profiles only: rendering the room list must not fetch members.
+async fn direct_avatar_url(room: &Room) -> Option<String> {
+    if room.avatar_url().is_some() || room.direct_targets().is_empty() {
+        return None;
+    }
+    let service_members = room.service_members().unwrap_or_default();
+    let targets: Vec<OwnedUserId> = room
+        .direct_targets()
+        .iter()
+        .filter_map(|target| OwnedUserId::try_from(target.as_str()).ok())
+        .filter(|target| target != room.own_user_id() && !service_members.contains(target))
+        .collect();
+    if let [target] = targets.as_slice()
+        && let Ok(Some(member)) = room.get_member_no_sync(target).await
+        && matches!(
+            member.membership(),
+            MembershipState::Join | MembershipState::Invite
+        )
+        && let Some(avatar) = member.avatar_url()
+    {
+        return Some(avatar.to_string());
+    }
+    // Sliding sync can supply a hero's picture before their member event.
+    let heroes = room.heroes().await;
+    if let [hero] = heroes.as_slice()
+        && hero.user_id != room.own_user_id()
+    {
+        return hero.avatar_url.as_ref().map(ToString::to_string);
+    }
+    None
 }
 
 async fn is_tombstoned(client: &Client, room: &Room, is_space: bool) -> bool {
