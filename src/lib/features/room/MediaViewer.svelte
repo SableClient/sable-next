@@ -439,11 +439,11 @@
     };
   });
 
-  async function shareMedia(): Promise<void> {
+  async function shareMedia(anchor: HTMLElement): Promise<void> {
     if (!url) return;
     const name = item.body || 'image';
     if (nativeShare) {
-      await shareFile(url, name, item.mime ?? undefined);
+      await shareFile(url, name, item.mime ?? undefined, anchor.getBoundingClientRect());
       return;
     }
     try {
@@ -534,7 +534,9 @@
                 label={$i18n.t('viewer.share')}
                 size="medium"
                 variant="ghost"
-                onclick={() => void shareMedia()}><ShareNetworkIcon /></IconButton
+                onclick={(event) => {
+                  void shareMedia(event.currentTarget);
+                }}><ShareNetworkIcon /></IconButton
               >
             {/if}
             <IconButton
