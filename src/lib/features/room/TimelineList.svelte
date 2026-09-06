@@ -799,12 +799,11 @@
     // `position` goes stale: a programmatic scroll raises no gesture and a
     // wheel at offset zero raises no scroll event.
     const pinnedToEnd = viewport !== null && isNearLatest(viewport, nearLatestPx);
-    // Prepended history has to be held even at the end: a wheel in a room that
-    // fits the viewport raises no scroll event, so the gesture stays pending and
-    // the end-follow declines, stranding the newest message out of view.
+    const followingEnd = position.kind === 'pinned' && !historyController.isScrollGestureActive;
     if (
       edgesChanged &&
       (prepended || !pinnedToEnd) &&
+      !followingEnd &&
       position.kind !== 'settling' &&
       position.kind !== 'focused'
     ) {
@@ -1032,12 +1031,20 @@
   }
 
   function jumpToLatest(): void {
+    const node = viewport;
+    if (!node) return;
     historyController.finishHistoryFill();
-    setPosition({ kind: 'pinned' });
-    recordScroll('jumpToLatest', viewport?.scrollTop ?? -1);
-    viewport?.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-    nearLatest = true;
-    atLatest = true;
+    if (activeHoldId !== null) finishHold(activeHoldId, 0);
+    anchor.release();
+    if (prefersReducedMotion.current) {
+      setPosition({ kind: 'pinned' });
+      scrollToOffsetNow(node.scrollHeight, 'jumpToLatest');
+      nearLatest = true;
+      refreshAtLatest();
+      return;
+    }
+    recordScroll('jumpToLatest', node.scrollTop);
+    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
   }
 </script>
 

@@ -48,8 +48,8 @@ export class RoomTimeline {
     return this.page.locator(`[data-index="${String(index)}"]`);
   }
 
-  async expectRevealed(): Promise<void> {
-    await expect(this.container).not.toHaveClass(/initial/);
+  async expectRevealed(options?: { timeout?: number }): Promise<void> {
+    await expect(this.container).not.toHaveClass(/initial/, options);
   }
 
   async trackRebuilds(): Promise<void> {
@@ -183,7 +183,7 @@ export class RoomTimeline {
         const positions: number[] = [];
         const sample = (): void => {
           const anchor = document.querySelector<HTMLElement>(`[data-item-id="${itemId}"]`);
-          if (anchor) positions.push(anchor.getBoundingClientRect().top);
+          positions.push(anchor ? anchor.getBoundingClientRect().top : Number.POSITIVE_INFINITY);
         };
         sample();
         const deadline = performance.now() + durationMs;
