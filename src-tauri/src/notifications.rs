@@ -229,8 +229,16 @@ pub fn register_actions<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-pub fn allow_encrypted_content<R: Runtime>(app: &AppHandle<R>, allowed: bool) {
-    if let Err(error) = app.notifications().set_encrypted_content_allowed(allowed) {
+#[cfg_attr(desktop, allow(clippy::unused_async))]
+pub async fn allow_encrypted_content<R: Runtime>(app: &AppHandle<R>, allowed: bool) {
+    #[cfg(mobile)]
+    let result = app
+        .notifications()
+        .set_encrypted_content_allowed(allowed)
+        .await;
+    #[cfg(desktop)]
+    let result = app.notifications().set_encrypted_content_allowed(allowed);
+    if let Err(error) = result {
         log::debug!("could not set the encrypted content policy: {error}");
     }
 }
@@ -269,6 +277,10 @@ pub struct PushConfig {
     /// Absent when the reader has retargeted the gateway: a token distributor
     /// needs an app id that gateway serves, and only the deployment names one.
     pub native_app_id: Option<String>,
+    #[serde(default)]
+    pub ios_app_id: Option<String>,
+    #[serde(default)]
+    pub unified_push_gateway_url: Option<String>,
 }
 
 #[cfg(any(mobile, test))]
@@ -294,7 +306,42 @@ fn pusher(
                 auth,
             }),
         )),
-        _ => Some((native_app_id?.to_owned(), registration.token, None)),
+        (None, None) if is_unified_push_endpoint(&registration.token) => {
+            Some(("moe.sable.up".to_owned(), registration.token, None))
+        }
+        (None, None) if !registration.token.is_empty() && !registration.token.contains("://") => {
+            Some((native_app_id?.to_owned(), registration.token, None))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(any(mobile, test))]
+fn is_unified_push_endpoint(token: &str) -> bool {
+    tauri::Url::parse(token).is_ok_and(|url| {
+        url.scheme() == "https"
+            && url.host_str().is_some()
+            && url.username().is_empty()
+            && url.password().is_none()
+            && url.fragment().is_none()
+    })
+}
+
+#[cfg(any(mobile, test))]
+fn registration_gateway<'a>(
+    registration: &Registration,
+    config: &'a PushConfig,
+) -> Option<&'a str> {
+    if registration.p256dh.is_none()
+        && registration.auth.is_none()
+        && is_unified_push_endpoint(&registration.token)
+    {
+        config
+            .unified_push_gateway_url
+            .as_deref()
+            .filter(|url| !url.trim().is_empty())
+    } else {
+        Some(&config.gateway_url)
     }
 }
 
@@ -313,11 +360,11 @@ pub async fn register_push<R: Runtime>(
     let registered = app
         .notifications()
         .register_for_push_notifications(
-            Some(config.vapid_key),
+            Some(config.vapid_key.clone()),
             None,
             None,
-            config.user_id,
-            config.device_id,
+            config.user_id.clone(),
+            config.device_id.clone(),
         )
         .await
         .map_err(|error| {
@@ -331,21 +378,30 @@ pub async fn register_push<R: Runtime>(
         auth: registered.auth,
     };
 
-    // No app id for what the platform handed back means this build does not
-    // configure that half.
+    let gateway_url = registration_gateway(&registration, &config)
+        .ok_or_else(|| {
+            log::warn!("no UnifiedPush gateway is configured for this distributor");
+            CommandErr::Unavailable
+        })?
+        .to_owned();
+
     let Some((app_id, pushkey, web_push)) = pusher(
         registration,
-        config.native_app_id.as_deref(),
+        if cfg!(target_os = "ios") {
+            config.ios_app_id.as_deref()
+        } else {
+            config.native_app_id.as_deref()
+        },
         Some(&config.web_app_id),
     ) else {
-        return Ok(());
+        return Err(CommandErr::Unavailable);
     };
 
     let command = Command::SetPusher {
         pusher: PusherView {
             pushkey,
             app_id,
-            url: config.gateway_url,
+            url: gateway_url,
             device_display_name: format!("Sable on {}", std::env::consts::OS),
             web_push,
             event_id_only: config.event_id_only,
@@ -425,6 +481,81 @@ mod tests {
         let keys = web_push.expect("the gateway needs the keys");
         assert_eq!(keys.endpoint, "https://push.example/endpoint");
         assert_eq!(keys.auth, "secret");
+    }
+
+    #[test]
+    fn a_unified_push_url_is_not_an_fcm_token() {
+        let (app_id, pushkey, web_push) = pusher(
+            Registration {
+                token: "https://ntfy.sh/up123?up=1".to_owned(),
+                p256dh: None,
+                auth: None,
+            },
+            Some("moe.sable.client.android"),
+            Some("moe.sable.app.sygnal"),
+        )
+        .expect("UnifiedPush registration");
+        assert_eq!(app_id, "moe.sable.up");
+        assert_eq!(pushkey, "https://ntfy.sh/up123?up=1");
+        assert!(web_push.is_none());
+    }
+
+    #[test]
+    fn incomplete_keys_and_unsafe_endpoints_are_rejected() {
+        for (token, p256dh, auth) in [
+            ("https://ntfy.sh/topic", Some("key"), None),
+            ("https://ntfy.sh/topic", None, Some("auth")),
+            ("http://ntfy.sh/topic", None, None),
+            ("https://user:password@ntfy.sh/topic", None, None),
+            ("", None, None),
+        ] {
+            assert!(
+                pusher(
+                    Registration {
+                        token: token.to_owned(),
+                        p256dh: p256dh.map(str::to_owned),
+                        auth: auth.map(str::to_owned),
+                    },
+                    Some("native"),
+                    Some("web"),
+                )
+                .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn ntfy_and_webpush_use_their_own_gateways() {
+        let mut config: super::PushConfig = serde_json::from_value(serde_json::json!({
+            "gateway_url": "https://sygnal.example/_matrix/push/v1/notify",
+            "unified_push_gateway_url": "https://ntfy.example/_matrix/push/v1/notify",
+            "vapid_key": "key", "web_app_id": "web", "event_id_only": true,
+        }))
+        .expect("push config");
+        let mut registration = Registration {
+            token: "https://ntfy.example/topic".to_owned(),
+            p256dh: None,
+            auth: None,
+        };
+        assert_eq!(
+            super::registration_gateway(&registration, &config),
+            config.unified_push_gateway_url.as_deref()
+        );
+        config.unified_push_gateway_url = None;
+        assert!(super::registration_gateway(&registration, &config).is_none());
+        registration.p256dh = Some("key".to_owned());
+        registration.auth = Some("auth".to_owned());
+        assert_eq!(
+            super::registration_gateway(&registration, &config),
+            Some(config.gateway_url.as_str())
+        );
+        registration.token = "fcm-token".to_owned();
+        registration.p256dh = None;
+        registration.auth = None;
+        assert_eq!(
+            super::registration_gateway(&registration, &config),
+            Some(config.gateway_url.as_str())
+        );
     }
 
     #[test]

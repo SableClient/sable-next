@@ -7,13 +7,18 @@ import { resolve } from '$app/paths';
 
 import favicon from '#lib/assets/favicon.png';
 import { appendLine, readLines, summarise } from '#lib/features/notifications/conversation.js';
-import { alert, type PushPayload, unreadCount } from '#lib/features/notifications/push-payload.js';
+import {
+  alert,
+  parsePushPayload,
+  type PushPayload,
+  unreadCount,
+} from '#lib/features/notifications/push-payload.js';
 import { roomName } from '#lib/features/notifications/room-names.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
 worker.addEventListener('push', (event) => {
-  event.waitUntil(present(event.data?.json() as PushPayload | undefined));
+  event.waitUntil(present(parsePushPayload(event.data?.text()) ?? undefined));
 });
 
 worker.addEventListener('message', (event) => {

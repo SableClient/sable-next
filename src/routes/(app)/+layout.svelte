@@ -238,7 +238,9 @@
       )
       .catch(() => {});
 
-    void setNativeEncryptedContentAllowed(preferences.notificationEncryptedContent).catch(() => {});
+    void setNativeEncryptedContentAllowed(
+      preferences.notificationContent && preferences.notificationEncryptedContent
+    ).catch(() => {});
   });
 
   $effect(() => {

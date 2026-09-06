@@ -136,3 +136,14 @@ test('custom servers are allowed unless the config says otherwise', () => {
       .homeservers.allowCustom
   ).toBe(false);
 });
+
+test('a deployment can select a separate Matrix gateway for UnifiedPush', () => {
+  expect(
+    parseRuntimeConfig({
+      pushNotificationDetails: {
+        ...details,
+        unifiedPushGatewayUrl: ' https://ntfy.example/_matrix/push/v1/notify ',
+      },
+    }).push?.unifiedPushGatewayUrl
+  ).toBe('https://ntfy.example/_matrix/push/v1/notify');
+});

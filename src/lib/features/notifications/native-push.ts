@@ -23,6 +23,11 @@ export async function registerNativePush(
       details !== null && resolved.gateway === details.pushNotifyUrl
         ? details.nativePushAppID
         : null,
+    iosAppId:
+      details !== null && resolved.gateway === details.pushNotifyUrl
+        ? (details.iosPushAppID ?? null)
+        : null,
+    unifiedPushGatewayUrl: details?.unifiedPushGatewayUrl ?? null,
     eventIdOnly: !preferences.richPushPayloads,
     userId: session?.user_id ?? null,
     deviceId: session?.device_id ?? null,

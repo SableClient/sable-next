@@ -174,8 +174,8 @@ async fn test_notification(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
-fn set_notification_encrypted_content(app: AppHandle<BrowserEngine>, allowed: bool) {
-    notifications::allow_encrypted_content(&app, allowed);
+async fn set_notification_encrypted_content(app: AppHandle<BrowserEngine>, allowed: bool) {
+    notifications::allow_encrypted_content(&app, allowed).await;
 }
 
 #[allow(clippy::unnecessary_wraps)]

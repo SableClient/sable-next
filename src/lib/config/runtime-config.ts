@@ -12,6 +12,8 @@ export type PushDetails = {
   vapidPublicKey: string;
   webPushAppID: string;
   nativePushAppID: string | null;
+  iosPushAppID?: string | null;
+  unifiedPushGatewayUrl?: string | null;
 };
 
 export type HomeserversConfig = {
@@ -68,6 +70,10 @@ function parsePush(raw: unknown): PushDetails | null {
     vapidPublicKey,
     webPushAppID,
     nativePushAppID: text(source.nativePushAppID),
+    ...(text(source.iosPushAppID) ? { iosPushAppID: text(source.iosPushAppID) } : {}),
+    ...(text(source.unifiedPushGatewayUrl)
+      ? { unifiedPushGatewayUrl: text(source.unifiedPushGatewayUrl) }
+      : {}),
   };
 }
 

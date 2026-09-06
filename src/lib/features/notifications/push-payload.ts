@@ -16,6 +16,62 @@ export type PushPayload = {
   };
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function parsePushPayload(raw: string | undefined): PushPayload | null {
+  if (!raw) return null;
+  try {
+    const envelope: unknown = JSON.parse(raw);
+    if (!isRecord(envelope)) return null;
+    let notification: unknown =
+      envelope.notification === undefined ? envelope : envelope.notification;
+    if (typeof notification === 'string') notification = JSON.parse(notification);
+    if (!isRecord(notification)) return null;
+    const recipients = new Set<string>();
+    const addRecipient = (value: unknown) => {
+      if (typeof value === 'string' && value.trim()) recipients.add(value.trim());
+    };
+    addRecipient(envelope.user_id);
+    addRecipient(notification.user_id);
+    if (Array.isArray(notification.devices)) {
+      for (const device of notification.devices) {
+        if (!isRecord(device) || !isRecord(device.data)) continue;
+        addRecipient(device.data.user_id);
+        if (isRecord(device.data.default_payload))
+          addRecipient(device.data.default_payload.user_id);
+      }
+    }
+    if (recipients.size > 1) return null;
+    const [userId] = recipients;
+    const content = isRecord(notification.content) ? notification.content : {};
+    const counts = isRecord(notification.counts) ? notification.counts : {};
+    const unread =
+      typeof counts.unread === 'number' && Number.isSafeInteger(counts.unread) && counts.unread >= 0
+        ? counts.unread
+        : undefined;
+    return {
+      notification: {
+        user_id: userId,
+        room_id: text(notification.room_id),
+        event_id: text(notification.event_id),
+        room_name: text(notification.room_name),
+        sender_display_name: text(notification.sender_display_name),
+        type: text(notification.type),
+        content: { body: text(content.body), membership: text(content.membership) },
+        counts: { unread },
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 export type PushAlert = {
   title: string;
   body: string;

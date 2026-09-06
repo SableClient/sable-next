@@ -175,6 +175,10 @@ pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), Strin
         pusher_data
             .data
             .insert("user_id".to_owned(), user_id.as_str().into());
+        pusher_data.data.insert(
+            "default_payload".to_owned(),
+            serde_json::json!({ "user_id": user_id.as_str() }),
+        );
     }
     if let Some(keys) = pusher.web_push {
         pusher_data
