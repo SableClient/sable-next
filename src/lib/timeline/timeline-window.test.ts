@@ -158,6 +158,75 @@ test('expanding the viewport before reaching latest preserves the reader', async
   expect(anchor.getBoundingClientRect().top).toBe(top);
 });
 
+test.each(['scroll', 'layout'] as const)(
+  'returning from bottom overscroll stays pinned during %s',
+  async (notification) => {
+    const { window, viewport } = fixture();
+    await window.update(entries(10));
+    const bottom = viewport.scrollHeight - viewport.clientHeight;
+    let offset = bottom;
+    const writes = vi.fn((value: number) => {
+      offset = value;
+    });
+    Object.defineProperty(viewport, 'scrollTop', { get: () => offset, set: writes });
+    viewport.dispatchEvent(new Event('touchstart'));
+    for (const offset of [bottom + 80, bottom + 40, bottom]) {
+      viewport.scrollTop = offset;
+      if (notification === 'layout') document.dispatchEvent(new Event('visibilitychange'));
+      viewport.dispatchEvent(new Event('scroll'));
+      expect(window.state.pinned).toBe(true);
+    }
+    expect(writes).toHaveBeenCalledTimes(3);
+    viewport.dispatchEvent(new TouchEvent('touchend', { touches: [] }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(window.state.pinned).toBe(true);
+    viewport.scrollTop = bottom - 20;
+    viewport.dispatchEvent(new Event('scroll'));
+    expect(window.state.pinned).toBe(false);
+  }
+);
+
+test.each(['wheel', 'keydown'])(
+  'upward %s without movement keeps following latest',
+  async (type) => {
+    const { window, viewport, keys } = fixture();
+    await window.update(entries(10));
+    viewport.dispatchEvent(
+      type === 'wheel'
+        ? new WheelEvent('wheel', { deltaY: -20 })
+        : new KeyboardEvent('keydown', { key: 'ArrowUp' })
+    );
+    expect(window.state.pinned).toBe(true);
+    await window.update(entries(11));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(keys()).toContain('10');
+    expect(viewport.scrollTop).toBe(viewport.scrollHeight - viewport.clientHeight);
+    expect(window.state.pinned).toBe(true);
+  }
+);
+
+test.each(['scroll', 'layout'])(
+  'fractional scrolling preserves movement during %s',
+  async (notification) => {
+    const { window, viewport } = fixture();
+    await window.update(entries(10));
+    const bottom = viewport.scrollHeight - viewport.clientHeight;
+    viewport.dispatchEvent(new Event('touchstart'));
+    for (const direction of [-1, 1]) {
+      for (let step = 0; step < 8; step++) {
+        viewport.scrollTop += direction * 0.25;
+        if (notification === 'layout') document.dispatchEvent(new Event('visibilitychange'));
+        viewport.dispatchEvent(new Event('scroll'));
+      }
+      expect(window.state.pinned).toBe(direction === 1);
+    }
+    viewport.dispatchEvent(new TouchEvent('touchend', { touches: [] }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(viewport.scrollTop).toBe(bottom);
+    expect(window.state.pinned).toBe(true);
+  }
+);
+
 test('renders a bounded latest window and jumps to a stable key', async () => {
   const { window, keys } = fixture();
   await window.update(entries(1000));
