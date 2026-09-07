@@ -152,6 +152,20 @@ async function saveSignedInState(
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
+  page: async ({ page }, use) => {
+    const errors: Error[] = [];
+    const onError = (error: Error) => errors.push(error);
+    page.on('pageerror', onError);
+    try {
+      await use(page);
+    } finally {
+      page.off('pageerror', onError);
+      expect(
+        errors.map((error) => error.stack ?? error.message),
+        'Uncaught page errors'
+      ).toEqual([]);
+    }
+  },
   storageState: ({ workerStorageState }, use) => use(workerStorageState),
 
   workerSession: [

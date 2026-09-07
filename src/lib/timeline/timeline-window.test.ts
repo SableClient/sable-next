@@ -19,6 +19,7 @@ function entries(count: number) {
 
 function fixture(heightForRow?: (value: number) => number) {
   let rowHeight = 50;
+  let viewportHeight = 300;
   const size = (value: number) => heightForRow?.(value) ?? rowHeight;
   const viewport = document.createElement('div');
   const canvas = document.createElement('div');
@@ -27,10 +28,12 @@ function fixture(heightForRow?: (value: number) => number) {
   canvas.append(content);
   document.body.append(viewport);
   Object.defineProperties(viewport, {
-    clientHeight: { get: () => 300 },
-    scrollHeight: { get: () => Number.parseFloat(canvas.style.height) || 300 },
+    clientHeight: { get: () => viewportHeight },
+    scrollHeight: {
+      get: () => Math.max(Number.parseFloat(canvas.style.height) || 0, viewportHeight),
+    },
   });
-  viewport.getBoundingClientRect = () => new DOMRect(0, 0, 300, 300);
+  viewport.getBoundingClientRect = () => new DOMRect(0, 0, 300, viewportHeight);
   let measuredHeight = 0;
   const contentHeight = () => (heightForRow ? measuredHeight : content.children.length * rowHeight);
   content.getBoundingClientRect = () => new DOMRect(0, 0, 300, contentHeight());
@@ -89,6 +92,14 @@ function fixture(heightForRow?: (value: number) => number) {
     onChange,
     keys: () =>
       Array.from(content.children).map((node) => (node as HTMLElement).dataset.timelineKey),
+    resizeViewport: (height: number) => {
+      viewportHeight = height;
+      viewport.scrollTop = Math.max(
+        0,
+        Math.min(viewport.scrollTop, viewport.scrollHeight - height)
+      );
+      document.dispatchEvent(new Event('visibilitychange'));
+    },
     resize: (height: number) => {
       rowHeight = height;
       document.dispatchEvent(new Event('visibilitychange'));
@@ -105,6 +116,47 @@ function fixture(heightForRow?: (value: number) => number) {
     },
   };
 }
+
+test.each([
+  { height: 400, touching: false },
+  { height: 600, touching: false },
+  { height: 400, touching: true },
+  { height: 600, touching: true },
+])(
+  'expanding the viewport to $height restores bottom state without a gap (touching: $touching)',
+  async ({ height, touching }) => {
+    const { window, viewport, content, resizeViewport } = fixture();
+    await window.update(entries(10));
+    viewport.scrollTop = 100;
+    viewport.dispatchEvent(new Event('scroll'));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(window.state.pinned).toBe(false);
+    if (touching) viewport.dispatchEvent(new Event('touchstart'));
+    let offset = viewport.scrollTop;
+    const writes = vi.fn((value: number) => {
+      offset = value;
+    });
+    Object.defineProperty(viewport, 'scrollTop', { get: () => offset, set: writes });
+    resizeViewport(height);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(window.state.pinned).toBe(true);
+    expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBe(0);
+    expect(content.lastElementChild?.getBoundingClientRect().bottom).toBe(height);
+    expect(writes).toHaveBeenCalledTimes(1);
+  }
+);
+
+test('expanding the viewport before reaching latest preserves the reader', async () => {
+  const { window, content, resizeViewport } = fixture();
+  await window.update(entries(100));
+  await window.jumpTo('20', 'start');
+  const anchor = content.querySelector('[data-timeline-key="20"]');
+  if (!anchor) throw new Error('missing reader anchor');
+  const top = anchor.getBoundingClientRect().top;
+  resizeViewport(600);
+  expect(window.state.pinned).toBe(false);
+  expect(anchor.getBoundingClientRect().top).toBe(top);
+});
 
 test('renders a bounded latest window and jumps to a stable key', async () => {
   const { window, keys } = fixture();

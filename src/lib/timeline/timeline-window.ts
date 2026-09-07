@@ -62,6 +62,7 @@ export class TimelineWindow<T> {
   private readonly sizes = new Map<string, number>();
   private offset = 0;
   private scrollHeight = 0;
+  private viewportHeight = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private task: Promise<void> = Promise.resolve();
   private renderTask: Promise<void> | null = null;
@@ -374,7 +375,17 @@ export class TimelineWindow<T> {
       const height = element.getBoundingClientRect().height;
       if (key && height > 0) this.sizes.set(key, height);
     }
-    if (this.pinned && !this.active) {
+    const reachedEndAfterResize =
+      this.ready &&
+      viewport.clientHeight > this.viewportHeight &&
+      this.end === this.items.length &&
+      viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - EPSILON;
+    if (reachedEndAfterResize) this.pinned = true;
+    this.viewportHeight = viewport.clientHeight;
+    if (reachedEndAfterResize && this.active) {
+      this.setHeight(Math.max(this.height, viewport.clientHeight));
+      this.setTop(this.height - this.contentHeight);
+    } else if (this.pinned && !this.active) {
       this.setTop(Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight));
       this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
       this.setTop(this.height - this.contentHeight);

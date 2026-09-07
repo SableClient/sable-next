@@ -210,11 +210,13 @@ export class RoomTimeline {
 
   async anchorAt(nth: number, { visibleOnly = false } = {}): Promise<TimelineAnchor> {
     const locator = visibleOnly ? this.visibleItems().nth(nth) : this.items.nth(nth);
-    const itemId = await locator.getAttribute('data-item-id');
-    if (!itemId) throw new Error(`timeline item ${String(nth)} has no data-item-id`);
-    const box = await locator.boundingBox();
-    if (!box) throw new Error(`timeline item ${String(nth)} has no bounds`);
-    return { itemId, y: box.y };
+    return locator.evaluate((node) => {
+      const itemId = node.getAttribute('data-item-id');
+      if (!itemId) throw new Error('timeline item has no data-item-id');
+      if (node.getClientRects().length === 0)
+        throw new Error(`timeline item ${itemId} has no bounds`);
+      return { itemId, y: node.getBoundingClientRect().top };
+    });
   }
 
   // A partially clipped row shifts on its own as history lands, so an anchor

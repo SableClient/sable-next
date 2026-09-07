@@ -7,6 +7,7 @@ export default {
   trailingComma: 'es5',
   svelte: true,
   ignorePatterns: [
+    '.agents/skills',
     'dist',
     'node_modules',
     '.svelte-kit',
