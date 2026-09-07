@@ -12,7 +12,13 @@
   import Select from '#lib/ui/primitives/Select.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { selectedPushDistributor, switchPushDistributor } from './native-push.js';
+  import {
+    selectedPushDistributor,
+    selectedPushProvider,
+    switchPushDistributor,
+    switchPushProvider,
+    type PushProvider,
+  } from './native-push.js';
   import {
     hasCompleteOverride,
     type OverrideProblem,
@@ -41,6 +47,7 @@
   let selected = $state('');
   let switching = $state(false);
   let distributorError = $state(false);
+  let provider = $state<PushProvider>('auto');
 
   async function refreshDistributors(): Promise<void> {
     try {
@@ -49,6 +56,7 @@
       if (!android) return;
       distributors = await listPushDistributors();
       selected = selectedPushDistributor();
+      provider = selectedPushProvider();
       distributorError = false;
     } catch {
       distributorError = true;
@@ -69,6 +77,22 @@
     } catch {
       distributorError = true;
       selected = selectedPushDistributor();
+    } finally {
+      switching = false;
+    }
+  }
+
+  async function changeProvider(next: string): Promise<void> {
+    if (switching || next === provider) return;
+    switching = true;
+    distributorError = false;
+    try {
+      await switchPushProvider(next as PushProvider, pushOverride(), core.session);
+      provider = next as PushProvider;
+      selected = selectedPushDistributor();
+    } catch {
+      distributorError = true;
+      provider = selectedPushProvider();
     } finally {
       switching = false;
     }
@@ -110,22 +134,37 @@
 
 {#if android}
   <section class="gateway" aria-labelledby="push-distributor">
-    <h3 id="push-distributor">{$i18n.t('settings.pushDistributor')}</h3>
-    <p class="hint">{$i18n.t('settings.pushDistributorHint')}</p>
-    {#key selected + String(switching)}
-      <Select
-        value={selected}
-        items={distributors.map((value) => ({
-          value,
-          label:
-            value === 'embedded-websocket' ? $i18n.t('settings.pushDistributorBuiltIn') : value,
-        }))}
-        aria-label={$i18n.t('settings.pushDistributor')}
-        placeholder={$i18n.t('settings.pushDistributorChoose')}
-        disabled={switching || core.status !== 'ready'}
-        onValueChange={(value) => void changeDistributor(value)}
-      />
-    {/key}
+    <h3 id="push-distributor">{$i18n.t('settings.pushTransport')}</h3>
+    <p class="hint">{$i18n.t('settings.pushTransportHint')}</p>
+    <Select
+      value={provider}
+      items={[
+        { value: 'auto', label: $i18n.t('settings.pushTransportAuto') },
+        { value: 'fcm', label: $i18n.t('settings.pushTransportNative') },
+        { value: 'unifiedpush', label: $i18n.t('settings.pushTransportUnifiedPush') },
+        { value: 'embedded', label: $i18n.t('settings.pushDistributorBuiltIn') },
+      ]}
+      aria-label={$i18n.t('settings.pushTransport')}
+      disabled={switching || core.status !== 'ready'}
+      onValueChange={(value) => void changeProvider(value)}
+    />
+    {#if provider === 'unifiedpush'}
+      <p class="hint">{$i18n.t('settings.pushDistributorHint')}</p>
+      {#key selected + String(switching)}
+        <Select
+          value={selected}
+          items={distributors.map((value) => ({
+            value,
+            label:
+              value === 'embedded-websocket' ? $i18n.t('settings.pushDistributorBuiltIn') : value,
+          }))}
+          aria-label={$i18n.t('settings.pushDistributor')}
+          placeholder={$i18n.t('settings.pushDistributorChoose')}
+          disabled={switching || core.status !== 'ready'}
+          onValueChange={(value) => void changeDistributor(value)}
+        />
+      {/key}
+    {/if}
     {#if distributorError}
       <Alert variant="critical">{$i18n.t('settings.pushDistributorFailed')}</Alert>
     {/if}

@@ -283,6 +283,8 @@ pub struct PushConfig {
     pub unified_push_gateway_url: Option<String>,
     #[serde(default)]
     pub embedded_gateway_url: Option<String>,
+    #[serde(default)]
+    pub provider: Option<String>,
 }
 
 #[cfg(any(mobile, test))]
@@ -363,7 +365,7 @@ pub async fn register_push<R: Runtime>(
         .notifications()
         .register_for_push_notifications(
             Some(config.vapid_key.clone()),
-            None,
+            config.provider.clone(),
             config.embedded_gateway_url.clone(),
             config.user_id.clone(),
             config.device_id.clone(),

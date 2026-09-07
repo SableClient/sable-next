@@ -19,7 +19,12 @@ vi.mock('#lib/platform/notifications.js', () => ({ deliversNativePush: mocks.nat
 vi.mock('#lib/settings/preferences.svelte.js', () => ({ preferences: { richPushPayloads: true } }));
 vi.mock('./push-config', () => ({ pushConfig: mocks.config }));
 
-import { registerNativePush, selectedPushDistributor, switchPushDistributor } from './native-push';
+import {
+  registerNativePush,
+  selectedPushDistributor,
+  switchPushDistributor,
+  switchPushProvider,
+} from './native-push';
 
 const session = { account_id: 'account', user_id: '@alice:example.org', device_id: 'DEVICE' };
 const override = { pushGatewayUrl: '', pushVapidKey: '', pushAppId: '' };
@@ -66,6 +71,19 @@ test('registers the built-in gateway and preserves native and UnifiedPush routin
     })
   );
   expect(mocks.select).not.toHaveBeenCalled();
+});
+
+test('passes the selected native provider to the plugin', async () => {
+  localStorage.setItem('sable.push.provider', 'fcm');
+  await registerNativePush(override, session);
+  expect(mocks.register.mock.calls[0][0].provider).toBe('fcm');
+});
+
+test('switches to UnifiedPush and selects an installed distributor', async () => {
+  await switchPushProvider('unifiedpush', override, session);
+  expect(mocks.select).toHaveBeenCalledWith('io.heckel.ntfy');
+  expect(mocks.register.mock.calls[0][0].provider).toBe('unifiedpush');
+  expect(selectedPushDistributor()).toBe('io.heckel.ntfy');
 });
 
 test('uses a deployment-provided built-in server', async () => {

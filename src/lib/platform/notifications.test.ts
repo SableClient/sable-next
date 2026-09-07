@@ -96,6 +96,7 @@ test('forwards the built-in server and account through the native command', asyn
       ios_app_id: null,
       unified_push_gateway_url: null,
       embedded_gateway_url: 'https://ntfy.example',
+      provider: 'auto',
       user_id: '@alice:example.org',
       device_id: 'DEVICE',
       event_id_only: false,

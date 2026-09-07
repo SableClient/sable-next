@@ -10,6 +10,7 @@ export interface NativePushConfig {
   iosAppId?: string | null;
   unifiedPushGatewayUrl?: string | null;
   embeddedGatewayUrl?: string | null;
+  provider?: 'auto' | 'fcm' | 'unifiedpush' | 'embedded';
   eventIdOnly: boolean;
   userId: string | null;
   deviceId: string | null;
@@ -27,6 +28,7 @@ export async function registerNativePushConfig(config: NativePushConfig): Promis
       ios_app_id: config.iosAppId ?? null,
       unified_push_gateway_url: config.unifiedPushGatewayUrl ?? null,
       embedded_gateway_url: config.embeddedGatewayUrl ?? null,
+      provider: config.provider ?? 'auto',
       event_id_only: config.eventIdOnly,
       user_id: config.userId,
       device_id: config.deviceId,
