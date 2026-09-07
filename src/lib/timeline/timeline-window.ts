@@ -83,9 +83,14 @@ export class TimelineWindow<T> {
     this.observer.observe(content);
     const listen = <K extends keyof HTMLElementEventMap>(
       type: K,
-      callback: (event: HTMLElementEventMap[K]) => void
+      callback: (event: HTMLElementEventMap[K]) => void,
+      capture = false
     ): void => {
-      viewport.addEventListener(type, callback, { passive: true, signal: this.listeners.signal });
+      viewport.addEventListener(type, callback, {
+        capture,
+        passive: true,
+        signal: this.listeners.signal,
+      });
     };
     listen('scroll', () => {
       this.scrolled();
@@ -108,8 +113,8 @@ export class TimelineWindow<T> {
       this.touching = event.touches.length > 0;
       this.scheduleSettle();
     };
-    listen('touchend', release);
-    listen('touchcancel', release);
+    listen('touchend', release, true);
+    listen('touchcancel', release, true);
     listen('keydown', (event) => {
       if (event.target !== viewport) return;
       if (['ArrowUp', 'PageUp', 'Home', 'ArrowDown', 'PageDown', 'End', ' '].includes(event.key))
@@ -175,7 +180,12 @@ export class TimelineWindow<T> {
       );
     }
     if (version !== this.jumpVersion) {
-      await this.restore(previous);
+      if (this.state.scrolling) await this.restore(previous);
+      return false;
+    }
+    const row = key === null ? null : this.element(key);
+    if (key !== null && !row) {
+      if (this.start !== previous.start || this.end !== previous.end) await this.restore(previous);
       return false;
     }
     this.pinned = key === null;
@@ -183,13 +193,14 @@ export class TimelineWindow<T> {
     this.setTop(this.estimatePrefix());
     this.setHeight(Math.max(this.top + this.contentHeight, this.options.viewport.clientHeight));
     if (this.pinned) this.setTop(this.height - this.contentHeight);
-    const row = key === null ? null : this.element(key);
     const viewport = this.options.viewport;
     const target = row
       ? viewport.scrollTop +
         row.getBoundingClientRect().top -
         viewport.getBoundingClientRect().top -
-        (align === 'center' ? (viewport.clientHeight - row.getBoundingClientRect().height) / 2 : 0)
+        (align === 'center'
+          ? Math.max(0, (viewport.clientHeight - row.getBoundingClientRect().height) / 2)
+          : 0)
       : viewport.scrollHeight - viewport.clientHeight;
     this.jumping = smooth;
     this.active = smooth;
@@ -219,7 +230,7 @@ export class TimelineWindow<T> {
   }
 
   private async restore(snapshot: ViewSnapshot): Promise<void> {
-    if (!this.active || this.disposed) return;
+    if (this.disposed) return;
     this.offset = this.options.viewport.scrollTop;
     this.anchors = snapshot.anchors.map((anchor) => ({
       ...anchor,

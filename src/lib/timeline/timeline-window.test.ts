@@ -42,6 +42,7 @@ function fixture(heightForRow?: (value: number) => number) {
     Number.parseFloat(content.style.bottom || '0') -
     contentHeight();
   let pause: Promise<void> | undefined;
+  let omittedKey: string | undefined;
   const render = vi.fn(async (rows: readonly TimelineRow<number>[]) => {
     if (pause) await pause;
     const existing = new Map(
@@ -51,21 +52,23 @@ function fixture(heightForRow?: (value: number) => number) {
       ])
     );
     measuredHeight = 0;
-    const nodes = rows.map((row, index) => {
-      const measuredTop = measuredHeight;
-      measuredHeight += size(row.value);
-      const node = existing.get(row.key) ?? document.createElement('button');
-      if (!existing.has(row.key)) node.textContent = row.key;
-      node.dataset.timelineKey = row.key;
-      node.getBoundingClientRect = () =>
-        new DOMRect(
-          0,
-          contentTop() + (heightForRow ? measuredTop : index * rowHeight) - viewport.scrollTop,
-          300,
-          size(row.value)
-        );
-      return node;
-    });
+    const nodes = rows
+      .filter((row) => row.key !== omittedKey)
+      .map((row, index) => {
+        const measuredTop = measuredHeight;
+        measuredHeight += size(row.value);
+        const node = existing.get(row.key) ?? document.createElement('button');
+        if (!existing.has(row.key)) node.textContent = row.key;
+        node.dataset.timelineKey = row.key;
+        node.getBoundingClientRect = () =>
+          new DOMRect(
+            0,
+            contentTop() + (heightForRow ? measuredTop : index * rowHeight) - viewport.scrollTop,
+            300,
+            size(row.value)
+          );
+        return node;
+      });
     for (const node of Array.from(content.children)) {
       if (!nodes.includes(node as HTMLElement)) node.remove();
     }
@@ -86,19 +89,25 @@ function fixture(heightForRow?: (value: number) => number) {
   windows.push(window);
   return {
     window,
+    omitRow: (key: string) => {
+      omittedKey = key;
+      Array.from(content.children)
+        .find((node) => (node as HTMLElement).dataset.timelineKey === key)
+        ?.remove();
+    },
     viewport,
     content,
     render,
     onChange,
     keys: () =>
       Array.from(content.children).map((node) => (node as HTMLElement).dataset.timelineKey),
-    resizeViewport: (height: number) => {
+    resizeViewport: (height: number, notify = true) => {
       viewportHeight = height;
       viewport.scrollTop = Math.max(
         0,
         Math.min(viewport.scrollTop, viewport.scrollHeight - height)
       );
-      document.dispatchEvent(new Event('visibilitychange'));
+      if (notify) document.dispatchEvent(new Event('visibilitychange'));
     },
     resize: (height: number) => {
       rowHeight = height;
@@ -226,6 +235,89 @@ test.each(['scroll', 'layout'])(
     expect(window.state.pinned).toBe(true);
   }
 );
+
+test.each(['touchend', 'touchcancel'])(
+  'a stopped %s still releases queued updates',
+  async (type) => {
+    const { window, viewport, content, keys } = fixture();
+    await window.update(entries(100));
+    await window.jumpTo('50', 'start');
+    const row = content.querySelector('[data-timeline-key="50"]');
+    if (!row) throw new Error('missing touched row');
+    row.dispatchEvent(new Event('touchstart', { bubbles: true }));
+    viewport.scrollTop += 20;
+    viewport.dispatchEvent(new Event('scroll'));
+    const offset = viewport.scrollTop;
+    const top = row.getBoundingClientRect().top;
+    const updated = entries(100).filter((entry) => entry.key !== '30');
+    await window.update(updated);
+    expect(keys()).toContain('30');
+    row.addEventListener(type, (event) => {
+      event.stopPropagation();
+    });
+    row.dispatchEvent(new TouchEvent(type, { bubbles: true, touches: [] }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(window.state.scrolling).toBe(false);
+    expect(keys()).not.toContain('30');
+    expect(row.getBoundingClientRect().top).toBe(top);
+    expect(viewport.scrollTop).toBe(offset - 50);
+  }
+);
+
+test.each([50, 300, 600])(
+  'centering a message of height %s keeps its beginning visible',
+  async (height) => {
+    const { window, content } = fixture((value) => (value === 50 ? height : 50));
+    await window.update(entries(100));
+    expect(await window.jumpTo('50', 'center')).toBe(true);
+    const row = content.querySelector('[data-timeline-key="50"]');
+    if (!row) throw new Error('missing target row');
+    expect(row.getBoundingClientRect().top).toBe(Math.max(0, (300 - height) / 2));
+  }
+);
+
+test.each([
+  { pinned: true, inRange: true },
+  { pinned: true, inRange: false },
+  { pinned: false, inRange: true },
+  { pinned: false, inRange: false },
+])(
+  'a missing jump target preserves the reader (pinned: $pinned, in range: $inRange)',
+  async ({ pinned, inRange }) => {
+    const { window, viewport, content, keys, omitRow } = fixture();
+    await window.update(entries(1000));
+    if (!pinned) await window.jumpTo('500', 'start');
+    const target = inRange ? (pinned ? '950' : '480') : '20';
+    omitRow(target);
+    const before = window.state;
+    const previousKeys = keys();
+    const offset = viewport.scrollTop;
+    const anchorKey = pinned ? '995' : '500';
+    const anchor = content.querySelector(`[data-timeline-key="${anchorKey}"]`);
+    if (!anchor) throw new Error('missing reader anchor');
+    const top = anchor.getBoundingClientRect().top;
+    expect(await window.jumpTo(target)).toBe(false);
+    expect(window.state).toEqual(before);
+    expect(keys()).toEqual(previousKeys);
+    expect(viewport.scrollTop).toBe(offset);
+    expect(
+      content.querySelector(`[data-timeline-key="${anchorKey}"]`)?.getBoundingClientRect().top
+    ).toBe(top);
+  }
+);
+
+test('a queued scroll re-pins after a resize clamps back to the previous offset', async () => {
+  const { window, viewport, resizeViewport } = fixture();
+  await window.update(entries(10));
+  await window.jumpTo('0', 'start');
+  expect(window.state.pinned).toBe(false);
+  expect(viewport.scrollTop).toBe(0);
+  viewport.scrollTop = 1;
+  resizeViewport(600, false);
+  expect(viewport.scrollTop).toBe(0);
+  viewport.dispatchEvent(new Event('scroll'));
+  expect(window.state.pinned).toBe(true);
+});
 
 test('renders a bounded latest window and jumps to a stable key', async () => {
   const { window, keys } = fixture();
