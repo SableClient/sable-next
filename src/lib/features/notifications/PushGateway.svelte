@@ -1,12 +1,18 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+
   import { runtimeConfig } from '#lib/config/runtime-config.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { listPushDistributors, supportsPushDistributors } from '#lib/platform/push.js';
   import { i18n } from '#lib/i18n.js';
-  import { deliversWebPush } from '#lib/platform/notifications.js';
+  import { deliversNativePush, deliversWebPush } from '#lib/platform/notifications.js';
   import { setPreference } from '#lib/settings/preferences.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import { selectedPushDistributor, switchPushDistributor } from './native-push.js';
   import {
     hasCompleteOverride,
     type OverrideProblem,
@@ -28,6 +34,45 @@
   };
 
   const config = runtimeConfig();
+  const core = useCoreClient();
+  let android = $state(false);
+  let native = $state(false);
+  let distributors = $state<string[]>([]);
+  let selected = $state('');
+  let switching = $state(false);
+  let distributorError = $state(false);
+
+  async function refreshDistributors(): Promise<void> {
+    try {
+      native = await deliversNativePush();
+      android = await supportsPushDistributors();
+      if (!android) return;
+      distributors = await listPushDistributors();
+      selected = selectedPushDistributor();
+      distributorError = false;
+    } catch {
+      distributorError = true;
+    }
+  }
+
+  onMount(() => {
+    void refreshDistributors();
+  });
+
+  async function changeDistributor(name: string): Promise<void> {
+    if (switching || !name || name === selected) return;
+    switching = true;
+    distributorError = false;
+    try {
+      await switchPushDistributor(name, pushOverride(), core.session);
+      selected = name;
+    } catch {
+      distributorError = true;
+      selected = selectedPushDistributor();
+    } finally {
+      switching = false;
+    }
+  }
 
   const fields: Field[] = [
     {
@@ -57,11 +102,41 @@
   }
 </script>
 
+<svelte:window
+  onfocus={() => {
+    if (!switching) void refreshDistributors();
+  }}
+/>
+
+{#if android}
+  <section class="gateway" aria-labelledby="push-distributor">
+    <h3 id="push-distributor">{$i18n.t('settings.pushDistributor')}</h3>
+    <p class="hint">{$i18n.t('settings.pushDistributorHint')}</p>
+    {#key selected + String(switching)}
+      <Select
+        value={selected}
+        items={distributors.map((value) => ({
+          value,
+          label:
+            value === 'embedded-websocket' ? $i18n.t('settings.pushDistributorBuiltIn') : value,
+        }))}
+        aria-label={$i18n.t('settings.pushDistributor')}
+        placeholder={$i18n.t('settings.pushDistributorChoose')}
+        disabled={switching || core.status !== 'ready'}
+        onValueChange={(value) => void changeDistributor(value)}
+      />
+    {/key}
+    {#if distributorError}
+      <Alert variant="critical">{$i18n.t('settings.pushDistributorFailed')}</Alert>
+    {/if}
+  </section>
+{/if}
+
 <section class="gateway" aria-labelledby="push-gateway">
   <h3 id="push-gateway">{$i18n.t('settings.pushGateway')}</h3>
   <p class="hint">{$i18n.t('settings.pushGatewayHint')}</p>
 
-  {#if !deliversWebPush()}
+  {#if !deliversWebPush() && !native}
     <Alert variant="info">
       <p>{$i18n.t('settings.pushGatewayUnsupported')}</p>
     </Alert>

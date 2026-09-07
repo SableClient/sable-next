@@ -147,3 +147,14 @@ test('a deployment can select a separate Matrix gateway for UnifiedPush', () => 
     }).push?.unifiedPushGatewayUrl
   ).toBe('https://ntfy.example/_matrix/push/v1/notify');
 });
+
+test('reads a deployment-provided built-in push server', () => {
+  expect(
+    parseRuntimeConfig({
+      pushNotificationDetails: {
+        ...details,
+        unifiedPushEmbeddedServerUrl: ' https://ntfy.example ',
+      },
+    }).push?.unifiedPushEmbeddedServerUrl
+  ).toBe('https://ntfy.example');
+});
