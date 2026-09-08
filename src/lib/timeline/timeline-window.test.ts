@@ -319,6 +319,109 @@ test('a queued scroll re-pins after a resize clamps back to the previous offset'
   expect(window.state.pinned).toBe(true);
 });
 
+test.each(['scroll', 'layout'])(
+  'opening the keyboard preserves bottom following during %s',
+  async (notification) => {
+    const { window, viewport, resizeViewport } = fixture();
+    await window.update(entries(10));
+    viewport.dispatchEvent(new Event('pointerdown'));
+    resizeViewport(200, false);
+    viewport.scrollTop += 50;
+    if (notification === 'layout') document.dispatchEvent(new Event('visibilitychange'));
+    viewport.dispatchEvent(new Event('scroll'));
+    expect(window.state.pinned).toBe(true);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(viewport.scrollTop).toBe(viewport.scrollHeight - viewport.clientHeight);
+    expect(window.state.pinned).toBe(true);
+  }
+);
+
+test.each([
+  { pinned: true, delta: 50, notification: 'scroll' },
+  { pinned: true, delta: -50, notification: 'scroll' },
+  { pinned: false, delta: 50, notification: 'scroll' },
+  { pinned: false, delta: -50, notification: 'scroll' },
+  { pinned: true, delta: 50, notification: 'layout' },
+  { pinned: true, delta: -50, notification: 'layout' },
+  { pinned: false, delta: 50, notification: 'layout' },
+  { pinned: false, delta: -50, notification: 'layout' },
+])(
+  'keyboard resizing respects touch direction (pinned: $pinned, delta: $delta, $notification)',
+  async ({ pinned, delta, notification }) => {
+    const { window, viewport, content, resizeViewport, render } = fixture();
+    await window.update(entries(100));
+    if (!pinned) await window.jumpTo('50', 'start');
+    viewport.dispatchEvent(new Event('touchstart'));
+    resizeViewport(200, false);
+    viewport.scrollTop += delta;
+    if (notification === 'layout') document.dispatchEvent(new Event('visibilitychange'));
+    viewport.dispatchEvent(new Event('scroll'));
+    const following = pinned && delta > 0;
+    expect(window.state.pinned).toBe(following);
+    const anchorKey = String(window.state.firstVisible);
+    const anchor = content.querySelector(`[data-timeline-key="${anchorKey}"]`);
+    if (!anchor) throw new Error('missing reader anchor');
+    const top = anchor.getBoundingClientRect().top;
+    const renders = render.mock.calls.length;
+    await window.update(entries(101));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(render).toHaveBeenCalledTimes(renders);
+    viewport.dispatchEvent(new TouchEvent('touchend', { touches: [] }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(window.state.pinned).toBe(following);
+    if (following) {
+      expect(viewport.scrollTop).toBe(viewport.scrollHeight - viewport.clientHeight);
+    } else {
+      expect(
+        content.querySelector(`[data-timeline-key="${anchorKey}"]`)?.getBoundingClientRect().top
+      ).toBe(top);
+    }
+  }
+);
+
+test('touch interrupts a pending latest jump during keyboard resize and an incoming update', async () => {
+  const { window, viewport, content, pause, resizeViewport } = fixture();
+  await window.update(entries(1000));
+  await window.jumpTo('20', 'start');
+  const release = pause();
+  const jump = window.jumpTo(null, 'start', true);
+  viewport.dispatchEvent(new Event('touchstart'));
+  viewport.scrollTop += 50;
+  viewport.dispatchEvent(new Event('scroll'));
+  resizeViewport(200);
+  await window.update(entries(1001));
+  release();
+  expect(await jump).toBe(false);
+  expect(window.state.pinned).toBe(false);
+  const anchorKey = String(window.state.firstVisible);
+  const anchor = content.querySelector(`[data-timeline-key="${anchorKey}"]`);
+  if (!anchor) throw new Error('missing reader anchor');
+  const top = anchor.getBoundingClientRect().top;
+  viewport.dispatchEvent(new TouchEvent('touchend', { touches: [] }));
+  await vi.advanceTimersByTimeAsync(200);
+  expect(window.state.pinned).toBe(false);
+  expect(
+    content.querySelector(`[data-timeline-key="${anchorKey}"]`)?.getBoundingClientRect().top
+  ).toBe(top);
+});
+
+test.each([0, 2])(
+  'a room with %s messages stays at latest when it fills with the keyboard open',
+  async (count) => {
+    const { window, viewport, resizeViewport, content } = fixture();
+    await window.update(entries(count));
+    resizeViewport(200);
+    await window.update(entries(1000));
+    expect(window.state.pinned).toBe(true);
+    expect(window.state.lastVisible).toBe(999);
+    expect(viewport.scrollTop).toBe(viewport.scrollHeight - viewport.clientHeight);
+    expect(content.children.length).toBeLessThanOrEqual(80);
+    resizeViewport(300);
+    expect(window.state.pinned).toBe(true);
+    expect(viewport.scrollTop).toBe(viewport.scrollHeight - viewport.clientHeight);
+  }
+);
+
 test('renders a bounded latest window and jumps to a stable key', async () => {
   const { window, keys } = fixture();
   await window.update(entries(1000));

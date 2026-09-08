@@ -382,7 +382,7 @@ export class TimelineWindow<T> {
       const delta = viewport.scrollTop - this.offset;
       if (delta !== 0) this.scrollingUp = delta < 0;
       for (const anchor of this.anchors) anchor.top -= delta;
-      if (!this.jumping && delta !== 0) this.pinned = this.atEnd();
+      if (!this.jumping && delta !== 0) this.pinned = this.atEnd() || (this.pinned && delta > 0);
       this.offset = viewport.scrollTop;
     }
     for (const element of this.elements()) {
@@ -452,7 +452,7 @@ export class TimelineWindow<T> {
       for (const anchor of this.anchors) anchor.top -= delta;
       this.active = true;
       if (!this.jumping) {
-        this.pinned = this.atEnd();
+        this.pinned = this.atEnd() || (this.pinned && delta > 0);
       }
       this.scheduleSettle();
       if (!this.rendering) {

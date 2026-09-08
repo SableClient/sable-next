@@ -60,6 +60,78 @@ for (const { fits, touching } of [
   });
 }
 
+test('touch keyboard resize keeps following latest during a partial scroll adjustment', async ({
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await loadScrollableHistory(core, timeline);
+  await timeline.waitForScrollSettled();
+  await expect(timeline.jumpToLatest).toBeHidden();
+  await app.composer.focus();
+  await timeline.viewport.evaluate((node) => {
+    node.style.maxHeight = '50%';
+    const remaining = node.scrollHeight - node.clientHeight - node.scrollTop;
+    if (remaining <= 0) throw new Error('timeline viewport did not shrink');
+    node.scrollTop += remaining / 2;
+    node.dispatchEvent(new Event('scroll'));
+  });
+  await expect(timeline.jumpToLatest).toBeHidden();
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+  await expect(timeline.jumpToLatest).toBeHidden();
+});
+
+for (const reading of [false, true]) {
+  test(`touch repeated keyboard resizing preserves ${reading ? 'the reader' : 'latest'} with incoming messages and late measurements`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    await loadScrollableHistory(core, timeline);
+    if (reading) {
+      const height = await timeline.viewport.evaluate((node) => node.clientHeight);
+      await timeline.scrollAboveBottomAndNotify(height * 2);
+    }
+    await timeline.waitForScrollSettled();
+    const anchor = reading ? await timeline.fullyVisibleAnchor() : null;
+    const size = page.viewportSize();
+    if (!size) throw new Error('missing viewport size');
+    const subscription = await core.subscription();
+    await app.composer.focus();
+    for (const [index, ratio] of [0.65, 0.5, 1].entries()) {
+      await page.setViewportSize({ width: size.width, height: Math.round(size.height * ratio) });
+      await core.emitTimelineDiff(subscription, [
+        {
+          op: 'push_back',
+          value: timelineItem(`keyboard-cycle-${index}`, 'Incoming during keyboard resize'),
+        },
+      ]);
+      await timeline.viewport.evaluate((node) => {
+        const row = node.querySelector<HTMLElement>('.item');
+        if (!row) throw new Error('missing row to resize');
+        row.style.paddingBottom = '4rem';
+      });
+      await timeline.waitForScrollSettled();
+      if (anchor) {
+        await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
+        await expect(timeline.jumpToLatest).toBeVisible();
+      } else {
+        await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+        await expect(timeline.itemById(`keyboard-cycle-${index}`)).toBeInViewport();
+        await expect(timeline.jumpToLatest).toBeHidden();
+      }
+    }
+  });
+}
+
 test('touch navigation to a distant latest message never renders a blank frame', async ({
   page,
   app,
