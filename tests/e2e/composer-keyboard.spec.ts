@@ -1,6 +1,11 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-test.use({ storageState: SIGNED_OUT });
+test.use({
+  storageState: SIGNED_OUT,
+  hasTouch: true,
+  isMobile: true,
+  viewport: { width: 390, height: 844 },
+});
 
 test('mobile emote autocomplete keeps the editor focused and keyboard spacing stable', async ({
   page,

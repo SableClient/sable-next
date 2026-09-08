@@ -50,8 +50,8 @@ test('a query returns hits grouped by room and opens the message it lands on', a
 
   const results = page.getByRole('button', { name: /Welcome to/ });
   await expect(results.first()).toBeVisible(INDEXED);
-  await expect(anyGroup(page, 'General')).toBeVisible();
-  await expect(anyGroup(page, 'Random')).toBeVisible();
+  await expect(anyGroup(page, 'General')).toBeVisible(INDEXED);
+  await expect(anyGroup(page, 'Random')).toBeVisible(INDEXED);
 
   await results.first().click();
   await expect.poll(() => new URL(page.url()).searchParams.get('event')).toMatch(/^\$/);

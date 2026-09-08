@@ -15,15 +15,16 @@ test('renders a startup state while the core is restoring', async ({ app, instal
   await expect(app.startupHeading).toBeVisible();
 });
 
-test('renders a recoverable error when the core cannot start', async ({
+test('returns to login when the core cannot restore the session', async ({
+  page,
   app,
   installEmptyCore,
 }) => {
   await installEmptyCore('error');
   await app.openRooms();
 
-  await expect(app.startupError).toContainText('Sable could not start');
-  await expect(app.retryButton).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Welcome to Sable' })).toBeVisible();
 });
 
 test('redirects signed-out protected routes to login', async ({ page }) => {

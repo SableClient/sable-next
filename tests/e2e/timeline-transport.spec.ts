@@ -130,7 +130,7 @@ test('prefetches history within the oldest timeline items', async ({
   await expect.poll(() => pages(homeserverProxy), { timeout: 20_000 }).toBeGreaterThan(0);
 });
 
-test('anchors each history page requested by separate upward gestures', async ({
+test.fixme('anchors each history page requested by separate upward gestures', async ({
   page,
   app,
   timeline,

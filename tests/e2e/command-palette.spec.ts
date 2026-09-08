@@ -51,9 +51,9 @@ test.describe('the jump-to-room palette', () => {
 
   test('Escape closes the palette and restores focus', async ({ page, app, palette }) => {
     void palette;
-    const homeLink = app.homeLink();
-    await homeLink.focus();
-    await expect(homeLink).toBeFocused();
+    const railLink = app.landingLink();
+    await railLink.focus();
+    await expect(railLink).toBeFocused();
 
     await page.keyboard.press('ControlOrMeta+k');
     const dialog = page.getByRole('dialog', { name: 'Jump to room' });
@@ -63,7 +63,7 @@ test.describe('the jump-to-room palette', () => {
     await page.keyboard.press('Escape');
 
     await expect(dialog).toHaveCount(0);
-    await expect(homeLink).toBeFocused();
+    await expect(railLink).toBeFocused();
   });
 
   test('a shortcut without allowInEditable does not fire while typing in the composer', async ({

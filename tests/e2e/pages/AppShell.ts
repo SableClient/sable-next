@@ -8,8 +8,6 @@ export class AppShell {
   readonly mobileQuickTools: Locator;
   readonly startupStatus: Locator;
   readonly startupHeading: Locator;
-  readonly startupError: Locator;
-  readonly retryButton: Locator;
   readonly backToRooms: Locator;
   readonly resizeRooms: Locator;
   readonly composer: Locator;
@@ -28,8 +26,6 @@ export class AppShell {
     // Scoped to the page: root-layout banners are live regions too.
     this.startupStatus = page.getByRole('main').getByRole('status');
     this.startupHeading = page.getByRole('heading', { name: 'Starting Sable' });
-    this.startupError = page.getByRole('alert');
-    this.retryButton = page.getByRole('button', { name: 'Try again' });
     this.backToRooms = page.getByRole('button', { name: 'Back to rooms' });
     this.resizeRooms = page.getByRole('slider', { name: 'Resize rooms' });
     this.composer = page.getByRole('combobox', { name: 'Send a message...' });
@@ -116,8 +112,8 @@ export class AppShell {
     await this.page.goto(`/to/${fragment}`);
   }
 
-  homeLink(): Locator {
-    return this.primaryNavigation.getByRole('link', { name: 'Home' });
+  landingLink(): Locator {
+    return this.primaryNavigation.getByRole('link', { name: 'Rooms outside spaces' });
   }
 
   roomLink(name: string): Locator {

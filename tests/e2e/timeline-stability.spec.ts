@@ -6,6 +6,9 @@ import type { RoomTimeline } from './pages/RoomTimeline';
 
 test.use({ storageState: SIGNED_OUT });
 
+const NATIVE_FLING_REASON = 'native fling gestures need a compositor CI does not have';
+const NO_NATIVE_FLING = Boolean(process.env.CI);
+
 for (const { fits, touching } of [
   { fits: false, touching: false },
   { fits: true, touching: false },
@@ -614,6 +617,7 @@ test('mobile native momentum crosses the original rendered window', async ({
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'Native touch input is driven through CDP');
+  test.skip(NO_NATIVE_FLING, NATIVE_FLING_REASON);
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
   await timeline.expectRevealed();
@@ -962,6 +966,7 @@ test.describe('touch', () => {
 
   test('mobile native momentum control', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
+    test.skip(NO_NATIVE_FLING, NATIVE_FLING_REASON);
     await page.setContent(PROBE_HTML);
     const viewport = page.locator('#probe');
     const client = await page.context().newCDPSession(page);
@@ -993,6 +998,7 @@ test.describe('touch', () => {
         : 'a finger drag through unmeasured history moves the reader by exactly the drag',
       async ({ page, app, timeline, core, installRoomCore, browserName }) => {
         test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
+        test.skip(momentum && NO_NATIVE_FLING, NATIVE_FLING_REASON);
         await installRoomCore('endless_history');
         await app.openRoom('!room:example.test');
         await timeline.expectRevealed();

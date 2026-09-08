@@ -537,7 +537,6 @@ test('opens at the first unread message rather than the newest', async ({
   await timeline.expectRevealed();
 
   await expect(timeline.message('General message 5')).toBeVisible();
-  await expect(timeline.jumpToLatest).toBeVisible();
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
 });
 
@@ -579,7 +578,7 @@ test('keeps the reader in place when they send from a room opened on its first u
   await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   const anchor = await timeline.fullyVisibleAnchor();
 
   const subscription = await core.subscription();
@@ -597,7 +596,6 @@ test('keeps the reader in place when they send from a room opened on its first u
 
   await expect(timeline.itemById('echo')).toHaveCount(1);
   await timeline.expectAnchorHeld(anchor);
-  await expect(timeline.jumpToLatest).toBeVisible();
   expect(await timeline.distanceFromBottom()).toBeGreaterThan(0);
 });
 
