@@ -319,6 +319,65 @@ test('a queued scroll re-pins after a resize clamps back to the previous offset'
   expect(window.state.pinned).toBe(true);
 });
 
+test('a subpixel native bottom still follows an appended message', async () => {
+  const { window, viewport } = fixture();
+  await window.update(entries(10));
+  const bottom = viewport.scrollHeight - viewport.clientHeight;
+
+  viewport.scrollTop = bottom - 100;
+  viewport.dispatchEvent(new Event('scroll'));
+  expect(window.state.pinned).toBe(false);
+
+  viewport.scrollTop = bottom - 0.75;
+  viewport.dispatchEvent(new Event('scroll'));
+  expect(window.state.pinned).toBe(true);
+  await window.update(entries(11));
+  await vi.advanceTimersByTimeAsync(200);
+
+  expect(window.state.pinned).toBe(true);
+  expect(viewport.scrollTop).toBe(viewport.scrollHeight - viewport.clientHeight);
+});
+
+test('an external input restores a pinned timeline before its native scroll event', async () => {
+  const { window, viewport } = fixture();
+  await window.update(entries(10));
+  const bottom = viewport.scrollHeight - viewport.clientHeight;
+  const composer = document.createElement('textarea');
+  document.body.append(composer);
+
+  viewport.scrollTop = bottom - 6;
+  composer.dispatchEvent(new Event('input', { bubbles: true }));
+  viewport.dispatchEvent(new Event('scroll'));
+
+  expect(window.state.pinned).toBe(true);
+  expect(viewport.scrollTop).toBe(bottom);
+});
+
+test.each([
+  { pinned: false, active: false },
+  { pinned: true, active: true },
+])(
+  'an external input does not change an unpinned or active timeline',
+  async ({ pinned, active }) => {
+    const { window, viewport } = fixture();
+    await window.update(entries(10));
+    if (!pinned) {
+      viewport.scrollTop -= 50;
+      viewport.dispatchEvent(new Event('scroll'));
+      await vi.advanceTimersByTimeAsync(200);
+    }
+    if (active) viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: 20 }));
+    const composer = document.createElement('textarea');
+    document.body.append(composer);
+    const offset = viewport.scrollTop;
+
+    composer.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(window.state.pinned).toBe(pinned);
+    expect(viewport.scrollTop).toBe(offset);
+  }
+);
+
 test.each(['scroll', 'layout'])(
   'opening the keyboard preserves bottom following during %s',
   async (notification) => {

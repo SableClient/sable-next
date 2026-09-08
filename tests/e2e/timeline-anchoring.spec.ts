@@ -105,7 +105,7 @@ test('falls back to a surviving visible anchor when the first row is replaced', 
   await timeline.expectRevealed();
 
   await timeline.wheelUp(200);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await timeline.dispatchWheel(1);
   await timeline.scrollToAndNotify(0);
   await page.waitForTimeout(200);
@@ -151,7 +151,7 @@ test('anchors a large reset by surviving event identity', async ({
 
   const anchor = timeline.itemByEventId('$general-0:example.test');
   await timeline.wheelUp(300);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await timeline.dispatchWheel(1);
   await timeline.scrollToMiddleAndNotify();
   await expect(anchor).toHaveCount(1);
@@ -339,7 +339,7 @@ test('keeps a local echo and the visible position stable through confirmation', 
   await expect(timeline.container).not.toHaveClass(/initial/, { timeout: 20_000 });
 
   await timeline.wheelUp(200);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
 
   const subscription = await core.subscription();
   const localEcho = {
@@ -450,7 +450,7 @@ test('anchors delayed history inserted after a stable date divider', async ({
 
   const anchor = timeline.itemByEventId('$general-0:example.test');
   await timeline.wheelUp(200);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await timeline.dispatchWheel(1);
   await timeline.scrollTo(0);
   const before = await anchor.boundingBox();
@@ -476,7 +476,7 @@ test('anchors delayed history from a nonzero oldest-threshold offset', async ({
   await timeline.expectRevealed();
 
   await timeline.wheelUp(200);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await timeline.dispatchWheel(1);
   await timeline.scrollToAndNotify(await timeline.offsetOfIndex(8));
 

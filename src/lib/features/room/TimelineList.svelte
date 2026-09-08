@@ -141,6 +141,7 @@
   let controller = $state.raw<TimelineWindow<RowValue> | null>(null);
   let viewport = $state<HTMLDivElement | null>(null);
   let revealed = $state(false);
+  let jumpToLatestVisible = $state(false);
   let opening = false;
   let filling = $state(false);
   let disposed = false;
@@ -154,7 +155,6 @@
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
   );
-  let atLatest = $derived(windowState.pinned);
   let readEventId = $derived.by(() => {
     if (!revealed || !viewport) return null;
     if (windowState.pinned) return latestEventId(rows.map((row) => row.value.item));
@@ -215,6 +215,10 @@
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;
+    jumpToLatestVisible =
+      !state.pinned &&
+      node !== null &&
+      node.scrollHeight - node.clientHeight - node.scrollTop >= node.clientHeight;
     nearLatest =
       state.end === entries.length &&
       node !== null &&
@@ -498,7 +502,7 @@
     {/if}
   </div>
 
-  {#if revealed && timeline.mode.kind === 'live' && !atLatest && visibleItems.length > 0}
+  {#if revealed && timeline.mode.kind === 'live' && jumpToLatestVisible && visibleItems.length > 0}
     <Button
       type="button"
       class="jump-to-latest"

@@ -8,6 +8,7 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:4175', contextOptions: { reducedMotion: 'reduce' } },
   projects: [
     { name: 'chromium', grepInvert: /mobile/, use: devices['Desktop Chrome'] },
+    { name: 'firefox', grepInvert: /mobile/, use: devices['Desktop Firefox'] },
     { name: 'webkit', grepInvert: /mobile/, use: devices['Desktop Safari'] },
     {
       name: 'android',

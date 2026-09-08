@@ -127,6 +127,19 @@ export class TimelineWindow<T> {
       },
       { signal: this.listeners.signal }
     );
+    viewport.ownerDocument.addEventListener(
+      'input',
+      (event) => {
+        if (
+          this.pinned &&
+          !this.active &&
+          event.target instanceof Node &&
+          !viewport.contains(event.target)
+        )
+          this.writeOffset(viewport.scrollHeight - viewport.clientHeight);
+      },
+      { signal: this.listeners.signal }
+    );
   }
 
   get state(): TimelineWindowState {
@@ -379,11 +392,11 @@ export class TimelineWindow<T> {
     this.offset = viewport.scrollTop;
   }
 
-  private atEnd(): boolean {
+  private atEnd(tolerance = EPSILON): boolean {
     const viewport = this.options.viewport;
     return (
       this.end === this.items.length &&
-      viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - EPSILON
+      viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - tolerance
     );
   }
 
@@ -393,7 +406,8 @@ export class TimelineWindow<T> {
     if (delta === 0) return delta;
     this.scrollingUp = delta < 0;
     for (const anchor of this.anchors) anchor.top -= delta;
-    if (!this.jumping) this.pinned = this.atEnd() || (this.pinned && delta > 0);
+    if (!this.jumping)
+      this.pinned = this.atEnd(delta > 0 ? 2 : EPSILON) || (this.pinned && delta > 0);
     return delta;
   }
 

@@ -28,7 +28,7 @@ for (const { fits, touching } of [
       height: node.clientHeight,
       content: node.scrollHeight,
     }));
-    await timeline.scrollAboveBottomAndNotify(dimensions.height / 4);
+    await timeline.scrollAboveBottomAndNotify(dimensions.height + 1);
     await timeline.waitForScrollSettled();
     await expect(timeline.jumpToLatest).toBeVisible();
     if (touching) {
@@ -39,7 +39,7 @@ for (const { fits, touching } of [
     }
     await page.setViewportSize({
       width: size.width,
-      height: Math.ceil(size.height + (fits ? dimensions.content : dimensions.height / 2)),
+      height: Math.ceil(size.height + (fits ? dimensions.content : dimensions.height * 2)),
     });
     await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
     await expect(timeline.jumpToLatest).toBeHidden();
@@ -724,13 +724,13 @@ test('reading just above latest stays fixed when typing shrinks the viewport', a
   await timeline.expectRevealed();
   await timeline.scrollAboveBottomAndNotify(30);
   await timeline.waitForScrollSettled();
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect(timeline.jumpToLatest).toBeHidden();
   const anchor = await timeline.fullyVisibleAnchor();
   const positions = await timeline.sampleAnchorWhile(anchor.itemId, 400, async () => {
     await core.emitTyping('!room:example.test', ['@alice:example.test']);
   });
   expect(Math.max(...positions.map((top) => Math.abs(top - anchor.y)))).toBeLessThanOrEqual(2);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect(timeline.jumpToLatest).toBeHidden();
 });
 
 test('scrolling through unmeasured history preserves the requested movement every frame', async ({
@@ -1125,7 +1125,9 @@ test.describe('mobile', () => {
     await installRoomCore('ready');
     await app.openRoom('!room:example.test');
     await loadScrollableHistory(core, timeline);
-    await timeline.scrollAboveBottomAndNotify(200);
+    await timeline.scrollAboveBottomAndNotify(
+      await timeline.viewport.evaluate((node) => node.clientHeight + 1)
+    );
     await expect(timeline.jumpToLatest).toBeVisible();
     const gap = await timeline.jumpToLatest.evaluate((button) => {
       (button as HTMLElement).click();
@@ -1168,7 +1170,7 @@ test.describe('mobile', () => {
     await loadScrollableHistory(core, timeline);
     await timeline.scrollAboveBottomAndNotify(200);
     await timeline.waitForScrollSettled();
-    await expect(timeline.jumpToLatest).toBeVisible();
+    await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
     const anchor = await timeline.fullyVisibleAnchor();
     const size = page.viewportSize();
     if (!size) throw new Error('missing mobile viewport');
@@ -1177,7 +1179,7 @@ test.describe('mobile', () => {
     await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
     await page.setViewportSize(size);
     await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
-    await expect(timeline.jumpToLatest).toBeVisible();
+    await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   });
 
   test('rotating the viewport preserves the reader’s position within the timeline', async ({
@@ -1192,7 +1194,7 @@ test.describe('mobile', () => {
     await loadScrollableHistory(core, timeline);
     await timeline.scrollAboveBottomAndNotify(200);
     await timeline.waitForScrollSettled();
-    await expect(timeline.jumpToLatest).toBeVisible();
+    await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
     const anchor = await timeline.fullyVisibleAnchor();
     const before = await timeline.viewport.boundingBox();
     const size = page.viewportSize();
@@ -1218,7 +1220,9 @@ test.describe('mobile', () => {
     await installRoomCore('ready');
     await app.openRoom('!room:example.test');
     await loadScrollableHistory(core, timeline);
-    await timeline.scrollAboveBottomAndNotify(200);
+    await timeline.scrollAboveBottomAndNotify(
+      await timeline.viewport.evaluate((node) => node.clientHeight + 1)
+    );
     await expect(timeline.jumpToLatest).toBeVisible();
     const before = await timeline.scrollTop();
     const end = await timeline.scrollableHeight();
@@ -1259,32 +1263,244 @@ test('a message the reader sends from the bottom is followed on every frame', as
   await timeline.expectRevealed();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
   const subscription = await core.subscription();
-  const echo = {
-    ...timelineItem('sent-from-bottom', `A message I just sent ${'that wraps '.repeat(30)}`),
-    event_id: null,
-    transaction_id: 'txn-sent-from-bottom',
-    is_own: true,
-  };
-  const gaps = await page.evaluate(
-    async ({ subscription, echo }) => {
-      const viewport = document.querySelector<HTMLElement>('.timeline-viewport .viewport');
-      if (!viewport) throw new Error('no viewport');
+  const sends = [
+    { id: 'sent-from-bottom-short', body: 'A short message I just sent', method: 'enter' },
+    {
+      id: 'sent-from-bottom-tall',
+      body: Array.from(
+        { length: 8 },
+        (_, index) => `Wrapped line ${index} ${'with text '.repeat(12)}`
+      ).join('\n'),
+      method: 'button',
+    },
+    { id: 'sent-from-bottom-follow-up', body: 'A short follow-up message', method: 'enter' },
+  ] as const;
+  const initialComposerHeight = await app.composer.evaluate(
+    (node) => node.getBoundingClientRect().height
+  );
+  for (const [index, send] of sends.entries()) {
+    await app.composer.fill(send.body);
+    if (index === 1) {
+      await expect
+        .poll(() => app.composer.evaluate((node) => node.getBoundingClientRect().height))
+        .toBeGreaterThan(initialComposerHeight);
+    }
+    if (send.method === 'button') await app.sendMessage.click();
+    else await app.composer.press('Enter');
+    await expect
+      .poll(
+        async () => (await core.commands()).filter((command) => command === 'send_message').length
+      )
+      .toBe(index + 1);
+    await expect(app.composer).toHaveText('');
+    const echo = {
+      ...timelineItem(send.id, send.body),
+      event_id: null,
+      transaction_id: `txn-${send.id}`,
+      is_own: true,
+      send_state: { status: 'sending' as const },
+    };
+    const result = await page.evaluate(
+      async ({ subscription, echo }) => {
+        const viewport = document.querySelector<HTMLElement>('.timeline-viewport .viewport');
+        if (!viewport) throw new Error('no viewport');
+        const gaps: number[] = [];
+        let visible = true;
+        window.__e2eEmitTimelineEvent({
+          type: 'timeline_diff',
+          subscription,
+          diffs: [{ op: 'push_back', value: echo }],
+        });
+        for (let frame = 0; frame < 30; frame += 1) {
+          await new Promise(requestAnimationFrame);
+          gaps.push(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop);
+          const row = viewport.querySelector<HTMLElement>(`[data-item-id="${echo.id}"]`);
+          if (!row) continue;
+          const rowBounds = row.getBoundingClientRect();
+          const viewportBounds = viewport.getBoundingClientRect();
+          visible &&=
+            rowBounds.bottom <= viewportBounds.bottom + 1 &&
+            rowBounds.bottom >= viewportBounds.top &&
+            (rowBounds.height > viewport.clientHeight || rowBounds.top >= viewportBounds.top - 1);
+          if (frame === 15) {
+            window.__e2eEmitTimelineEvent({
+              type: 'timeline_diff',
+              subscription,
+              diffs: [
+                {
+                  op: 'set',
+                  index: Number(row.dataset.index),
+                  value: {
+                    ...echo,
+                    event_id: `$${echo.id}`,
+                    transaction_id: null,
+                    send_state: null,
+                  },
+                },
+              ],
+            });
+          }
+        }
+        return { gaps, visible };
+      },
+      { subscription, echo }
+    );
+    expect(Math.max(...result.gaps)).toBeLessThanOrEqual(1);
+    expect(result.visible).toBe(true);
+    await expect(timeline.itemById(send.id)).toHaveAttribute('data-event-id', `$${send.id}`);
+  }
+});
+
+test('deleting the last composer character keeps following latest', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: 900, height: 420 });
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ urlPreviews: true }));
+  });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  const subscription = await core.subscription();
+  const linkBody = 'A link preview https://example.test/article';
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('empty-draft-link', linkBody),
+        event_id: null,
+        transaction_id: 'empty-draft-link-txn',
+        is_own: true,
+        content: {
+          kind: 'message',
+          body: linkBody,
+          html: 'A link preview <a href="https://example.test/article">https://example.test/article</a>',
+          emote: false,
+          notice: false,
+          edited: false,
+        },
+      },
+    },
+  ]);
+  await expect(page.locator('.link-preview')).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+  await expect(timeline.jumpToLatest).toBeHidden();
+  await app.composer.focus();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await app.composer.press('a');
+    await page.waitForTimeout(200);
+    const sampling = timeline.viewport.evaluate(async (node) => {
       const gaps: number[] = [];
-      window.__e2eEmitTimelineEvent({
-        type: 'timeline_diff',
-        subscription,
-        diffs: [{ op: 'push_back', value: echo }],
-      });
-      for (let frame = 0; frame < 30; frame += 1) {
+      for (let frame = 0; frame < 20; frame += 1) {
         await new Promise(requestAnimationFrame);
-        gaps.push(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop);
+        gaps.push(node.scrollHeight - node.clientHeight - node.scrollTop);
       }
       return gaps;
+    });
+    await app.composer.press('Backspace');
+    const samples = await sampling;
+    expect(Math.max(...samples), JSON.stringify(samples)).toBeLessThanOrEqual(1);
+    await expect(app.composer).toHaveText('');
+    await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+    await expect(timeline.jumpToLatest).toBeHidden();
+  }
+  const body = 'Follow-up after empty draft';
+  await app.composer.fill(body);
+  await app.composer.press('Enter');
+  await expect(app.composer).toHaveText('');
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('empty-draft-follow-up', body),
+        event_id: null,
+        transaction_id: 'empty-draft-follow-up-txn',
+        is_own: true,
+      },
     },
-    { subscription, echo }
-  );
-  expect(Math.max(...gaps)).toBeLessThanOrEqual(1);
-  await expect(timeline.itemById('sent-from-bottom')).toBeInViewport();
+  ]);
+  await expect(timeline.itemById('empty-draft-follow-up')).toBeInViewport();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+  await expect(timeline.jumpToLatest).toBeHidden();
+});
+
+test('follows sent links after scrolling back to the bottom in Firefox', async ({
+  browserName,
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  test.skip(browserName !== 'firefox', 'Firefox fractional scroll regression');
+  await page.setViewportSize({ width: 901, height: 421 });
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ urlPreviews: true }));
+  });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'reset',
+      values: historyItems({
+        idPrefix: 'firefox-regression',
+        label: 'Firefox regression history',
+        count: 100,
+        timestampBase: 1_699_999_000_000,
+      }),
+    },
+  ]);
+  await expect.poll(() => timeline.scrollableHeight()).toBeGreaterThan(500);
+  await timeline.scrollToBottomAndNotify();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+  await timeline.waitForScrollSettled();
+
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = '87.5%';
+  });
+  await page.waitForTimeout(100);
+
+  await timeline.viewport.hover();
+  await page.mouse.wheel(0, -500);
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(100);
+
+  await page.mouse.wheel(0, 5000);
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(2);
+
+  const subscription = await core.subscription();
+  const body = 'Firefox regression https://example.test/article';
+  await app.composer.fill(body);
+  await app.composer.press('Enter');
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('firefox-regression-link', body),
+        event_id: null,
+        transaction_id: 'firefox-regression-txn',
+        is_own: true,
+        content: {
+          kind: 'message',
+          body,
+          html: 'Firefox regression <a href="https://example.test/article">https://example.test/article</a>',
+          emote: false,
+          notice: false,
+          edited: false,
+        },
+      },
+    },
+  ]);
+
+  const preview = page.locator('.link-preview');
+  await expect(preview).toBeVisible();
+  await expect(preview).toBeInViewport();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(2);
 });
 
 test('an incoming message never moves a reader who is reading history', async ({
@@ -1322,7 +1538,7 @@ test('a message sent while reading history leaves the reader in place', async ({
   await app.openRoom('!room:example.test');
   await timeline.scrollToAndNotify(200);
   await timeline.waitForScrollSettled();
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   const subscription = await core.subscription();
   const anchor = await timeline.fullyVisibleAnchor();
   const positions = await core.sampleAnchorWhile(
@@ -1342,5 +1558,5 @@ test('a message sent while reading history leaves the reader in place', async ({
     400
   );
   expect(Math.max(...positions.map((top) => Math.abs(top - anchor.y)))).toBeLessThanOrEqual(1);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
 });

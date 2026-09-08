@@ -44,7 +44,7 @@ test('loads a real room at latest and preserves the viewport while paginating', 
     });
   const initialOldestMessage = await oldestRenderedMessage();
   await timeline.wheelUp(200);
-  await expect(timeline.jumpToLatest).toBeVisible();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await timeline.dispatchWheel(1);
   await timeline.scrollToAndNotify(0);
   await expect.poll(oldestRenderedMessage, { timeout: 15_000 }).toBeLessThan(initialOldestMessage);

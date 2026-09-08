@@ -10,6 +10,11 @@
   }
 
   let { list }: Props = $props();
+  let followingLive = $state(false);
+
+  $effect(() => {
+    list.followingLive = followingLive;
+  });
 
   providePinnedEvents(
     new PinnedEvents(
@@ -29,4 +34,4 @@
   );
 </script>
 
-<TimelineList {...list} />
+<TimelineList {...list} bind:followingLive />

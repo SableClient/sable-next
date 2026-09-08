@@ -681,21 +681,24 @@ interface LiveTimeline {
   setScrollHeight: (height: number) => void;
 }
 
+let currentLiveList: { followingLive: boolean };
+
 /** Every row lays out at `ROW`, so the virtualiser and the stubbed box agree. */
 async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   layOutRows();
   roomTimeline.mode = { kind: 'live' };
   roomTimeline.backwardPagination = 'end';
+  const list = {
+    timeline: roomTimeline,
+    onRequestHistory: () => Promise.resolve(false),
+    onRequestFuture: async () => {},
+    onRead: async () => {},
+    followingLive: false,
+  };
+  currentLiveList = list;
   const instance = mount(TimelineListHarness, {
     target: document.body,
-    props: {
-      list: {
-        timeline: roomTimeline,
-        onRequestHistory: () => Promise.resolve(false),
-        onRequestFuture: async () => {},
-        onRead: async () => {},
-      },
-    },
+    props: { list },
   });
   let scrollHeight = roomTimeline.items.length * ROW;
   const element = viewport();
@@ -769,8 +772,8 @@ async function dragTo(element: HTMLDivElement, from: number, to: number): Promis
   await tick();
 }
 
-function anchored(): boolean {
-  return document.querySelector('.jump-to-latest') !== null;
+function followingLive(): boolean {
+  return currentLiveList.followingLive;
 }
 
 function liveItems(count: number): TimelineItemView[] {
@@ -782,11 +785,12 @@ test('reading back inside the near-latest band leaves follow mode', async () => 
   roomTimeline.items = liveItems(20);
   const { instance, element, end } = await mountLive(roomTimeline);
   expect(document.querySelectorAll('.item').length).toBeGreaterThan(0);
-  expect(anchored()).toBe(false);
+  expect(followingLive()).toBe(true);
 
   await dragTo(element, end, end - 30);
 
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
+  expect(document.querySelector('.jump-to-latest')).toBeNull();
   await unmount(instance);
 });
 
@@ -797,7 +801,24 @@ test('reading back past the band anchors', async () => {
 
   await dragTo(element, end, end - 900);
 
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('shows the jump control only after one viewport height from the latest message', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - element.clientHeight + 1);
+  expect(followingLive()).toBe(false);
+  expect(document.querySelector('.jump-to-latest')).toBeNull();
+
+  await dragTo(element, end - element.clientHeight + 1, end - element.clientHeight);
+  expect(followingLive()).toBe(false);
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+
   await unmount(instance);
 });
 
@@ -807,11 +828,11 @@ test('scrolling back to the end restores follow mode', async () => {
   const { instance, element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
 
   await dragTo(element, end - 900, end);
 
-  expect(anchored()).toBe(false);
+  expect(followingLive()).toBe(true);
   await unmount(instance);
 });
 
@@ -821,14 +842,14 @@ test('hides the jump control when a content shrink clamps an anchored reader to 
   const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
 
   setScrollHeight(1_000);
   element.scrollTop = element.scrollHeight - element.clientHeight;
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(anchored()).toBe(false);
+  expect(followingLive()).toBe(true);
   await unmount(instance);
 });
 
@@ -883,7 +904,7 @@ test('a wheel notch inside the band also leaves follow mode', async () => {
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
   await unmount(instance);
 });
 
@@ -893,11 +914,11 @@ test('a repeated scroll notification near latest preserves the reading position'
   const { instance, element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 30);
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
   await unmount(instance);
 });
 
@@ -911,7 +932,7 @@ test('middle-button autoscroll leaves follow mode', async () => {
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
   await unmount(instance);
 });
 
@@ -925,7 +946,7 @@ test('a scrollbar drag leaves follow mode like any other reading back', async ()
   element.dispatchEvent(new Event('scroll'));
   await tick();
 
-  expect(anchored()).toBe(true);
+  expect(followingLive()).toBe(false);
   await unmount(instance);
 });
 
