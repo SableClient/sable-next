@@ -5,6 +5,8 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import { memberAvatar, memberName, senderDisplayColors } from './members.js';
@@ -16,17 +18,29 @@
     members: readonly MemberView[];
     class?: ClassValue;
     onProfile?: (userId: string, anchor: HTMLElement) => void;
+    showStatus?: boolean;
     trailing?: Snippet;
   }
 
-  let { userId, members, class: className = '', onProfile, trailing }: Props = $props();
+  let {
+    userId,
+    members,
+    class: className = '',
+    onProfile,
+    showStatus = false,
+    trailing,
+  }: Props = $props();
   const core = useCoreClient();
+  const presenceStore = usePresenceStore();
   let profile = $state<ProfileView | null>(null);
   let displayName = $derived(memberName(members, userId));
   let avatarUrl = $derived(memberAvatar(members, userId));
   let colors = $derived(senderDisplayColors(userId, profile));
   let avatarColor = $derived(avatarUrl ? undefined : senderColor(userId));
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
+  let userStatus = $derived(
+    showStatus ? resolveUserStatus(profile, presenceStore.get(userId)) : null
+  );
 
   $effect(() => {
     profile = null;
@@ -50,7 +64,15 @@
 {#snippet identity()}
   <Avatar src={avatarUrl} name={displayName} color={avatarColor} size="small" />
   <div class="member-identity-main">
-    <SenderName {displayName} {colors} nameClass="member-name" compact />
+    <span class="member-identity-text">
+      <SenderName {displayName} {colors} nameClass="member-name" compact />
+      {#if userStatus}
+        <span class="member-identity-status">
+          {#if userStatus.emoji}<span class="member-identity-status-emoji">{userStatus.emoji}</span
+            >{/if}{userStatus.text}
+        </span>
+      {/if}
+    </span>
     {#if trailing}
       <span class="member-identity-trailing">{@render trailing()}</span>
     {/if}
@@ -107,6 +129,25 @@
     flex: 1;
     gap: var(--space-200);
     min-width: 0;
+  }
+
+  .member-identity-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .member-identity-status {
+    color: var(--sable-surface-var-on-container);
+    font-size: var(--font-size-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .member-identity-status-emoji {
+    margin-right: var(--space-050);
   }
 
   .member-identity-trailing {

@@ -22,6 +22,7 @@ const coreStub = vi.hoisted(() => {
     roomPermissions: vi.fn(() => new Promise<never>(() => {})),
     roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
     fetchMedia: vi.fn(() => new Promise<never>(() => {})),
+    userProfile: vi.fn((): Promise<unknown> => Promise.reject(new Error('no profile'))),
     session: null,
   };
 
@@ -54,11 +55,17 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.canonical_alias ?? room.room_id),
   roomPathParamFromId: (roomId: string) => encodeURIComponent(roomId),
 }));
+const presenceFixture = vi.hoisted(() => ({
+  entry: null as { statusMessage: string | null } | null,
+}));
+
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
-  usePresenceStore: () => ({ get: () => null }),
+  usePresenceStore: () => ({ get: () => presenceFixture.entry }),
 }));
 
 import RoomNav from './RoomNav.svelte';
+
+const realObserver = globalThis.IntersectionObserver;
 
 function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -111,10 +118,14 @@ beforeEach(() => {
   pageState.params = {};
   roomsFixture.rooms = [];
   roomsFixture.mutedRoomIds = new Set();
+  presenceFixture.entry = null;
+  coreStub.userProfile.mockReset();
+  coreStub.userProfile.mockRejectedValue(new Error('no profile'));
 });
 
 afterEach(() => {
   document.body.replaceChildren();
+  globalThis.IntersectionObserver = realObserver;
 });
 
 test('home lists every joined room, including the children of joined spaces', async () => {
@@ -392,5 +403,80 @@ test('an active call in a text room shows the live count without the voice icon'
     false
   );
   expect(document.querySelector('.voice-badge')?.textContent).toBe('1');
+  await unmount(instance);
+});
+
+function observeImmediately(): void {
+  globalThis.IntersectionObserver = class {
+    #callback: IntersectionObserverCallback;
+    disconnect = () => {};
+    unobserve = () => {};
+    takeRecords = () => [];
+    root = null;
+    rootMargin = '';
+    thresholds = [];
+    constructor(callback: IntersectionObserverCallback) {
+      this.#callback = callback;
+    }
+    observe() {
+      this.#callback([{ isIntersecting: true }] as IntersectionObserverEntry[], this as never);
+    }
+  } as unknown as typeof IntersectionObserver;
+}
+
+function roomTopics(): (string | null)[] {
+  return Array.from(document.querySelectorAll('.room-row .room-topic')).map(
+    (node) => node.textContent
+  );
+}
+
+test('a DM row shows the peer status once its profile arrives', async () => {
+  observeImmediately();
+  coreStub.userProfile.mockResolvedValue({ status: { text: 'Shipping', emoji: '\u{1F680}' } });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!dm:example.org',
+      name: 'Bob',
+      is_direct: true,
+      direct_targets: ['@bob:example.org'],
+    }),
+  ];
+  const instance = await mountNav();
+  await tick();
+  await tick();
+
+  expect(coreStub.userProfile).toHaveBeenCalledWith('@bob:example.org');
+  expect(roomTopics()).toEqual(['\u{1F680}Shipping']);
+  await unmount(instance);
+});
+
+test('a DM row falls back to the peer presence message, and a topic still wins', async () => {
+  presenceFixture.entry = { statusMessage: 'In a meeting' };
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!dm:example.org',
+      name: 'Bob',
+      is_direct: true,
+      direct_targets: ['@bob:example.org'],
+    }),
+  ];
+  let instance = await mountNav();
+  await tick();
+  expect(roomTopics()).toEqual(['In a meeting']);
+  await unmount(instance);
+
+  document.body.replaceChildren();
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!dm:example.org',
+      name: 'Bob',
+      topic: 'Ship logs',
+      is_direct: true,
+      direct_targets: ['@bob:example.org'],
+    }),
+  ];
+  instance = await mountNav();
+  await tick();
+  expect(roomTopics()).toEqual(['Ship logs']);
   await unmount(instance);
 });

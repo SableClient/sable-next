@@ -33,6 +33,7 @@
   import { preferredPronouns } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -74,6 +75,7 @@
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
   let presence = $derived(presenceStore.get(userId));
   let presenceLabel = $derived(presence ? $i18n.t(`presence.${presence.presence}`) : null);
+  let userStatus = $derived(resolveUserStatus(currentProfile, presence));
   let lastSeenText = $derived.by(() => {
     if (!presence || presence.presence !== 'offline') return null;
     const ms = lastSeenMs(presence, Date.now());
@@ -338,7 +340,7 @@
   {#if presenceLabel}
     <span class="profile-meta-item">
       <PresenceDot presence={presence?.presence ?? 'offline'} label={presenceLabel} />
-      {presence?.statusMessage || lastSeenText || presenceLabel}
+      {lastSeenText || presenceLabel}
     </span>
   {/if}
   {#if pronouns}
@@ -590,8 +592,8 @@
   heroColor={currentProfile?.hero_color}
   heroBrightness={currentProfile?.hero_brightness}
   bannerUrl={currentProfile?.banner_url}
-  status={currentProfile?.status?.text}
-  statusEmoji={currentProfile?.status?.emoji}
+  status={userStatus?.text}
+  statusEmoji={userStatus?.emoji}
   nameColorLight={currentProfile?.name_color_light}
   nameColorDark={currentProfile?.name_color_dark}
   bioMoreLabel={shared ? undefined : $i18n.t('timeline.profileBioMore')}

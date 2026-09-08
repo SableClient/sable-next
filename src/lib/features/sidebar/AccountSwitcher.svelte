@@ -8,6 +8,8 @@
   import { i18n } from '#lib/i18n.js';
   import { DropdownMenu } from 'bits-ui';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
@@ -22,10 +24,14 @@
 
   let { mode }: Props = $props();
   const core = useCoreClient();
+  const presenceStore = usePresenceStore();
   let switching = $state(false);
   let profile = $state<ProfileView | null>(null);
   let activeProfile = $derived(profile?.user_id === core.session?.user_id ? profile : null);
   let displayName = $derived(activeProfile?.display_name ?? core.session?.user_id ?? '?');
+  let userStatus = $derived(
+    resolveUserStatus(activeProfile, presenceStore.get(core.session?.user_id ?? ''))
+  );
   let avatarUrl = $derived(activeProfile?.avatar_url ?? null);
 
   $effect(() => {
@@ -108,8 +114,8 @@
           heroColor={activeProfile?.hero_color}
           heroBrightness={activeProfile?.hero_brightness}
           bannerUrl={activeProfile?.banner_url}
-          status={activeProfile?.status?.text}
-          statusEmoji={activeProfile?.status?.emoji}
+          status={userStatus?.text}
+          statusEmoji={userStatus?.emoji}
           nameColorLight={activeProfile?.name_color_light}
           nameColorDark={activeProfile?.name_color_dark}
         />

@@ -10,10 +10,13 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import SettingsSheet from '#lib/features/settings/SettingsSheet.svelte';
 
   const core = useCoreClient();
+  const presenceStore = usePresenceStore();
   let switching = $state(false);
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
@@ -23,6 +26,7 @@
   let activeAccountId = $derived(core.session?.account_id);
   let activeUserId = $derived(core.session?.user_id ?? '');
   let displayName = $derived(profile?.display_name ?? activeUserId);
+  let userStatus = $derived(resolveUserStatus(profile, presenceStore.get(activeUserId)));
   let profileColor = $derived(profile?.hero_color ?? 'var(--sable-primary-container)');
   let accountToRemove = $derived(
     core.accounts.find((account) => account.account_id === removeAccountId) ?? null
@@ -97,8 +101,8 @@
     heroColor={profile?.hero_color}
     heroBrightness={profile?.hero_brightness}
     bannerUrl={profile?.banner_url}
-    status={profile?.status?.text}
-    statusEmoji={profile?.status?.emoji}
+    status={userStatus?.text}
+    statusEmoji={userStatus?.emoji}
     nameColorLight={profile?.name_color_light}
     nameColorDark={profile?.name_color_dark}
     actions={profileActions}

@@ -30,6 +30,13 @@ vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
 }));
 
+vi.mock('#lib/rooms/presence.svelte.js', async () => {
+  const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(
+    '#lib/rooms/presence.svelte.js'
+  );
+  return { ...actual, usePresenceStore: () => ({ get: () => null }) };
+});
+
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';

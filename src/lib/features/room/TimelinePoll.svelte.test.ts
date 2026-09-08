@@ -9,6 +9,13 @@ vi.mock('#lib/core/context.js', () => ({
   }),
 }));
 
+vi.mock('#lib/rooms/presence.svelte.js', async () => {
+  const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(
+    '#lib/rooms/presence.svelte.js'
+  );
+  return { ...actual, usePresenceStore: () => ({ get: () => null }) };
+});
+
 import type { PollView } from '#src/generated/protocol';
 
 import TimelinePoll from './TimelinePoll.svelte';

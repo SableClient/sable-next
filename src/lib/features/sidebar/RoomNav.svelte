@@ -4,6 +4,7 @@
   import { page } from '$app/state';
   import type {
     NotificationModeView,
+    ProfileView,
     RoomPermissionsView,
     RoomSummary,
   } from '#src/generated/protocol';
@@ -15,7 +16,7 @@
     roomPathParamFromId,
     useRoomList,
   } from '#lib/rooms/room-list.svelte.js';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
@@ -34,6 +35,8 @@
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import { resolveUserStatus } from '#lib/rooms/user-status.js';
+  import { whenVisible } from '#lib/ui/when-visible.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
@@ -91,6 +94,17 @@
     if (room.direct_targets.length === 0) return null;
     const own = core.session?.user_id;
     return room.direct_targets.find((target) => target !== own) ?? room.direct_targets[0];
+  }
+
+  const peerProfiles = new SvelteMap<string, ProfileView | null>();
+
+  function requestPeerProfile(userId: string): void {
+    if (peerProfiles.has(userId)) return;
+    peerProfiles.set(userId, null);
+    void core.userProfile(userId).then(
+      (profile) => peerProfiles.set(userId, profile),
+      () => undefined
+    );
   }
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
@@ -652,6 +666,9 @@
                 !marked}
               {@const peerId = room?.is_direct ? dmPeerId(room) : null}
               {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
+              {@const peerStatus = peerId
+                ? resolveUserStatus(peerProfiles.get(peerId), peerPresence)
+                : null}
               <div class="room-row-wrap">
                 <a
                   oncontextmenu={(event) => {
@@ -664,6 +681,11 @@
                   onclick={() => onNavigate?.(href)}
                   aria-label={collapsed ? name : undefined}
                   aria-current={active ? 'page' : undefined}
+                  {@attach peerId !== null && !collapsed
+                    ? whenVisible(() => {
+                        requestPeerProfile(peerId);
+                      })
+                    : undefined}
                 >
                   {#if showIcons}
                     <span class="room-avatar">
@@ -693,6 +715,12 @@
                       <span class="room-name">{name}</span>
                       {#if room?.is_direct && room.topic}
                         <span class="room-topic">{room.topic}</span>
+                      {:else if peerStatus}
+                        <span class="room-topic"
+                          >{#if peerStatus.emoji}<span class="room-status-emoji"
+                              >{peerStatus.emoji}</span
+                            >{/if}{peerStatus.text}</span
+                        >
                       {/if}
                     </span>
                     {#if typing}
@@ -1201,6 +1229,10 @@
     flex: 1;
     flex-direction: column;
     min-width: 0;
+  }
+
+  .room-status-emoji {
+    margin-right: var(--space-050);
   }
 
   .room-topic {

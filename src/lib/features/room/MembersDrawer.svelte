@@ -192,6 +192,7 @@
                   userId={member.user_id}
                   {members}
                   onProfile={onMemberProfile}
+                  showStatus
                 />
               </li>
             {/each}
