@@ -88,11 +88,16 @@ export function createMultiSfuTransport(
     expectedGeneration: number
   ): Promise<void> => {
     if (transports.has(backend.id)) return;
+    const telemetryAttributes = {
+      'call.backend_id': backend.id,
+      'call.backend_role': backend.id === publisherId ? 'publisher' : 'subscriber',
+    };
     const transport = (deps.createTransport ?? createLivekitTransport)({
       encryptMedia,
       publishMedia: backend.id === publisherId,
       ownIdentity: backend.id === publisherId ? backend.identity : undefined,
       telemetry,
+      telemetryAttributes,
     });
     transports.set(backend.id, transport);
     let connected = false;
@@ -123,7 +128,7 @@ export function createMultiSfuTransport(
         return;
       }
     } catch (error) {
-      telemetry?.failure('call.backend.connect', error);
+      telemetry?.failure('call.backend.connect', error, telemetryAttributes);
       if (backend.id === publisherId) throw error;
       transports.delete(backend.id);
       unsubscribes.get(backend.id)?.();
@@ -151,9 +156,14 @@ export function createMultiSfuTransport(
         })
     );
     if (options && expectedGeneration === generation) {
-      for (const backend of backends) {
-        if (expectedGeneration !== generation) break;
-        await ensure(backend, options, expectedGeneration);
+      const publisher = backends.find((backend) => backend.id === publisherId);
+      if (publisher) await ensure(publisher, options, expectedGeneration);
+      if (expectedGeneration === generation) {
+        await Promise.all(
+          backends
+            .filter((backend) => backend.id !== publisherId)
+            .map((backend) => ensure(backend, options, expectedGeneration))
+        );
       }
     }
     publish();

@@ -62,6 +62,7 @@ export class CallSession {
   #buffer: PendingEvent[] = [];
   #pendingKeys: { key: CallEncryptionKey; backendId?: string }[] = [];
   #ownKeyPending = false;
+  #keysAccepted = false;
   #connected = false;
   #keyCount = 0;
   #backendsRevision = -1;
@@ -233,6 +234,7 @@ export class CallSession {
       this.lifecycle = 'connecting';
       const encryptionKeys = this.#pendingKeys.splice(0, this.#pendingKeys.length);
       const connectBackends = this.#latestBackends?.backends ?? grant.backends;
+      this.#keysAccepted = true;
       await telemetry.step('call.transport.connect', async () => {
         await transport.connect({
           url: grant.url,
@@ -252,12 +254,6 @@ export class CallSession {
         return;
       }
       this.#connected = true;
-      const lateKeys = this.#pendingKeys.splice(0, this.#pendingKeys.length);
-      await Promise.all(
-        [...encryptionKeys, ...lateKeys].map(({ key, backendId }) =>
-          transport.setEncryptionKey(key, backendId)
-        )
-      );
       if (attempt !== this.#attemptGeneration) return;
       if (this.#latestBackends && this.#latestBackends.revision > this.#backendsRevision) {
         const snapshot = this.#latestBackends;
@@ -391,7 +387,7 @@ export class CallSession {
       return;
     }
 
-    if (!this.#connected) {
+    if (!this.#keysAccepted) {
       this.#pendingKeys.push({ key: entry });
       if (event.own) {
         this.#ownKeyPending = true;
@@ -502,6 +498,7 @@ export class CallSession {
     this.#keyCount = 0;
     this.#backendsRevision = -1;
     this.#latestBackends = undefined;
+    this.#keysAccepted = false;
     this.#connected = false;
     this.#backendEnded = false;
     this.#transportConnection = undefined;

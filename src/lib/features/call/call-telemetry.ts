@@ -70,12 +70,12 @@ export class CallTelemetry {
     });
   }
 
-  async step<T>(stage: string, action: () => Promise<T>): Promise<T> {
+  async step<T>(stage: string, action: () => Promise<T>, attributes: Attributes = {}): Promise<T> {
     const span = Sentry.startInactiveSpan({
       name: stage,
       op: stage,
       parentSpan: this.#joining ? this.#root : null,
-      attributes: this.#attributes,
+      attributes: { ...this.#attributes, ...attributes },
     });
     try {
       const result = await action();
@@ -83,7 +83,7 @@ export class CallTelemetry {
       return result;
     } catch (error) {
       span.setStatus({ code: 2 });
-      this.failure(stage, error);
+      this.failure(stage, error, attributes);
       throw error;
     } finally {
       span.end();
@@ -91,6 +91,12 @@ export class CallTelemetry {
   }
 
   event(stage: string, attributes: Attributes = {}): void {
+    Sentry.addBreadcrumb({
+      category: 'call',
+      level: 'info',
+      message: stage,
+      data: { ...this.#attributes, ...attributes },
+    });
     const span = Sentry.startInactiveSpan({
       name: stage,
       op: stage,
@@ -101,14 +107,14 @@ export class CallTelemetry {
     span.end();
   }
 
-  failure(stage: string, error: unknown): void {
+  failure(stage: string, error: unknown, attributes: Attributes = {}): void {
     if (error && typeof error === 'object') {
       if (this.#reportedErrors.has(error)) return;
       this.#reportedErrors.add(error);
     }
     this.#failedStage ??= stage;
     const category = errorCategory(error);
-    const key = `${stage}:${category}`;
+    const key = `${stage}:${category}:${attributes['call.backend_id'] ?? ''}:${attributes['call.participant_index'] ?? ''}`;
     if (this.#reportedFailures.has(key)) return;
     this.#reportedFailures.add(key);
 
@@ -118,6 +124,7 @@ export class CallTelemetry {
       parentSpan: null,
       attributes: {
         ...this.#attributes,
+        ...attributes,
         'call.stage': stage,
         'call.error_category': category,
       },
@@ -129,7 +136,12 @@ export class CallTelemetry {
     Sentry.withActiveSpan(span, () => {
       Sentry.captureException(new Error('Call operation failed'), {
         contexts: {
-          call: { ...this.#attributes, 'call.stage': stage, 'call.error_category': category },
+          call: {
+            ...this.#attributes,
+            ...attributes,
+            'call.stage': stage,
+            'call.error_category': category,
+          },
         },
         fingerprint: ['call', stage, category],
         tags: { 'call.stage': stage, 'call.error_category': category },

@@ -61,6 +61,7 @@ export type LivekitTransportOptions = {
   publishMedia?: boolean;
   ownIdentity?: string;
   telemetry?: Pick<CallTelemetry, 'step' | 'event' | 'failure'>;
+  telemetryAttributes?: Record<string, string | number | boolean>;
   createRoom?: (options: ConstructorParameters<typeof LivekitRoom>[0]) => LivekitRoom;
   createWorker?: () => Worker;
 };
@@ -86,12 +87,25 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   let healthTimer: ReturnType<typeof setTimeout> | undefined;
   let healthGeneration = 0;
   let qualitySnapshot = '';
+  const participantIndexes = new WeakMap<object, number>();
+  let nextParticipantIndex = 0;
 
-  const fail = (stage: string, error: unknown): void => options.telemetry?.failure(stage, error);
-  const step = <T>(stage: string, action: () => Promise<T>): Promise<T> =>
-    options.telemetry ? options.telemetry.step(stage, action) : action();
+  const fail = (
+    stage: string,
+    error: unknown,
+    attributes: Record<string, string | number | boolean> = {}
+  ): void =>
+    options.telemetry?.failure(stage, error, { ...options.telemetryAttributes, ...attributes });
+  const step = <T>(
+    stage: string,
+    action: () => Promise<T>,
+    attributes: Record<string, string | number | boolean> = {}
+  ): Promise<T> =>
+    options.telemetry
+      ? options.telemetry.step(stage, action, { ...options.telemetryAttributes, ...attributes })
+      : action();
   const event = (stage: string, attributes: Record<string, string | number | boolean> = {}): void =>
-    options.telemetry?.event(stage, attributes);
+    options.telemetry?.event(stage, { ...options.telemetryAttributes, ...attributes });
 
   const mediaCounts = () => {
     let audioPublished = 0;
@@ -113,6 +127,14 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       if (keys.some((key) => key.participantIdentity === participant.identity)) matches += 1;
     }
     return matches;
+  };
+
+  const participantIndex = (participant: RemoteParticipant): number => {
+    const existing = participantIndexes.get(participant);
+    if (existing !== undefined) return existing;
+    const index = nextParticipantIndex++;
+    participantIndexes.set(participant, index);
+    return index;
   };
 
   const scheduleHealth = (delay = 10_000): void => {
@@ -138,29 +160,35 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     const localTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
       | { getSenderStats: () => Promise<{ bytesSent?: number } | undefined> }
       | undefined;
-    const remoteTracks = [...room.remoteParticipants.values()]
-      .map(
-        (participant) =>
-          participant.getTrackPublication(Track.Source.Microphone)?.track as unknown as
-            | { getReceiverStats: () => Promise<{ bytesReceived?: number } | undefined> }
-            | undefined
-      )
-      .filter(
-        (
-          track
-        ): track is { getReceiverStats: () => Promise<{ bytesReceived?: number } | undefined> } =>
-          typeof track?.getReceiverStats === 'function'
-      );
+    const participants = [...room.remoteParticipants.values()];
+    const remoteTracks = participants.map((participant) => {
+      const publication = participant.getTrackPublication(Track.Source.Microphone);
+      const track = publication?.track as unknown as
+        | {
+            getReceiverStats: () => Promise<
+              | {
+                  bytesReceived?: number;
+                  totalAudioEnergy?: number;
+                  totalSamplesDuration?: number;
+                }
+              | undefined
+            >;
+          }
+        | undefined;
+      return { participant, publication, track, index: participantIndex(participant) };
+    });
     const [sender, ...receivers] = await Promise.all([
       localTrack?.getSenderStats().catch((error: unknown) => {
         fail('call.media.health.sender_stats', error);
         return undefined;
       }),
-      ...remoteTracks.map((track) =>
-        track.getReceiverStats().catch((error: unknown) => {
-          fail('call.media.health.receiver_stats', error);
-          return undefined;
-        })
+      ...remoteTracks.map(({ track, index }) =>
+        typeof track?.getReceiverStats === 'function'
+          ? track.getReceiverStats().catch((error: unknown) => {
+              fail('call.media.health.receiver_stats', error, { 'call.participant_index': index });
+              return undefined;
+            })
+          : Promise.resolve(undefined)
       ),
     ]);
     if (generation !== healthGeneration) return;
@@ -179,6 +207,22 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       'audio.key_matched_participant_count': keyMatchCount(),
       'audio.playback_allowed': room.canPlaybackAudio,
     });
+    for (const [position, { participant, publication, index }] of remoteTracks.entries()) {
+      const receiver = receivers[position];
+      event('call.media.receiver_health', {
+        'call.participant_index': index,
+        'audio.key_present': (keyProvider?.getKeys() ?? []).some(
+          (key) => key.participantIdentity === participant.identity
+        ),
+        'audio.published': Boolean(publication),
+        'audio.subscribed': Boolean(publication?.isSubscribed),
+        'audio.muted': Boolean(publication?.isMuted),
+        'audio.receiver_stats_available': Boolean(receiver),
+        'audio.receiver_bytes': receiver?.bytesReceived ?? 0,
+        'audio.receiver_total_audio_energy': receiver?.totalAudioEnergy ?? 0,
+        'audio.receiver_total_samples_duration': receiver?.totalSamplesDuration ?? 0,
+      });
+    }
   };
 
   const publish = (changes: Partial<CallTransportState>): void => {

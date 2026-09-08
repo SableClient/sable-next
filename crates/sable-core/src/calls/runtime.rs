@@ -274,7 +274,7 @@ async fn discover(
         member_id: if mode == CallMode::Matrix2 {
             Some(member_id)
         } else {
-            None
+            Some(identity.clone())
         },
         identity,
         mode,
@@ -300,14 +300,18 @@ async fn publish(
 ) -> Result<Published, CommandErr> {
     let state_key = state_key(room, own);
     let delay = if own.mode == CallMode::Matrix2 {
-        sticky::send_delayed(
-            &room.client(),
-            room,
-            json!({"msc4354_sticky_key":own.member_id}),
-            HANGUP_DELAY,
-        )
-        .await
-        .ok()
+        if core.delayed_events_supported().await.unwrap_or(false) {
+            sticky::send_delayed(
+                &room.client(),
+                room,
+                json!({"msc4354_sticky_key":own.member_id}),
+                HANGUP_DELAY,
+            )
+            .await
+            .ok()
+        } else {
+            None
+        }
     } else {
         core.schedule_hangup(&room.room_id().to_owned(), &state_key)
             .await
@@ -443,7 +447,7 @@ pub(super) async fn join(
             postpone,
             _handlers: handlers,
             updates: Some(updates),
-            sticky_member: own.member_id,
+            sticky_member: own.member_id.filter(|_| mode == CallMode::Matrix2),
         },
     );
     Ok(CommandOk::JoinCall {
@@ -678,13 +682,20 @@ fn emit_pending(
             member.user_id == pending.sender
                 && member.device_id == pending.device
                 && match &member.member_id {
-                    Some(id) => pending.content.member.id.as_ref() == Some(id),
-                    None => pending
+                    Some(id) => pending
                         .content
                         .member
                         .id
                         .as_ref()
-                        .is_none_or(|id| id == &member.identity),
+                        .map_or(member.mode != CallMode::Matrix2, |pending_id| {
+                            pending_id == id
+                        }),
+                    None => pending
+                        .content
+                        .member
+                        .id
+                        .as_deref()
+                        .is_none_or(|id| id == member.identity),
                 }
         });
         if let Some(member) = member {

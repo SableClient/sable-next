@@ -223,10 +223,24 @@ fn is_aggregation(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> boo
     }
 }
 
-/// Everything the default filter keeps, plus the message-like events it drops
-/// for having no dedicated rendering — those become `HiddenEvent` items.
 pub(crate) fn hidden_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
-    default_event_filter(event, rules) || !is_aggregation(event, rules)
+    !is_signaling_event(event)
+        && (default_event_filter(event, rules) || !is_aggregation(event, rules))
+}
+
+fn timeline_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
+    !is_signaling_event(event) && default_event_filter(event, rules)
+}
+
+fn is_signaling_event(event: &AnySyncTimelineEvent) -> bool {
+    let event_type = event.event_type().to_string();
+    matches!(
+        event_type.as_str(),
+        "m.rtc.member"
+            | "io.element.call.encryption_keys"
+            | "org.matrix.msc4075.rtc.notification"
+            | "org.matrix.msc4310.rtc.decline"
+    )
 }
 
 pub(crate) async fn build_room_timeline(
@@ -252,14 +266,14 @@ pub(crate) async fn build_room_timeline(
     let builder = if hidden_events {
         builder.event_filter(hidden_event_filter)
     } else {
-        builder
+        builder.event_filter(timeline_event_filter)
     };
     builder.build().await
 }
 
 #[cfg(test)]
 mod tests {
-    use matrix_sdk::ruma::event_id;
+    use matrix_sdk::ruma::{event_id, serde::Raw};
 
     use super::TimelineFocusView;
 
@@ -295,5 +309,43 @@ mod tests {
                 event_id: event_id!("$target").to_owned(),
             }
         );
+    }
+
+    #[test]
+    fn signaling_events_are_filtered_from_the_timeline() {
+        let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
+        let event_json = [
+            ("m.rtc.member", "{}"),
+            ("io.element.call.encryption_keys", "{}"),
+            (
+                "org.matrix.msc4075.rtc.notification",
+                r#"{"m.mentions":{"room":true,"user_ids":[]},"notification_type":"ring","m.relates_to":{"rel_type":"m.reference","event_id":"$root"},"sender_ts":1,"lifetime":30000,"m.text":[]}"#,
+            ),
+            (
+                "org.matrix.msc4310.rtc.decline",
+                r#"{"m.relates_to":{"rel_type":"m.reference","event_id":"$root"}}"#,
+            ),
+        ];
+        for (event_type, content) in event_json {
+            let event = Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+                format!(
+                    r#"{{"type":"{event_type}","event_id":"$signal","sender":"@alice:example.org","origin_server_ts":1,"content":{content},"unsigned":{{}}}}"#
+                ),
+            )
+            .unwrap()
+            .deserialize()
+            .unwrap();
+
+            assert!(!super::timeline_event_filter(&event, &rules));
+            assert!(!super::hidden_event_filter(&event, &rules));
+        }
+
+        let ordinary = Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+            r#"{"type":"com.example.signal","event_id":"$ordinary","sender":"@alice:example.org","origin_server_ts":1,"content":{},"unsigned":{}}"#.to_owned(),
+        )
+        .unwrap()
+        .deserialize()
+        .unwrap();
+        assert!(super::hidden_event_filter(&ordinary, &rules));
     }
 }

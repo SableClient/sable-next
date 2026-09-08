@@ -609,7 +609,7 @@ test('canceling while the own key gate is pending never starts transport', async
   expect(session.lifecycle).toBe('idle');
 });
 
-test('keys received while transport connects are applied after the initial key batch', async () => {
+test('keys received while transport connects reach the transport before connect finishes', async () => {
   const h = harness();
   let releaseConnect!: () => void;
   h.transport.connect = vi.fn(
@@ -628,6 +628,10 @@ test('keys received while transport connects are applied after the initial key b
     own: false,
     identity: '@remote:example.org:PHONE',
   } as CoreEvent);
+  expect(h.transport.setEncryptionKey).toHaveBeenCalledWith(
+    expect.objectContaining({ identity: '@remote:example.org:PHONE' }),
+    undefined
+  );
   h.emitTransportState({ ...idleTransportState(), connection: 'connected' });
   releaseConnect();
   await joining;

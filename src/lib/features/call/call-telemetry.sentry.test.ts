@@ -49,6 +49,7 @@ test('sends sampled call traces without the transport secret', async () => {
   expect(sent).toContain('call.join');
   expect(sent).toContain('call.signaling.join');
   expect(sent).toContain('call.transport.state');
+  expect(sent).toContain('category":"call');
   expect(sent).toContain('call.failure');
   expect(sent).toContain('call.attempt_id');
   expect(sent).not.toContain('sfu.example.org');

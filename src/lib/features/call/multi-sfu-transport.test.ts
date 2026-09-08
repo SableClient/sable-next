@@ -38,6 +38,115 @@ test('connects each backend while publishing media only on the publisher and rou
   expect(created[1].transport.setEncryptionKey).toHaveBeenCalledOnce();
 });
 
+test('starts the publisher and healthy subscribers while another subscriber is blocked', async () => {
+  let releaseBlocked!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    releaseBlocked = resolve;
+  });
+  let subscribers = 0;
+  const created: ReturnType<typeof fakeTransport>[] = [];
+  const transport = createMultiSfuTransport(false, undefined, {
+    createTransport: (options) => {
+      const next = fakeTransport();
+      if (options.publishMedia === false && subscribers++ === 0) {
+        next.connect = vi.fn(() => blocked);
+      }
+      created.push(next);
+      return next;
+    },
+  });
+  let completed = false;
+  const connecting = transport
+    .connect({
+      url: '',
+      token: '',
+      microphoneEnabled: false,
+      cameraEnabled: false,
+      publisherId: 'publish',
+      backends: [
+        { id: 'blocked', url: 'wss://blocked', jwt: 'blocked', identity: 'blocked' },
+        { id: 'publish', url: 'wss://publish', jwt: 'publish', identity: 'me' },
+        { id: 'healthy', url: 'wss://healthy', jwt: 'healthy', identity: 'healthy' },
+      ],
+      encryptionKeys: [],
+    })
+    .then(() => {
+      completed = true;
+    });
+
+  await vi.waitFor(() => {
+    expect(created).toHaveLength(3);
+  });
+  expect(created[0].getState().connection).toBe('connected');
+  expect(created[2].getState().connection).toBe('connected');
+  expect(completed).toBe(false);
+  releaseBlocked();
+  await connecting;
+});
+
+test('delivers a remote key while that subscriber is still connecting', async () => {
+  let releaseRemote!: () => void;
+  const remoteConnecting = new Promise<void>((resolve) => {
+    releaseRemote = resolve;
+  });
+  const created: ReturnType<typeof fakeTransport>[] = [];
+  const transport = createMultiSfuTransport(true, undefined, {
+    createTransport: (options) => {
+      const next = fakeTransport();
+      if (options.publishMedia === false) next.connect = vi.fn(() => remoteConnecting);
+      created.push(next);
+      return next;
+    },
+  });
+  const publisher = { id: 'publish', url: 'wss://one', jwt: 'one', identity: 'me' };
+  const remote = { id: 'remote', url: 'wss://two', jwt: 'two', identity: 'other' };
+  const connecting = transport.connect({
+    url: '',
+    token: '',
+    microphoneEnabled: true,
+    cameraEnabled: false,
+    publisherId: publisher.id,
+    backends: [publisher, remote],
+    encryptionKeys: [],
+  });
+  await vi.waitFor(() => {
+    expect(created).toHaveLength(2);
+  });
+  await transport.setEncryptionKey(
+    { backendId: remote.id, identity: 'other', keyIndex: 1, key: new Uint8Array() },
+    remote.id
+  );
+  expect(created[1].setEncryptionKey).toHaveBeenCalledOnce();
+  releaseRemote();
+  await connecting;
+});
+
+test('assigns an opaque backend id and role to each transport telemetry stream', async () => {
+  const attributes: Record<string, string | number | boolean>[] = [];
+  const transport = createMultiSfuTransport(false, undefined, {
+    createTransport: (options) => {
+      attributes.push(options.telemetryAttributes ?? {});
+      return fakeTransport();
+    },
+  });
+  await transport.connect({
+    url: '',
+    token: '',
+    microphoneEnabled: false,
+    cameraEnabled: false,
+    publisherId: 'publish',
+    backends: [
+      { id: 'publish', url: 'wss://one', jwt: 'one', identity: 'me' },
+      { id: 'remote', url: 'wss://two', jwt: 'two', identity: 'other' },
+    ],
+    encryptionKeys: [],
+  });
+  expect(attributes).toEqual([
+    { 'call.backend_id': 'publish', 'call.backend_role': 'publisher' },
+    { 'call.backend_id': 'remote', 'call.backend_role': 'subscriber' },
+  ]);
+});
+
 test('retries a failed subscriber on the next backend snapshot', async () => {
   let remoteAttempts = 0;
   const transport = createMultiSfuTransport(false, undefined, {

@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, sync::Arc};
 
+use base64::Engine as _;
 use matrix_sdk::{
-    ruma::{device_id, owned_room_id, owned_user_id},
+    ruma::{device_id, event_id, owned_device_id, owned_room_id, owned_user_id, room_id},
     test_utils::mocks::MatrixMockServer,
 };
 use matrix_sdk_ui::sync_service::SyncService;
@@ -120,6 +121,115 @@ fn own_liveness_requires_the_current_generation() {
     assert!(own_is_present(&[current], &own));
 }
 
+#[tokio::test]
+async fn pending_key_with_a_custom_membership_id_is_emitted() {
+    use matrix_sdk::ruma::{events::AnySyncStateEvent, serde::Raw};
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use serde_json::json;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let parsed_room_id = room_id!("!call:example.org");
+    let now = super::keys::now_ms();
+    let event = json!({
+        "type": "org.matrix.msc3401.call.member",
+        "state_key": "_@user:example.org_DEVICE_m.call",
+        "sender": "@user:example.org", "event_id": "$custom",
+        "origin_server_ts": now,
+        "content": {
+            "application": "m.call", "call_id": "", "scope": "m.room",
+            "device_id": "DEVICE", "membershipID": "custom-membership",
+            "created_ts": now, "expires": 14_400_000,
+            "focus_active": {"type":"livekit", "focus_selection":"multi_sfu"},
+            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.example.org", "livekit_alias":parsed_room_id}]
+        }
+    });
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(parsed_room_id).add_state_event(
+                Raw::new(&event)
+                    .unwrap()
+                    .cast_unchecked::<AnySyncStateEvent>(),
+            ),
+        )
+        .await;
+    let members = super::membership::active_members(&room).await;
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0].member_id.as_deref(), Some("custom-membership"));
+
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let room_id = owned_room_id!("!call:example.org");
+    let pending = |index, id: Option<&str>| super::PendingKey {
+        sender: owned_user_id!("@user:example.org"),
+        device: owned_device_id!("DEVICE"),
+        content: super::keys::ToDeviceCallEncryptionKeysEventContent {
+            keys: super::keys::KeyPayload {
+                index,
+                key: base64::engine::general_purpose::STANDARD.encode([index; 16]),
+            },
+            room_id: room_id.clone(),
+            member: super::keys::MemberRef {
+                claimed_device_id: "DEVICE".to_owned(),
+                id: id.map(str::to_owned),
+            },
+            session: super::keys::SessionRef::default(),
+            sent_ts: 1,
+        },
+        received: super::keys::now_ms(),
+    };
+    let mut state = State {
+        own: member(CallMode::Compatibility, 1, &[]),
+        sticky: super::StickyMemberships::default(),
+        members,
+        backends: BTreeMap::new(),
+        pending_keys: vec![pending(3, Some("custom-membership"))],
+        distributor: None,
+        own_observed: false,
+        revision: 0,
+    };
+
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+
+    assert!(matches!(
+        events.try_recv(),
+        Ok(crate::protocol::CoreEvent::CallEncryptionKey { identity, key_index: 3, own: false, .. })
+            if identity == "@user:example.org:DEVICE"
+    ));
+    assert!(state.pending_keys.is_empty());
+
+    state
+        .pending_keys
+        .push(pending(4, Some("other-membership")));
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+    assert_eq!(
+        events.try_recv().unwrap_err(),
+        tokio::sync::mpsc::error::TryRecvError::Empty
+    );
+    assert_eq!(state.pending_keys.len(), 1);
+
+    state.pending_keys.push(pending(5, None));
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+    assert!(matches!(
+        events.try_recv(),
+        Ok(crate::protocol::CoreEvent::CallEncryptionKey {
+            key_index: 5,
+            own: false,
+            ..
+        })
+    ));
+
+    let mut sticky = member(CallMode::Matrix2, 1, &["https://sfu.example.org"]);
+    sticky.member_id = Some("sticky-member".to_owned());
+    state.members = vec![sticky];
+    state.pending_keys.push(pending(6, None));
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+    assert_eq!(
+        events.try_recv().unwrap_err(),
+        tokio::sync::mpsc::error::TryRecvError::Empty
+    );
+}
+
 async fn refresh_fixture(
     created_ts: u64,
     observed: bool,
@@ -208,4 +318,43 @@ async fn refresh_stops_when_an_unobserved_membership_is_old() {
     let (core, room, state) =
         refresh_fixture(super::keys::now_ms().saturating_sub(30_001), false).await;
     assert!(!refresh(&core, 0, CallSessionId(1), &room, &state).await);
+}
+
+#[tokio::test]
+async fn schedule_hangup_does_not_write_when_delayed_events_are_unsupported() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server
+        .mock_room_send_state()
+        .ok(event_id!("$left"))
+        .mount()
+        .await;
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client: client.clone(),
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    let state_key = super::super::membership_state_key(
+        client.user_id().unwrap(),
+        client.device_id().unwrap(),
+        "",
+    );
+
+    assert!(
+        core.schedule_hangup(&owned_room_id!("!call:example.org"), &state_key)
+            .await
+            .is_none()
+    );
+
+    let requests = server.server().received_requests().await.unwrap();
+    assert!(!requests.iter().any(|request| {
+        request
+            .url
+            .query_pairs()
+            .any(|(key, _)| key == "org.matrix.msc4140.delay")
+    }));
 }

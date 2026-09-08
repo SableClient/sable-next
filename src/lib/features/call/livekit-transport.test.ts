@@ -254,3 +254,56 @@ test('stops health snapshots and suppresses an in-flight result after disconnect
 
   expect(event.mock.calls.filter(([stage]) => stage === 'call.media.health')).toHaveLength(0);
 });
+
+test('emits per-receiver health without the participant identity', async () => {
+  vi.useFakeTimers();
+  const fixture = roomFixture();
+  fixture.room.remoteParticipants.set('remote', {
+    identity: 'sensitive-participant-identity',
+    connectionQuality: 0,
+    getTrackPublication: vi.fn(() => ({
+      isSubscribed: true,
+      isMuted: false,
+      track: {
+        getReceiverStats: () =>
+          Promise.resolve({
+            bytesReceived: 12,
+            totalAudioEnergy: 3,
+            totalSamplesDuration: 4,
+          }),
+      },
+    })),
+  } as never);
+  const event = vi.fn();
+  const telemetry: Pick<CallTelemetry, 'event' | 'failure' | 'step'> = {
+    event,
+    failure: vi.fn(),
+    step: <T>(_stage: string, action: () => Promise<T>): Promise<T> => action(),
+  };
+  const transport = createLivekitTransport({
+    encryptMedia: false,
+    createRoom: () => fixture.room,
+    telemetry,
+  });
+
+  await transport.connect(connectOptions);
+  await vi.advanceTimersByTimeAsync(10_000);
+
+  const receiver = event.mock.calls.find(([stage]) => stage === 'call.media.receiver_health');
+  expect(receiver).toEqual([
+    'call.media.receiver_health',
+    expect.objectContaining({
+      'call.participant_index': 0,
+      'audio.key_present': false,
+      'audio.published': true,
+      'audio.subscribed': true,
+      'audio.muted': false,
+      'audio.receiver_stats_available': true,
+      'audio.receiver_bytes': 12,
+      'audio.receiver_total_audio_energy': 3,
+      'audio.receiver_total_samples_duration': 4,
+    }),
+  ]);
+  expect(JSON.stringify(receiver)).not.toContain('sensitive-participant-identity');
+  await transport.disconnect();
+});

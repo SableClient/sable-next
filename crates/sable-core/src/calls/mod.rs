@@ -353,6 +353,9 @@ impl Core {
         room_id: &OwnedRoomId,
         state_key: &CallMemberStateKey,
     ) -> Option<String> {
+        if !self.delayed_events_supported().await.ok()? {
+            return None;
+        }
         let request = delayed_state_event::unstable::Request::new(
             room_id.clone(),
             state_key.as_ref().to_owned(),

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use matrix_sdk::Room;
 use matrix_sdk::ruma::events::call::member::{
-    ActiveFocus, Application, CallMemberEventContent, CallScope, Focus,
+    ActiveFocus, Application, CallMemberEventContent, CallScope, Focus, MembershipData,
 };
 use matrix_sdk::ruma::{DeviceId, OwnedDeviceId, OwnedUserId, UserId};
 use serde::Deserialize;
@@ -134,7 +134,14 @@ impl CallMember {
         self.user_id == other.user_id
             && self.device_id == other.device_id
             && match (&self.member_id, &other.member_id) {
-                (Some(left), Some(right)) => left == right,
+                (Some(left), Some(right)) => {
+                    left == right
+                        && match (self.mode, other.mode) {
+                            (CallMode::Matrix2, CallMode::Matrix2) => true,
+                            (CallMode::Matrix2, _) | (_, CallMode::Matrix2) => false,
+                            _ => self.created_ts == other.created_ts,
+                        }
+                }
                 (None, None) => self.created_ts == other.created_ts,
                 _ => false,
             }
@@ -151,6 +158,19 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
 
     let mut members = Vec::new();
     for raw in events {
+        let membership_id = match &raw {
+            matrix_sdk::deserialized_responses::RawSyncOrStrippedState::Sync(raw) => raw
+                .deserialize_as::<serde_json::Value>()
+                .ok()
+                .and_then(|event| {
+                    event
+                        .get("content")?
+                        .get("membershipID")?
+                        .as_str()
+                        .map(str::to_owned)
+                }),
+            matrix_sdk::deserialized_responses::RawSyncOrStrippedState::Stripped(_) => None,
+        };
         let Ok(event) = raw.deserialize() else {
             continue;
         };
@@ -180,7 +200,13 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
             members.push(CallMember {
                 user_id: event.state_key.user_id().to_owned(),
                 device_id: membership.device_id().to_owned(),
-                member_id: None,
+                member_id: Some(match membership {
+                    MembershipData::Legacy(data) => data.membership_id.clone(),
+                    MembershipData::Session(_) => membership_id.clone().unwrap_or_else(|| {
+                        format!("{}:{}", event.state_key.user_id(), membership.device_id())
+                    }),
+                    _ => format!("{}:{}", event.state_key.user_id(), membership.device_id()),
+                }),
                 identity: format!("{}:{}", event.state_key.user_id(), membership.device_id()),
                 mode,
                 created_ts: membership
@@ -551,7 +577,52 @@ mod tests {
                 .unwrap();
             assert_eq!(member.mode, mode);
             assert_eq!(member.identity, format!("@user:example.org:{device}"));
+            assert_eq!(
+                member.member_id.as_deref(),
+                Some(format!("@user:example.org:{device}").as_str())
+            );
             assert_eq!(member.foci, ["https://sfu.example.org"]);
         }
+    }
+
+    #[tokio::test]
+    async fn state_membership_uses_its_custom_membership_id() {
+        use matrix_sdk::ruma::{events::AnySyncStateEvent, room_id, serde::Raw};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use serde_json::json;
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!call:example.org");
+        let now = super::super::keys::now_ms();
+        let event = json!({
+            "type": "org.matrix.msc3401.call.member",
+            "state_key": "_@user:example.org_DEVICE_m.call",
+            "sender": "@user:example.org", "event_id": "$custom",
+            "origin_server_ts": now,
+            "content": {
+                "application": "m.call", "call_id": "", "scope": "m.room",
+                "device_id": "DEVICE", "membershipID": "custom-membership",
+                "created_ts": now, "expires": 14_400_000,
+                "focus_active": {"type":"livekit", "focus_selection":"multi_sfu"},
+                "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.example.org", "livekit_alias":room_id}]
+            }
+        });
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_event(
+                    Raw::new(&event)
+                        .unwrap()
+                        .cast_unchecked::<AnySyncStateEvent>(),
+                ),
+            )
+            .await;
+
+        let members = super::active_members(&room).await;
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].member_id.as_deref(), Some("custom-membership"));
+        assert_eq!(members[0].identity, "@user:example.org:DEVICE");
     }
 }

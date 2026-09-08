@@ -1,11 +1,13 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 
 const telemetryMock = vi.hoisted(() => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
   spans: [] as { options: Record<string, unknown>; end: ReturnType<typeof vi.fn> }[],
 }));
 
 vi.mock('@sentry/sveltekit', () => ({
+  addBreadcrumb: telemetryMock.addBreadcrumb,
   captureException: telemetryMock.captureException,
   startInactiveSpan: vi.fn((options: Record<string, unknown>) => {
     const span = {
@@ -28,6 +30,7 @@ import { CallTelemetry } from './call-telemetry';
 beforeEach(() => {
   telemetryMock.spans.length = 0;
   telemetryMock.captureException.mockClear();
+  telemetryMock.addBreadcrumb.mockClear();
 });
 
 test('closes the root and stage spans after a successful join', async () => {
@@ -72,6 +75,28 @@ test('records a bounded sanitized failure with the attempt correlation', async (
   expect(telemetryMock.spans[1].end).toHaveBeenCalledOnce();
 });
 
+test('keeps matching failures from separate backends distinct', () => {
+  const telemetry = new CallTelemetry();
+
+  telemetry.failure('call.backend.connect', new Error('failed'), {
+    'call.backend_id': 'first',
+  });
+  telemetry.failure('call.backend.connect', new Error('failed'), {
+    'call.backend_id': 'second',
+  });
+
+  expect(telemetryMock.captureException).toHaveBeenCalledTimes(2);
+  for (const [index, backendId] of ['first', 'second'].entries()) {
+    expect(telemetryMock.captureException).toHaveBeenNthCalledWith(
+      index + 1,
+      expect.any(Error),
+      expect.objectContaining({
+        contexts: { call: expect.objectContaining({ 'call.backend_id': backendId }) as unknown },
+      })
+    );
+  }
+});
+
 test('creates runtime events outside the completed join root', () => {
   const telemetry = new CallTelemetry();
   telemetry.finish('connected');
@@ -85,4 +110,13 @@ test('creates runtime events outside the completed join root', () => {
     },
   });
   expect(telemetryMock.spans[1].end).toHaveBeenCalledOnce();
+  expect(telemetryMock.addBreadcrumb).toHaveBeenCalledWith({
+    category: 'call',
+    level: 'info',
+    message: 'call.transport.state',
+    data: {
+      'call.attempt_id': telemetry.attemptId,
+      'call.connection': 'reconnecting',
+    },
+  });
 });
