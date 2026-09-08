@@ -65,6 +65,7 @@ function memberSuggestions(needle: string, members: readonly MemberView[]): Sugg
 }
 
 function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Suggestion[] {
+  const shortcodes = new Set<string>();
   const packs = emotes
     .filter((image) => image.shortcode.toLowerCase().includes(needle))
     .sort((left, right) => {
@@ -73,6 +74,11 @@ function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Sug
         right.shortcode.toLowerCase().startsWith(needle)
       );
       return byPrefix === 0 ? left.shortcode.localeCompare(right.shortcode) : byPrefix;
+    })
+    .filter((image) => {
+      if (shortcodes.has(image.shortcode)) return false;
+      shortcodes.add(image.shortcode);
+      return true;
     })
     .slice(0, limit)
     .map((image) => ({

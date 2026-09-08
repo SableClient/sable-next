@@ -101,6 +101,27 @@ test('pack emotes come first, then native emoji fill the panel', () => {
   expect(suggestions.slice(2).every((item) => item.id.startsWith('emoji:'))).toBe(true);
 });
 
+test('duplicate pack shortcodes keep the first matching pack image', () => {
+  const suggestions = suggestionsFor(
+    emoteQuery('wave'),
+    [],
+    [
+      emote('wave'),
+      ...Array.from({ length: 7 }, () => ({
+        ...emote('wave'),
+        url: 'mxc://example.org/second-wave',
+      })),
+      emote('wave2'),
+    ],
+    []
+  );
+
+  expect(suggestions.filter((suggestion) => suggestion.id === 'pack:wave')).toEqual([
+    expect.objectContaining({ imageUrl: 'mxc://example.org/wave' }),
+  ]);
+  expect(suggestions).toContainEqual(expect.objectContaining({ id: 'pack:wave2' }));
+});
+
 test('a shortcode with no pack match still finds a native emoji', () => {
   const suggestions = suggestionsFor(emoteQuery('joy'), [], [], []);
 
