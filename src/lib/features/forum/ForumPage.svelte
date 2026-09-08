@@ -33,7 +33,7 @@
   const core = useCoreClient();
   const personas = usePersonaStore();
   const roomList = useRoomList();
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
   const forumThreads = new ForumThreads(core);
   const memberLoader = new RoomMemberLoader();
 
@@ -41,7 +41,7 @@
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
-  let desktop = $derived(appLayout.matches);
+  let desktop = $derived(sidePanels.matches);
   let threadRootId = $state<string | null>(null);
   let permissions = $state<RoomPermissionsView | null>(null);
 

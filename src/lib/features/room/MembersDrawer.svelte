@@ -356,7 +356,7 @@
     padding: 0 var(--space-200);
   }
 
-  @media (width >= 48rem) {
+  @media (width > 70.25rem) {
     .members-drawer:not(.compact) {
       border-left: var(--border-width) solid var(--sable-surface-container-line);
       box-shadow: none;

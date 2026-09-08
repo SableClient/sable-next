@@ -241,8 +241,8 @@
   let pageTitle = $derived(
     mentionCount > 0 ? `(${mentionCount}) ${roomName} - Sable` : `${roomName} - Sable`
   );
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  let desktop = $derived(appLayout.matches);
+  const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
+  let desktop = $derived(sidePanels.matches);
   let typingLabel = $derived.by(() => {
     if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
     const names = typingUserIds.slice(0, 3).map(typingMemberName);

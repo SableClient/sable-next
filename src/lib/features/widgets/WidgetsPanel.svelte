@@ -147,7 +147,7 @@
     width: 100%;
   }
 
-  @media (width >= 48rem) {
+  @media (width > 70.25rem) {
     .widgets-panel:not(.modal) {
       border-left: var(--border-width) solid var(--sable-surface-container-line);
       width: 22rem;

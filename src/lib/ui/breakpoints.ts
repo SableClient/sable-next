@@ -3,6 +3,7 @@
  */
 export const BREAKPOINTS = {
   appLayout: '(width >= 48rem)',
+  sidePanels: '(width > 70.25rem)',
   settingsStack: '42rem',
   compactContent: '32rem',
 } as const;
