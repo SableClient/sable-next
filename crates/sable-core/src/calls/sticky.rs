@@ -11,7 +11,6 @@ const STICKY_DURATION_MS: u32 = 900_000;
 #[derive(Debug)]
 pub(super) enum StickySyncError {
     Matrix,
-    MissingExtension,
 }
 
 pub(super) struct StickySync {
@@ -59,9 +58,6 @@ impl StickySync {
             return Err(StickySyncError::Matrix);
         };
         let sticky = response.extensions.sticky_events;
-        if self.since.is_none() && sticky.next_batch.is_none() && sticky.rooms.is_empty() {
-            return Err(StickySyncError::MissingExtension);
-        }
         self.pos = Some(response.pos);
         if sticky.next_batch.is_some() {
             self.since = sticky.next_batch;

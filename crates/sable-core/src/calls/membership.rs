@@ -251,7 +251,7 @@ impl StickyMemberships {
                     .or_else(|| unsigned.get("sticky_duration_ttl_ms"))
             })
             .and_then(Value::as_u64)
-            .map_or(order_expires_at_ms, |ttl| {
+            .map_or(now_ms.min(created_ts).saturating_add(duration), |ttl| {
                 now_ms.saturating_add(ttl.min(duration))
             });
         let entry_key = (sender, key.to_owned());
@@ -269,6 +269,9 @@ impl StickyMemberships {
             let Some(member) = sticky_member(&value.to_string()) else {
                 return false;
             };
+            if member.member_id != key {
+                return false;
+            }
             Some(member)
         };
         self.entries.insert(
@@ -439,6 +442,15 @@ mod tests {
     }
 
     #[test]
+    fn sticky_expiry_without_a_ttl_does_not_extend_a_future_timestamp() {
+        let mut store = super::StickyMemberships::default();
+        let event = sticky_event("$future", 2_000);
+        assert!(store.apply(&event, 1_000));
+        assert_eq!(store.members(1_000)[0].expires_at_ms, Some(901_000));
+        assert!(store.members(901_000).is_empty());
+    }
+
+    #[test]
     fn sticky_tombstones_override_older_memberships_and_are_sender_scoped() {
         let mut store = super::StickyMemberships::default();
         let event = sticky_event("$a", 100);
@@ -485,6 +497,15 @@ mod tests {
             assert!(!store.apply(&event, 200));
             assert_eq!(store.members(200).len(), 1);
         }
+    }
+
+    #[test]
+    fn a_sticky_member_id_must_match_its_sticky_key() {
+        let mut store = super::StickyMemberships::default();
+        let mut event = sticky_event("$mismatch", 100);
+        event["content"]["member"]["id"] = serde_json::json!("other");
+        assert!(!store.apply(&event, 100));
+        assert!(store.members(100).is_empty());
     }
     #[tokio::test]
     async fn state_memberships_survive_the_sdk_store_for_both_focus_modes() {

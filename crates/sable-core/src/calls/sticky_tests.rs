@@ -9,7 +9,7 @@ use wiremock::{
     matchers::{method, path_regex},
 };
 
-use super::{StickySync, StickySyncError, send, send_delayed};
+use super::{StickySync, send, send_delayed};
 
 async fn room() -> (MatrixMockServer, matrix_sdk::Room) {
     let server = MatrixMockServer::new().await;
@@ -207,16 +207,53 @@ async fn test_sticky_sync_reuses_since_when_incremental_response_is_empty() {
 }
 
 #[async_test]
-async fn test_sticky_sync_missing_initial_extension_is_an_error() {
+async fn test_sticky_sync_accepts_an_empty_initial_extension_and_keeps_its_position() {
     let (server, room) = room().await;
     Mock::given(method("POST"))
         .and(path_regex(".*sync.*"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"pos":"p1","rooms":{}})))
+        .expect(1)
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(".*sync.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "pos":"p2",
+            "extensions": {"org.matrix.msc4354.sticky_events": {"next_batch":"s2"}}
+        })))
         .mount(server.server())
         .await;
     let mut sync = StickySync::new(2);
-    assert!(matches!(
-        sync.sync(&room, Duration::from_secs(1)).await,
-        Err(StickySyncError::MissingExtension)
-    ));
+    sync.sync(&room, Duration::from_secs(1))
+        .await
+        .expect("empty initial sync");
+    sync.sync(&room, Duration::from_secs(1))
+        .await
+        .expect("token sync");
+
+    let requests = server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|request| request.method == "POST" && request.url.path().contains("sync"))
+        .collect::<Vec<_>>();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(
+        requests[1]
+            .url
+            .query_pairs()
+            .find(|(key, _)| key == "pos")
+            .unwrap()
+            .1,
+        "p1"
+    );
+    let second: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert!(
+        second["extensions"]["org.matrix.msc4354.sticky_events"]
+            .get("since")
+            .is_none()
+    );
 }
