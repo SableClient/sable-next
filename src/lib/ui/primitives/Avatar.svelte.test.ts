@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount } from 'svelte';
+import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const coreStub = vi.hoisted(() => {
@@ -40,4 +40,21 @@ test('leaves a picture on a transparent box, so a transparent png keeps its own 
   const fallback = document.querySelector<HTMLElement>('.sable-avatar-fallback');
   expect(fallback?.dataset.status).toBe('loaded');
   expect(fallback?.style.display).toBe('none');
+});
+
+test('removes the old picture when its reactive source is cleared', async () => {
+  const props = $state<{ src: string | null; name: string }>({
+    src: 'mxc://example.org/avatar',
+    name: 'Sable',
+  });
+  const instance = mount(Avatar, { target: document.body, props });
+
+  expect(document.querySelector('.sable-avatar-image')).not.toBeNull();
+
+  props.src = null;
+  await tick();
+
+  expect(document.querySelector('.sable-avatar-image')).toBeNull();
+  expect(document.querySelector('.sable-avatar-fallback')).not.toBeNull();
+  await unmount(instance);
 });

@@ -7,6 +7,7 @@ use matrix_sdk::{
         events::{
             key::verification::done::KeyVerificationDoneEventContent,
             relation::Reference,
+            room::avatar::RoomAvatarEventContent,
             room::message::{LocationMessageEventContent, MessageType, RoomMessageEventContent},
         },
         room_id, user_id,
@@ -1584,4 +1585,171 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
     let summary = super::view::room_summary(&item, &cache);
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
+}
+
+#[tokio::test]
+async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!room-avatar:example.org");
+    let avatar = matrix_sdk::ruma::mxc_uri!("mxc://example.org/room-picture");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(factory.room_avatar().url(avatar)),
+        )
+        .await;
+    let item =
+        matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
+    let mut cache = std::collections::HashMap::new();
+    super::view::enrich_room_fields(
+        &client,
+        &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+            index: 0,
+            value: item.clone(),
+        },
+        &mut cache,
+    )
+    .await;
+    assert_eq!(
+        super::view::room_summary(&item, &cache)
+            .avatar_url
+            .as_deref(),
+        Some(avatar.as_str())
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_state_event(
+                matrix_sdk::ruma::serde::Raw::new(&json!({
+                    "content": {"url": null},
+                    "event_id": "$room-avatar-cleared",
+                    "origin_server_ts": 0,
+                    "sender": *ALICE,
+                    "state_key": "",
+                    "type": "m.room.avatar",
+                }))
+                .unwrap()
+                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncStateEvent>(),
+            ),
+        )
+        .await;
+    let item =
+        matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
+    super::view::enrich_room_fields(
+        &client,
+        &matrix_sdk_ui::eyeball_im::VectorDiff::PushFront {
+            value: item.clone(),
+        },
+        &mut cache,
+    )
+    .await;
+
+    let summary = super::view::room_summary(&item, &cache);
+    assert!(!summary.is_direct);
+    assert_eq!(summary.avatar_url, None);
+}
+
+#[tokio::test]
+async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property() {
+    for (name, room_id, avatar_content, expected_avatar) in [
+        (
+            "missing",
+            room_id!("!sliding-avatar-missing:example.org"),
+            None,
+            Some("mxc://example.org/stale-room-picture"),
+        ),
+        (
+            "cleared",
+            room_id!("!sliding-avatar-cleared:example.org"),
+            Some(json!({"url": null})),
+            None,
+        ),
+        (
+            "replaced",
+            room_id!("!sliding-avatar-replaced:example.org"),
+            Some(json!({"url": "mxc://example.org/new-room-picture"})),
+            Some("mxc://example.org/new-room-picture"),
+        ),
+    ] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let sliding_sync = client.sliding_sync(name).unwrap().build().await.unwrap();
+        sliding_sync.subscribe_to_rooms(&[room_id], None, true);
+        let stream = sliding_sync.sync();
+        pin_mut!(stream);
+
+        let mut room_response = json!({
+            "avatar": "mxc://example.org/stale-room-picture",
+            "initial": true,
+        });
+        if let Some(content) = avatar_content.as_ref() {
+            room_response["required_state"] = json!([{
+                "content": content,
+                "event_id": "$room-avatar",
+                "origin_server_ts": 0,
+                "sender": *ALICE,
+                "state_key": "",
+                "type": "m.room.avatar",
+            }]);
+        }
+        let mut rooms = serde_json::Map::new();
+        rooms.insert(room_id.to_string(), room_response);
+        let response = Mock::given(method("POST"))
+            .and(path(
+                "/_matrix/client/unstable/org.matrix.simplified_msc3575/sync",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "pos": "1",
+                "lists": {},
+                "rooms": rooms,
+                "extensions": {}
+            })))
+            .mount_as_scoped(server.server())
+            .await;
+        stream.next().await.unwrap().unwrap();
+        drop(response);
+
+        let room = client.get_room(room_id).expect("subscribed room");
+        let cached_avatar = room
+            .get_state_event_static::<RoomAvatarEventContent>()
+            .await
+            .unwrap();
+        let expected_cached_avatar: Option<Option<matrix_sdk::ruma::OwnedMxcUri>> = avatar_content
+            .as_ref()
+            .map(|content| content["url"].as_str().map(Into::into));
+        assert_eq!(
+            cached_avatar.map(|event| event
+                .deserialize()
+                .unwrap()
+                .original_content()
+                .unwrap()
+                .url
+                .clone()),
+            expected_cached_avatar,
+            "{name} cached avatar state"
+        );
+
+        let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
+        let mut cache = std::collections::HashMap::new();
+        super::view::enrich_room_fields(
+            &client,
+            &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+                index: 0,
+                value: item.clone(),
+            },
+            &mut cache,
+        )
+        .await;
+        assert_eq!(
+            super::view::room_summary(&item, &cache)
+                .avatar_url
+                .as_deref(),
+            expected_avatar,
+            "{name} room summary"
+        );
+    }
 }

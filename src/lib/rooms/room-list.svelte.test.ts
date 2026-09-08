@@ -42,3 +42,34 @@ test('limits concurrent notification-settings requests after room-list hydration
   expect(maximumActive).toBeLessThanOrEqual(8);
   roomList.stop();
 });
+
+test('clears a room avatar when a room-list diff supplies null', async () => {
+  const room = {
+    room_id: '!room:example.org',
+    avatar_url: 'mxc://example.org/avatar',
+  } as RoomSummary;
+  const clearedRoom = { ...room, avatar_url: null };
+  const eventListeners: ((event: unknown) => void)[] = [];
+  const core = {
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
+      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  eventListeners[0]?.({
+    type: 'room_list_diff',
+    subscription: 1,
+    diffs: [{ op: 'set', index: 0, value: clearedRoom }],
+  });
+
+  expect(roomList.rooms[0]?.avatar_url).toBeNull();
+  roomList.stop();
+});

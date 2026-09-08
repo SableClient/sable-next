@@ -12,6 +12,7 @@ use matrix_sdk::ruma::directory::PublicRoomsChunk;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
 use matrix_sdk::ruma::events::room::MediaSource;
+use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, UnstableAmplitude};
@@ -64,7 +65,7 @@ pub struct RoomInfo {
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,
     pub canonical_alias: Option<String>,
-    pub direct_avatar_url: Option<String>,
+    pub avatar_url: Option<String>,
     pub children: Vec<SpaceChildEdge>,
     pub tags: Vec<RoomTag>,
 }
@@ -86,10 +87,10 @@ pub fn room_summary<S: BuildHasher>(
             .map(|name| name.to_string())
             .or_else(|| item.name()),
         topic: item.topic(),
-        avatar_url: item
-            .avatar_url()
-            .map(|url| url.to_string())
-            .or_else(|| info.and_then(|info| info.direct_avatar_url.clone())),
+        avatar_url: info.map_or_else(
+            || item.avatar_url().map(|url| url.to_string()),
+            |info| info.avatar_url.clone(),
+        ),
         is_direct: !item.direct_targets().is_empty(),
         direct_targets: item
             .direct_targets()
@@ -232,8 +233,7 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
     }
 }
 
-/// `Room::get_state_events_static` hits the state store, so this runs once per
-/// room per subscription.
+/// Resolve current room fields for every emitted item, including reordered rooms.
 pub async fn enrich_room_fields<S: BuildHasher>(
     client: &Client,
     diff: &eyeball_im::VectorDiff<RoomListItem>,
@@ -250,40 +250,12 @@ pub async fn enrich_room_fields<S: BuildHasher>(
         _ => Vec::new(),
     };
 
-    let stale = items
+    let lookups = items
         .into_iter()
-        .filter(|item| !room_cache.contains_key(item.room_id()) || matches!(diff, In::Set { .. }));
-
-    let lookups = stale.map(|item| {
-        let room_id = item.room_id().to_owned();
-        let room = client.get_room(&room_id);
-        async move {
-            match room {
-                Some(room) => (room_id, room_info(client, &room).await),
-                None => (room_id, RoomInfo::absent()),
-            }
-        }
-    });
+        .map(|item| async move { (item.room_id().to_owned(), room_info(client, item).await) });
 
     for (room_id, info) in futures_util::future::join_all(lookups).await {
         room_cache.insert(room_id, info);
-    }
-}
-
-impl RoomInfo {
-    const fn absent() -> Self {
-        Self {
-            is_space: false,
-            is_tombstoned: false,
-            has_space_parent: false,
-            supports_knock: false,
-            supports_restricted: false,
-            supports_knock_restricted: false,
-            canonical_alias: None,
-            direct_avatar_url: None,
-            children: Vec::new(),
-            tags: Vec::new(),
-        }
     }
 }
 
@@ -314,15 +286,35 @@ async fn room_info(client: &Client, room: &Room) -> RoomInfo {
         supports_restricted,
         supports_knock_restricted,
         canonical_alias: room.canonical_alias().map(|alias| alias.to_string()),
-        direct_avatar_url: direct_avatar_url(room).await,
+        avatar_url: room_avatar_url(room).await,
         children,
         tags: room_tags(room),
     }
 }
 
+async fn room_avatar_url(room: &Room) -> Option<String> {
+    let avatar = if let Ok(Some(event)) = room
+        .get_state_event_static::<RoomAvatarEventContent>()
+        .await
+        && let Ok(event) = event.deserialize()
+    {
+        // Sliding-sync metadata can retain an old URL after the state event clears it.
+        event
+            .original_content()
+            .and_then(|content| content.url.clone())
+    } else {
+        room.avatar_url()
+    };
+
+    match avatar {
+        Some(url) => Some(url.to_string()),
+        None => direct_avatar_url(room).await,
+    }
+}
+
 /// Use synced profiles only: rendering the room list must not fetch members.
 async fn direct_avatar_url(room: &Room) -> Option<String> {
-    if room.avatar_url().is_some() || room.direct_targets().is_empty() {
+    if room.direct_targets().is_empty() {
         return None;
     }
     let service_members = room.service_members().unwrap_or_default();

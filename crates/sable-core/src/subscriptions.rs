@@ -60,7 +60,7 @@ impl Core {
                 Box::new(new_filter_deduplicate_versions()),
             ])));
 
-            // Stable over a stream's life, so resolved once per room.
+            // Refreshed from each diff before constructing synchronous summaries.
             let mut room_cache: HashMap<OwnedRoomId, view::RoomInfo> = HashMap::new();
 
             let mut stream = Box::pin(stream);
