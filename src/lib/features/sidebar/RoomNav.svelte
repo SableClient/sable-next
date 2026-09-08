@@ -229,6 +229,26 @@
       .map(roomRow)
       .toSorted(byRecency);
   });
+  let invites = $derived.by<RoomSummary[]>(() => {
+    const pending = roomList.rooms.filter((room) => room.state === 'invited');
+
+    if (directSection) {
+      return pending.filter((room) => room.is_direct);
+    }
+
+    if (page.url.pathname.startsWith('/space')) {
+      const children = new Set(activeSpace?.space_children.map((child) => child.room_id) ?? []);
+      return pending.filter((room) => children.has(room.room_id));
+    }
+
+    const claimedByJoinedSpace = unspacedSection
+      ? claimedRoomIds(roomList.rooms)
+      : new Set<string>();
+
+    return pending.filter(
+      (room) => !(unspacedSection && room.is_direct) && !claimedByJoinedSpace.has(room.room_id)
+    );
+  });
   $effect(() => {
     publishVisibleRoomOrder(rooms.map((row) => row.roomId));
   });
@@ -526,7 +546,7 @@
   {/snippet}
 
   <div class="room-nav-content">
-    <RoomInvites {collapsed} />
+    <RoomInvites {collapsed} {invites} />
 
     <div class="room-nav-actions" class:collapsed>
       {#snippet action(href: string, label: string, icon: Component)}

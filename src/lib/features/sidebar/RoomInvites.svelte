@@ -2,22 +2,21 @@
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
+  import type { RoomSummary } from '#src/generated/protocol';
+
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   interface Props {
+    invites: readonly RoomSummary[];
     collapsed?: boolean;
   }
 
-  let { collapsed = false }: Props = $props();
-  const roomList = useRoomList();
+  let { invites, collapsed = false }: Props = $props();
   const answers = new InviteActions(useCoreClient());
-
-  let invites = $derived(roomList.rooms.filter((room) => room.state === 'invited'));
 </script>
 
 {#if invites.length > 0 && !collapsed}
