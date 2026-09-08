@@ -9,8 +9,10 @@
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import StarIcon from 'phosphor-svelte/lib/StarIcon';
   import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
+  import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
+  import RoomInviteDialog from '#lib/features/room/RoomInviteDialog.svelte';
   import RoomNotificationSubmenu from '#lib/features/room/RoomNotificationSubmenu.svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -106,6 +108,20 @@
     }
   }
 
+  function readInvitePermission(): void {
+    const run = ++inviteRun;
+    canInvite = false;
+    void core.commands
+      .roomPermissions(room.room_id)
+      .then((permissions) => {
+        if (run !== inviteRun) return;
+        canInvite = permissions.can_invite;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] room permissions unavailable', error);
+      });
+  }
+
   let offeredSpaces = $derived(addableSpaces.filter((space) => manageable.has(space.room_id)));
   let removableParent = $derived(
     parentSpace !== null && manageable.has(parentSpace.room_id) ? parentSpace : null
@@ -113,6 +129,9 @@
 
   let opened = $state(false);
   let addToSpaceOpen = $state(false);
+  let inviteOpen = $state(false);
+  let canInvite = $state(false);
+  let inviteRun = 0;
 
   function report(error: unknown): void {
     console.warn('[sable room] room action failed', error);
@@ -164,6 +183,7 @@
     if (!open) return;
     opened = true;
     readManageableSpaces();
+    readInvitePermission();
   }}
 >
   {#if !anchor}
@@ -216,6 +236,16 @@
 
       <DropdownMenu.Separator class="sable-menu-separator" />
 
+      <DropdownMenu.Item
+        class="sable-menu-item"
+        disabled={!canInvite}
+        onSelect={() => {
+          inviteOpen = true;
+        }}
+      >
+        <UserPlusIcon />
+        {$i18n.t('room.menuInvite')}
+      </DropdownMenu.Item>
       <DropdownMenu.Item class="sable-menu-item" onSelect={copyLink}>
         <LinkIcon />
         {$i18n.t('room.menuCopyLink')}
@@ -281,6 +311,14 @@
     addToSpaceOpen = next;
   }}
   onApply={addToSpaces}
+/>
+
+<RoomInviteDialog
+  open={inviteOpen}
+  {room}
+  onOpenChange={(next) => {
+    inviteOpen = next;
+  }}
 />
 
 <style>
