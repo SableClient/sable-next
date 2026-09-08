@@ -42,7 +42,7 @@ use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomId, RoomOrAliasId, ServerName, UInt,
-    events::Mentions, events::room::MediaSource, events::room::member::MembershipState,
+    events::room::MediaSource, events::room::member::MembershipState,
     events::room::message::RoomMessageEventContent,
 };
 use matrix_sdk::ruma::{
@@ -59,6 +59,7 @@ use crate::protocol::{
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
 use crate::media::mxc_uri;
+use crate::messages::outgoing_mentions;
 use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::encryption_status;
@@ -2328,13 +2329,10 @@ fn message_content(
         (MessageKind::Notice, None) => RoomMessageEventContent::notice_plain(body),
     };
 
-    if mentions.is_empty() && !room {
-        return content;
+    match outgoing_mentions(mentions, room) {
+        Some(mentions) => content.add_mentions(mentions),
+        None => content,
     }
-
-    let mut wanted = Mentions::with_user_ids(mentions);
-    wanted.room = room;
-    content.add_mentions(wanted)
 }
 
 fn edit_content(

@@ -312,6 +312,7 @@ test('anything you sent is yours to redact, not only your text', () => {
     ({ ...item(content), is_own: false }) as TimelineItemView;
   const image = {
     kind: 'image',
+    html: null,
     body: 'photo.png',
     source: 'mxc://example.org/p',
     filename: 'photo.png',

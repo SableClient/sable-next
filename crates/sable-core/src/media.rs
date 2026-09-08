@@ -6,11 +6,13 @@ use matrix_sdk::attachment::{
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::{
-    OwnedEventId, OwnedMxcUri, OwnedRoomId, UInt, events::room::message::TextMessageEventContent,
+    OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, UInt,
+    events::room::message::TextMessageEventContent,
 };
 use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource};
 use mime::Mime;
 
+use crate::messages::outgoing_mentions;
 use crate::protocol::{AttachmentInfoView, CommandErr};
 
 use crate::Core;
@@ -107,6 +109,9 @@ impl Core {
         in_reply_to: Option<String>,
         info: Option<AttachmentInfoView>,
         thread_root: Option<String>,
+        formatted_caption: Option<String>,
+        mentions: Vec<String>,
+        mentions_room: bool,
     ) -> Result<(), CommandErr> {
         if bytes.len() > MAX_ATTACHMENT_BYTES {
             return Err(CommandErr::InvalidMedia);
@@ -122,9 +127,14 @@ impl Core {
             Some(id) => Some(OwnedEventId::try_from(id).map_err(|_| CommandErr::UnknownRoom)?),
             None => None,
         };
+        let mentions = mentions
+            .into_iter()
+            .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let config = AttachmentConfig {
-            caption: caption.map(TextMessageEventContent::plain),
+            caption: attachment_caption(caption, formatted_caption),
+            mentions: outgoing_mentions(mentions, mentions_room),
             in_reply_to,
             info: Some(attachment_info(
                 &mime,
@@ -144,6 +154,16 @@ impl Core {
 
         Ok(())
     }
+}
+
+fn attachment_caption(
+    caption: Option<String>,
+    formatted_caption: Option<String>,
+) -> Option<TextMessageEventContent> {
+    caption.map(|body| match formatted_caption {
+        Some(html) => TextMessageEventContent::html(body, html),
+        None => TextMessageEventContent::plain(body),
+    })
 }
 
 fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> AttachmentInfo {
@@ -194,7 +214,10 @@ pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
 
 #[cfg(test)]
 mod tests {
-    use super::{AttachmentInfo, AttachmentInfoView, Mime, attachment_info};
+    use super::{
+        AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, OwnedUserId,
+        attachment_caption, attachment_info, outgoing_mentions,
+    };
 
     fn view(
         width: Option<u32>,
@@ -286,5 +309,46 @@ mod tests {
         };
         assert_eq!(image.width, None);
         assert_eq!(image.size.map(u64::from), Some(512));
+    }
+
+    #[test]
+    fn attachment_caption_preserves_html_and_mentions() {
+        let config = AttachmentConfig {
+            caption: attachment_caption(
+                Some("Hello @Ada :wave:".to_owned()),
+                Some("Hello <a href=\"https://matrix.to/#/@ada:example.org\">@Ada</a> <img data-mx-emoticon />".to_owned()),
+            ),
+            mentions: outgoing_mentions(
+                vec![OwnedUserId::try_from("@ada:example.org").expect("a user ID")],
+                true,
+            ),
+            ..AttachmentConfig::default()
+        };
+
+        let content = serde_json::to_value(config.caption.as_ref().expect("a formatted caption"))
+            .expect("caption serializes");
+        assert_eq!(content["body"], "Hello @Ada :wave:");
+        assert_eq!(
+            content["formatted_body"],
+            "Hello <a href=\"https://matrix.to/#/@ada:example.org\">@Ada</a> <img data-mx-emoticon />"
+        );
+
+        let mentions = config.mentions.as_ref().expect("mentions are retained");
+        assert!(mentions.room);
+        assert!(
+            mentions
+                .user_ids
+                .contains(&OwnedUserId::try_from("@ada:example.org").expect("a user ID"))
+        );
+    }
+
+    #[test]
+    fn attachment_caption_is_plain_without_html_and_absent_without_a_body() {
+        let plain =
+            attachment_caption(Some("A caption".to_owned()), None).expect("a plain caption");
+        let content = serde_json::to_value(plain).expect("caption serializes");
+        assert_eq!(content["body"], "A caption");
+        assert!(content.get("formatted_body").is_none());
+        assert!(attachment_caption(None, Some("<b>orphaned HTML</b>".to_owned())).is_none());
     }
 }

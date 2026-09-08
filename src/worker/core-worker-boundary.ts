@@ -16,7 +16,10 @@ export type WorkerCore = {
     caption: string | null,
     inReplyTo: string | null,
     info: string | null,
-    threadRoot: string | null
+    threadRoot: string | null,
+    formattedCaption: string | null,
+    mentions: string | null,
+    mentionsRoom: boolean
   ): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 };
@@ -173,8 +176,19 @@ export function createCoreWorkerBoundary(
           return;
         }
         if ('attachment' in request) {
-          const { roomId, filename, mime, bytes, caption, inReplyTo, info, threadRoot } =
-            request.attachment;
+          const {
+            roomId,
+            filename,
+            mime,
+            bytes,
+            caption,
+            inReplyTo,
+            info,
+            threadRoot,
+            formattedCaption,
+            mentions,
+            mentionsRoom,
+          } = request.attachment;
           await instance.sendAttachment(
             roomId,
             filename,
@@ -183,7 +197,10 @@ export function createCoreWorkerBoundary(
             caption,
             inReplyTo,
             info === null ? null : JSON.stringify(info),
-            threadRoot
+            threadRoot,
+            formattedCaption,
+            JSON.stringify(mentions),
+            mentionsRoom
           );
           port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;

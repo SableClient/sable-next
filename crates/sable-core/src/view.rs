@@ -1172,6 +1172,7 @@ fn message_content(
     match message.msgtype() {
         MessageType::Image(image) => TimelineItemContentView::Image {
             body: image.body.clone(),
+            html: formatted_caption_html(image.body.as_str(), image.formatted_caption()),
             source: media_source(&image.source),
             filename: image.filename.clone(),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
@@ -1182,6 +1183,7 @@ fn message_content(
         },
         MessageType::Video(video) => TimelineItemContentView::Video {
             body: video.body.clone(),
+            html: formatted_caption_html(video.body.as_str(), video.formatted_caption()),
             source: media_source(&video.source),
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
@@ -1191,6 +1193,7 @@ fn message_content(
         },
         MessageType::Audio(audio) => TimelineItemContentView::Audio {
             body: audio.body.clone(),
+            html: formatted_caption_html(audio.body.as_str(), audio.formatted_caption()),
             source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
             duration_ms: audio
@@ -1215,6 +1218,7 @@ fn message_content(
         },
         MessageType::File(file) => TimelineItemContentView::File {
             body: file.body.clone(),
+            html: formatted_caption_html(file.body.as_str(), file.formatted_caption()),
             source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
             size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
@@ -1309,6 +1313,13 @@ fn content(
         TimelineItemContent::CallInvite => unsupported("call invite"),
         _ => unsupported("event"),
     }
+}
+
+fn formatted_caption_html(
+    body: &str,
+    formatted: Option<&matrix_sdk::ruma::events::room::message::FormattedBody>,
+) -> Option<String> {
+    formatted.map(|formatted| display_html(body, Some(formatted.body.as_str())))
 }
 
 fn formatted_body(msgtype: &MessageType) -> Option<String> {
@@ -1540,12 +1551,12 @@ pub fn room_power_levels(power_levels: &RoomPowerLevels) -> RoomPowerLevelsView 
 
 #[cfg(test)]
 mod tests {
-    use matrix_sdk::ruma::OwnedUserId;
+    use matrix_sdk::ruma::{OwnedUserId, events::room::message::FormattedBody};
     use serde_json::json;
 
     use super::{
-        call_participants, clamp_power_level, geo_coordinates, in_call, per_message_profile,
-        relay_author, relay_profile, via_servers,
+        call_participants, clamp_power_level, formatted_caption_html, geo_coordinates, in_call,
+        per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
 
@@ -1728,6 +1739,23 @@ mod tests {
         let profile = per_message_profile(Some(&content)).expect("a profile");
 
         assert_eq!(profile.display_name, None);
+    }
+
+    #[test]
+    fn formatted_attachment_captions_are_sanitised_for_display() {
+        let html = formatted_caption_html(
+            "hi Ana party",
+            Some(&FormattedBody::html(
+                "<a href=\"https://matrix.to/#/@ana:example.org\">Ana</a> <img src=\"mxc://example.org/party\" alt=\"party\" data-mx-emoticon><script>steal()</script>",
+            )),
+        )
+        .expect("a formatted caption maps to display HTML");
+
+        assert!(html.contains("href=\"https://matrix.to/#/@ana:example.org\""));
+        assert!(html.contains("src=\"mxc://example.org/party\""));
+        assert!(html.contains("data-mx-emoticon"));
+        assert!(!html.contains("script"));
+        assert_eq!(formatted_caption_html("photo.png", None), None);
     }
 
     #[test]

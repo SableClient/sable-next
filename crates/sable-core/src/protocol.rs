@@ -2172,6 +2172,8 @@ pub enum TimelineItemContentView {
     },
     Image {
         body: String,
+        /// Sanitised display HTML for a formatted caption, when present.
+        html: Option<String>,
         source: String,
         filename: Option<String>,
         mime: Option<String>,
@@ -2184,6 +2186,8 @@ pub enum TimelineItemContentView {
     },
     Video {
         body: String,
+        /// Sanitised display HTML for a formatted caption, when present.
+        html: Option<String>,
         source: String,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
@@ -2195,6 +2199,8 @@ pub enum TimelineItemContentView {
     },
     Audio {
         body: String,
+        /// Sanitised display HTML for a formatted caption, when present.
+        html: Option<String>,
         source: String,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
@@ -2205,6 +2211,8 @@ pub enum TimelineItemContentView {
     },
     File {
         body: String,
+        /// Sanitised display HTML for a formatted caption, when present.
+        html: Option<String>,
         source: String,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]

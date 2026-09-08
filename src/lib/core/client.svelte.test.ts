@@ -97,6 +97,38 @@ test('commands dispatch through the transport the client was given', async () =>
   expect(fake.sent).toContainEqual({ type: 'room_aliases', room_id: '!room:example.org' });
 });
 
+test('sending an attachment forwards its rich caption, mentions, reply, and thread', async () => {
+  const fake = fakeTransport();
+  const sendAttachment = vi.fn<Transport['sendAttachment']>();
+  fake.transport.sendAttachment = sendAttachment;
+  const core = createCoreClient(() => fake.transport);
+  const file = new File(['pdf'], 'report.pdf', { type: 'application/pdf' });
+
+  await core.commands.sendAttachment('!room:example.org', file, {
+    caption: 'hey Member One :wave:',
+    formattedCaption:
+      'hey <a href="https://matrix.to/#/@one:example.org">Member One</a> <img data-mx-emoticon>',
+    mentions: { userIds: ['@one:example.org'], room: true },
+    inReplyTo: '$reply:example.org',
+    threadRoot: '$thread:example.org',
+  });
+
+  expect(sendAttachment).toHaveBeenCalledWith({
+    roomId: '!room:example.org',
+    filename: 'report.pdf',
+    mime: 'application/pdf',
+    bytes: new TextEncoder().encode('pdf'),
+    caption: 'hey Member One :wave:',
+    formattedCaption:
+      'hey <a href="https://matrix.to/#/@one:example.org">Member One</a> <img data-mx-emoticon>',
+    mentions: ['@one:example.org'],
+    mentionsRoom: true,
+    inReplyTo: '$reply:example.org',
+    info: null,
+    threadRoot: '$thread:example.org',
+  });
+});
+
 test('stopping clears the session and closes the transport', async () => {
   const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
   const core = createCoreClient(() => fake.transport);

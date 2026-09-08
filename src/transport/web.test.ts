@@ -100,6 +100,28 @@ test('uses a WASM-specific worker URL', async () => {
   expect(FakeSharedWorker.last?.url.searchParams.get('wasm')).toBeTruthy();
 }, 20_000);
 
+test('preserves rich attachment captions and mentions across the worker transport', async () => {
+  const transport = await load();
+  const attachment = {
+    roomId: '!room:example.org',
+    filename: 'photo.png',
+    mime: 'image/png',
+    bytes: new Uint8Array([1]),
+    caption: 'One',
+    formattedCaption: '<a href="https://matrix.to/#/@one:example.org">One</a>',
+    mentions: ['@one:example.org'],
+    mentionsRoom: true,
+    inReplyTo: '$reply',
+    info: null,
+    threadRoot: '$thread',
+  };
+  const pending = transport.sendAttachment(attachment);
+  expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 1, attachment });
+  FakeSharedWorker.last?.port.receive({ id: 1, uri: null });
+  await pending;
+  transport.close();
+});
+
 test('a slow command reports an unresponsive worker', async () => {
   expect(
     await stalledFor((transport) => {

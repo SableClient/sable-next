@@ -29,6 +29,49 @@ function fakeCore(submitCommand: WorkerCore['submitCommand']): WorkerCore {
   };
 }
 
+test('passes rich attachment captions and mentions to the WASM core', async () => {
+  const core = fakeCore(() => Promise.resolve(''));
+  const sendAttachment = vi.fn(() => Promise.resolve());
+  core.sendAttachment = sendAttachment;
+  const boundary = createCoreWorkerBoundary(Promise.resolve(core));
+  const port = new FakePort();
+  boundary.connect(port);
+  const bytes = new Uint8Array([1]);
+  const formattedCaption = '<a href="https://matrix.to/#/@one:example.org">One</a>';
+
+  await port.send({
+    id: 1,
+    attachment: {
+      roomId: '!room:example.org',
+      filename: 'photo.png',
+      mime: 'image/png',
+      bytes,
+      caption: 'One',
+      inReplyTo: '$reply',
+      info: null,
+      threadRoot: '$thread',
+      formattedCaption,
+      mentions: ['@one:example.org'],
+      mentionsRoom: true,
+    },
+  });
+
+  expect(sendAttachment).toHaveBeenCalledWith(
+    '!room:example.org',
+    'photo.png',
+    'image/png',
+    bytes,
+    'One',
+    '$reply',
+    null,
+    '$thread',
+    formattedCaption,
+    JSON.stringify(['@one:example.org']),
+    true
+  );
+  expect(port.messages).toEqual([{ id: 1, uri: null }]);
+});
+
 test('answers a health probe while a core command is pending', async () => {
   const boundary = createCoreWorkerBoundary(
     Promise.resolve(fakeCore(() => new Promise<string>(() => {})))

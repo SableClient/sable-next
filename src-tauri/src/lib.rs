@@ -126,6 +126,11 @@ async fn send_attachment(
             header("in-reply-to"),
             header("info").and_then(|json| serde_json::from_str(&json).ok()),
             header("thread-root"),
+            header("formatted-caption"),
+            header("mentions")
+                .and_then(|json| serde_json::from_str(&json).ok())
+                .unwrap_or_default(),
+            header("mentions-room").is_some_and(|value| value == "true"),
         )
         .await
 }

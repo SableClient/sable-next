@@ -27,6 +27,7 @@ import MediaViewer from './MediaViewer.svelte';
 
 const imageItem: MediaItem = {
   kind: 'image',
+  html: null,
   body: 'photo.png',
   source: 'mxc://example.org/image',
   filename: 'photo.png',
@@ -41,6 +42,7 @@ const imageItem: MediaItem = {
 
 const videoItem: MediaItem = {
   kind: 'video',
+  html: null,
   body: 'clip.mp4',
   source: 'mxc://example.org/video',
   mime: 'video/mp4',
@@ -54,6 +56,7 @@ const videoItem: MediaItem = {
 
 const audioItem: MediaItem = {
   kind: 'audio',
+  html: null,
   duration_ms: null,
   waveform: null,
   voice: false,

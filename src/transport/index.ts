@@ -15,6 +15,9 @@ export type Attachment = {
   mime: string;
   bytes: Uint8Array<ArrayBuffer>;
   caption?: string | null;
+  formattedCaption?: string | null;
+  mentions?: string[];
+  mentionsRoom?: boolean;
   inReplyTo?: string | null;
   info?: AttachmentInfoView | null;
   threadRoot?: string | null;

@@ -1,13 +1,23 @@
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::api::client::room::report_content;
 use matrix_sdk::ruma::events::room::pinned_events::RoomPinnedEventsEventContent;
-use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, AnySyncTimelineEvent};
+use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, AnySyncTimelineEvent, Mentions};
 use matrix_sdk::ruma::room::JoinRule;
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, UInt};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, UInt};
 
 use crate::Core;
 use crate::personas::PER_MESSAGE_PROFILE;
 use crate::protocol::CommandErr;
+
+pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Option<Mentions> {
+    if user_ids.is_empty() && !room {
+        return None;
+    }
+
+    let mut mentions = Mentions::with_user_ids(user_ids);
+    mentions.room = room;
+    Some(mentions)
+}
 
 impl Core {
     pub(crate) async fn bulk_redact(

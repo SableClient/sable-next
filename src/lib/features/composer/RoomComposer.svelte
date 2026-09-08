@@ -14,6 +14,7 @@
   import { onDestroy } from 'svelte';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
+  import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
   import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
@@ -73,7 +74,7 @@
       formatted: string | null,
       mentions: OutgoingMentions
     ) => Promise<unknown>;
-    onSendAttachment: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
+    onSendAttachment: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
     onSendSticker?: (
       roomId: string,
       url: string,
@@ -403,7 +404,17 @@
 
         while (unsent.length > 0) {
           const [next, ...rest] = unsent;
-          await onSendAttachment(roomId, next.file, captioned ? { caption: message.body } : {});
+          await onSendAttachment(
+            roomId,
+            next.file,
+            captioned
+              ? {
+                  caption: message.body,
+                  formattedCaption: message.formatted,
+                  mentions: message.mentions,
+                }
+              : {}
+          );
           unsent = rest;
         }
 

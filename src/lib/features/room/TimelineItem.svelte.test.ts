@@ -67,6 +67,7 @@ function imageItem(): TimelineItemView {
     ...item(false),
     content: {
       kind: 'image',
+      html: null,
       body: 'photo.png',
       source: 'mxc://example.org/photo',
       filename: 'photo.png',

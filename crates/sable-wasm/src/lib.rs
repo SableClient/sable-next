@@ -255,10 +255,17 @@ impl SableCore {
         in_reply_to: Option<String>,
         info: Option<String>,
         thread_root: Option<String>,
+        formatted_caption: Option<String>,
+        mentions: Option<String>,
+        mentions_room: bool,
     ) -> Result<(), String> {
         let info = info
             .as_deref()
             .and_then(|json| serde_json::from_str(json).ok());
+        let mentions = mentions
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok())
+            .unwrap_or_default();
 
         self.core
             .send_attachment(
@@ -270,6 +277,9 @@ impl SableCore {
                 in_reply_to,
                 info,
                 thread_root,
+                formatted_caption,
+                mentions,
+                mentions_room,
             )
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))

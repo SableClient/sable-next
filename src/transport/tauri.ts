@@ -53,12 +53,27 @@ export function createTauriTransport(): Transport {
       }
     },
 
-    async sendAttachment({ roomId, filename, mime, bytes, caption, inReplyTo, info, threadRoot }) {
+    async sendAttachment({
+      roomId,
+      filename,
+      mime,
+      bytes,
+      caption,
+      formattedCaption,
+      mentions,
+      mentionsRoom,
+      inReplyTo,
+      info,
+      threadRoot,
+    }) {
       await carry('send_attachment', bytes, {
         'room-id': roomId,
         filename,
         mime,
         ...(caption ? { caption } : {}),
+        ...(formattedCaption ? { 'formatted-caption': formattedCaption } : {}),
+        ...(mentions ? { mentions: JSON.stringify(mentions) } : {}),
+        ...(mentionsRoom ? { 'mentions-room': 'true' } : {}),
         ...(inReplyTo ? { 'in-reply-to': inReplyTo } : {}),
         ...(info ? { info: JSON.stringify(info) } : {}),
         ...(threadRoot ? { 'thread-root': threadRoot } : {}),

@@ -9,6 +9,7 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { firstPreviewableLink } from './link-preview.js';
+  import FormattedBody from './FormattedBody.svelte';
   import LinkPreviewCard from './LinkPreviewCard.svelte';
   import { isCaption } from './members.js';
   import TimelineGallery from './TimelineGallery.svelte';
@@ -69,9 +70,11 @@
     retryable
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
   />
-  {#if isCaption(item.content.body) || preferences.alwaysShowAltText}<p class="body">
-      {item.content.body}
-    </p>{/if}
+  {#if item.content.html}
+    <FormattedBody html={item.content.html} {onMatrixLink} />
+  {:else if isCaption(item.content.body) || preferences.alwaysShowAltText}
+    <p class="body">{item.content.body}</p>
+  {/if}
 {:else if item.content.kind === 'gallery'}
   <TimelineGallery
     items={item.content.items}
@@ -111,6 +114,9 @@
     waveform={item.content.kind === 'audio' ? item.content.waveform : null}
     onOpen={item.event_id ? () => onOpenMedia?.(item.event_id ?? '') : undefined}
   />
+  {#if item.content.html}
+    <FormattedBody html={item.content.html} {onMatrixLink} />
+  {/if}
 {/if}
 {#if previewLink}
   <LinkPreviewCard url={previewLink} />

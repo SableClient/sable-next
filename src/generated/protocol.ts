@@ -870,7 +870,15 @@ body: string;
 /**  Sanitised display HTML, safe to inject as-is. */
 html: string; 
 /**  `m.emote`, which reads as an action by the sender rather than speech. */
-emote: boolean; notice: boolean; edited: boolean } | { kind: "image"; body: string; source: string; filename: string | null; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video"; body: string; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio"; body: string; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file"; body: string; source: string; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } | 
+emote: boolean; notice: boolean; edited: boolean } | { kind: "image"; body: string; 
+/**  Sanitised display HTML for a formatted caption, when present. */
+html: string | null; source: string; filename: string | null; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video"; body: string; 
+/**  Sanitised display HTML for a formatted caption, when present. */
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio"; body: string; 
+/**  Sanitised display HTML for a formatted caption, when present. */
+html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file"; body: string; 
+/**  Sanitised display HTML for a formatted caption, when present. */
+html: string | null; source: string; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } | 
 /**
  *  The coordinates are absent for a `geo:` URI we cannot read; `geo_uri` is
  *  passed through as sent either way.

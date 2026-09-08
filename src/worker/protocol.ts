@@ -1,21 +1,7 @@
-import type {
-  AttachmentInfoView,
-  Command,
-  CommandErr,
-  CommandOk,
-  CoreEvent,
-} from '#src/generated/protocol';
+import type { Command, CommandErr, CommandOk, CoreEvent } from '#src/generated/protocol';
+import type { Attachment } from '#src/transport';
 
-export type AttachmentRequest = {
-  roomId: string;
-  filename: string;
-  mime: string;
-  bytes: Uint8Array<ArrayBuffer>;
-  caption: string | null;
-  inReplyTo: string | null;
-  info: AttachmentInfoView | null;
-  threadRoot: string | null;
-};
+export type AttachmentRequest = Required<Attachment>;
 
 export type WorkerRequest =
   | { id: number; command: Command }

@@ -9,7 +9,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
-import type { EditImage } from '#lib/core/commands.svelte.js';
+import type { EditImage, SendAttachmentOptions } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
 import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure.js';
@@ -125,10 +125,10 @@ export class Conversation {
   readonly sendAttachment = async (
     targetRoomId: string,
     file: File,
-    options: { caption?: string } = {}
+    options: SendAttachmentOptions = {}
   ): Promise<void> => {
     await this.#core.commands.sendAttachment(targetRoomId, file, {
-      caption: options.caption,
+      ...options,
       inReplyTo: this.#consumeReply(),
       threadRoot: this.#threadRoot,
     });

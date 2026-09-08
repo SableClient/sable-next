@@ -2,13 +2,15 @@
 
 import type { ImagePackView, MemberView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
-import { clearDrafts } from './composer-drafts.svelte';
+import { clearDrafts, writeDraft } from './composer-drafts.svelte';
 import { ComposerEditor } from './editor/composer-editor';
+import { composerSchema } from './editor/schema';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
@@ -69,7 +71,7 @@ interface ComposerProps {
     formatted: string | null,
     mentions: { userIds: string[]; room: boolean }
   ) => Promise<void>;
-  onSendAttachment?: (roomId: string, file: File, options: { caption?: string }) => Promise<void>;
+  onSendAttachment?: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
   threadRoot?: string | null;
@@ -277,10 +279,51 @@ test('text rides a lone attachment as its caption', async () => {
   submit();
   await tick();
 
-  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { caption: 'look at this' });
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {
+    caption: 'look at this',
+    formattedCaption: null,
+    mentions: { userIds: [], room: false },
+  });
   expect(message).not.toHaveBeenCalled();
   void unmount(instance);
 });
+
+test.each([true, false])(
+  'a lone attachment preserves rich caption details in %s composer mode',
+  async (richTextComposer) => {
+    setPreference('richTextComposer', richTextComposer);
+    const attachment = vi.fn(async () => {});
+    const file = new File(['image'], 'caption.png', { type: 'image/png' });
+    const caption = composerSchema.node('doc', null, [
+      composerSchema.nodes.paragraph.create(null, [
+        composerSchema.text('hey '),
+        composerSchema.nodes.mention.create({ userId: '@one:example.org', name: 'Member One' }),
+        composerSchema.text(' '),
+        composerSchema.nodes.emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave' }),
+      ]),
+    ]);
+    writeDraft('!room:example.org', { doc: caption.toJSON(), staged: [], nextStagedId: 0 });
+    const instance = render({
+      roomId: '!room:example.org',
+      onSendAttachment: attachment,
+    });
+
+    await tick();
+    await pick(file);
+    submit();
+
+    await vi.waitFor(() => {
+      expect(attachment).toHaveBeenCalled();
+    });
+    expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {
+      caption: 'hey Member One :wave:',
+      formattedCaption:
+        'hey <a href="https://matrix.to/#/@one:example.org">Member One</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt=":wave:" title=":wave:" height="32">',
+      mentions: { userIds: ['@one:example.org'], room: false },
+    });
+    await unmount(instance);
+  }
+);
 
 test('text follows two attachments as its own message', async () => {
   const attachment = vi.fn(async () => {});

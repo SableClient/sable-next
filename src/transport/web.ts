@@ -287,7 +287,19 @@ export function createWebTransport(): Transport {
       }));
     },
 
-    async sendAttachment({ roomId, filename, mime, bytes, caption, inReplyTo, info, threadRoot }) {
+    async sendAttachment({
+      roomId,
+      filename,
+      mime,
+      bytes,
+      caption,
+      formattedCaption,
+      mentions,
+      mentionsRoom,
+      inReplyTo,
+      info,
+      threadRoot,
+    }) {
       await request<null>(
         (id) => ({
           id,
@@ -297,6 +309,9 @@ export function createWebTransport(): Transport {
             mime,
             bytes,
             caption: caption ?? null,
+            formattedCaption: formattedCaption ?? null,
+            mentions: mentions ?? [],
+            mentionsRoom: mentionsRoom ?? false,
             inReplyTo: inReplyTo ?? null,
             info: info ?? null,
             threadRoot: threadRoot ?? null,

@@ -85,6 +85,14 @@ export type SendMessageOptions = {
   kind?: MessageKind;
 };
 
+export type SendAttachmentOptions = {
+  caption?: string | null;
+  formattedCaption?: string | null;
+  mentions?: OutgoingMentions;
+  inReplyTo?: string | null;
+  threadRoot?: string | null;
+};
+
 export type EditImage = {
   source: string;
   filename: string | null;
@@ -1000,11 +1008,7 @@ export function createCommands(transport: () => Transport) {
     async sendAttachment(
       roomId: string,
       file: File,
-      options: {
-        caption?: string | null;
-        inReplyTo?: string | null;
-        threadRoot?: string | null;
-      } = {}
+      options: SendAttachmentOptions = {}
     ): Promise<void> {
       if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
       const info = await measureAttachment(file);
@@ -1015,6 +1019,9 @@ export function createCommands(transport: () => Transport) {
         mime: file.type || 'application/octet-stream',
         bytes,
         caption: options.caption ?? null,
+        formattedCaption: options.formattedCaption ?? null,
+        mentions: options.mentions?.userIds ?? [],
+        mentionsRoom: options.mentions?.room ?? false,
         inReplyTo: options.inReplyTo ?? null,
         info,
         threadRoot: options.threadRoot ?? null,

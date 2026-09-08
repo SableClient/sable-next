@@ -5,6 +5,7 @@ import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
 
 const video: TimelineItemContentView = {
   kind: 'video',
+  html: null,
   body: 'clip.mp4',
   source: '{}',
   mime: 'video/mp4',
@@ -19,6 +20,7 @@ test('every renderable message kind yields a preview', () => {
   expect(
     replyPreviewBody({
       kind: 'audio',
+      html: null,
       body: 'voice.ogg',
       source: '{}',
       mime: null,
@@ -28,7 +30,14 @@ test('every renderable message kind yields a preview', () => {
     })
   ).toBe('voice.ogg');
   expect(
-    replyPreviewBody({ kind: 'file', body: 'deck.pdf', source: '{}', mime: null, size: null })
+    replyPreviewBody({
+      kind: 'file',
+      body: 'deck.pdf',
+      html: null,
+      source: '{}',
+      mime: null,
+      size: null,
+    })
   ).toBe('deck.pdf');
   expect(
     replyPreviewBody({
