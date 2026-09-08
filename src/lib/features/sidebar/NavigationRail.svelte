@@ -118,7 +118,7 @@
     {
       href: resolve('/(app)/rooms'),
       activePrefix: '/rooms',
-      icon: HashIcon,
+      icon: preferences.showHome ? HashIcon : HouseIcon,
       label: 'nav.unspaced',
       unread: unspacedUnread,
     },
