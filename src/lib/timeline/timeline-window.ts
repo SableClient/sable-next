@@ -157,6 +157,19 @@ export class TimelineWindow<T> {
     align: 'start' | 'center' = 'center',
     smooth = false
   ): Promise<boolean> {
+    if (this.disposed) return false;
+    if (key !== null) {
+      const index = (this.pending ?? this.items).findIndex((item) => item.key === key);
+      if (index < 0) return false;
+      if (
+        !this.pending &&
+        !this.rendering &&
+        index >= this.start &&
+        index < this.end &&
+        !this.element(key)
+      )
+        return false;
+    }
     const version = ++this.jumpVersion;
     this.active = false;
     this.touching = false;
@@ -271,6 +284,7 @@ export class TimelineWindow<T> {
       }
       await this.renderRange(this.start, this.end);
       this.layout();
+      if (this.state.scrolling && !this.jumping) await this.extendWindow();
     }
   }
 
@@ -373,29 +387,39 @@ export class TimelineWindow<T> {
     );
   }
 
+  private trackMovement(): number {
+    const delta = this.options.viewport.scrollTop - this.offset;
+    this.offset = this.options.viewport.scrollTop;
+    if (delta === 0) return delta;
+    this.scrollingUp = delta < 0;
+    for (const anchor of this.anchors) anchor.top -= delta;
+    if (!this.jumping) this.pinned = this.atEnd() || (this.pinned && delta > 0);
+    return delta;
+  }
+
   private layout(): void {
     if (this.disposed || this.rendering) return;
     const viewport = this.options.viewport;
     this.top =
       this.height - this.contentHeight - Number.parseFloat(this.options.content.style.bottom);
-    if (this.active) {
-      const delta = viewport.scrollTop - this.offset;
-      if (delta !== 0) this.scrollingUp = delta < 0;
-      for (const anchor of this.anchors) anchor.top -= delta;
-      if (!this.jumping && delta !== 0) this.pinned = this.atEnd() || (this.pinned && delta > 0);
-      this.offset = viewport.scrollTop;
-    }
+    if (this.active) this.trackMovement();
     for (const element of this.elements()) {
       const key = element.dataset.timelineKey;
       const height = element.getBoundingClientRect().height;
       if (key && height > 0) this.sizes.set(key, height);
     }
-    const reachedEndAfterResize =
-      this.ready && viewport.clientHeight > this.viewportHeight && this.atEnd();
-    if (reachedEndAfterResize) this.pinned = true;
+    const contentFits =
+      this.start === 0 &&
+      this.end === this.items.length &&
+      this.contentHeight <= viewport.clientHeight;
+    const reachedEnd =
+      contentFits || (this.ready && viewport.clientHeight > this.viewportHeight && this.atEnd());
+    if (reachedEnd) this.pinned = true;
     this.viewportHeight = viewport.clientHeight;
-    if (reachedEndAfterResize && this.active) {
-      this.setHeight(Math.max(this.height, viewport.clientHeight));
+    if (reachedEnd && this.active) {
+      this.setHeight(
+        contentFits ? viewport.clientHeight : Math.max(this.height, viewport.clientHeight)
+      );
       this.setTop(this.height - this.contentHeight);
     } else if (this.pinned && !this.active) {
       this.setTop(Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight));
@@ -440,20 +464,14 @@ export class TimelineWindow<T> {
   private scrolled(): void {
     if (this.disposed) return;
     const viewport = this.options.viewport;
-    const delta = viewport.scrollTop - this.offset;
-    this.offset = viewport.scrollTop;
+    const delta = this.trackMovement();
     if (delta === 0 && viewport.scrollHeight !== this.scrollHeight && this.atEnd()) {
       this.pinned = true;
       this.publish();
     }
     this.scrollHeight = viewport.scrollHeight;
     if (delta !== 0) {
-      this.scrollingUp = delta < 0;
-      for (const anchor of this.anchors) anchor.top -= delta;
       this.active = true;
-      if (!this.jumping) {
-        this.pinned = this.atEnd() || (this.pinned && delta > 0);
-      }
       this.scheduleSettle();
       if (!this.rendering) {
         if (this.scrollingUp && !this.jumping && this.top < -EPSILON) this.layout();

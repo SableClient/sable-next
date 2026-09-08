@@ -422,6 +422,72 @@ test.each([0, 2])(
   }
 );
 
+test.each(['update', 'resize'])(
+  'content shrinking to fit restores bottom following after %s',
+  async (change) => {
+    const { window, viewport, content, resize } = fixture();
+    await window.update(entries(10));
+    await window.jumpTo('0', 'start');
+    expect(window.state.pinned).toBe(false);
+    if (change === 'update') await window.update(entries(2));
+    else resize(10);
+    expect(viewport.scrollHeight).toBe(viewport.clientHeight);
+    expect(viewport.scrollTop).toBe(0);
+    expect(window.state.pinned).toBe(true);
+    expect(content.lastElementChild?.getBoundingClientRect().bottom).toBe(viewport.clientHeight);
+  }
+);
+
+test.each(['missing', 'removed', 'unrendered'])(
+  'a $0 jump target preserves the held gesture and queued update',
+  async (target) => {
+    const { window, viewport, render, omitRow } = fixture();
+    await window.update(entries(100));
+    viewport.dispatchEvent(new Event('touchstart'));
+    const queued = target === 'removed' ? entries(99) : entries(101);
+    if (target !== 'unrendered') await window.update(queued);
+    else omitRow('99');
+    const before = window.state;
+    const offset = viewport.scrollTop;
+    const renders = render.mock.calls.length;
+    expect(await window.jumpTo(target === 'missing' ? 'missing' : '99')).toBe(false);
+    expect(window.state).toEqual(before);
+    expect(viewport.scrollTop).toBe(offset);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(render).toHaveBeenCalledTimes(renders);
+    viewport.dispatchEvent(new TouchEvent('touchend', { touches: [] }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(window.state.scrolling).toBe(false);
+    if (target !== 'unrendered') expect(render.mock.calls.length).toBeGreaterThan(renders);
+  }
+);
+
+test('a jump can target a message in a queued update', async () => {
+  const { window, viewport } = fixture();
+  await window.update(entries(100));
+  viewport.dispatchEvent(new Event('touchstart'));
+  await window.update(entries(101));
+  expect(await window.jumpTo('100')).toBe(true);
+  expect(window.state.lastVisible).toBe(100);
+});
+
+test.each([false, true])(
+  'a seek during an incoming render fills the destination (touch held: %s)',
+  async (touching) => {
+    const { window, viewport, pause } = fixture();
+    await window.update(entries(1000));
+    const release = pause();
+    const update = window.update(entries(1001));
+    if (touching) viewport.dispatchEvent(new Event('touchstart'));
+    viewport.scrollTop = 0;
+    viewport.dispatchEvent(new Event('scroll'));
+    release();
+    await update;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(window.state.firstVisible).toBe(0);
+  }
+);
+
 test('renders a bounded latest window and jumps to a stable key', async () => {
   const { window, keys } = fixture();
   await window.update(entries(1000));

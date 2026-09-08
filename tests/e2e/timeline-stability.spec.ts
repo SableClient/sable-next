@@ -114,11 +114,14 @@ for (const reading of [false, true]) {
           value: timelineItem(`keyboard-cycle-${index}`, 'Incoming during keyboard resize'),
         },
       ]);
-      await timeline.viewport.evaluate((node) => {
+      const growth = await timeline.viewport.evaluate((node) => {
         const row = node.querySelector<HTMLElement>('.item');
         if (!row) throw new Error('missing row to resize');
-        row.style.paddingBottom = '4rem';
+        const before = row.getBoundingClientRect().height;
+        row.style.paddingBottom = `calc(${getComputedStyle(row).paddingBottom} + 4rem)`;
+        return row.getBoundingClientRect().height - before;
       });
+      expect(growth).toBeGreaterThan(0);
       await timeline.waitForScrollSettled();
       if (anchor) {
         await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
@@ -131,6 +134,43 @@ for (const reading of [false, true]) {
     }
   });
 }
+
+test('touch timeline shrinking to fit hides the bottom button without leaving a gap', async ({
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await loadScrollableHistory(core, timeline);
+  await timeline.scrollToAndNotify(0);
+  await timeline.waitForScrollSettled();
+  await expect(timeline.jumpToLatest).toBeVisible();
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'reset',
+      values: historyItems({
+        idPrefix: 'mobile',
+        label: 'Mobile history',
+        count: 2,
+        timestampBase: 1_699_999_000_000,
+      }),
+    },
+  ]);
+  await expect(timeline.itemById('mobile-1')).toBeInViewport();
+  await expect(timeline.jumpToLatest).toBeHidden();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+  await expect
+    .poll(() =>
+      timeline.viewport.evaluate((node) => {
+        const rows = node.querySelector('.window-rows');
+        if (!rows) throw new Error('missing timeline rows');
+        return Math.abs(rows.getBoundingClientRect().bottom - node.getBoundingClientRect().bottom);
+      })
+    )
+    .toBeLessThanOrEqual(1);
+});
 
 test('touch navigation to a distant latest message never renders a blank frame', async ({
   page,
