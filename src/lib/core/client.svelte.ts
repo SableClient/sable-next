@@ -25,6 +25,7 @@ type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
 
 const profileCacheFreshMs = 10 * 60 * 1000;
+const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
@@ -114,6 +115,10 @@ export class CoreClient {
   private readonly profileRequests = new Map<
     string,
     { accountId: string | null; request: Promise<ProfileView> }
+  >();
+  private readonly profileFailures = new Map<
+    string,
+    { accountId: string | null; failedAt: number; error: unknown }
   >();
   private readonly relationsCache = new Map<
     string,
@@ -385,9 +390,15 @@ export class CoreClient {
     const pending = this.profileRequests.get(userId);
     if (pending?.accountId === accountId) return pending.request;
 
+    const failure = this.profileFailures.get(userId);
+    if (failure?.accountId === accountId && Date.now() - failure.failedAt < profileFailureRetryMs) {
+      throw failure.error;
+    }
+
     const request = this.ensureTransport()
       .send({ type: 'user_profile', user_id: userId })
       .then((response) => {
+        this.profileFailures.delete(userId);
         this.profileCache.set(userId, {
           accountId,
           fetchedAt: Date.now(),
@@ -398,6 +409,16 @@ export class CoreClient {
           if (oldest !== undefined) this.profileCache.delete(oldest);
         }
         return response.profile;
+      })
+      .catch((error: unknown) => {
+        if (this.profileRequests.get(userId)?.request === request) {
+          this.profileFailures.set(userId, { accountId, failedAt: Date.now(), error });
+          if (this.profileFailures.size > MAX_PROFILE_CACHE_ENTRIES) {
+            const oldest = this.profileFailures.keys().next().value;
+            if (oldest !== undefined) this.profileFailures.delete(oldest);
+          }
+        }
+        throw error;
       });
     this.profileRequests.set(userId, { accountId, request });
     const clearRequest = () => {
@@ -522,6 +543,7 @@ export class CoreClient {
       value,
     });
     this.profileCache.delete(this.session?.user_id ?? '');
+    this.profileFailures.delete(this.session?.user_id ?? '');
   }
 
   async uploadRoomAvatar(
@@ -568,6 +590,7 @@ export class CoreClient {
   private resetCachedState(): void {
     this.profileCache.clear();
     this.profileRequests.clear();
+    this.profileFailures.clear();
     this.relationsCache.clear();
     this.sync = null;
     this.crashed = null;

@@ -10,6 +10,7 @@ const coreStub = vi.hoisted(() => {
     roomPermissions: vi.fn(),
     roomPowerLevels: vi.fn(),
     roomStateEvent: vi.fn(),
+    roomStateEventsRaw: vi.fn(),
     roomAliases: vi.fn(),
     roomDirectoryVisibility: vi.fn(),
   };
@@ -74,7 +75,8 @@ function permissions(canChangeJoinRule: boolean): RoomPermissionsView {
 
 async function render(
   canChangeJoinRule: boolean,
-  hasSpaceParent = false
+  hasSpaceParent = false,
+  isSpace = false
 ): Promise<ReturnType<typeof mount>> {
   coreStub.roomPermissions.mockResolvedValue(permissions(canChangeJoinRule));
   coreStub.roomPowerLevels.mockResolvedValue({
@@ -96,7 +98,7 @@ async function render(
     target: document.body,
     props: {
       open: true,
-      room: { ...room, has_space_parent: hasSpaceParent },
+      room: { ...room, has_space_parent: hasSpaceParent, is_space: isSpace },
       onOpenChange: () => {},
     },
   });
@@ -134,4 +136,56 @@ test('offers space-based rules to a room in a space', async () => {
   expect(document.body.textContent).not.toContain('room.settingsJoinRuleUnsettable');
 
   await unmount(instance);
+});
+
+test.each([false, true])('non-admins can inspect and copy data (space: %s)', async (isSpace) => {
+  const avatarEvent = {
+    type: 'm.room.avatar',
+    state_key: '',
+    content: { url: 'mxc://example.org/room-avatar' },
+  };
+  coreStub.roomStateEventsRaw.mockImplementation((_roomId: string, type: string) => {
+    if (type === 'm.space.child') return Promise.reject(new Error('state unavailable'));
+    return Promise.resolve(type === 'm.room.avatar' ? [avatarEvent] : []);
+  });
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const clipboard = vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(writeText);
+  const instance = await render(false, false, isSpace);
+  const click = async (label: string) => {
+    const button = Array.from(document.querySelectorAll('button')).find((entry) =>
+      entry.textContent.includes(label)
+    );
+    if (!button) throw new Error(`Missing button: ${label}`);
+    button.click();
+    await tick();
+    await tick();
+  };
+  try {
+    await click('room.settingsDeveloper');
+    expect(document.body.textContent).toContain(
+      isSpace ? 'room.devSpaceDataTitle' : 'room.devRoomDataTitle'
+    );
+    expect(document.body.textContent).not.toContain('room.devSend');
+    await click('room.devDataLoad');
+    await vi.waitFor(() => {
+      expect(document.querySelector('#room-dev-data')).not.toBeNull();
+    });
+    const field = document.querySelector<HTMLTextAreaElement>('#room-dev-data');
+    if (!field) throw new Error('Missing diagnostic data');
+    const data: unknown = JSON.parse(field.value);
+    expect(field.readOnly).toBe(true);
+    expect(data).toMatchObject({
+      room: { room_id: room.room_id, is_space: isSpace, avatar_url: null },
+      cached_state: {
+        'm.room.avatar': { events: [avatarEvent] },
+        'm.space.child': { error: 'state unavailable' },
+      },
+    });
+    expect(coreStub.roomStateEventsRaw).toHaveBeenCalledWith(room.room_id, 'm.space.parent', null);
+    await click('room.devDataCopy');
+    expect(writeText).toHaveBeenCalledWith(field.value);
+  } finally {
+    clipboard.mockRestore();
+    await unmount(instance);
+  }
 });

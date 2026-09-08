@@ -990,7 +990,6 @@
 
   .room-list {
     display: grid;
-    gap: var(--space-100);
     min-width: 0;
     padding: 0 var(--space-200) var(--space-200);
   }
@@ -1054,6 +1053,10 @@
     padding: 0 var(--kebab-gutter, var(--space-300)) 0
       calc(var(--space-200) + var(--room-depth, 0) * var(--space-400));
     text-decoration: none;
+  }
+
+  .room-row {
+    min-height: 2.25rem;
   }
 
   .room-row[aria-current='page'] {

@@ -49,7 +49,6 @@
   let sections = $derived(
     roomSettingsSections(room?.is_space ?? false).filter((entry) => {
       if (entry.id === 'emojis-stickers') return editable('im.ponies.room_emotes');
-      if (entry.id === 'developer-tools') return editable('m.room.topic');
       return true;
     })
   );

@@ -13,6 +13,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
 
   import { canSendState } from './permission-groups';
+  import RoomDeveloperData from './RoomDeveloperData.svelte';
 
   import '#lib/ui/primitives/settings-row.css';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
@@ -100,6 +101,11 @@
 </script>
 
 <div class="section">
+  {#if room}
+    {#key room.room_id}
+      <RoomDeveloperData {room} {permissions} {levels} />
+    {/key}
+  {/if}
   <SettingsSection
     headingId="room-developer-state"
     title={$i18n.t('room.devStateTitle')}

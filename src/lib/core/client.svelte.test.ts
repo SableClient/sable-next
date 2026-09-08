@@ -15,12 +15,12 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   const listeners = new Set<(event: CoreEvent) => void>();
   const sent: { type: string }[] = [];
   const close = vi.fn();
+  const send = vi.fn((command: { type: string }) => {
+    sent.push(command);
+    return Promise.resolve(responses[command.type] ?? {});
+  });
   const transport = {
-    send: vi.fn((command: { type: string }) => {
-      sent.push(command);
-
-      return Promise.resolve(responses[command.type] ?? {});
-    }),
+    send,
     subscribe: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
 
@@ -37,6 +37,7 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
 
   return {
     transport,
+    send,
     sent,
     close,
     emit: (event: CoreEvent) => {
@@ -185,4 +186,25 @@ test('a session ending clears the session and looks for a fallback account', asy
 
   expect(core.session).toBeNull();
   expect(core.status).toBe('authenticating');
+});
+
+test('failed profile lookups cool down across repeated timeline mounts and retry later', async () => {
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const failure = new Error('profile unavailable');
+  const send = fake.send;
+  const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+  send.mockRejectedValue(failure);
+  try {
+    await expect(core.userProfile('@remote:example.org')).rejects.toBe(failure);
+    await expect(core.userProfile('@remote:example.org')).rejects.toBe(failure);
+    expect(send).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(61_001);
+    await expect(core.userProfile('@remote:example.org')).rejects.toBe(failure);
+    expect(send).toHaveBeenCalledTimes(2);
+  } finally {
+    now.mockRestore();
+    core.stop();
+  }
 });
