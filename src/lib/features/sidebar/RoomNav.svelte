@@ -1139,8 +1139,12 @@
     opacity: var(--opacity-p500);
   }
 
-  .room-row[aria-current='page'] :global(.room-avatar-icon) {
+  .room-row[aria-current='page'] :global(.room-avatar-icon)::after {
+    border-radius: inherit;
     box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-main);
+    content: '';
+    inset: 0;
+    position: absolute;
   }
 
   .room-icon :global(svg),

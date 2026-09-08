@@ -48,9 +48,13 @@
   border-radius: calc(var(--radius) - var(--border-width));
 }
 
-.sable-nav-tab[aria-current='page'] .sable-avatar,
-.sable-nav-tab[data-current='true'] .sable-avatar {
+.sable-nav-tab[aria-current='page'] > .sable-avatar::after,
+.sable-nav-tab[data-current='true'] > .sable-avatar::after {
+  border-radius: inherit;
   box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-main);
+  content: '';
+  inset: 0;
+  position: absolute;
 }
 
 .sable-nav-tab .sable-unread-badge {
