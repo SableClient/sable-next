@@ -91,8 +91,16 @@ export function watchSharedContent(inbox: ShareInbox): () => void {
   let stopped = false;
   const stops: (() => void)[] = [];
 
+  const dispose = (stop: () => void): void => {
+    void Promise.resolve()
+      .then(stop)
+      .catch((error: unknown) => {
+        console.debug('[sable share-target] listener cleanup failed', error);
+      });
+  };
+
   const collect = (stop: () => void): void => {
-    if (stopped) stop();
+    if (stopped) dispose(stop);
     else stops.push(stop);
   };
 
@@ -107,8 +115,9 @@ export function watchSharedContent(inbox: ShareInbox): () => void {
   document.addEventListener('visibilitychange', onVisible);
 
   return () => {
+    if (stopped) return;
     stopped = true;
-    for (const stop of stops) stop();
+    for (const stop of stops) dispose(stop);
     document.removeEventListener('visibilitychange', onVisible);
   };
 }
