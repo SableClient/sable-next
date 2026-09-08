@@ -17,7 +17,7 @@ use matrix_sdk::{
         MatrixMockServer, RoomContextResponseTemplate, RoomMessagesResponseTemplate,
     },
 };
-use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+use matrix_sdk_test::{ALICE, InvitedRoomBuilder, JoinedRoomBuilder, event_factory::EventFactory};
 use matrix_sdk_ui::sync_service::{State as SyncState, SyncService};
 use serde_json::json;
 use wiremock::{
@@ -1479,6 +1479,50 @@ async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<
         .filter(|item| item.as_event().is_some())
         .map(|item| crate::view::timeline_item(item, None, &BTreeSet::new()).sender_name)
         .collect()
+}
+
+#[tokio::test]
+async fn invited_direct_room_summary_is_direct() {
+    for (is_direct, expected) in [(true, true), (false, false)] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!dm-invite:example.org");
+        let own = client.user_id().expect("a logged-in client").to_owned();
+        let member = matrix_sdk::ruma::serde::Raw::new(&json!({
+            "type": "m.room.member",
+            "sender": *ALICE,
+            "state_key": own,
+            "content": { "membership": "invite", "is_direct": is_direct },
+        }))
+        .unwrap()
+        .cast_unchecked();
+
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_invited_room(
+                    InvitedRoomBuilder::new(room_id).add_state_event(member.clone()),
+                );
+            })
+            .await;
+
+        let item =
+            matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
+        let mut cache = std::collections::HashMap::new();
+        super::view::enrich_room_fields(
+            &client,
+            &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
+                index: 0,
+                value: item.clone(),
+            },
+            &mut cache,
+        )
+        .await;
+        let summary = super::view::room_summary(&item, &cache);
+
+        assert!(summary.direct_targets.is_empty());
+        assert_eq!(summary.is_direct, expected);
+    }
 }
 
 #[tokio::test]

@@ -59,6 +59,7 @@ use crate::protocol::{
 #[allow(clippy::struct_excessive_bools)]
 pub struct RoomInfo {
     pub is_space: bool,
+    pub is_direct: bool,
     pub is_tombstoned: bool,
     pub has_space_parent: bool,
     pub supports_knock: bool,
@@ -91,7 +92,7 @@ pub fn room_summary<S: BuildHasher>(
             || item.avatar_url().map(|url| url.to_string()),
             |info| info.avatar_url.clone(),
         ),
-        is_direct: !item.direct_targets().is_empty(),
+        is_direct: info.map_or_else(|| !item.direct_targets().is_empty(), |info| info.is_direct),
         direct_targets: item
             .direct_targets()
             .into_iter()
@@ -270,16 +271,18 @@ async fn room_info(client: &Client, room: &Room) -> RoomInfo {
         }
     };
 
-    let (has_space_parent, join_rules, children) = futures_util::future::join3(
+    let (has_space_parent, join_rules, children, is_direct) = futures_util::future::join4(
         has_space_parent(room),
         crate::rooms::join_rule_support(room),
         children,
+        is_direct(room),
     )
     .await;
     let (supports_knock, supports_restricted, supports_knock_restricted) = join_rules;
 
     RoomInfo {
         is_space,
+        is_direct,
         is_tombstoned,
         has_space_parent,
         supports_knock,
@@ -364,6 +367,10 @@ async fn is_tombstoned(client: &Client, room: &Room, is_space: bool) -> bool {
         ))
         .await
         .is_ok()
+}
+
+async fn is_direct(room: &Room) -> bool {
+    room.is_direct().await.unwrap_or(false)
 }
 
 async fn has_space_parent(room: &Room) -> bool {
