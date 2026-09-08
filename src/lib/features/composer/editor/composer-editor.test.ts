@@ -160,7 +160,7 @@ test('a mention-only document is not empty', () => {
 
 test('clear empties the document and setText refills it', () => {
   const editor = open();
-  editor.setText('one\ntwo');
+  editor.setText('one\n\ntwo');
   expect(editor.doc()?.childCount).toBe(2);
 
   editor.clear();

@@ -74,6 +74,7 @@ interface ComposerProps {
   onSendAttachment?: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
+  onDeleteEdited?: (eventId: string, reason: string | null) => void;
   threadRoot?: string | null;
   readOnly?: boolean;
   roomName?: string;
@@ -653,6 +654,61 @@ test('an edit hands back the draft it interrupted', async () => {
   await tick();
 
   expect(editorText()).toBe('half a thought');
+  void unmount(instance);
+});
+
+function clearEditor(): void {
+  const editor = document.querySelector('[role="combobox"]');
+  if (!editor) throw new Error('editor not found');
+  for (const init of [{ key: 'a', ctrlKey: true }, { key: 'Backspace' }]) {
+    editor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, ...init }));
+  }
+}
+
+function deleteDialogButton(): HTMLButtonElement {
+  const button = Array.from(document.querySelectorAll('button')).find(
+    (candidate) => candidate.textContent.trim() === 'Delete message'
+  );
+  if (!button) throw new Error('delete confirmation not found');
+  return button;
+}
+
+test('emptying an edit offers to delete the message instead of sending nothing', async () => {
+  const message = vi.fn(async () => {});
+  const deleted = vi.fn();
+  const instance = render({
+    roomId: '!room:example.org',
+    onSend: message,
+    onDeleteEdited: deleted,
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'never mind' },
+  });
+  await tick();
+
+  clearEditor();
+  await tick();
+  expect(editorText()).toBe('');
+
+  submit();
+  await tick();
+
+  deleteDialogButton().click();
+  await tick();
+
+  expect(deleted).toHaveBeenCalledWith('$one:example.org', null);
+  expect(message).not.toHaveBeenCalled();
+  void unmount(instance);
+});
+
+test('an empty composer only offers to delete while an edit is in flight', async () => {
+  const deleted = vi.fn();
+  const instance = render({ roomId: '!room:example.org', onDeleteEdited: deleted });
+  await tick();
+
+  submit();
+  await tick();
+
+  expect(document.body.textContent).not.toContain('Delete message');
+  expect(deleted).not.toHaveBeenCalled();
   void unmount(instance);
 });
 

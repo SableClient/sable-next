@@ -176,13 +176,19 @@ function html(doc: ProseMirrorNode): string {
   return blocks.map((block) => block.outerHTML).join('');
 }
 
+export function composerMarkdown(doc: ProseMirrorNode): string {
+  return markdown.serialize(withoutTrailingParagraph(flattenRoomPings(doc))).trim();
+}
+
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const mentions = mentionsOf(doc);
   const flat = withoutTrailingParagraph(flattenRoomPings(doc));
+  if (isPlain(flat)) return { body: plainTextOf(flat).trim(), formatted: null, mentions };
+
   const body = markdown.serialize(flat).trim();
   if (body === '') return { body, formatted: null, mentions };
 
-  return { body, formatted: isPlain(flat) ? null : html(flat), mentions };
+  return { body, formatted: html(flat), mentions };
 }
 
 function mentionsRoom(doc: ProseMirrorNode): boolean {
@@ -359,8 +365,8 @@ export function markdownSlice(text: string): Slice {
   return new Slice(parsed.content, 0, 0);
 }
 
-export function textSlice(text: string): Slice {
-  const blocks = text.split(/(?:\r\n?|\n){2,}/).map((block) => {
+function textBlocks(text: string): ProseMirrorNode[] {
+  return text.split(/(?:\r\n?|\n){2,}/).map((block) => {
     const content: ProseMirrorNode[] = [];
     for (const [index, line] of block.split(/\r\n?|\n/).entries()) {
       if (index > 0) content.push(composerSchema.nodes.hard_break.create());
@@ -368,6 +374,14 @@ export function textSlice(text: string): Slice {
     }
     return composerSchema.nodes.paragraph.create(null, content);
   });
+}
+
+export function textDoc(text: string): ProseMirrorNode {
+  return composerSchema.topNodeType.create(null, Fragment.fromArray(textBlocks(text)));
+}
+
+export function textSlice(text: string): Slice {
+  const blocks = textBlocks(text);
 
   const only = blocks.length === 1 ? blocks[0] : null;
   if (only) return new Slice(only.content, 0, 0);

@@ -780,6 +780,7 @@
             readOnly={permissions ? !permissions.can_post : false}
             context={conversation.context}
             onCancelContext={conversation.clearContext}
+            onDeleteEdited={conversation.redact}
             onEditLast={conversation.editLast}
           />
         {/key}

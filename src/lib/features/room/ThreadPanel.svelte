@@ -132,6 +132,7 @@
       onTyping={conversation.setTyping}
       context={conversation.context}
       onCancelContext={conversation.clearContext}
+      onDeleteEdited={conversation.redact}
       onEditLast={conversation.editLast}
     />
   </div>

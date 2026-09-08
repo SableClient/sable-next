@@ -43,10 +43,11 @@ import { hasAndroidCompositionQuirk } from '#lib/platform/input.js';
 import { queryKey, queryPlugin } from './query-plugin';
 import { composerSchema, parseMatrixHtml } from './schema';
 import {
+  composerMarkdown,
   markdownFromSlice,
   markdownSlice,
   richFromPlain,
-  serializeComposer,
+  textDoc,
   textSlice,
 } from './serialize';
 import { shortcodeInputRule } from './shortcodes';
@@ -479,7 +480,7 @@ export class ComposerEditor {
       this.setDoc(richFromPlain(doc));
     } else {
       this.source = true;
-      this.setSource(serializeComposer(doc).body);
+      this.setSource(composerMarkdown(doc));
     }
     return this.source;
   }
@@ -511,12 +512,7 @@ export class ComposerEditor {
   }
 
   setText(text: string): void {
-    const paragraphs = text
-      .split('\n')
-      .map((line) =>
-        composerSchema.nodes.paragraph.create(null, line ? composerSchema.text(line) : null)
-      );
-    this.setDoc(composerSchema.node('doc', null, paragraphs));
+    this.setDoc(textDoc(text));
   }
 
   insert(node: ProseMirrorNode): void {

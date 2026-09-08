@@ -18,6 +18,7 @@
   import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
+  import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
   import { i18n } from '#lib/i18n.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -101,6 +102,7 @@
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     onCancelContext?: () => void;
+    onDeleteEdited?: (eventId: string, reason: string | null) => void;
     onEditLast?: () => void;
     threadRoot?: string | null;
   }
@@ -119,6 +121,7 @@
     readOnly = false,
     context = null,
     onCancelContext,
+    onDeleteEdited,
     onEditLast,
     threadRoot = null,
   }: Props = $props();
@@ -168,6 +171,7 @@
   let linkDialogOpen = $state(false);
   let spoilerDialogOpen = $state(false);
   let sourceMode = $state(false);
+  let deleteEditOpen = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
   let empty = $state(true);
   let showPlaceholder = $state(true);
@@ -182,13 +186,17 @@
   let dismissedAt = $state<number | null>(null);
   let activeIndex = $state(0);
   let previousContext: ComposerContext | null = null;
+  let deleteEditTarget = $state.raw<ComposerContext | null>(null);
   let members = $state.raw<MemberView[]>([]);
   let emotes = $state.raw<PackImageView[]>([]);
 
   let desktop = $derived(appLayout.matches);
   let sending = $derived(inFlight > 0);
   let hasContent = $derived(!empty || staged.length > 0);
-  let primaryAction = $derived(!hasContent && voiceSupported && !micDenied ? 'record' : 'send');
+  let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
+  let primaryAction = $derived(
+    !hasContent && !canDeleteEdited && voiceSupported && !micDenied ? 'record' : 'send'
+  );
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
   $effect(() => {
@@ -355,6 +363,15 @@
     if (activeElement instanceof HTMLElement) activeElement.blur();
   }
 
+  function confirmDeleteEdit(reason: string | null): void {
+    const target = deleteEditTarget;
+    if (!target) return;
+
+    deleteEditTarget = null;
+    onDeleteEdited?.(target.eventId, reason);
+    cancelContext();
+  }
+
   function cancelContext(): void {
     onCancelContext?.();
     if (context?.kind === 'edit' || !desktop) blurEditor();
@@ -379,7 +396,14 @@
   }
 
   async function send(): Promise<void> {
-    if (!hasContent || readOnly) return;
+    if (readOnly) return;
+    if (!hasContent) {
+      if (canDeleteEdited) {
+        deleteEditTarget = context;
+        deleteEditOpen = true;
+      }
+      return;
+    }
 
     const doc = editor.doc();
     const rich = richSend;
@@ -821,7 +845,7 @@
               variant="ghost"
               size="small"
               class="composer-send"
-              disabled={primaryAction === 'send' && !hasContent}
+              disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
               label={primaryAction === 'record'
                 ? $i18n.t('composer.voiceRecord')
                 : $i18n.t('timeline.sendMessage')}
@@ -891,6 +915,14 @@
     onCreate={(question: string, answers: string[], undisclosed: boolean) => {
       void onCreatePoll(roomId, question, answers, undisclosed);
     }}
+  />
+{/if}
+
+{#if deleteEditOpen}
+  <DeleteMessageDialog
+    bind:open={deleteEditOpen}
+    preview={deleteEditTarget?.body ?? null}
+    onConfirm={confirmDeleteEdit}
   />
 {/if}
 

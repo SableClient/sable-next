@@ -4,7 +4,7 @@ import { Fragment, Slice, type Node as ProseMirrorNode } from 'prosemirror-model
 import { describe, expect, test } from 'vitest';
 
 import { composerSchema, parseMatrixHtml } from './schema';
-import { markdownFromSlice, serializeComposer, serializePlain } from './serialize';
+import { markdownFromSlice, serializeComposer, serializePlain, textDoc } from './serialize';
 
 const { doc, paragraph, heading, blockquote, bullet_list, list_item, mention, emoticon } =
   composerSchema.nodes;
@@ -26,6 +26,38 @@ test('plain text sends no formatted body', () => {
     formatted: null,
     mentions: { userIds: [], room: false },
   });
+});
+
+test('unformatted text keeps its markdown characters unescaped', () => {
+  for (const typed of ['test \\', 'C:\\path', '5 * 3', '# hi', 'a_b_c']) {
+    const message = serializeComposer(docOf(para(composerSchema.text(typed))));
+
+    expect(message.body).toBe(typed);
+    expect(message.formatted).toBeNull();
+  }
+});
+
+test('re-sending an unchanged edit does not escape the body again', () => {
+  const typed = 'test \\';
+  const first = serializeComposer(docOf(para(composerSchema.text(typed))));
+  const second = serializeComposer(docOf(para(composerSchema.text(first.body))));
+
+  expect(second.body).toBe(typed);
+});
+
+test.each(['one\ntwo', 'one\n\ntwo', 'a\nb\n\nc'])(
+  'reloading the body %j for an edit sends the same body back',
+  (body) => {
+    expect(serializeComposer(textDoc(body)).body).toBe(body);
+    expect(serializePlain(textDoc(body)).body).toBe(body);
+  }
+);
+
+test('a lone newline reloads as a line break and a blank line as a paragraph', () => {
+  const reloaded = textDoc('one\ntwo\n\nthree');
+
+  expect(reloaded.childCount).toBe(2);
+  expect(reloaded.firstChild?.childCount).toBe(3);
 });
 
 test('a bold mark serialises to markdown in the body and html in the formatted body', () => {
