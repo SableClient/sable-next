@@ -1,0 +1,58 @@
+name: 🐞 Bug Report
+description: Report a bug
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## First of all
+        1. Please search for [existing issues](https://github.com/SableClient/sable-next/issues?q=is%3Aissue) about this problem first.
+        2. Make sure Sable is up to date.
+        3. Make sure it's an issue with Sable and not something else you are using.
+        4. Remember to be friendly. The [Code of Conduct](https://github.com/SableClient/sable-next/blob/main/CODE_OF_CONDUCT.md) applies in issues too.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear description of what the bug is. Include screenshots if applicable.
+      placeholder: Bug description
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. See error
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: A clear description of what you expected to happen.
+
+  - type: textarea
+    id: info
+    attributes:
+      label: Platform and versions
+      description: 'Provide the build you are using, your OS, and your homeserver.'
+      placeholder: |
+        1. Build: [e.g. next.sable.moe, or the desktop/mobile app]
+        2. OS: [e.g. Windows 11, macOS 15, Android 15]
+        3. Browser: [e.g. Chrome 140, Firefox 142 — web builds only]
+        4. Sable version: [e.g. 0.1.0]
+        5. Matrix homeserver: [e.g. matrix.org]
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here.

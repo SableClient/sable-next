@@ -1,0 +1,75 @@
+name: DCO
+
+on:
+  pull_request:
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: dco-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sign-off:
+    name: Check sign-off
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check sign-off
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          checked=0
+
+          for sha in $(git rev-list --no-merges "${BASE_SHA}..${HEAD_SHA}"); do
+            author_name=$(git show -s --format='%an' "$sha")
+            author_email=$(git show -s --format='%ae' "$sha")
+
+            case "$author_name" in *'[bot]') continue ;; esac
+
+            checked=$((checked + 1))
+            signoffs=$(git show -s --format='%(trailers:key=Signed-off-by,valueonly)' "$sha")
+
+            if grep -oE '<[^>]+>' <<<"$signoffs" | tr -d '<>' \
+                 | grep -qix "$author_email"; then
+              continue
+            fi
+
+            failed=1
+            echo "::error::${sha} is not signed off by its author <${author_email}>"
+          done
+
+          if [ "$failed" -eq 0 ]; then
+            echo "All ${checked} commit(s) carry a Signed-off-by trailer matching their author."
+            exit 0
+          fi
+
+          cat >&2 <<EOF
+          Every commit needs a Signed-off-by trailer matching its own author,
+          certifying the Developer Certificate of Origin. See CONTRIBUTING.md.
+
+          Sign off the last commit with:
+
+            git commit -s --amend --no-edit
+
+          Or a whole branch with:
+
+            git rebase --signoff origin/${BASE_REF#refs/heads/}
+
+          Then force-push with --force-with-lease, and use 'git commit -s' from now on.
+          EOF
+          exit 1
