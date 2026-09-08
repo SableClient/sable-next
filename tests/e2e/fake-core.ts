@@ -688,6 +688,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         jwt: 'e2e-jwt',
         identity: `${session.user_id}:${session.device_id}`,
         encrypt_media: false,
+        mode: 'legacy',
+        publisher_id: 'legacy',
+        backends: [
+          {
+            id: 'legacy',
+            url: 'wss://sfu.example.test',
+            jwt: 'e2e-jwt',
+            identity: `${session.user_id}:${session.device_id}`,
+          },
+        ],
       }),
       call_support: () => ({ type: 'call_support', has_focus: false, can_join: false }),
       room_permissions: (command) => {

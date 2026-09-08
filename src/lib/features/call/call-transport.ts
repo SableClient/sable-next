@@ -1,4 +1,5 @@
 export type CallEncryptionKey = {
+  backendId?: string;
   identity: string;
   keyIndex: number;
   key: Uint8Array<ArrayBuffer>;
@@ -13,6 +14,7 @@ export type CallTrack = {
 export type CallConnectionQuality = 'lost' | 'poor' | 'good' | 'excellent' | 'unknown';
 
 export type CallParticipant = {
+  backendId?: string;
   identity: string;
   camera?: CallTrack;
   screenShare?: CallTrack;
@@ -37,7 +39,12 @@ export type CallTransportConnectOptions = {
   microphoneEnabled: boolean;
   cameraEnabled: boolean;
   encryptionKeys: CallEncryptionKey[];
+  publisherId?: string;
+  backends?: CallBackendGrant[];
 };
+
+export type CallBackendGrant = { id: string; url: string; jwt: string; identity: string };
+export type CallTransportRoom = { backendId: string; room: import('livekit-client').Room };
 
 export type CallAudioRoute = {
   id: string;
@@ -60,10 +67,13 @@ export type CallTransport = {
   disconnect: () => Promise<void>;
   setMicrophoneEnabled: (enabled: boolean) => Promise<void>;
   setCameraEnabled: (enabled: boolean) => Promise<void>;
-  setEncryptionKey: (key: CallEncryptionKey) => Promise<void>;
+  setEncryptionKey: (key: CallEncryptionKey, backendId?: string) => Promise<void>;
   subscribe: (listener: (state: CallTransportState) => void) => () => void;
   getState: () => CallTransportState;
   capabilities: CallTransportCapabilities;
+  reconcileBackends?: (backends: CallBackendGrant[]) => Promise<void>;
+  rooms?: () => readonly CallTransportRoom[];
+  roomFor?: (backendId: string | undefined) => import('livekit-client').Room | undefined;
 };
 
 export const ignoreError = (): void => undefined;

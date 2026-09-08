@@ -93,7 +93,9 @@ struct CallSession {
     room_id: OwnedRoomId,
     state_key: CallMemberStateKey,
     delay_id: Option<String>,
-    _postpone: Option<Task>,
+    postpone: Option<Task>,
+    updates: Option<Task>,
+    sticky_member: Option<String>,
     _handlers: Vec<matrix_sdk::event_handler::EventHandlerDropGuard>,
 }
 

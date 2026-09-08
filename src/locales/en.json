@@ -1878,6 +1878,7 @@
     "participants_one": "{{count}} participant",
     "participants_other": "{{count}} participants",
     "noParticipants": "Waiting for others to join",
+    "enableAudio": "Enable audio",
     "muted": "Muted",
     "cameraOffLabel": "Camera off",
     "connectionPoor": "Weak connection",

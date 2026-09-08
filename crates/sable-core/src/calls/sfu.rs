@@ -1,6 +1,7 @@
 #[cfg(not(target_family = "wasm"))]
 use std::time::Duration;
 
+use base64::Engine;
 use matrix_sdk::Room;
 use matrix_sdk::ruma::api::client::account::request_openid_token;
 use matrix_sdk::ruma::{DeviceId, UserId};
@@ -29,6 +30,21 @@ struct SfuGetRequest<'a> {
     device_id: &'a str,
 }
 
+#[derive(Debug, Serialize)]
+struct SfuGetTokenRequest<'a> {
+    room_id: &'a str,
+    slot_id: &'static str,
+    openid_token: OpenIdCredentials<'a>,
+    member: SfuMember<'a>,
+}
+
+#[derive(Debug, Serialize)]
+struct SfuMember<'a> {
+    id: &'a str,
+    claimed_user_id: &'a str,
+    claimed_device_id: &'a str,
+}
+
 #[derive(Debug, Deserialize)]
 struct SfuGetResponse {
     url: String,
@@ -38,6 +54,7 @@ struct SfuGetResponse {
 pub(crate) struct Provisioned {
     pub(crate) url: String,
     pub(crate) jwt: String,
+    pub(crate) identity: String,
 }
 
 fn http_client() -> Option<matrix_sdk::reqwest::Client> {
@@ -140,11 +157,123 @@ pub(crate) async fn provision(
     if provisioned.url.is_empty() || provisioned.jwt.is_empty() {
         return Err(ProvisionError::MalformedResponse);
     }
+    let identity = jwt_identity(&provisioned.jwt)?;
 
     Ok(Provisioned {
         url: provisioned.url,
         jwt: provisioned.jwt,
+        identity,
     })
+}
+
+pub(crate) async fn provision_matrix2(
+    room: &Room,
+    service_url: &str,
+    device_id: &DeviceId,
+    member_id: &str,
+) -> Result<Provisioned, ProvisionError> {
+    let client = room.client();
+    let user_id = client
+        .user_id()
+        .ok_or(ProvisionError::NotLoggedIn)?
+        .to_owned();
+    let token = client
+        .send(request_openid_token::v3::Request::new(user_id.clone()))
+        .await
+        .map_err(|_| ProvisionError::OpenIdUnavailable)?;
+    let body = SfuGetTokenRequest {
+        room_id: room.room_id().as_str(),
+        slot_id: "m.call#ROOM",
+        openid_token: OpenIdCredentials {
+            access_token: &token.access_token,
+            token_type: "Bearer",
+            matrix_server_name: token.matrix_server_name.as_str(),
+            expires_in: token.expires_in.as_secs(),
+        },
+        member: SfuMember {
+            id: member_id,
+            claimed_user_id: user_id.as_str(),
+            claimed_device_id: device_id.as_str(),
+        },
+    };
+    provision_request(service_url, "get_token", &body).await
+}
+
+pub(crate) async fn provision_remote(
+    room: &Room,
+    service_url: &str,
+    device_id: &DeviceId,
+    member_id: &str,
+) -> Result<Provisioned, ProvisionError> {
+    match provision_matrix2(room, service_url, device_id, member_id).await {
+        Ok(provisioned) => Ok(provisioned),
+        Err(_) => provision(room, service_url, device_id).await,
+    }
+}
+
+async fn provision_request<T: Serialize>(
+    service_url: &str,
+    endpoint: &str,
+    body: &T,
+) -> Result<Provisioned, ProvisionError> {
+    let http = http_client().ok_or(ProvisionError::Unreachable)?;
+    let payload = serde_json::to_vec(body).map_err(|_| ProvisionError::MalformedResponse)?;
+    let response = http
+        .post(format!(
+            "{}/{}",
+            service_url.trim_end_matches('/'),
+            endpoint
+        ))
+        .header("Content-Type", "application/json")
+        .body(payload)
+        .send()
+        .await
+        .map_err(|_| ProvisionError::Unreachable)?;
+    if !response.status().is_success() {
+        return Err(ProvisionError::Refused(response.status().as_u16()));
+    }
+    let body = response
+        .text()
+        .await
+        .map_err(|_| ProvisionError::MalformedResponse)?;
+    let provisioned: SfuGetResponse =
+        serde_json::from_str(&body).map_err(|_| ProvisionError::MalformedResponse)?;
+    if provisioned.url.is_empty() || provisioned.jwt.is_empty() {
+        return Err(ProvisionError::MalformedResponse);
+    }
+    let identity = jwt_identity(&provisioned.jwt)?;
+    Ok(Provisioned {
+        url: provisioned.url,
+        jwt: provisioned.jwt,
+        identity,
+    })
+}
+
+#[derive(Deserialize)]
+struct JwtPayload {
+    sub: String,
+    video: JwtVideo,
+}
+
+#[derive(Deserialize)]
+struct JwtVideo {
+    room: String,
+}
+
+fn jwt_identity(jwt: &str) -> Result<String, ProvisionError> {
+    let Some(payload) = jwt.split('.').nth(1) else {
+        return Err(ProvisionError::MalformedResponse);
+    };
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(payload))
+        .map_err(|_| ProvisionError::MalformedResponse)?;
+    let payload: JwtPayload =
+        serde_json::from_slice(&decoded).map_err(|_| ProvisionError::MalformedResponse)?;
+    if payload.sub.is_empty() || payload.video.room.is_empty() {
+        return Err(ProvisionError::MalformedResponse);
+    }
+    Ok(payload.sub)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -173,8 +302,13 @@ impl std::fmt::Display for ProvisionError {
 #[cfg(test)]
 mod tests {
     use matrix_sdk::ruma::{device_id, user_id};
+    use wiremock::matchers::{body_partial_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    use super::{ProvisionError, livekit_identity};
+    use super::{
+        OpenIdCredentials, ProvisionError, SfuGetTokenRequest, SfuMember, jwt_identity,
+        livekit_identity, provision_request,
+    };
 
     #[test]
     fn test_the_livekit_identity_pairs_with_the_legacy_endpoint() {
@@ -190,5 +324,76 @@ mod tests {
 
         assert!(message.contains("403"));
         assert!(!message.contains("jwt"));
+    }
+
+    #[test]
+    fn token_requires_a_subject_and_room() {
+        assert_eq!(
+            jwt_identity("x.eyJzdWIiOiJpZCIsInZpZGVvIjp7InJvb20iOiJyIn19.x"),
+            Ok("id".to_owned())
+        );
+        assert_eq!(
+            jwt_identity("x.eyJzdWIiOiIiLCJ2aWRlbyI6eyJyb29tIjoiciJ9fQ.x"),
+            Err(ProvisionError::MalformedResponse)
+        );
+    }
+
+    #[test]
+    fn matrix2_request_uses_the_sticky_call_slot_and_claims() {
+        let body = SfuGetTokenRequest {
+            room_id: "!room:example.org",
+            slot_id: "m.call#ROOM",
+            openid_token: OpenIdCredentials {
+                access_token: "token",
+                token_type: "Bearer",
+                matrix_server_name: "example.org",
+                expires_in: 60,
+            },
+            member: SfuMember {
+                id: "member",
+                claimed_user_id: "@user:example.org",
+                claimed_device_id: "DEVICE",
+            },
+        };
+        let value = serde_json::to_value(body).unwrap();
+        assert_eq!(value["room_id"], "!room:example.org");
+        assert_eq!(value["slot_id"], "m.call#ROOM");
+        assert_eq!(value["member"]["claimed_device_id"], "DEVICE");
+    }
+
+    #[tokio::test]
+    async fn matrix2_request_posts_to_the_root_get_token_endpoint() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/get_token"))
+            .and(body_partial_json(serde_json::json!({
+                "slot_id": "m.call#ROOM",
+                "member": { "id": "member" },
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "url": "wss://sfu.example.org",
+                "jwt": "x.eyJzdWIiOiJpZCIsInZpZGVvIjp7InJvb20iOiJyIn19.x",
+            })))
+            .mount(&server)
+            .await;
+        let body = SfuGetTokenRequest {
+            room_id: "!room:example.org",
+            slot_id: "m.call#ROOM",
+            openid_token: OpenIdCredentials {
+                access_token: "token",
+                token_type: "Bearer",
+                matrix_server_name: "example.org",
+                expires_in: 60,
+            },
+            member: SfuMember {
+                id: "member",
+                claimed_user_id: "@user:example.org",
+                claimed_device_id: "DEVICE",
+            },
+        };
+        let provisioned = provision_request(&server.uri(), "get_token", &body)
+            .await
+            .unwrap();
+        assert_eq!(provisioned.identity, "id");
     }
 }

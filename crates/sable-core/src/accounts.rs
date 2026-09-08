@@ -733,7 +733,7 @@ mod regression_tests {
             Err(CommandErr::Denied)
         ));
         assert!(matches!(
-            core.join_call(room_id, Some("https://focus.example.org".to_owned()))
+            core.join_call(room_id, Some("https://focus.example.org".to_owned()), None)
                 .await,
             Err(CommandErr::Denied)
         ));

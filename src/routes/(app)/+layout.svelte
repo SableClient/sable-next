@@ -474,6 +474,13 @@
         />
       </div>
     {/if}
+    {#if callSession.rooms.length > 0}
+      {#await import('#lib/features/call/CallAudio.svelte') then { default: CallAudio }}
+        {#each callSession.rooms as entry (entry.backendId)}
+          <CallAudio room={entry.room} telemetry={callSession.telemetry} />
+        {/each}
+      {/await}
+    {/if}
     <IncomingCallDialog
       call={incoming}
       senderName={incomingProfile?.name ?? incoming?.sender ?? ''}

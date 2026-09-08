@@ -41,7 +41,10 @@ if (dsn && preferences.errorReporting) {
         : []),
     ],
 
-    tracesSampleRate: sampleEverything ? 1 : 0.1,
+    tracesSampler(context) {
+      if (context.name.startsWith('call.')) return 1;
+      return context.inheritOrSampleWith(sampleEverything ? 1 : 0.1);
+    },
     replaysSessionSampleRate: sampleEverything ? 1 : 0.1,
     replaysOnErrorSampleRate: 1,
     enableLogs: true,

@@ -1,34 +1,29 @@
 mod keys;
 mod membership;
 mod notify;
+mod runtime;
 mod sfu;
+mod sticky;
 
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use matrix_sdk::event_handler::EventHandlerDropGuard;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::{
     DelayParameters, delayed_state_event, update_delayed_event,
 };
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
-use matrix_sdk::ruma::events::call::member::{
-    ActiveFocus, ActiveLivekitFocus, Application, CallApplicationContent, CallMemberEventContent,
-    CallMemberStateKey, CallScope, Focus, LivekitFocus,
-};
+use matrix_sdk::ruma::events::call::member::{CallMemberEventContent, CallMemberStateKey};
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{DeviceId, EventId, OwnedDeviceId, OwnedRoomId, UserId};
+use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, UserId};
 use matrix_sdk::{Client, Room};
-use tokio::sync::Mutex;
 
 use crate::protocol::{
-    CallMemberView, CallSessionId, CallSupportView, CommandErr, CommandOk, CoreEvent,
+    CallMemberView, CallMode, CallSessionId, CallSupportView, CommandErr, CommandOk, CoreEvent,
 };
 use crate::{CallSession, Core};
 
-use keys::{KeyDistributor, Rolled};
 use membership::CallMember;
 use sfu::ProvisionError;
 
@@ -36,37 +31,23 @@ const HANGUP_DELAY: Duration = Duration::from_secs(20);
 const HANGUP_POSTPONE_INTERVAL: Duration = Duration::from_secs(5);
 const HANGUP_RETRY_BACKOFF: Duration = Duration::from_secs(1);
 const HANGUP_RETRY_BUDGET: Duration = Duration::from_secs(12);
-const ADVERTISED_MEMBERSHIP_EXPIRY: Duration = Duration::from_hours(4);
 const USE_KEY_DELAY: Duration = Duration::from_secs(1);
 
 const APPLICATION_SUFFIX: &str = "m.call";
 
-fn membership_state_key(user_id: &UserId, device_id: &DeviceId) -> CallMemberStateKey {
+fn membership_state_key(
+    user_id: &UserId,
+    device_id: &DeviceId,
+    room_version: &str,
+) -> CallMemberStateKey {
+    let namespaced_keys = room_version == "org.matrix.msc3757"
+        || room_version.starts_with("org.matrix.msc3757.")
+        || room_version == "org.matrix.msc3779"
+        || room_version.starts_with("org.matrix.msc3779.");
     CallMemberStateKey::new(
         user_id.to_owned(),
         Some(format!("{device_id}_{APPLICATION_SUFFIX}")),
-        false,
-    )
-}
-
-fn joined_membership(
-    room_id: &OwnedRoomId,
-    device_id: OwnedDeviceId,
-    livekit_service_url: String,
-) -> CallMemberEventContent {
-    CallMemberEventContent::new(
-        Application::Call(CallApplicationContent::new(
-            room_id.to_string(),
-            CallScope::Room,
-        )),
-        device_id,
-        ActiveFocus::Livekit(ActiveLivekitFocus::new()),
-        vec![Focus::Livekit(LivekitFocus::new(
-            room_id.to_string(),
-            livekit_service_url,
-        ))],
-        None,
-        Some(ADVERTISED_MEMBERSHIP_EXPIRY),
+        !namespaced_keys,
     )
 }
 
@@ -80,7 +61,8 @@ fn member_views(members: &[CallMember]) -> Vec<CallMemberView> {
         .map(|member| CallMemberView {
             user_id: member.user_id.clone(),
             device_id: member.device_id.to_string(),
-            identity: sfu::livekit_identity(&member.user_id, &member.device_id),
+            identity: member.identity.clone(),
+            backend_id: None,
         })
         .collect()
 }
@@ -90,99 +72,9 @@ impl Core {
         self: &Arc<Self>,
         room_id: OwnedRoomId,
         livekit_service_url: Option<String>,
+        mode: Option<CallMode>,
     ) -> Result<CommandOk, CommandErr> {
-        let generation = self.session_generation.load(Ordering::SeqCst);
-        let room = self.room(&room_id).await?;
-        let encrypt_media = self.room_is_encrypted(&room).await?;
-        let client = room.client();
-        let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
-        let device_id = client
-            .device_id()
-            .ok_or(CommandErr::NotLoggedIn)?
-            .to_owned();
-
-        let existing = membership::active_members(&room).await;
-        let was_running = existing
-            .iter()
-            .any(|member| !member.is_own(&user_id, &device_id));
-
-        let service_url = self
-            .resolve_focus(&existing, livekit_service_url, &room)
-            .await
-            .ok_or(CommandErr::NoCallFocus)?;
-
-        let state_key = membership_state_key(&user_id, &device_id);
-        let membership = joined_membership(&room_id, device_id.clone(), service_url.clone());
-
-        let delay_id = self.schedule_hangup(&room_id, &state_key).await;
-        let postpone = delay_id.clone().map(|id| self.spawn_postpone_loop(id));
-
-        let membership_event_id = room
-            .send_state_event_for_key(&state_key, membership)
-            .await
-            .map_err(|error| self.room_error("join_call", error))?
-            .event_id;
-
-        if !was_running {
-            self.announce_call(&room, &membership_event_id).await;
-        }
-
-        let provisioned = match sfu::provision(&room, &service_url, &device_id).await {
-            Ok(provisioned) => provisioned,
-            Err(error) => {
-                self.retract_membership(&room, &state_key, delay_id).await;
-                return Err(self.provision_error(&service_url, &error));
-            }
-        };
-
-        let session = CallSessionId(self.allocate_subscription().0);
-
-        let distributor = encrypt_media.then(|| {
-            Arc::new(Mutex::new(KeyDistributor::new(
-                room_id.clone(),
-                user_id.clone(),
-                device_id.clone(),
-            )))
-        });
-
-        let mut handlers = vec![self.watch_call_memberships(
-            &client,
-            generation,
-            session,
-            room_id.clone(),
-            distributor.clone(),
-        )];
-        if encrypt_media {
-            handlers.push(self.watch_call_keys(&client, generation, session, room_id.clone()));
-        }
-
-        if self.session_generation.load(Ordering::SeqCst) != generation {
-            drop(postpone);
-            self.retract_membership(&room, &state_key, delay_id).await;
-            return Err(CommandErr::NotLoggedIn);
-        }
-
-        self.call_sessions.lock().await.insert(
-            session,
-            CallSession {
-                room_id,
-                state_key,
-                _postpone: postpone,
-                delay_id,
-                _handlers: handlers,
-            },
-        );
-
-        self.refresh_call(generation, session, &room, distributor.as_ref())
-            .await;
-
-        Ok(CommandOk::JoinCall {
-            session,
-            url: provisioned.url,
-            jwt: provisioned.jwt,
-            identity: sfu::livekit_identity(&user_id, &device_id),
-            encrypt_media,
-        })
+        runtime::join(self, room_id, livekit_service_url, mode).await
     }
 
     pub(crate) async fn call_support(&self, room_id: OwnedRoomId) -> Result<CommandOk, CommandErr> {
@@ -194,11 +86,29 @@ impl Core {
             .to_owned();
 
         let members = membership::active_members(&room).await;
-        let has_focus = self.resolve_focus(&members, None, &room).await.is_some();
-        let can_join = room
-            .power_levels_or_default()
-            .await
-            .user_can_send_state(&user_id, StateEventType::CallMember);
+        let mut has_focus = self.resolve_focus(&members, None, &room).await.is_some();
+        let levels = room.power_levels_or_default().await;
+        let state_allowed = levels.user_can_send_state(&user_id, StateEventType::CallMember);
+        let sticky_available = (!has_focus || !state_allowed)
+            && room
+                .client()
+                .unstable_features()
+                .await
+                .is_ok_and(|features| features.contains(&"org.matrix.msc4354".into()));
+        if !has_focus && sticky_available {
+            let mut sync = sticky::StickySync::new(self.allocate_subscription().0);
+            if let Ok(events) = sync.sync(&room, Duration::ZERO).await {
+                let mut sticky_members = membership::StickyMemberships::default();
+                for event in events {
+                    sticky_members.apply(&event, keys::now_ms());
+                }
+                has_focus =
+                    !membership::advertised_service_urls(&sticky_members.members(keys::now_ms()))
+                        .is_empty();
+            }
+        }
+        let can_join = state_allowed
+            || (sticky_available && levels.user_can_send_message(&user_id, "m.rtc.member".into()));
 
         Ok(CommandOk::CallSupport(CallSupportView {
             has_focus,
@@ -360,148 +270,6 @@ impl Core {
         }
     }
 
-    async fn refresh_call(
-        self: &Arc<Self>,
-        generation: u64,
-        session: CallSessionId,
-        room: &Room,
-        distributor: Option<&Arc<Mutex<KeyDistributor>>>,
-    ) {
-        let members = membership::active_members(room).await;
-        self.emit_if_current(
-            generation,
-            CoreEvent::CallMembers {
-                session,
-                members: member_views(&members),
-            },
-        );
-
-        let Some(distributor) = distributor else {
-            return;
-        };
-
-        let rolled = distributor.lock().await.roll(room, &members).await;
-        match rolled {
-            Rolled::Nothing | Rolled::Shared => {}
-            Rolled::Rotated {
-                announcement,
-                first,
-            } => {
-                let event = CoreEvent::CallEncryptionKey {
-                    session,
-                    identity: announcement.identity,
-                    key_index: announcement.index,
-                    key: announcement.encoded,
-                    own: true,
-                };
-
-                if first {
-                    self.emit(event);
-                } else {
-                    let core = self.clone();
-                    self.track_session_task(
-                        spawn(async move {
-                            matrix_sdk::sleep::sleep(USE_KEY_DELAY).await;
-                            core.emit(event);
-                        })
-                        .abort_on_drop(),
-                    );
-                }
-            }
-        }
-    }
-
-    fn watch_call_memberships(
-        self: &Arc<Self>,
-        client: &Client,
-        generation: u64,
-        session: CallSessionId,
-        room_id: OwnedRoomId,
-        distributor: Option<Arc<Mutex<KeyDistributor>>>,
-    ) -> EventHandlerDropGuard {
-        let core = self.clone();
-        let handle = client.add_event_handler(
-            move |_: matrix_sdk::ruma::events::call::member::SyncCallMemberEvent, room: Room| {
-                let core = core.clone();
-                let room_id = room_id.clone();
-                let distributor = distributor.clone();
-                async move {
-                    if *room.room_id() != *room_id {
-                        return;
-                    }
-                    core.refresh_call(generation, session, &room, distributor.as_ref())
-                        .await;
-                }
-            },
-        );
-        client.event_handler_drop_guard(handle)
-    }
-
-    fn watch_call_keys(
-        self: &Arc<Self>,
-        client: &Client,
-        generation: u64,
-        session: CallSessionId,
-        room_id: OwnedRoomId,
-    ) -> EventHandlerDropGuard {
-        let core = self.clone();
-        let handle =
-            client.add_event_handler(
-                move |event: keys::ToDeviceCallEncryptionKeysEvent,
-                      encryption_info: Option<
-                    matrix_sdk::deserialized_responses::EncryptionInfo,
-                >| {
-                    let core = core.clone();
-                    let room_id = room_id.clone();
-                    async move {
-                        if event.content.room_id != room_id {
-                            return;
-                        }
-
-                        let Some(info) = encryption_info else {
-                            tracing::warn!(
-                                sender = %event.sender,
-                                "call media key arrived in the clear, dropping it"
-                            );
-                            return;
-                        };
-
-                        let Some(device_id) = info.sender_device.as_ref() else {
-                            tracing::warn!("call media key has no verified sending device");
-                            return;
-                        };
-
-                        if info.sender != event.sender
-                            || device_id.as_str() != event.content.member.claimed_device_id
-                        {
-                            tracing::warn!(
-                                claimed = event.content.member.claimed_device_id,
-                                "call media key claims a device it was not sent from"
-                            );
-                            return;
-                        }
-
-                        if keys::decode_key(&event.content.keys.key).is_none() {
-                            tracing::warn!("call media key is not decodable base64");
-                            return;
-                        }
-
-                        core.emit_if_current(
-                            generation,
-                            CoreEvent::CallEncryptionKey {
-                                session,
-                                identity: sfu::livekit_identity(&info.sender, device_id),
-                                key_index: event.content.keys.index,
-                                key: event.content.keys.key,
-                                own: false,
-                            },
-                        );
-                    }
-                },
-            );
-        client.event_handler_drop_guard(handle)
-    }
-
     pub(crate) async fn end_all_calls(&self) {
         let calls: Vec<CallSession> = self
             .call_sessions
@@ -511,9 +279,14 @@ impl Core {
             .map(|(_, call)| call)
             .collect();
 
-        for call in calls {
+        for mut call in calls {
+            drop(call.updates.take());
+            drop(call.postpone.take());
             let result = match call.delay_id.clone() {
-                Some(delay_id) => self.fire_hangup(delay_id).await,
+                Some(delay_id) => match self.fire_hangup(delay_id).await {
+                    Ok(result) => Ok(result),
+                    Err(_) => self.send_left_membership(&call).await,
+                },
                 None => self.send_left_membership(&call).await,
             };
             if let Err(error) = result {
@@ -523,15 +296,20 @@ impl Core {
     }
 
     pub(crate) async fn leave_call(&self, session: CallSessionId) -> Result<CommandOk, CommandErr> {
-        let call = self
+        let mut call = self
             .call_sessions
             .lock()
             .await
             .remove(&session)
             .ok_or(CommandErr::UnknownCall)?;
 
+        drop(call.updates.take());
+        drop(call.postpone.take());
         match call.delay_id.clone() {
-            Some(delay_id) => self.fire_hangup(delay_id).await,
+            Some(delay_id) => match self.fire_hangup(delay_id).await {
+                Ok(result) => Ok(result),
+                Err(_) => self.send_left_membership(&call).await,
+            },
             None => self.send_left_membership(&call).await,
         }
     }
@@ -550,6 +328,17 @@ impl Core {
     }
 
     async fn send_left_membership(&self, call: &CallSession) -> Result<CommandOk, CommandErr> {
+        if let Some(member_id) = &call.sticky_member {
+            let room = self.room(&call.room_id).await?;
+            sticky::send(
+                &room.client(),
+                &room,
+                serde_json::json!({"msc4354_sticky_key": member_id}),
+            )
+            .await
+            .map_err(|error| self.room_error("leave_call", error))?;
+            return Ok(CommandOk::LeaveCall);
+        }
         self.room(&call.room_id)
             .await?
             .send_state_event_for_key(&call.state_key, left_membership())
@@ -654,10 +443,10 @@ mod tests {
     fn test_a_membership_is_keyed_per_device() {
         let user = user_id!("@erwan:localhost");
 
-        let first = membership_state_key(user, device_id!("AAAAAAAA"));
-        let second = membership_state_key(user, device_id!("BBBBBBBB"));
+        let first = membership_state_key(user, device_id!("AAAAAAAA"), "12");
+        let second = membership_state_key(user, device_id!("BBBBBBBB"), "12");
 
-        assert_eq!(first.as_ref(), "@erwan:localhost_AAAAAAAA_m.call");
+        assert_eq!(first.as_ref(), "_@erwan:localhost_AAAAAAAA_m.call");
         assert_ne!(
             first.as_ref(),
             second.as_ref(),
@@ -666,8 +455,17 @@ mod tests {
     }
 
     #[test]
+    fn test_experimental_room_versions_use_namespaced_state_keys() {
+        for version in ["org.matrix.msc3757", "org.matrix.msc3779.10"] {
+            let key =
+                membership_state_key(user_id!("@user:example.org"), device_id!("DEVICE"), version);
+            assert_eq!(key.as_ref(), "@user:example.org_DEVICE_m.call");
+        }
+    }
+
+    #[test]
     fn test_the_state_key_carries_the_users_own_id() {
-        let key = membership_state_key(user_id!("@erwan:localhost"), device_id!("DEVICEID"));
+        let key = membership_state_key(user_id!("@erwan:localhost"), device_id!("DEVICEID"), "12");
 
         assert_eq!(key.user_id(), user_id!("@erwan:localhost"));
     }
@@ -677,7 +475,11 @@ mod tests {
         let views = member_views(&[CallMember {
             user_id: owned_user_id!("@erwan:localhost"),
             device_id: "LAPTOP".into(),
+            member_id: None,
+            identity: "@erwan:localhost:LAPTOP".to_owned(),
+            mode: crate::protocol::CallMode::Legacy,
             created_ts: 0,
+            expires_at_ms: None,
             foci: Vec::new(),
         }]);
 

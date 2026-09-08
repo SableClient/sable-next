@@ -24,6 +24,7 @@ import type {
   UserDirectoryEntryView,
   RoomPermissionsView,
   CallSupportView,
+  CallMode,
   RoomPowerLevelsView,
   RoomVersionsView,
   SearchFilter,
@@ -53,7 +54,12 @@ export type CallGrant = {
   jwt: string;
   identity: string;
   encryptMedia: boolean;
+  mode?: 'legacy' | 'compatibility' | 'matrix_2';
+  publisherId?: string;
+  backends?: CallBackendGrant[];
 };
+
+export type CallBackendGrant = { id: string; url: string; jwt: string; identity: string };
 
 export type CreateRoomOptions = {
   name?: string | null;
@@ -378,11 +384,16 @@ export function createCommands(transport: () => Transport) {
       return response.hits;
     },
 
-    async joinCall(roomId: string, livekitServiceUrl: string | null = null): Promise<CallGrant> {
+    async joinCall(
+      roomId: string,
+      livekitServiceUrl: string | null = null,
+      mode: CallMode | null = null
+    ): Promise<CallGrant> {
       const response = await transport().send({
         type: 'join_call',
         room_id: roomId,
         livekit_service_url: livekitServiceUrl,
+        mode: mode ?? null,
       });
       return {
         session: response.session,
@@ -390,6 +401,9 @@ export function createCommands(transport: () => Transport) {
         jwt: response.jwt,
         identity: response.identity,
         encryptMedia: response.encrypt_media,
+        mode: response.mode,
+        publisherId: response.publisher_id,
+        backends: response.backends,
       };
     },
 

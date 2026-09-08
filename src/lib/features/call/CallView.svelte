@@ -6,8 +6,8 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
-  import CallAudio from './CallAudio.svelte';
   import CallControls from './CallControls.svelte';
+  import CallPlayback from './CallPlayback.svelte';
   import CallParticipantTile from './CallParticipantTile.svelte';
   import type { CallSession } from './call-session.svelte.js';
   import { callFailureKey, callStatusKey } from './call-status';
@@ -64,15 +64,17 @@
     <Alert variant="critical">{$i18n.t(callFailureKey(session.failure))}</Alert>
   {/if}
 
+  <CallPlayback rooms={session.rooms} telemetry={session.telemetry} />
+
   {#if session.transport.participants.length === 0}
     <p class="empty">{$i18n.t('call.noParticipants')}</p>
   {:else}
     <ul class="grid">
-      {#each session.transport.participants as participant (participant.identity)}
+      {#each session.transport.participants as participant (`${participant.backendId ?? 'legacy'}:${participant.identity}`)}
         {@const profile = profileOf(participant.identity)}
         <CallParticipantTile
           {participant}
-          room={session.room?.room}
+          room={session.roomFor(participant.backendId)}
           name={profile.name}
           userId={profile.userId}
           avatar={profile.avatar}
@@ -80,8 +82,6 @@
       {/each}
     </ul>
   {/if}
-
-  <CallAudio room={session.room?.room} />
 
   <CallControls
     microphoneEnabled={session.transport.microphoneEnabled}

@@ -55,6 +55,29 @@ export class MatrixKeyProvider extends BaseKeyProvider {
     this.#queue = this.#queue.then(() => this.#apply(generation, key, own));
   }
 
+  waitForOwnKey(identity: string, timeoutMs = 10_000): Promise<void> {
+    if (this.#state.ready && this.#state.ownIdentity === identity) return Promise.resolve();
+    if (this.#state.lastFailure) return Promise.reject(new Error('own-key-failed'));
+    const generation = this.#generation;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.#listeners.delete(listener);
+        reject(new Error('own-key-timeout'));
+      }, timeoutMs);
+      const listener = (state: KeyProviderState): void => {
+        const cancelled = generation !== this.#generation;
+        if (!cancelled && !state.lastFailure && !(state.ready && state.ownIdentity === identity))
+          return;
+        clearTimeout(timer);
+        this.#listeners.delete(listener);
+        if (cancelled) reject(new Error('call-cancelled'));
+        else if (state.lastFailure) reject(new Error('own-key-failed'));
+        else resolve();
+      };
+      this.#listeners.add(listener);
+    });
+  }
+
   async #apply(generation: number, key: CallEncryptionKey, own: boolean): Promise<void> {
     if (generation !== this.#generation) return;
 
@@ -68,7 +91,7 @@ export class MatrixKeyProvider extends BaseKeyProvider {
     try {
       material = await subtle.importKey('raw', key.key, 'HKDF', false, ['deriveBits', 'deriveKey']);
     } catch {
-      this.#update({ lastFailure: 'import-failed' });
+      if (generation === this.#generation) this.#update({ lastFailure: 'import-failed' });
       return;
     }
 

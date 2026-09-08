@@ -42,6 +42,12 @@ impl Default for SessionRef {
     }
 }
 
+impl SessionRef {
+    pub(crate) fn is_legacy_room_call(&self) -> bool {
+        self.call_id.is_empty() && self.application == "m.call" && self.scope == "m.room"
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, EventContent)]
 #[ruma_event(type = "io.element.call.encryption_keys", kind = ToDevice)]
 pub(crate) struct ToDeviceCallEncryptionKeysEventContent {
@@ -169,6 +175,8 @@ pub(crate) struct KeyDistributor {
     room_id: OwnedRoomId,
     user_id: OwnedUserId,
     device_id: OwnedDeviceId,
+    member_id: String,
+    identity: String,
     outbound: Option<OutboundKey>,
 }
 
@@ -177,11 +185,15 @@ impl KeyDistributor {
         room_id: OwnedRoomId,
         user_id: OwnedUserId,
         device_id: OwnedDeviceId,
+        member_id: String,
+        identity: String,
     ) -> Self {
         Self {
             room_id,
             user_id,
             device_id,
+            member_id,
+            identity,
             outbound: None,
         }
     }
@@ -210,7 +222,7 @@ impl KeyDistributor {
                 let reached = self.send(room, &key, &targets).await;
 
                 let announcement = Announcement {
-                    identity: super::sfu::livekit_identity(&self.user_id, &self.device_id),
+                    identity: self.identity.clone(),
                     index: key.index,
                     encoded: key.encoded(),
                 };
@@ -269,7 +281,7 @@ impl KeyDistributor {
             room_id: self.room_id.clone(),
             member: MemberRef {
                 claimed_device_id: self.device_id.to_string(),
-                id: Some(super::sfu::livekit_identity(&self.user_id, &self.device_id)),
+                id: Some(self.member_id.clone()),
             },
             session: SessionRef::default(),
             sent_ts: now_ms(),
@@ -328,13 +340,20 @@ mod tests {
     use matrix_sdk::ruma::owned_user_id;
 
     use super::super::membership::CallMember;
-    use super::{KEY_BYTES, OutboundKey, Rollout, decode_key, plan_rollout};
+    use super::{
+        KEY_BYTES, OutboundKey, Rollout, SessionRef, ToDeviceCallEncryptionKeysEventContent,
+        decode_key, plan_rollout,
+    };
 
     fn member(device: &str, created_ts: u64) -> CallMember {
         CallMember {
             user_id: owned_user_id!("@erwan:localhost"),
             device_id: device.into(),
+            member_id: None,
+            identity: format!("@erwan:localhost:{device}"),
+            mode: crate::protocol::CallMode::Legacy,
             created_ts,
+            expires_at_ms: None,
             foci: Vec::new(),
         }
     }
@@ -455,5 +474,44 @@ mod tests {
             Some(&key.key[..])
         );
         assert_eq!(decode_key(""), None);
+    }
+
+    #[test]
+    fn test_missing_key_session_uses_the_legacy_room_call() {
+        let content =
+            serde_json::from_value::<ToDeviceCallEncryptionKeysEventContent>(serde_json::json!({
+                "keys": { "index": 0, "key": "CQkJCQkJCQkJCQkJCQkJCQ==" },
+                "room_id": "!room:example.org",
+                "member": { "claimed_device_id": "DEVICE" },
+                "sent_ts": 0
+            }));
+
+        assert!(content.is_ok_and(|content| content.session.is_legacy_room_call()));
+    }
+
+    #[test]
+    fn test_only_the_legacy_room_call_session_is_accepted() {
+        assert!(SessionRef::default().is_legacy_room_call());
+        assert!(
+            !SessionRef {
+                application: "m.other".to_owned(),
+                ..SessionRef::default()
+            }
+            .is_legacy_room_call()
+        );
+        assert!(
+            !SessionRef {
+                scope: "m.space".to_owned(),
+                ..SessionRef::default()
+            }
+            .is_legacy_room_call()
+        );
+        assert!(
+            !SessionRef {
+                call_id: "call".to_owned(),
+                ..SessionRef::default()
+            }
+            .is_legacy_room_call()
+        );
     }
 }

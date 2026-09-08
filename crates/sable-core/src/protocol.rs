@@ -823,6 +823,8 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
         livekit_service_url: Option<String>,
+        #[serde(default)]
+        mode: Option<CallMode>,
     },
 
     CallSupport {
@@ -928,6 +930,9 @@ pub enum CommandOk {
         jwt: String,
         identity: String,
         encrypt_media: bool,
+        mode: CallMode,
+        publisher_id: String,
+        backends: Vec<CallBackendView>,
     },
     CallSupport(CallSupportView),
     LeaveCall,
@@ -1396,6 +1401,20 @@ pub enum CoreEvent {
         key_index: u8,
         key: String,
         own: bool,
+        backend_id: Option<String>,
+    },
+
+    CallBackends {
+        session: CallSessionId,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        revision: u64,
+        backends: Vec<CallBackendView>,
+    },
+
+    CallSignalingError {
+        session: CallSessionId,
+        stage: CallSignalingStage,
+        fatal: bool,
     },
 
     CallMembers {
@@ -1561,6 +1580,35 @@ pub struct CallMemberView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub user_id: OwnedUserId,
     pub device_id: String,
+    pub identity: String,
+    pub backend_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum CallMode {
+    Legacy,
+    Compatibility,
+    #[serde(rename = "matrix_2")]
+    Matrix2,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum CallSignalingStage {
+    Membership,
+    Sync,
+    Provision,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct CallBackendView {
+    pub id: String,
+    pub url: String,
+    pub jwt: String,
     pub identity: String,
 }
 
