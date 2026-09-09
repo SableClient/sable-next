@@ -41,6 +41,7 @@
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import UserQuickTools from './UserQuickTools.svelte';
 
   const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0 };
 
@@ -68,6 +69,7 @@
     directRooms?: readonly RoomSummary[];
     directUnread?: UnreadCount;
     mobile?: boolean;
+    compact?: boolean;
     onNavigate?: (href: string) => void;
     layout?: readonly SidebarItem[];
     openFolders?: ReadonlySet<string>;
@@ -87,6 +89,7 @@
     directRooms = [],
     directUnread = NO_UNREAD,
     mobile = false,
+    compact = false,
     onNavigate,
     layout = [],
     openFolders = new Set(),
@@ -634,6 +637,9 @@
       <li>{@render railItem(createItem, false)}</li>
     </ul>
   </div>
+  {#if !mobile && compact}
+    <UserQuickTools compact />
+  {/if}
 </div>
 
 {#if !mobile}
