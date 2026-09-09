@@ -67,7 +67,13 @@
   <Popover.Root {open} onOpenChange={handleOpenChange}>
     <Popover.Trigger>
       {#snippet child({ props })}
-        <IconButton {...props} variant="ghost" size="small" class="sable-open" {label}>
+        <IconButton
+          {...props}
+          variant="ghost"
+          size="small"
+          class="persona-button-format sable-open"
+          {label}
+        >
           {#if active}
             <Avatar src={active.avatar_url} name={active.display_name} size="small" />
           {:else}
@@ -97,7 +103,7 @@
   <IconButton
     variant="ghost"
     size="small"
-    class="sable-open"
+    class="persona-button-format sable-open"
     {label}
     aria-haspopup="dialog"
     aria-expanded={open}
@@ -134,5 +140,9 @@
     padding: var(--space-200);
     width: min(18rem, calc(100vw - 2rem));
     z-index: var(--layer-popover);
+  }
+
+  :global(.persona-button-format) {
+    color: var(--sable-surface-var-on-container);
   }
 </style>

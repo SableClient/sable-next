@@ -227,6 +227,7 @@
           {unspacedUnread}
           {directRooms}
           {directUnread}
+          compact={collapsed}
           {...railProps}
         />
         <RoomNav width={roomNavWidth} {collapsed} />
@@ -247,9 +248,7 @@
           onkeydown={handleResizeKeydown}
         ></button>
       </div>
-      {#if collapsed}
-        <UserQuickTools compact />
-      {:else}
+      {#if !collapsed}
         <UserQuickTools />
       {/if}
     </nav>
