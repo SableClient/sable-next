@@ -162,6 +162,7 @@ export class RoomTimeline {
     try {
       const response = await this.core.commands.paginate(subscription, 'backward', count);
       if (session === this.session && subscription === this.subscription) {
+        this.error = null;
         const state = response.reached_end ? 'end' : 'idle';
         if (this.mode.kind === 'focused') {
           this.backwardPaginationPending = false;
@@ -208,6 +209,7 @@ export class RoomTimeline {
     try {
       const response = await this.core.commands.paginate(subscription, 'forward', count);
       if (session === this.session && subscription === this.subscription) {
+        this.error = null;
         this.forwardPagination = response.reached_end ? 'end' : 'idle';
       }
       return response.reached_end;

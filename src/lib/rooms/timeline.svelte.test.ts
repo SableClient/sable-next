@@ -163,6 +163,42 @@ test('paginates the SDK timeline that owns the subscription', async () => {
   expect(timeline.items.map((entry) => entry.id)).toEqual(['history', 'initial']);
 });
 
+class RetryPaginationCore extends FakeCore {
+  failNextPagination = true;
+
+  override paginate(subscription: number, direction: 'backward' | 'forward') {
+    if (this.failNextPagination) {
+      this.failNextPagination = false;
+      return Promise.reject(new Error('pagination failed'));
+    }
+    return super.paginate(subscription, direction);
+  }
+}
+
+test('clears a failed backward pagination error after a successful retry', async () => {
+  const core = new RetryPaginationCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+
+  await timeline.paginateBackward(25);
+  expect(timeline.error).toBe('load_failed');
+
+  await timeline.paginateBackward(25);
+  expect(timeline.error).toBe(null);
+});
+
+test('clears a failed forward pagination error after a successful retry', async () => {
+  const core = new RetryPaginationCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', '$target');
+
+  await timeline.paginateForward(25);
+  expect(timeline.error).toBe('load_failed');
+
+  await timeline.paginateForward(25);
+  expect(timeline.error).toBe(null);
+});
+
 class DelayedDiffCore extends FakeCore {
   override subscribeTimeline(roomId: string, focus: TimelineFocusView) {
     this.subscribeCalls.push({ roomId, focus });

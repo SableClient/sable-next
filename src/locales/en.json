@@ -528,7 +528,7 @@
     "back": "Back to rooms",
     "loading": "Loading messages...",
     "loadingHistory": "Loading older messages...",
-    "loadFailed": "Unable to load messages. Your session may have expired.",
+    "loadFailed": "Unable to load messages. Please try again.",
     "messagePlaceholder": "Send a message...",
     "sendMessage": "Send message",
     "sendAttachment": "Send attachment",
