@@ -426,6 +426,7 @@
   let showReceiptBadge = $derived(
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'message'
   );
+  let nonTextContent = $derived(item.content.kind !== 'message');
 
   const rowPress = new LongPress({
     enabled: () => actionable,
@@ -783,16 +784,18 @@
             <LinkPreviewCard url={previewUrl} />
           {/if}
         {:else}
-          <MessageBody
-            {item}
-            {members}
-            {canRedactOthers}
-            {onMatrixLink}
-            {onOpenMedia}
-            {onVotePoll}
-            {onEndPoll}
-            {onSenderProfile}
-          />
+          <div class:content-bubble={layout === 'bubble' && nonTextContent}>
+            <MessageBody
+              {item}
+              {members}
+              {canRedactOthers}
+              {onMatrixLink}
+              {onOpenMedia}
+              {onVotePoll}
+              {onEndPoll}
+              {onSenderProfile}
+            />
+          </div>
         {/if}
         {#if threadSummary && onOpenThread && threadTarget}
           {@const target = threadTarget}
@@ -1470,7 +1473,7 @@
     flex-direction: column;
   }
 
-  /* `.body` only ever matches a media caption, which stays flat. */
+  .message.layout-bubble .content-bubble,
   .message.layout-bubble :global(.formatted-body) {
     background: var(--sable-surface-container);
     border: var(--border-width) solid var(--sable-surface-container-line);
@@ -1480,6 +1483,17 @@
     padding: var(--space-200) var(--space-300);
   }
 
+  .message.layout-bubble .content-bubble :global(.formatted-body) {
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+
+  .message.layout-bubble .content-bubble :global(.image) {
+    margin-top: 0;
+  }
+
+  .message.layout-bubble.own .content-bubble,
   .message.layout-bubble.own :global(.formatted-body) {
     background: var(--sable-primary-container);
     border-color: var(--sable-primary-container-line);

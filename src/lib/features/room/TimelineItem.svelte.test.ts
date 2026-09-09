@@ -69,13 +69,13 @@ function item(emote: boolean): TimelineItemView {
   };
 }
 
-function imageItem(): TimelineItemView {
+function imageItem(body = 'photo.png'): TimelineItemView {
   return {
     ...item(false),
     content: {
       kind: 'image',
       html: null,
-      body: 'photo.png',
+      body,
       source: 'mxc://example.org/photo',
       filename: 'photo.png',
       mime: 'image/png',
@@ -237,6 +237,27 @@ test('edits an own image caption without dropping its media details', async () =
     width: 800,
     height: 600,
   });
+  await unmount(instance);
+});
+
+test('wraps non-text messages in a bubble in bubble layout', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: {
+        item: imageItem('A caption'),
+        collapsed: false,
+        layout: 'bubble',
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.message.layout-bubble .content-bubble')).toBeInstanceOf(
+    HTMLElement
+  );
+
   await unmount(instance);
 });
 
