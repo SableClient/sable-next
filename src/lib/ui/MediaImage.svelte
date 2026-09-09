@@ -99,10 +99,6 @@
      is a thumbnail whose shape need not match. The decoded shape covers an event
      carrying none, and is known before the `<img>` mounts. */
   let aspectRatio = $derived(eventRatio ?? fileRatio ?? width / height);
-  /* A homeserver thumbnail can come back with the EXIF orientation dropped but
-     never applied, leaving the photo on its side. The event's dimensions are the
-     upright shape, so a served file of the inverse shape is sideways and only
-     the original renders right: the browser orients that one itself. */
   let sidewaysSource = $state<string | null>(null);
   let servedSideways = $derived(sidewaysSource === source);
   let blurhashDecodeHeight = $derived(Math.max(1, Math.round(BLURHASH_DECODE_WIDTH / aspectRatio)));
@@ -146,7 +142,7 @@
     const release = holdMediaUrl(core, source, requestWidth, requestHeight);
     const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {
-      measured();
+      measured(requestWidth, requestHeight);
       gifPreviewReady = false;
       gifPlaying = false;
       if (url !== cached) imageLoaded = false;
@@ -164,7 +160,7 @@
     void load(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
-        measured();
+        measured(requestWidth, requestHeight);
         gifPreviewReady = false;
         gifPlaying = false;
         url = nextUrl;
@@ -252,8 +248,8 @@
     return Math.abs(a - b) <= ORIENTATION_TOLERANCE * b;
   }
 
-  function measured(): void {
-    const ratio = mediaAspectRatio(core, source);
+  function measured(requestWidth: number, requestHeight: number): void {
+    const ratio = mediaAspectRatio(core, source, requestWidth, requestHeight);
     fileRatio = ratio;
     if (ratio === null || eventRatio === null) return;
     if (!sameRatio(ratio, eventRatio) && sameRatio(ratio, 1 / eventRatio)) sidewaysSource = source;

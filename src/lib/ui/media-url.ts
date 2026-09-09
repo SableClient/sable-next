@@ -25,10 +25,6 @@ function cacheKey(
   return `${accountId ?? ''}:${source}:${String(width)}:${String(height)}`;
 }
 
-function metadataKey(accountId: string | undefined, source: string): string {
-  return `${accountId ?? ''}:${source}`;
-}
-
 function startsWith(bytes: Uint8Array, signature: number[], offset = 0): boolean {
   return signature.every((byte, index) => bytes[offset + index] === byte);
 }
@@ -67,8 +63,13 @@ function measure(key: string, type: string, blob: Blob): Promise<void> | null {
     .catch(() => {});
 }
 
-export function mediaAspectRatio(core: Pick<CoreClient, 'session'>, source: string): number | null {
-  return aspectRatios.get(metadataKey(core.session?.account_id, source)) ?? null;
+export function mediaAspectRatio(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number
+): number | null {
+  return aspectRatios.get(cacheKey(core.session?.account_id, source, width, height)) ?? null;
 }
 
 function evict(published: string): void {
@@ -144,7 +145,7 @@ export function loadMediaUrl(
           evict(key);
           return objectUrl;
         };
-        const measuring = measure(metadataKey(core.session?.account_id, source), type, blob);
+        const measuring = measure(key, type, blob);
         return measuring === null ? publish() : measuring.then(publish);
       })
       .finally(() => {

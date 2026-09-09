@@ -354,6 +354,14 @@ test('steps GIF frames itself and stops on the frame it held', async () => {
   await unmount(instance);
 });
 
+async function settle(): Promise<void> {
+  await tick();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+}
+
 async function mountAndLoad(
   props: ComponentProps<typeof MediaImage>,
   served: { width: number; height: number } | null
@@ -366,11 +374,7 @@ async function mountAndLoad(
     vi.stubGlobal('createImageBitmap', () => Promise.resolve({ ...served, close: () => {} }));
   }
   const instance = mount(MediaImage, { target: document.body, props });
-  await tick();
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   return () => unmount(instance);
 }
@@ -508,4 +512,32 @@ test('keeps the thumbnail when the served shape is merely different', async () =
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   await dispose();
+});
+
+test('measures the thumbnail even once the original has been measured', async () => {
+  const source = 'mxc://example.org/viewed-first';
+  const props = { source, alt: 'Image', width: 800, height: 600 };
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const bitmaps = [
+    { width: 3024, height: 4032 },
+    { width: 4032, height: 3024 },
+  ];
+  vi.stubGlobal('createImageBitmap', () =>
+    Promise.resolve({ ...(bitmaps.shift() ?? { width: 1, height: 1 }), close: () => {} })
+  );
+  const objectUrls = ['blob:original', 'blob:thumbnail'];
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => objectUrls.shift() ?? 'blob:extra');
+
+  const viewer = mount(MediaImage, { target: document.body, props: { ...props, original: true } });
+  await settle();
+  await unmount(viewer);
+
+  const timeline = mount(MediaImage, {
+    target: document.body,
+    props: { ...props, intrinsicWidth: 3024, intrinsicHeight: 4032 },
+  });
+  await settle();
+
+  expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:original');
+  await unmount(timeline);
 });
