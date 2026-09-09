@@ -17,6 +17,7 @@
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
   const BLURHASH_DECODE_WIDTH = 32;
+  const ORIENTATION_TOLERANCE = 0.05;
 
   interface Props {
     source: string;
@@ -98,6 +99,12 @@
      is a thumbnail whose shape need not match. The decoded shape covers an event
      carrying none, and is known before the `<img>` mounts. */
   let aspectRatio = $derived(eventRatio ?? fileRatio ?? width / height);
+  /* A homeserver thumbnail can come back with the EXIF orientation dropped but
+     never applied, leaving the photo on its side. The event's dimensions are the
+     upright shape, so a served file of the inverse shape is sideways and only
+     the original renders right: the browser orients that one itself. */
+  let sidewaysSource = $state<string | null>(null);
+  let servedSideways = $derived(sidewaysSource === source);
   let blurhashDecodeHeight = $derived(Math.max(1, Math.round(BLURHASH_DECODE_WIDTH / aspectRatio)));
   let blurhashPixels = $derived(
     blurhash === null
@@ -133,13 +140,13 @@
     let active = true;
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
-    const asIs = original || mime === 'image/svg+xml' || animatedGif;
+    const asIs = original || mime === 'image/svg+xml' || animatedGif || servedSideways;
     const requestWidth = asIs ? 0 : width;
     const requestHeight = asIs ? 0 : height;
     const release = holdMediaUrl(core, source, requestWidth, requestHeight);
     const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {
-      fileRatio = mediaAspectRatio(core, source);
+      measured();
       gifPreviewReady = false;
       gifPlaying = false;
       if (url !== cached) imageLoaded = false;
@@ -157,7 +164,7 @@
     void load(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
-        fileRatio = mediaAspectRatio(core, source);
+        measured();
         gifPreviewReady = false;
         gifPlaying = false;
         url = nextUrl;
@@ -240,6 +247,17 @@
     image.data.set(pixels);
     context.putImageData(image, 0, 0);
   });
+
+  function sameRatio(a: number, b: number): boolean {
+    return Math.abs(a - b) <= ORIENTATION_TOLERANCE * b;
+  }
+
+  function measured(): void {
+    const ratio = mediaAspectRatio(core, source);
+    fileRatio = ratio;
+    if (ratio === null || eventRatio === null) return;
+    if (!sameRatio(ratio, eventRatio) && sameRatio(ratio, 1 / eventRatio)) sidewaysSource = source;
+  }
 
   async function paintFrame(playback: GifPlayback, index: number): Promise<void> {
     const frame = await playback.frame(index);

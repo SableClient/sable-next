@@ -474,3 +474,38 @@ test('a cached image does not come back blurred', async () => {
   expect(placeholder === null || placeholder.classList.contains('loaded')).toBe(true);
   await unmount(second);
 });
+
+test('falls back to the original when the thumbnail comes back sideways', async () => {
+  const dispose = await mountAndLoad(
+    {
+      source: 'mxc://example.org/sideways',
+      alt: 'Image',
+      width: 800,
+      height: 600,
+      intrinsicWidth: 3024,
+      intrinsicHeight: 4032,
+    },
+    { width: 4032, height: 3024 }
+  );
+
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/sideways', 800, 600);
+  expect(core.fetchMedia).toHaveBeenLastCalledWith('mxc://example.org/sideways', 0, 0);
+  await dispose();
+});
+
+test('keeps the thumbnail when the served shape is merely different', async () => {
+  const dispose = await mountAndLoad(
+    {
+      source: 'mxc://example.org/cropped',
+      alt: 'Image',
+      width: 800,
+      height: 600,
+      intrinsicWidth: 600,
+      intrinsicHeight: 900,
+    },
+    { width: 1000, height: 400 }
+  );
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+  await dispose();
+});
