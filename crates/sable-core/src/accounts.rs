@@ -396,6 +396,7 @@ impl Core {
 
         self.install_session_callbacks(&client, &homeserver, &account_id, generation);
 
+        let session_changes = client.subscribe_to_session_changes();
         let sync_service = session::start_sync(client.clone())
             .await
             .map_err(|error| self.failed("start_sync", error))?;
@@ -424,7 +425,7 @@ impl Core {
         });
         drop(session);
 
-        self.watch_session_changes(&client, generation);
+        self.watch_session_changes(session_changes, generation);
         self.watch_encryption(&client, generation);
         self.watch_devices(&client, generation);
         self.watch_notifications(&client, generation);
@@ -546,14 +547,23 @@ impl Core {
         }
     }
 
-    fn watch_session_changes(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+    pub(crate) fn watch_session_changes(
+        self: &Arc<Self>,
+        mut changes: tokio::sync::broadcast::Receiver<matrix_sdk::SessionChange>,
+        generation: u64,
+    ) {
         let core = self.clone();
-        let mut changes = client.subscribe_to_session_changes();
         self.track_session_task(
             spawn(async move {
-                while let Ok(change) = changes.recv().await {
-                    if core.handle_session_change(&change, generation) {
-                        return;
+                loop {
+                    match changes.recv().await {
+                        Ok(change) => {
+                            if core.handle_session_change(&change, generation) {
+                                return;
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
                     }
                 }
             })

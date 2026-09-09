@@ -427,6 +427,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejected_token_after_a_refresh_still_ends_the_session() {
+        let (core, mut events) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        let (changes, receiver) = tokio::sync::broadcast::channel(1);
+
+        changes
+            .send(matrix_sdk::SessionChange::TokensRefreshed)
+            .unwrap();
+        changes
+            .send(matrix_sdk::SessionChange::UnknownToken(
+                matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
+            ))
+            .unwrap();
+        core.watch_session_changes(receiver, 1);
+
+        assert!(matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), events.recv())
+                .await
+                .ok()
+                .flatten(),
+            Some(CoreEvent::SessionEnded { reason }) if reason == "token_rejected"
+        ));
+    }
+
+    #[tokio::test]
     async fn accounts_are_reanchored_after_the_data_dir_moves() {
         let bytes = serde_json::to_vec(&serde_json::json!({
             "version": 1,

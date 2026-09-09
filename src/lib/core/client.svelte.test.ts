@@ -220,6 +220,40 @@ test('a session ending clears the session and looks for a fallback account', asy
   expect(core.status).toBe('authenticating');
 });
 
+test('a rejected session with no fallback account leaves the client signed out', async () => {
+  const restore: { session: SessionInfo | null } = { session };
+  const accounts = { accounts: [session] };
+  const fake = fakeTransport({ restore, list_accounts: accounts });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  accounts.accounts.length = 0;
+  restore.session = null;
+  fake.emit({ type: 'session_ended', reason: 'token_rejected' });
+
+  await vi.waitFor(() => {
+    expect(core.status).toBe('signed-out');
+    expect(core.session).toBeNull();
+  });
+  expect(fake.sent).not.toContainEqual({ type: 'logout' });
+});
+
+test('a transient sync error keeps the current session ready', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  fake.emit({ type: 'sync_status', state: 'error', message: 'temporary sync failure' });
+
+  expect(core.status).toBe('ready');
+  expect(core.session).toEqual(session);
+  expect(core.sync).toEqual({
+    type: 'sync_status',
+    state: 'error',
+    message: 'temporary sync failure',
+  });
+});
+
 test('failed profile lookups cool down across repeated timeline mounts and retry later', async () => {
   const fake = fakeTransport();
   const core = createCoreClient(() => fake.transport);
