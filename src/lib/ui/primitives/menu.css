@@ -1,6 +1,6 @@
 .sable-menu {
   --menu-min-width: 11rem;
-  --menu-max-height: none;
+  --menu-max-height: 20rem;
 
   background: var(--sable-bg-container);
   border: var(--border-width) solid var(--sable-bg-container-line);

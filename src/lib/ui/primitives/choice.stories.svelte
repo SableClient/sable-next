@@ -32,6 +32,10 @@
     { value: 'mute', label: 'Nothing' },
     { value: 'default', label: 'Match the account default', disabled: true },
   ];
+  const manyItems = Array.from({ length: 50 }, (_, index) => ({
+    value: `theme-${index}`,
+    label: `Official theme ${index + 1}`,
+  }));
 </script>
 
 <Story name="Option cards" asChild>
@@ -50,6 +54,12 @@
   <div class="stack">
     <Label for="notify">Notify me about</Label>
     <Select id="notify" {items} value="mentions" placeholder="Choose one" />
+  </div>
+</Story>
+
+<Story name="Select: long list" asChild>
+  <div class="stack">
+    <Select id="long" items={manyItems} placeholder="Choose an official theme" />
   </div>
 </Story>
 

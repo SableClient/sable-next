@@ -272,7 +272,7 @@
 </Popover.Root>
 
 <style>
-  :global(.pin-menu) {
+  :global(.sable-menu.pin-menu) {
     --menu-min-width: 20rem;
     --menu-max-height: min(28rem, 70dvh);
 

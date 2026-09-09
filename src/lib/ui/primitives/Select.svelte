@@ -83,7 +83,7 @@
     width: var(--icon-size-small);
   }
 
-  :global(.select-content) {
+  :global(.sable-menu.select-content) {
     --menu-max-height: min(20rem, var(--bits-select-content-available-height));
     --menu-min-width: var(--bits-select-anchor-width);
 
