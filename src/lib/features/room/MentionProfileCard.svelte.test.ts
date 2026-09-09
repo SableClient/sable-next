@@ -107,6 +107,31 @@ test('leaves out the bio and metadata panels when the profile has neither', asyn
   await unmount(instance);
 });
 
+test('opens a profile avatar through viewer callback', async () => {
+  const onAvatarClick = vi.fn();
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: { ...emptyProfile, display_name: 'Alice', avatar_url: 'mxc://example.org/avatar' },
+      onAvatarClick,
+    },
+  });
+  await tick();
+
+  const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
+  if (!avatarButton) throw new Error('profile avatar button missing');
+  expect(avatarButton.getAttribute('aria-label')).toBe("View Alice's avatar");
+  expect(avatarButton.querySelector('.sable-avatar')?.getAttribute('aria-hidden')).toBe('true');
+  avatarButton.click();
+
+  expect(onAvatarClick).toHaveBeenCalledWith('mxc://example.org/avatar', 'Alice');
+  await unmount(instance);
+});
+
 test('sends a direct message from the composer', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
   core.sendMessage.mockResolvedValue(undefined);

@@ -54,7 +54,7 @@
   import RoomReadReceipts from './RoomReadReceipts.svelte';
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
-  import MediaViewer from './MediaViewer.svelte';
+  import MediaViewer, { type MediaItem } from './MediaViewer.svelte';
   import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
   import {
     POWER_LEVEL_TAGS_EVENT_TYPE,
@@ -109,6 +109,8 @@
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
+  let profileAvatarItem = $state<MediaItem | null>(null);
+  let profileAvatarSequence = 0;
   let callSupport = $state<CallSupportView | null>(null);
   let widgetsOpen = $state(false);
   let widgets = $state.raw<RoomWidget[]>([]);
@@ -122,8 +124,8 @@
     memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
   );
 
-  let mediaItems = $derived(
-    timeline.items.flatMap((entry) => {
+  let mediaItems = $derived.by(() => {
+    const items: MediaItem[] = timeline.items.flatMap((entry) => {
       const eventId = entry.event_id;
       if (eventId === null) return [];
       const content = entry.content;
@@ -142,8 +144,9 @@
           sender: entry.sender_name ?? entry.sender ?? 'Unknown sender',
         },
       ];
-    })
-  );
+    });
+    return profileAvatarItem ? [profileAvatarItem] : items;
+  });
   let callable = $derived(
     !call.active && callSupport !== null && callSupport.has_focus && callSupport.can_join
   );
@@ -590,7 +593,33 @@
   }
 
   function openMedia(eventId: string): void {
+    profileAvatarItem = null;
     mediaEventId = eventId;
+  }
+
+  function openProfileAvatar(source: string, displayName: string): void {
+    closeProfile();
+    const eventId = `profile-avatar-${String(++profileAvatarSequence)}`;
+    profileAvatarItem = {
+      kind: 'image',
+      body: displayName,
+      html: null,
+      source,
+      filename: null,
+      mime: null,
+      width: null,
+      height: null,
+      blurhash: null,
+      spoiler: null,
+      eventId,
+      sender: displayName,
+    };
+    mediaEventId = eventId;
+  }
+
+  function closeMedia(): void {
+    mediaEventId = null;
+    profileAvatarItem = null;
   }
 
   function tombstoneSuccessorPath(id: string, isSpace: boolean): string {
@@ -959,14 +988,11 @@
     {permissions}
     {profile}
     failed={profileFailed}
+    onAvatarClick={openProfileAvatar}
   />
 
   {#if mediaEventId}
-    <MediaViewer
-      items={mediaItems}
-      selectedEventId={mediaEventId}
-      onClose={() => (mediaEventId = null)}
-    />
+    <MediaViewer items={mediaItems} selectedEventId={mediaEventId} onClose={closeMedia} />
   {/if}
 </main>
 

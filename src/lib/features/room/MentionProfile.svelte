@@ -17,6 +17,7 @@
     ownPowerLevel?: number;
     permissions?: RoomPermissionsView | null;
     profile?: ProfileView | null;
+    onAvatarClick?: (source: string, displayName: string) => void;
     failed?: boolean;
     anchor: HTMLElement | null;
     onOpenChange?: (open: boolean) => void;
@@ -30,6 +31,7 @@
     ownPowerLevel = 0,
     permissions = null,
     profile = null,
+    onAvatarClick,
     failed = false,
     anchor,
     onOpenChange,
@@ -76,6 +78,7 @@
             {ownPowerLevel}
             {permissions}
             {profile}
+            {onAvatarClick}
             {failed}
           />
         {/if}
@@ -100,6 +103,7 @@
         {ownPowerLevel}
         {permissions}
         {profile}
+        {onAvatarClick}
         {failed}
         variant="sheet"
       />

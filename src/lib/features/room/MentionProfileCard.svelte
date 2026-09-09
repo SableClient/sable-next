@@ -57,6 +57,7 @@
     ownPowerLevel?: number;
     permissions?: RoomPermissionsView | null;
     profile: ProfileView | null;
+    onAvatarClick?: (source: string, displayName: string) => void;
     failed?: boolean;
     variant?: 'popover' | 'sheet';
   }
@@ -68,6 +69,7 @@
     ownPowerLevel = 0,
     permissions = null,
     profile,
+    onAvatarClick,
     failed = false,
     variant = 'popover',
   }: Props = $props();
@@ -593,6 +595,8 @@
   {displayName}
   {userId}
   {avatarUrl}
+  avatarLabel={$i18n.t('timeline.profileAvatar', { name: displayName })}
+  {onAvatarClick}
   {color}
   heroColor={currentProfile?.hero_color}
   heroBrightness={currentProfile?.hero_brightness}
