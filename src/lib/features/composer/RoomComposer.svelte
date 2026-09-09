@@ -54,6 +54,7 @@
     unstageFile,
     type StagedFile,
   } from './composer-files';
+  import { isMultiline } from './composer-multiline';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
   import type { FormatAction } from './editor/formatting';
@@ -173,6 +174,12 @@
   let sourceMode = $state(false);
   let deleteEditOpen = $state(false);
   let fileInput = $state<HTMLInputElement | null>(null);
+  let rowEl = $state<HTMLElement>();
+  let beforeEl = $state<HTMLElement>();
+  let afterEl = $state<HTMLElement>();
+  let measurerEl = $state<HTMLElement>();
+  let multiline = $state(false);
+  let layoutFrame: number | undefined;
   let empty = $state(true);
   let showPlaceholder = $state(true);
   let activeFormats = $state.raw<FormatAction[]>([]);
@@ -233,7 +240,10 @@
       showPlaceholder = change.placeholder;
       activeFormats = change.active;
       activeIndex = 0;
-      if (change.docChanged) updateTyping();
+      if (change.docChanged) {
+        updateTyping();
+        scheduleLayout();
+      }
     },
     onQuery: (next) => {
       if (!next) dismissedAt = null;
@@ -261,6 +271,34 @@
     editor.syncActiveOption();
   });
 
+  function updateLayout(): void {
+    const editable = editor.editable();
+    if (!rowEl || !measurerEl || !editable) return;
+    multiline = isMultiline({
+      text: editor.text(),
+      row: rowEl,
+      before: beforeEl,
+      after: afterEl,
+      editable,
+      measurer: measurerEl,
+    });
+  }
+
+  function scheduleLayout(): void {
+    if (layoutFrame !== undefined) return;
+    layoutFrame = requestAnimationFrame(() => {
+      layoutFrame = undefined;
+      updateLayout();
+    });
+  }
+
+  $effect(() => {
+    if (!rowEl || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(scheduleLayout);
+    for (const element of [rowEl, beforeEl, afterEl]) if (element) observer.observe(element);
+    return () => observer.disconnect();
+  });
+
   $effect(() => {
     const next = richText;
     if (next === configuredRich) return;
@@ -283,6 +321,7 @@
   });
 
   onDestroy(() => {
+    if (layoutFrame !== undefined) cancelAnimationFrame(layoutFrame);
     if (typingTimeout) clearTimeout(typingTimeout);
     stopTyping();
     queue.dispose();
@@ -742,6 +781,8 @@
         {/if}
         <form
           class="composer-row"
+          class:multiline={multiline && !recording}
+          bind:this={rowEl}
           onsubmit={(event) => {
             event.preventDefault();
             void send();
@@ -760,26 +801,28 @@
               }}
             />
           {:else}
-            <ComposerDoor
-              {desktop}
-              onPick={pick}
-              onPoll={onCreatePoll
-                ? () => {
-                    pollOpen = true;
-                  }
-                : undefined}
-              onLocation={onSendLocation
-                ? () => {
-                    locationOpen = true;
-                  }
-                : undefined}
-              onSchedule={onSchedule
-                ? () => {
-                    scheduleOpen = true;
-                  }
-                : undefined}
-              onBeforeOpen={!desktop ? blurEditor : undefined}
-            />
+            <div class="composer-before" bind:this={beforeEl}>
+              <ComposerDoor
+                {desktop}
+                onPick={pick}
+                onPoll={onCreatePoll
+                  ? () => {
+                      pollOpen = true;
+                    }
+                  : undefined}
+                onLocation={onSendLocation
+                  ? () => {
+                      locationOpen = true;
+                    }
+                  : undefined}
+                onSchedule={onSchedule
+                  ? () => {
+                      scheduleOpen = true;
+                    }
+                  : undefined}
+                onBeforeOpen={!desktop ? blurEditor : undefined}
+              />
+            </div>
             <input
               bind:this={fileInput}
               class="composer-file"
@@ -810,6 +853,8 @@
                   onSelect={commit}
                 />
               {/if}
+            </div>
+            <div class="composer-after" bind:this={afterEl}>
               <ComposerBoard
                 {roomId}
                 {desktop}
@@ -821,56 +866,57 @@
                 onPickGif={onSendGif ? pickGifFromBoard : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
-            </div>
-            {#if showPersonaPicker}
-              <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
-            {/if}
-            {#if richText}
+              {#if showPersonaPicker}
+                <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
+              {/if}
+              {#if richText}
+                <IconButton
+                  variant="ghost"
+                  size="small"
+                  class="composer-format sable-open"
+                  aria-pressed={formattingOpen}
+                  data-state={formattingOpen ? 'open' : 'closed'}
+                  label={$i18n.t('composer.formatting')}
+                  onclick={() => {
+                    setPreference('formattingToolbar', !formattingOpen);
+                  }}
+                >
+                  <TextAaIcon />
+                </IconButton>
+              {/if}
               <IconButton
+                type={primaryAction === 'record' ? 'button' : 'submit'}
                 variant="ghost"
                 size="small"
-                class="composer-format sable-open"
-                aria-pressed={formattingOpen}
-                data-state={formattingOpen ? 'open' : 'closed'}
-                label={$i18n.t('composer.formatting')}
-                onclick={() => {
-                  setPreference('formattingToolbar', !formattingOpen);
+                class="composer-send"
+                disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
+                label={primaryAction === 'record'
+                  ? $i18n.t('composer.voiceRecord')
+                  : $i18n.t('timeline.sendMessage')}
+                onclick={primaryAction === 'record'
+                  ? () => {
+                      recording = true;
+                    }
+                  : undefined}
+                onpointerdown={(event: PointerEvent) => {
+                  if (hasContent) event.preventDefault();
+                }}
+                onmousedown={(event: MouseEvent) => {
+                  if (hasContent) event.preventDefault();
                 }}
               >
-                <TextAaIcon />
+                {#if primaryAction === 'record'}
+                  <MicrophoneIcon />
+                {:else if sending}
+                  <Spinner small />
+                {:else}
+                  <PaperPlaneIcon weight="fill" />
+                {/if}
               </IconButton>
-            {/if}
-            <IconButton
-              type={primaryAction === 'record' ? 'button' : 'submit'}
-              variant="ghost"
-              size="small"
-              class="composer-send"
-              disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
-              label={primaryAction === 'record'
-                ? $i18n.t('composer.voiceRecord')
-                : $i18n.t('timeline.sendMessage')}
-              onclick={primaryAction === 'record'
-                ? () => {
-                    recording = true;
-                  }
-                : undefined}
-              onpointerdown={(event: PointerEvent) => {
-                if (hasContent) event.preventDefault();
-              }}
-              onmousedown={(event: MouseEvent) => {
-                if (hasContent) event.preventDefault();
-              }}
-            >
-              {#if primaryAction === 'record'}
-                <MicrophoneIcon />
-              {:else if sending}
-                <Spinner small />
-              {:else}
-                <PaperPlaneIcon weight="fill" />
-              {/if}
-            </IconButton>
+            </div>
           {/if}
         </form>
+        <div class="composer-measurer" bind:this={measurerEl} aria-hidden="true"></div>
         <p class="composer-hint" id={hintId}>
           {preferences.enterForNewline
             ? $i18n.t('composer.hintSendModifier')
@@ -1021,17 +1067,47 @@
 
   .composer-row {
     align-items: center;
-    display: flex;
+    display: grid;
     gap: var(--space-100);
+    grid-template-columns: auto 1fr auto;
     padding: var(--space-100);
     width: 100%;
+  }
+
+  .composer-row.multiline {
+    grid-template-areas:
+      'before field'
+      'before after';
+    grid-template-columns: auto 1fr;
+  }
+
+  .composer-before,
+  .composer-after {
+    align-items: center;
+    display: flex;
+    gap: var(--space-100);
+  }
+
+  .composer-row > :global(.voice-recorder) {
+    grid-column: 1 / -1;
+  }
+
+  .composer-measurer {
+    box-sizing: border-box;
+    height: 0;
+    overflow: hidden;
+    overflow-wrap: break-word;
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
+    white-space: pre-wrap;
   }
 
   .locked {
     align-items: center;
     color: var(--sable-surface-var-on-container);
     display: flex;
-    flex: 1;
+    grid-column: 1 / -1;
     justify-content: center;
     margin: 0;
     min-height: var(--target);
@@ -1041,9 +1117,22 @@
   .composer-field {
     align-items: center;
     display: flex;
-    flex: 1;
     min-width: 0;
     position: relative;
+  }
+
+  .multiline .composer-before {
+    align-self: end;
+    grid-area: before;
+  }
+
+  .multiline .composer-field {
+    grid-area: field;
+  }
+
+  .multiline .composer-after {
+    grid-area: after;
+    justify-self: end;
   }
 
   .composer-file {

@@ -296,7 +296,7 @@ const PLACEHOLDER_ATOMS = new Set([
 ]);
 
 /** The literal characters the user typed, with the atoms spelled back out. */
-function plainTextOf(doc: ProseMirrorNode): string {
+export function plainTextOf(doc: ProseMirrorNode): string {
   const { hard_break: hardBreak } = composerSchema.nodes;
 
   return doc.textBetween(0, doc.content.size, '\n\n', (node) =>

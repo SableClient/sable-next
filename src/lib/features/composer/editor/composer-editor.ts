@@ -46,6 +46,7 @@ import {
   composerMarkdown,
   markdownFromSlice,
   markdownSlice,
+  plainTextOf,
   richFromPlain,
   textDoc,
   textSlice,
@@ -439,6 +440,15 @@ export class ComposerEditor {
 
   doc(): ProseMirrorNode | undefined {
     return this.view?.state.doc;
+  }
+
+  text(): string {
+    const doc = this.view?.state.doc;
+    return doc ? plainTextOf(doc) : '';
+  }
+
+  editable(): HTMLElement | undefined {
+    return this.view?.dom;
   }
 
   focus(): void {
