@@ -43,6 +43,8 @@ import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 
+import { setLanguage } from '#lib/i18n.js';
+import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
@@ -65,6 +67,7 @@ export type SelectPreference = Exclude<
 export interface SettingOption {
   value: string;
   label: string;
+  literal?: true;
 }
 
 interface BaseSetting {
@@ -77,19 +80,20 @@ interface BaseSetting {
   unavailable?: true;
   /** Left out entirely where the platform has nothing for it to switch. */
   supported?: () => boolean;
-  onChange?: (value: boolean) => void;
   requiresReload?: true;
 }
 
 export interface BooleanSetting extends BaseSetting {
   type: 'boolean';
   key: BooleanPreference;
+  onChange?: (value: boolean) => void;
 }
 
 export interface SelectSetting extends BaseSetting {
   type: 'select';
   key: SelectPreference;
   options: SettingOption[];
+  onChange?: (value: string) => void;
 }
 
 export type SettingDefinition = BooleanSetting | SelectSetting;
@@ -223,6 +227,24 @@ export const settingsCategories: SettingsCategory[] = [
     description: 'settings.appearanceDescription',
     icon: PaintBrushIcon,
     items: [
+      {
+        key: 'language',
+        icon: TranslateIcon,
+        name: 'settings.language',
+        description: 'settings.languageHint',
+        type: 'select',
+        options: [
+          { value: SYSTEM_LANGUAGE, label: 'settings.languageSystem' },
+          ...availableLocales.map((code) => ({
+            value: code,
+            label: localeLabel(code),
+            literal: true as const,
+          })),
+        ],
+        onChange: (value) => {
+          void setLanguage(value);
+        },
+      },
       {
         key: 'theme',
         icon: MoonIcon,

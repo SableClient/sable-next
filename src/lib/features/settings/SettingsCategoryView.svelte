@@ -130,10 +130,11 @@
                 value={preferences[key]}
                 items={setting.options.map((option) => ({
                   value: option.value,
-                  label: $i18n.t(option.label),
+                  label: option.literal ? option.label : $i18n.t(option.label),
                 }))}
                 onValueChange={(value) => {
                   setPreference(key, value as Preferences[typeof key]);
+                  setting.onChange?.(value);
                 }}
               />
             {:else}

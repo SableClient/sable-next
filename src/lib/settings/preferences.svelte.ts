@@ -1,4 +1,5 @@
 import type { MemberSort } from '#lib/features/room/member-listing.js';
+import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
@@ -12,6 +13,7 @@ export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
 
 export interface Preferences {
+  language: string;
   layout: TimelineLayout;
   messageSpacing: MessageSpacing;
   theme: ThemeMode;
@@ -106,6 +108,7 @@ const STORAGE_KEY = 'sable-preferences';
 const LEGACY_STORAGE_KEY = 'sable-timeline-preferences';
 
 const ENUMS = {
+  language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
   messageSpacing: ['compact', 'cozy', 'roomy'],
   theme: ['system', 'dark', 'light'],
@@ -129,6 +132,7 @@ const FREE_TEXT = [
 export type FreeTextPreference = (typeof FREE_TEXT)[number];
 
 const DEFAULTS: Preferences = {
+  language: SYSTEM_LANGUAGE,
   layout: 'modern',
   messageSpacing: 'cozy',
   theme: 'system',
