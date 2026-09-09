@@ -22,6 +22,36 @@ test('creates a room and opens it', async ({ page, app, signIn }) => {
   await expect(page).toHaveTitle(`${name} - Sable`);
 });
 
+for (const entry of ['sidebar', 'header'] as const) {
+  test(`shows room notification options from the ${entry} menu`, async ({
+    page,
+    app,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+
+    if (entry === 'sidebar') {
+      await app.roomLink('General').click({ button: 'right' });
+    } else {
+      await page.getByRole('button', { name: 'More options', exact: true }).click();
+    }
+    const trigger = page.getByRole('menuitem', { name: 'Notifications', exact: true });
+    if (entry === 'sidebar') {
+      await trigger.hover();
+    } else {
+      await trigger.focus();
+      await page.keyboard.press('ArrowRight');
+    }
+
+    await expect(page.getByRole('menuitem', { name: 'All messages', exact: true })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Mentions and keywords' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Mute', exact: true })).toBeVisible();
+    await page.getByRole('menuitem', { name: 'All messages', exact: true }).click();
+    await expect(trigger).not.toBeVisible();
+  });
+}
+
 test('switches the timeline between two real rooms', async ({ app, timeline, signIn }) => {
   await signIn();
   await app.openCreateRoom();

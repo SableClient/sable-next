@@ -53,6 +53,10 @@
   flex-grow: 1;
 }
 
+.sable-menu-submenu-chevron {
+  margin-inline-start: auto;
+}
+
 .sable-menu-item-roomy {
   --menu-item-height: var(--control-height-400);
   --menu-item-gap: var(--space-200);

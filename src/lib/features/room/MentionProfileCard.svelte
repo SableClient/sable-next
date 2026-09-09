@@ -48,6 +48,8 @@
   import MutualRoomsPanel from './MutualRoomsPanel.svelte';
   import { senderColor } from './timeline-format';
 
+  import '#lib/ui/primitives/menu.css';
+
   interface Props {
     userId: string;
     member: MemberView | null;
@@ -446,22 +448,25 @@
             <DropdownMenu.SubTrigger class="sable-menu-item">
               <ShieldIcon />
               {$i18n.t('timeline.profileChangePower')}
+              <CaretRightIcon class="sable-menu-submenu-chevron" aria-hidden="true" />
             </DropdownMenu.SubTrigger>
-            <DropdownMenu.SubContent class="sable-menu" sideOffset={4}>
-              <IconContext values={{ 'aria-hidden': 'true' }}>
-                {#each powerRoles as role (role.level)}
-                  <DropdownMenu.Item
-                    class="sable-menu-item"
-                    onSelect={() => {
-                      setPowerLevel(role.level);
-                    }}
-                  >
-                    <span class="profile-power-name">{role.label}</span>
-                    <span class="profile-power-level">{role.level}</span>
-                  </DropdownMenu.Item>
-                {/each}
-              </IconContext>
-            </DropdownMenu.SubContent>
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent class="sable-menu" sideOffset={4}>
+                <IconContext values={{ 'aria-hidden': 'true' }}>
+                  {#each powerRoles as role (role.level)}
+                    <DropdownMenu.Item
+                      class="sable-menu-item"
+                      onSelect={() => {
+                        setPowerLevel(role.level);
+                      }}
+                    >
+                      <span class="profile-power-name">{role.label}</span>
+                      <span class="profile-power-level">{role.level}</span>
+                    </DropdownMenu.Item>
+                  {/each}
+                </IconContext>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Portal>
           </DropdownMenu.Sub>
         {/if}
         {#if canKick}

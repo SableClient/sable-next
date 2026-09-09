@@ -1,6 +1,7 @@
 <script lang="ts">
   import { DropdownMenu } from 'bits-ui';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
+  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import type { NotificationModeView } from '#src/generated/protocol';
 
@@ -59,22 +60,25 @@
   <DropdownMenu.SubTrigger class="sable-menu-item">
     <BellIcon />
     {$i18n.t('room.menuNotifications')}
+    <CaretRightIcon class="sable-menu-submenu-chevron" aria-hidden="true" />
   </DropdownMenu.SubTrigger>
-  <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
-    <IconContext values={{ 'aria-hidden': 'true' }}>
-      {#each modes as option (option.mode ?? 'default')}
-        {@const selected = mode === option.mode}
-        <DropdownMenu.Item
-          class="sable-menu-item"
-          aria-checked={selected}
-          onSelect={() => {
-            select(option.mode);
-          }}
-        >
-          <span class="sable-menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
-          {$i18n.t(option.label, { mode: defaultLabel })}
-        </DropdownMenu.Item>
-      {/each}
-    </IconContext>
-  </DropdownMenu.SubContent>
+  <DropdownMenu.Portal>
+    <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        {#each modes as option (option.mode ?? 'default')}
+          {@const selected = mode === option.mode}
+          <DropdownMenu.Item
+            class="sable-menu-item"
+            aria-checked={selected}
+            onSelect={() => {
+              select(option.mode);
+            }}
+          >
+            <span class="sable-menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+            {$i18n.t(option.label, { mode: defaultLabel })}
+          </DropdownMenu.Item>
+        {/each}
+      </IconContext>
+    </DropdownMenu.SubContent>
+  </DropdownMenu.Portal>
 </DropdownMenu.Sub>
