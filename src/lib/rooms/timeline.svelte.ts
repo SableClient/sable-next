@@ -307,7 +307,7 @@ export class RoomTimeline {
       response = await this.core.commands.subscribeTimeline(roomId, focusFor(mode), hiddenEvents);
     } catch (error) {
       stopEvents();
-      this.state = 'stopped';
+      if (session === this.session) this.state = 'stopped';
       throw error;
     }
 

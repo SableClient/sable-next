@@ -2,13 +2,22 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: 'tests/e2e',
-  testMatch: process.env.SABLE_E2E_MATCH ?? 'timeline-stability.spec.ts',
+  testMatch: process.env.SABLE_E2E_MATCH ?? [
+    'timeline-stability.spec.ts',
+    'timeline-gap.spec.ts',
+    'timeline-keyboard.spec.ts',
+    'timeline-lifecycle.spec.ts',
+  ],
   workers: 1,
   timeout: 60_000,
   use: { baseURL: 'http://127.0.0.1:4175', contextOptions: { reducedMotion: 'reduce' } },
   projects: [
     { name: 'chromium', grepInvert: /mobile/, use: devices['Desktop Chrome'] },
-    { name: 'firefox', grepInvert: /mobile/, use: devices['Desktop Firefox'] },
+    {
+      name: 'firefox',
+      grepInvert: /mobile/,
+      use: { ...devices['Desktop Firefox'], hasTouch: true },
+    },
     { name: 'webkit', grepInvert: /mobile/, use: devices['Desktop Safari'] },
     {
       name: 'android',

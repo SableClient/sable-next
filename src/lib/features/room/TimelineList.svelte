@@ -215,10 +215,7 @@
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;
-    jumpToLatestVisible =
-      !state.pinned &&
-      node !== null &&
-      node.scrollHeight - node.clientHeight - node.scrollTop >= node.clientHeight;
+    jumpToLatestVisible = !state.pinned;
     nearLatest =
       state.end === entries.length &&
       node !== null &&

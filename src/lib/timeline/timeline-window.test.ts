@@ -319,6 +319,59 @@ test('a queued scroll re-pins after a resize clamps back to the previous offset'
   expect(window.state.pinned).toBe(true);
 });
 
+test('a held touch keeps the latest rendered window bottom-aligned after its rows shrink', async () => {
+  const { window, viewport, content, resize } = fixture();
+  await window.update(entries(1_000));
+  viewport.dispatchEvent(new Event('touchstart'));
+  resize(25);
+  expect(window.state.pinned).toBe(true);
+  expect(content.lastElementChild?.getBoundingClientRect().bottom).toBe(
+    viewport.getBoundingClientRect().bottom
+  );
+});
+
+test('a keyboard viewport shrink keeps the latest row at the bottom during an active touch', async () => {
+  const { window, viewport, content, resizeViewport } = fixture();
+  await window.update(entries(1_000));
+  viewport.dispatchEvent(new Event('touchstart'));
+  resizeViewport(200);
+
+  expect(window.state.pinned).toBe(true);
+  expect(content.lastElementChild?.getBoundingClientRect().bottom).toBe(
+    viewport.getBoundingClientRect().bottom
+  );
+});
+
+test('backgrounding an interrupted touch settles queued updates without moving the reader', async () => {
+  const { window, viewport, content } = fixture();
+  await window.update(entries(100));
+  await window.jumpTo('50', 'start');
+  const anchor = content.querySelector<HTMLElement>('[data-timeline-key="50"]');
+  if (!anchor) throw new Error('missing reader anchor');
+  const top = anchor.getBoundingClientRect().top;
+
+  viewport.dispatchEvent(new Event('touchstart'));
+  const queued = entries(100);
+  queued.splice(40, 0, { key: 'queued', value: 100 });
+  await window.update(queued);
+  expect(content.querySelector('[data-timeline-key="queued"]')).toBeNull();
+
+  const visibility = vi.spyOn(document, 'visibilityState', 'get');
+  try {
+    visibility.mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    visibility.mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(content.querySelector('[data-timeline-key="queued"]')).not.toBeNull();
+    expect(anchor.getBoundingClientRect().top).toBe(top);
+    expect(window.state.scrolling).toBe(false);
+  } finally {
+    visibility.mockRestore();
+  }
+});
+
 test('a subpixel native bottom still follows an appended message', async () => {
   const { window, viewport } = fixture();
   await window.update(entries(10));

@@ -40,6 +40,17 @@
     coalesceTimer = undefined;
     const eventId = pendingEventId;
     if (!eventId || readingEventId !== null) return;
+    // Queued receipts were already visible, even if the tab is now hidden.
+    if (
+      readReceiptEventId(timeline.items, {
+        visibleEventId: eventId,
+        documentVisible: true,
+        lastReadEventId,
+      }) !== eventId
+    ) {
+      pendingEventId = null;
+      return;
+    }
     pendingEventId = null;
     send(eventId);
   }
@@ -58,7 +69,7 @@
     const eventId = readReceiptEventId(timeline.items, {
       visibleEventId,
       documentVisible,
-      lastReadEventId,
+      lastReadEventId: pendingEventId ?? readingEventId ?? lastReadEventId,
     });
     if (!eventId || eventId === readingEventId) return;
     pendingEventId = eventId;
@@ -66,6 +77,7 @@
   });
 
   onDestroy(() => {
+    pendingEventId = null;
     clearTimeout(coalesceTimer);
   });
 </script>

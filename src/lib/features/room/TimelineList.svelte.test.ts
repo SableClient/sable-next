@@ -465,6 +465,7 @@ test('requests history from upward input when already at the top', async () => {
 });
 
 test('requests history before an upward wheel gesture settles', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
@@ -495,7 +496,9 @@ test('requests history before an upward wheel gesture settles', async () => {
   await tick();
 
   expect(history).toHaveBeenCalledTimes(1);
-  await finishWheelGesture(element);
+  element.dispatchEvent(new Event('scrollend'));
+  await vi.advanceTimersByTimeAsync(160);
+  await tick();
   expect(history).toHaveBeenCalledTimes(1);
   await unmount(instance);
 });
@@ -790,7 +793,7 @@ test('reading back inside the near-latest band leaves follow mode', async () => 
   await dragTo(element, end, end - 30);
 
   expect(followingLive()).toBe(false);
-  expect(document.querySelector('.jump-to-latest')).toBeNull();
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
   await unmount(instance);
 });
 
@@ -806,19 +809,50 @@ test('reading back past the band anchors', async () => {
   await unmount(instance);
 });
 
-test('shows the jump control only after one viewport height from the latest message', async () => {
+test('shows the jump control whenever reading behind the latest message', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - element.clientHeight + 1);
   expect(followingLive()).toBe(false);
-  expect(document.querySelector('.jump-to-latest')).toBeNull();
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
 
   await dragTo(element, end - element.clientHeight + 1, end - element.clientHeight);
   expect(followingLive()).toBe(false);
   expect(document.querySelector('.jump-to-latest')).not.toBeNull();
 
+  await unmount(instance);
+});
+
+test('keeps the latest own echo reachable after appending while reading near latest', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 30);
+  expect(followingLive()).toBe(false);
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await tick();
+
+  const ownEcho = {
+    ...item('own-echo'),
+    event_id: null,
+    transaction_id: 'txn-own-echo',
+    is_own: true,
+    send_state: { status: 'sending' as const, progress: null },
+  };
+  roomTimeline.items = [...roomTimeline.items, ownEcho];
+  setScrollHeight(2_100);
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelectorAll('.item')).toHaveLength(21);
+  expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(30);
+  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
   await unmount(instance);
 });
 

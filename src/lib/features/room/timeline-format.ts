@@ -104,13 +104,17 @@ export function visibleTimelineItems(
 
   const visible: TimelineItemView[] = [];
   let hasEventBelow = false;
+  let hasUnreadBelow = false;
   for (let index = kept.length - 1; index >= 0; index -= 1) {
     const item = kept[index];
     if (item.content.kind === 'date_divider') {
       if (!hasEventBelow) continue;
       hasEventBelow = false;
+    } else if (item.content.kind === 'read_marker') {
+      if (!hasUnreadBelow) continue;
     } else if (!isAnnotation(item)) {
       hasEventBelow = true;
+      if (!item.is_own && UNREAD_KINDS.has(item.content.kind)) hasUnreadBelow = true;
     }
     visible.push(item);
   }

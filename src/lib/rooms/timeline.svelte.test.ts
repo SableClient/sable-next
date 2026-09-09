@@ -289,10 +289,12 @@ test('settles a reached-end live page after its diff arrives', async () => {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((next, fail) => {
     resolve = next;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 class PendingPaginationCore extends FakeCore {
@@ -402,6 +404,31 @@ test('a late room subscription cannot replace the current room', async () => {
 
   expect(timeline.items.map((entry) => entry.id)).toEqual(['second']);
   expect(core.unsubscribed).toEqual([1]);
+});
+
+test('a stale failed start cannot stop the active room subscription', async () => {
+  const core = new SwitchingCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  const firstStart = timeline.start('!first:example.org');
+  void timeline.stop();
+  const secondStart = timeline.start('!second:example.org');
+  const secondResponse = core.responses.get('!second:example.org');
+  if (!secondResponse) throw new Error('second subscription was not created');
+  secondResponse.resolve({ subscription: 2, items: [item('second')] });
+  await secondStart;
+
+  const firstResponse = core.responses.get('!first:example.org');
+  if (!firstResponse) throw new Error('first subscription was not created');
+  firstResponse.reject(new Error('stale failure'));
+  await firstStart;
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 2,
+    diffs: [{ op: 'push_back', value: item('live') }],
+  });
+
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['second', 'live']);
 });
 
 test('waits for the previous unsubscribe before replacing a timeline subscription', async () => {

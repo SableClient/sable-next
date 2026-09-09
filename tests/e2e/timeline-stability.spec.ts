@@ -728,13 +728,13 @@ test('reading just above latest stays fixed when typing shrinks the viewport', a
   await timeline.expectRevealed();
   await timeline.scrollAboveBottomAndNotify(30);
   await timeline.waitForScrollSettled();
-  await expect(timeline.jumpToLatest).toBeHidden();
+  await expect(timeline.jumpToLatest).toBeVisible();
   const anchor = await timeline.fullyVisibleAnchor();
   const positions = await timeline.sampleAnchorWhile(anchor.itemId, 400, async () => {
     await core.emitTyping('!room:example.test', ['@alice:example.test']);
   });
   expect(Math.max(...positions.map((top) => Math.abs(top - anchor.y)))).toBeLessThanOrEqual(2);
-  await expect(timeline.jumpToLatest).toBeHidden();
+  await expect(timeline.jumpToLatest).toBeVisible();
 });
 
 test('scrolling through unmeasured history preserves the requested movement every frame', async ({
@@ -1565,4 +1565,39 @@ test('a message sent while reading history leaves the reader in place', async ({
   );
   expect(Math.max(...positions.map((top) => Math.abs(top - anchor.y)))).toBeLessThanOrEqual(1);
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+});
+
+test('shows jump to latest for a near-latest sent echo and returns to it', async ({
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await loadScrollableHistory(core, timeline);
+  const subscription = await core.subscription();
+  await timeline.scrollAboveBottomAndNotify(30);
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+  await expect(timeline.jumpToLatest).toBeVisible();
+
+  const body = 'A message sent near latest';
+  await app.composer.fill(body);
+  await app.composer.press('Enter');
+  const echo = {
+    ...timelineItem('sent-near-latest', body),
+    event_id: null,
+    transaction_id: 'txn-sent-near-latest',
+    is_own: true,
+    send_state: { status: 'sending' as const },
+  };
+  await core.emitTimelineDiff(subscription, [{ op: 'push_back', value: echo }]);
+  await expect(timeline.itemById('sent-near-latest')).toBeAttached();
+  await expect(timeline.jumpToLatest).toBeVisible();
+
+  await timeline.jumpToLatest.click();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
+  await expect(timeline.itemById('sent-near-latest')).toBeInViewport();
+  await expect(timeline.jumpToLatest).toBeHidden();
 });

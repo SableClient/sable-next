@@ -86,6 +86,7 @@ const message = item({
   edited: false,
 });
 const divider = item({ kind: 'date_divider', timestamp: 0 });
+const readMarker = item({ kind: 'read_marker' });
 const joined = item({
   kind: 'membership',
   user_id: '@a:b',
@@ -176,6 +177,34 @@ test('drops a divider whose whole run was filtered out', () => {
     message,
   ]);
   expect(visibleTimelineItems([divider, renamed], defaults)).toEqual([]);
+});
+
+test('shows read markers only before unread messages', () => {
+  expect(visibleTimelineItems([message, readMarker], defaults)).toEqual([message]);
+  expect(visibleTimelineItems([readMarker, message, readMarker], defaults)).toEqual([
+    readMarker,
+    message,
+  ]);
+  expect(visibleTimelineItems([readMarker, divider, message], defaults)).toEqual([
+    readMarker,
+    divider,
+    message,
+  ]);
+  expect(visibleTimelineItems([divider, readMarker, message], defaults)).toEqual([
+    divider,
+    readMarker,
+    message,
+  ]);
+  const ownMessage = { ...message, id: 'own', is_own: true };
+  expect(visibleTimelineItems([message, readMarker, ownMessage], defaults)).toEqual([
+    message,
+    ownMessage,
+  ]);
+  const renamedRoom = stateChange({ kind: 'room_name', name: 'Lobby', previous: null });
+  expect(visibleTimelineItems([message, readMarker, renamedRoom], defaults)).toEqual([
+    message,
+    renamedRoom,
+  ]);
 });
 
 test('keeps an unclassified membership change out of the timeline', () => {

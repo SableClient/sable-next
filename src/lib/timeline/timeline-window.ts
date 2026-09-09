@@ -123,7 +123,10 @@ export class TimelineWindow<T> {
     viewport.ownerDocument.addEventListener(
       'visibilitychange',
       () => {
-        if (viewport.ownerDocument.visibilityState === 'visible') this.layout();
+        if (viewport.ownerDocument.visibilityState === 'hidden') {
+          this.touching = false;
+          this.scheduleSettle();
+        } else this.layout();
       },
       { signal: this.listeners.signal }
     );
@@ -430,7 +433,13 @@ export class TimelineWindow<T> {
       contentFits || (this.ready && viewport.clientHeight > this.viewportHeight && this.atEnd());
     if (reachedEnd) this.pinned = true;
     this.viewportHeight = viewport.clientHeight;
-    if (reachedEnd && this.active) {
+    if (this.pinned && this.active && !this.jumping) {
+      // Follow keyboard resizing without writing scrollTop during a gesture.
+      this.setHeight(
+        contentFits ? viewport.clientHeight : Math.max(this.height, viewport.clientHeight)
+      );
+      this.setTop(viewport.scrollTop + viewport.clientHeight - this.contentHeight);
+    } else if (reachedEnd && this.active) {
       this.setHeight(
         contentFits ? viewport.clientHeight : Math.max(this.height, viewport.clientHeight)
       );
