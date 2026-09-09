@@ -152,6 +152,6 @@
   }
 
   .content-inset {
-    padding: var(--control-height-medium) 0 var(--space-500);
+    padding: var(--control-height-medium) 0 var(--space-400);
   }
 </style>

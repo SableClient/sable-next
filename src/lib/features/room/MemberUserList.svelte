@@ -45,7 +45,7 @@
   {#if userIds.length === 0}
     <EmptyState title={emptyTitle} />
   {:else}
-    <ul>
+    <ul class:flush={!showHeader}>
       {#each userIds as userId (userId)}
         <li>
           <MemberIdentityRow class="member" {userId} {members} onProfile={onMemberProfile} />
@@ -87,6 +87,10 @@
     min-height: 0;
     overflow-y: auto;
     padding: var(--space-100) var(--space-200) var(--space-200);
+  }
+
+  .flush {
+    padding: 0;
   }
 
   :global(.member-user-list .member-identity-row.member) {

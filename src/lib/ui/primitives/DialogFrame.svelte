@@ -96,10 +96,10 @@
     box-shadow: var(--shadow-dialog);
     max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);
     overflow: auto;
-    padding: var(--space-500);
+    padding: var(--space-400);
 
     /* Bottom-anchored, so the home indicator would otherwise sit on the content. */
-    padding-bottom: calc(var(--space-500) + var(--safe-bottom));
+    padding-bottom: calc(var(--space-400) + var(--safe-bottom));
     width: 100%;
     z-index: var(--layer-sheet);
   }
@@ -121,7 +121,7 @@
       bottom: auto;
       left: 50%;
       max-width: min(34rem, calc(100vw - 3rem));
-      padding: var(--space-600);
+      padding: var(--space-500);
       top: 50%;
       transform: translate(-50%, -50%);
 
