@@ -20,6 +20,14 @@
   let { html, onMatrixLink }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
+  let renderedHtml = $derived(deferMxcImageSources(html));
+
+  function deferMxcImageSources(value: string): string {
+    return value.replace(
+      /(<img\b[^>]*?)\s+src=(["'])(mxc:[^"']+)\2/gi,
+      '$1 data-sable-mxc-src=$2$3$2'
+    );
+  }
 
   function resolveImages(node: HTMLElement): (() => void)[] {
     const releases: (() => void)[] = [];
@@ -27,7 +35,7 @@
       if (image.dataset.mediaHandled !== undefined) continue;
       image.dataset.mediaHandled = '';
 
-      const source = image.getAttribute('src') ?? '';
+      const source = image.dataset.sableMxcSrc ?? image.getAttribute('src') ?? '';
       const emoticon = image.dataset.mxEmoticon !== undefined;
       const scheme = source.slice(0, source.indexOf(':') + 1).toLowerCase();
       if (scheme === 'http:' || scheme === 'https:') {
@@ -297,7 +305,7 @@
 </script>
 
 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-<div class="formatted-body" {@attach decorate(html)}>{@html html}</div>
+<div class="formatted-body" {@attach decorate(renderedHtml)}>{@html renderedHtml}</div>
 
 <style>
   .formatted-body {

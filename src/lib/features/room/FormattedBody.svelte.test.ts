@@ -186,6 +186,23 @@ test('resolves an mxc emoticon through the core media command', async () => {
   await unmount(instance);
 });
 
+test('defers an mxc emoticon source until its Blob URL is ready', async () => {
+  core.fetchMedia.mockReturnValue(new Promise(() => {}));
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: {
+      html: '<img data-mx-emoticon="" src="mxc://example.org/delayed" alt=":party:">',
+    },
+  });
+  await tick();
+
+  const image = document.querySelector('img');
+  expect(image?.getAttribute('src')).toBeNull();
+  expect(image?.dataset.sableMxcSrc).toBe('mxc://example.org/delayed');
+
+  await unmount(instance);
+});
+
 test('renders maths in place of the sender fallback', async () => {
   const instance = mount(FormattedBody, {
     target: document.body,
