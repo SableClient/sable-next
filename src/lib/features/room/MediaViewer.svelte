@@ -59,6 +59,8 @@
     )
   );
   let item = $derived(items[index]);
+  let source = $derived(item.source);
+  let mime = $derived(item.mime ?? null);
   let url = $state<string | null>(null);
   let failed = $state(false);
   let zoom = $state(1);
@@ -111,7 +113,7 @@
   }
 
   $effect(() => {
-    void item.source;
+    void source;
     untrack(() => {
       zoom = 1;
       rotation = 0;
@@ -141,12 +143,10 @@
   $effect(() => {
     let active = true;
     failed = false;
-    const release = holdMediaUrl(core, item.source, 0, 0);
-    const cached = cachedMediaUrl(core, item.source, 0, 0);
+    const release = holdMediaUrl(core, source, 0, 0);
+    const cached = cachedMediaUrl(core, source, 0, 0);
     url = cached ?? null;
-    const request = cached
-      ? Promise.resolve(cached)
-      : loadMediaUrl(core, item.source, 0, 0, item.mime ?? null);
+    const request = cached ? Promise.resolve(cached) : loadMediaUrl(core, source, 0, 0, mime);
     void request
       .then((nextUrl) => {
         if (active) url = nextUrl;
