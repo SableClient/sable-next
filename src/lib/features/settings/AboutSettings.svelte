@@ -8,7 +8,6 @@
   import { i18n } from '#lib/i18n.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -22,7 +21,6 @@
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
   const canResetCache = !isTauri();
   let info = $state<{ homeserver: string; server: HomeserverSoftwareView | null } | null>(null);
-  let confirmOpen = $state(false);
   let resetting = $state(false);
   let resetFailed = $state(false);
 
@@ -41,7 +39,6 @@
   });
 
   async function resetCaches(): Promise<void> {
-    confirmOpen = false;
     resetting = true;
     resetFailed = false;
     try {
@@ -123,7 +120,7 @@
           description={$i18n.t('settings.aboutResetCacheHint')}
           icon={TrashIcon}
         >
-          <Button variant="danger" size="small" onclick={() => (confirmOpen = true)}>
+          <Button size="small" loading={resetting} onclick={resetCaches}>
             {$i18n.t('settings.aboutReset')}
           </Button>
         </SettingsRow>
@@ -134,25 +131,6 @@
     </ul>
   </SettingsSection>
 </div>
-
-<DialogFrame
-  bind:open={confirmOpen}
-  variant="verification"
-  label={$i18n.t('settings.aboutResetCacheConfirm')}
->
-  <div class="reset">
-    <h2>{$i18n.t('settings.aboutResetCacheConfirm')}</h2>
-    <p>{$i18n.t('settings.aboutResetCacheConfirmHint')}</p>
-    <div class="actions">
-      <Button variant="ghost" onclick={() => (confirmOpen = false)}>
-        {$i18n.t('timeline.cancel')}
-      </Button>
-      <Button variant="danger" loading={resetting} onclick={resetCaches}>
-        {$i18n.t('settings.aboutReset')}
-      </Button>
-    </div>
-  </div>
-</DialogFrame>
 
 <style>
   .about-page {
@@ -215,32 +193,8 @@
     overflow-wrap: anywhere;
   }
 
-  .reset {
-    display: grid;
-    gap: var(--space-300);
-    width: min(27rem, calc(100vw - 2rem));
-  }
-
-  .reset h2 {
-    font-size: var(--font-size-heading);
-    line-height: var(--line-height-heading);
-    margin: 0;
-  }
-
-  .reset p {
-    margin: 0;
-  }
-
   .error {
     color: var(--sable-crit-main);
     margin: 0;
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-300);
-    justify-content: flex-end;
-    margin-top: var(--space-200);
   }
 </style>

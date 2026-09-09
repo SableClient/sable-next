@@ -22,19 +22,25 @@ function stubIndexedDB(existing: string[]) {
   return deleted;
 }
 
-test('removes the app session and every Matrix store the SDK opened', async () => {
+test('removes the rebuildable stores but keeps the session and the crypto stores', async () => {
   const deleted = stubIndexedDB([
+    'sable-next-session',
+    'sable-next-account-a1',
     'sable-next-account-a1::matrix-sdk-state',
+    'sable-next-account-a1::event_cache',
+    'sable-next-account-a1::media',
     'sable-next-account-a1::matrix-sdk-crypto',
+    'sable-next-account-a1::matrix-sdk-crypto-meta',
     'unrelated-database',
   ]);
 
   await resetWebStorage();
 
   expect(deleted).toEqual([
-    'sable-next-session',
+    'sable-next-account-a1',
     'sable-next-account-a1::matrix-sdk-state',
-    'sable-next-account-a1::matrix-sdk-crypto',
+    'sable-next-account-a1::event_cache',
+    'sable-next-account-a1::media',
   ]);
 });
 
@@ -70,11 +76,8 @@ test('uses known database names when database listing is unavailable', async () 
   await resetWebStorage();
 
   expect(deleted).toEqual([
-    'sable-next-session',
     'sable-next',
     'sable-next::matrix-sdk-state',
-    'sable-next::matrix-sdk-crypto',
-    'sable-next::matrix-sdk-crypto-meta',
     'sable-next::event_cache',
     'sable-next::media',
   ]);

@@ -4,11 +4,10 @@ const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
 
 const APP_DATABASE_PREFIX = 'sable-next';
-const KNOWN_DATABASE_NAMES = [
+const KEPT_DATABASE_SUFFIXES = ['::matrix-sdk-crypto', '::matrix-sdk-crypto-meta'];
+const KNOWN_CACHE_DATABASE_NAMES = [
   'sable-next',
   'sable-next::matrix-sdk-state',
-  'sable-next::matrix-sdk-crypto',
-  'sable-next::matrix-sdk-crypto-meta',
   'sable-next::event_cache',
   'sable-next::media',
 ];
@@ -129,20 +128,22 @@ function deleteDatabase(name: string): Promise<void> {
   });
 }
 
-async function appDatabaseNames(): Promise<string[]> {
+function isCacheDatabase(name: string | undefined): name is string {
+  if (name === undefined || !name.startsWith(APP_DATABASE_PREFIX)) return false;
+  if (name === DATABASE_NAME) return false;
+  return !KEPT_DATABASE_SUFFIXES.some((suffix) => name.endsWith(suffix));
+}
+
+async function cacheDatabaseNames(): Promise<string[]> {
   if (typeof globalThis.indexedDB.databases !== 'function') {
-    return [DATABASE_NAME, ...KNOWN_DATABASE_NAMES];
+    return KNOWN_CACHE_DATABASE_NAMES;
   }
 
   try {
     const listed = await globalThis.indexedDB.databases();
-    const owned = listed
-      .map((database) => database.name)
-      .filter((name): name is string => name?.startsWith(APP_DATABASE_PREFIX) ?? false);
-
-    return [DATABASE_NAME, ...owned];
+    return listed.map((database) => database.name).filter(isCacheDatabase);
   } catch {
-    return [DATABASE_NAME, ...KNOWN_DATABASE_NAMES];
+    return KNOWN_CACHE_DATABASE_NAMES;
   }
 }
 
@@ -155,11 +156,7 @@ async function clearHttpCaches(): Promise<void> {
 }
 
 export async function resetWebStorage(): Promise<void> {
-  const database = await databasePromise?.catch(() => undefined);
-  database?.close();
-  databasePromise = undefined;
-
-  const names = await appDatabaseNames();
+  const names = await cacheDatabaseNames();
   await Promise.all([...new Set(names)].map(deleteDatabase));
   await clearHttpCaches();
 }

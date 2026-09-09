@@ -160,7 +160,7 @@ test('a slow media fetch does not report the core as unresponsive', async () => 
   ).toBe(false);
 });
 
-test('resetCaches terminates the worker and wipes the browser storage', async () => {
+test('resetCaches terminates the worker and drops the cached stores', async () => {
   const deleted: string[] = [];
   vi.stubGlobal('indexedDB', {
     databases: () => Promise.resolve([{ name: 'sable-next-account-a1::matrix-sdk-state' }]),
@@ -180,5 +180,5 @@ test('resetCaches terminates the worker and wipes the browser storage', async ()
   await transport.resetCaches();
 
   expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 2, reset: true });
-  expect(deleted).toEqual(['sable-next-session', 'sable-next-account-a1::matrix-sdk-state']);
+  expect(deleted).toEqual(['sable-next-account-a1::matrix-sdk-state']);
 });
