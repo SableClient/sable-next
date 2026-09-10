@@ -189,6 +189,20 @@ pub async fn show<R: Runtime>(
     }
 }
 
+#[cfg(target_os = "android")]
+pub async fn ensure_channel<R: Runtime>(app: &AppHandle<R>) {
+    let channel = tauri_plugin_notifications::Channel::builder(MESSAGES_CHANNEL, "Messages")
+        .description("Matrix message notifications")
+        .importance(tauri_plugin_notifications::Importance::High)
+        .visibility(tauri_plugin_notifications::Visibility::Private)
+        .vibration(true)
+        .build();
+
+    if let Err(error) = app.notifications().create_channel(channel).await {
+        log::warn!("could not create the message notification channel: {error}");
+    }
+}
+
 pub async fn show_test<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Core, sequence: u32) {
     show(app, core, &test_view(sequence)).await;
 }

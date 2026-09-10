@@ -304,6 +304,11 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     spawn_event_pump(app.handle().clone(), pushing, events, event_sink);
     #[cfg(desktop)]
     notifications::register_actions(app.handle());
+    #[cfg(target_os = "android")]
+    {
+        let handle = app.handle().clone();
+        tauri::async_runtime::spawn(async move { notifications::ensure_channel(&handle).await });
+    }
     #[cfg(desktop)]
     app.manage(tray::DesktopWindowStore::default());
 
