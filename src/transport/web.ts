@@ -211,8 +211,17 @@ export function createWebTransport(): Transport {
     return nextWorker;
   }
 
+  const releasePageHide =
+    typeof window === 'undefined'
+      ? undefined
+      : on(window, 'pagehide', (event) => {
+          if (event.persisted) return;
+          worker?.port.postMessage({ disconnect: true } satisfies WorkerRequest);
+        });
+
   function detach(reason: string, farewell: WorkerRequest): void {
     closed = true;
+    releasePageHide?.();
     listeners.clear();
     crashListeners.clear();
     stallListeners.clear();
@@ -353,10 +362,16 @@ export function createWebTransport(): Transport {
       return () => stallListeners.delete(onStall);
     },
 
-    async resetCaches() {
+    async resetCaches(accountIds) {
       await request<null>((id) => ({ id, reset: true }));
       detach('cache reset', { disconnect: true });
-      await resetWebStorage();
+
+      try {
+        await resetWebStorage(accountIds);
+      } catch (error) {
+        console.error('[sable transport] the local caches were not fully cleared', error);
+        Sentry.captureException(error, { tags: { source: 'cache-reset' } });
+      }
     },
 
     close() {

@@ -178,7 +178,7 @@ test('resetCaches terminates the worker and drops the cached stores', async () =
   const transport = await load();
   void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never).catch(() => {});
 
-  await transport.resetCaches();
+  await transport.resetCaches([]);
 
   expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 2, reset: true });
   expect(deleted).toEqual(['sable-next-account-a1::matrix-sdk-state']);

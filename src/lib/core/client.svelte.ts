@@ -520,7 +520,7 @@ export class CoreClient {
   }
 
   async resetCaches(): Promise<void> {
-    await this.ensureTransport().resetCaches();
+    await this.ensureTransport().resetCaches(this.accounts.map((account) => account.account_id));
   }
 
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {

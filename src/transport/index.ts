@@ -54,7 +54,7 @@ export interface Transport {
 
   subscribeStall(onStall: (stalled: boolean) => void): () => void;
 
-  resetCaches(): Promise<void>;
+  resetCaches(accountIds: readonly string[]): Promise<void>;
 
   close(): void;
 }
