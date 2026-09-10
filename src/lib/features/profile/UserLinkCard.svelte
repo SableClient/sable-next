@@ -7,6 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import MediaViewer, { type MediaItem } from '#lib/features/room/MediaViewer.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -26,6 +27,25 @@
   let failed = $state(false);
 
   let name = $derived(profile?.display_name ?? userId);
+  let avatarOpen = $state(false);
+  let avatar = $derived<MediaItem | null>(
+    profile?.avatar_url
+      ? {
+          kind: 'image',
+          body: name,
+          html: null,
+          source: profile.avatar_url,
+          filename: null,
+          mime: null,
+          width: null,
+          height: null,
+          blurhash: null,
+          spoiler: null,
+          eventId: 'profile-avatar',
+          sender: name,
+        }
+      : null
+  );
 
   $effect(() => {
     const wanted = userId;
@@ -72,7 +92,20 @@
   {#if !loaded}
     <div role="status"><Spinner /></div>
   {:else}
-    <Avatar src={profile?.avatar_url} {name} size="large" />
+    {#if avatar}
+      <button
+        class="avatar-button"
+        type="button"
+        aria-label={`Open ${name}'s avatar`}
+        onclick={() => {
+          avatarOpen = true;
+        }}
+      >
+        <Avatar src={profile?.avatar_url} {name} size="large" />
+      </button>
+    {:else}
+      <Avatar src={profile?.avatar_url} {name} size="large" />
+    {/if}
     <h1 id="user-link-title">{name}</h1>
     <p class="user-link-id">{userId}</p>
     {#if failed}
@@ -83,6 +116,14 @@
     </Button>
   {/if}
 </section>
+
+{#if avatarOpen && avatar}
+  <MediaViewer
+    items={[avatar]}
+    selectedEventId={avatar.eventId}
+    onClose={() => (avatarOpen = false)}
+  />
+{/if}
 
 <style>
   .user-link {
@@ -107,5 +148,18 @@
     color: var(--sable-surface-var-on-container);
     margin: 0;
     overflow-wrap: anywhere;
+  }
+
+  .avatar-button {
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .avatar-button:focus-visible {
+    outline: 2px solid var(--sable-primary-main);
+    outline-offset: 3px;
   }
 </style>
