@@ -718,7 +718,7 @@
               {@const typing =
                 !preferences.hideTypingIndicators &&
                 room !== undefined &&
-                roomList.typingRoomIds.has(room.room_id) &&
+                roomList.typingUsers.has(room.room_id) &&
                 mentions === 0 &&
                 unread === 0 &&
                 !marked}

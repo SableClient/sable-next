@@ -37,10 +37,13 @@ export function findRoomByPathId(
   return rooms.find((room) => room.room_id === pathId || room.canonical_alias === pathId);
 }
 
+const NOBODY_TYPING: readonly string[] = [];
+
 export class RoomList {
   rooms = $state.raw<RoomSummary[]>([]);
   mutedRoomIds = $state.raw<ReadonlySet<string>>(new SvelteSet());
-  typingRoomIds = $state.raw<ReadonlySet<string>>(new SvelteSet());
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  typingUsers = $state.raw<ReadonlyMap<string, readonly string[]>>(new Map());
 
   private subscription: SubscriptionId | null = null;
   private unsubscribeEvents: (() => void) | null = null;
@@ -52,6 +55,10 @@ export class RoomList {
   private loadingNotificationModes = new SvelteSet<string>();
 
   constructor(private readonly core: CoreClient) {}
+
+  typingUserIds(roomId: string): readonly string[] {
+    return this.typingUsers.get(roomId) ?? NOBODY_TYPING;
+  }
 
   notificationOverride(roomId: string): NotificationModeView | null {
     return this.notificationModes.get(roomId)?.room ?? null;
@@ -76,7 +83,8 @@ export class RoomList {
     this.startPromise = null;
     this.rooms = [];
     this.mutedRoomIds = new SvelteSet();
-    this.typingRoomIds = new SvelteSet();
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    this.typingUsers = new Map();
     this.notificationModes.clear();
     this.loadingNotificationModes.clear();
     this.unsubscribeEvents?.();
@@ -126,10 +134,11 @@ export class RoomList {
     this.unsubscribeTyping = this.core.subscribeEvents((event) => {
       if (event.type !== 'typing') return;
 
-      const rooms = new SvelteSet(this.typingRoomIds);
-      if (event.user_ids.length > 0) rooms.add(event.room_id);
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
+      const rooms = new Map(this.typingUsers);
+      if (event.user_ids.length > 0) rooms.set(event.room_id, event.user_ids);
       else rooms.delete(event.room_id);
-      this.typingRoomIds = rooms;
+      this.typingUsers = rooms;
     });
   }
 

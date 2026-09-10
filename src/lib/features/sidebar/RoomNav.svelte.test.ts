@@ -14,7 +14,7 @@ const pageState = vi.hoisted(() => ({
 const roomsFixture = vi.hoisted(() => ({
   rooms: [] as RoomSummary[],
   mutedRoomIds: new Set<string>(),
-  typingRoomIds: new Set<string>(),
+  typingUsers: new Map<string, readonly string[]>(),
   notificationOverride: () => null,
 }));
 

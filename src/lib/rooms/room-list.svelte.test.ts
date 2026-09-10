@@ -73,3 +73,35 @@ test('clears a room avatar when a room-list diff supplies null', async () => {
   expect(roomList.rooms[0]?.avatar_url).toBeNull();
   roomList.stop();
 });
+
+test('holds the typing user ids so a room opened later reads them', async () => {
+  const room = { room_id: '!room:example.org' } as RoomSummary;
+  const eventListeners: ((event: unknown) => void)[] = [];
+  const core = {
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
+      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  for (const listener of eventListeners) {
+    listener({ type: 'typing', room_id: room.room_id, user_ids: ['@alice:example.org'] });
+  }
+
+  expect(roomList.typingUserIds(room.room_id)).toEqual(['@alice:example.org']);
+  expect(roomList.typingUserIds('!other:example.org')).toEqual([]);
+
+  for (const listener of eventListeners) {
+    listener({ type: 'typing', room_id: room.room_id, user_ids: [] });
+  }
+
+  expect(roomList.typingUserIds(room.room_id)).toEqual([]);
+  roomList.stop();
+});

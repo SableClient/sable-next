@@ -112,7 +112,6 @@
   let inviteOpen = $state(false);
   let jumpOpen = $state(false);
   let leaveOpen = $state(false);
-  let typingUserIds = $state.raw<string[]>([]);
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
@@ -277,6 +276,7 @@
   );
   const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
   let desktop = $derived(sidePanels.matches);
+  let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
   let typingLabel = $derived.by(() => {
     if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
     const names = typingUserIds.slice(0, 3).map(typingMemberName);
@@ -295,18 +295,11 @@
   });
 
   $effect(() => {
-    const activeRoomId = resolvedRoomId;
+    void resolvedRoomId;
     memberLoader.reset();
-    typingUserIds = [];
     conversation.forgetRequestedDetails();
     receiptsOpen = false;
     closeProfile();
-
-    return core.subscribeEvents((event) => {
-      if (event.type !== 'typing' || event.room_id !== activeRoomId) return;
-      typingUserIds = event.user_ids.filter((userId) => userId !== core.session?.user_id);
-      if (typingUserIds.length > 0) void loadMembers();
-    });
   });
 
   $effect(() => {
