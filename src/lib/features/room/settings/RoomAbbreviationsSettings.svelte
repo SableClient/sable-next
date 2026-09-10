@@ -15,6 +15,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import { abbreviationsChanged } from '../room-abbreviations.svelte.js';
   import { canSendState } from './permission-groups';
   import {
     ABBREVIATIONS_EVENT_TYPE,
@@ -69,6 +70,7 @@
     try {
       await core.commands.sendStateEvent(target, ABBREVIATIONS_EVENT_TYPE, '', { entries: next });
       entries = [...next];
+      abbreviationsChanged();
     } catch (error) {
       console.warn('[sable room] abbreviation save failed', error);
       failed = true;

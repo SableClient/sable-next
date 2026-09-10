@@ -3,6 +3,8 @@
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
 
+  import './tooltip.css';
+
   export type TooltipVariant = 'icon' | 'inline';
   type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
   type TriggerSnippet = Snippet<[{ props: Record<string, unknown> }]>;
@@ -98,42 +100,12 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  :global(.sable-tooltip) {
-    animation: tooltip-in var(--motion-fast) var(--motion-easing-emphasized) both;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radii-400);
-    box-shadow: var(--shadow-e200);
-    box-sizing: border-box;
-    color: var(--sable-surface-on-container);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-small);
-    max-width: min(15rem, calc(100vw - 2rem));
-    overflow-wrap: anywhere;
-    padding: var(--space-200) var(--space-250);
-    white-space: normal;
-    z-index: var(--layer-tooltip);
-  }
-
-  @keyframes tooltip-in {
-    from {
-      opacity: 0;
-      transform: translateY(0.25rem) scale(0.96);
-    }
-  }
-
   @media (prefers-reduced-motion: no-preference) {
     .tooltip-trigger {
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
         color var(--motion-normal) var(--motion-easing-standard),
         box-shadow var(--motion-normal) var(--motion-easing-standard);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.sable-tooltip) {
-      animation: none;
     }
   }
 </style>

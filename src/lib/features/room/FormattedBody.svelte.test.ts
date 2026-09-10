@@ -25,6 +25,7 @@ vi.mock('#lib/core/context.js', () => ({
 }));
 
 import FormattedBody from './FormattedBody.svelte';
+import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';
 
 afterEach(() => {
   core.fetchMedia.mockReset();
@@ -343,5 +344,29 @@ test('renders a settings link as a labelled chip', async () => {
   expect(anchor?.dataset.settingsLink).toBe('timeline');
   expect(anchor?.dataset.settingsLinkFocus).toBe('hide-read-receipts');
   expect(anchor?.textContent).toBe('Timeline / Hide read receipts');
+  await unmount(instance);
+});
+
+test('shows a room abbreviation definition in a tooltip on hover', async () => {
+  const instance = mount(FormattedBodyHarness, {
+    target: document.body,
+    props: {
+      html: '<p>a foss build</p>',
+      entries: [{ term: 'FOSS', definition: 'Free and open source software' }],
+    },
+  });
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const abbr = document.querySelector<HTMLElement>('abbr[data-abbr-definition]');
+  expect(abbr?.textContent).toBe('foss');
+
+  abbr?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(document.querySelector('.sable-tooltip')?.textContent.trim()).toBe(
+    'Free and open source software'
+  );
   await unmount(instance);
 });

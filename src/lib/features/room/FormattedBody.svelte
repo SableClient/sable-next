@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Tooltip } from 'bits-ui';
   import { on } from 'svelte/events';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -6,11 +7,16 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
 
+  import { markAbbreviations } from './abbreviations';
+  import { hasRoomAbbreviations, useRoomAbbreviations } from './room-abbreviations.svelte.js';
+
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';
   import { splitVia } from './join-address';
   import { settingsLinkLabel } from './settings-link-label';
   import { parseSettingsLink } from './settings-link';
+
+  import '#lib/ui/primitives/tooltip.css';
 
   interface Props {
     html: string;
@@ -20,6 +26,10 @@
   let { html, onMatrixLink }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
+  const abbreviations = hasRoomAbbreviations() ? useRoomAbbreviations() : null;
+  let definitionAnchor = $state.raw<HTMLElement | null>(null);
+  let definitionPinned = $state(false);
+  let definition = $derived(definitionAnchor?.dataset.abbrDefinition ?? '');
   let renderedHtml = $derived(deferMxcImageSources(html));
 
   function deferMxcImageSources(value: string): string {
@@ -143,6 +153,9 @@
         }
       }
 
+      const pattern = abbreviations?.pattern;
+      if (pattern) markAbbreviations(node, abbreviations.map, pattern);
+
       const releases = resolveImages(node);
       decorateCodeBlocks(node);
       const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
@@ -150,9 +163,18 @@
 
       const offClick = on(node, 'click', handleClick);
       const offKeydown = on(node, 'keydown', handleKeydown);
+      const offPointerOver = on(node, 'pointerover', handleDefinitionOver);
+      const offPointerOut = on(node, 'pointerout', handleDefinitionOut);
+      const offFocusIn = on(node, 'focusin', handleDefinitionOver);
+      const offFocusOut = on(node, 'focusout', handleDefinitionOut);
       return () => {
         offClick();
         offKeydown();
+        offPointerOver();
+        offPointerOut();
+        offFocusIn();
+        offFocusOut();
+        closeDefinition();
         for (const release of releases) release();
       };
     };
@@ -276,9 +298,44 @@
     return true;
   }
 
+  function definitionOf(target: EventTarget | null): HTMLElement | null {
+    return target instanceof Element
+      ? target.closest<HTMLElement>('abbr[data-abbr-definition]')
+      : null;
+  }
+
+  function closeDefinition(): void {
+    definitionAnchor = null;
+    definitionPinned = false;
+  }
+
+  function handleDefinitionOver(event: PointerEvent | FocusEvent): void {
+    const abbr = definitionOf(event.target);
+    if (abbr) definitionAnchor = abbr;
+  }
+
+  function handleDefinitionOut(event: PointerEvent | FocusEvent): void {
+    if (definitionPinned) return;
+    const abbr = definitionOf(event.target);
+    if (abbr && abbr === definitionAnchor) definitionAnchor = null;
+  }
+
   function handleClick(event: MouseEvent): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const abbr = definitionOf(target);
+    if (abbr) {
+      event.preventDefault();
+      if (definitionPinned && abbr === definitionAnchor) closeDefinition();
+      else {
+        definitionAnchor = abbr;
+        definitionPinned = true;
+      }
+      return;
+    }
+    if (definitionPinned) closeDefinition();
+
     if (handleCodeAction(target)) {
       event.preventDefault();
       return;
@@ -307,6 +364,23 @@
 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
 <div class="formatted-body" {@attach decorate(renderedHtml)}>{@html renderedHtml}</div>
 
+{#if definitionAnchor && definition}
+  <Tooltip.Provider>
+    <Tooltip.Root open>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          class="sable-tooltip"
+          customAnchor={definitionAnchor}
+          side="top"
+          sideOffset={8}
+        >
+          {definition}
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  </Tooltip.Provider>
+{/if}
+
 <style>
   .formatted-body {
     /* Relative so inline code keeps its ratio inside a heading too. */
@@ -317,6 +391,17 @@
   .formatted-body :global(p) {
     line-height: var(--line-height-body);
     margin: 0;
+  }
+
+  .formatted-body :global(abbr[data-abbr-definition]) {
+    cursor: help;
+    text-decoration: underline dotted;
+    text-underline-offset: 0.15em;
+  }
+
+  .formatted-body :global(abbr[data-abbr-definition]:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   .formatted-body :global([data-plain-body]) {

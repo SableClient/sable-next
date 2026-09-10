@@ -14,6 +14,12 @@
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { ancestorSpaceIds } from './abbreviations';
+  import {
+    abbreviationChanges,
+    provideRoomAbbreviations,
+    RoomAbbreviations,
+  } from './room-abbreviations.svelte.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
   import { Conversation } from './conversation.svelte.js';
@@ -236,6 +242,17 @@
     tombstoneReplacementId ? findRoomByPathId(roomList.rooms, tombstoneReplacementId) : null
   );
   let tombstoneSuccessorJoined = $derived(tombstoneSuccessor?.state === 'joined');
+
+  const abbreviations = new RoomAbbreviations(core.commands);
+  provideRoomAbbreviations(abbreviations);
+
+  let ancestorSpaceKey = $derived(ancestorSpaceIds(roomList.rooms, resolvedRoomId).join(','));
+
+  $effect(() => {
+    void abbreviationChanges.version;
+    const key = ancestorSpaceKey;
+    void abbreviations.load(resolvedRoomId, key === '' ? [] : key.split(','));
+  });
   let mentionCount = $derived(
     roomList.rooms
       .filter((room) => room.state === 'joined' && !room.is_space)
