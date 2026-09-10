@@ -901,3 +901,23 @@ test.each(gapCases)(
     );
   }
 );
+
+test('a send that resizes the composer before its scroll event keeps following latest', async () => {
+  const f = fixture();
+  await f.window.update(entries(1_000));
+  expect(f.window.state.pinned).toBe(true);
+
+  f.resizeViewport(360, false);
+  f.resizeViewport(320, false);
+  f.viewport.dispatchEvent(new Event('scroll'));
+
+  expect(f.window.state.pinned).toBe(true);
+
+  await f.window.update(entries(1_001));
+  await vi.advanceTimersByTimeAsync(200);
+
+  expect(f.window.state.pinned).toBe(true);
+  expect(f.content.lastElementChild?.getBoundingClientRect().bottom).toBe(
+    f.viewport.getBoundingClientRect().bottom
+  );
+});

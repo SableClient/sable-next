@@ -431,13 +431,15 @@ export class TimelineWindow<T> {
   }
 
   private trackMovement(): number {
-    const delta = this.options.viewport.scrollTop - this.offset;
-    this.offset = this.options.viewport.scrollTop;
+    const viewport = this.options.viewport;
+    const delta = viewport.scrollTop - this.offset;
+    this.offset = viewport.scrollTop;
     if (delta === 0) return delta;
     this.scrollingUp = delta < 0;
     for (const anchor of this.anchors) anchor.top -= delta;
+    const resized = this.ready && !this.active && viewport.clientHeight !== this.viewportHeight;
     if (!this.jumping)
-      this.pinned = this.atEnd(delta > 0 ? 2 : EPSILON) || (this.pinned && delta > 0);
+      this.pinned = this.atEnd(delta > 0 ? 2 : EPSILON) || (this.pinned && (delta > 0 || resized));
     return delta;
   }
 
