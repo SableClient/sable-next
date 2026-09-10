@@ -380,6 +380,11 @@ impl Core {
         let Some(registry) = accounts.as_mut() else {
             return Err(self.failed("remove account", "account registry is not initialized"));
         };
+        let store_id = registry
+            .accounts
+            .iter()
+            .find(|account| account.account_id == account_id)
+            .map(|account| account.store_id.clone());
         registry
             .accounts
             .retain(|account| account.account_id != account_id);
@@ -392,7 +397,18 @@ impl Core {
             .save(bytes)
             .await
             .map_err(|error| self.failed("logout: save accounts", error))?;
+        if let Some(store_id) = store_id {
+            self.discard_account_store(&store_id);
+        }
         Ok(())
+    }
+
+    fn discard_account_store(&self, store_id: &str) {
+        if session::removable_account_store(&self.store_id, store_id) {
+            remove_store_dir(store_id);
+        } else {
+            tracing::warn!(store_id, "refusing to delete a shared account store");
+        }
     }
 
     async fn take_session(&self) -> Option<Session> {
@@ -674,6 +690,18 @@ impl Core {
         true
     }
 }
+
+#[cfg(not(target_family = "wasm"))]
+fn remove_store_dir(store_id: &str) {
+    if let Err(error) = std::fs::remove_dir_all(store_id)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        tracing::error!(store_id, "could not delete the account store: {error}");
+    }
+}
+
+#[cfg(target_family = "wasm")]
+const fn remove_store_dir(_store_id: &str) {}
 
 #[cfg(all(test, not(target_family = "wasm")))]
 #[allow(clippy::large_futures)]

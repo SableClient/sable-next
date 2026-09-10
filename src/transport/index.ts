@@ -56,6 +56,8 @@ export interface Transport {
 
   resetCaches(accountIds: readonly string[]): Promise<void>;
 
+  deleteAccountStore(accountId: string): Promise<void>;
+
   close(): void;
 }
 

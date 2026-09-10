@@ -3,6 +3,7 @@ import type { SessionInfo } from '#src/generated/protocol';
 import { deliversNativePush } from '#lib/platform/notifications.js';
 import {
   registerNativePushConfig,
+  unregisterNativePushConfig,
   listPushDistributors,
   setPushDistributor,
 } from '#lib/platform/push.js';
@@ -69,6 +70,10 @@ export function registerNativePush(
   session: SessionInfo | null
 ): Promise<void> {
   return enqueue(() => register(override, session));
+}
+
+export function unregisterNativePush(): Promise<void> {
+  return enqueue(() => unregisterNativePushConfig());
 }
 
 export function switchPushProvider(

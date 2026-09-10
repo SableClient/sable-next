@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { resetWebStorage } from './session-storage.js';
+import { deleteAccountWebStorage, resetWebStorage } from './session-storage.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -124,4 +124,45 @@ test('drops the sliding sync position the crypto store keeps', async () => {
   await resetWebStorage();
 
   expect(cleared).toEqual([{ lower: 'sliding_sync_store::', upper: 'sliding_sync_store::\uffff' }]);
+});
+
+test('deletes every store of the signed-out account, crypto included', async () => {
+  const { deleted } = stubIndexedDB([
+    'sable-next-session',
+    'sable-next',
+    'sable-next-account-a1',
+    'sable-next-account-a1::matrix-sdk-state',
+    'sable-next-account-a1::event_cache',
+    'sable-next-account-a1::media',
+    'sable-next-account-a1::matrix-sdk-crypto',
+    'sable-next-account-a1::matrix-sdk-crypto-meta',
+    'sable-next-account-a10::matrix-sdk-state',
+    'sable-next-account-a2::matrix-sdk-crypto',
+  ]);
+
+  await deleteAccountWebStorage('a1');
+
+  expect(deleted).toEqual([
+    'sable-next-account-a1',
+    'sable-next-account-a1::matrix-sdk-state',
+    'sable-next-account-a1::event_cache',
+    'sable-next-account-a1::media',
+    'sable-next-account-a1::matrix-sdk-crypto',
+    'sable-next-account-a1::matrix-sdk-crypto-meta',
+  ]);
+});
+
+test('derives the account stores when database listing is unavailable', async () => {
+  const { deleted } = stubIndexedDB(null);
+
+  await deleteAccountWebStorage('a1');
+
+  expect(deleted).toEqual([
+    'sable-next-account-a1',
+    'sable-next-account-a1::matrix-sdk-state',
+    'sable-next-account-a1::event_cache',
+    'sable-next-account-a1::media',
+    'sable-next-account-a1::matrix-sdk-crypto',
+    'sable-next-account-a1::matrix-sdk-crypto-meta',
+  ]);
 });

@@ -36,6 +36,12 @@ export async function registerNativePushConfig(config: NativePushConfig): Promis
   });
 }
 
+export async function unregisterNativePushConfig(): Promise<void> {
+  if (!(await deliversNativePush())) return;
+
+  await invoke('unregister_push');
+}
+
 export async function supportsPushDistributors(): Promise<boolean> {
   if (!isTauri()) return false;
   const { type } = await import('@tauri-apps/plugin-os');

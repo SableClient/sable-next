@@ -239,7 +239,13 @@ async fn register_push(
     config: notifications::PushConfig,
 ) -> Result<(), CommandErr> {
     let core = state.core.clone();
-    notifications::register_push(&app, &core, config).await
+    Box::pin(notifications::register_push(&app, &core, config)).await
+}
+
+#[tauri::command]
+async fn unregister_push(state: State<'_, AppState>) -> Result<(), CommandErr> {
+    let core = state.core.clone();
+    Box::pin(notifications::unregister_push(&core)).await
 }
 
 #[tauri::command]
@@ -466,6 +472,7 @@ pub fn run() {
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,
             register_push,
+            unregister_push,
             dismiss_room_notification,
             test_notification,
             set_notification_encrypted_content,

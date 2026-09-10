@@ -7,6 +7,7 @@ const APP_DATABASE_PREFIX = 'sable-next';
 const ACCOUNT_STORE_INFIX = '-account-';
 const CACHE_DATABASE_SUFFIXES = ['', '::matrix-sdk-state', '::event_cache', '::media'];
 const CRYPTO_DATABASE_SUFFIX = '::matrix-sdk-crypto';
+const CRYPTO_META_DATABASE_SUFFIX = '::matrix-sdk-crypto-meta';
 const CRYPTO_CORE_STORE = 'core';
 const SLIDING_SYNC_KEY_PREFIX = 'sliding_sync_store::';
 
@@ -208,6 +209,23 @@ function rejections(results: PromiseSettledResult<unknown>[]): unknown[] {
   return results
     .filter((result) => result.status === 'rejected')
     .map((result): unknown => result.reason);
+}
+
+export async function deleteAccountWebStorage(accountId: string): Promise<void> {
+  const prefix = `${APP_DATABASE_PREFIX}${ACCOUNT_STORE_INFIX}${accountId}`;
+  const listed = await listedDatabaseNames();
+  const names = listed
+    ? listed.filter((name) => name === prefix || name.startsWith(`${prefix}::`))
+    : derivedNames(
+        [prefix],
+        [...CACHE_DATABASE_SUFFIXES, CRYPTO_DATABASE_SUFFIX, CRYPTO_META_DATABASE_SUFFIX]
+      );
+
+  const failures = rejections(await Promise.allSettled([...new Set(names)].map(deleteDatabase)));
+
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `Could not delete the local store for ${accountId}`);
+  }
 }
 
 export async function resetWebStorage(accountIds: readonly string[] = []): Promise<void> {

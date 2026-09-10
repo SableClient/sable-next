@@ -12,7 +12,7 @@ import {
   wasmErrorTitle,
   wasmLogLevel,
 } from '../lib/observability/wasm-log.js';
-import { resetWebStorage } from '../lib/platform/session-storage.js';
+import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/session-storage.js';
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
@@ -372,6 +372,10 @@ export function createWebTransport(): Transport {
         console.error('[sable transport] the local caches were not fully cleared', error);
         Sentry.captureException(error, { tags: { source: 'cache-reset' } });
       }
+    },
+
+    async deleteAccountStore(accountId) {
+      await deleteAccountWebStorage(accountId);
     },
 
     close() {

@@ -105,6 +105,10 @@ export function createTauriTransport(): Transport {
       await resetWebStorage(accountIds);
     },
 
+    deleteAccountStore() {
+      return Promise.resolve();
+    },
+
     close() {
       listeners.clear();
     },

@@ -164,6 +164,13 @@ pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
     format!("{base_store_id}-account-{account_id}")
 }
 
+#[must_use]
+pub fn removable_account_store(base_store_id: &str, store_id: &str) -> bool {
+    store_id
+        .strip_prefix(&format!("{base_store_id}-account-"))
+        .is_some_and(|account_id| !account_id.is_empty())
+}
+
 impl Credentials {
     #[must_use]
     pub fn oauth(session: OAuthSession) -> Self {
@@ -354,7 +361,7 @@ fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{AccountRegistry, account_store_id};
+    use super::{AccountRegistry, account_store_id, removable_account_store};
 
     fn registry_json(store_id: &str) -> Vec<u8> {
         serde_json::to_vec(&serde_json::json!({
@@ -428,6 +435,19 @@ mod tests {
         let (_, first) = accounts.allocate_account("sable-next");
         let (_, second) = accounts.allocate_account("sable-next");
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn only_an_allocated_account_store_may_be_deleted() {
+        let base = "/data/moe.sable.next";
+        assert!(removable_account_store(base, &account_store_id(base, "a1")));
+        assert!(!removable_account_store(base, base));
+        assert!(!removable_account_store(
+            base,
+            "/data/moe.sable.next-account-"
+        ));
+        assert!(!removable_account_store(base, "/data/other-account-a1"));
+        assert!(!removable_account_store(base, "/data/moe.sable.next/store"));
     }
 
     #[test]

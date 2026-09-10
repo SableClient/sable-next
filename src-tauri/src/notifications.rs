@@ -41,6 +41,9 @@ struct Line {
 static CONVERSATIONS: LazyLock<Mutex<HashMap<String, Vec<Line>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+static REGISTERED_PUSHER: LazyLock<Mutex<Option<(String, String)>>> =
+    LazyLock::new(|| Mutex::new(None));
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -403,8 +406,8 @@ pub async fn register_push<R: Runtime>(
 
     let command = Command::SetPusher {
         pusher: PusherView {
-            pushkey,
-            app_id,
+            pushkey: pushkey.clone(),
+            app_id: app_id.clone(),
             url: gateway_url,
             device_display_name: format!("Sable on {}", std::env::consts::OS),
             web_push,
@@ -413,7 +416,35 @@ pub async fn register_push<R: Runtime>(
         },
     };
 
-    core.dispatch(command).await.map(|_| ())
+    Box::pin(core.dispatch(command)).await.map(|_| ())?;
+    remember_pusher(pushkey, app_id);
+    Ok(())
+}
+
+#[cfg(mobile)]
+fn remember_pusher(pushkey: String, app_id: String) {
+    *REGISTERED_PUSHER
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((pushkey, app_id));
+}
+
+/// # Errors
+///
+/// When the homeserver refuses to delete the pusher.
+pub async fn unregister_push(core: &Arc<sable_core::Core>) -> Result<(), CommandErr> {
+    use sable_core::protocol::Command;
+
+    let Some((pushkey, app_id)) = REGISTERED_PUSHER
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+    else {
+        return Ok(());
+    };
+
+    Box::pin(core.dispatch(Command::RemovePusher { pushkey, app_id }))
+        .await
+        .map(|_| ())
 }
 
 /// A desktop build has no distributor to register with, and nothing runs to

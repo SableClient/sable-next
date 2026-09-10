@@ -83,6 +83,12 @@ export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' |
 export type CoreSession = SessionInfo;
 export type ActiveVerification = { flowId: string; state: VerificationView };
 
+function discardAccountStore(transport: Transport, accountId: string): void {
+  void transport.deleteAccountStore(accountId).catch((error: unknown) => {
+    console.error('[sable core] the local store was not deleted', accountId, error);
+  });
+}
+
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
@@ -503,20 +509,25 @@ export class CoreClient {
   }
 
   async removeAccount(accountId: string): Promise<void> {
-    await this.ensureTransport().send({
+    const transport = this.ensureTransport();
+    await transport.send({
       type: 'remove_account',
       account_id: accountId,
     });
     await this.refreshAccounts();
+    discardAccountStore(transport, accountId);
   }
 
   async logout(): Promise<void> {
-    await this.ensureTransport().send({ type: 'logout' });
+    const transport = this.ensureTransport();
+    const accountId = this.session?.account_id ?? null;
+    await transport.send({ type: 'logout' });
     this.generation += 1;
     this.replaceSession(null);
     this.accounts = [];
     this.verification = null;
     this.status = 'signed-out';
+    if (accountId !== null) discardAccountStore(transport, accountId);
   }
 
   async resetCaches(): Promise<void> {

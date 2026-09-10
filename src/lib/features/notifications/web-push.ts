@@ -2,6 +2,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
+import { unregisterNativePush } from './native-push';
 import { type PushConfig, pushConfig, type PushOverride } from './push-config';
 
 const REGISTERED_ENDPOINT = 'sable-push-endpoint';
@@ -98,10 +99,6 @@ export async function dropPushSubscription(
 }
 
 export async function logoutWithPush(core: CoreClient, override: PushOverride): Promise<void> {
-  try {
-    await dropPushSubscription(core, override);
-  } catch {
-    // Logging out must continue if the pusher cannot be removed.
-  }
+  await Promise.allSettled([dropPushSubscription(core, override), unregisterNativePush()]);
   await core.logout();
 }
