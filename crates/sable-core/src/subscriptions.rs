@@ -158,16 +158,24 @@ impl Core {
         let core = self.clone();
         let stream_user_id = own_user_id.clone();
         let stream_relays = relays.clone();
+        let stream_room = room.clone();
         let task = spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
+                let push = stream_room.push_context().await.ok().flatten();
+                let highlights = view::Highlights::for_diffs(push.as_ref(), &diffs).await;
                 core.emit(CoreEvent::TimelineDiff {
                     subscription,
                     diffs: diffs
                         .into_iter()
                         .map(|diff| {
                             view::map_diff(diff, |item| {
-                                view::timeline_item(item, stream_user_id.as_deref(), &stream_relays)
+                                view::timeline_item(
+                                    item,
+                                    stream_user_id.as_deref(),
+                                    &stream_relays,
+                                    &highlights,
+                                )
                             })
                         })
                         .collect(),
@@ -199,11 +207,14 @@ impl Core {
             self.emit(timeline_pagination_event(subscription, status));
         }
 
+        let push = room.push_context().await.ok().flatten();
+        let highlights = view::Highlights::compute(push.as_ref(), items.iter()).await;
+
         Ok(CommandOk::SubscribeTimeline {
             subscription,
             items: items
                 .iter()
-                .map(|item| view::timeline_item(item, own_user_id.as_deref(), &relays))
+                .map(|item| view::timeline_item(item, own_user_id.as_deref(), &relays, &highlights))
                 .collect(),
         })
     }

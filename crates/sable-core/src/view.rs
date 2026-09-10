@@ -5,7 +5,7 @@ use std::sync::Arc;
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
-use matrix_sdk::room::{ParentSpace, Room, RoomMember};
+use matrix_sdk::room::{ParentSpace, PushContext, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
 use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::directory::PublicRoomsChunk;
@@ -19,6 +19,7 @@ use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, Unst
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
+use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::room::{
     JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
 };
@@ -600,11 +601,60 @@ fn sort_child_edges(children: &mut [SpaceChildEdge]) {
     });
 }
 
+#[derive(Default)]
+pub struct Highlights(HashMap<String, bool>);
+
+impl Highlights {
+    pub async fn compute<'a>(
+        push: Option<&PushContext>,
+        items: impl IntoIterator<Item = &'a Arc<TimelineItem>>,
+    ) -> Self {
+        let Some(push) = push else {
+            return Self::default();
+        };
+
+        let mut holds = HashMap::new();
+        for item in items {
+            let TimelineItemKind::Event(event) = item.kind() else {
+                continue;
+            };
+            if event.is_own() {
+                continue;
+            }
+            let Some(raw) = event.latest_json().or_else(|| event.original_json()) else {
+                continue;
+            };
+            let highlighted = push.for_event(raw).await.iter().any(Action::is_highlight);
+            holds.insert(item.unique_id().0.clone(), highlighted);
+        }
+        Self(holds)
+    }
+
+    pub async fn for_diffs(
+        push: Option<&PushContext>,
+        diffs: &[eyeball_im::VectorDiff<Arc<TimelineItem>>],
+    ) -> Self {
+        let mut items = Vec::new();
+        for diff in diffs {
+            items.extend(diff_values(diff));
+        }
+        Self::compute(push, items).await
+    }
+
+    fn holds(&self, id: &str, event: &EventTimelineItem) -> bool {
+        self.0
+            .get(id)
+            .copied()
+            .unwrap_or_else(|| event.is_highlighted())
+    }
+}
+
 #[must_use]
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
     own_user_id: Option<&UserId>,
     relays: &BTreeSet<OwnedUserId>,
+    highlights: &Highlights,
 ) -> TimelineItemView {
     let id = item.unique_id().0.clone();
 
@@ -621,6 +671,8 @@ pub fn timeline_item(
                     .then(|| relay_profile(raw.content.as_ref()))
                     .flatten()
             });
+
+            let mention = mention(event, own_user_id, highlights.holds(&id, event));
 
             TimelineItemView {
                 id,
@@ -641,7 +693,7 @@ pub fn timeline_item(
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,
-                mention: mention(event, own_user_id),
+                mention,
             }
         }
 
@@ -699,15 +751,15 @@ fn send_state(state: &EventSendState) -> SendStateView {
     }
 }
 
-/// MSC4144 is still unstable, so the Beeper key is what servers actually emit
-/// today; the `m.` key is read too so nothing breaks when it stabilises.
-/// `m.mentions` names us directly; the SDK's highlight flag folds in `@room`
-/// and any push rule the server matched.
-fn mention(event: &EventTimelineItem, own_user_id: Option<&UserId>) -> MentionView {
+fn mention(
+    event: &EventTimelineItem,
+    own_user_id: Option<&UserId>,
+    highlighted: bool,
+) -> MentionView {
     if event.is_own() {
         return MentionView::None;
     }
-    if event.is_highlighted() {
+    if highlighted {
         return MentionView::Loud;
     }
 

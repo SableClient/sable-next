@@ -703,7 +703,14 @@ async fn timeline_views(
             .items()
             .await
             .iter()
-            .map(|item| super::view::timeline_item(item, client.user_id(), &BTreeSet::new()))
+            .map(|item| {
+                super::view::timeline_item(
+                    item,
+                    client.user_id(),
+                    &BTreeSet::new(),
+                    &super::view::Highlights::default(),
+                )
+            })
             .collect(),
     )
 }
@@ -1478,7 +1485,15 @@ async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<
         .await
         .iter()
         .filter(|item| item.as_event().is_some())
-        .map(|item| crate::view::timeline_item(item, None, &BTreeSet::new()).sender_name)
+        .map(|item| {
+            crate::view::timeline_item(
+                item,
+                None,
+                &BTreeSet::new(),
+                &crate::view::Highlights::default(),
+            )
+            .sender_name
+        })
         .collect()
 }
 
@@ -1797,4 +1812,62 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
             "{name} room summary"
         );
     }
+}
+
+#[tokio::test]
+async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let own_user_id = client.user_id().expect("a logged-in user").to_owned();
+    let room_id = room_id!("!mention:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_bulk([
+                    factory.member(&own_user_id).into_raw(),
+                    factory.member(*ALICE).into_raw(),
+                    factory.default_power_levels().into_raw(),
+                ])
+                .add_timeline_event(
+                    factory
+                        .text_msg("hey")
+                        .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
+                            own_user_id.clone(),
+                        ]))
+                        .event_id(event_id!("$mention")),
+                ),
+        )
+        .await;
+
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .expect("a timeline");
+    let items = timeline.items().await;
+
+    let push = room
+        .push_context()
+        .await
+        .expect("a push context")
+        .expect("a room the ruleset can be evaluated against");
+    let highlights = super::view::Highlights::compute(Some(&push), items.iter()).await;
+
+    let views = items
+        .iter()
+        .map(|item| {
+            super::view::timeline_item(item, Some(&own_user_id), &BTreeSet::new(), &highlights)
+        })
+        .collect::<Vec<_>>();
+    let mention = views
+        .iter()
+        .find_map(|view| match &view.content {
+            crate::protocol::TimelineItemContentView::Message { .. } => Some(view.mention),
+            _ => None,
+        })
+        .expect("the mentioning message");
+
+    assert_eq!(mention, crate::protocol::MentionView::Loud);
 }
