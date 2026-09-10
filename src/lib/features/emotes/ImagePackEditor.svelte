@@ -158,7 +158,7 @@
     busy = true;
     failed = false;
     try {
-      await onApply?.(draft);
+      await onApply?.($state.snapshot(draft));
       draft = null;
     } catch (error) {
       console.warn('[sable emotes] the pack could not be saved', error);
