@@ -114,3 +114,25 @@ test('stopPropagation is opt-in', () => {
   );
   expect(loudStop).toHaveBeenCalled();
 });
+
+test('the trailing click a fired press produces is swallowed once', () => {
+  vi.useFakeTimers();
+  const press = new LongPress({ onPress: vi.fn() });
+  const onSheetItem = vi.fn();
+  const item = document.createElement('button');
+  item.addEventListener('click', onSheetItem);
+  document.body.append(item);
+
+  press.start(pointer());
+  vi.advanceTimersByTime(450);
+  press.end(pointer());
+  item.click();
+
+  expect(onSheetItem).not.toHaveBeenCalled();
+
+  item.click();
+  expect(onSheetItem).toHaveBeenCalledOnce();
+
+  item.remove();
+  vi.useRealTimers();
+});

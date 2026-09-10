@@ -1,4 +1,5 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
+import { armTrailingClickSwallow } from '#lib/ui/trailing-click.js';
 
 const LONG_PRESS_MS = 450;
 const LONG_PRESS_SLOP_PX = 10;
@@ -31,6 +32,7 @@ export class LongPress {
       this.#origin = null;
       this.fired = true;
       hapticFeedback('medium');
+      armTrailingClickSwallow();
       this.options.onPress();
     }, LONG_PRESS_MS);
   };

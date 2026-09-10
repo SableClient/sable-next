@@ -20,6 +20,7 @@
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { registerServiceWorker } from '#lib/platform/service-worker.js';
+  import { guardTouchClicks } from '#lib/ui/trailing-click.js';
   import {
     applyDesktopWindowSettings,
     titleBarKind,
@@ -52,11 +53,13 @@
     }
 
     const stopTrackingKeyboard = trackKeyboardInset();
+    const stopGuardingClicks = guardTouchClicks();
     void registerServiceWorker();
     void core.start();
     return () => {
       stopListening();
       stopTrackingKeyboard();
+      stopGuardingClicks();
       core.stop();
     };
   });
