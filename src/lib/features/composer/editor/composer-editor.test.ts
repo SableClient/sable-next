@@ -397,7 +397,7 @@ describe('block editing', () => {
     expect(doc?.firstChild?.textContent).toBe('a\n');
   });
 
-  test('enter on an empty line inside a code block exits into a paragraph', () => {
+  test('enter on the blank last line of a code block exits and takes the newline with it', () => {
     const editor = open();
     editor.setHtml('<pre>a\n</pre>');
     const block = view(editor).state.doc.firstChild;
@@ -409,8 +409,37 @@ describe('block editing', () => {
     );
     press(editor, 'Enter');
 
-    expect(editor.doc()?.firstChild?.textContent).toBe('a\n');
+    expect(editor.doc()?.firstChild?.textContent).toBe('a');
     expect(view(editor).state.selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  test('enter in a freshly opened code block writes a newline instead of leaving it', () => {
+    const editor = open();
+    editor.setHtml('<pre></pre>');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(TextSelection.create(view(editor).state.doc, 1))
+    );
+    press(editor, 'Enter');
+
+    expect(view(editor).state.selection.$from.parent.type.name).toBe('code_block');
+    expect(editor.doc()?.firstChild?.textContent).toBe('\n');
+  });
+
+  test('enter after the language word moves it onto the block', () => {
+    const editor = open();
+    editor.setHtml('<pre>rust</pre>');
+    const block = view(editor).state.doc.firstChild;
+    if (!block) throw new Error('code block not found');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(
+        TextSelection.create(view(editor).state.doc, block.nodeSize - 1)
+      )
+    );
+    press(editor, 'Enter');
+
+    const code = editor.doc()?.firstChild;
+    expect(code?.attrs.language).toBe('rust');
+    expect(code?.textContent).toBe('');
   });
 
   test('shift+arrowdown exits a code block from its final line', () => {
@@ -505,7 +534,7 @@ describe('block editing', () => {
 
   test('shift+arrow keys put a caret back inside an adjacent code block', () => {
     const editor = open();
-    editor.setHtml('<p>before</p><pre>alpha</pre>');
+    editor.setHtml('<p>before</p><pre>alpha</pre><p>after</p>');
     const editorView = view(editor);
     const paragraph = editorView.state.doc.child(0);
 
@@ -561,10 +590,17 @@ describe('block editing', () => {
 
   test('a block that cannot be typed after gains a trailing paragraph', () => {
     const editor = open();
-    editor.setHtml('<pre>a</pre>');
+    editor.setHtml('<hr>');
 
     expect(editor.doc()?.childCount).toBe(2);
     expect(editor.doc()?.lastChild?.type.name).toBe('paragraph');
+  });
+
+  test('a code block gains none, since enter leaves it on its own', () => {
+    const editor = open();
+    editor.setHtml('<pre>a</pre>');
+
+    expect(editor.doc()?.childCount).toBe(1);
   });
 
   test('a document already ending in a paragraph gains nothing', () => {

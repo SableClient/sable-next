@@ -103,6 +103,20 @@
     padding: var(--space-200);
   }
 
+  /* ProseMirror's caret hack; a `pre` already breaks on the newline itself. */
+  /* stylelint-disable-next-line selector-class-pattern */
+  .editor :global(pre br.ProseMirror-trailingBreak:not(:only-child)) {
+    display: none;
+  }
+
+  .editor :global(pre[data-language])::before {
+    color: var(--surface-var-on-container);
+    content: attr(data-language);
+    display: block;
+    font-size: var(--font-size-small);
+    margin-bottom: var(--space-100);
+  }
+
   .editor :global([data-mx-spoiler]) {
     background: var(--surface-container-active);
     border-radius: var(--radii-300);

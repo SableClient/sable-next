@@ -14,7 +14,7 @@ import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import { Slice, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { Plugin, EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
-import { EditorView } from 'prosemirror-view';
+import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
 
 /* ProseMirror's own stylesheet is load-bearing, not cosmetic: it hides the
@@ -28,6 +28,7 @@ import type { PackImageView } from '#src/generated/protocol';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { AutocompleteQuery } from '../autocomplete';
 import { compositionInputRules } from './composition-rules';
+import { isFenceLanguage } from './fence-languages';
 import {
   activeMarks,
   formatCommands,
@@ -90,14 +91,40 @@ const insertHardBreak: Command = (state, dispatch) => {
 
 const exitEmptyCodeLine: Command = (state, dispatch) => {
   const { $from } = state.selection;
-  if (!state.selection.empty || $from.parent.type !== composerSchema.nodes.code_block) {
-    return false;
-  }
+  const block = $from.parent;
+  if (!state.selection.empty || block.type !== composerSchema.nodes.code_block) return false;
+  if ($from.parentOffset !== block.content.size || !block.textContent.endsWith('\n')) return false;
 
-  const text = $from.parent.textContent;
-  const lineStart = text.lastIndexOf('\n', $from.parentOffset - 1) + 1;
-  if (text.slice(lineStart, $from.parentOffset) !== '') return false;
-  return exitCode(state, dispatch);
+  const paragraph = composerSchema.nodes.paragraph.createAndFill();
+  if (!paragraph) return false;
+
+  if (dispatch) {
+    const position = $from.after() - 1;
+    const tr = state.tr.delete($from.pos - 1, $from.pos);
+    const next = tr.doc.resolve(position).nodeAfter;
+    if (next?.type !== composerSchema.nodes.paragraph || next.content.size > 0) {
+      tr.insert(position, paragraph);
+    }
+    dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(position), 1)).scrollIntoView());
+  }
+  return true;
+};
+
+const captureFenceLanguage: Command = (state, dispatch) => {
+  const { $from } = state.selection;
+  const block = $from.parent;
+  if (!state.selection.empty || block.type !== composerSchema.nodes.code_block) return false;
+  if (block.attrs.language !== '') return false;
+
+  const text = block.textContent;
+  if ($from.parentOffset !== text.length || !isFenceLanguage(text)) return false;
+
+  dispatch?.(
+    state.tr
+      .delete($from.before() + 1, $from.after() - 1)
+      .setNodeMarkup($from.before(), undefined, { language: text })
+  );
+  return true;
 };
 
 function escapeCodeBlock(direction: -1 | 1): Command {
@@ -179,12 +206,34 @@ const splitEntry: Command = chainCommands(
   splitBlockKeepMarks
 );
 
+function codeLanguageLabels(): Plugin {
+  return new Plugin({
+    props: {
+      decorations: (state) => {
+        const decorations: Decoration[] = [];
+        state.doc.descendants((node, position) => {
+          if (node.type !== composerSchema.nodes.code_block) return true;
+          const language = node.attrs.language as string;
+          if (language !== '') {
+            decorations.push(
+              Decoration.node(position, position + node.nodeSize, { 'data-language': language })
+            );
+          }
+          return false;
+        });
+        return DecorationSet.create(state.doc, decorations);
+      },
+    },
+  });
+}
+
 function trailingParagraph(): Plugin {
   return new Plugin({
     appendTransaction: (transactions, _old, state) => {
       if (!transactions.some((tr) => tr.docChanged)) return null;
       const last = state.doc.lastChild;
       if (!last || last.type === composerSchema.nodes.paragraph) return null;
+      if (last.type === composerSchema.nodes.code_block) return null;
       return state.tr.insert(state.doc.content.size, composerSchema.nodes.paragraph.create());
     },
   });
@@ -268,6 +317,7 @@ export class ComposerEditor {
   private enter: Command = (state, dispatch, view) => {
     if (this.options.onNavigate('Enter')) return true;
     if (exitEmptyCodeLine(state, dispatch, view)) return true;
+    if (captureFenceLanguage(state, dispatch, view)) return true;
     if (newlineInCode(state, dispatch, view)) return true;
     return preferences.enterForNewline ? splitEntry(state, dispatch, view) : this.submit();
   };
@@ -319,6 +369,7 @@ export class ComposerEditor {
         gapCursor(),
         dropCursor(),
         trailingParagraph(),
+        codeLanguageLabels(),
         keymap({
           'Mod-z': undo,
           'Mod-y': redo,

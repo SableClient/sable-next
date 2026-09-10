@@ -280,6 +280,17 @@ test('reads the language off the pre when the code element carries none', async 
   await unmount(instance);
 });
 
+test('a code block drops the newline the fence left at its end', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<pre><code>one\ntwo\n</code></pre>' },
+  });
+  await tick();
+
+  expect(document.querySelector('pre code')?.textContent).toBe('one\ntwo');
+  await unmount(instance);
+});
+
 test('an unlabelled block falls back to a generic label', async () => {
   const instance = mount(FormattedBody, {
     target: document.body,

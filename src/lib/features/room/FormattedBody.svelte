@@ -204,6 +204,13 @@
     return named?.slice('language-'.length) || null;
   }
 
+  function trimTrailingNewline(block: HTMLElement): void {
+    const last = block.querySelector('code')?.lastChild ?? block.lastChild;
+    if (last?.nodeType === Node.TEXT_NODE && last.nodeValue?.endsWith('\n')) {
+      last.nodeValue = last.nodeValue.slice(0, -1);
+    }
+  }
+
   function codeLanguage(block: HTMLElement): string | null {
     return classLanguage(block.querySelector('code')) ?? classLanguage(block);
   }
@@ -214,6 +221,7 @@
       block.dataset.codeHandled = '';
 
       const language = codeLanguage(block);
+      trimTrailingNewline(block);
       const long = block.textContent.split('\n').length > CODE_LINE_LIMIT;
 
       const figure = document.createElement('div');

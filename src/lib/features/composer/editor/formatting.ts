@@ -5,6 +5,7 @@ import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirr
 import type { Command, EditorState } from 'prosemirror-state';
 import { wrapIn } from 'prosemirror-commands';
 
+import { isFenceLanguage } from './fence-languages';
 import { composerSchema } from './schema';
 
 const nodes = composerSchema.nodes;
@@ -68,6 +69,7 @@ function fenceLanguageRule(): InputRule {
       const block = $from.parent;
       if (block.type !== nodes.code_block || block.attrs.language !== '') return null;
       if (block.textContent !== match[0].slice(0, end - start)) return null;
+      if (!isFenceLanguage(match[1])) return null;
 
       return state.tr.delete(start, end).setNodeMarkup($from.before(), undefined, {
         language: match[1],

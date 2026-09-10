@@ -293,6 +293,15 @@ test('a fence carries its language into the block', () => {
   expect(block?.attrs.language).toBe('rust');
 });
 
+test('a first code word that is not a language is left in the block', () => {
+  open();
+  type('```const ');
+
+  const block = view?.state.doc.firstChild;
+  expect(block?.attrs.language).toBe('');
+  expect(block?.textContent).toBe('const ');
+});
+
 test('three dashes become a rule rather than a paragraph of dashes', () => {
   open();
   type('---');
