@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import { resolve } from '$app/paths';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import type {
     NotificationModeView,
@@ -30,6 +31,7 @@
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
@@ -146,6 +148,7 @@
   );
 
   const searchHref = resolve('/(app)/search');
+  const joinHref = `${resolve('explore')}#explore-join-by-address`;
   let browseLabel = $derived(
     activeSpace === null ? $i18n.t('nav.exploreSpaces') : $i18n.t('nav.lobby')
   );
@@ -153,6 +156,14 @@
   let createRoomLabel = $derived(
     activeSpace === null ? $i18n.t('nav.createRoom') : $i18n.t('nav.createRoomInSpace')
   );
+
+  function navigateTo(href: string): void {
+    if (onNavigate) {
+      onNavigate(href);
+    } else {
+      void goto(href);
+    }
+  }
 
   // Held by id so the dialogs follow the live summary.
   let settingsRoom = $derived(
@@ -579,12 +590,42 @@
           {#if !collapsed}<span class="room-text"><span class="room-name">{label}</span></span>{/if}
         </a>
       {/snippet}
+      {#snippet createMenu()}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            class="nav-action sable-current sable-selection-layer sable-open"
+            aria-label={collapsed ? createRoomLabel : undefined}
+          >
+            <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
+            {#if !collapsed}<span class="room-text"
+                ><span class="room-name">{createRoomLabel}</span></span
+              >{/if}
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="sable-menu" side="right" align="start" sideOffset={4}>
+            {#if canCreateHere}
+              <DropdownMenu.Item
+                class="sable-menu-item"
+                onSelect={() => navigateTo(createRoomHref)}
+              >
+                <PlusIcon />
+                {createRoomLabel}
+              </DropdownMenu.Item>
+            {/if}
+            <DropdownMenu.Item class="sable-menu-item" onSelect={() => navigateTo(joinHref)}>
+              <LinkIcon />
+              {$i18n.t('nav.joinWithAddress')}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item class="sable-menu-item" onSelect={() => navigateTo(browseHref)}>
+              <CompassIcon />
+              {browseLabel}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      {/snippet}
       {#if directSection}
         {@render action(newChatHref, $i18n.t('nav.newChat'), PlusIcon)}
       {:else}
-        {#if canCreateHere}
-          {@render action(createRoomHref, createRoomLabel, PlusIcon)}
-        {/if}
+        {@render createMenu()}
         {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}
         {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
       {/if}
