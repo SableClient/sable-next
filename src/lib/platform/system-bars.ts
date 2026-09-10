@@ -30,6 +30,8 @@ function readSurfaceColor(x: number, y: number): string | undefined {
   return undefined;
 }
 
+const SAMPLE_INTERVAL_MS = 200;
+
 type BarCommand = 'set_status_bar_light' | 'set_navigation_bar_light';
 
 function syncEdge(
@@ -58,11 +60,13 @@ export function startSystemBarSync(): () => void {
 
   let frame = 0;
   let timer = 0;
+  let sampledAt = 0;
   let lastTop = '';
   let lastBottom = '';
 
   const sample = (): void => {
     frame = 0;
+    sampledAt = performance.now();
     const x = Math.round(window.innerWidth / 2);
     lastTop = syncEdge('set_status_bar_light', readSurfaceColor(x, 1), lastTop);
     lastBottom = syncEdge(
@@ -73,13 +77,13 @@ export function startSystemBarSync(): () => void {
   };
 
   const runSample = (): void => {
-    if (frame) cancelAnimationFrame(frame);
+    if (frame) return;
     frame = requestAnimationFrame(sample);
   };
   const schedule = (): void => {
-    runSample();
+    if (performance.now() - sampledAt >= SAMPLE_INTERVAL_MS) runSample();
     window.clearTimeout(timer);
-    timer = window.setTimeout(runSample, 120);
+    timer = window.setTimeout(runSample, SAMPLE_INTERVAL_MS);
   };
 
   runSample();
