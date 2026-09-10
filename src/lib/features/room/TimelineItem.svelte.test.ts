@@ -240,6 +240,27 @@ test('edits an own image caption without dropping its media details', async () =
   await unmount(instance);
 });
 
+test('drops the right-hand side of a bubble when own alignment is off', async () => {
+  const own = { ...item(false), is_own: true };
+  for (const [alignOwn, expected] of [
+    [true, true],
+    [false, false],
+  ] as const) {
+    const instance = mount(TimelineItemHarness, {
+      target: document.body,
+      props: {
+        core: core.commands,
+        item: { item: own, collapsed: false, layout: 'bubble', alignOwn },
+      },
+    });
+    await tick();
+
+    expect(document.querySelector('.message.own')?.classList.contains('align-own')).toBe(expected);
+
+    await unmount(instance);
+  }
+});
+
 test('wraps non-text messages in a bubble in bubble layout', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

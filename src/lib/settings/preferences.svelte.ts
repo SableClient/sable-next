@@ -15,6 +15,7 @@ export type ReadReceiptPlacement = 'message' | 'room';
 export interface Preferences {
   language: string;
   layout: TimelineLayout;
+  alignOwnMessages: boolean;
   messageSpacing: MessageSpacing;
   theme: ThemeMode;
   underlineLinks: boolean;
@@ -135,6 +136,7 @@ export type FreeTextPreference = (typeof FREE_TEXT)[number];
 const DEFAULTS: Preferences = {
   language: SYSTEM_LANGUAGE,
   layout: 'modern',
+  alignOwnMessages: true,
   messageSpacing: 'cozy',
   theme: 'system',
   underlineLinks: true,

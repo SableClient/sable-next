@@ -99,6 +99,7 @@
     canRedactOthers?: boolean;
     selected?: boolean;
     layout?: TimelineLayout;
+    alignOwn?: boolean;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
@@ -133,6 +134,7 @@
     canRedactOthers = false,
     selected = false,
     layout = 'modern',
+    alignOwn = true,
     members = [],
     onJumpToEvent,
     onOpenMedia,
@@ -539,6 +541,7 @@
         highlighted,
         persona: personaTint,
         own: item.is_own,
+        'align-own': alignOwn,
         'mention-silent': item.mention === 'silent',
         'mention-loud': item.mention === 'loud',
       },
@@ -1507,6 +1510,21 @@
     margin-top: 0;
   }
 
+  .message.layout-bubble .has-edited :global(.formatted-body) {
+    display: inline-block;
+  }
+
+  .message.layout-bubble.own.align-own .has-edited {
+    align-items: flex-end;
+    display: flex;
+    flex-direction: row-reverse;
+    gap: var(--space-100);
+  }
+
+  .message.layout-bubble.own.align-own .has-edited .edited {
+    margin-inline-start: 0;
+  }
+
   .message.layout-bubble.own .content-bubble,
   .message.layout-bubble.own :global(.formatted-body) {
     background: var(--primary-container);
@@ -1515,19 +1533,37 @@
   }
 
   /* The one mode where your own side changes. */
-  .message.layout-bubble.own {
+  .message.layout-bubble.own.align-own {
     flex-direction: row-reverse;
   }
 
-  .message.layout-bubble.own .message-main {
+  .message.layout-bubble.own.align-own .message-main {
     align-items: flex-end;
+    grid-column: 1 / -1;
   }
 
-  .message.layout-bubble.own header {
+  .message.layout-bubble.own.align-own .message-content > :global(.read-receipt-stack) {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-inline-start: 0;
+  }
+
+  .message.layout-bubble.own.align-own .reply-preview {
+    grid-template-columns: minmax(0, 1fr) auto;
+    text-align: end;
+    width: auto;
+  }
+
+  .message.layout-bubble.own.align-own .reply-preview :global(.reply-icon) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .message.layout-bubble.own.align-own header {
     flex-direction: row-reverse;
   }
 
-  .message.layout-bubble.own.collapsed {
+  .message.layout-bubble.own.align-own.collapsed {
     padding-left: 0;
     padding-right: calc(var(--avatar-size-small) + var(--space-250));
   }

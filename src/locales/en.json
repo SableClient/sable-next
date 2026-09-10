@@ -1039,6 +1039,8 @@
     "layoutModern": "Modern",
     "layoutCompact": "Compact",
     "layoutBubble": "Bubble",
+    "alignOwnMessages": "Align your messages to the right",
+    "alignOwnMessagesHint": "Bubble layout only. Off keeps every message in one left-hand column.",
     "unverifiedBannerTitle": "This device is not verified",
     "unverifiedBannerBody": "It cannot read messages sent before you signed in, and your other devices will warn people about it.",
     "unverifiedOthersTitle_one": "One of your devices is not verified",

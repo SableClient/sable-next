@@ -270,6 +270,13 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'alignOwnMessages',
+        icon: LayoutIcon,
+        name: 'settings.alignOwnMessages',
+        description: 'settings.alignOwnMessagesHint',
+        type: 'boolean',
+      },
+      {
         key: 'messageSpacing',
         icon: ArrowsOutLineVerticalIcon,
         name: 'settings.messageSpacing',

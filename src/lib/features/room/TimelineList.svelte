@@ -515,6 +515,7 @@
                   {canRedactOthers}
                   {members}
                   layout={preferences.layout}
+                  alignOwn={preferences.alignOwnMessages}
                   {onJumpToEvent}
                   {onOpenMedia}
                   {onPersonaAvatarClick}
