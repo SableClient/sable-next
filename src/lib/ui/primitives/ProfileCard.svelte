@@ -10,6 +10,8 @@
     displayName: string;
     userId: string;
     avatarUrl?: string | null;
+    avatarLabel?: string;
+    onAvatarClick?: (source: string, displayName: string) => void;
     color: string;
     /** The owner's own choice, so only this one tints the card. `color` also
         covers the id-derived fallback. */
@@ -35,6 +37,8 @@
     displayName,
     userId,
     avatarUrl = null,
+    avatarLabel,
+    onAvatarClick,
     color,
     heroColor = null,
     heroBrightness = null,
@@ -58,6 +62,7 @@
   let nameColor = $derived(nameColorLight ?? nameColorDark);
   let nameColorForDark = $derived(nameColorDark ?? nameColorLight);
   let clampable = $derived(Boolean(bioMoreLabel && bioLessLabel));
+  let canOpenAvatar = $derived(Boolean(avatarUrl && onAvatarClick));
   let expanded = $state(false);
   let truncated = $state(false);
   const uid = $props.id();
@@ -75,6 +80,10 @@
       observer.disconnect();
     };
   }
+
+  function openAvatar(): void {
+    if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
+  }
 </script>
 
 <section
@@ -90,14 +99,32 @@
     {/if}
   </div>
   <div class="profile-card-crest">
-    <Avatar
-      class="profile-card-avatar"
-      size="large"
-      src={avatarUrl}
-      name={displayName}
-      {color}
-      alt={displayName}
-    />
+    {#if canOpenAvatar}
+      <button
+        class="profile-card-avatar-button"
+        type="button"
+        aria-label={avatarLabel ?? displayName}
+        onclick={openAvatar}
+      >
+        <Avatar
+          class="profile-card-avatar"
+          size="large"
+          src={avatarUrl}
+          name={displayName}
+          {color}
+          decorative
+        />
+      </button>
+    {:else}
+      <Avatar
+        class="profile-card-avatar"
+        size="large"
+        src={avatarUrl}
+        name={displayName}
+        {color}
+        alt={displayName}
+      />
+    {/if}
     {#if status}
       <p class="profile-card-status">
         {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
@@ -233,6 +260,23 @@
     --avatar-size: var(--profile-avatar-size);
 
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
+  }
+
+  .profile-card-avatar-button {
+    background: none;
+    border: 0;
+    border-radius: var(--radii-400);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 var(--profile-avatar-size);
+    height: var(--profile-avatar-size);
+    padding: 0;
+    width: var(--profile-avatar-size);
+  }
+
+  .profile-card-avatar-button:focus-visible {
+    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   /* Rounded like the bio panel, not pill like the action row: this is something

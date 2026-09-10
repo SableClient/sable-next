@@ -674,6 +674,7 @@
     "seenByNames": "Seen by {{names}}. Open the list.",
     "userProfile": "Profile",
     "senderProfile": "Open {{name}}'s profile",
+    "profileAvatar": "View {{name}}'s avatar",
     "mentionSender": "Mention {{name}}",
     "closeProfile": "Close profile",
     "profileUnavailable": "Could not load this profile.",
