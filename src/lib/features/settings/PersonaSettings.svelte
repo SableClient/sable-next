@@ -8,6 +8,7 @@
   import type { PersonaView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { importPersonaAvatar } from '#lib/platform/persona-avatar.js';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import {
@@ -77,11 +78,7 @@
     }
 
     try {
-      const response = await fetch(member.avatar_url);
-      if (!response.ok) throw new Error(`avatar responded ${String(response.status)}`);
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      const mime = response.headers.get('content-type') ?? 'image/*';
-      return { url: await core.commands.uploadMedia(mime, bytes), failed: false };
+      return { url: await importPersonaAvatar(member.avatar_url, core.commands), failed: false };
     } catch (cause) {
       console.warn('[sable personas] fetching a PluralKit picture failed', cause);
       return { url: existing?.avatar_url ?? null, failed: true };

@@ -100,6 +100,14 @@ pub(crate) fn decode_header(request: &Request<'_>, name: &str) -> Option<String>
     decode_header_value(value)
 }
 
+#[tauri::command]
+async fn import_persona_avatar(
+    state: State<'_, AppState>,
+    url: String,
+) -> Result<String, CommandErr> {
+    state.core.import_persona_avatar(url).await
+}
+
 fn decode_header_value(value: &str) -> Option<String> {
     Some(
         percent_encoding::percent_decode_str(value)
@@ -449,6 +457,7 @@ pub fn run() {
             submit_command,
             subscribe_events,
             fetch_media,
+            import_persona_avatar,
             send_attachment,
             send_attachment_base64,
             upload_media,

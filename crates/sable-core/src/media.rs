@@ -21,6 +21,18 @@ use crate::Core;
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
 
 impl Core {
+    /// Downloads a persona avatar over native HTTP and uploads it to Matrix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the download or Matrix upload fails.
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn import_persona_avatar(&self, url: String) -> Result<String, CommandErr> {
+        self.client().await?;
+        let (mime, bytes) = download_persona_avatar(&url).await?;
+        self.upload_media(mime, bytes).await
+    }
+
     /// Authenticated media needs the access token, so the fetch happens here.
     ///
     /// # Errors
@@ -168,10 +180,129 @@ impl Core {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+async fn download_persona_avatar(url: &str) -> Result<(String, Vec<u8>), CommandErr> {
+    const MAX_AVATAR_BYTES: usize = 20 * 1024 * 1024;
+    let url = url::Url::parse(url).map_err(|_| CommandErr::InvalidMedia)?;
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(CommandErr::InvalidMedia);
+    }
+    // Do not send Matrix credentials to avatar hosts.
+    let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+        .user_agent("Sable")
+        .timeout(Duration::from_secs(30))
+        .redirect(matrix_sdk::reqwest::redirect::Policy::limited(5))
+        .build()
+        .map_err(|_| CommandErr::Unavailable)?;
+    let mut response = http
+        .get(url)
+        .send()
+        .await
+        .and_then(matrix_sdk::reqwest::Response::error_for_status)
+        .map_err(|error| {
+            tracing::warn!("persona avatar download failed: {}", error.without_url());
+            CommandErr::Unavailable
+        })?;
+    if response
+        .content_length()
+        .is_some_and(|size| size > MAX_AVATAR_BYTES as u64)
+    {
+        return Err(CommandErr::InvalidMedia);
+    }
+    let mime = response
+        .headers()
+        .get(matrix_sdk::reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("image/*")
+        .to_owned();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| CommandErr::Unavailable)?
+    {
+        if chunk.len() > MAX_AVATAR_BYTES - bytes.len() {
+            return Err(CommandErr::InvalidMedia);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if bytes.is_empty() {
+        return Err(CommandErr::InvalidMedia);
+    }
+    Ok((mime, bytes))
+}
+
 fn attachment_profile(
     profile: &PerMessageProfileView,
 ) -> serde_json::Map<String, serde_json::Value> {
     profile_extra_content(profile)
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod avatar_import_tests {
+    use super::download_persona_avatar;
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::path};
+
+    #[tokio::test]
+    async fn downloads_without_cors_headers_and_follows_redirects() {
+        let server = MockServer::start().await;
+        Mock::given(path("/avatar"))
+            .respond_with(ResponseTemplate::new(302).insert_header("Location", "/image"))
+            .mount(&server)
+            .await;
+        Mock::given(path("/image"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![137, 80, 78, 71])
+                    .insert_header("Content-Type", "image/png"),
+            )
+            .mount(&server)
+            .await;
+        let (mime, bytes) = download_persona_avatar(&format!("{}/avatar", server.uri()))
+            .await
+            .expect("native avatar download");
+        assert_eq!(mime, "image/png");
+        assert_eq!(bytes, [137, 80, 78, 71]);
+        for request in server.received_requests().await.expect("requests") {
+            assert!(!request.headers.contains_key("authorization"));
+            assert!(!request.headers.contains_key("cookie"));
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_failed_empty_and_oversized_downloads() {
+        let server = MockServer::start().await;
+        for (route, response) in [
+            ("/missing", ResponseTemplate::new(404)),
+            ("/empty", ResponseTemplate::new(200)),
+            (
+                "/large",
+                ResponseTemplate::new(200).set_body_bytes(vec![0; 20 * 1024 * 1024 + 1]),
+            ),
+        ] {
+            Mock::given(path(route))
+                .respond_with(response)
+                .mount(&server)
+                .await;
+            download_persona_avatar(&format!("{}{route}", server.uri()))
+                .await
+                .unwrap_err();
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_non_http_and_credential_urls() {
+        for url in [
+            "file:///tmp/avatar",
+            "data:image/png;base64,AAAA",
+            "https://user:password@example.org/avatar",
+        ] {
+            download_persona_avatar(url).await.unwrap_err();
+        }
+    }
 }
 
 fn attachment_caption(
