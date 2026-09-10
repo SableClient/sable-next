@@ -59,6 +59,7 @@ fn install_permission_policy() {
             PermissionKind::ScreenCapture | PermissionKind::CapturedSurfaceControl => {
                 Some("screen")
             }
+            PermissionKind::Geolocation => Some("location"),
             _ => None,
         };
 
@@ -87,6 +88,7 @@ fn install_permission_policy() {
             ["microphone"] => "Sable wants to use your microphone.",
             ["camera"] => "Sable wants to use your camera.",
             ["screen"] => "Sable wants to share your screen.",
+            ["location"] => "Sable wants to access your location.",
             _ => "Sable wants to use your microphone and camera.",
         };
 
@@ -161,6 +163,76 @@ fn is_cef_subprocess() -> bool {
     std::env::args().any(|arg| arg.starts_with("--type="))
 }
 
+#[cfg(target_os = "linux")]
+fn apply_env_defaults(defaults: &[(&str, std::ffi::OsString)]) {
+    for (key, value) in defaults {
+        if std::env::var_os(key).is_some() {
+            continue;
+        }
+        // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
+        #[allow(unsafe_code)]
+        unsafe {
+            std::env::set_var(key, value);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_env_defaults() -> Vec<(&'static str, std::ffi::OsString)> {
+    let nvidia = [("__NV_DISABLE_EXPLICIT_SYNC", std::ffi::OsString::from("1"))];
+    #[cfg(feature = "cef")]
+    let engine: Vec<(&'static str, std::ffi::OsString)> = Vec::new();
+    #[cfg(not(feature = "cef"))]
+    let engine = webkit_env_defaults();
+    nvidia.into_iter().chain(engine).collect()
+}
+
+#[cfg(all(not(feature = "cef"), target_os = "linux"))]
+fn webkit_env_defaults() -> Vec<(&'static str, std::ffi::OsString)> {
+    use std::path::{Path, PathBuf};
+
+    let mut defaults = vec![
+        ("WEBKIT_DISABLE_COMPOSITING_MODE", "1".into()),
+        ("WEBKIT_DISABLE_DMABUF_RENDERER", "1".into()),
+    ];
+
+    let plugin_dirs = [
+        "/usr/lib/gstreamer-1.0",
+        "/usr/lib64/gstreamer-1.0",
+        "/usr/local/lib/gstreamer-1.0",
+        "/usr/local/lib64/gstreamer-1.0",
+        "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
+        "/usr/lib/aarch64-linux-gnu/gstreamer-1.0",
+        "/run/host/usr/lib/gstreamer-1.0",
+        "/run/host/usr/lib64/gstreamer-1.0",
+    ];
+    if let Some(dir) = plugin_dirs.iter().find(|dir| Path::new(dir).exists()) {
+        defaults.push(("GST_PLUGIN_SYSTEM_PATH_1_0", (*dir).into()));
+        defaults.push(("GST_PLUGIN_PATH_1_0", (*dir).into()));
+    }
+
+    let mut scanners: Vec<PathBuf> = [
+        "/usr/lib/gstreamer-1.0/gst-plugin-scanner",
+        "/usr/lib64/gstreamer-1.0/gst-plugin-scanner",
+        "/usr/libexec/gstreamer-1.0/gst-plugin-scanner",
+        "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/gst-plugin-scanner",
+        "/usr/lib/aarch64-linux-gnu/gstreamer-1.0/gst-plugin-scanner",
+        "/run/host/usr/lib/gstreamer-1.0/gst-plugin-scanner",
+        "/run/host/usr/lib64/gstreamer-1.0/gst-plugin-scanner",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect();
+    if let Some(path) = std::env::var_os("PATH") {
+        scanners.extend(std::env::split_paths(&path).map(|dir| dir.join("gst-plugin-scanner")));
+    }
+    if let Some(scanner) = scanners.iter().find(|path| path.exists()) {
+        defaults.push(("GST_PLUGIN_SCANNER", scanner.clone().into_os_string()));
+    }
+
+    defaults
+}
+
 fn main() {
     // The CEF runtime's Wayland path is unstable; the crate is verified on X11.
     // https://github.com/tauri-apps/tauri/issues/14251
@@ -170,6 +242,9 @@ fn main() {
     unsafe {
         std::env::set_var("GDK_BACKEND", "x11");
     }
+
+    #[cfg(target_os = "linux")]
+    apply_env_defaults(&linux_env_defaults());
 
     // Before everything else: CEF re-execs this binary for its subprocesses.
     #[cfg(all(feature = "cef", target_os = "linux"))]

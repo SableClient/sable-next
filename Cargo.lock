@@ -263,6 +263,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "webkit2gtk",
  "zbus",
 ]
 

@@ -20,6 +20,8 @@ mod sentry;
 mod share_inbox;
 #[cfg(desktop)]
 mod tray;
+#[cfg(all(not(feature = "cef"), target_os = "linux"))]
+mod webkit;
 
 use std::{
     collections::HashMap,
@@ -316,6 +318,9 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     if let Some(window) = app.get_webview_window("main") {
         ios::hide_form_accessory_bar(&window);
     }
+
+    #[cfg(all(not(feature = "cef"), target_os = "linux"))]
+    webkit::configure(app.handle());
 
     Ok(())
 }
