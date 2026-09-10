@@ -67,7 +67,7 @@ function fenceLanguageRule(): InputRule {
       const { $from } = state.selection;
       const block = $from.parent;
       if (block.type !== nodes.code_block || block.attrs.language !== '') return null;
-      if (block.textContent !== match[1]) return null;
+      if (block.textContent !== match[0].slice(0, end - start)) return null;
 
       return state.tr.delete(start, end).setNodeMarkup($from.before(), undefined, {
         language: match[1],
@@ -80,16 +80,18 @@ function fenceLanguageRule(): InputRule {
 function autolinkRule(): InputRule {
   return new InputRule(
     URL_PATTERN,
-    (state, match, _start, end) => {
+    (state, match, start, end) => {
       const text = match[1];
-      const from = end - text.length;
+      const from = start + (match[0].length - text.length - match[2].length);
+      const to = from + text.length;
       if (from < 0 || marks.link.isInSet(state.doc.resolve(from).marks())) return null;
 
       const href = text.startsWith('www.') ? `https://${text}` : text;
-      return state.tr
-        .addMark(from, end, marks.link.create({ href }))
-        .removeStoredMark(marks.link)
-        .insertText(match[2], end);
+      const tr = state.tr
+        .addMark(from, to, marks.link.create({ href }))
+        .removeStoredMark(marks.link);
+
+      return end - start === match[0].length ? tr : tr.insertText(match[2], to);
     },
     { inCodeMark: false }
   );

@@ -27,6 +27,7 @@ import type { PackImageView } from '#src/generated/protocol';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { AutocompleteQuery } from '../autocomplete';
+import { compositionInputRules } from './composition-rules';
 import {
   activeMarks,
   formatCommands,
@@ -303,6 +304,7 @@ export class ComposerEditor {
         inputRules({
           rules: [shortcodeInputRule(this.options.emotes), ...(rich ? formattingInputRules : [])],
         }),
+        compositionInputRules(),
         ...(rich
           ? [
               keymap(formattingKeymap),
