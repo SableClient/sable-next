@@ -12,8 +12,8 @@
 
 <AppPageShell
   eyebrow={space?.name ?? undefined}
-  title={$i18n.t('room.createTitle')}
-  description={$i18n.t('room.createDescription')}
+  title={$i18n.t('room.createSubspaceTitle')}
+  description={$i18n.t('room.createSpaceDescription')}
 >
-  <CreateRoomForm mode="room" parentSpaceId={space?.room_id ?? null} />
+  <CreateRoomForm mode="space" parentSpaceId={space?.room_id ?? null} />
 </AppPageShell>

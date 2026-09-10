@@ -47,6 +47,8 @@
     "mobilePanelInstructions": "Swipe right to show the room list or left to show the conversation. Use the left and right arrow keys to switch panels.",
     "roomOptions": "Room options",
     "createRoomInSpace": "Create room in space",
+    "createSpace": "Create space",
+    "createSubspace": "Create subspace",
     "folder": "Folder",
     "folderRename": "Rename folder",
     "folderRenameDescription": "Choose a short label. Leave it empty to show the space names again.",
@@ -86,6 +88,9 @@
   "room": {
     "createTitle": "Create a room",
     "createDescription": "Rooms hold a conversation. A space holds rooms.",
+    "createSpaceTitle": "Create a space",
+    "createSubspaceTitle": "Create a subspace",
+    "createSpaceDescription": "A space groups rooms and other spaces together.",
     "createNameLabel": "Name",
     "createNamePlaceholder": "General",
     "createTopicLabel": "Topic",

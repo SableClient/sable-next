@@ -33,9 +33,10 @@
   interface Props {
     /** Preselects the parent space, so creating from inside a space stays there. */
     parentSpaceId?: string | null;
+    mode?: 'all' | 'room' | 'space';
   }
 
-  let { parentSpaceId = null }: Props = $props();
+  let { parentSpaceId = null, mode = 'all' }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const userIdPattern = /^@[^:\s]+:\S+$/;
@@ -48,7 +49,9 @@
   // `parentSpaceId` arrives once the room list has loaded, so the field follows
   // it until the user picks something else.
   let parentChoice = $state<string | null>(null);
-  let parentSpace = $derived(parentChoice ?? parentSpaceId ?? '');
+  let parentSpace = $derived(
+    mode === 'all' ? (parentChoice ?? parentSpaceId ?? '') : (parentSpaceId ?? '')
+  );
   let joinRuleChoice = $state<PrivateJoinRule>('invite');
   let alias = $state('');
   let roomVersionChoice = $state('');
@@ -61,8 +64,9 @@
   let failed = $state(false);
 
   let spaces = $derived(roomList.rooms.filter((room) => room.is_space && room.state === 'joined'));
+  let effectiveKind = $derived(mode === 'space' ? 'space' : kind);
   // The core ignores `encrypted` for a space or a public room.
-  let encryptable = $derived(kind !== 'space' && access === 'private');
+  let encryptable = $derived(effectiveKind !== 'space' && access === 'private');
   let parentSpaceSummary = $derived(spaces.find((space) => space.room_id === parentSpace) ?? null);
   let knockSupported = $derived(roomList.rooms.some((room) => room.supports_knock));
   let restrictedSupported = $derived(parentSpaceSummary?.supports_restricted ?? false);
@@ -165,7 +169,7 @@
       const roomId = await core.commands.createRoom({
         name: name.trim(),
         topic: topic.trim() === '' ? null : topic.trim(),
-        kind,
+        kind: effectiveKind,
         public: access === 'public',
         encrypted: encryptable && encrypted,
         // A `$state` array is a Proxy, which postMessage cannot clone.
@@ -177,7 +181,7 @@
         federate,
       });
       const target = roomPathParamFromId(roomId);
-      if (kind === 'space') {
+      if (effectiveKind === 'space') {
         await goto(resolve('/(app)/space/[spaceId]', { spaceId: target }));
       } else if (parentSpace !== '') {
         // A child opens inside its space, so the rail and room list stay put.
@@ -221,38 +225,46 @@
     <p class="hint">{$i18n.t('room.createTopicHint')}</p>
   </div>
 
-  <div class="field">
-    <span class="field-label">{$i18n.t('room.createKindLabel')}</span>
-    <OptionCards
-      label={$i18n.t('room.createKindLabel')}
-      value={kind}
-      onSelect={(next: CreateRoomKind) => {
-        kind = next;
-      }}
-      options={[
-        {
-          value: 'text',
-          label: $i18n.t('room.createKindRoom'),
-          hint: $i18n.t('room.createKindRoomHint'),
-          icon: ChatsIcon,
-        },
-        {
-          value: 'voice',
-          label: $i18n.t('room.createKindVoice'),
-          hint: $i18n.t('room.createKindVoiceHint'),
-          icon: SpeakerHighIcon,
-        },
-        {
-          value: 'space',
-          label: $i18n.t('room.createKindSpace'),
-          hint: $i18n.t('room.createKindSpaceHint'),
-          icon: UsersThreeIcon,
-        },
-      ]}
-    />
-  </div>
+  {#if mode === 'space'}
+    <p class="hint">{$i18n.t('room.createSpaceDescription')}</p>
+  {:else}
+    <div class="field">
+      <span class="field-label">{$i18n.t('room.createKindLabel')}</span>
+      <OptionCards
+        label={$i18n.t('room.createKindLabel')}
+        value={kind}
+        onSelect={(next: CreateRoomKind) => {
+          kind = next;
+        }}
+        options={[
+          {
+            value: 'text',
+            label: $i18n.t('room.createKindRoom'),
+            hint: $i18n.t('room.createKindRoomHint'),
+            icon: ChatsIcon,
+          },
+          {
+            value: 'voice',
+            label: $i18n.t('room.createKindVoice'),
+            hint: $i18n.t('room.createKindVoiceHint'),
+            icon: SpeakerHighIcon,
+          },
+          ...(mode === 'all'
+            ? [
+                {
+                  value: 'space' as const,
+                  label: $i18n.t('room.createKindSpace'),
+                  hint: $i18n.t('room.createKindSpaceHint'),
+                  icon: UsersThreeIcon,
+                },
+              ]
+            : []),
+        ]}
+      />
+    </div>
+  {/if}
 
-  {#if spaces.length > 0}
+  {#if mode === 'all' && spaces.length > 0}
     <div class="field">
       <Label for="create-room-parent">{$i18n.t('room.createParentLabel')}</Label>
       <Select

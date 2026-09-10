@@ -5,6 +5,8 @@
     SpaceHierarchyRoomView,
   } from '#src/generated/protocol';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import { goto } from '$app/navigation';
@@ -365,6 +367,32 @@
     {/if}
     <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" uniform />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
+    {#if canManage && space}
+      <div class="hero-actions">
+        <Button
+          size="small"
+          onclick={() => {
+            void goto(
+              resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(space) })
+            );
+          }}
+        >
+          <PlusIcon />
+          {$i18n.t('nav.createRoomInSpace')}
+        </Button>
+        <Button
+          size="small"
+          onclick={() => {
+            void goto(
+              resolve('/(app)/space/[spaceId]/create-space', { spaceId: roomPathParam(space) })
+            );
+          }}
+        >
+          <UsersThreeIcon />
+          {$i18n.t('nav.createSubspace')}
+        </Button>
+      </div>
+    {/if}
     {#if space?.topic}
       <button
         type="button"
@@ -496,6 +524,14 @@
     position: absolute;
     right: 0;
     top: var(--space-300);
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+    justify-content: center;
+    margin-top: var(--space-300);
   }
 
   h1 {

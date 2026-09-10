@@ -149,6 +149,14 @@
 
   const searchHref = resolve('/(app)/search');
   const joinHref = `${resolve('explore')}#explore-join-by-address`;
+  let createSpaceHref = $derived(
+    activeSpace === null
+      ? resolve('create-space')
+      : resolve('/(app)/space/[spaceId]/create-space', { spaceId: roomPathParam(activeSpace) })
+  );
+  let createSpaceLabel = $derived(
+    activeSpace === null ? $i18n.t('nav.createSpace') : $i18n.t('nav.createSubspace')
+  );
   let browseLabel = $derived(
     activeSpace === null ? $i18n.t('nav.exploreSpaces') : $i18n.t('nav.lobby')
   );
@@ -609,6 +617,15 @@
               >
                 <PlusIcon />
                 {createRoomLabel}
+              </DropdownMenu.Item>
+            {/if}
+            {#if canCreateHere}
+              <DropdownMenu.Item
+                class="sable-menu-item"
+                onSelect={() => navigateTo(createSpaceHref)}
+              >
+                <HouseIcon />
+                {createSpaceLabel}
               </DropdownMenu.Item>
             {/if}
             <DropdownMenu.Item class="sable-menu-item" onSelect={() => navigateTo(joinHref)}>
