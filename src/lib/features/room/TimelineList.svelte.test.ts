@@ -175,6 +175,36 @@ test('fills a short live timeline until the server reports the timeline start', 
   await unmount(instance);
 });
 
+test('a permalink whose context does not fill the viewport paginates on its own', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('older'), item('target'), item('newer')];
+  roomTimeline.mode = { kind: 'focused', eventId: '$target' };
+  const future = vi.fn(() => {
+    roomTimeline.forwardPagination = 'end';
+    return Promise.resolve();
+  });
+  const history = vi.fn(() => Promise.resolve(true));
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$target',
+        onRequestHistory: history,
+        onRequestFuture: future,
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(future).toHaveBeenCalled();
+  await unmount(instance);
+});
+
 test('continues the opening fill past twenty pages until the server reports the start', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];

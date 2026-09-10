@@ -33,3 +33,33 @@ test('jumps to an event outside the loaded range', async ({
   await expect(timeline.itemByEventId(distantEventId)).toBeVisible({ timeout: 30_000 });
   await expect(timeline.message(distantBody)).toBeVisible();
 });
+
+test('scrolls forward out of a permalink whose context is shorter than the viewport', async ({
+  page,
+  app,
+  timeline,
+  deepRoom,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const target = deepRoom.eventIds[0];
+  await app.openPermalink(deepRoom.roomId, target);
+  await timeline.expectRevealed({ timeout: 30_000 });
+  await expect(timeline.itemByEventId(target)).toBeVisible({ timeout: 30_000 });
+
+  await expect.poll(() => timeline.scrollableHeight(), { timeout: 30_000 }).toBeGreaterThan(0);
+
+  const forward = deepRoom.eventIds[30];
+  await timeline.viewport.hover();
+  await expect
+    .poll(
+      async () => {
+        if (await timeline.itemByEventId(forward).isVisible()) return true;
+        await page.mouse.wheel(0, 900);
+        return false;
+      },
+      { intervals: Array.from({ length: 120 }, () => 250), timeout: 60_000 }
+    )
+    .toBe(true);
+});

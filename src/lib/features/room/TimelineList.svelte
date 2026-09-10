@@ -151,6 +151,7 @@
   let historyRequestPending = $state(false);
   let historyTask: Promise<boolean> | null = null;
   let emptyRefillPending = false;
+  let focusFilling = false;
   let hadVisibleItems = false;
   let personas = $derived(personaLookup(timeline.items));
   let personaOpen = $state(false);
@@ -278,6 +279,32 @@
       if (!loading && !disposed) void openTimeline(engine);
     });
   });
+  async function fillFocusedViewport(engine: TimelineWindow<RowValue>): Promise<void> {
+    if (focusFilling) return;
+    focusFilling = true;
+    try {
+      while (!disposed && timeline.mode.kind !== 'live') {
+        const node = viewport;
+        if (!node || node.scrollHeight - node.clientHeight > 1) break;
+        if (timeline.forwardPagination === 'loading' || timeline.backwardPagination === 'loading') {
+          await new Promise((resolve) =>
+            setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval)
+          );
+          continue;
+        }
+        if (timeline.forwardPagination !== 'end') await onRequestFuture();
+        else if (!historyExhausted && timeline.backwardPagination !== 'end')
+          historyExhausted = await requestHistory();
+        else break;
+        await engine.update(entries);
+        await new Promise(requestAnimationFrame);
+      }
+    } catch {
+      historyExhausted = false;
+    } finally {
+      focusFilling = false;
+    }
+  }
   async function awaitPagination(): Promise<void> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
     while (!disposed && timeline.backwardPagination === 'loading' && performance.now() < deadline) {
@@ -303,6 +330,7 @@
         handledFocus = focusEventId;
       }
       revealed = true;
+      if (entry) await fillFocusedViewport(engine);
       return;
     }
     const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
@@ -375,7 +403,9 @@
     const entry = entries.find(({ value }) => value.item.event_id === target);
     if (!entry) return;
     handledFocus = target;
-    void engine.jumpTo(entry.key, 'center', !prefersReducedMotion.current);
+    void engine
+      .jumpTo(entry.key, 'center', !prefersReducedMotion.current)
+      .then(() => fillFocusedViewport(engine));
   });
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
