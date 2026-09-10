@@ -410,32 +410,6 @@ impl Core {
         Ok(())
     }
 
-    pub(crate) async fn send_with_persona(
-        &self,
-        room: &Room,
-        content: &AnyMessageLikeEventContent,
-        profile: &PerMessageProfileView,
-    ) -> Result<(), CommandErr> {
-        let event_type = content.event_type().to_string();
-        let mut value = serde_json::to_value(content)
-            .map_err(|error| self.failed("send_with_persona", error))?;
-
-        stamp_profile(&mut value, profile);
-        if let Some(new_content) = value.get_mut("m.new_content") {
-            stamp_profile(new_content, profile);
-        }
-
-        let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(value.to_string())
-            .map_err(|error| self.failed("send_with_persona", error))?;
-
-        room.send_queue()
-            .send_raw(raw, event_type)
-            .await
-            .map_err(|error| self.failed("send_with_persona", error))?;
-
-        Ok(())
-    }
-
     async fn persona_account_data(
         &self,
         event_type: GlobalAccountDataEventType,

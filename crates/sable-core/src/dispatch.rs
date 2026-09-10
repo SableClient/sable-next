@@ -382,8 +382,13 @@ impl Core {
                         None => content,
                     };
 
-                    self.send_with_persona(&room, &content.into(), &persona)
-                        .await?;
+                    timeline
+                        .send_with_extra_content(
+                            content.into(),
+                            Some(crate::personas::profile_extra_content(&persona)),
+                        )
+                        .await
+                        .map_err(|error| self.failed("send_message", error))?;
                     return Ok(CommandOk::SendMessage);
                 }
 
