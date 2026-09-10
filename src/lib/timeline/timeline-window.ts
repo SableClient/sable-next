@@ -228,10 +228,10 @@ export class TimelineWindow<T> {
     }
     this.pinned = key === null;
     this.anchors = [];
-    this.setTop(this.estimatePrefix());
-    this.setHeight(Math.max(this.top + this.contentHeight, this.options.viewport.clientHeight));
-    if (this.pinned) this.setTop(this.height - this.contentHeight);
     const viewport = this.options.viewport;
+    this.setTop(Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight));
+    this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
+    if (this.pinned) this.setTop(this.height - this.contentHeight);
     const target = row
       ? viewport.scrollTop +
         row.getBoundingClientRect().top -
@@ -243,6 +243,7 @@ export class TimelineWindow<T> {
     this.jumping = smooth;
     this.active = smooth;
     this.writeOffset(target, smooth);
+    if (this.atEnd()) this.pinned = true;
     if (smooth) this.scheduleSettle();
     this.capture();
     this.publish();

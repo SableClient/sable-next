@@ -921,3 +921,29 @@ test('a send that resizes the composer before its scroll event keeps following l
     f.viewport.getBoundingClientRect().bottom
   );
 });
+
+test('opening on an unread marker in a room that fits leaves no gap under the last row', async () => {
+  const f = fixture();
+  await f.window.update(entries(4));
+
+  await f.window.jumpTo('1', 'start');
+
+  expect(f.content.lastElementChild?.getBoundingClientRect().bottom).toBe(
+    f.viewport.getBoundingClientRect().bottom
+  );
+});
+
+test('a room opened on its last unread stays flush when the marker row is removed', async () => {
+  const f = fixture();
+  await f.window.update(entries(1_000));
+  await f.window.jumpTo('998', 'start');
+  await vi.advanceTimersByTimeAsync(200);
+  expect(f.window.state.pinned).toBe(true);
+
+  await f.window.update(entries(1_000).filter((entry) => entry.key !== '998'));
+  await vi.advanceTimersByTimeAsync(200);
+
+  expect(f.content.lastElementChild?.getBoundingClientRect().bottom).toBe(
+    f.viewport.getBoundingClientRect().bottom
+  );
+});

@@ -540,6 +540,27 @@ test('opens at the first unread message rather than the newest', async ({
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
 });
 
+test('a room that fits opens on its unread marker with no gap under the last message', async ({
+  page,
+  app,
+  timeline,
+  installRoomCore,
+}) => {
+  await installRoomCore('unread');
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+
+  await expect(timeline.message('General message 5')).toBeVisible();
+  const gap = await timeline.viewport.evaluate((node) => {
+    const last = [...node.querySelectorAll('.item')].at(-1);
+    if (!last) throw new Error('no rendered rows');
+    return node.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
+  });
+  expect(gap).toBeLessThanOrEqual(1);
+});
+
 test('follows an appended event while a pointer rests on the timeline', async ({
   page,
   app,
