@@ -5,7 +5,6 @@ import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirr
 import type { Command, EditorState } from 'prosemirror-state';
 import { wrapIn } from 'prosemirror-commands';
 
-import { isFenceLanguage } from './fence-languages';
 import { composerSchema } from './schema';
 
 const nodes = composerSchema.nodes;
@@ -53,31 +52,14 @@ export const formattingInputRules: readonly InputRule[] = [
     (match) => ({ order: Number(match[1]) }),
     (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
   ),
-  textblockTypeInputRule(/^```$/, nodes.code_block),
-  fenceLanguageRule(),
+  textblockTypeInputRule(/^```([^`\s]*) $/, nodes.code_block, (match) => ({
+    language: match[1],
+  })),
   new InputRule(/^(?:---|\*\*\*|___)$/, (state, _match, start, end) =>
     state.tr.replaceRangeWith(start, end, nodes.horizontal_rule.create()).scrollIntoView()
   ),
   autolinkRule(),
 ];
-
-function fenceLanguageRule(): InputRule {
-  return new InputRule(
-    /^([\w-]+) $/,
-    (state, match, start, end) => {
-      const { $from } = state.selection;
-      const block = $from.parent;
-      if (block.type !== nodes.code_block || block.attrs.language !== '') return null;
-      if (block.textContent !== match[0].slice(0, end - start)) return null;
-      if (!isFenceLanguage(match[1])) return null;
-
-      return state.tr.delete(start, end).setNodeMarkup($from.before(), undefined, {
-        language: match[1],
-      });
-    },
-    { inCode: 'only' }
-  );
-}
 
 function autolinkRule(): InputRule {
   return new InputRule(

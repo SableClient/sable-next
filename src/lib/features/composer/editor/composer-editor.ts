@@ -28,7 +28,6 @@ import type { PackImageView } from '#src/generated/protocol';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { AutocompleteQuery } from '../autocomplete';
 import { compositionInputRules } from './composition-rules';
-import { isFenceLanguage } from './fence-languages';
 import {
   activeMarks,
   formatCommands,
@@ -110,19 +109,50 @@ const exitEmptyCodeLine: Command = (state, dispatch) => {
   return true;
 };
 
-const captureFenceLanguage: Command = (state, dispatch) => {
+const deleteEmptyCodeBlock: Command = (state, dispatch) => {
   const { $from } = state.selection;
   const block = $from.parent;
   if (!state.selection.empty || block.type !== composerSchema.nodes.code_block) return false;
-  if (block.attrs.language !== '') return false;
+  if ($from.parentOffset !== 0 || block.content.size !== 0) return false;
 
-  const text = block.textContent;
-  if ($from.parentOffset !== text.length || !isFenceLanguage(text)) return false;
+  const from = $from.before();
+  const to = $from.after();
+  const container = $from.node(-1);
+  const canDelete = container.canReplace($from.index(-1), $from.indexAfter(-1));
+
+  if (dispatch) {
+    const tr = canDelete
+      ? state.tr.delete(from, to)
+      : state.tr.setBlockType(from, to, composerSchema.nodes.paragraph);
+    const position = Math.min(from, tr.doc.content.size);
+    dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(position), -1)).scrollIntoView());
+  }
+  return true;
+};
+
+const FENCE = /^```([^`\s]*)[ \t]*$/;
+
+const openFence: Command = (state, dispatch) => {
+  const { $from } = state.selection;
+  const block = $from.parent;
+  if (!state.selection.empty || block.type !== composerSchema.nodes.paragraph) return false;
+  if ($from.parentOffset !== block.content.size) return false;
+
+  const match = FENCE.exec(block.textContent);
+  if (!match) return false;
+
+  const start = $from.start();
+  const $start = state.doc.resolve(start);
+  const codeBlock = composerSchema.nodes.code_block;
+  if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), codeBlock)) {
+    return false;
+  }
 
   dispatch?.(
     state.tr
-      .delete($from.before() + 1, $from.after() - 1)
-      .setNodeMarkup($from.before(), undefined, { language: text })
+      .delete(start, start + block.content.size)
+      .setBlockType(start, start, codeBlock, { language: match[1] })
+      .scrollIntoView()
   );
   return true;
 };
@@ -316,8 +346,8 @@ export class ComposerEditor {
 
   private enter: Command = (state, dispatch, view) => {
     if (this.options.onNavigate('Enter')) return true;
+    if (openFence(state, dispatch, view)) return true;
     if (exitEmptyCodeLine(state, dispatch, view)) return true;
-    if (captureFenceLanguage(state, dispatch, view)) return true;
     if (newlineInCode(state, dispatch, view)) return true;
     return preferences.enterForNewline ? splitEntry(state, dispatch, view) : this.submit();
   };
@@ -374,7 +404,7 @@ export class ComposerEditor {
           'Mod-z': undo,
           'Mod-y': redo,
           'Shift-Mod-z': redo,
-          Backspace: undoInputRule,
+          Backspace: chainCommands(deleteEmptyCodeBlock, undoInputRule),
           ArrowUp: () => this.options.onNavigate('ArrowUp'),
           ArrowDown: () => this.options.onNavigate('ArrowDown'),
           'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
@@ -429,11 +459,25 @@ export class ComposerEditor {
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
             beforeinput: (view, event) => {
-              if (!hasAndroidCompositionQuirk()) return false;
               if (event.inputType === 'deleteContentBackward') {
+                if (
+                  event.cancelable &&
+                  deleteEmptyCodeBlock(
+                    view.state,
+                    (tr) => {
+                      view.dispatch(tr);
+                    },
+                    view
+                  )
+                ) {
+                  event.preventDefault();
+                  return true;
+                }
+                if (!hasAndroidCompositionQuirk()) return false;
                 handleAndroidDeleteBackward(view);
                 return true;
               }
+              if (!hasAndroidCompositionQuirk()) return false;
               if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
                 event.preventDefault();
                 return this.enter(

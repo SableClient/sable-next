@@ -284,22 +284,32 @@ test('an address inside a code span is left alone', () => {
   expect(marksOn('https://example.org')).toEqual(['code']);
 });
 
-test('a fence carries its language into the block', () => {
+test('a fence opens a block when a space follows its language', () => {
   open();
   type('```rust ');
 
   const block = view?.state.doc.firstChild;
   expect(block?.type.name).toBe('code_block');
   expect(block?.attrs.language).toBe('rust');
+  expect(block?.textContent).toBe('');
 });
 
-test('a first code word that is not a language is left in the block', () => {
+test('a bare fence opens a block when followed by a space', () => {
   open();
-  type('```const ');
+  type('``` ');
 
   const block = view?.state.doc.firstChild;
+  expect(block?.type.name).toBe('code_block');
   expect(block?.attrs.language).toBe('');
-  expect(block?.textContent).toBe('const ');
+  expect(block?.textContent).toBe('');
+});
+
+test('a fence stays text until enter or a following space opens it', () => {
+  open();
+  type('```go');
+
+  expect(view?.state.doc.firstChild?.type.name).toBe('paragraph');
+  expect(view?.state.doc.textContent).toBe('```go');
 });
 
 test('three dashes become a rule rather than a paragraph of dashes', () => {

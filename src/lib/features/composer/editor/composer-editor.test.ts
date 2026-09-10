@@ -259,6 +259,20 @@ describe('Android backspace fallback', () => {
     expect(editor.doc()?.textContent).toBe('h');
   });
 
+  test('removes an empty code block before the IME can mutate its DOM', () => {
+    setUserAgent(androidUserAgent);
+    const editor = open();
+    editor.setHtml('<pre></pre>');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(TextSelection.create(view(editor).state.doc, 1))
+    );
+
+    const event = beforeInput(surface(), 'deleteContentBackward');
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
+  });
+
   test.each([
     ['Android non-delete input', androidUserAgent, 'insertText'],
     ['non-Android backward delete', defaultUserAgent, 'deleteContentBackward'],
@@ -273,6 +287,20 @@ describe('Android backspace fallback', () => {
 
     expect(editor.doc()?.textContent).toBe('hi');
   });
+});
+
+test('iOS-style beforeinput removes an empty code block', () => {
+  setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+  const editor = open();
+  editor.setHtml('<pre></pre>');
+  view(editor).dispatch(
+    view(editor).state.tr.setSelection(TextSelection.create(view(editor).state.doc, 1))
+  );
+
+  const event = beforeInput(surface(), 'deleteContentBackward');
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
 });
 
 describe('Android enter', () => {
@@ -354,6 +382,12 @@ function press(
   view(editor).someProp('handleKeyDown', (handler) => handler(view(editor), event));
 }
 
+function pressSurface(key: string): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  surface().dispatchEvent(event);
+  return event;
+}
+
 describe('block editing', () => {
   test('shift+enter inserts a soft break instead of a second paragraph', () => {
     const editor = open();
@@ -411,6 +445,9 @@ describe('block editing', () => {
 
     expect(editor.doc()?.firstChild?.textContent).toBe('a');
     expect(view(editor).state.selection.$from.parent.type.name).toBe('paragraph');
+    expect(surface().querySelector('pre code')?.textContent).toBe('a');
+    expect(surface().querySelectorAll('pre br.ProseMirror-trailingBreak')).toHaveLength(0);
+    expect(surface().querySelectorAll('p br.ProseMirror-trailingBreak')).toHaveLength(1);
   });
 
   test('enter in a freshly opened code block writes a newline instead of leaving it', () => {
@@ -425,21 +462,58 @@ describe('block editing', () => {
     expect(editor.doc()?.firstChild?.textContent).toBe('\n');
   });
 
-  test('enter after the language word moves it onto the block', () => {
+  test('backspace on an empty code block removes the block', () => {
     const editor = open();
-    editor.setHtml('<pre>rust</pre>');
-    const block = view(editor).state.doc.firstChild;
-    if (!block) throw new Error('code block not found');
+    editor.setHtml('<pre></pre>');
     view(editor).dispatch(
-      view(editor).state.tr.setSelection(
-        TextSelection.create(view(editor).state.doc, block.nodeSize - 1)
-      )
+      view(editor).state.tr.setSelection(TextSelection.create(view(editor).state.doc, 1))
+    );
+
+    const event = pressSurface('Backspace');
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
+    expect(surface().querySelector('pre')).toBeNull();
+  });
+
+  test('enter after a fence opens the block it names', () => {
+    const editor = open();
+    editor.setText('```rust');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+    );
+    const event = pressSurface('Enter');
+
+    const code = editor.doc()?.firstChild;
+    expect(event.defaultPrevented).toBe(true);
+    expect(code?.type.name).toBe('code_block');
+    expect(code?.attrs.language).toBe('rust');
+    expect(code?.textContent).toBe('');
+    expect(surface().querySelector('pre')?.getAttribute('data-language')).toBe('rust');
+    expect(surface().querySelector('pre code')?.textContent).toBe('');
+  });
+
+  test('enter after a fence ignores its trailing whitespace', () => {
+    const editor = open();
+    editor.setText('```golang  ');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
     );
     press(editor, 'Enter');
 
-    const code = editor.doc()?.firstChild;
-    expect(code?.attrs.language).toBe('rust');
-    expect(code?.textContent).toBe('');
+    expect(editor.doc()?.firstChild?.attrs.language).toBe('golang');
+  });
+
+  test('enter after a bare fence opens an empty block', () => {
+    const editor = open();
+    editor.setText('```');
+    view(editor).dispatch(
+      view(editor).state.tr.setSelection(Selection.atEnd(view(editor).state.doc))
+    );
+    press(editor, 'Enter');
+
+    expect(editor.doc()?.firstChild?.type.name).toBe('code_block');
+    expect(editor.doc()?.firstChild?.attrs.language).toBe('');
   });
 
   test('shift+arrowdown exits a code block from its final line', () => {

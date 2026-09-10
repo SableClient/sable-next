@@ -78,12 +78,12 @@ test('an autolink keeps the space that is already in the document', () => {
   expect(linkOn('https://example.org')).toBe('https://example.org');
 });
 
-test('a fence language still moves onto the node', () => {
+test('a fence opens after composition when a space follows its language', () => {
   open();
-  editor().dispatch(editor().state.tr.setBlockType(1, 1, composerSchema.nodes.code_block));
-  commit('rust ');
+  commit('```rust ');
 
   const block = editor().state.doc.firstChild;
+  expect(block?.type.name).toBe('code_block');
   expect(block?.attrs.language).toBe('rust');
   expect(block?.textContent).toBe('');
 });
