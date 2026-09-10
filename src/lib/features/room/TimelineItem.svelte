@@ -1180,8 +1180,12 @@
   .message header {
     align-items: center;
     display: flex;
-    flex-wrap: wrap;
     gap: var(--space-200);
+    min-width: 0;
+  }
+
+  .message header :global(.sender-identity) {
+    flex-shrink: 1;
   }
 
   .message header .message-details {
@@ -1190,6 +1194,7 @@
     flex-grow: 1;
     font-size: var(--font-size-small);
     justify-content: end;
+    min-width: 0;
   }
 
   .persona {
@@ -1249,6 +1254,10 @@
     border-radius: var(--radius-pill);
     cursor: pointer;
     letter-spacing: 0.01em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .via.via-hidden {
@@ -1291,6 +1300,10 @@
   time,
   .edited {
     color: var(--sable-surface-var-on-container);
+  }
+
+  .message-details time {
+    flex-shrink: 0;
   }
 
   .edited {
