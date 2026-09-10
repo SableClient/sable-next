@@ -50,6 +50,7 @@
   let clock = $state(Date.now());
   let loadGeneration = $state(0);
   let retryNextLoad = false;
+  let backoffSource: string | null = null;
   /* An unsized video lays out at the UA's 150px, then jumps to its intrinsic
      size once metadata arrives, shoving the rows below it down. */
   let mediaLabel = $derived(
@@ -99,9 +100,12 @@
 
   $effect(() => {
     if (!failed || retryWait === 0) return;
-    const timeout = setTimeout(() => {
-      clock = Date.now();
-    }, retryWait);
+    const timeout = setTimeout(
+      () => {
+        clock = Date.now();
+      },
+      Math.min(retryWait, 1000)
+    );
     return () => {
       clearTimeout(timeout);
     };
@@ -118,6 +122,11 @@
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
     failed = false;
+    if (source !== backoffSource) {
+      backoffSource = source;
+      retryCount = 0;
+      retryAt = 0;
+    }
     const release = holdMediaUrl(core, source, 0, 0);
     const cached = cachedMediaUrl(core, source, 0, 0);
     if (cached !== undefined) {
@@ -129,7 +138,10 @@
     const load = retry ? retryMediaUrl : loadMediaUrl;
     void load(core, source, 0, 0, mime)
       .then((nextUrl) => {
-        if (active) url = nextUrl;
+        if (!active) return;
+        url = nextUrl;
+        retryCount = 0;
+        retryAt = 0;
       })
       .catch(() => {
         if (!active) return;

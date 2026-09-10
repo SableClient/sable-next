@@ -60,6 +60,7 @@
   let clock = $state(Date.now());
   let loadGeneration = $state(0);
   let retryNextLoad = false;
+  let backoffSource: string | null = null;
   let gifPreview = $state<HTMLCanvasElement>();
   let gifImage = $state<HTMLImageElement>();
   let gifPreviewReady = $state(false);
@@ -124,9 +125,12 @@
 
   $effect(() => {
     if (!failed || retryWait === 0) return;
-    const timeout = setTimeout(() => {
-      clock = Date.now();
-    }, retryWait);
+    const timeout = setTimeout(
+      () => {
+        clock = Date.now();
+      },
+      Math.min(retryWait, 1000)
+    );
     return () => {
       clearTimeout(timeout);
     };
@@ -136,6 +140,11 @@
     let active = true;
     const retry = loadGeneration > 0 && retryNextLoad;
     retryNextLoad = false;
+    if (source !== backoffSource) {
+      backoffSource = source;
+      retryCount = 0;
+      retryAt = 0;
+    }
     const asIs = original || mime === 'image/svg+xml' || animatedGif || servedSideways;
     const requestWidth = asIs ? 0 : width;
     const requestHeight = asIs ? 0 : height;
@@ -147,6 +156,7 @@
       gifPlaying = false;
       if (url !== cached) imageLoaded = false;
       url = cached;
+      failed = false;
       return release;
     }
 
@@ -164,6 +174,8 @@
         gifPreviewReady = false;
         gifPlaying = false;
         url = nextUrl;
+        retryCount = 0;
+        retryAt = 0;
       })
       .catch(() => {
         if (!active) return;
@@ -362,7 +374,15 @@
       <ImageBrokenIcon />
       <span>{unavailableLabel}</span>
       {#if retryable}
-        <Button class="retry-media" size="small" onclick={retry} disabled={retryWait > 0}>
+        <Button
+          class="retry-media"
+          size="small"
+          onclick={retry}
+          onpointerdown={stopTimelinePress}
+          onpointermove={stopTimelinePress}
+          onpointerup={stopTimelinePress}
+          disabled={retryWait > 0}
+        >
           {retryLabel}
         </Button>
       {/if}

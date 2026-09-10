@@ -127,6 +127,37 @@ test('backs off repeated manual retries', async () => {
   await unmount(instance);
 });
 
+test('counts the retry backoff down while it waits', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/retry-countdown',
+      alt: 'Holiday photo',
+      width: 800,
+      height: 600,
+      retryable: true,
+    },
+  });
+
+  await vi.advanceTimersByTimeAsync(0);
+  await tick();
+  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  await vi.advanceTimersByTimeAsync(0);
+  await tick();
+
+  expect(document.querySelector('.retry-media')?.textContent).toContain('Retry in 2 seconds');
+
+  await vi.advanceTimersByTimeAsync(1000);
+  await tick();
+
+  expect(document.querySelector('.retry-media')?.textContent).toContain('Retry in 1 second');
+
+  await unmount(instance);
+  vi.useRealTimers();
+});
+
 test('renders clickable media as a button', async () => {
   const onclick = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));

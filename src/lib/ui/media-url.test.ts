@@ -60,6 +60,57 @@ test('does not revoke an object URL a caller is still displaying', async () => {
   expect(revoke).toHaveBeenCalledWith(held);
 });
 
+test('revokes the URL it replaces when a key is fetched twice', async () => {
+  let nextUrl = 0;
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:replaced-${String(nextUrl++)}`);
+  const core = {
+    session: { account_id: 'account-replaced', user_id: '@a:example.org', device_id: 'device-a' },
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+  const source = 'mxc://example.org/notification-avatar';
+
+  const first = await loadMediaUrl(core, source, 96, 96);
+  const second = await loadMediaUrl(core, source, 96, 96);
+
+  expect(second).not.toBe(first);
+  expect(revoke).toHaveBeenCalledWith(first);
+});
+
+test('holds media requests at six in flight', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:gated');
+  const settlers: (() => void)[] = [];
+  const core = {
+    session: { account_id: 'account-gated', user_id: '@a:example.org', device_id: 'device-a' },
+    commands: {
+      fetchMedia: vi.fn(
+        () =>
+          new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
+            settlers.push(() => {
+              resolve(new Uint8Array([1]));
+            });
+          })
+      ),
+    },
+  };
+
+  const requests = Array.from({ length: 8 }, (_, index) =>
+    loadMediaUrl(core, `mxc://example.org/gated-${String(index)}`, 96, 96)
+  );
+
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(6);
+
+  for (let settled = 0; settled < requests.length; settled += 1) {
+    await vi.waitFor(() => {
+      expect(settlers.length).toBeGreaterThan(settled);
+    });
+    settlers[settled]?.();
+  }
+  await Promise.all(requests);
+
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(8);
+});
+
 test('never revokes the URL it is about to return', async () => {
   let nextUrl = 0;
   const revoke = vi.spyOn(URL, 'revokeObjectURL');

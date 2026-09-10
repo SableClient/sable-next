@@ -14,7 +14,16 @@ const holds = new Map<string, number>();
 const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
+const MAX_MEDIA_REQUESTS = 6;
 let objectUrlBytes = 0;
+let inflight = 0;
+const waiting: (() => void)[] = [];
+
+function releaseSlot(): void {
+  const next = waiting.shift();
+  if (next) next();
+  else inflight -= 1;
+}
 
 function cacheKey(
   accountId: string | undefined,
@@ -122,6 +131,21 @@ export type MediaFetcher = Pick<CoreClient, 'session'> & {
   commands: Pick<CoreCommands, 'fetchMedia'>;
 };
 
+function fetchThroughGate(
+  core: MediaFetcher,
+  source: string,
+  width: number,
+  height: number
+): Promise<Uint8Array<ArrayBuffer>> {
+  const fetch = (): Promise<Uint8Array<ArrayBuffer>> =>
+    core.commands.fetchMedia(source, width, height);
+  if (inflight < MAX_MEDIA_REQUESTS) {
+    inflight += 1;
+    return fetch();
+  }
+  return new Promise<void>((resolve) => waiting.push(resolve)).then(fetch);
+}
+
 export function loadMediaUrl(
   core: MediaFetcher,
   source: string,
@@ -133,13 +157,17 @@ export function loadMediaUrl(
   if (unavailable.has(key)) return Promise.reject(new Error('Media unavailable'));
   const request =
     pending.get(key) ??
-    core.commands
-      .fetchMedia(source, width, height)
+    fetchThroughGate(core, source, width, height)
       .then((bytes) => {
         const type = mime ?? imageMime(bytes) ?? '';
         const blob = new Blob([bytes], { type });
         const publish = (): string => {
           const objectUrl = URL.createObjectURL(blob);
+          const previous = objectUrls.get(key);
+          if (previous !== undefined) {
+            objectUrlBytes -= previous.bytes;
+            if (!holds.has(key)) URL.revokeObjectURL(previous.url);
+          }
           objectUrls.set(key, { url: objectUrl, bytes: blob.size });
           objectUrlBytes += blob.size;
           evict(key);
@@ -150,6 +178,7 @@ export function loadMediaUrl(
       })
       .finally(() => {
         pending.delete(key);
+        releaseSlot();
       });
   pending.set(key, request);
   void request.catch(() => {
@@ -169,6 +198,9 @@ export function retryMediaUrl(
   height: number,
   mime?: string | null
 ): Promise<string> {
-  unavailable.delete(cacheKey(core.session?.account_id, source, width, height));
+  const prefix = `${core.session?.account_id ?? ''}:${source}:`;
+  for (const key of unavailable) {
+    if (key.startsWith(prefix)) unavailable.delete(key);
+  }
   return loadMediaUrl(core, source, width, height, mime);
 }

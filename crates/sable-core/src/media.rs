@@ -52,22 +52,31 @@ impl Core {
             format,
         };
 
+        let media = media_label(&source);
+
         match client.media().get_media_content(&request, true).await {
             Ok(bytes) => Ok(bytes),
-            // Some servers cannot thumbnail SVGs or older media. The original is
-            // still useful, and is the only safe fallback for an unknown thumbnail.
-            Err(_) if width != 0 && height != 0 => client
-                .media()
-                .get_media_content(
-                    &MediaRequestParameters {
-                        source,
-                        format: MediaFormat::File,
-                    },
-                    true,
-                )
-                .await
-                .map_err(|_| CommandErr::Unavailable),
-            Err(_) => Err(CommandErr::Unavailable),
+            Err(error) if width != 0 && height != 0 && answered_by_server(&error) => {
+                tracing::warn!(%media, "thumbnail refused, falling back to the original: {error}");
+                client
+                    .media()
+                    .get_media_content(
+                        &MediaRequestParameters {
+                            source,
+                            format: MediaFormat::File,
+                        },
+                        true,
+                    )
+                    .await
+                    .map_err(|error| {
+                        tracing::warn!(%media, "the original is unavailable too: {error}");
+                        CommandErr::Unavailable
+                    })
+            }
+            Err(error) => {
+                tracing::warn!(%media, width, height, "media unavailable: {error}");
+                Err(CommandErr::Unavailable)
+            }
         }
     }
 
@@ -210,6 +219,17 @@ fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> Attac
             }
         }
         _ => AttachmentInfo::File(BaseFileInfo { size }),
+    }
+}
+
+fn answered_by_server(error: &matrix_sdk::Error) -> bool {
+    matches!(error, matrix_sdk::Error::Http(http) if http.as_ruma_api_error().is_some())
+}
+
+fn media_label(source: &MediaSource) -> String {
+    match source {
+        MediaSource::Plain(uri) => uri.to_string(),
+        MediaSource::Encrypted(file) => file.url.to_string(),
     }
 }
 
