@@ -65,6 +65,12 @@
     onOpenChange?.(false);
     onOpenAccount();
   }
+
+  function openAvatar(source: string, displayName: string): void {
+    open = false;
+    onOpenChange?.(false);
+    onAvatarClick?.(source, displayName);
+  }
 </script>
 
 {#if desktop}
@@ -84,7 +90,7 @@
           {accountId}
           {accountName}
           onOpenAccount={openAccount}
-          {onAvatarClick}
+          onAvatarClick={openAvatar}
         />
       </Popover.Content>
     </Popover.Portal>
@@ -115,7 +121,7 @@
       {accountId}
       {accountName}
       onOpenAccount={openAccount}
-      {onAvatarClick}
+      onAvatarClick={openAvatar}
       variant="sheet"
     />
   </BottomSheet>

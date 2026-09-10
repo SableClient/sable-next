@@ -378,8 +378,12 @@ test('opens a per-message profile avatar through viewer callback', async () => {
   const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
   if (!avatarButton) throw new Error('persona avatar button was not rendered');
   avatarButton.click();
+  await tick();
 
   expect(onPersonaAvatarClick).toHaveBeenCalledWith('mxc://example.org/kris', 'Kris');
+  expect(
+    profileTrigger.getAttribute('aria-expanded') ?? profileTrigger.getAttribute('data-state')
+  ).toMatch(/false|closed/);
   await unmount(instance);
 });
 
