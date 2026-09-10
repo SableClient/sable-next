@@ -1,5 +1,9 @@
 import type { NotificationView } from '#src/generated/protocol';
 
+import {
+  nativeNotificationPermission,
+  requestNativeNotificationPermission,
+} from '#lib/platform/native-notifications.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -17,6 +21,16 @@ export function permission(): NotificationPermission {
 export async function requestPermission(): Promise<NotificationPermission> {
   if (!presentsInApp()) return 'denied';
   return Notification.requestPermission();
+}
+
+export async function permissionGranted(): Promise<boolean> {
+  if (presentsInApp()) return permission() === 'granted';
+  return (await nativeNotificationPermission()) === 'granted';
+}
+
+export async function grantPermission(): Promise<boolean> {
+  if (presentsInApp()) return (await requestPermission()) === 'granted';
+  return (await requestNativeNotificationPermission()) === 'granted';
 }
 
 export function title(view: NotificationView): string {

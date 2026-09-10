@@ -189,6 +189,28 @@ pub async fn show<R: Runtime>(
     }
 }
 
+pub async fn permission<R: Runtime>(app: &AppHandle<R>) -> &'static str {
+    grant(app.notifications().permission_state().await)
+}
+
+pub async fn request_permission<R: Runtime>(app: &AppHandle<R>) -> &'static str {
+    grant(app.notifications().request_permission().await)
+}
+
+fn grant(
+    state: Result<tauri::plugin::PermissionState, tauri_plugin_notifications::Error>,
+) -> &'static str {
+    match state {
+        Ok(tauri::plugin::PermissionState::Granted) => "granted",
+        Ok(tauri::plugin::PermissionState::Denied) => "denied",
+        Ok(_) => "prompt",
+        Err(error) => {
+            log::debug!("could not read the notification permission: {error}");
+            "prompt"
+        }
+    }
+}
+
 #[cfg(target_os = "android")]
 pub async fn ensure_channel<R: Runtime>(app: &AppHandle<R>) {
     let channel = tauri_plugin_notifications::Channel::builder(MESSAGES_CHANNEL, "Messages")

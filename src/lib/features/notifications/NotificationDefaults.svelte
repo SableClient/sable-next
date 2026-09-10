@@ -3,13 +3,12 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { presentsInApp } from '#lib/platform/notifications.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
 
   import { settingsChanges } from './notifications.svelte';
-  import { permission, requestPermission } from './present';
+  import { grantPermission, permissionGranted } from './present';
 
   const core = useCoreClient();
   const modes: NotificationModeView[] = ['all', 'mentions', 'mute'];
@@ -22,7 +21,18 @@
   let direct = $state<NotificationModeView | null>(null);
   let group = $state<NotificationModeView | null>(null);
   let failed = $state(false);
-  let granted = $state(!presentsInApp() || permission() === 'granted');
+  let granted = $state(true);
+
+  $effect(() => {
+    let current = true;
+    void permissionGranted().then((allowed) => {
+      if (current) granted = allowed;
+    });
+
+    return () => {
+      current = false;
+    };
+  });
 
   $effect(() => {
     void settingsChanges.version;
@@ -66,8 +76,8 @@
         variant="secondary"
         size="small"
         onclick={() => {
-          void requestPermission().then((result) => {
-            granted = result === 'granted';
+          void grantPermission().then((allowed) => {
+            granted = allowed;
           });
         }}>{$i18n.t('settings.notificationPermissionAction')}</Button
       >

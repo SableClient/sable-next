@@ -342,6 +342,16 @@ fn hide_to_tray_on_close(window: &tauri::Window<BrowserEngine>, event: &tauri::W
 }
 
 #[tauri::command]
+async fn notification_permission(app: AppHandle<BrowserEngine>) -> &'static str {
+    notifications::permission(&app).await
+}
+
+#[tauri::command]
+async fn request_notification_permission(app: AppHandle<BrowserEngine>) -> &'static str {
+    notifications::request_permission(&app).await
+}
+
+#[tauri::command]
 async fn dismiss_room_notification(
     app: AppHandle<BrowserEngine>,
     user_id: String,
@@ -479,6 +489,8 @@ pub fn run() {
             register_push,
             unregister_push,
             dismiss_room_notification,
+            notification_permission,
+            request_notification_permission,
             test_notification,
             set_notification_encrypted_content,
             #[cfg(desktop)]

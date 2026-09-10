@@ -15,6 +15,18 @@ export function alertsNatively(): boolean {
   return isTauri();
 }
 
+export type NotificationGrant = 'granted' | 'denied' | 'prompt';
+
+export async function nativeNotificationPermission(): Promise<NotificationGrant> {
+  if (!isTauri()) return 'granted';
+  return invoke<NotificationGrant>('notification_permission');
+}
+
+export async function requestNativeNotificationPermission(): Promise<NotificationGrant> {
+  if (!isTauri()) return 'granted';
+  return invoke<NotificationGrant>('request_notification_permission');
+}
+
 export async function dismissNativeRoomNotification(userId: string, roomId: string): Promise<void> {
   if (!isTauri()) return;
   await invoke('dismiss_room_notification', { userId, roomId });

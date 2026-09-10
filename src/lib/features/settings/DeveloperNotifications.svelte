@@ -4,7 +4,7 @@
   import type { NotificationView } from '#src/generated/protocol';
 
   import { useNotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
-  import { permission, requestPermission } from '#lib/features/notifications/present.js';
+  import { grantPermission, permissionGranted } from '#lib/features/notifications/present.js';
   import { i18n } from '#lib/i18n.js';
   import {
     alertsNatively,
@@ -42,11 +42,14 @@
     failed = false;
 
     try {
+      if (!(await permissionGranted()) && !(await grantPermission())) {
+        failed = true;
+        return;
+      }
       if (alertsNatively()) {
         await sendNativeTestNotification(sequence);
         return;
       }
-      if (permission() === 'default') await requestPermission();
       notifications.present(view(sequence));
     } catch {
       failed = true;
