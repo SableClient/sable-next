@@ -4,6 +4,8 @@ import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol'
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
+import { reorderPersonas } from './persona.js';
+
 export class PersonaStore {
   personas = $state.raw<PersonaView[]>([]);
   account = $state<PersonaSelectionView | null>(null);
@@ -48,6 +50,12 @@ export class PersonaStore {
   async remove(id: string): Promise<void> {
     this.personas = await this.core.commands.removePersona(id);
     this.repoint(id, null);
+  }
+
+  async reorder(from: number, to: number): Promise<void> {
+    if (to < 0 || to >= this.personas.length || from === to) return;
+    const ids = reorderPersonas(this.personas, from, to).map((persona) => persona.id);
+    this.personas = await this.core.commands.reorderPersonas(ids);
   }
 
   selectionFor(roomId: string | null): PersonaSelectionView | null {

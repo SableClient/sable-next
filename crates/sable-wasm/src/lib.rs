@@ -258,6 +258,7 @@ impl SableCore {
         formatted_caption: Option<String>,
         mentions: Option<String>,
         mentions_room: bool,
+        persona: Option<String>,
     ) -> Result<(), String> {
         let info = info
             .as_deref()
@@ -266,6 +267,9 @@ impl SableCore {
             .as_deref()
             .and_then(|json| serde_json::from_str(json).ok())
             .unwrap_or_default();
+        let persona = persona
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok());
 
         self.core
             .send_attachment(
@@ -280,6 +284,7 @@ impl SableCore {
                 formatted_caption,
                 mentions,
                 mentions_room,
+                persona,
             )
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))

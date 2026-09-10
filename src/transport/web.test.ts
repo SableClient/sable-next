@@ -114,6 +114,7 @@ test('preserves rich attachment captions and mentions across the worker transpor
     inReplyTo: '$reply',
     info: null,
     threadRoot: '$thread',
+    persona: null,
   };
   const pending = transport.sendAttachment(attachment);
   expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 1, attachment });

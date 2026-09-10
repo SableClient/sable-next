@@ -435,6 +435,10 @@ impl Core {
                 personas: self.remove_persona(&id).await?,
             }),
 
+            Command::ReorderPersonas { ids } => Ok(CommandOk::ReorderPersonas {
+                personas: self.reorder_personas(ids).await?,
+            }),
+
             Command::SetPersonaSelection {
                 room_id,
                 persona_id,
@@ -452,6 +456,7 @@ impl Core {
                 info,
                 in_reply_to,
                 thread_root,
+                persona,
             } => {
                 let url = OwnedMxcUri::from(url);
                 if url.parts().is_err() {
@@ -472,10 +477,19 @@ impl Core {
                     (None, None) => None,
                 };
 
-                timeline
-                    .send(content.into())
-                    .await
-                    .map_err(|error| self.failed("send_sticker", error))?;
+                match persona {
+                    Some(persona) => timeline
+                        .send_with_extra_content(
+                            content.into(),
+                            Some(crate::personas::profile_extra_content(&persona)),
+                        )
+                        .await
+                        .map_err(|error| self.failed("send_sticker", error))?,
+                    None => timeline
+                        .send(content.into())
+                        .await
+                        .map_err(|error| self.failed("send_sticker", error))?,
+                };
 
                 Ok(CommandOk::SendSticker)
             }
@@ -490,6 +504,7 @@ impl Core {
                 size,
                 in_reply_to,
                 thread_root,
+                persona,
             } => {
                 let url = OwnedMxcUri::from(url);
                 if url.parts().is_err() {
@@ -515,10 +530,19 @@ impl Core {
                             .map_err(|error| self.failed("send_gif_reply", error))?;
                     }
                     None => {
-                        timeline
-                            .send(content.into())
-                            .await
-                            .map_err(|error| self.failed("send_gif", error))?;
+                        match persona {
+                            Some(persona) => timeline
+                                .send_with_extra_content(
+                                    content.into(),
+                                    Some(crate::personas::profile_extra_content(&persona)),
+                                )
+                                .await
+                                .map_err(|error| self.failed("send_gif", error))?,
+                            None => timeline
+                                .send(content.into())
+                                .await
+                                .map_err(|error| self.failed("send_gif", error))?,
+                        };
                     }
                 }
 
@@ -532,7 +556,7 @@ impl Core {
                 formatted,
                 kind,
                 image,
-                thread_root,
+                thread_root: _,
                 mentions,
                 mentions_room,
                 persona,
@@ -541,23 +565,14 @@ impl Core {
                     edit_content(body, formatted, kind, image, mentions, mentions_room)?.into(),
                 );
 
-                if let Some(persona) = persona {
-                    let room = self.room(&room_id).await?;
-                    let content = room
-                        .make_edit_event(&event_id, edited)
-                        .await
-                        .map_err(|error| self.failed("edit_message", error))?;
-
-                    self.send_with_persona(&room, &content, &persona).await?;
-                    return Ok(CommandOk::EditMessage);
-                }
-
-                self.timeline_for(&room_id, thread_root.as_ref())
-                    .await?
-                    .edit(&TimelineEventItemId::EventId(event_id), edited)
+                let room = self.room(&room_id).await?;
+                let content = room
+                    .make_edit_event(&event_id, edited)
                     .await
                     .map_err(|error| self.failed("edit_message", error))?;
 
+                self.edit_with_persona(&room, &content, persona.as_ref())
+                    .await?;
                 Ok(CommandOk::EditMessage)
             }
 

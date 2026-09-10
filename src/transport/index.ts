@@ -4,6 +4,7 @@ import type {
   CommandOk,
   CommandErr,
   CoreEvent,
+  PerMessageProfileView,
 } from '#src/generated/protocol';
 
 /** Resolves a command's response from its tag, so `send` is typed end to end. */
@@ -21,6 +22,7 @@ export type Attachment = {
   inReplyTo?: string | null;
   info?: AttachmentInfoView | null;
   threadRoot?: string | null;
+  persona?: PerMessageProfileView | null;
 };
 
 export class CoreError extends Error {

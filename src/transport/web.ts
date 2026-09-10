@@ -299,6 +299,7 @@ export function createWebTransport(): Transport {
       inReplyTo,
       info,
       threadRoot,
+      persona,
     }) {
       await request<null>(
         (id) => ({
@@ -315,6 +316,7 @@ export function createWebTransport(): Transport {
             inReplyTo: inReplyTo ?? null,
             info: info ?? null,
             threadRoot: threadRoot ?? null,
+            persona: persona ?? null,
           },
         }),
         [bytes.buffer]

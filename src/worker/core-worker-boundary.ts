@@ -19,7 +19,8 @@ export type WorkerCore = {
     threadRoot: string | null,
     formattedCaption: string | null,
     mentions: string | null,
-    mentionsRoom: boolean
+    mentionsRoom: boolean,
+    persona: string | null
   ): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 };
@@ -188,6 +189,7 @@ export function createCoreWorkerBoundary(
             formattedCaption,
             mentions,
             mentionsRoom,
+            persona,
           } = request.attachment;
           await instance.sendAttachment(
             roomId,
@@ -200,7 +202,8 @@ export function createCoreWorkerBoundary(
             threadRoot,
             formattedCaption,
             JSON.stringify(mentions),
-            mentionsRoom
+            mentionsRoom,
+            persona === null ? null : JSON.stringify(persona)
           );
           port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;

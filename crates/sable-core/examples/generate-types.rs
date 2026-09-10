@@ -58,6 +58,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register::<CoreEvent>()
         .register::<AttachmentInfoView>();
     let output = specta_typescript::Typescript::default().export(&types, ProtocolFormat)?;
+    let output = format!(
+        "{}\n",
+        output
+            .lines()
+            .map(str::trim_end)
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/generated/protocol.ts");
 
     if check {

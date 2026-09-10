@@ -111,6 +111,15 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
     mentions: { userIds: ['@one:example.org'], room: true },
     inReplyTo: '$reply:example.org',
     threadRoot: '$thread:example.org',
+    persona: {
+      id: 'hatchy',
+      display_name: 'Hatchy',
+      avatar_url: null,
+      pronouns: [],
+      color_on_light: null,
+      color_on_dark: null,
+      has_fallback: false,
+    },
   });
 
   expect(sendAttachment).toHaveBeenCalledWith({
@@ -126,6 +135,15 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
     inReplyTo: '$reply:example.org',
     info: null,
     threadRoot: '$thread:example.org',
+    persona: {
+      id: 'hatchy',
+      display_name: 'Hatchy',
+      avatar_url: null,
+      pronouns: [],
+      color_on_light: null,
+      color_on_dark: null,
+      has_fallback: false,
+    },
   });
 });
 

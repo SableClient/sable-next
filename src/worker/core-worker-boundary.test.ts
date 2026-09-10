@@ -53,6 +53,7 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
       formattedCaption,
       mentions: ['@one:example.org'],
       mentionsRoom: true,
+      persona: null,
     },
   });
 

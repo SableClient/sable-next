@@ -341,10 +341,13 @@
       if (formatted === null) editor.setText(context.body);
       else editor.setHtml(formatted);
     } else if (context === null) {
+      const wasEditing = prefilledFor !== null;
       prefilledFor = null;
       if (preEdit) {
         editor.setDoc(preEdit);
         preEdit = undefined;
+      } else if (wasEditing) {
+        editor.clear();
       }
     }
   });

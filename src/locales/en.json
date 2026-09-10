@@ -1818,6 +1818,8 @@
     "edit": "Edit {{name}}",
     "remove": "Delete {{name}}",
     "removeConfirm": "Delete this profile? Messages already sent keep the name and picture they were sent with.",
+    "moveUp": "Move {name} up",
+    "moveDown": "Move {name} down",
     "name": "Name",
     "nameHint": "Shown as the sender of every message sent as this profile.",
     "avatar": "Picture",

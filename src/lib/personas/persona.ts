@@ -25,6 +25,20 @@ export function personaById(
   return personas.find((persona) => persona.id === id);
 }
 
+export function reorderPersonas(
+  personas: readonly PersonaView[],
+  from: number,
+  to: number
+): PersonaView[] {
+  if (from === to || from < 0 || to < 0 || from >= personas.length || to >= personas.length) {
+    return [...personas];
+  }
+  const reordered = [...personas];
+  const [persona] = reordered.splice(from, 1);
+  reordered.splice(to, 0, persona);
+  return reordered;
+}
+
 function live(selection: PersonaSelectionView | undefined, now: number): boolean {
   if (!selection) return false;
   return selection.valid_until === null || selection.valid_until > now;

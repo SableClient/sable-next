@@ -2,6 +2,8 @@
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
+  import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
 
   import type { PersonaView } from '#src/generated/protocol';
 
@@ -135,6 +137,7 @@
     {:else}
       <ul class="persona-list">
         {#each personas.personas as persona (persona.id)}
+          {@const index = personas.personas.indexOf(persona)}
           <li>
             <Avatar src={persona.avatar_url} name={persona.display_name} size="small" />
             <div class="persona-copy">
@@ -157,6 +160,24 @@
               }}
             >
               <PencilSimpleIcon />
+            </IconButton>
+            <IconButton
+              variant="ghost"
+              size="small"
+              disabled={index === 0}
+              label={$i18n.t('personas.moveUp', { name: persona.display_name })}
+              onclick={() => void personas.reorder(index, index - 1)}
+            >
+              <ArrowUpIcon />
+            </IconButton>
+            <IconButton
+              variant="ghost"
+              size="small"
+              disabled={index === personas.personas.length - 1}
+              label={$i18n.t('personas.moveDown', { name: persona.display_name })}
+              onclick={() => void personas.reorder(index, index + 1)}
+            >
+              <ArrowDownIcon />
             </IconButton>
             <IconButton
               variant="ghost"

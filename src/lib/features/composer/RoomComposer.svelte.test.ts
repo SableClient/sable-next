@@ -633,6 +633,10 @@ test('a thread keeps its draft out of the room it hangs off', async () => {
 });
 
 test('an edit hands back the draft it interrupted', async () => {
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('half a thought')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
   let setContext: ((next: ComposerContext | null) => void) | undefined;
   const instance = render({
     roomId: '!room:example.org',
@@ -640,10 +644,6 @@ test('an edit hands back the draft it interrupted', async () => {
       setContext = set;
     },
   });
-  await tick();
-  setContext?.({ kind: 'edit', eventId: '$draft:example.org', body: 'half a thought' });
-  await tick();
-  setContext?.(null);
   await tick();
   setContext?.({ kind: 'edit', eventId: '$one:example.org', body: 'the older message' });
   await tick();
@@ -654,6 +654,25 @@ test('an edit hands back the draft it interrupted', async () => {
   await tick();
 
   expect(editorText()).toBe('half a thought');
+  void unmount(instance);
+});
+
+test('cancelling an edit clears the message being edited', async () => {
+  let setContext: ((next: ComposerContext | null) => void) | undefined;
+  const instance = render({
+    roomId: '!room:example.org',
+    registerContext: (set) => {
+      setContext = set;
+    },
+  });
+  await tick();
+  setContext?.({ kind: 'edit', eventId: '$one:example.org', body: 'never mind' });
+  await tick();
+
+  setContext?.(null);
+  await tick();
+
+  expect(editorText()).toBe('');
   void unmount(instance);
 });
 

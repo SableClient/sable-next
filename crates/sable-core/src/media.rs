@@ -13,7 +13,8 @@ use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource};
 use mime::Mime;
 
 use crate::messages::outgoing_mentions;
-use crate::protocol::{AttachmentInfoView, CommandErr};
+use crate::personas::profile_extra_content;
+use crate::protocol::{AttachmentInfoView, CommandErr, PerMessageProfileView};
 
 use crate::Core;
 
@@ -112,6 +113,7 @@ impl Core {
         formatted_caption: Option<String>,
         mentions: Vec<String>,
         mentions_room: bool,
+        persona: Option<PerMessageProfileView>,
     ) -> Result<(), CommandErr> {
         if bytes.len() > MAX_ATTACHMENT_BYTES {
             return Err(CommandErr::InvalidMedia);
@@ -141,6 +143,7 @@ impl Core {
                 &info.unwrap_or_default(),
                 bytes.len(),
             )),
+            extra_content: persona.as_ref().map(attachment_profile),
             ..AttachmentConfig::default()
         };
 
@@ -154,6 +157,12 @@ impl Core {
 
         Ok(())
     }
+}
+
+fn attachment_profile(
+    profile: &PerMessageProfileView,
+) -> serde_json::Map<String, serde_json::Value> {
+    profile_extra_content(profile)
 }
 
 fn attachment_caption(
@@ -216,7 +225,8 @@ pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
 mod tests {
     use super::{
         AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, OwnedUserId,
-        attachment_caption, attachment_info, outgoing_mentions,
+        PerMessageProfileView, attachment_caption, attachment_info, attachment_profile,
+        outgoing_mentions,
     };
 
     fn view(
@@ -350,5 +360,22 @@ mod tests {
         assert_eq!(content["body"], "A caption");
         assert!(content.get("formatted_body").is_none());
         assert!(attachment_caption(None, Some("<b>orphaned HTML</b>".to_owned())).is_none());
+    }
+
+    #[test]
+    fn attachment_profile_adds_the_persona_without_a_body_fallback() {
+        let profile = PerMessageProfileView {
+            id: Some("hatchy".to_owned()),
+            display_name: Some("Hatchy".to_owned()),
+            avatar_url: None,
+            pronouns: Vec::new(),
+            color_on_light: None,
+            color_on_dark: None,
+            has_fallback: true,
+        };
+        let profile = attachment_profile(&profile);
+
+        assert_eq!(profile["com.beeper.per_message_profile"]["id"], "hatchy");
+        assert!(profile.get("body").is_none());
     }
 }

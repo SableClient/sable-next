@@ -126,6 +126,7 @@ pub enum Command {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
+        #[serde(default)]
         /// Replying inside a thread needs no extra field: the SDK infers the
         /// thread from the replied-to event.
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
@@ -159,6 +160,8 @@ pub enum Command {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
+        #[serde(default)]
+        persona: Option<PerMessageProfileView>,
     },
     SendGif {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -179,6 +182,8 @@ pub enum Command {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
+        #[serde(default)]
+        persona: Option<PerMessageProfileView>,
     },
     /// `edited` on the view flips once the server has the replacement.
     EditMessage {
@@ -366,6 +371,9 @@ pub enum Command {
     },
     RemovePersona {
         id: String,
+    },
+    ReorderPersonas {
+        ids: Vec<String>,
     },
     SetPersonaSelection {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
@@ -1062,6 +1070,9 @@ pub enum CommandOk {
         personas: Vec<PersonaView>,
     },
     RemovePersona {
+        personas: Vec<PersonaView>,
+    },
+    ReorderPersonas {
         personas: Vec<PersonaView>,
     },
     SetPersonaSelection,

@@ -6,6 +6,7 @@ import type { PersonaTriggerView, PersonaView } from '#src/generated/protocol';
 
 import {
   projectPersona,
+  reorderPersonas,
   resolvePersona,
   resolveProxy,
   stripProxyHtml,
@@ -70,6 +71,13 @@ describe('resolveProxy', () => {
 
   it('returns nothing when no trigger matches', () => {
     expect(resolveProxy([persona('Kris', [trigger('k:')])], 'hello')).toBeUndefined();
+  });
+});
+
+describe('reorderPersonas', () => {
+  it('moves one profile while preserving the rest', () => {
+    const profiles = [persona('A'), persona('B'), persona('C')];
+    expect(reorderPersonas(profiles, 2, 0).map(({ id }) => id)).toEqual(['C', 'A', 'B']);
   });
 });
 

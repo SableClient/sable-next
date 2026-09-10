@@ -127,10 +127,12 @@ export class Conversation {
     file: File,
     options: SendAttachmentOptions = {}
   ): Promise<void> => {
+    const persona = this.#personaFor(targetRoomId, '', null).persona;
     await this.#core.commands.sendAttachment(targetRoomId, file, {
       ...options,
       inReplyTo: this.#consumeReply(),
       threadRoot: this.#threadRoot,
+      persona,
     });
   };
 
@@ -146,7 +148,8 @@ export class Conversation {
       body,
       info,
       this.#consumeReply(),
-      this.#threadRoot
+      this.#threadRoot,
+      this.#personaFor(targetRoomId, '', null).persona
     );
   };
 
@@ -164,7 +167,8 @@ export class Conversation {
       proxied.mimetype,
       gif.size > 0 && proxied.mimetype === gif.mimetype ? gif.size : null,
       this.#consumeReply(),
-      this.#threadRoot
+      this.#threadRoot,
+      this.#personaFor(targetRoomId, '', null).persona
     );
   };
 

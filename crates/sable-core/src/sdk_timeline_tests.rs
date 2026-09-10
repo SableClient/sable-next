@@ -621,6 +621,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
             info: None,
             in_reply_to: None,
             thread_root: None,
+            persona: None,
         })
         .await;
 

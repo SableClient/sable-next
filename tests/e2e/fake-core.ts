@@ -829,6 +829,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       save_persona: () => ({ type: 'save_persona', personas: [] }),
       remove_persona: () => ({ type: 'remove_persona', personas: [] }),
+      reorder_personas: () => ({ type: 'reorder_personas', personas: [] }),
       bookmarks: () => ({ type: 'bookmarks', bookmarks: readBookmarks() }),
       set_bookmark: (command) => {
         const entries = readBookmarks().filter(

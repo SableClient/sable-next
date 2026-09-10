@@ -97,6 +97,7 @@ export type SendAttachmentOptions = {
   mentions?: OutgoingMentions;
   inReplyTo?: string | null;
   threadRoot?: string | null;
+  persona?: PerMessageProfileView | null;
 };
 
 export type EditImage = {
@@ -619,7 +620,8 @@ export function createCommands(transport: () => Transport) {
       body: string,
       info: PackImageInfoView | null = null,
       inReplyTo: string | null = null,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      persona: PerMessageProfileView | null = null
     ): Promise<void> {
       await transport().send({
         type: 'send_sticker',
@@ -629,6 +631,7 @@ export function createCommands(transport: () => Transport) {
         info,
         in_reply_to: inReplyTo,
         thread_root: threadRoot,
+        persona: $state.snapshot(persona),
       });
     },
 
@@ -641,7 +644,8 @@ export function createCommands(transport: () => Transport) {
       mimetype: string,
       size: number | null = null,
       inReplyTo: string | null = null,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      persona: PerMessageProfileView | null = null
     ): Promise<void> {
       await transport().send({
         type: 'send_gif',
@@ -654,6 +658,7 @@ export function createCommands(transport: () => Transport) {
         size,
         in_reply_to: inReplyTo,
         thread_root: threadRoot,
+        persona: $state.snapshot(persona),
       });
     },
 
@@ -803,6 +808,14 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'remove_persona',
         id,
+      });
+      return response.personas;
+    },
+
+    async reorderPersonas(ids: string[]): Promise<PersonaView[]> {
+      const response = await transport().send({
+        type: 'reorder_personas',
+        ids,
       });
       return response.personas;
     },
@@ -1039,6 +1052,7 @@ export function createCommands(transport: () => Transport) {
         inReplyTo: options.inReplyTo ?? null,
         info,
         threadRoot: options.threadRoot ?? null,
+        persona: options.persona ?? null,
       });
     },
 

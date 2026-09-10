@@ -21,8 +21,12 @@ mod share_inbox;
 #[cfg(desktop)]
 mod tray;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sable_core::{
     Core,
     protocol::{Command, CommandErr, CommandOk, CoreEvent},
@@ -94,12 +98,36 @@ async fn fetch_media(
 
 pub(crate) fn decode_header(request: &Request<'_>, name: &str) -> Option<String> {
     let value = request.headers().get(name)?.to_str().ok()?;
+    decode_header_value(value)
+}
+
+fn decode_header_value(value: &str) -> Option<String> {
     Some(
         percent_encoding::percent_decode_str(value)
             .decode_utf8()
             .ok()?
             .into_owned(),
     )
+}
+
+#[derive(serde::Deserialize)]
+struct Base64Invoke {
+    bytes: String,
+    headers: HashMap<String, String>,
+}
+
+impl Base64Invoke {
+    fn bytes(&self) -> Result<Vec<u8>, CommandErr> {
+        STANDARD
+            .decode(&self.bytes)
+            .map_err(|_| CommandErr::InvalidMedia)
+    }
+
+    fn header(&self, name: &str) -> Option<String> {
+        self.headers
+            .get(name)
+            .and_then(|value| decode_header_value(value))
+    }
 }
 
 /// Bytes in the raw body, metadata in the headers: a `Vec<u8>` argument would be
@@ -131,6 +159,7 @@ async fn send_attachment(
                 .and_then(|json| serde_json::from_str(&json).ok())
                 .unwrap_or_default(),
             header("mentions-room").is_some_and(|value| value == "true"),
+            header("persona").and_then(|json| serde_json::from_str(&json).ok()),
         )
         .await
 }
@@ -148,6 +177,48 @@ async fn upload_media(
     let mime = decode_header(&request, "mime").ok_or(CommandErr::InvalidMedia)?;
 
     state.core.upload_media(mime, bytes.clone()).await
+}
+
+#[tauri::command]
+async fn send_attachment_base64(
+    state: State<'_, AppState>,
+    request: Base64Invoke,
+) -> Result<(), CommandErr> {
+    state
+        .core
+        .send_attachment(
+            request.header("room-id").ok_or(CommandErr::UnknownRoom)?,
+            request.header("filename").ok_or(CommandErr::InvalidMedia)?,
+            request.header("mime").ok_or(CommandErr::InvalidMedia)?,
+            request.bytes()?,
+            request.header("caption"),
+            request.header("in-reply-to"),
+            request
+                .header("info")
+                .and_then(|json| serde_json::from_str(&json).ok()),
+            request.header("thread-root"),
+            request.header("formatted-caption"),
+            request
+                .header("mentions")
+                .and_then(|json| serde_json::from_str(&json).ok())
+                .unwrap_or_default(),
+            request
+                .header("mentions-room")
+                .is_some_and(|value| value == "true"),
+            request
+                .header("persona")
+                .and_then(|json| serde_json::from_str(&json).ok()),
+        )
+        .await
+}
+
+#[tauri::command]
+async fn upload_media_base64(
+    state: State<'_, AppState>,
+    request: Base64Invoke,
+) -> Result<String, CommandErr> {
+    let mime = request.header("mime").ok_or(CommandErr::InvalidMedia)?;
+    state.core.upload_media(mime, request.bytes()?).await
 }
 
 #[tauri::command]
@@ -382,7 +453,9 @@ pub fn run() {
             subscribe_events,
             fetch_media,
             send_attachment,
+            send_attachment_base64,
             upload_media,
+            upload_media_base64,
             open_external_url,
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,

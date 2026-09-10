@@ -265,7 +265,7 @@ fn selection_to_json(selection: &PersonaSelectionView) -> Value {
     Value::Object(object)
 }
 
-fn profile_to_json(profile: &PerMessageProfileView) -> Value {
+pub(crate) fn profile_to_json(profile: &PerMessageProfileView) -> Value {
     let mut object = Map::new();
     if let Some(id) = &profile.id {
         object.insert("id".to_owned(), id.clone().into());
@@ -294,6 +294,12 @@ fn profile_to_json(profile: &PerMessageProfileView) -> Value {
         object.insert("has_fallback".to_owned(), true.into());
     }
     Value::Object(object)
+}
+
+pub(crate) fn profile_extra_content(profile: &PerMessageProfileView) -> Map<String, Value> {
+    [(PER_MESSAGE_PROFILE.to_owned(), profile_to_json(profile))]
+        .into_iter()
+        .collect()
 }
 
 pub(crate) fn stamp_profile(content: &mut Value, profile: &PerMessageProfileView) {
@@ -370,6 +376,40 @@ fn split_edit_marker(value: &str) -> (&str, &str) {
 }
 
 impl Core {
+    pub(crate) async fn edit_with_persona(
+        &self,
+        room: &Room,
+        content: &AnyMessageLikeEventContent,
+        profile: Option<&PerMessageProfileView>,
+    ) -> Result<(), CommandErr> {
+        let event_type = content.event_type().to_string();
+        let mut value = serde_json::to_value(content)
+            .map_err(|error| self.failed("edit_with_persona", error))?;
+
+        let update = |content: &mut Value| {
+            if let Some(profile) = profile {
+                stamp_profile(content, profile);
+            } else if let Some(object) = content.as_object_mut() {
+                object.remove(PER_MESSAGE_PROFILE);
+                object.remove("m.per_message_profile");
+            }
+        };
+        update(&mut value);
+        if let Some(content) = value.get_mut("m.new_content") {
+            update(content);
+        }
+
+        let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(value.to_string())
+            .map_err(|error| self.failed("edit_with_persona", error))?;
+
+        room.send_queue()
+            .send_raw(raw, event_type)
+            .await
+            .map_err(|error| self.failed("edit_with_persona", error))?;
+
+        Ok(())
+    }
+
     pub(crate) async fn send_with_persona(
         &self,
         room: &Room,
@@ -539,6 +579,31 @@ impl Core {
         self.repoint_selections(id, None).await?;
 
         Ok(personas)
+    }
+
+    pub(crate) async fn reorder_personas(
+        &self,
+        ids: Vec<String>,
+    ) -> Result<Vec<PersonaView>, CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
+        let personas = self.load_personas().await?;
+        let mut reordered = Vec::with_capacity(personas.len());
+        for id in ids {
+            if let Some(persona) = personas.iter().find(|persona| persona.id == id)
+                && !reordered
+                    .iter()
+                    .any(|existing: &PersonaView| existing.id == id)
+            {
+                reordered.push(persona.clone());
+            }
+        }
+        let remaining = personas
+            .into_iter()
+            .filter(|persona| !reordered.iter().any(|existing| existing.id == persona.id))
+            .collect::<Vec<_>>();
+        reordered.extend(remaining);
+        self.save_personas(&reordered).await?;
+        Ok(reordered)
     }
 
     async fn repoint_selections(&self, from: &str, to: Option<&str>) -> Result<(), CommandErr> {
