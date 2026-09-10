@@ -6,12 +6,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function session(accountId: string, userId: string, deviceId: string) {
+  return {
+    account_id: accountId,
+    user_id: userId,
+    device_id: deviceId,
+    homeserver: 'https://example.org',
+    needs_reauth: false,
+  };
+}
+
 test('evicts object URLs when cached media exceeds the byte budget', async () => {
   let nextUrl = 0;
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:media-${String(nextUrl++)}`);
   const core = {
-    session: { account_id: 'account-a', user_id: '@a:example.org', device_id: 'device-a' },
+    session: session('account-a', '@a:example.org', 'device-a'),
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))) },
   };
 
@@ -26,11 +36,11 @@ test('does not share a media URL between accounts', async () => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:account-${String(nextUrl++)}`);
   const source = 'mxc://example.org/account-scoped';
   const accountA = {
-    session: { account_id: 'account-a', user_id: '@a:example.org', device_id: 'device-a' },
+    session: session('account-a', '@a:example.org', 'device-a'),
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
   };
   const accountB = {
-    session: { account_id: 'account-b', user_id: '@b:example.org', device_id: 'device-b' },
+    session: session('account-b', '@b:example.org', 'device-b'),
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([2]))) },
   };
 
@@ -44,7 +54,7 @@ test('does not revoke an object URL a caller is still displaying', async () => {
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:held-${String(nextUrl++)}`);
   const core = {
-    session: { account_id: 'account-held', user_id: '@a:example.org', device_id: 'device-a' },
+    session: session('account-held', '@a:example.org', 'device-a'),
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))) },
   };
 
@@ -65,7 +75,7 @@ test('revokes the URL it replaces when a key is fetched twice', async () => {
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:replaced-${String(nextUrl++)}`);
   const core = {
-    session: { account_id: 'account-replaced', user_id: '@a:example.org', device_id: 'device-a' },
+    session: session('account-replaced', '@a:example.org', 'device-a'),
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
   };
   const source = 'mxc://example.org/notification-avatar';
@@ -81,7 +91,7 @@ test('holds media requests at six in flight', async () => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:gated');
   const settlers: (() => void)[] = [];
   const core = {
-    session: { account_id: 'account-gated', user_id: '@a:example.org', device_id: 'device-a' },
+    session: session('account-gated', '@a:example.org', 'device-a'),
     commands: {
       fetchMedia: vi.fn(
         () =>
@@ -116,7 +126,7 @@ test('never revokes the URL it is about to return', async () => {
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:published-${String(nextUrl++)}`);
   const core = {
-    session: { account_id: 'account-published', user_id: '@a:example.org', device_id: 'device-a' },
+    session: session('account-published', '@a:example.org', 'device-a'),
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))) },
   };
 

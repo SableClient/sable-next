@@ -2830,6 +2830,8 @@ pub struct SessionInfo {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub user_id: OwnedUserId,
     pub device_id: String,
+    pub homeserver: String,
+    pub needs_reauth: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -663,13 +663,15 @@ export class CoreClient {
         await this.refreshAccounts();
         this.status = 'ready';
       } else {
+        console.warn('[sable core] no session to restore');
         this.replaceSession(null);
         this.accounts = [];
         this.status = 'signed-out';
       }
-    } catch {
+    } catch (error) {
       if (generation !== this.generation) return;
 
+      console.error('[sable core] restore failed', error);
       this.replaceSession(null);
       this.status = 'signed-out';
       this.cleanupTransport();
@@ -770,7 +772,7 @@ export class CoreClient {
   private async restoreFallbackAccount(): Promise<void> {
     try {
       await this.refreshAccounts();
-      const fallbackAccountId = this.accounts.at(0)?.account_id;
+      const fallbackAccountId = this.accounts.find((account) => !account.needs_reauth)?.account_id;
       if (fallbackAccountId === undefined) {
         this.status = 'signed-out';
         return;

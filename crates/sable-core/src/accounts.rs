@@ -70,6 +70,9 @@ impl Core {
         else {
             return Err(self.failed("restore", "active account is missing"));
         };
+        if account.needs_reauth {
+            return Ok(CommandOk::Restore { session: None });
+        }
         let persisted = account.session;
 
         let client = session::build_client(&account.store_id, &persisted.homeserver)
@@ -84,6 +87,8 @@ impl Core {
                 .parse()
                 .map_err(|error| self.failed("restore: user id", error))?,
             device_id: persisted.credentials.device_id(),
+            homeserver: persisted.homeserver.clone(),
+            needs_reauth: false,
         };
 
         match persisted.credentials {
@@ -123,6 +128,8 @@ impl Core {
             account_id: session.account_id.clone(),
             user_id: session.client.user_id()?.to_owned(),
             device_id: session.client.device_id()?.to_string(),
+            homeserver: session.homeserver.clone(),
+            needs_reauth: false,
         })
     }
 
@@ -141,6 +148,8 @@ impl Core {
                         .parse()
                         .map_err(|error| self.failed("list accounts: user id", error))?,
                     device_id: account.session.credentials.device_id(),
+                    homeserver: account.session.homeserver,
+                    needs_reauth: account.needs_reauth,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -157,6 +166,9 @@ impl Core {
             .into_iter()
             .find(|account| account.account_id == account_id)
             .ok_or(CommandErr::NotLoggedIn)?;
+        if account.needs_reauth {
+            return Err(CommandErr::NotLoggedIn);
+        }
         let persisted = account.session;
         let client = session::build_client(&account.store_id, &persisted.homeserver)
             .await
@@ -169,6 +181,8 @@ impl Core {
                 .parse()
                 .map_err(|error| self.failed("switch account: user id", error))?,
             device_id: persisted.credentials.device_id(),
+            homeserver: persisted.homeserver.clone(),
+            needs_reauth: false,
         };
         match persisted.credentials {
             Credentials::Password(matrix) => client
@@ -284,6 +298,7 @@ impl Core {
             account_id: account_id.to_owned(),
             store_id: store_id.to_owned(),
             session: persisted.clone(),
+            needs_reauth: false,
         });
         let bytes = serde_json::to_vec(registry)
             .map_err(|error| self.failed("persist: serialize", error))?;
@@ -321,6 +336,38 @@ impl Core {
             .clear()
             .await
             .map_err(|error| self.failed("clear session", error))
+    }
+
+    pub(crate) async fn mark_account_needs_reauth(
+        &self,
+        account_id: Option<&str>,
+    ) -> Result<(), CommandErr> {
+        let Some(account_id) = account_id else {
+            return Ok(());
+        };
+
+        let _guard = self.session_store_lock.lock().await;
+        let mut accounts = self.accounts.lock().await;
+        let Some(registry) = accounts.as_mut() else {
+            return Err(self.failed("soft logout", "account registry is not initialized"));
+        };
+        let Some(account) = registry
+            .accounts
+            .iter_mut()
+            .find(|account| account.account_id == account_id)
+        else {
+            return Ok(());
+        };
+        account.needs_reauth = true;
+        if registry.active_account_id.as_deref() == Some(account_id) {
+            registry.active_account_id = None;
+        }
+        let bytes = serde_json::to_vec(registry)
+            .map_err(|error| self.failed("soft logout: serialize accounts", error))?;
+        self.sessions
+            .save(bytes)
+            .await
+            .map_err(|error| self.failed("soft logout: save accounts", error))
     }
 
     async fn remove_account(&self, account_id: Option<&str>) -> Result<(), CommandErr> {
@@ -576,9 +623,10 @@ impl Core {
         change: &matrix_sdk::SessionChange,
         generation: u64,
     ) -> bool {
-        if !matches!(change, matrix_sdk::SessionChange::UnknownToken(_)) {
+        let matrix_sdk::SessionChange::UnknownToken(data) = change else {
             return false;
-        }
+        };
+        let soft_logout = data.soft_logout;
 
         if self
             .session_generation
@@ -605,11 +653,22 @@ impl Core {
             if let Some(session) = session {
                 session.sync_service.stop().await;
             }
-            if let Err(error) = core.remove_account(account_id.as_deref()).await {
-                tracing::error!("could not clear rejected session: {error:?}");
+
+            let outcome = if soft_logout {
+                core.mark_account_needs_reauth(account_id.as_deref()).await
+            } else {
+                core.remove_account(account_id.as_deref()).await
+            };
+            if let Err(error) = outcome {
+                tracing::error!(soft_logout, "could not clear rejected session: {error:?}");
             }
+
             core.emit(CoreEvent::SessionEnded {
-                reason: "token_rejected".to_owned(),
+                reason: if soft_logout {
+                    "soft_logout".to_owned()
+                } else {
+                    "token_rejected".to_owned()
+                },
             });
         }));
         true

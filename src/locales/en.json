@@ -28,6 +28,8 @@
     "removeAccountConfirm": "Remove this account?",
     "removeAccountDescription": "This removes the account and its local data from this device.",
     "removeAccountFailed": "Could not remove this account.",
+    "accountSignedOut": "Signed out",
+    "accountSignInAgain": "Sign in again",
     "currentAccount": "Current",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",

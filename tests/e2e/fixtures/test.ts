@@ -25,6 +25,8 @@ type Session = {
   account_id: string;
   user_id: string;
   device_id: string;
+  homeserver: string;
+  needs_reauth: boolean;
 };
 
 export const SIGNED_OUT = { cookies: [], origins: [] };
@@ -177,6 +179,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         account_id: `e2e-account-${suffix}`,
         user_id: `@e2e-${suffix}:example.test`,
         device_id: `E2EDEVICE${workerIndex}`,
+        homeserver: 'https://example.test',
+        needs_reauth: false,
       });
     },
     { scope: 'worker' },

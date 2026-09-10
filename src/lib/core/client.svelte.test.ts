@@ -9,6 +9,8 @@ const session: SessionInfo = {
   account_id: 'account-a',
   user_id: '@erwan:example.org',
   device_id: 'LAPTOP',
+  homeserver: 'https://example.org',
+  needs_reauth: false,
 };
 
 function fakeTransport(responses: Record<string, unknown> = {}) {

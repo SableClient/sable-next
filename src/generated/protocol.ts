@@ -802,6 +802,8 @@ export type SessionInfo = {
 	account_id: string,
 	user_id: string,
 	device_id: string,
+	homeserver: string,
+	needs_reauth: boolean,
 };
 
 export type SidebarItemView = { kind: "space"; room_id: string } | { kind: "folder"; id: string; name: string | null; content: string[] };

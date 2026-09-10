@@ -77,6 +77,8 @@ pub struct PersistedAccount {
     pub account_id: String,
     pub store_id: String,
     pub session: PersistedSession,
+    #[serde(default)]
+    pub needs_reauth: bool,
 }
 
 impl AccountRegistry {
@@ -112,6 +114,7 @@ impl AccountRegistry {
                     account_id: "a1".to_owned(),
                     store_id: legacy_store_id.to_owned(),
                     session,
+                    needs_reauth: false,
                 }],
             },
             true,

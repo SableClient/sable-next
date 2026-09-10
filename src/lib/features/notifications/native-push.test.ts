@@ -26,7 +26,13 @@ import {
   switchPushProvider,
 } from './native-push';
 
-const session = { account_id: 'account', user_id: '@alice:example.org', device_id: 'DEVICE' };
+const session = {
+  account_id: 'account',
+  user_id: '@alice:example.org',
+  device_id: 'DEVICE',
+  homeserver: 'https://example.org',
+  needs_reauth: false,
+};
 const override = { pushGatewayUrl: '', pushVapidKey: '', pushAppId: '' };
 const config = {
   resolved: { gateway: 'https://push.example/_matrix/push/v1/notify', vapid: 'key', appId: 'web' },

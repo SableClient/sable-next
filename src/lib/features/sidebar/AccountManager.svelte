@@ -47,6 +47,10 @@
     };
   });
 
+  function reauthenticate(homeserver: string): Promise<void> {
+    return goto(resolve(`login?addAccount=1&server=${encodeURIComponent(homeserver)}`));
+  }
+
   async function switchAccount(accountId: string): Promise<void> {
     if (accountId === activeAccountId || switching) return;
 
@@ -121,15 +125,40 @@
           class="account-select"
           type="button"
           disabled={active || switching}
-          onclick={() => void switchAccount(account.account_id)}
+          onclick={() =>
+            void (account.needs_reauth
+              ? reauthenticate(account.homeserver)
+              : switchAccount(account.account_id))}
         >
           <Avatar size="medium" name={account.user_id} />
           <span class="account-identity">
             <strong>{account.user_id}</strong>
-            <small>{active ? $i18n.t('nav.activeAccount') : account.device_id}</small>
+            <small>
+              {#if account.needs_reauth}
+                {$i18n.t('nav.accountSignedOut')}
+              {:else if active}
+                {$i18n.t('nav.activeAccount')}
+              {:else}
+                {account.device_id}
+              {/if}
+            </small>
           </span>
         </button>
-        {#if active}
+        {#if account.needs_reauth}
+          <Button
+            variant="secondary"
+            size="small"
+            onclick={() => void reauthenticate(account.homeserver)}
+            >{$i18n.t('nav.accountSignInAgain')}</Button
+          >
+          <Button
+            variant="danger"
+            size="small"
+            onclick={() => {
+              removeAccountId = account.account_id;
+            }}>{$i18n.t('nav.removeAccount')}</Button
+          >
+        {:else if active}
           <Button
             variant="secondary"
             size="small"

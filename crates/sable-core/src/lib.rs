@@ -342,7 +342,7 @@ impl Core {
 #[allow(clippy::large_futures)]
 mod tests {
     use super::*;
-    use crate::protocol::{Command, CommandErr};
+    use crate::protocol::{Command, CommandErr, CommandOk};
 
     struct FailingClearSessionStore;
 
@@ -447,6 +447,131 @@ mod tests {
                 .ok()
                 .flatten(),
             Some(CoreEvent::SessionEnded { reason }) if reason == "token_rejected"
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_soft_logout_ends_the_session_with_its_own_reason() {
+        let (core, mut events) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        let (changes, receiver) = tokio::sync::broadcast::channel(1);
+
+        let mut data = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
+        data.soft_logout = true;
+        changes
+            .send(matrix_sdk::SessionChange::UnknownToken(data))
+            .unwrap();
+        core.watch_session_changes(receiver, 1);
+
+        assert!(matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), events.recv())
+                .await
+                .ok()
+                .flatten(),
+            Some(CoreEvent::SessionEnded { reason }) if reason == "soft_logout"
+        ));
+    }
+
+    #[test]
+    fn synapse_reports_an_expired_access_token_as_a_soft_logout() {
+        use matrix_sdk::ruma::api::error::{ErrorKind, StandardErrorBody};
+
+        let expired: StandardErrorBody = serde_json::from_value(serde_json::json!({
+            "errcode": "M_UNKNOWN_TOKEN",
+            "error": "Access token has expired",
+            "soft_logout": true,
+        }))
+        .unwrap();
+        assert!(matches!(
+            expired.kind,
+            ErrorKind::UnknownToken(data) if data.soft_logout
+        ));
+
+        let revoked: StandardErrorBody = serde_json::from_value(serde_json::json!({
+            "errcode": "M_UNKNOWN_TOKEN",
+            "error": "Unrecognised access token",
+            "soft_logout": false,
+        }))
+        .unwrap();
+        assert!(matches!(
+            revoked.kind,
+            ErrorKind::UnknownToken(data) if !data.soft_logout
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_soft_logout_keeps_the_account_and_only_flags_it() {
+        let bytes = Arc::new(Mutex::new(Some(
+            serde_json::to_vec(&serde_json::json!({
+                "version": 1,
+                "active_account_id": "a1",
+                "next_account_id": 2,
+                "accounts": [{
+                    "account_id": "a1",
+                    "store_id": "test-account-a1",
+                    "session": {
+                        "homeserver": "https://example.org",
+                        "credentials": {
+                            "kind": "password",
+                            "user_id": "@alice:example.org",
+                            "device_id": "DEVICEID",
+                            "access_token": "token"
+                        }
+                    }
+                }]
+            }))
+            .unwrap(),
+        )));
+        let (core, _events) = Core::new(
+            "test",
+            Box::new(TestSessionStore {
+                bytes: bytes.clone(),
+            }),
+        );
+
+        core.accounts().await.unwrap();
+        core.mark_account_needs_reauth(Some("a1")).await.unwrap();
+
+        let stored: serde_json::Value =
+            serde_json::from_slice(bytes.lock().await.as_deref().unwrap()).unwrap();
+        assert_eq!(stored["accounts"].as_array().unwrap().len(), 1);
+        assert_eq!(stored["accounts"][0]["needs_reauth"], true);
+        assert_eq!(stored["accounts"][0]["store_id"], "test-account-a1");
+        assert!(stored["active_account_id"].is_null());
+    }
+
+    #[tokio::test]
+    async fn restore_refuses_an_account_waiting_for_reauthentication() {
+        let bytes = Arc::new(Mutex::new(Some(
+            serde_json::to_vec(&serde_json::json!({
+                "version": 1,
+                "active_account_id": "a1",
+                "next_account_id": 2,
+                "accounts": [{
+                    "account_id": "a1",
+                    "store_id": "test-account-a1",
+                    "needs_reauth": true,
+                    "session": {
+                        "homeserver": "https://example.org",
+                        "credentials": {
+                            "kind": "password",
+                            "user_id": "@alice:example.org",
+                            "device_id": "DEVICEID",
+                            "access_token": "token"
+                        }
+                    }
+                }]
+            }))
+            .unwrap(),
+        )));
+        let (core, _events) = Core::new("test", Box::new(TestSessionStore { bytes }));
+
+        assert!(matches!(
+            core.restore().await,
+            Ok(CommandOk::Restore { session: None })
+        ));
+        assert!(matches!(
+            core.switch_account("a1".to_owned()).await,
+            Err(CommandErr::NotLoggedIn)
         ));
     }
 

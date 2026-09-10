@@ -85,6 +85,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       account_id: 'e2e-account',
       user_id: '@e2e:example.test',
       device_id: 'E2EDEVICE',
+      homeserver: 'https://example.test',
+      needs_reauth: false,
     };
     const profile: ProfileView = {
       user_id: session.user_id,
