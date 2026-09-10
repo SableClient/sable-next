@@ -21,8 +21,7 @@ test('sends raw command bodies through Android JSON IPC', async () => {
   await rawInvoke('send_attachment', new Uint8Array([0, 1, 255]), { filename: 'été.png' });
 
   expect(invoke).toHaveBeenCalledWith('send_attachment_base64', {
-    bytes: 'AAH/',
-    headers: { filename: '%C3%A9t%C3%A9.png' },
+    request: { bytes: 'AAH/', headers: { filename: '%C3%A9t%C3%A9.png' } },
   });
 });
 

@@ -20,7 +20,7 @@ export function rawInvoke<T>(
     osType() === 'android' &&
     (command === 'send_attachment' || command === 'upload_media')
   ) {
-    return invoke<T>(`${command}_base64`, { bytes: base64(bytes), headers: encoded });
+    return invoke<T>(`${command}_base64`, { request: { bytes: base64(bytes), headers: encoded } });
   }
   return invoke<T>(command, bytes, { headers: encoded });
 }
