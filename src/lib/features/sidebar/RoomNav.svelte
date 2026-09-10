@@ -600,14 +600,20 @@
       {/snippet}
       {#snippet createMenu()}
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger
-            class="nav-action sable-current sable-selection-layer sable-open"
-            aria-label={collapsed ? createRoomLabel : undefined}
-          >
-            <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
-            {#if !collapsed}<span class="room-text"
-                ><span class="room-name">{createRoomLabel}</span></span
-              >{/if}
+          <DropdownMenu.Trigger>
+            {#snippet child({ props })}
+              <button
+                {...props}
+                class="room-nav-trigger"
+                aria-label={collapsed ? createRoomLabel : undefined}
+                style="align-items: center; display: flex; gap: var(--space-200); text-align: left"
+              >
+                <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
+                {#if !collapsed}<span class="room-text"
+                    ><span class="room-name">{createRoomLabel}</span></span
+                  >{/if}
+              </button>
+            {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content class="sable-menu" side="right" align="start" sideOffset={4}>
             {#if canCreateHere}
@@ -1009,7 +1015,9 @@
   }
 
   .room-nav-actions a:hover,
-  .room-nav-actions a:focus-visible {
+  .room-nav-actions a:focus-visible,
+  .room-nav-actions :global(.room-nav-trigger:hover),
+  .room-nav-actions :global(.room-nav-trigger:focus-visible) {
     background: var(--sable-bg-container-hover);
   }
 
@@ -1146,12 +1154,17 @@
   }
 
   .room-row,
-  .nav-action {
+  .nav-action,
+  :global(.room-nav-trigger) {
     align-items: center;
+    background: transparent;
+    border: 0;
     border-radius: var(--radius);
     color: inherit;
+    cursor: pointer;
     display: flex;
     flex: 1;
+    font: inherit;
     font-weight: var(--font-weight-500);
     gap: var(--space-200);
     min-height: var(--control-height-medium);
@@ -1195,7 +1208,8 @@
     position: relative;
   }
 
-  .room-icon {
+  .room-icon,
+  :global(.room-nav-trigger .room-icon) {
     align-items: center;
     border-radius: var(--radius);
     display: flex;
@@ -1234,6 +1248,7 @@
   }
 
   .room-icon :global(svg),
+  :global(.room-nav-trigger .room-icon svg),
   :global(.room-avatar-icon svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
@@ -1271,7 +1286,8 @@
 
   .category-name,
   .room-name,
-  .room-topic {
+  .room-topic,
+  :global(.room-nav-trigger .room-name) {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1282,7 +1298,8 @@
     flex: 0 1 auto;
   }
 
-  .room-text {
+  .room-text,
+  :global(.room-nav-trigger .room-text) {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -1381,12 +1398,13 @@
       height: var(--control-height-small);
     }
 
-    .room-nav-actions.collapsed a {
+    .room-nav-actions.collapsed :is(a, button) {
       width: var(--control-height-small);
     }
 
     .room-row,
-    .nav-action {
+    .nav-action,
+    :global(.room-nav-trigger) {
       min-height: 2.25rem;
     }
 

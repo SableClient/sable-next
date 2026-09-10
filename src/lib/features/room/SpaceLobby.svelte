@@ -371,6 +371,7 @@
     {#if canManage && space}
       <FormActions>
         <Button
+          variant="primary"
           size="small"
           onclick={() => {
             void goto(
@@ -382,6 +383,7 @@
           {$i18n.t('nav.createRoomInSpace')}
         </Button>
         <Button
+          variant="ghost"
           size="small"
           onclick={() => {
             void goto(
