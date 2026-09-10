@@ -59,6 +59,7 @@
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
+    onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     readOnly?: boolean;
@@ -93,6 +94,7 @@
     members = [],
     onJumpToEvent,
     onOpenMedia,
+    onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
     readOnly = false,
@@ -480,6 +482,7 @@
                   layout={preferences.layout}
                   {onJumpToEvent}
                   {onOpenMedia}
+                  {onPersonaAvatarClick}
                   {onVotePoll}
                   {onEndPoll}
                   onPersonaOpenChange={setPersonaOpen}

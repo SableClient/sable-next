@@ -755,6 +755,7 @@
         members={memberLoader.members}
         onJumpToEvent={jumpToEvent}
         onOpenMedia={openMedia}
+        onPersonaAvatarClick={openProfileAvatar}
         onVotePoll={conversation.votePoll}
         onEndPoll={conversation.endPoll}
         readOnly={permissions ? !permissions.can_post : false}
@@ -831,6 +832,7 @@
           onSenderProfile={openProfile}
           onCopyLink={copyEventLink}
           onOpenMedia={openMedia}
+          onPersonaAvatarClick={openProfileAvatar}
         />
       {/key}
     {/if}
@@ -892,6 +894,7 @@
             onSenderProfile={openProfile}
             onCopyLink={copyEventLink}
             onOpenMedia={openMedia}
+            onPersonaAvatarClick={openProfileAvatar}
           />
         {/key}
       {/if}

@@ -16,9 +16,17 @@
     accountName: string;
     variant?: 'popover' | 'sheet';
     onOpenAccount: () => void;
+    onAvatarClick?: (source: string, displayName: string) => void;
   }
 
-  let { profile, accountId, accountName, variant = 'popover', onOpenAccount }: Props = $props();
+  let {
+    profile,
+    accountId,
+    accountName,
+    variant = 'popover',
+    onOpenAccount,
+    onAvatarClick,
+  }: Props = $props();
   let displayName = $derived(profile.display_name ?? accountName);
   let accountLabel = $derived(displayName === accountName ? accountId : accountName);
   let pronouns = $derived(
@@ -36,6 +44,8 @@
   {variant}
   userId={accountLabel}
   avatarUrl={profile.avatar_url}
+  avatarLabel={$i18n.t('timeline.profileAvatar', { name: displayName })}
+  {onAvatarClick}
   color={senderColor(profile.id ?? displayName)}
   nameColorLight={profile.color_on_light}
   nameColorDark={profile.color_on_dark}

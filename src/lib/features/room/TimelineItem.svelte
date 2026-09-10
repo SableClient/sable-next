@@ -102,6 +102,7 @@
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
+    onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     onPersonaOpenChange?: (open: boolean) => void;
@@ -135,6 +136,7 @@
     members = [],
     onJumpToEvent,
     onOpenMedia,
+    onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
     onPersonaOpenChange,
@@ -671,6 +673,7 @@
           {accountName}
           label={$i18n.t('timeline.personaProfile', { name: senderName })}
           onOpenAccount={openAccountFromPersona}
+          onAvatarClick={onPersonaAvatarClick}
           onOpenChange={onPersonaOpenChange}
         >
           <Avatar

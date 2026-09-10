@@ -17,12 +17,21 @@
     accountName: string;
     label: string;
     onOpenAccount: () => void;
+    onAvatarClick?: (source: string, displayName: string) => void;
     onOpenChange?: (open: boolean) => void;
     children: Snippet;
   }
 
-  let { profile, accountId, accountName, label, onOpenAccount, onOpenChange, children }: Props =
-    $props();
+  let {
+    profile,
+    accountId,
+    accountName,
+    label,
+    onOpenAccount,
+    onAvatarClick,
+    onOpenChange,
+    children,
+  }: Props = $props();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
   let open = $state(false);
@@ -70,7 +79,13 @@
         align="start"
         collisionPadding={12}
       >
-        <PersonaCard {profile} {accountId} {accountName} onOpenAccount={openAccount} />
+        <PersonaCard
+          {profile}
+          {accountId}
+          {accountName}
+          onOpenAccount={openAccount}
+          {onAvatarClick}
+        />
       </Popover.Content>
     </Popover.Portal>
   </Popover.Root>
@@ -95,7 +110,14 @@
     contentInset={false}
     onOpenChange={handleOpenChange}
   >
-    <PersonaCard {profile} {accountId} {accountName} onOpenAccount={openAccount} variant="sheet" />
+    <PersonaCard
+      {profile}
+      {accountId}
+      {accountName}
+      onOpenAccount={openAccount}
+      {onAvatarClick}
+      variant="sheet"
+    />
   </BottomSheet>
 {/if}
 

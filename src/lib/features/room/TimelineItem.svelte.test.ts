@@ -347,6 +347,42 @@ test('a per-message profile takes the sender position and names the account behi
   await unmount(instance);
 });
 
+test('opens a per-message profile avatar through viewer callback', async () => {
+  const onPersonaAvatarClick = vi.fn();
+  const persona = {
+    ...item(false),
+    per_message_profile: {
+      id: 'kris',
+      display_name: 'Kris',
+      avatar_url: 'mxc://example.org/kris',
+      pronouns: [],
+      color_on_light: null,
+      color_on_dark: null,
+      has_fallback: false,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: { item: persona, collapsed: false, layout: 'modern', onPersonaAvatarClick },
+    },
+  });
+  await tick();
+
+  const profileTrigger = document.querySelector<HTMLButtonElement>('.avatar-button');
+  if (!profileTrigger) throw new Error('persona profile trigger was not rendered');
+  profileTrigger.click();
+  await tick();
+
+  const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
+  if (!avatarButton) throw new Error('persona avatar button was not rendered');
+  avatarButton.click();
+
+  expect(onPersonaAvatarClick).toHaveBeenCalledWith('mxc://example.org/kris', 'Kris');
+  await unmount(instance);
+});
+
 test('without a persona the hover-only via keeps the account MXID', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

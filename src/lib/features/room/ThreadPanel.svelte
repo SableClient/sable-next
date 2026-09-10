@@ -25,6 +25,7 @@
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onCopyLink?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
+    onPersonaAvatarClick?: (source: string, displayName: string) => void;
   }
 
   let {
@@ -39,6 +40,7 @@
     onSenderProfile,
     onCopyLink,
     onOpenMedia,
+    onPersonaAvatarClick,
   }: Props = $props();
 
   let composer = $state<RoomComposer>();
@@ -102,6 +104,7 @@
     onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
     {onCopyLink}
     {onOpenMedia}
+    {onPersonaAvatarClick}
     onRequestHistory={requestHistory}
     onRequestFuture={requestFuture}
     onRead={markRead}
