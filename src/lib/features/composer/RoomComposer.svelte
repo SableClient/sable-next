@@ -103,6 +103,7 @@
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     onCancelContext?: () => void;
+    onToggleSilentReply?: () => void;
     onDeleteEdited?: (eventId: string, reason: string | null) => void;
     onEditLast?: () => void;
     threadRoot?: string | null;
@@ -122,6 +123,7 @@
     readOnly = false,
     context = null,
     onCancelContext,
+    onToggleSilentReply,
     onDeleteEdited,
     onEditLast,
     threadRoot = null,
@@ -759,7 +761,7 @@
     <div class="composer-shell">
       <div class="composer" role="group" aria-label={$i18n.t('timeline.messagePlaceholder')}>
         {#if context}
-          <ComposerContextBanner {context} onCancel={cancelContext} />
+          <ComposerContextBanner {context} onCancel={cancelContext} {onToggleSilentReply} />
         {/if}
         {#if staged.length > 0}
           <ComposerAttachments

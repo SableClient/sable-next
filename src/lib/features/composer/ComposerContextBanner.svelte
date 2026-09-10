@@ -1,4 +1,6 @@
 <script lang="ts">
+  import BellIcon from 'phosphor-svelte/lib/BellIcon';
+  import BellSlashIcon from 'phosphor-svelte/lib/BellSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
@@ -9,9 +11,11 @@
   interface Props {
     context: ComposerContext;
     onCancel?: () => void;
+    onToggleSilentReply?: () => void;
   }
 
-  let { context, onCancel }: Props = $props();
+  let { context, onCancel, onToggleSilentReply }: Props = $props();
+  let silent = $derived(context.silentReply === true);
 </script>
 
 <div class="context">
@@ -21,6 +25,21 @@
       : $i18n.t('composer.replyingTo', { name: context.sender ?? '' })}
   </span>
   <span class="context-body">{context.body}</span>
+  {#if context.kind === 'reply'}
+    <IconButton
+      size="small"
+      variant="ghost"
+      label={silent ? $i18n.t('composer.unmuteReply') : $i18n.t('composer.muteReply')}
+      aria-pressed={silent}
+      onclick={onToggleSilentReply}
+    >
+      {#if silent}
+        <BellSlashIcon />
+      {:else}
+        <BellIcon />
+      {/if}
+    </IconButton>
+  {/if}
   <IconButton
     size="small"
     variant="ghost"

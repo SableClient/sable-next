@@ -135,6 +135,7 @@
       onTyping={conversation.setTyping}
       context={conversation.context}
       onCancelContext={conversation.clearContext}
+      onToggleSilentReply={conversation.toggleSilentReply}
       onDeleteEdited={conversation.redact}
       onEditLast={conversation.editLast}
     />

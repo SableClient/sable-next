@@ -4,6 +4,7 @@ export interface ComposerContext {
   kind: 'reply' | 'edit';
   eventId: string;
   sender?: string | null;
+  silentReply?: boolean;
   body: string;
   html?: string | null;
   image?: EditImage | null;

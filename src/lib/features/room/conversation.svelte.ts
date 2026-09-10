@@ -116,6 +116,7 @@ export class Conversation {
       threadRoot: this.#threadRoot,
       formatted: outgoing.formatted,
       mentions: untouched || outcome.verbatim === true ? mentions : NO_MENTIONS,
+      silentReply: pending?.silentReply ?? false,
       kind: outcome.msgtype,
       persona: outgoing.persona,
     });
@@ -265,8 +266,15 @@ export class Conversation {
       kind: 'reply',
       eventId,
       sender: item.sender_name ?? item.sender,
+      silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
       body: replyPreviewBody(item.content),
     };
+  };
+
+  readonly toggleSilentReply = (): void => {
+    const pending = this.context;
+    if (pending?.kind !== 'reply') return;
+    this.context = { ...pending, silentReply: pending.silentReply !== true };
   };
 
   readonly edit = (

@@ -366,39 +366,31 @@ impl Core {
                 in_reply_to,
                 mentions,
                 mentions_room,
+                silent_reply,
                 persona,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = message_content(body, formatted, kind, mentions, mentions_room);
 
-                if let Some(persona) = persona {
-                    let room = self.room(&room_id).await?;
-                    let reply = thread_reply(in_reply_to, thread_root.clone());
-                    let content = match reply {
-                        Some(reply) => room
-                            .make_reply_event(content.into(), reply)
-                            .await
-                            .map_err(|error| self.failed("send_reply", error))?,
-                        None => content,
-                    };
-
-                    timeline
-                        .send_with_extra_content(
-                            content.into(),
-                            Some(crate::personas::profile_extra_content(&persona)),
-                        )
+                let content = match thread_reply(in_reply_to, thread_root.clone(), silent_reply) {
+                    Some(reply) => self
+                        .room(&room_id)
+                        .await?
+                        .make_reply_event(content.into(), reply)
                         .await
-                        .map_err(|error| self.failed("send_message", error))?;
-                    return Ok(CommandOk::SendMessage);
-                }
+                        .map_err(|error| self.failed("send_reply", error))?,
+                    None => content,
+                };
 
-                match in_reply_to {
-                    // `send_reply` fills the thread relation itself.
-                    Some(event_id) => {
+                match persona {
+                    Some(persona) => {
                         timeline
-                            .send_reply(content.into(), event_id)
+                            .send_with_extra_content(
+                                content.into(),
+                                Some(crate::personas::profile_extra_content(&persona)),
+                            )
                             .await
-                            .map_err(|error| self.failed("send_reply", error))?;
+                            .map_err(|error| self.failed("send_message", error))?;
                     }
                     None => {
                         timeline
@@ -2319,6 +2311,7 @@ impl Core {
 fn thread_reply(
     in_reply_to: Option<matrix_sdk::ruma::OwnedEventId>,
     thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
+    silent: bool,
 ) -> Option<SdkReply> {
     let (event_id, enforce_thread) = match (in_reply_to, thread_root) {
         (Some(event_id), Some(_)) => (event_id, EnforceThread::Threaded(ReplyWithinThread::Yes)),
@@ -2330,7 +2323,11 @@ fn thread_reply(
     Some(SdkReply {
         event_id,
         enforce_thread,
-        add_mentions: AddMentions::Yes,
+        add_mentions: if silent {
+            AddMentions::No
+        } else {
+            AddMentions::Yes
+        },
     })
 }
 
@@ -2456,6 +2453,19 @@ mod tests {
     use matrix_sdk::ruma::RoomId;
 
     use crate::protocol::{CreateJoinRuleView, EditImageView, MessageKind};
+
+    #[test]
+    fn a_silent_reply_carries_no_mention() {
+        let event_id = <&matrix_sdk::ruma::EventId>::try_from("$one:example.org")
+            .expect("an event id")
+            .to_owned();
+
+        let loud = super::thread_reply(Some(event_id.clone()), None, false).expect("a reply");
+        assert_eq!(loud.add_mentions, super::AddMentions::Yes);
+
+        let silent = super::thread_reply(Some(event_id), None, true).expect("a reply");
+        assert_eq!(silent.add_mentions, super::AddMentions::No);
+    }
 
     #[test]
     fn a_preview_with_nothing_to_show_is_no_preview() {

@@ -184,6 +184,7 @@
         readOnly={permissions ? !permissions.can_post : false}
         context={conversation.context}
         onCancelContext={conversation.clearContext}
+        onToggleSilentReply={conversation.toggleSilentReply}
       />
     </div>
   </div>

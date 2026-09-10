@@ -84,6 +84,7 @@ const noMentions: OutgoingMentions = { userIds: [], room: false };
 
 export type SendMessageOptions = {
   inReplyTo?: string | null;
+  silentReply?: boolean;
   threadRoot?: string | null;
   formatted?: string | null;
   mentions?: OutgoingMentions;
@@ -108,7 +109,7 @@ export type EditImage = {
   height: number | null;
 };
 
-export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo'> & {
+export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
   image?: EditImage | null;
 };
 
@@ -601,6 +602,7 @@ export function createCommands(transport: () => Transport) {
         in_reply_to: options.inReplyTo ?? null,
         mentions: mentions.userIds,
         mentions_room: mentions.room,
+        silent_reply: options.silentReply ?? false,
         persona: $state.snapshot(options.persona ?? null),
       });
     },

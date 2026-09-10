@@ -66,7 +66,7 @@ hidden_events: boolean } | { type: "unsubscribe"; subscription: SubscriptionId }
  *  Replying inside a thread needs no extra field: the SDK infers the
  *  thread from the replied-to event.
  */
-in_reply_to: string | null; mentions: string[]; mentions_room: boolean; persona: PerMessageProfileView | null } | { type: "send_raw_event"; room_id: string; event_type: string; content: unknown } | { type: "send_sticker"; room_id: string;
+in_reply_to: string | null; mentions: string[]; mentions_room: boolean; silent_reply: boolean; persona: PerMessageProfileView | null } | { type: "send_raw_event"; room_id: string; event_type: string; content: unknown } | { type: "send_sticker"; room_id: string;
 /**  `mxc://` only; the core rejects anything else. */
 url: string; body: string; info: PackImageInfoView | null; in_reply_to: string | null; thread_root: string | null; persona: PerMessageProfileView | null } | { type: "send_gif"; room_id: string;
 /**  `mxc://` only; the core rejects anything else. */

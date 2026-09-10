@@ -137,6 +137,8 @@ pub enum Command {
         #[serde(default)]
         mentions_room: bool,
         #[serde(default)]
+        silent_reply: bool,
+        #[serde(default)]
         persona: Option<PerMessageProfileView>,
     },
     SendRawEvent {

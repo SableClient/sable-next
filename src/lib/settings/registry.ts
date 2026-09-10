@@ -509,6 +509,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'mentionInReplies',
+        icon: BellIcon,
+        name: 'settings.mentionInReplies',
+        description: 'settings.mentionInRepliesHint',
+        type: 'boolean',
+      },
+      {
         key: 'richTextComposer',
         icon: CodeIcon,
         name: 'settings.richTextComposer',

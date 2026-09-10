@@ -45,6 +45,7 @@ export interface Preferences {
   pronounPillLimit: PronounPillLimit;
 
   enterForNewline: boolean;
+  mentionInReplies: boolean;
   formattingToolbar: boolean;
   richTextComposer: boolean;
 
@@ -164,6 +165,7 @@ const DEFAULTS: Preferences = {
   pronounPillLimit: '3',
 
   enterForNewline: false,
+  mentionInReplies: true,
   formattingToolbar: false,
   richTextComposer: true,
 
