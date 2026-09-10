@@ -3,6 +3,7 @@
 /// <reference lib="webworker" />
 /// <reference types="@sveltejs/kit" />
 
+import { version } from '$app/env';
 import { resolve } from '$app/paths';
 
 import favicon from '#lib/assets/favicon.png';
@@ -25,6 +26,7 @@ worker.addEventListener('message', (event) => {
   const message = event.data as { type?: unknown } | undefined;
   if (message?.type === 'sable:skip-waiting') event.waitUntil(worker.skipWaiting());
   if (message?.type === 'sable:share-take') event.waitUntil(handShares());
+  if (message?.type === 'sable:version') event.ports[0]?.postMessage(version);
 });
 
 interface StashedShare {

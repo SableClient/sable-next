@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { version } from '$app/env';
   import { onMount } from 'svelte';
   import { on } from 'svelte/events';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
@@ -9,8 +10,29 @@
 
   let registration = $state<ServiceWorkerRegistration | null>(null);
   let dismissed = $state(false);
+  let live = true;
 
-  function showUpdate(next: ServiceWorkerRegistration): void {
+  const VERSION_REPLY_MS = 1_500;
+
+  function workerVersion(worker: ServiceWorker): Promise<string | null> {
+    return new Promise((settle) => {
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => settle(null), VERSION_REPLY_MS);
+      channel.port1.onmessage = (event: MessageEvent<unknown>) => {
+        clearTimeout(timer);
+        settle(typeof event.data === 'string' ? event.data : null);
+      };
+      worker.postMessage({ type: 'sable:version' }, [channel.port2]);
+    });
+  }
+
+  async function consider(next: ServiceWorkerRegistration, worker: ServiceWorker): Promise<void> {
+    const reported = await workerVersion(worker);
+    if (!live) return;
+    if (reported === version) {
+      worker.postMessage({ type: 'sable:skip-waiting' });
+      return;
+    }
     registration = next;
     dismissed = false;
   }
@@ -31,22 +53,21 @@
   onMount(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    let active = true;
     let stopInstalling: (() => void) | undefined;
     let stopUpdates: (() => void) | undefined;
     void navigator.serviceWorker.ready
       .then((ready) => {
-        if (!active) return;
-        if (ready.waiting) showUpdate(ready);
+        if (!live) return;
+        if (ready.waiting) void consider(ready, ready.waiting);
 
         const onUpdate = (): void => {
-          if (!active) return;
+          if (!live) return;
           const installing = ready.installing;
           if (installing === null) return;
 
           const onStateChange = (): void => {
             if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdate(ready);
+              void consider(ready, installing);
             }
           };
           stopInstalling?.();
@@ -60,7 +81,7 @@
       });
 
     return () => {
-      active = false;
+      live = false;
       stopInstalling?.();
       stopUpdates?.();
     };
