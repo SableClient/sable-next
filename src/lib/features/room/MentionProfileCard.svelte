@@ -605,8 +605,6 @@
   statusEmoji={userStatus?.emoji}
   nameColorLight={currentProfile?.name_color_light}
   nameColorDark={currentProfile?.name_color_dark}
-  bioMoreLabel={shared ? undefined : $i18n.t('timeline.profileBioMore')}
-  bioLessLabel={shared ? undefined : $i18n.t('timeline.profileBioLess')}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
   children={shared ? sharedPanel : showFailure || currentProfile?.bio ? bioPanel : undefined}

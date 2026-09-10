@@ -707,8 +707,6 @@
     "profileBlock": "Block user",
     "profileUnblock": "Unblock user",
     "messageUser": "Message {{name}}",
-    "profileBioMore": "View full bio",
-    "profileBioLess": "Show less",
     "animalBoth": "{{is}} with {{has}}",
     "animalIs": "Is {{is}}",
     "animalHas": "Has {{has}}",

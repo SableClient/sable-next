@@ -22,8 +22,6 @@
     statusEmoji?: string | null;
     nameColorLight?: string | null;
     nameColorDark?: string | null;
-    bioMoreLabel?: string;
-    bioLessLabel?: string;
     variant?: 'popover' | 'sheet';
     class?: ClassValue;
     meta?: Snippet;
@@ -47,8 +45,6 @@
     statusEmoji = null,
     nameColorLight = null,
     nameColorDark = null,
-    bioMoreLabel,
-    bioLessLabel,
     variant = 'popover',
     class: className = '',
     meta,
@@ -61,26 +57,7 @@
   let tinted = $derived(heroColor !== null && heroColor !== '');
   let nameColor = $derived(nameColorLight ?? nameColorDark);
   let nameColorForDark = $derived(nameColorDark ?? nameColorLight);
-  let clampable = $derived(Boolean(bioMoreLabel && bioLessLabel));
   let canOpenAvatar = $derived(Boolean(avatarUrl && onAvatarClick));
-  let expanded = $state(false);
-  let truncated = $state(false);
-  const uid = $props.id();
-
-  // The bio arrives with the profile fetch, so the overflow check has to outlive
-  // the first render.
-  function measureOverflow(node: HTMLElement): (() => void) | undefined {
-    if (typeof ResizeObserver === 'undefined') return;
-
-    const observer = new ResizeObserver(() => {
-      if (!expanded) truncated = node.scrollHeight > node.clientHeight + 1;
-    });
-    observer.observe(node);
-    return () => {
-      observer.disconnect();
-    };
-  }
-
   function openAvatar(): void {
     if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
   }
@@ -152,25 +129,7 @@
     <div class="profile-card-panel" class:framed={children}>
       {#if children}
         <div class="profile-card-bio-block">
-          <div
-            id="{uid}-bio"
-            class="profile-card-bio"
-            class:clamped={clampable && !expanded}
-            {@attach measureOverflow}
-          >
-            {@render children()}
-          </div>
-          {#if clampable && (truncated || expanded)}
-            <button
-              class="profile-card-bio-toggle"
-              type="button"
-              aria-expanded={expanded}
-              aria-controls="{uid}-bio"
-              onclick={() => (expanded = !expanded)}
-            >
-              {expanded ? bioLessLabel : bioMoreLabel}
-            </button>
-          {/if}
+          <div class="profile-card-bio">{@render children()}</div>
         </div>
       {/if}
       {#if footer}
@@ -194,7 +153,6 @@
     );
     --profile-avatar-size: var(--avatar-size-large);
     --profile-cover-height: var(--avatar-size-large);
-    --profile-bio-lines: 4;
     --profile-card-ground: var(--sable-bg-container);
     --profile-panel-ground: var(--sable-surface-container);
 
@@ -233,7 +191,6 @@
 
   .sable-profile-card-sheet {
     --profile-cover-height: 6rem;
-    --profile-bio-lines: 6;
   }
 
   /* Both dimensions, so the ratio MediaImage sets inline stops applying. */
@@ -385,47 +342,8 @@
     overflow-wrap: break-word;
   }
 
-  .profile-card-bio.clamped {
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
-    -webkit-line-clamp: var(--profile-bio-lines);
-    line-clamp: var(--profile-bio-lines);
-    overflow: hidden;
-  }
-
   .profile-card-bio :global(.formatted-body) {
     white-space: normal;
-  }
-
-  /* A link, so it keeps an underline instead of a button's shape. */
-  .profile-card-bio-toggle {
-    background: none;
-    border: 0;
-    color: var(--sable-primary-main);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    justify-self: start;
-    margin: var(--space-200) 0 0;
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-  }
-
-  .profile-card-bio-toggle:hover {
-    text-decoration-thickness: 2px;
-  }
-
-  .sable-profile-card-sheet .profile-card-bio-toggle {
-    align-items: center;
-    display: inline-flex;
-    min-height: 2.75rem;
-  }
-
-  .profile-card-bio-toggle:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
-    outline-offset: var(--focus-ring-offset);
   }
 
   /* No hairline: the framed panel above already draws one edge, and two reads as
