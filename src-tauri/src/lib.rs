@@ -84,7 +84,6 @@ async fn submit_command(
     Box::pin(state.core.dispatch(command)).await
 }
 
-/// `Response` keeps the bytes out of JSON.
 #[tauri::command]
 async fn fetch_media(
     state: State<'_, AppState>,
@@ -130,8 +129,6 @@ impl Base64Invoke {
     }
 }
 
-/// Bytes in the raw body, metadata in the headers: a `Vec<u8>` argument would be
-/// marshalled as a JSON array of numbers.
 #[tauri::command]
 async fn send_attachment(
     state: State<'_, AppState>,

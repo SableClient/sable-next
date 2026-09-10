@@ -1,12 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
 
-/**
- * A `Vec<u8>` argument would be marshalled as a JSON array of numbers, so the
- * bytes ride the raw request body and the metadata the headers. A header value
- * holds no character above U+00FF, so every value is percent-encoded and the
- * Rust `decode_header` helper decodes it.
- */
 export function rawInvoke<T>(
   command: string,
   bytes: Uint8Array<ArrayBuffer>,
