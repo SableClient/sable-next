@@ -102,6 +102,9 @@ opt-level = 1
 [profile.test.package.sable-core]
 opt-level = 1
 
+[profile.dev.package.app]
+opt-level = 1
+
 [profile.wasm-release]
 inherits = "release"
 opt-level = "z"
