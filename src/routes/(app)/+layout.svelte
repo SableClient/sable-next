@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, type Snippet } from 'svelte';
+  import { onDestroy, type Snippet, untrack } from 'svelte';
   import { on } from 'svelte/events';
   import { page } from '$app/state';
   import AppShell from '#lib/ui/AppShell.svelte';
@@ -142,7 +142,7 @@
   $effect(() => {
     const login = resolve('login');
     if (core.status === 'signed-out' && !page.url.pathname.startsWith(login)) {
-      clearDrafts();
+      untrack(clearDrafts);
       void goto(login, { replace: true });
     }
   });
