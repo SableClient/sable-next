@@ -91,6 +91,8 @@ async function present(payload: PushPayload | undefined): Promise<void> {
     await navigator.setAppBadge(count).catch(() => undefined);
   }
 
+  if (await focused()) return;
+
   // `event_id_only` leaves nothing to reveal, so what arrives is what shows.
   const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), true);
   if (!showing) return;
@@ -108,6 +110,11 @@ async function present(payload: PushPayload | undefined): Promise<void> {
   };
 
   await worker.registration.showNotification(showing.title, options);
+}
+
+async function focused(): Promise<boolean> {
+  const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  return clients.some((client) => client.focused);
 }
 
 async function conversation(tag: string): Promise<ReturnType<typeof readLines>> {

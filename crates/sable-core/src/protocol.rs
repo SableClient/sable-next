@@ -713,6 +713,10 @@ pub enum Command {
         visible: bool,
         encrypted: bool,
     },
+    SetReadRoom {
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        room_id: Option<OwnedRoomId>,
+    },
     SetPresence {
         presence: PresenceView,
         status_message: Option<String>,
@@ -1196,6 +1200,7 @@ pub enum CommandOk {
     SetPusher,
     RemovePusher,
     SetNotificationContent,
+    SetReadRoom,
     SetPresence,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,

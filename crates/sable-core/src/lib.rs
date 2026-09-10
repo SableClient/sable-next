@@ -43,7 +43,7 @@ use std::{
 
 use matrix_sdk::executor::AbortOnDrop;
 use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
-use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId};
 use matrix_sdk_ui::timeline::Timeline;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use url::Url;
@@ -82,6 +82,7 @@ pub struct Core {
     thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
     notification_content: AtomicBool,
     notification_encrypted_content: AtomicBool,
+    read_room: std::sync::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
     server_search: Mutex<search::ServerSearch>,
@@ -149,6 +150,7 @@ impl Core {
             events,
             notification_content: AtomicBool::new(false),
             notification_encrypted_content: AtomicBool::new(false),
+            read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
             foreground_paginations: AtomicU32::new(0),
             next_log_id: AtomicU64::new(1),
@@ -186,6 +188,22 @@ impl Core {
     #[must_use]
     pub fn notification_encrypted_content(&self) -> bool {
         self.notification_encrypted_content.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn set_read_room(&self, room_id: Option<OwnedRoomId>) {
+        *self
+            .read_room
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = room_id;
+    }
+
+    #[must_use]
+    pub(crate) fn is_read_room(&self, room_id: &RoomId) -> bool {
+        self.read_room
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_deref()
+            == Some(room_id)
     }
 
     /// No carrier means no UI, and syncing continues, so a drop is not an error.

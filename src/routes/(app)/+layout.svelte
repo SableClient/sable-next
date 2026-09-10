@@ -356,6 +356,21 @@
     notifications.retireRead(roomList.rooms);
   });
 
+  let visible = $state(true);
+
+  $effect(() => {
+    const read = () => {
+      visible = document.visibilityState === 'visible';
+    };
+    read();
+    return on(document, 'visibilitychange', read);
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready') return;
+    notifications.readRoom(visible ? openRoomId : null);
+  });
+
   $effect(() => {
     if (core.status !== 'ready' || !alertsNatively()) return;
 

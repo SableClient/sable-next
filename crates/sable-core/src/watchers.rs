@@ -111,6 +111,7 @@ impl Core {
                             }
                             if notifications::is_backfill(session_start, event.origin_server_ts)
                                 || notifications::is_read(&room)
+                                || core.is_read_room(room.room_id())
                             {
                                 return;
                             }

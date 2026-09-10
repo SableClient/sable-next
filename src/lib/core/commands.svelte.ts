@@ -1136,6 +1136,10 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async setReadRoom(roomId: string | null): Promise<void> {
+      await transport().send({ type: 'set_read_room', room_id: roomId });
+    },
+
     async notificationKeywords(): Promise<string[]> {
       const response = await transport().send({
         type: 'notification_keywords',

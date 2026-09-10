@@ -2,8 +2,6 @@ import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 
 import { createContext } from 'svelte';
 
-import { page } from '$app/state';
-
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadMediaUrl } from '#lib/ui/media-url.js';
@@ -24,6 +22,7 @@ export class NotificationCenter {
   private stopEvents: (() => void) | null = null;
   private client: CoreClient | null = null;
   private open: OpenRoom | null = null;
+  private reading: string | null = null;
   /* eslint-disable svelte/prefer-svelte-reactivity -- a write from a notification would subscribe whichever effect is running */
   private readonly unread = new Set<string>();
   private readonly conversations = new Map<string, ConversationLine[]>();
@@ -48,14 +47,22 @@ export class NotificationCenter {
     this.stopEvents = null;
     this.client = null;
     this.open = null;
+    this.reading = null;
     this.unread.clear();
     this.conversations.clear();
     this.presented.clear();
   }
 
+  readRoom(roomId: string | null): void {
+    if (this.reading === roomId) return;
+    this.reading = roomId;
+
+    void this.client?.commands.setReadRoom(roomId).catch(() => undefined);
+    if (roomId !== null && preferences.clearNotificationsOnRead) this.retire(roomId);
+  }
+
   retireRead(rooms: readonly RoomSummary[]): void {
     if (!preferences.clearNotificationsOnRead) return;
-    const userId = this.client?.session?.account_id;
 
     for (const room of rooms) {
       if (room.unread > 0) {
@@ -64,13 +71,19 @@ export class NotificationCenter {
       }
       if (!this.unread.delete(room.room_id)) continue;
 
-      this.conversations.delete(room.room_id);
-      this.presented.get(room.room_id)?.close();
-      this.presented.delete(room.room_id);
-      if (userId !== undefined) {
-        void retireRoomAlerts(userId, room.room_id).catch(() => undefined);
-      }
+      this.retire(room.room_id);
     }
+  }
+
+  private retire(roomId: string): void {
+    this.unread.delete(roomId);
+    this.conversations.delete(roomId);
+    this.presented.get(roomId)?.close();
+    this.presented.delete(roomId);
+
+    const userId = this.client?.session?.account_id;
+    if (userId === undefined) return;
+    void retireRoomAlerts(userId, roomId).catch(() => undefined);
   }
 
   present(view: NotificationView): void {
@@ -79,7 +92,7 @@ export class NotificationCenter {
     const lines = appendLine(this.conversations.get(view.room_id) ?? [], line(view));
     this.conversations.set(view.room_id, lines);
 
-    if (!enabled() || reading(view)) return;
+    if (!enabled() || this.reading === view.room_id) return;
 
     void this.show(view, lines);
 
@@ -119,12 +132,6 @@ async function avatar(core: CoreClient, view: NotificationView): Promise<string>
 }
 
 const FALLBACK_ICON = '/favicon.png';
-
-function reading(view: NotificationView): boolean {
-  if (document.visibilityState !== 'visible') return false;
-  const open = page.params.roomId;
-  return open !== undefined && decodeURIComponent(open) === view.room_id;
-}
 
 function chime(): void {
   try {

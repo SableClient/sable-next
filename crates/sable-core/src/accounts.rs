@@ -431,6 +431,7 @@ impl Core {
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
+        self.set_read_room(None);
         *self.search_index.lock().await = search::MessageIndex::new();
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();

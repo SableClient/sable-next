@@ -4,10 +4,12 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-const mocks = vi.hoisted(() => ({ retire: vi.fn().mockResolvedValue(undefined) }));
+const mocks = vi.hoisted(() => ({
+  retire: vi.fn().mockResolvedValue(undefined),
+  setReadRoom: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
-vi.mock('$app/state', () => ({ page: { params: {} } }));
 vi.mock('./retire', () => ({ retireRoomAlerts: mocks.retire }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -16,6 +18,7 @@ import { NotificationCenter } from './notifications.svelte';
 
 beforeEach(() => {
   mocks.retire.mockClear();
+  mocks.setReadRoom.mockClear();
 });
 
 function room(unread: number): RoomSummary {
@@ -27,6 +30,7 @@ function center(): NotificationCenter {
   notifications.start(
     {
       session: { account_id: '@me:example.org' },
+      commands: { setReadRoom: mocks.setReadRoom },
       subscribeEvents: () => () => {},
     } as unknown as CoreClient,
     () => {}
@@ -51,4 +55,22 @@ test('a room that was never unread retires nothing', () => {
   notifications.retireRead([room(0)]);
 
   expect(mocks.retire).not.toHaveBeenCalled();
+});
+
+test('opening a room retires its alerts and tells the core to skip it', () => {
+  const notifications = center();
+
+  notifications.readRoom('!room:example.org');
+
+  expect(mocks.setReadRoom).toHaveBeenCalledWith('!room:example.org');
+  expect(mocks.retire).toHaveBeenCalledWith('@me:example.org', '!room:example.org');
+});
+
+test('leaving a room clears the core-side gate', () => {
+  const notifications = center();
+
+  notifications.readRoom('!room:example.org');
+  notifications.readRoom(null);
+
+  expect(mocks.setReadRoom).toHaveBeenLastCalledWith(null);
 });
