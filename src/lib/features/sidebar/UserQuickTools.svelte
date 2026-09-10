@@ -148,7 +148,9 @@
           aria-label={toolLabel(item)}
           aria-current={toolActive ? 'page' : undefined}
         >
-          <span aria-hidden="true"><item.icon weight={toolActive ? 'fill' : 'regular'} /></span>
+          <span class="tool-icon" aria-hidden="true"
+            ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
+          >
           {#if item.href === '/inbox'}
             <UnreadBadge counts={inboxCounts} aria-hidden="true" />
           {/if}
@@ -176,7 +178,9 @@
             aria-label={toolLabel(item)}
             aria-current={toolActive ? 'page' : undefined}
           >
-            <span aria-hidden="true"><item.icon weight={toolActive ? 'fill' : 'regular'} /></span>
+            <span class="tool-icon" aria-hidden="true"
+              ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
+            >
             {#if item.href === '/inbox'}
               <UnreadBadge counts={inboxCounts} aria-hidden="true" />
             {/if}
@@ -273,7 +277,8 @@
     z-index: 1;
   }
 
-  .mobile-icon {
+  .mobile-icon,
+  .tool-icon {
     display: flex;
   }
 
