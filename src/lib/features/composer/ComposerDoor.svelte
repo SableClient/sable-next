@@ -243,14 +243,18 @@
     width: var(--icon-size-small);
   }
 
-  :global(.composer-menu) {
+  :global(.sable-menu.composer-menu) {
+    --radius-outer: var(--radii-500);
+    --radius-padding: var(--space-150);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+
     background: var(--sable-bg-container);
     border: var(--border-width) solid var(--sable-bg-container-line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-outer);
     box-shadow: var(--shadow-float);
     display: grid;
     gap: var(--space-100);
-    padding: var(--space-150);
+    padding: var(--radius-padding);
     width: min(15rem, calc(100vw - 2rem));
     z-index: var(--layer-popover);
   }

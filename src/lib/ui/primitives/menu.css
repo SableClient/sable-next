@@ -1,16 +1,19 @@
 .sable-menu {
   --menu-min-width: 11rem;
   --menu-max-height: 20rem;
+  --radius-outer: var(--radii-400);
+  --radius-padding: var(--space-100);
+  --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
   background: var(--sable-bg-container);
   border: var(--border-width) solid var(--sable-bg-container-line);
-  border-radius: var(--radii-400);
+  border-radius: var(--radius-outer);
   box-shadow: var(--shadow-e200);
   display: grid;
   max-height: var(--menu-max-height);
   min-width: var(--menu-min-width);
   overflow: auto;
-  padding: var(--space-100);
+  padding: var(--radius-padding);
   z-index: var(--layer-menu);
 }
 
@@ -23,7 +26,7 @@
   appearance: none;
   background: transparent;
   border: 0;
-  border-radius: var(--radii-400);
+  border-radius: var(--radius-inner);
   color: inherit;
   cursor: pointer;
   display: flex;

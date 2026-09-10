@@ -141,17 +141,21 @@
 
 <style>
   .message-actions {
+    --radius-outer: var(--radius);
+    --radius-padding: var(--space-050);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+
     align-items: center;
     background: var(--sable-surface-container);
     border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-outer);
     inset-inline-end: var(--space-300);
     bottom: calc(100% - var(--space-200));
     box-shadow: var(--shadow-float);
     display: flex;
     gap: var(--space-050);
     opacity: 0;
-    padding: var(--space-050);
+    padding: var(--radius-padding);
     pointer-events: none;
     position: absolute;
     z-index: 3;
@@ -160,6 +164,7 @@
   .message-actions :global(.message-action-button) {
     --button-height: 1.5rem;
 
+    border-radius: var(--radius-inner);
     color: var(--sable-surface-var-on-container);
     position: relative;
   }

@@ -81,7 +81,7 @@
 
   kbd {
     background: var(--sable-surface-var-container);
-    border-radius: calc(var(--radius) - 0.25rem);
+    border-radius: var(--radii-300);
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
     padding: var(--space-100) var(--space-150);

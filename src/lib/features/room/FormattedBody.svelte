@@ -412,7 +412,7 @@
   .formatted-body :global(:not(pre) > code) {
     background: var(--sable-surface-var-container);
     border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-radius: 0.25rem;
+    border-radius: var(--radii-300);
     font-family: var(--font-family-mono);
     font-size: var(--inline-code-scale);
     padding: 0 var(--space-100);

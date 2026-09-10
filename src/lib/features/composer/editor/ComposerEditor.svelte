@@ -88,7 +88,7 @@
   .editor :global(:not(pre) > code) {
     background: var(--sable-surface-var-container);
     border: var(--border-width) solid var(--sable-surface-var-container-line);
-    border-radius: calc(var(--radius) - 0.25rem);
+    border-radius: var(--radii-300);
     font-family: var(--font-family-mono);
     padding: 0 var(--space-050);
   }
@@ -105,7 +105,7 @@
 
   .editor :global([data-mx-spoiler]) {
     background: var(--sable-surface-container-active);
-    border-radius: calc(var(--radius) - 0.25rem);
+    border-radius: var(--radii-300);
     padding: 0 var(--space-050);
   }
 

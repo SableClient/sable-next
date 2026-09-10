@@ -78,7 +78,7 @@
 
   .tooltip-trigger-inline {
     align-items: baseline;
-    border-radius: 0.125rem;
+    border-radius: var(--radii-200);
     color: inherit;
     cursor: default;
     display: inline;

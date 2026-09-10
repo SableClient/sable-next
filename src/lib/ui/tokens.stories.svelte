@@ -23,7 +23,7 @@
     '800',
     '900',
   ]);
-  const radii = scale('--radii', ['300', '400', '500', 'pill']);
+  const radii = scale('--radii', ['200', '300', '400', '500', 'pill']);
   const sizes = scale('--size', ['x50', 'x100', 'x200', 'x300', 'x400', 'x500', 'x600']);
   const borders = scale('--border-width', ['300', '400', '500', '600', '700']);
   const shadows = scale('--shadow', ['e100', 'e200', 'e300', 'e400']);

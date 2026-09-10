@@ -849,12 +849,12 @@
   .pixel-toggle:hover,
   .reset:hover {
     background: var(--sable-surface-container-hover);
-    border-radius: 0.5rem;
+    border-radius: var(--radii-400);
   }
 
   .pixel-toggle:focus-visible,
   .reset:focus-visible {
-    border-radius: 0.5rem;
+    border-radius: var(--radii-400);
     outline: var(--focus-ring-width) solid var(--sable-focus-ring);
     outline-offset: 0.15rem;
   }

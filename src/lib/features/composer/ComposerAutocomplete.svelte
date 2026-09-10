@@ -146,7 +146,7 @@
 
   .key {
     background: var(--sable-surface-var-container);
-    border-radius: calc(var(--radius) - 0.25rem);
+    border-radius: var(--radii-300);
     color: var(--sable-surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);

@@ -63,15 +63,19 @@
   }
 
   .staged-item {
+    --radius-outer: var(--radius);
+    --radius-padding: var(--space-100);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+
     align-items: center;
     background: var(--sable-bg-container);
     border: var(--border-width) solid var(--sable-surface-container-line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-outer);
     display: flex;
     gap: var(--space-150);
     max-width: 14rem;
     min-width: 0;
-    padding: var(--space-100) var(--space-100) var(--space-100) var(--space-200);
+    padding: var(--radius-padding) var(--radius-padding) var(--radius-padding) var(--space-200);
   }
 
   .staged-icon {
@@ -104,7 +108,8 @@
     font-size: var(--font-size-small);
   }
 
-  :global(.staged-remove) {
+  .staged-item :global(.staged-remove) {
+    border-radius: var(--radius-inner);
     flex: 0 0 auto;
   }
 
