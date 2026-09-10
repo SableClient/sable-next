@@ -22,7 +22,6 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import FormActions from '#lib/ui/primitives/FormActions.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -369,10 +368,11 @@
     <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" uniform />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if canManage && space}
-      <FormActions>
+      <div class="hero-actions">
         <Button
           variant="primary"
           size="small"
+          class="hero-action"
           onclick={() => {
             void goto(
               resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(space) })
@@ -385,6 +385,7 @@
         <Button
           variant="ghost"
           size="small"
+          class="hero-action hero-action-subspace"
           onclick={() => {
             void goto(
               resolve('/(app)/space/[spaceId]/create-space', { spaceId: roomPathParam(space) })
@@ -394,7 +395,7 @@
           <UsersThreeIcon />
           {$i18n.t('nav.createSubspace')}
         </Button>
-      </FormActions>
+      </div>
     {/if}
     {#if space?.topic}
       <button
@@ -527,6 +528,26 @@
     position: absolute;
     right: 0;
     top: var(--space-300);
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+    justify-content: center;
+    margin-top: var(--space-300);
+  }
+
+  :global(.hero-action) {
+    border-radius: var(--radius-pill);
+  }
+
+  :global(.hero-action-subspace) {
+    --button-container: var(--sable-surface-var-container);
+    --button-container-active: var(--sable-surface-var-container-active);
+    --button-container-hover: var(--sable-surface-var-container-hover);
+    --button-line: var(--sable-surface-var-container-line);
+    --button-on-container: var(--sable-surface-var-on-container);
   }
 
   h1 {

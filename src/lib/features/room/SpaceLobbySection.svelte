@@ -344,7 +344,7 @@
   .room {
     align-items: center;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: var(--space-400);
     padding: var(--space-300) var(--space-400);
   }
@@ -474,10 +474,6 @@
   }
 
   @media (width >= 42rem) {
-    .room {
-      flex-wrap: nowrap;
-    }
-
     .room-actions {
       margin-left: 0;
     }
