@@ -269,6 +269,17 @@ test('a code block gains a language label and a copy control', async () => {
   await unmount(instance);
 });
 
+test('reads the language off the pre when the code element carries none', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<pre class="language-go"><code>x</code></pre>' },
+  });
+  await tick();
+
+  expect(document.querySelector('.code-language')?.textContent).toBe('go');
+  await unmount(instance);
+});
+
 test('an unlabelled block falls back to a generic label', async () => {
   const instance = mount(FormattedBody, {
     target: document.body,

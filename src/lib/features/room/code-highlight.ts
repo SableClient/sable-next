@@ -26,12 +26,16 @@ async function loadArborium(): Promise<ArboriumModule | null> {
 }
 
 /** `null` means the caller keeps the plain text it already has. */
-export async function highlightCode(code: string, language: string): Promise<string | null> {
-  const requested = LANGUAGE_ALIASES[language.toLowerCase()] ?? language;
+export async function highlightCode(code: string, language: string | null): Promise<string | null> {
   const arborium = await loadArborium();
   if (!arborium) return null;
 
   try {
+    const requested =
+      language === null
+        ? arborium.detectLanguage(code)
+        : (LANGUAGE_ALIASES[language.toLowerCase()] ?? language);
+    if (!requested) return null;
     const resolved = arborium.normalizeLanguage(requested);
     if (!(await arborium.isLanguageAvailable(resolved))) return null;
     const html = await arborium.highlight(resolved, code);

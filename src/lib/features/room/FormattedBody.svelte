@@ -199,10 +199,13 @@
   /** Past this many lines a block collapses behind a toggle. */
   const CODE_LINE_LIMIT = 14;
 
-  function codeLanguage(block: HTMLElement): string | null {
-    const code = block.querySelector('code');
-    const named = [...(code?.classList ?? [])].find((name) => name.startsWith('language-'));
+  function classLanguage(element: Element | null): string | null {
+    const named = [...(element?.classList ?? [])].find((name) => name.startsWith('language-'));
     return named?.slice('language-'.length) || null;
+  }
+
+  function codeLanguage(block: HTMLElement): string | null {
+    return classLanguage(block.querySelector('code')) ?? classLanguage(block);
   }
 
   function decorateCodeBlocks(node: HTMLElement): void {
@@ -243,11 +246,11 @@
 
       block.replaceWith(figure);
       figure.append(header, block);
-      if (language) void paintHighlight(block, language);
+      void paintHighlight(block, language);
     }
   }
 
-  async function paintHighlight(block: HTMLPreElement, language: string): Promise<void> {
+  async function paintHighlight(block: HTMLPreElement, language: string | null): Promise<void> {
     const code = block.querySelector('code');
     const source = code?.textContent;
     if (!code || !source) return;
