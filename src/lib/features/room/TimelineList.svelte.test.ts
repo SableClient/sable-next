@@ -261,6 +261,102 @@ test('fills past several filtered pages until the opening viewport has enough me
   await unmount(instance);
 });
 
+test('a reset that leaves one message refills the viewport on its own', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+  const history = vi.fn(() => Promise.resolve(false));
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  const element = viewport();
+  Object.defineProperties(element, {
+    clientHeight: { configurable: true, value: 100 },
+    scrollHeight: { configurable: true, value: 900 },
+  });
+  await tick();
+  await runAnimationFrames();
+  const opening = history.mock.calls.length;
+
+  roomTimeline.items = [item('latest')];
+  Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 100 });
+  await tick();
+  await runAnimationFrames();
+
+  expect(history.mock.calls.length).toBeGreaterThan(opening);
+  await unmount(instance);
+});
+
+test('an empty snapshot keeps the skeleton until the first page decides', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [];
+  let releaseHistory = (end: boolean): void => void end;
+  const history = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        releaseHistory = resolve;
+      })
+  );
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('.timeline-empty')).toBeNull();
+  expect(document.querySelector('.timeline-placeholder')).not.toBeNull();
+  expect(history).toHaveBeenCalled();
+
+  releaseHistory(false);
+  roomTimeline.items = [item('latest')];
+  await runAnimationFrames();
+
+  expect(document.querySelector('.timeline-empty')).toBeNull();
+  await unmount(instance);
+});
+
+test('an empty room reports it once the start is reached', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [];
+  const history = vi.fn(() => Promise.resolve(true));
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('.timeline-empty')).not.toBeNull();
+  await unmount(instance);
+});
+
 test('reveals a short timeline at once and pads it out behind the reader', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
@@ -1039,6 +1135,37 @@ test('keeps filling past a window of events the settings hide', async () => {
   }
 
   expect(history).toHaveBeenCalledTimes(25);
+  await unmount(instance);
+});
+
+test('a window of hidden events keeps the skeleton rather than the filtered notice', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [hiddenItem('renamed')];
+  const history = vi.fn(() => Promise.resolve(false));
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('.timeline-empty')).toBeNull();
+  expect(document.querySelector('.timeline-placeholder')).not.toBeNull();
+
+  roomTimeline.backwardPagination = 'end';
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('.timeline-empty')).not.toBeNull();
   await unmount(instance);
 });
 

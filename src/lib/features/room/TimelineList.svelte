@@ -150,13 +150,16 @@
   let historyExhausted = $state(false);
   let historyRequestPending = $state(false);
   let historyTask: Promise<boolean> | null = null;
-  let emptyRefillPending = false;
+  let refillPending = false;
   let focusFilling = false;
-  let hadVisibleItems = false;
+  let visibleItemCount = 0;
   let personas = $derived(personaLookup(timeline.items));
   let personaOpen = $state(false);
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
+  );
+  let awaitingContent = $derived(
+    visibleItems.length === 0 && timeline.error === null && !noHistory
   );
   let readEventId = $derived.by(() => {
     if (!revealed || !viewport) return null;
@@ -201,6 +204,9 @@
     followingLive = revealed && windowState.pinned;
   });
 
+  function fillsViewport(engine: TimelineWindow<RowValue>, node: HTMLElement): boolean {
+    return engine.contentHeight >= node.clientHeight || node.scrollHeight > node.clientHeight;
+  }
   function requestHistory(): Promise<boolean> {
     if (historyTask) return historyTask;
     historyRequestPending = true;
@@ -362,33 +368,32 @@
     }
   }
   $effect(() => {
-    if (visibleItems.length > 0) {
-      hadVisibleItems = true;
-      return;
-    }
-    if (hadVisibleItems) {
-      hadVisibleItems = false;
-      historyExhausted = false;
-    }
+    const count = visibleItems.length;
+    if (count < visibleItemCount) historyExhausted = false;
+    visibleItemCount = count;
+    const engine = controller;
+    const node = viewport;
     if (
       timeline.loading ||
-      !controller ||
+      !engine ||
       !revealed ||
       historyExhausted ||
       timeline.backwardPagination !== 'idle' ||
       historyRequestPending ||
       filling ||
-      emptyRefillPending
+      focusFilling ||
+      refillPending
     )
       return;
-    emptyRefillPending = true;
+    if (count > 0 && !(node && windowState.start === 0 && !fillsViewport(engine, node))) return;
+    refillPending = true;
     void requestHistory()
       .then((end) => {
         historyExhausted = end;
       })
       .catch(() => {})
       .finally(() => {
-        emptyRefillPending = false;
+        refillPending = false;
       });
   });
   let handledFocus: string | null = null;
@@ -525,7 +530,7 @@
       </div>
     </div>
 
-    {#if !revealed && !noHistory}
+    {#if (!revealed || awaitingContent) && !noHistory}
       <TimelineSkeleton layout={preferences.layout} />
     {:else if visibleItems.length === 0}
       <EmptyState
