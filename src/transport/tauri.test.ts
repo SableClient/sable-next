@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 const invoke = vi.fn();
 
@@ -9,8 +9,14 @@ vi.mock('@tauri-apps/api/core', () => ({
   },
 }));
 vi.mock('#lib/platform/session-storage.js', () => ({ resetWebStorage: () => Promise.resolve() }));
+const captureException = vi.fn();
+vi.mock('@sentry/sveltekit', () => ({ captureException }));
 
 const { createTauriTransport } = await import('./tauri');
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function headersOf(call: unknown[]): Record<string, string> {
   const options = call[2] as { headers: Record<string, string> };
@@ -46,4 +52,28 @@ test('percent-encodes a caption and a filename a header value cannot carry', asy
   for (const value of Object.values(headers)) {
     expect(value).toMatch(/^[ -~]*$/);
   }
+});
+
+test('a throwing listener neither escapes the channel nor stops the batch', () => {
+  invoke.mockResolvedValue(undefined);
+  const transport = createTauriTransport();
+  const subscribed = invoke.mock.calls.findLast(([command]) => command === 'subscribe_events');
+  if (!subscribed) throw new Error('the transport did not subscribe to events');
+  const { channel } = subscribed[1] as {
+    channel: { onmessage: ((events: unknown) => void) | null };
+  };
+
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  const seen: string[] = [];
+  transport.subscribe(() => {
+    throw new Error('listener exploded');
+  });
+  transport.subscribe((event) => {
+    seen.push(event.type);
+  });
+
+  const batch = [{ type: 'sync_state' }, { type: 'sync_state' }];
+  expect(() => channel.onmessage?.(batch)).not.toThrow();
+  expect(seen).toEqual(['sync_state', 'sync_state']);
+  expect(captureException).toHaveBeenCalledTimes(2);
 });

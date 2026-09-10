@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/sveltekit';
 import { Channel, invoke } from '@tauri-apps/api/core';
 
 import type { Command, CommandErr, CoreEvent } from '#src/generated/protocol';
@@ -27,7 +28,16 @@ export function createTauriTransport(): Transport {
   const channel = new Channel<CoreEvent[]>();
   channel.onmessage = (events) => {
     for (const event of events) {
-      for (const listener of listeners) listener(event);
+      for (const listener of listeners) {
+        try {
+          listener(event);
+        } catch (error) {
+          console.error('[sable transport] event listener failed', { event: event.type, error });
+          Sentry.captureException(error, {
+            tags: { source: 'tauri-event', event: event.type },
+          });
+        }
+      }
     }
   };
 
