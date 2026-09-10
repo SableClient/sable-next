@@ -5,6 +5,7 @@
   import { tick, untrack } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
   import {
@@ -52,6 +53,10 @@
 
   let { items, selectedEventId, onClose }: Props = $props();
   const core = useCoreClient();
+  holdOverlayBack(
+    () => item !== undefined,
+    () => onClose()
+  );
   let index = $derived(
     Math.max(
       0,

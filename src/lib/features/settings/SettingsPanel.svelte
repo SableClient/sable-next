@@ -51,6 +51,7 @@
 
 <DialogFrame
   open
+  ownsBack
   variant="settings"
   onOpenChange={(open) => {
     if (!open) close();

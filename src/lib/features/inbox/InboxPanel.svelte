@@ -47,6 +47,7 @@
   </Popover.Root>
 {:else}
   <BottomSheet
+    ownsBack
     open={page.state.inbox === true}
     label={$i18n.t('nav.inbox')}
     closeLabel={$i18n.t('settings.close')}

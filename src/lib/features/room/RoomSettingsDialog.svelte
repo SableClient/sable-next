@@ -8,6 +8,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
@@ -37,6 +38,11 @@
   let permissions = $state<RoomPermissionsView | null>(null);
   let levels = $state<RoomPowerLevelsView | null>(null);
   let section = $state<RoomSettingsSectionId | null>(null);
+
+  holdOverlayBack(
+    () => open && section !== null,
+    () => (section = null)
+  );
 
   let roomId = $derived(room?.room_id ?? null);
   let roomName = $derived(room?.name ?? room?.room_id ?? '');

@@ -1,6 +1,7 @@
 <script lang="ts">
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import { i18n } from '#lib/i18n.js';
+  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import SettingsSectionContent from './SettingsSectionContent.svelte';
   import SettingsNavigator from './SettingsNavigator.svelte';
 
@@ -11,6 +12,8 @@
   let { open = $bindable(false) }: Props = $props();
   let section: string | null = $state(null);
   let focus: string | null = $state(null);
+
+  holdOverlayBack(() => section !== null, back);
 
   function close(): void {
     open = false;

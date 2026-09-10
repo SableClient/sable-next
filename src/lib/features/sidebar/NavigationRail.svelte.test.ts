@@ -5,11 +5,15 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-const pageState = vi.hoisted(() => ({ url: { pathname: '/home', search: '', hash: '' } }));
+const pageState = vi.hoisted(() => ({
+  url: { pathname: '/home', search: '', hash: '' },
+  state: {},
+}));
 const navigation = vi.hoisted(() => ({ afterNavigate: null as (() => void) | null }));
 
 vi.mock('$app/state', () => ({ page: pageState }));
 vi.mock('$app/navigation', () => ({
+  goto: () => Promise.resolve(),
   afterNavigate: (callback: () => void) => {
     navigation.afterNavigate = callback;
   },

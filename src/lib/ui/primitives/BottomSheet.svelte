@@ -12,6 +12,7 @@
     background?: string;
     contentInset?: boolean;
     fullHeight?: boolean;
+    ownsBack?: boolean;
     onOpenChange?: (open: boolean) => void;
     children: Snippet;
   }
@@ -25,6 +26,7 @@
     background,
     contentInset = true,
     fullHeight = false,
+    ownsBack = false,
     onOpenChange,
     children,
   }: Props = $props();
@@ -89,6 +91,7 @@
 <DialogFrame
   bind:open
   variant="sheet"
+  {ownsBack}
   {label}
   contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
   {onOpenChange}

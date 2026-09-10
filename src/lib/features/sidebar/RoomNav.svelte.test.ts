@@ -8,6 +8,7 @@ import type { RoomSummary } from '#src/generated/protocol';
 const pageState = vi.hoisted(() => ({
   url: { pathname: '/home' },
   params: {},
+  state: {},
 }));
 
 const roomsFixture = vi.hoisted(() => ({
@@ -30,6 +31,7 @@ const coreStub = vi.hoisted(() => {
 });
 
 vi.mock('$app/state', () => ({ page: pageState }));
+vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
 vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string> = {}) => {

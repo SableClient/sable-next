@@ -143,6 +143,25 @@ test('back closes the mobile room list before leaving a room', async ({
   );
 });
 
+test('back closes an overlay before it leaves the room', async ({
+  page,
+  app,
+  homeserver,
+  signIn,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn();
+  await app.openRoom(homeserver.timelineRoomId);
+
+  await page.getByRole('button', { name: 'Members', exact: true }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toBeVisible();
+
+  await page.goBack();
+  await expect(drawer).toBeHidden();
+  await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
+});
+
 test('reopens a room after returning to the mobile room list', async ({
   page,
   app,

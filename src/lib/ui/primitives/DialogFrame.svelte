@@ -2,11 +2,14 @@
   import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
 
+  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+
   type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet';
 
   interface Props {
     open?: boolean;
     variant: DialogVariant;
+    ownsBack?: boolean;
     label?: string;
     contentStyle?: string;
     onOpenChange?: (open: boolean) => void;
@@ -16,11 +19,20 @@
   let {
     open = $bindable(),
     variant,
+    ownsBack = false,
     label,
     contentStyle,
     onOpenChange,
     children,
   }: Props = $props();
+
+  holdOverlayBack(
+    () => open === true && !ownsBack,
+    () => {
+      open = false;
+      onOpenChange?.(false);
+    }
+  );
 </script>
 
 <Dialog.Root bind:open {onOpenChange}>
