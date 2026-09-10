@@ -105,6 +105,30 @@ test('the swallow only expires once the pointer is up', () => {
   expect(activated).not.toHaveBeenCalled();
 });
 
+test('a lost lift cannot leave the swallow armed across the next tap', () => {
+  stopGuard = guardTouchClicks();
+
+  press('touch');
+  armTrailingClickSwallow();
+  press('touch');
+  lift();
+  item.click();
+
+  expect(activated).toHaveBeenCalledOnce();
+});
+
+test('a touch that produces no click is not compared against a later one', () => {
+  stopGuard = guardTouchClicks();
+
+  press('touch');
+  lift();
+  vi.advanceTimersByTime(500);
+  const menu = surface();
+  menu.element.click();
+
+  expect(menu.activated).toHaveBeenCalledOnce();
+});
+
 test('the teardown drops the guard', () => {
   guardTouchClicks()();
 
