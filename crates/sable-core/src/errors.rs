@@ -39,6 +39,18 @@ impl Core {
         self.failed("recover_identity", error)
     }
 
+    pub(crate) fn profile_error(&self, error: matrix_sdk::Error) -> CommandErr {
+        if error.client_api_error_kind() == Some(&ErrorKind::NotFound) {
+            tracing::debug!(context = "user_profile", "the user has no profile");
+            return CommandErr::Unavailable;
+        }
+
+        match error {
+            matrix_sdk::Error::Http(error) => self.homeserver_http_error("user_profile", *error),
+            _ => self.failed("user_profile", error),
+        }
+    }
+
     pub(crate) fn room_error(&self, context: &str, error: matrix_sdk::Error) -> CommandErr {
         match error.client_api_error_kind() {
             Some(ErrorKind::Forbidden) => {

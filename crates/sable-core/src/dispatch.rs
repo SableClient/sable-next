@@ -666,7 +666,7 @@ impl Core {
                     .account()
                     .fetch_user_profile_of(&user_id)
                     .await
-                    .map_err(|error| self.failed("user_profile", error))?;
+                    .map_err(|error| self.profile_error(error))?;
 
                 Ok(CommandOk::UserProfile {
                     profile: Box::new(profile_view(user_id, &response)),

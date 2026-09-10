@@ -16,6 +16,13 @@ import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/sessio
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
+const QUIET_COMMAND_FAILURES = new Set([
+  'media:unavailable',
+  'user_profile:unavailable',
+  'unsubscribe:denied',
+  'unsubscribe:unknown_subscription',
+]);
+
 const MAX_REPORTED_CORE_ERRORS = 20;
 const reportedCoreErrors = new Set<string>();
 
@@ -198,7 +205,7 @@ export function createWebTransport(): Transport {
       } else if ('bytes' in data) waiting.resolve(data.bytes);
       else if ('uri' in data) waiting.resolve(data.uri);
       else {
-        if (command !== 'media' || data.err.code !== 'unavailable') {
+        if (!QUIET_COMMAND_FAILURES.has(`${String(command)}:${data.err.code}`)) {
           console.warn('[sable transport] command failed', { command, code: data.err.code });
         }
         waiting.reject(new CoreError(data.err));

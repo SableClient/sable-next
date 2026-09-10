@@ -63,9 +63,9 @@
       items.findIndex((item) => item.eventId === selectedEventId)
     )
   );
-  let item = $derived(items[index]);
-  let source = $derived(item.source);
-  let mime = $derived(item.mime ?? null);
+  let item = $derived<MediaItem | undefined>(items[index]);
+  let source = $derived(item?.source ?? null);
+  let mime = $derived(item?.mime ?? null);
   let url = $state<string | null>(null);
   let failed = $state(false);
   let zoom = $state(1);
@@ -100,14 +100,14 @@
   let panPointerId: number | null = null;
   let panOrigin: Vector2 = { x: 0, y: 0 };
   let panStartPointer: Vector2 = { x: 0, y: 0 };
-  let isImage = $derived(item.kind === 'image' || item.kind === 'sticker');
-  let isPdf = $derived(item.kind === 'file');
+  let isImage = $derived(item?.kind === 'image' || item?.kind === 'sticker');
+  let isPdf = $derived(item?.kind === 'file');
   let pdfPages = $state(0);
   let pdfPage = $state(1);
   let downloadLabel = $derived(
-    item.kind === 'video'
+    item?.kind === 'video'
       ? $i18n.t('viewer.downloadVideo')
-      : item.kind === 'audio'
+      : item?.kind === 'audio'
         ? $i18n.t('viewer.downloadAudio')
         : $i18n.t('viewer.downloadImage')
   );
@@ -146,6 +146,16 @@
   });
 
   $effect(() => {
+    if (item === undefined) onClose();
+  });
+
+  $effect(() => {
+    if (source === null) {
+      url = null;
+      failed = false;
+      return;
+    }
+
     let active = true;
     failed = false;
     const release = holdMediaUrl(core, source, 0, 0);
@@ -447,7 +457,7 @@
   });
 
   async function shareMedia(anchor: HTMLElement): Promise<void> {
-    if (!url) return;
+    if (!url || !item) return;
     const name = item.body || 'image';
     if (nativeShare) {
       await shareFile(url, name, item.mime ?? undefined, anchor.getBoundingClientRect());
@@ -480,7 +490,7 @@
   }
 
   async function download(): Promise<void> {
-    if (!url) return;
+    if (!url || !item) return;
     const filename = item.body || 'image';
     if (savesNatively()) {
       await saveFile(url, filename);
@@ -493,7 +503,7 @@
   }
 
   async function saveToPhotos(): Promise<void> {
-    if (!url) return;
+    if (!url || !item) return;
     await saveImageToPhotos(url, item.body || 'image', item.mime ?? undefined);
   }
 </script>

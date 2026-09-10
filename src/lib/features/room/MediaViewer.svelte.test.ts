@@ -350,3 +350,19 @@ test('a short swipe springs back instead of dismissing', async () => {
 
   await unmount(instance);
 });
+
+test('closes instead of throwing when the selected media is no longer in the timeline', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  const instance = mount(MediaViewer, {
+    target: document.body,
+    props: { items: [], selectedEventId: '$image', onClose },
+  });
+
+  await tick();
+
+  expect(onClose).toHaveBeenCalled();
+  expect(core.fetchMedia).not.toHaveBeenCalled();
+  expect(document.querySelector('.stage')).toBeNull();
+  await unmount(instance);
+});
