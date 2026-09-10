@@ -4,13 +4,11 @@ const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
 
 const APP_DATABASE_PREFIX = 'sable-next';
-const KEPT_DATABASE_SUFFIXES = ['::matrix-sdk-crypto', '::matrix-sdk-crypto-meta'];
-const KNOWN_CACHE_DATABASE_NAMES = [
-  'sable-next',
-  'sable-next::matrix-sdk-state',
-  'sable-next::event_cache',
-  'sable-next::media',
-];
+const ACCOUNT_STORE_INFIX = '-account-';
+const CACHE_DATABASE_SUFFIXES = ['', '::matrix-sdk-state', '::event_cache', '::media'];
+const CRYPTO_DATABASE_SUFFIX = '::matrix-sdk-crypto';
+const CRYPTO_CORE_STORE = 'core';
+const SLIDING_SYNC_KEY_PREFIX = 'sliding_sync_store::';
 
 let databasePromise: Promise<IDBDatabase> | undefined;
 
@@ -122,28 +120,79 @@ function deleteDatabase(name: string): Promise<void> {
     request.onerror = () => {
       reject(request.error ?? new Error(`Could not delete ${name}`));
     };
-    request.onblocked = () => {
-      reject(new Error(`Could not delete ${name}: database is still open`));
+  });
+}
+
+function storeIds(accountIds: readonly string[]): string[] {
+  return [
+    APP_DATABASE_PREFIX,
+    ...accountIds.map((id) => `${APP_DATABASE_PREFIX}${ACCOUNT_STORE_INFIX}${id}`),
+  ];
+}
+
+function derivedNames(ids: readonly string[], suffixes: readonly string[]): string[] {
+  return ids.flatMap((id) => suffixes.map((suffix) => `${id}${suffix}`));
+}
+
+function isAppDatabase(name: string | undefined): name is string {
+  return name !== undefined && name.startsWith(APP_DATABASE_PREFIX) && name !== DATABASE_NAME;
+}
+
+async function listedDatabaseNames(): Promise<string[] | null> {
+  if (typeof globalThis.indexedDB.databases !== 'function') return null;
+
+  try {
+    const listed = await globalThis.indexedDB.databases();
+    return listed.map((database) => database.name).filter(isAppDatabase);
+  } catch {
+    return null;
+  }
+}
+
+function openExistingDatabase(name: string): Promise<IDBDatabase | null> {
+  return new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.open(name);
+
+    request.onupgradeneeded = () => {
+      request.transaction?.abort();
+    };
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      if (request.error?.name === 'AbortError') {
+        resolve(null);
+        return;
+      }
+      reject(request.error ?? new Error(`Could not open ${name}`));
     };
   });
 }
 
-function isCacheDatabase(name: string | undefined): name is string {
-  if (name === undefined || !name.startsWith(APP_DATABASE_PREFIX)) return false;
-  if (name === DATABASE_NAME) return false;
-  return !KEPT_DATABASE_SUFFIXES.some((suffix) => name.endsWith(suffix));
-}
-
-async function cacheDatabaseNames(): Promise<string[]> {
-  if (typeof globalThis.indexedDB.databases !== 'function') {
-    return KNOWN_CACHE_DATABASE_NAMES;
-  }
+async function clearSlidingSyncPosition(name: string): Promise<void> {
+  const database = await openExistingDatabase(name);
+  if (!database) return;
 
   try {
-    const listed = await globalThis.indexedDB.databases();
-    return listed.map((database) => database.name).filter(isCacheDatabase);
-  } catch {
-    return KNOWN_CACHE_DATABASE_NAMES;
+    if (!database.objectStoreNames.contains(CRYPTO_CORE_STORE)) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction(CRYPTO_CORE_STORE, 'readwrite');
+      tx.objectStore(CRYPTO_CORE_STORE).delete(
+        IDBKeyRange.bound(SLIDING_SYNC_KEY_PREFIX, `${SLIDING_SYNC_KEY_PREFIX}\uffff`)
+      );
+      tx.oncomplete = () => {
+        resolve();
+      };
+      tx.onerror = () => {
+        reject(tx.error ?? new Error(`Could not clear the sliding sync position in ${name}`));
+      };
+      tx.onabort = () => {
+        reject(tx.error ?? new Error(`Could not clear the sliding sync position in ${name}`));
+      };
+    });
+  } finally {
+    database.close();
   }
 }
 
@@ -155,8 +204,29 @@ async function clearHttpCaches(): Promise<void> {
   await Promise.all(names.map((name) => storage.delete(name)));
 }
 
-export async function resetWebStorage(): Promise<void> {
-  const names = await cacheDatabaseNames();
-  await Promise.all([...new Set(names)].map(deleteDatabase));
-  await clearHttpCaches();
+function rejections(results: PromiseSettledResult<unknown>[]): unknown[] {
+  return results
+    .filter((result) => result.status === 'rejected')
+    .map((result): unknown => result.reason);
+}
+
+export async function resetWebStorage(accountIds: readonly string[] = []): Promise<void> {
+  const ids = storeIds(accountIds);
+  const listed = await listedDatabaseNames();
+  const crypto = listed
+    ? listed.filter((name) => name.endsWith(CRYPTO_DATABASE_SUFFIX))
+    : derivedNames(ids, [CRYPTO_DATABASE_SUFFIX]);
+  const caches = listed
+    ? listed.filter((name) => !name.includes(CRYPTO_DATABASE_SUFFIX))
+    : derivedNames(ids, CACHE_DATABASE_SUFFIXES);
+
+  const failures = [
+    ...rejections(await Promise.allSettled([...new Set(crypto)].map(clearSlidingSyncPosition))),
+    ...rejections(await Promise.allSettled([...new Set(caches)].map(deleteDatabase))),
+    ...rejections(await Promise.allSettled([clearHttpCaches()])),
+  ];
+
+  if (failures.length > 0) {
+    throw new AggregateError(failures, 'Could not fully reset the local caches');
+  }
 }

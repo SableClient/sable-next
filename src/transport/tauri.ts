@@ -101,8 +101,8 @@ export function createTauriTransport(): Transport {
       return () => {};
     },
 
-    async resetCaches() {
-      await resetWebStorage();
+    async resetCaches(accountIds) {
+      await resetWebStorage(accountIds);
     },
 
     close() {
