@@ -31,6 +31,13 @@ interface Anchor {
   top: number;
 }
 
+interface PrefixEstimate<T> {
+  items: readonly TimelineEntry<T>[];
+  start: number;
+  measured: number;
+  unmeasured: number;
+}
+
 interface ViewSnapshot {
   start: number;
   end: number;
@@ -60,6 +67,8 @@ export class TimelineWindow<T> {
   private height = 0;
   private top = 0;
   private readonly sizes = new Map<string, number>();
+  private sizeTotal = 0;
+  private prefix: PrefixEstimate<T> | null = null;
   private offset = 0;
   private scrollHeight = 0;
   private viewportHeight = 0;
@@ -281,7 +290,11 @@ export class TimelineWindow<T> {
         .find((index) => index >= 0);
       this.items = next;
       const keys = new Set(next.map((entry) => entry.key));
-      for (const key of this.sizes.keys()) if (!keys.has(key)) this.sizes.delete(key);
+      for (const [key, size] of this.sizes) {
+        if (keys.has(key)) continue;
+        this.sizes.delete(key);
+        this.sizeTotal -= size;
+      }
       if (this.pinned || !this.ready || (first < 0 && anchorIndex === undefined)) {
         this.start = Math.max(0, next.length - PAGE * 2);
         this.end = next.length;
@@ -375,15 +388,29 @@ export class TimelineWindow<T> {
   }
 
   private estimatedSize(): number {
-    const measured = [...this.sizes.values()];
-    return measured.length ? measured.reduce((sum, value) => sum + value, 0) / measured.length : 72;
+    return this.sizes.size ? this.sizeTotal / this.sizes.size : 72;
+  }
+
+  private setSize(key: string, height: number): void {
+    const previous = this.sizes.get(key);
+    if (previous === height) return;
+    this.sizeTotal += height - (previous ?? 0);
+    this.sizes.set(key, height);
+    if (previous === undefined) this.prefix = null;
   }
 
   private estimatePrefix(): number {
-    const estimate = this.estimatedSize();
-    return this.items
-      .slice(0, this.start)
-      .reduce((sum, item) => sum + (this.sizes.get(item.key) ?? estimate), 0);
+    let cache = this.prefix;
+    if (cache === null || cache.items !== this.items || cache.start !== this.start) {
+      cache = { items: this.items, start: this.start, measured: 0, unmeasured: 0 };
+      for (const item of this.items.slice(0, this.start)) {
+        const size = this.sizes.get(item.key);
+        if (size === undefined) cache.unmeasured += 1;
+        else cache.measured += size;
+      }
+      this.prefix = cache;
+    }
+    return cache.measured + cache.unmeasured * this.estimatedSize();
   }
 
   private writeOffset(offset: number, smooth = false): void {
@@ -420,10 +447,11 @@ export class TimelineWindow<T> {
     this.top =
       this.height - this.contentHeight - Number.parseFloat(this.options.content.style.bottom);
     if (this.active) this.trackMovement();
-    for (const element of this.elements()) {
+    const elements = this.elements();
+    for (const element of elements) {
       const key = element.dataset.timelineKey;
       const height = element.getBoundingClientRect().height;
-      if (key && height > 0) this.sizes.set(key, height);
+      if (key && height > 0) this.setSize(key, height);
     }
     const contentFits =
       this.start === 0 &&
@@ -451,7 +479,10 @@ export class TimelineWindow<T> {
       this.writeOffset(viewport.scrollHeight - viewport.clientHeight);
     } else {
       const anchor = this.anchors
-        .map((candidate) => ({ ...candidate, element: this.element(candidate.key) }))
+        .map((candidate) => ({
+          ...candidate,
+          element: elements.find((node) => node.dataset.timelineKey === candidate.key),
+        }))
         .find((candidate) => candidate.element);
       if (anchor?.element) {
         const element = anchor.element;

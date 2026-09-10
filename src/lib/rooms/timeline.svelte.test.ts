@@ -180,11 +180,33 @@ test('clears a failed backward pagination error after a successful retry', async
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   await timeline.start('!room:example.org');
 
-  await timeline.paginateBackward(25);
+  await expect(timeline.paginateBackward(25)).rejects.toThrow('pagination failed');
   expect(timeline.error).toBe('load_failed');
+  expect(timeline.backwardPagination).toBe('idle');
 
   await timeline.paginateBackward(25);
   expect(timeline.error).toBe(null);
+});
+
+test('paginates a thread timeline forwards', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.startThread('!room:example.org', '$root');
+
+  await timeline.paginateForward(25);
+
+  expect(core.paginateSubscriptions).toEqual([1]);
+  expect(timeline.forwardPagination).toBe('end');
+});
+
+test('never paginates a live timeline forwards', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+
+  await expect(timeline.paginateForward(25)).resolves.toBe(true);
+
+  expect(core.paginateSubscriptions).toEqual([]);
 });
 
 test('clears a failed forward pagination error after a successful retry', async () => {

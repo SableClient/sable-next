@@ -118,7 +118,7 @@
   }
 
   function loadMoreThreads(): void {
-    void forumThreads.paginateBackward(30);
+    forumThreads.paginateBackward(30).catch(() => {});
   }
 
   async function findJustSent(body: string, sentAfter: number): Promise<string | null> {

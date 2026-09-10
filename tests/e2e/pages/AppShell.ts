@@ -125,6 +125,7 @@ export class AppShell {
   }
 
   async openRoomFromList(name: string): Promise<void> {
+    if (await this.backToRooms.isVisible()) await this.backToRooms.click();
     await this.roomLink(name).click();
   }
 }

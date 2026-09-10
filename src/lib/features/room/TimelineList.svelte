@@ -166,12 +166,17 @@
     }
     return seen;
   });
-  let stuckUnreadCount = $derived.by(() => {
+  let readMarker = $derived.by(() => {
     const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
-    return index >= 0 && windowState.firstVisible !== null && index < windowState.firstVisible
-      ? unreadCountAfter(visibleItems, index)
-      : 0;
+    return index >= 0 ? { index, count: unreadCountAfter(visibleItems, index) } : null;
   });
+  let stuckUnreadCount = $derived(
+    readMarker !== null &&
+      windowState.firstVisible !== null &&
+      readMarker.index < windowState.firstVisible
+      ? readMarker.count
+      : 0
+  );
   let historyLoading = $derived(
     revealed &&
       visibleItems.length > 0 &&
@@ -215,12 +220,15 @@
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;
-    jumpToLatestVisible = !state.pinned;
+    const distance = node === null ? 0 : node.scrollHeight - node.clientHeight - node.scrollTop;
+    jumpToLatestVisible =
+      !state.pinned &&
+      (state.end !== entries.length ||
+        (node !== null && distance >= node.clientHeight * TIMELINE_LAYOUT.jumpToLatestPages));
     nearLatest =
       state.end === entries.length &&
       node !== null &&
-      node.scrollHeight - node.clientHeight - node.scrollTop <=
-        TIMELINE_LAYOUT.jumpToLatestRem * 16;
+      distance <= TIMELINE_LAYOUT.jumpToLatestRem * 16;
     if (wasScrolling && !state.scrolling) historyController.onScrollSettled();
   }
   function readerScrolled(delta: number): void {
@@ -441,45 +449,43 @@
           <div class="window-rows">
             {#each rows as row (row.key)}
               {@const { item, collapsed, groupStart } = row.value}
-              {#if item}
-                <div
-                  class={['item', { collapsed, 'group-start': groupStart }]}
-                  data-event-id={item.event_id ?? undefined}
-                  data-item-id={item.id}
-                  data-index={row.index}
-                  data-timeline-key={row.key}
-                >
-                  <TimelineItem
-                    {item}
-                    {collapsed}
-                    unreadCount={row.value.unreadCount}
-                    replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
-                    highlighted={focusEventId !== null && item.event_id === focusEventId}
-                    {onMatrixLink}
-                    {onCopyLink}
-                    {onMarkUnread}
-                    {onSenderProfile}
-                    {onMentionUser}
-                    {onRetrySend}
-                    {onCancelSend}
-                    {currentUserId}
-                    {onToggleReaction}
-                    {onReply}
-                    {onOpenThread}
-                    {onEdit}
-                    {onDelete}
-                    {canRedactOthers}
-                    {members}
-                    layout={preferences.layout}
-                    {onJumpToEvent}
-                    {onOpenMedia}
-                    {onVotePoll}
-                    {onEndPoll}
-                    onPersonaOpenChange={setPersonaOpen}
-                    {roomId}
-                  />
-                </div>
-              {/if}
+              <div
+                class={['item', { collapsed, 'group-start': groupStart }]}
+                data-event-id={item.event_id ?? undefined}
+                data-item-id={item.id}
+                data-index={row.index}
+                data-timeline-key={row.key}
+              >
+                <TimelineItem
+                  {item}
+                  {collapsed}
+                  unreadCount={row.value.unreadCount}
+                  replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
+                  highlighted={focusEventId !== null && item.event_id === focusEventId}
+                  {onMatrixLink}
+                  {onCopyLink}
+                  {onMarkUnread}
+                  {onSenderProfile}
+                  {onMentionUser}
+                  {onRetrySend}
+                  {onCancelSend}
+                  {currentUserId}
+                  {onToggleReaction}
+                  {onReply}
+                  {onOpenThread}
+                  {onEdit}
+                  {onDelete}
+                  {canRedactOthers}
+                  {members}
+                  layout={preferences.layout}
+                  {onJumpToEvent}
+                  {onOpenMedia}
+                  {onVotePoll}
+                  {onEndPoll}
+                  onPersonaOpenChange={setPersonaOpen}
+                  {roomId}
+                />
+              </div>
             {/each}
           </div>
         </div>

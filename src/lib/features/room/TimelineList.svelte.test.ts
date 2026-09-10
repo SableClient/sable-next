@@ -793,7 +793,7 @@ test('reading back inside the near-latest band leaves follow mode', async () => 
   await dragTo(element, end, end - 30);
 
   expect(followingLive()).toBe(false);
-  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+  expect(document.querySelector('.jump-to-latest')).toBeNull();
   await unmount(instance);
 });
 
@@ -809,18 +809,21 @@ test('reading back past the band anchors', async () => {
   await unmount(instance);
 });
 
-test('shows the jump control whenever reading behind the latest message', async () => {
+test('shows the jump control once the reader is a page behind the latest message', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - element.clientHeight + 1);
   expect(followingLive()).toBe(false);
-  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+  expect(document.querySelector('.jump-to-latest')).toBeNull();
 
   await dragTo(element, end - element.clientHeight + 1, end - element.clientHeight);
   expect(followingLive()).toBe(false);
   expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+
+  await dragTo(element, end - element.clientHeight, end - element.clientHeight + 1);
+  expect(document.querySelector('.jump-to-latest')).toBeNull();
 
   await unmount(instance);
 });
@@ -832,7 +835,6 @@ test('keeps the latest own echo reachable after appending while reading near lat
 
   await dragTo(element, end, end - 30);
   expect(followingLive()).toBe(false);
-  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
 
   touch(element, 'touchend', 170);
   await new Promise((resolve) => setTimeout(resolve, 160));
@@ -852,7 +854,7 @@ test('keeps the latest own echo reachable after appending while reading near lat
 
   expect(document.querySelectorAll('.item')).toHaveLength(21);
   expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(30);
-  expect(document.querySelector('.jump-to-latest')).not.toBeNull();
+  expect(followingLive()).toBe(false);
   await unmount(instance);
 });
 
@@ -1135,5 +1137,38 @@ test('an empty timeline stops when its refill reports the timeline start', async
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(afterClear);
+  await unmount(instance);
+});
+
+test('a failed history request does not pass for the timeline start', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [];
+  const history = vi.fn(() =>
+    history.mock.calls.length === 1 ? Promise.reject(new Error('offline')) : Promise.resolve(false)
+  );
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: history,
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  expect(history).toHaveBeenCalledTimes(1);
+
+  roomTimeline.backwardPagination = 'loading';
+  await tick();
+  roomTimeline.backwardPagination = 'idle';
+  await tick();
+  await runAnimationFrames();
+
+  expect(history).toHaveBeenCalledTimes(2);
   await unmount(instance);
 });

@@ -6,6 +6,7 @@ export const TIMELINE_LAYOUT = {
   historyLoadingLinger: 500,
   historyLoadingFade: 180,
   jumpToLatestRem: 5,
+  jumpToLatestPages: 1,
   wheelGestureEndDelay: 150,
   mediaMaxRem: 25,
   stickerWidthRem: 9.5,

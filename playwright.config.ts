@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = process.env.SABLE_PREVIEW_PORT ?? '4173';
 const origin = `http://127.0.0.1:${port}`;
+const SCRIPTED_TIMELINE_SPECS =
+  /(?:^|\/)timeline-(?:anchoring|stability|gap|keyboard|lifecycle)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -40,6 +42,16 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /(?:^|\/)(?:app-shell|login|navigation)\.spec\.ts$/,
       use: devices['Desktop Safari'],
+    },
+    {
+      name: 'android',
+      testMatch: SCRIPTED_TIMELINE_SPECS,
+      use: { ...devices['Pixel 7'], browserName: 'chromium' },
+    },
+    {
+      name: 'ios',
+      testMatch: SCRIPTED_TIMELINE_SPECS,
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],
   webServer: {

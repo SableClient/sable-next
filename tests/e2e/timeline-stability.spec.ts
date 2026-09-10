@@ -726,7 +726,9 @@ test('reading just above latest stays fixed when typing shrinks the viewport', a
   await page.setViewportSize({ width: 900, height: 420 });
   await app.openRoom('!room:example.test');
   await timeline.expectRevealed();
-  await timeline.scrollAboveBottomAndNotify(30);
+  await timeline.scrollAboveBottomAndNotify(
+    (await timeline.viewport.evaluate((node) => node.clientHeight)) + 30
+  );
   await timeline.waitForScrollSettled();
   await expect(timeline.jumpToLatest).toBeVisible();
   const anchor = await timeline.fullyVisibleAnchor();
@@ -1567,7 +1569,27 @@ test('a message sent while reading history leaves the reader in place', async ({
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
 });
 
-test('shows jump to latest for a near-latest sent echo and returns to it', async ({
+test('keeps jump to latest hidden within a page of the end and shows it a page away', async ({
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await loadScrollableHistory(core, timeline);
+  await timeline.scrollAboveBottomAndNotify(30);
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+  await expect(timeline.jumpToLatest).toBeHidden();
+
+  const height = await timeline.viewport.evaluate((node) => node.clientHeight);
+  await timeline.scrollAboveBottomAndNotify(height + 30);
+  await timeline.waitForScrollSettled();
+  await expect(timeline.jumpToLatest).toBeVisible();
+});
+
+test('shows jump to latest for a sent echo while reading a page back and returns to it', async ({
   app,
   timeline,
   core,
@@ -1577,7 +1599,9 @@ test('shows jump to latest for a near-latest sent echo and returns to it', async
   await app.openRoom('!room:example.test');
   await loadScrollableHistory(core, timeline);
   const subscription = await core.subscription();
-  await timeline.scrollAboveBottomAndNotify(30);
+  await timeline.scrollAboveBottomAndNotify(
+    (await timeline.viewport.evaluate((node) => node.clientHeight)) + 30
+  );
   await timeline.waitForScrollSettled();
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await expect(timeline.jumpToLatest).toBeVisible();

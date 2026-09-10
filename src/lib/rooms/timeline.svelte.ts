@@ -180,7 +180,7 @@ export class RoomTimeline {
         }
       }
       return response.reached_end;
-    } catch {
+    } catch (error) {
       if (session === this.session && subscription === this.subscription) {
         this.backwardPaginationPending = false;
         this.backwardPaginationCompletion = null;
@@ -190,17 +190,13 @@ export class RoomTimeline {
         this.error = 'load_failed';
         this.backwardPagination = 'idle';
       }
-      return true;
+      throw error;
     }
   }
 
   async paginateForward(count: number): Promise<boolean> {
     const subscription = this.subscription;
-    if (
-      this.mode.kind !== 'focused' ||
-      subscription === null ||
-      this.forwardPagination !== 'idle'
-    ) {
+    if (this.mode.kind === 'live' || subscription === null || this.forwardPagination !== 'idle') {
       return true;
     }
 

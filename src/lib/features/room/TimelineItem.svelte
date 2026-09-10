@@ -214,8 +214,9 @@
   );
   let accountColors = $derived(senderDisplayColors(item.sender ?? '', profile, null, item.is_own));
 
+  let senderId = $derived(item.sender);
   $effect(() => {
-    const userId = item.sender;
+    const userId = senderId;
     profile = null;
     if (!userId) return;
 

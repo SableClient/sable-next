@@ -84,17 +84,6 @@ export class TimelineHistoryController {
 
   constructor(private readonly options: TimelineHistoryControllerOptions) {}
 
-  get gesture(): Gesture {
-    return this.activeGesture === 'none' && this.autoscrollActive
-      ? 'autoscroll'
-      : this.activeGesture;
-  }
-
-  get isScrollGestureActive(): boolean {
-    const gesture = this.gesture;
-    return gesture !== 'none' && gesture !== 'press';
-  }
-
   get isRequestPending(): boolean {
     return this.historyRequestPending;
   }

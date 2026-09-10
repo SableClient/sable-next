@@ -21,7 +21,7 @@ test.fixme('an edit above the viewport does not move the reader', async ({
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
   // Away from the end, so this is the anchor's job, not follow-to-bottom.
-  await timeline.wheelUp(200);
+  await timeline.wheelUp(600);
   await expect(timeline.jumpToLatest).toBeVisible();
 
   const before = await timeline.visibleRange();
@@ -46,7 +46,7 @@ test.fixme('a deletion above the viewport does not move the reader', async ({
   await timeline.expectRevealed();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 
-  await timeline.wheelUp(200);
+  await timeline.wheelUp(600);
   await expect(timeline.jumpToLatest).toBeVisible();
 
   const before = await timeline.visibleRange();

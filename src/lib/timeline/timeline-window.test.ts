@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { TimelineWindow, type TimelineRow } from './timeline-window';
 
 const windows: TimelineWindow<number>[] = [];
+type Fixture = ReturnType<typeof fixture>;
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -832,3 +833,71 @@ test('destroy prevents queued renders from publishing or writing offsets', async
   expect(viewport.scrollTop).toBe(0);
   expect(await window.jumpTo(null)).toBe(false);
 });
+
+const gapCases: {
+  name: string;
+  count: number;
+  change: (f: Fixture) => void | Promise<void>;
+}[] = [
+  {
+    name: 'rows shrink',
+    count: 1_000,
+    change: (f) => {
+      f.resize(25);
+    },
+  },
+  {
+    name: 'rows grow',
+    count: 1_000,
+    change: (f) => {
+      f.resize(90);
+    },
+  },
+  {
+    name: 'the viewport shrinks',
+    count: 1_000,
+    change: (f) => {
+      f.resizeViewport(200);
+    },
+  },
+  {
+    name: 'the viewport grows',
+    count: 1_000,
+    change: (f) => {
+      f.resizeViewport(600);
+    },
+  },
+  {
+    name: 'a short room shrinks its rows',
+    count: 4,
+    change: (f) => {
+      f.resize(25);
+    },
+  },
+  {
+    name: 'a short room grows past the viewport',
+    count: 4,
+    change: (f) => {
+      f.resize(90);
+    },
+  },
+  { name: 'a message is appended', count: 1_000, change: (f) => f.window.update(entries(1_001)) },
+];
+
+test.each(gapCases)(
+  'an idle pinned timeline leaves no gap under the latest row when $name',
+  async ({ count, change }) => {
+    const f = fixture();
+    await f.window.update(entries(count));
+    expect(f.window.state.pinned).toBe(true);
+
+    await change(f);
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(f.window.state.pinned).toBe(true);
+    expect(f.viewport.scrollHeight - f.viewport.clientHeight - f.viewport.scrollTop).toBe(0);
+    expect(f.content.lastElementChild?.getBoundingClientRect().bottom).toBe(
+      f.viewport.getBoundingClientRect().bottom
+    );
+  }
+);
