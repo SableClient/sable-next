@@ -844,6 +844,8 @@ pub enum Command {
     CallSupport {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
+        #[serde(default)]
+        livekit_service_url: Option<String>,
     },
     LeaveCall {
         session: CallSessionId,

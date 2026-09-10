@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_family = "wasm"))]
 const PROVISION_TIMEOUT: Duration = Duration::from_secs(15);
-const RTC_FOCI_WELL_KNOWN_KEY: &str = "org.matrix.msc4143.rtc_foci";
 
 pub(crate) fn livekit_identity(user_id: &UserId, device_id: &DeviceId) -> String {
     format!("{user_id}:{device_id}")
@@ -62,47 +61,6 @@ fn http_client() -> Option<matrix_sdk::reqwest::Client> {
     #[cfg(not(target_family = "wasm"))]
     let builder = builder.timeout(PROVISION_TIMEOUT);
     builder.build().ok()
-}
-
-pub(crate) async fn well_known_service_urls(server: &url::Url) -> Vec<String> {
-    let Ok(endpoint) = server.join("/.well-known/matrix/client") else {
-        return Vec::new();
-    };
-    let Some(http) = http_client() else {
-        return Vec::new();
-    };
-
-    let response = match http.get(endpoint).send().await {
-        Ok(response) if response.status().is_success() => response,
-        Ok(response) => {
-            tracing::debug!(status = %response.status(), "no rtc foci in well-known");
-            return Vec::new();
-        }
-        Err(error) => {
-            tracing::debug!(?error, "could not read well-known for rtc foci");
-            return Vec::new();
-        }
-    };
-
-    let Ok(body) = response.text().await else {
-        return Vec::new();
-    };
-    let Ok(document) = serde_json::from_str::<serde_json::Value>(&body) else {
-        return Vec::new();
-    };
-    let Some(foci) = document
-        .get(RTC_FOCI_WELL_KNOWN_KEY)
-        .and_then(|f| f.as_array())
-    else {
-        return Vec::new();
-    };
-
-    foci.iter()
-        .filter(|focus| focus.get("type").and_then(|t| t.as_str()) == Some("livekit"))
-        .filter_map(|focus| focus.get("livekit_service_url")?.as_str())
-        .filter(|url| !url.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
 }
 
 pub(crate) async fn provision(

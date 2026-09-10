@@ -13,6 +13,7 @@
 
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
 
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { ancestorSpaceIds } from './abbreviations';
   import {
@@ -118,6 +119,7 @@
   let profileAvatarItem = $state<MediaItem | null>(null);
   let profileAvatarSequence = 0;
   let callSupport = $state<CallSupportView | null>(null);
+  let callFallbackUrl = $state<string | null>(null);
   let widgetsOpen = $state(false);
   let widgets = $state.raw<RoomWidget[]>([]);
   let tombstoneReplacementId = $state<string | null>(null);
@@ -153,12 +155,16 @@
     });
     return profileAvatarItem ? [profileAvatarItem] : items;
   });
-  let callable = $derived(
-    !call.active && callSupport !== null && callSupport.has_focus && callSupport.can_join
-  );
+
+  $effect(() => {
+    void runtimeConfig().then((config) => {
+      callFallbackUrl = config.calls.livekitServiceUrl;
+    });
+  });
 
   $effect(() => {
     const target = resolvedRoomId;
+    const fallback = callFallbackUrl;
     if (!target) return;
 
     let current = true;
@@ -166,7 +172,7 @@
     if (typeof RTCPeerConnection === 'undefined') return;
 
     void core.commands
-      .callSupport(target)
+      .callSupport(target, fallback)
       .then((next) => {
         if (current) callSupport = next;
       })
@@ -233,6 +239,14 @@
   });
 
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
+  let callParticipants = $derived(resolvedRoom?.call_participants ?? []);
+  let callable = $derived(
+    !call.active &&
+      callSupport !== null &&
+      callSupport.can_join &&
+      (callSupport.has_focus || callParticipants.length > 0)
+  );
+
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
@@ -681,7 +695,7 @@
   async function joinCall(): Promise<void> {
     if (!resolvedRoomId) return;
     try {
-      await call.join(resolvedRoomId, prescreenMedia);
+      await call.join(resolvedRoomId, prescreenMedia, callFallbackUrl);
     } finally {
       prescreenOpen = false;
     }

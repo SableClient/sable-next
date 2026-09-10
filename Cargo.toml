@@ -20,6 +20,8 @@ matrix-sdk-base = { version = "0.18.0", git = "https://github.com/matrix-org/mat
 ] }
 ruma = { git = "https://github.com/ruma/ruma", rev = "0908aaa9847093ecb32bc6edf0af525f726717fd", features = [
   "client-api-c",
+  "unstable-msc4143",
+  "unstable-msc4195",
   "unstable-msc4480",
 ] }
 serde = { version = "1", features = ["derive"] }

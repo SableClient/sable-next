@@ -23,10 +23,15 @@ export type HomeserversConfig = {
   allowCustom: boolean;
 };
 
+export type CallsConfig = {
+  livekitServiceUrl: string | null;
+};
+
 export type RuntimeConfig = {
   push: PushDetails | null;
   gifs: GifsConfig;
   homeservers: HomeserversConfig;
+  calls: CallsConfig;
 };
 
 const NO_GIFS: GifsConfig = {
@@ -43,10 +48,13 @@ export const BUILT_IN_HOMESERVERS: HomeserversConfig = {
   allowCustom: true,
 };
 
+const NO_CALLS: CallsConfig = { livekitServiceUrl: null };
+
 const EMPTY: RuntimeConfig = {
   push: null,
   gifs: NO_GIFS,
   homeservers: BUILT_IN_HOMESERVERS,
+  calls: NO_CALLS,
 };
 
 function text(value: unknown): string | null {
@@ -96,6 +104,12 @@ function parseGifs(raw: unknown): GifsConfig {
   };
 }
 
+function parseCalls(raw: unknown): CallsConfig {
+  if (typeof raw !== 'object' || raw === null) return NO_CALLS;
+
+  return { livekitServiceUrl: text((raw as Record<string, unknown>).livekitServiceUrl) };
+}
+
 function parseHomeservers(raw: unknown, allowCustom: unknown): HomeserversConfig {
   const list = Array.isArray(raw)
     ? [...new Set(raw.map(text).filter((server): server is string => server !== null))]
@@ -124,6 +138,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
       parseHomeservers(source.homeserverList, source.allowCustomHomeservers),
       source.defaultHomeserver
     ),
+    calls: parseCalls(source.calls),
   };
 }
 

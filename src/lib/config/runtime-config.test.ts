@@ -158,3 +158,14 @@ test('reads a deployment-provided built-in push server', () => {
     }).push?.unifiedPushEmbeddedServerUrl
   ).toBe('https://ntfy.example');
 });
+
+test('a deployment fallback focus is read, and a blank one is no focus', () => {
+  expect(
+    parseRuntimeConfig({ calls: { livekitServiceUrl: 'https://livekit.example' } }).calls
+      .livekitServiceUrl
+  ).toBe('https://livekit.example');
+
+  for (const raw of [{}, { calls: {} }, { calls: 'no' }, { calls: { livekitServiceUrl: '  ' } }]) {
+    expect(parseRuntimeConfig(raw).calls.livekitServiceUrl).toBeNull();
+  }
+});

@@ -208,8 +208,15 @@ export function createCommands(transport: () => Transport) {
       return response.members;
     },
 
-    async callSupport(roomId: string): Promise<CallSupportView> {
-      const response = await transport().send({ type: 'call_support', room_id: roomId });
+    async callSupport(
+      roomId: string,
+      livekitServiceUrl: string | null = null
+    ): Promise<CallSupportView> {
+      const response = await transport().send({
+        type: 'call_support',
+        room_id: roomId,
+        livekit_service_url: livekitServiceUrl,
+      });
       return response;
     },
 

@@ -12,6 +12,7 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::{
     DelayParameters, delayed_state_event, update_delayed_event,
 };
+use matrix_sdk::ruma::api::client::rtc::RtcTransport;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{CallMemberEventContent, CallMemberStateKey};
@@ -34,6 +35,34 @@ const HANGUP_RETRY_BUDGET: Duration = Duration::from_secs(12);
 const USE_KEY_DELAY: Duration = Duration::from_secs(1);
 
 const APPLICATION_SUFFIX: &str = "m.call";
+
+fn pick_focus(
+    advertised: &[String],
+    discovered: &[String],
+    configured: Option<String>,
+) -> Option<String> {
+    advertised
+        .iter()
+        .chain(discovered)
+        .find(|url| !url.trim().is_empty())
+        .cloned()
+        .or_else(|| configured.filter(|url| !url.trim().is_empty()))
+}
+
+async fn discovered_service_urls(client: &Client) -> Vec<String> {
+    let Ok(Some(transports)) = client.discover_rtc_transports().await else {
+        return Vec::new();
+    };
+
+    transports
+        .into_iter()
+        .filter_map(|transport| match transport {
+            RtcTransport::LiveKit(livekit) => Some(livekit.service_url),
+            _ => None,
+        })
+        .filter(|url| !url.trim().is_empty())
+        .collect()
+}
 
 fn membership_state_key(
     user_id: &UserId,
@@ -77,7 +106,11 @@ impl Core {
         runtime::join(self, room_id, livekit_service_url, mode).await
     }
 
-    pub(crate) async fn call_support(&self, room_id: OwnedRoomId) -> Result<CommandOk, CommandErr> {
+    pub(crate) async fn call_support(
+        &self,
+        room_id: OwnedRoomId,
+        livekit_service_url: Option<String>,
+    ) -> Result<CommandOk, CommandErr> {
         let room = self.room(&room_id).await?;
         let user_id = room
             .client()
@@ -86,7 +119,10 @@ impl Core {
             .to_owned();
 
         let members = membership::active_members(&room).await;
-        let mut has_focus = self.resolve_focus(&members, None, &room).await.is_some();
+        let mut has_focus = self
+            .resolve_focus(&members, livekit_service_url, &room)
+            .await
+            .is_some();
         let levels = room.power_levels_or_default().await;
         let state_allowed = levels.user_can_send_state(&user_id, StateEventType::CallMember);
         let sticky_available = (!has_focus || !state_allowed)
@@ -122,22 +158,13 @@ impl Core {
         configured: Option<String>,
         room: &Room,
     ) -> Option<String> {
-        if let Some(url) = membership::advertised_service_urls(members)
-            .into_iter()
-            .next()
-        {
+        let advertised = membership::advertised_service_urls(members);
+        if let Some(url) = pick_focus(&advertised, &[], None) {
             return Some(url);
         }
 
-        if let Some(url) = configured.filter(|url| !url.trim().is_empty()) {
-            return Some(url);
-        }
-
-        let server = room.client().server()?.clone();
-        sfu::well_known_service_urls(&server)
-            .await
-            .into_iter()
-            .next()
+        let discovered = discovered_service_urls(&room.client()).await;
+        pick_focus(&[], &discovered, configured)
     }
 
     pub(crate) fn watch_incoming_calls(self: &Arc<Self>, client: &Client, generation: u64) {
@@ -440,7 +467,7 @@ mod tests {
     use matrix_sdk::ruma::{device_id, owned_user_id, user_id};
 
     use super::membership::CallMember;
-    use super::{member_views, membership_state_key};
+    use super::{member_views, membership_state_key, pick_focus};
 
     #[test]
     fn test_a_membership_is_keyed_per_device() {
@@ -488,5 +515,39 @@ mod tests {
 
         assert_eq!(views[0].identity, "@erwan:localhost:LAPTOP");
         assert_eq!(views[0].device_id, "LAPTOP");
+    }
+
+    #[test]
+    fn test_a_running_call_outranks_the_server_which_outranks_the_deployment() {
+        let advertised = vec!["https://running.example".to_owned()];
+        let discovered = vec!["https://server.example".to_owned()];
+        let configured = Some("https://deployment.example".to_owned());
+
+        assert_eq!(
+            pick_focus(&advertised, &discovered, configured.clone()),
+            Some("https://running.example".to_owned())
+        );
+        assert_eq!(
+            pick_focus(&[], &discovered, configured.clone()),
+            Some("https://server.example".to_owned())
+        );
+        assert_eq!(
+            pick_focus(&[], &[], configured),
+            Some("https://deployment.example".to_owned())
+        );
+        assert_eq!(pick_focus(&[], &[], None), None);
+    }
+
+    #[test]
+    fn test_a_blank_focus_is_not_a_focus() {
+        assert_eq!(
+            pick_focus(
+                &["  ".to_owned()],
+                &[String::new()],
+                Some("https://deployment.example".to_owned())
+            ),
+            Some("https://deployment.example".to_owned())
+        );
+        assert_eq!(pick_focus(&[], &[], Some("   ".to_owned())), None);
     }
 }
