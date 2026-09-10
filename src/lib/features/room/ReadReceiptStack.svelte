@@ -32,7 +32,7 @@
 
 {#if readers.length > 0}
   <button
-    class="read-receipt-stack sable-open"
+    class="read-receipt-stack selection-open"
     type="button"
     aria-label={$i18n.t('timeline.seenByNames', { names })}
     aria-haspopup="dialog"
@@ -68,13 +68,13 @@
 
 <style>
   button {
-    --stack-ring: var(--sable-bg-container);
+    --stack-ring: var(--bg-container);
 
     align-items: center;
     background: transparent;
     border: var(--border-width) solid transparent;
     border-radius: var(--radius-pill);
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: pointer;
     display: inline-flex;
     flex: none;
@@ -98,28 +98,28 @@
   }
 
   button:hover {
-    --stack-ring: var(--sable-bg-container-hover);
+    --stack-ring: var(--bg-container-hover);
 
-    background: var(--sable-bg-container-hover);
-    border-color: var(--sable-bg-container-line);
-    color: var(--sable-surface-var-on-container);
+    background: var(--bg-container-hover);
+    border-color: var(--bg-container-line);
+    color: var(--surface-var-on-container);
   }
 
   button:active {
-    --stack-ring: var(--sable-surface-var-container);
+    --stack-ring: var(--surface-var-container);
 
-    background: var(--sable-surface-var-container);
-    border-color: var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
+    background: var(--surface-var-container);
+    border-color: var(--surface-container-line);
+    color: var(--surface-var-on-container);
   }
 
   button[aria-expanded='true'] {
-    --stack-ring: var(--sable-surface-container);
+    --stack-ring: var(--surface-container);
   }
 
   button:focus-visible {
-    color: var(--sable-surface-var-on-container);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    color: var(--surface-var-on-container);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 0.15rem;
   }
 
@@ -138,7 +138,7 @@
     box-shadow: 0 0 0 0.125rem var(--stack-ring);
   }
 
-  :global(.sable-avatar.receipt-face) {
+  :global(.avatar-root.receipt-face) {
     --avatar-size: 1.125rem;
 
     font-size: var(--font-size-small);
@@ -146,10 +146,10 @@
 
   .overflow {
     align-items: center;
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius-pill);
     box-shadow: 0 0 0 0.125rem var(--stack-ring);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: inline-flex;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;

@@ -129,7 +129,7 @@
 
 <style>
   .scheduled {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     display: grid;
     gap: var(--space-100);
     padding: var(--space-200) var(--space-300) 0;
@@ -139,7 +139,7 @@
     align-items: center;
     background: none;
     border: none;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
     font: inherit;
@@ -178,7 +178,7 @@
   }
 
   .when {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: none;
   }
 </style>

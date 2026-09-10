@@ -97,7 +97,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function isDialogOpen(root: ParentNode = document): boolean {
-  return root.querySelector('.sable-dialog-content') !== null;
+  return root.querySelector('.dialog-content') !== null;
 }
 
 function canonicalBinding(binding: string, isMac: boolean): string {

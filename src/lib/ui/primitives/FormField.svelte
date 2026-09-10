@@ -26,7 +26,7 @@
   }
 
   .form-field-error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     font-size: var(--font-size-small);
     margin: 0;
   }

@@ -14,13 +14,13 @@
   let { variant = 'info', title, class: className = '', children, ...rest }: Props = $props();
 </script>
 
-<div {...rest} class={['sable-alert', `sable-alert-${variant}`, className]}>
+<div {...rest} class={['alert', `alert-${variant}`, className]}>
   {#if title}<strong>{title}</strong>{/if}
   {@render children?.()}
 </div>
 
 <style>
-  :global(.sable-alert) {
+  :global(.alert) {
     border: var(--border-width) solid;
     border-radius: var(--radius);
     display: grid;
@@ -28,31 +28,31 @@
     padding: var(--space-300);
   }
 
-  :global(.sable-alert p) {
+  :global(.alert p) {
     margin: 0;
   }
 
-  :global(.sable-alert-info) {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
+  :global(.alert-info) {
+    background: var(--primary-container);
+    border-color: var(--primary-container-line);
+    color: var(--primary-on-container);
   }
 
-  :global(.sable-alert-success) {
-    background: var(--sable-success-container);
-    border-color: var(--sable-success-container-line);
-    color: var(--sable-success-on-container);
+  :global(.alert-success) {
+    background: var(--success-container);
+    border-color: var(--success-container-line);
+    color: var(--success-on-container);
   }
 
-  :global(.sable-alert-warning) {
-    background: var(--sable-warn-container);
-    border-color: var(--sable-warn-container-line);
-    color: var(--sable-warn-on-container);
+  :global(.alert-warning) {
+    background: var(--warn-container);
+    border-color: var(--warn-container-line);
+    color: var(--warn-on-container);
   }
 
-  :global(.sable-alert-critical) {
-    background: var(--sable-crit-container);
-    border-color: var(--sable-crit-container-line);
-    color: var(--sable-crit-on-container);
+  :global(.alert-critical) {
+    background: var(--crit-container);
+    border-color: var(--crit-container-line);
+    color: var(--crit-on-container);
   }
 </style>

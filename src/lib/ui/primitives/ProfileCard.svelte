@@ -64,7 +64,7 @@
 </script>
 
 <section
-  class={['sable-profile-card', `sable-profile-card-${variant}`, className]}
+  class={['profile-card', `profile-card-${variant}`, className]}
   class:tinted
   class:tint-light={heroBrightness === 'light'}
   class:tint-dark={heroBrightness === 'dark'}
@@ -143,45 +143,41 @@
 </section>
 
 <style>
-  .sable-profile-card {
-    /* --sable-sec-main alone fails 4.5:1 on the light background at this text
+  .profile-card {
+    /* --sec-main alone fails 4.5:1 on the light background at this text
        size, so small words get a stronger mix and it is left to icons. */
-    --profile-text-muted: color-mix(
-      in oklab,
-      var(--sable-sec-main) 55%,
-      var(--sable-bg-on-container)
-    );
+    --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
     --profile-avatar-size: var(--avatar-size-large);
     --profile-cover-height: var(--avatar-size-large);
-    --profile-card-ground: var(--sable-bg-container);
-    --profile-panel-ground: var(--sable-surface-container);
+    --profile-card-ground: var(--bg-container);
+    --profile-panel-ground: var(--surface-container);
 
     background: var(--profile-card-ground);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     overflow: hidden;
     position: relative;
   }
 
-  .sable-profile-card.tinted {
+  .profile-card.tinted {
     --profile-tint: 20%;
     --profile-card-ground: color-mix(
       in oklab,
       var(--profile-hero) var(--profile-tint),
-      var(--sable-bg-container)
+      var(--bg-container)
     );
     --profile-panel-ground: color-mix(
       in oklab,
       var(--profile-hero) var(--profile-tint),
-      var(--sable-surface-container)
+      var(--surface-container)
     );
   }
 
-  .sable-profile-card.tinted.tint-dark {
+  .profile-card.tinted.tint-dark {
     --profile-tint: 30%;
   }
 
-  .sable-profile-card.tinted.tint-light {
+  .profile-card.tinted.tint-light {
     --profile-tint: 12%;
   }
 
@@ -189,7 +185,7 @@
     height: var(--profile-cover-height);
   }
 
-  .sable-profile-card-sheet {
+  .profile-card-sheet {
     --profile-cover-height: 6rem;
   }
 
@@ -213,7 +209,7 @@
     position: relative;
   }
 
-  .profile-card-crest :global(.sable-avatar.profile-card-avatar) {
+  .profile-card-crest :global(.avatar-root.profile-card-avatar) {
     --avatar-size: var(--profile-avatar-size);
 
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
@@ -232,7 +228,7 @@
   }
 
   .profile-card-avatar-button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -240,7 +236,7 @@
      the owner wrote, not a control. */
   .profile-card-status {
     background: var(--profile-panel-ground);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     -webkit-box-orient: vertical;
     display: -webkit-box;
@@ -316,7 +312,7 @@
      both edges of the panel. */
   .profile-card-panel.framed {
     background: var(--profile-panel-ground);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     overflow: clip;
   }
@@ -353,7 +349,7 @@
   }
 
   .profile-card-footer.divided {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
   }
 
   @media (prefers-color-scheme: dark) {

@@ -373,21 +373,21 @@
   }
 
   .status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     padding: var(--space-400) 0;
     text-align: center;
   }
 
   .level {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
   .role-chip {
     align-items: center;
-    background-color: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background-color: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-pill);
     display: inline-flex;
     gap: var(--space-200);
@@ -395,7 +395,7 @@
   }
 
   .role-swatch {
-    background-color: var(--sable-surface-var-on-container);
+    background-color: var(--surface-var-on-container);
     border-radius: var(--radius-pill);
     flex: 0 0 auto;
     height: 0.6rem;
@@ -414,7 +414,7 @@
   }
 
   .number-error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     font-size: var(--font-size-small);
     margin: 0;
   }

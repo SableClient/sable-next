@@ -175,7 +175,7 @@
   }
 
   .emoji-item small {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   .verification-actions {

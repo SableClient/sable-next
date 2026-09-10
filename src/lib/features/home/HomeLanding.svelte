@@ -144,17 +144,17 @@
     margin-top: var(--space-500);
   }
 
-  .hero-actions :global(.sable-button) {
+  .hero-actions :global(.btn) {
     flex: 0 0 11rem;
     width: 11rem;
   }
 
-  .hero-actions :global(.sable-button:not(:disabled)) {
+  .hero-actions :global(.btn:not(:disabled)) {
     cursor: pointer;
     pointer-events: auto;
   }
 
-  .hero-actions :global(.sable-button:disabled) {
+  .hero-actions :global(.btn:disabled) {
     cursor: default;
     pointer-events: none;
   }

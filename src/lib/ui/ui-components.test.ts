@@ -63,5 +63,5 @@ test('the Sable brand mark stays decorative', () => {
 
   const mark = document.querySelector('img');
   expect(mark?.getAttribute('alt')).toBe('');
-  expect(mark?.className).toContain('sable-brand-mark');
+  expect(mark?.className).toContain('brand-mark');
 });

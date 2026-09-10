@@ -80,7 +80,7 @@ test('collects an optional reason before kicking a member', async () => {
   reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.moderation-actions .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.kickUser).toHaveBeenCalledWith(
       '!room:example.org',
@@ -108,7 +108,7 @@ test('sends no reason when the moderation reason is left blank', async () => {
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.moderation-actions .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
   });

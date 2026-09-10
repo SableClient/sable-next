@@ -35,7 +35,7 @@
         <Button
           size="small"
           variant="ghost"
-          class="tab sable-choice"
+          class="tab choice"
           role="tab"
           aria-selected={reaction.key === group?.key}
           onclick={() => {
@@ -79,8 +79,8 @@
 
   :global(.tab) {
     align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
     color: inherit;
     cursor: pointer;

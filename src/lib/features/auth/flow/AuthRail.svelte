@@ -258,7 +258,7 @@
 
   .rail-shell::before,
   .rail-shell::after {
-    background: linear-gradient(90deg, var(--sable-bg-container), transparent);
+    background: linear-gradient(90deg, var(--bg-container), transparent);
     content: '';
     inset-block: 0;
     pointer-events: none;
@@ -272,7 +272,7 @@
   }
 
   .rail-shell::after {
-    background: linear-gradient(270deg, var(--sable-bg-container), transparent);
+    background: linear-gradient(270deg, var(--bg-container), transparent);
     right: 0;
   }
 
@@ -372,7 +372,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: pointer;
     display: flex;
     height: 2.25rem;
@@ -389,12 +389,12 @@
   }
 
   .panel-nav:focus-visible {
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
     outline: none;
   }
 
   .panel-nav:hover {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     transform: translateY(-50%) scale(1.05);
   }
 

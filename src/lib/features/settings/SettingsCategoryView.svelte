@@ -185,7 +185,7 @@
   }
 
   .settings-card {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
     border-radius: var(--radius);
     overflow: hidden;
   }

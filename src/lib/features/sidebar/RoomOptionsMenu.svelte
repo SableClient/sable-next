@@ -188,7 +188,7 @@
 >
   {#if !anchor}
     <DropdownMenu.Trigger
-      class="room-options-trigger sable-open"
+      class="room-options-trigger selection-open"
       aria-label={$i18n.t('room.menuLabel')}
     >
       <DotsThreeVerticalIcon />
@@ -196,20 +196,20 @@
   {/if}
   <DropdownMenu.Content
     customAnchor={anchor}
-    class="sable-menu room-options-menu"
+    class="menu-surface room-options-menu"
     {side}
     {align}
     sideOffset={4}
     preventScroll={false}
   >
     <IconContext values={{ 'aria-hidden': 'true' }}>
-      <DropdownMenu.Item class="sable-menu-item" disabled={!unread} onSelect={markRead}>
+      <DropdownMenu.Item class="menu-item" disabled={!unread} onSelect={markRead}>
         <ChecksIcon />
         {$i18n.t('room.menuMarkRead')}
       </DropdownMenu.Item>
-      <DropdownMenu.Separator class="sable-menu-separator" />
+      <DropdownMenu.Separator class="menu-separator" />
       <DropdownMenu.Item
-        class="sable-menu-item"
+        class="menu-item"
         onSelect={() => {
           toggleTag('favourite', favourite);
         }}
@@ -218,7 +218,7 @@
         {$i18n.t('room.menuFavourite')}
       </DropdownMenu.Item>
       <DropdownMenu.Item
-        class="sable-menu-item"
+        class="menu-item"
         onSelect={() => {
           toggleTag('low_priority', lowPriority);
         }}
@@ -228,16 +228,16 @@
       </DropdownMenu.Item>
 
       {#if room.is_direct}
-        <DropdownMenu.Item class="sable-menu-item" onSelect={convertToGroup}>
+        <DropdownMenu.Item class="menu-item" onSelect={convertToGroup}>
           <ChatCircleIcon />
           {$i18n.t('room.menuConvertToGroup')}
         </DropdownMenu.Item>
       {/if}
 
-      <DropdownMenu.Separator class="sable-menu-separator" />
+      <DropdownMenu.Separator class="menu-separator" />
 
       <DropdownMenu.Item
-        class="sable-menu-item"
+        class="menu-item"
         disabled={!canInvite}
         onSelect={() => {
           inviteOpen = true;
@@ -246,12 +246,12 @@
         <UserPlusIcon />
         {$i18n.t('room.menuInvite')}
       </DropdownMenu.Item>
-      <DropdownMenu.Item class="sable-menu-item" onSelect={copyLink}>
+      <DropdownMenu.Item class="menu-item" onSelect={copyLink}>
         <LinkIcon />
         {$i18n.t('room.menuCopyLink')}
       </DropdownMenu.Item>
       <DropdownMenu.Item
-        class="sable-menu-item"
+        class="menu-item"
         onSelect={() => {
           onSettings(room);
         }}
@@ -266,7 +266,7 @@
 
       {#if offeredSpaces.length > 0}
         <DropdownMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           onSelect={() => {
             addToSpaceOpen = true;
           }}
@@ -278,7 +278,7 @@
 
       {#if !room.is_space && removableParent}
         <DropdownMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           onSelect={() => {
             removeFromSpace(removableParent.room_id);
           }}
@@ -291,7 +291,7 @@
       {/if}
 
       <DropdownMenu.Item
-        class="sable-menu-item sable-menu-item-destructive"
+        class="menu-item menu-item-destructive"
         onSelect={() => {
           onLeave(room);
         }}
@@ -332,7 +332,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
     flex: none;
@@ -343,12 +343,12 @@
   }
 
   :global(.room-options-trigger:hover) {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   :global(.room-options-trigger:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 </style>

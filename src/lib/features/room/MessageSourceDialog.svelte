@@ -46,7 +46,7 @@
   }
 
   .source {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radii-400);
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);

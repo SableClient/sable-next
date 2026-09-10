@@ -78,7 +78,7 @@
   }
 
   .error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     margin: 0;
   }
 </style>

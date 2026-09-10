@@ -68,8 +68,8 @@
     --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
     align-items: center;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-outer);
     display: flex;
     gap: var(--space-150);
@@ -80,7 +80,7 @@
 
   .staged-icon {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
   }
@@ -104,7 +104,7 @@
   }
 
   .staged-size {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 

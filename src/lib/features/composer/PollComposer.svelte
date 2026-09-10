@@ -122,7 +122,7 @@
   }
 
   legend {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     padding: 0 0 var(--space-200);
   }

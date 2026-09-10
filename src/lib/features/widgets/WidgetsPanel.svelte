@@ -84,7 +84,7 @@
     <div class="widgets-tabs" role="tablist">
       {#each widgets as widget (widget.id)}
         <div
-          class="widgets-tab sable-choice"
+          class="widgets-tab choice"
           data-selected={widget.id === activeWidget?.id ? 'true' : undefined}
         >
           <button
@@ -137,7 +137,7 @@
 
 <style>
   .widgets-panel {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     box-sizing: border-box;
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
@@ -149,14 +149,14 @@
 
   @media (width > 70.25rem) {
     .widgets-panel:not(.modal) {
-      border-left: var(--border-width) solid var(--sable-surface-container-line);
+      border-left: var(--border-width) solid var(--surface-container-line);
       width: 22rem;
     }
   }
 
   .widgets-header {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
@@ -169,13 +169,13 @@
     margin: 0;
   }
 
-  .widgets-header :global(.sable-icon-button) {
+  .widgets-header :global(.icon-button) {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }
 
   .widgets-empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     padding: var(--space-400);
   }
 
@@ -189,8 +189,8 @@
 
   .widgets-tab {
     align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
     display: flex;
     flex-shrink: 0;
@@ -209,7 +209,7 @@
     padding: var(--space-100) var(--space-300);
   }
 
-  .widgets-tab :global(.sable-icon-button) {
+  .widgets-tab :global(.icon-button) {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }

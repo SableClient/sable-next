@@ -370,20 +370,20 @@
 
 {#snippet actionRow()}
   <DropdownMenu.Root>
-    <DropdownMenu.Trigger class="profile-action sable-open">
+    <DropdownMenu.Trigger class="profile-action selection-open">
       <ShareNetworkIcon size={14} />
       {$i18n.t('timeline.profileShare')}
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="sable-menu" side="bottom" align="start" sideOffset={4}>
+    <DropdownMenu.Content class="menu-surface" side="bottom" align="start" sideOffset={4}>
       <IconContext values={{ 'aria-hidden': 'true' }}>
-        <DropdownMenu.Item class="sable-menu-item" onSelect={copyUserId}>
+        <DropdownMenu.Item class="menu-item" onSelect={copyUserId}>
           {$i18n.t('timeline.profileCopyId')}
         </DropdownMenu.Item>
-        <DropdownMenu.Item class="sable-menu-item" onSelect={copyProfileLink}>
+        <DropdownMenu.Item class="menu-item" onSelect={copyProfileLink}>
           {$i18n.t('timeline.profileCopyLink')}
         </DropdownMenu.Item>
         {#if canShareLink}
-          <DropdownMenu.Item class="sable-menu-item" onSelect={shareProfileLink}>
+          <DropdownMenu.Item class="menu-item" onSelect={shareProfileLink}>
             {$i18n.t('timeline.profileShareLink')}
           </DropdownMenu.Item>
         {/if}
@@ -392,7 +392,7 @@
   </DropdownMenu.Root>
   {#if sharedRooms.length > 0}
     <button
-      class="profile-action sable-open"
+      class="profile-action selection-open"
       type="button"
       aria-expanded={shared === 'rooms'}
       onclick={() => {
@@ -405,7 +405,7 @@
   {/if}
   {#if sharedSpaces.length > 0}
     <button
-      class="profile-action sable-open"
+      class="profile-action selection-open"
       type="button"
       aria-expanded={shared === 'spaces'}
       onclick={() => {
@@ -418,46 +418,46 @@
   {/if}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger
-      class="profile-action profile-action-overflow sable-open"
+      class="profile-action profile-action-overflow selection-open"
       aria-label={$i18n.t('timeline.profileMoreActions')}
     >
       <DotsThreeIcon size={14} />
     </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+    <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
       <IconContext values={{ 'aria-hidden': 'true' }}>
-        <DropdownMenu.Item class="sable-menu-item" onSelect={copyServer}>
+        <DropdownMenu.Item class="menu-item" onSelect={copyServer}>
           <CopyIcon />
           {$i18n.t('timeline.profileCopyServer')}
         </DropdownMenu.Item>
-        <DropdownMenu.Item class="sable-menu-item" onSelect={openServer}>
+        <DropdownMenu.Item class="menu-item" onSelect={openServer}>
           <ArrowSquareOutIcon />
           {$i18n.t('timeline.profileOpenServer')}
         </DropdownMenu.Item>
         {#if canInvite}
-          <DropdownMenu.Item class="sable-menu-item" onSelect={moderate(core.commands.inviteUser)}>
+          <DropdownMenu.Item class="menu-item" onSelect={moderate(core.commands.inviteUser)}>
             <UserPlusIcon />
             {$i18n.t('timeline.profileInvite')}
           </DropdownMenu.Item>
         {/if}
         {#if canUnban}
-          <DropdownMenu.Item class="sable-menu-item" onSelect={moderate(core.commands.unbanUser)}>
+          <DropdownMenu.Item class="menu-item" onSelect={moderate(core.commands.unbanUser)}>
             <LockOpenIcon />
             {$i18n.t('timeline.profileUnban')}
           </DropdownMenu.Item>
         {/if}
         {#if canSetPower}
           <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger class="sable-menu-item">
+            <DropdownMenu.SubTrigger class="menu-item">
               <ShieldIcon />
               {$i18n.t('timeline.profileChangePower')}
-              <CaretRightIcon class="sable-menu-submenu-chevron" aria-hidden="true" />
+              <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
             </DropdownMenu.SubTrigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.SubContent class="sable-menu" sideOffset={4}>
+              <DropdownMenu.SubContent class="menu-surface" sideOffset={4}>
                 <IconContext values={{ 'aria-hidden': 'true' }}>
                   {#each powerRoles as role (role.level)}
                     <DropdownMenu.Item
-                      class="sable-menu-item"
+                      class="menu-item"
                       onSelect={() => {
                         setPowerLevel(role.level);
                       }}
@@ -473,7 +473,7 @@
         {/if}
         {#if canKick}
           <DropdownMenu.Item
-            class="sable-menu-item sable-menu-item-destructive profile-menu-destructive"
+            class="menu-item menu-item-destructive profile-menu-destructive"
             onSelect={() => {
               openModeration('kick');
             }}
@@ -485,7 +485,7 @@
         {#if canBan}
           <DropdownMenu.Item
             class={[
-              'sable-menu-item sable-menu-item-destructive profile-menu-destructive',
+              'menu-item menu-item-destructive profile-menu-destructive',
               canKick && 'profile-menu-grouped',
             ]}
             onSelect={() => {
@@ -499,7 +499,7 @@
         {#if !isSelf}
           <DropdownMenu.Item
             class={[
-              'sable-menu-item sable-menu-item-destructive profile-menu-destructive',
+              'menu-item menu-item-destructive profile-menu-destructive',
               (canKick || canBan) && 'profile-menu-grouped',
             ]}
             onSelect={toggleIgnored}
@@ -663,24 +663,24 @@
   }
 
   .profile-meta-aside {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
   }
 
   .profile-meta-elevated {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     font-weight: var(--font-weight-medium);
   }
 
   .profile-meta-elevated :global(svg) {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 
   :global(.profile-action) {
     align-items: center;
     background: none;
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-pill);
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     cursor: pointer;
     display: inline-flex;
     font: inherit;
@@ -693,21 +693,21 @@
     white-space: nowrap;
   }
 
-  :global(.sable-profile-card-sheet .profile-action) {
+  :global(.profile-card-sheet .profile-action) {
     min-height: 2.75rem;
   }
 
   :global(.profile-action svg) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     flex: none;
   }
 
   :global(.profile-action:hover:not([aria-expanded='true'])) {
-    background: color-mix(in oklab, var(--sable-bg-on-container) 7%, transparent);
+    background: color-mix(in oklab, var(--bg-on-container) 7%, transparent);
   }
 
   :global(.profile-action:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -721,13 +721,13 @@
   }
 
   :global(.profile-power-level) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
   }
 
   :global(.profile-menu-destructive) {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
     margin-top: var(--space-100);
   }
 
@@ -751,17 +751,17 @@
     padding-block: 0;
   }
 
-  :global(.sable-profile-card-sheet) .profile-composer :global(.profile-composer-input) {
+  :global(.profile-card-sheet) .profile-composer :global(.profile-composer-input) {
     height: var(--control-height-medium);
   }
 
-  :global(.sable-profile-card-sheet) .profile-composer :global(.sable-icon-button) {
+  :global(.profile-card-sheet) .profile-composer :global(.icon-button) {
     min-height: var(--control-height-medium);
     width: var(--control-height-medium);
   }
 
   .profile-composer-error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     font-size: var(--font-size-small);
     margin: var(--space-200) 0 0;
   }
@@ -788,16 +788,16 @@
   }
 
   .profile-extra summary:hover {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 
   .profile-extra summary:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
   .profile-extra summary :global(svg) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     flex: none;
   }
 
@@ -819,7 +819,7 @@
   }
 
   .profile-extra dt {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-weight: var(--font-weight-medium);
     overflow-wrap: anywhere;
   }

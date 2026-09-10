@@ -37,11 +37,11 @@
 
   .toast {
     align-items: center;
-    background: var(--sable-crit-container);
-    border: var(--border-width) solid var(--sable-crit-container-line);
+    background: var(--crit-container);
+    border: var(--border-width) solid var(--crit-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-e300);
-    color: var(--sable-crit-on-container);
+    color: var(--crit-on-container);
     display: flex;
     gap: var(--space-300);
     padding: var(--space-200) var(--space-200) var(--space-200) var(--space-300);

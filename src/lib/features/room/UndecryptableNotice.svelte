@@ -52,10 +52,10 @@
 
 <style>
   .undecryptable {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) dashed var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) dashed var(--surface-var-container-line);
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));

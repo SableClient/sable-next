@@ -188,7 +188,7 @@
         type="button"
         role="tab"
         aria-selected={tab === entry.id}
-        class="sable-choice"
+        class="choice"
         onclick={() => {
           tab = entry.id;
           search = '';
@@ -360,7 +360,7 @@
     background: transparent;
     border: var(--border-width) solid transparent;
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
@@ -369,17 +369,17 @@
   }
 
   .tabs button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
   .tabs button:hover:not(:disabled, [aria-selected='true']) {
-    background: var(--sable-surface-var-container-hover);
-    color: var(--sable-bg-on-container);
+    background: var(--surface-var-container-hover);
+    color: var(--bg-on-container);
   }
 
   .status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     padding: var(--space-400) 0;
     text-align: center;
@@ -391,7 +391,7 @@
   }
 
   .user-id {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
@@ -402,7 +402,7 @@
   }
 
   .power {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 

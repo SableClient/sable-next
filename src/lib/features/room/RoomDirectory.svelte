@@ -217,7 +217,7 @@
   }
 
   .count {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -240,7 +240,7 @@
   }
 
   .room:hover {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
   }
 
   .room-text {
@@ -260,7 +260,7 @@
 
   .room-meta,
   .room-topic {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -274,9 +274,9 @@
   }
 
   .badge {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
@@ -284,7 +284,7 @@
   }
 
   .divider {
-    color: var(--sable-surface-var-container-line);
+    color: var(--surface-var-container-line);
   }
 
   .loading {

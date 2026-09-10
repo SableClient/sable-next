@@ -110,9 +110,9 @@
   }
 
   .preview {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radii-300);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     max-height: 6rem;
@@ -125,7 +125,7 @@
   .files,
   .staging {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);

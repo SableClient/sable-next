@@ -57,24 +57,24 @@
 </script>
 
 <DropdownMenu.Sub>
-  <DropdownMenu.SubTrigger class="sable-menu-item">
+  <DropdownMenu.SubTrigger class="menu-item">
     <BellIcon />
     {$i18n.t('room.menuNotifications')}
-    <CaretRightIcon class="sable-menu-submenu-chevron" aria-hidden="true" />
+    <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
   </DropdownMenu.SubTrigger>
   <DropdownMenu.Portal>
-    <DropdownMenu.SubContent class="sable-menu room-options-menu" sideOffset={4}>
+    <DropdownMenu.SubContent class="menu-surface room-options-menu" sideOffset={4}>
       <IconContext values={{ 'aria-hidden': 'true' }}>
         {#each modes as option (option.mode ?? 'default')}
           {@const selected = mode === option.mode}
           <DropdownMenu.Item
-            class="sable-menu-item"
+            class="menu-item"
             aria-checked={selected}
             onSelect={() => {
               select(option.mode);
             }}
           >
-            <span class="sable-menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+            <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
             {$i18n.t(option.label, { mode: defaultLabel })}
           </DropdownMenu.Item>
         {/each}

@@ -121,8 +121,8 @@
 <style>
   .titlebar {
     align-items: stretch;
-    background: var(--sable-bg-container);
-    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     height: var(--titlebar-height);
     inset: 0 0 auto;
@@ -143,7 +143,7 @@
   }
 
   .title {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     overflow: hidden;
     pointer-events: none;
@@ -160,7 +160,7 @@
     align-items: center;
     background: none;
     border: 0;
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     cursor: default;
     display: flex;
     justify-content: center;
@@ -168,12 +168,12 @@
   }
 
   .controls button:hover {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .controls button.close:hover {
-    background: var(--sable-crit-main);
-    color: var(--sable-crit-on-main);
+    background: var(--crit-main);
+    color: var(--crit-on-main);
   }
 
   .controls :global(svg) {

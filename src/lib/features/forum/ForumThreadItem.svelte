@@ -68,7 +68,7 @@
     align-items: center;
     background: none;
     border: none;
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     cursor: pointer;
     display: flex;
@@ -80,7 +80,7 @@
   }
 
   .forum-thread-button:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   .forum-thread-body {
@@ -106,20 +106,20 @@
   }
 
   .forum-thread-time {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
   }
 
   .forum-thread-preview {
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .forum-thread-meta {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-300);
@@ -137,7 +137,7 @@
   }
 
   .forum-thread-unread-dot {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     border-radius: 50%;
     flex: 0 0 auto;
     height: 0.5rem;

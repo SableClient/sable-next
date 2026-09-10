@@ -205,7 +205,7 @@
   }
 
   .voice-message {
-    color: var(--sable-crit-on-container);
+    color: var(--crit-on-container);
     flex: 1;
     font-size: var(--font-size-small);
     margin: 0;
@@ -220,7 +220,7 @@
   }
 
   .voice-dot {
-    background: var(--sable-crit-main);
+    background: var(--crit-main);
     border-radius: var(--radius-pill);
     flex: none;
     height: 0.5rem;
@@ -228,7 +228,7 @@
   }
 
   .voice-level {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     border-radius: var(--radius-pill);
     flex: 1;
     height: 1.5rem;
@@ -236,7 +236,7 @@
   }
 
   .voice-time {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: none;
     font-variant-numeric: tabular-nums;
   }
@@ -262,7 +262,7 @@
   }
 
   :global(.voice-send) {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
   }
 
   .sr-only {

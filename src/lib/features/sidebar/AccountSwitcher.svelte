@@ -80,7 +80,7 @@
 
 {#if mode === 'mobile'}
   <button
-    class="quick-tool mobile-tool sable-selection-layer"
+    class="quick-tool mobile-tool selection-layer"
     type="button"
     aria-label={$i18n.t('nav.account')}
     onclick={openAccounts}
@@ -92,16 +92,16 @@
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         {...props}
-        class="quick-tool sable-nav-tab sable-nav-tab-outlined sable-open sable-selection-layer {mode ===
+        class="quick-tool nav-tab nav-tab-outlined selection-open selection-layer {mode ===
         'compact'
-          ? 'compact-tool sable-nav-tab-side'
-          : 'desktop-tool sable-nav-tab-bottom'}"
+          ? 'compact-tool nav-tab-side'
+          : 'desktop-tool nav-tab-bottom'}"
         aria-label={$i18n.t('nav.switchAccount')}
       >
         <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
-        class="sable-menu account-popover"
+        class="menu-surface account-popover"
         side={mode === 'compact' ? 'right' : 'top'}
         sideOffset={8}
       >
@@ -110,7 +110,7 @@
           {displayName}
           userId={core.session?.user_id ?? ''}
           {avatarUrl}
-          color={activeProfile?.hero_color ?? 'var(--sable-primary-container)'}
+          color={activeProfile?.hero_color ?? 'var(--primary-container)'}
           heroColor={activeProfile?.hero_color}
           heroBrightness={activeProfile?.hero_brightness}
           bannerUrl={activeProfile?.banner_url}

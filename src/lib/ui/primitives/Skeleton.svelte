@@ -6,18 +6,18 @@
   let { class: className = '', ...rest }: Props = $props();
 </script>
 
-<span {...rest} class={['sable-skeleton', className]} aria-hidden="true"></span>
+<span {...rest} class={['skeleton', className]} aria-hidden="true"></span>
 
 <style>
-  :global(.sable-skeleton) {
-    background: var(--sable-surface-container);
+  :global(.skeleton) {
+    background: var(--surface-container);
     border-radius: var(--radius);
     display: block;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.sable-skeleton) {
-      animation: sable-skeleton-pulse 1.8s ease-in-out infinite;
+    :global(.skeleton) {
+      animation: skeleton-pulse 1.8s ease-in-out infinite;
     }
   }
 </style>

@@ -147,7 +147,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
       });
     await tick();
     expect(document.querySelector(selector)?.getAttribute('aria-label')).toBe('Alice');
-    expect(document.querySelector(`${selector} .sable-unread-badge-count`)?.textContent).toBe('1');
+    expect(document.querySelector(`${selector} .unread-badge-count`)?.textContent).toBe('1');
     for (const listener of listeners)
       listener({
         type: 'room_list_diff',

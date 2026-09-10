@@ -28,7 +28,7 @@
     {@const actions = openMessageMenu.actions()}
     <ContextMenu.Portal>
       <ContextMenu.Content
-        class="sable-menu message-menu"
+        class="menu-surface message-menu"
         loop
         collisionPadding={8}
         customAnchor={anchor}
@@ -41,12 +41,12 @@
           {#each messageMenuRows(actions) as row (row.key)}
             {@const RowIcon = row.icon}
             {#if row.separated}
-              <ContextMenu.Separator class="sable-menu-separator" />
+              <ContextMenu.Separator class="menu-separator" />
             {/if}
             <ContextMenu.Item
               class={[
-                'sable-menu-item sable-menu-item-trailing-icon',
-                row.destructive && 'sable-menu-item-destructive',
+                'menu-item menu-item-trailing-icon',
+                row.destructive && 'menu-item-destructive',
               ]}
               onclick={row.run}
             >

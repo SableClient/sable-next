@@ -59,8 +59,8 @@
 
 <style>
   .link-preview {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: inherit;
     display: flex;
@@ -72,7 +72,7 @@
   }
 
   .link-preview:hover {
-    border-color: var(--sable-primary-main);
+    border-color: var(--primary-main);
   }
 
   :global(.link-preview-image) {
@@ -88,7 +88,7 @@
   }
 
   .link-preview-site {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     text-transform: uppercase;
   }
@@ -102,7 +102,7 @@
 
   .link-preview-description {
     -webkit-box-orient: vertical;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: -webkit-box;
     font-size: var(--font-size-small);
     -webkit-line-clamp: 2;

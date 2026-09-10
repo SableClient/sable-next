@@ -364,8 +364,8 @@
   {@const active = isActive(item)}
   <a
     {...props}
-    class="rail-item sable-nav-tab sable-nav-tab-side sable-current sable-selection-layer"
-    class:sable-nav-tab-outlined={outlined(item)}
+    class="rail-item nav-tab nav-tab-side selection-current selection-layer"
+    class:nav-tab-outlined={outlined(item)}
     class:space-item={Boolean(item.initial)}
     href={item.navigateHref ?? item.href}
     draggable={held ? 'false' : undefined}
@@ -403,9 +403,9 @@
       {/snippet}
     </ContextMenu.Trigger>
     <ContextMenu.Portal>
-      <ContextMenu.Content class="sable-menu">
+      <ContextMenu.Content class="menu-surface">
         <ContextMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           disabled={resolveUnreadBadge(item.unread, preferences, item.dm ?? false) === null}
           onSelect={() => {
             onMarkSectionRead?.(section);
@@ -458,9 +458,9 @@
           {/snippet}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="sable-menu">
+          <ContextMenu.Content class="menu-surface">
             <ContextMenu.Item
-              class="sable-menu-item"
+              class="menu-item"
               onSelect={() => {
                 onRemoveFromFolder?.(roomId, folderId);
               }}
@@ -477,7 +477,7 @@
 
 {#snippet folderMenuItems(folder: SidebarFolder)}
   <ContextMenu.Item
-    class="sable-menu-item"
+    class="menu-item"
     onSelect={() => {
       onRenameFolder?.(folder);
     }}
@@ -486,7 +486,7 @@
     {$i18n.t('nav.folderRename')}
   </ContextMenu.Item>
   <ContextMenu.Item
-    class="sable-menu-item"
+    class="menu-item"
     onSelect={() => {
       onUngroupFolder?.(folder.id);
     }}
@@ -514,8 +514,8 @@
   <button
     {...props}
     type="button"
-    class="rail-item folder-preview sable-nav-tab sable-nav-tab-side
-    sable-current sable-selection-layer"
+    class="rail-item folder-preview nav-tab nav-tab-side
+    selection-current selection-layer"
     data-current={folderActive(folder) ? 'true' : undefined}
     aria-expanded="false"
     aria-label={$i18n.t('nav.folderExpand', { name: folderLabel(folder) })}
@@ -556,7 +556,7 @@
       {/snippet}
     </ContextMenu.Trigger>
     <ContextMenu.Portal>
-      <ContextMenu.Content class="sable-menu">
+      <ContextMenu.Content class="menu-surface">
         {@render folderMenuItems(folder)}
       </ContextMenu.Content>
     </ContextMenu.Portal>
@@ -590,7 +590,7 @@
           {/snippet}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="sable-menu">
+          <ContextMenu.Content class="menu-surface">
             {@render folderMenuItems(folder)}
           </ContextMenu.Content>
         </ContextMenu.Portal>
@@ -646,7 +646,7 @@
   <DropdownMenu.Root bind:open={displayOpen}>
     <DropdownMenu.Content
       customAnchor={displayAnchor}
-      class="sable-menu rail-display-menu"
+      class="menu-surface rail-display-menu"
       side="right"
       align="start"
       preventScroll={false}
@@ -655,31 +655,31 @@
       {#each displayToggles as toggle (toggle.key)}
         {@const on = preferences[toggle.key]}
         <DropdownMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           closeOnSelect={false}
           aria-checked={on}
           onSelect={() => {
             setPreference(toggle.key, !on);
           }}
         >
-          <span class="sable-menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+          <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
           {$i18n.t(toggle.label)}
         </DropdownMenu.Item>
       {/each}
 
-      <DropdownMenu.Separator class="sable-menu-separator" />
+      <DropdownMenu.Separator class="menu-separator" />
 
       {#each viewToggles as toggle (toggle.key)}
         {@const on = preferences[toggle.key]}
         <DropdownMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           closeOnSelect={false}
           aria-checked={on}
           onSelect={() => {
             setPreference(toggle.key, !on);
           }}
         >
-          <span class="sable-menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+          <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
           {$i18n.t(toggle.label)}
         </DropdownMenu.Item>
       {/each}
@@ -725,10 +725,10 @@
 
 <style>
   .rail {
-    background: var(--sable-bg-container);
-    border-right: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border-right: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     display: flex;
     flex: 0 0 var(--navigation-rail-width);
     flex-direction: column;
@@ -743,7 +743,7 @@
   }
 
   .rail-separator {
-    background: var(--sable-bg-container-line);
+    background: var(--bg-container-line);
     block-size: var(--border-width);
     margin: 0 auto;
     width: 1.5rem;
@@ -784,7 +784,7 @@
   .rail-slot.drop-below::after,
   .folder-open.drop-above::after,
   .folder-open.drop-below::after {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     border-radius: var(--radius-pill);
     content: '';
     height: 2px;
@@ -813,7 +813,7 @@
   }
 
   .rail-slot.drop-into :global(.rail-item) {
-    outline: 2px solid var(--sable-primary-main);
+    outline: 2px solid var(--primary-main);
     outline-offset: 1px;
   }
 
@@ -821,7 +821,7 @@
     border: 0;
     height: auto;
     min-height: 2.625rem;
-    outline: var(--border-width) solid var(--sable-bg-container-line);
+    outline: var(--border-width) solid var(--bg-container-line);
     outline-offset: calc(var(--border-width) * -1);
     padding: var(--space-100);
   }
@@ -849,7 +849,7 @@
   .folder-card {
     align-items: center;
     background: transparent;
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radii-500);
     display: flex;
     flex-direction: column;
@@ -877,11 +877,11 @@
   }
 
   .folder-collapse:hover {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .folder-collapse:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 </style>

@@ -21,7 +21,7 @@
   {...rest}
   size="icon"
   aria-label={label}
-  class={['sable-icon-button', `sable-icon-button-${size}`, className]}
+  class={['icon-button', `icon-button-${size}`, className]}
 >
   <IconContext values={{ 'aria-hidden': 'true' }}>
     {@render children?.()}

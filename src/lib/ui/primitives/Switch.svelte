@@ -11,12 +11,12 @@
   let { checked = $bindable(false), disabled = false, label, onCheckedChange }: Props = $props();
 </script>
 
-<Switch.Root bind:checked {disabled} {onCheckedChange} class="sable-switch" aria-label={label}>
-  <Switch.Thumb class="sable-switch-thumb" />
+<Switch.Root bind:checked {disabled} {onCheckedChange} class="switch-root" aria-label={label}>
+  <Switch.Thumb class="switch-thumb" />
 </Switch.Root>
 
 <style>
-  :global(.sable-switch) {
+  :global(.switch-root) {
     align-items: center;
     background: transparent;
     border: 0;
@@ -34,30 +34,30 @@
     width: 2.75rem;
   }
 
-  :global(.sable-switch::after) {
+  :global(.switch-root::after) {
     content: '';
     inset: calc((var(--target-hit) - 1.5rem) / -2) 0;
     position: absolute;
   }
 
-  :global(.sable-switch[data-state='checked']) {
-    background: var(--sable-primary-main);
+  :global(.switch-root[data-state='checked']) {
+    background: var(--primary-main);
     box-shadow: none;
-    color: var(--sable-primary-on-main);
+    color: var(--primary-on-main);
     opacity: var(--opacity-p500);
   }
 
-  :global(.sable-switch:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  :global(.switch-root:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
-  :global(.sable-switch[data-disabled]) {
+  :global(.switch-root[data-disabled]) {
     cursor: not-allowed;
     opacity: var(--opacity-disabled);
   }
 
-  :global(.sable-switch-thumb) {
+  :global(.switch-thumb) {
     background: currentcolor;
     border-radius: var(--radii-pill);
     display: block;
@@ -66,21 +66,21 @@
     width: 0.875rem;
   }
 
-  :global(.sable-switch[data-state='checked'] .sable-switch-thumb) {
+  :global(.switch-root[data-state='checked'] .switch-thumb) {
     height: 1.125rem;
     translate: 1.4375rem 0;
     width: 1.125rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.sable-switch) {
+    :global(.switch-root) {
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
         box-shadow var(--motion-normal) var(--motion-easing-standard),
         opacity var(--motion-normal) var(--motion-easing-standard);
     }
 
-    :global(.sable-switch-thumb) {
+    :global(.switch-thumb) {
       transition:
         translate var(--motion-normal) var(--motion-easing-standard),
         height var(--motion-normal) var(--motion-easing-standard),

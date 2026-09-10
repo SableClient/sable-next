@@ -89,7 +89,7 @@
                 <Button
                   size="small"
                   variant={capturing === shortcut.id ? 'primary' : 'secondary'}
-                  class="sable-choice"
+                  class="choice"
                   aria-pressed={capturing === shortcut.id}
                   onclick={() => {
                     capturing = capturing === shortcut.id ? null : shortcut.id;

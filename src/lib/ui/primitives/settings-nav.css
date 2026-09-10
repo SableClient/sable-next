@@ -1,6 +1,6 @@
-.sable-settings-nav {
-  background: var(--sable-surface-container);
-  border-right: var(--border-width) solid var(--sable-surface-container-line);
+.settings-nav {
+  background: var(--surface-container);
+  border-right: var(--border-width) solid var(--surface-container-line);
   box-sizing: border-box;
   display: flex;
   flex: 0 0 16rem;
@@ -11,16 +11,16 @@
   padding-bottom: var(--space-400);
 }
 
-.sable-settings-nav-paged {
+.settings-nav-paged {
   border-right: 0;
   flex: 1 1 auto;
   width: 100%;
 }
 
-.sable-settings-nav-header {
+.settings-nav-header {
   align-items: center;
-  background: var(--sable-surface-container);
-  border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+  background: var(--surface-container);
+  border-bottom: var(--border-width) solid var(--surface-container-line);
   display: flex;
   flex: 0 0 auto;
   gap: var(--space-300);

@@ -42,7 +42,7 @@
   />
 
   <button
-    class="password-toggle sable-choice"
+    class="password-toggle choice"
     type="button"
     {disabled}
     aria-label={showPassword ? $i18n.t('auth.hidePassword') : $i18n.t('auth.showPassword')}
@@ -75,7 +75,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: pointer;
     display: flex;
     height: 100%;
@@ -88,7 +88,7 @@
   }
 
   .password-toggle:hover {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 
   .password-toggle:active {
@@ -97,7 +97,7 @@
 
   .password-toggle:focus-visible {
     border-radius: var(--radius);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: -4px;
   }
 

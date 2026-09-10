@@ -226,7 +226,7 @@ impl Core {
         self.sync_service()
             .await?
             .room_list_service()
-            .subscribe_to_rooms(&room_refs)
+            .set_room_subscriptions(&room_refs)
             .await;
         Ok(())
     }

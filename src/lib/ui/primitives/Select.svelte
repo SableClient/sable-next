@@ -45,14 +45,14 @@
     <CaretDownIcon class="select-caret" aria-hidden="true" />
   </BitsSelect.Trigger>
   <BitsSelect.Portal>
-    <BitsSelect.Content sideOffset={4} class="sable-menu select-content">
+    <BitsSelect.Content sideOffset={4} class="menu-surface select-content">
       <BitsSelect.Viewport>
         {#each items as item (item.value)}
           <BitsSelect.Item
             value={item.value}
             label={item.label}
             disabled={item.disabled}
-            class="sable-menu-item sable-choice"
+            class="menu-item choice"
           >
             {#snippet children({ selected })}
               <span>{item.label}</span>
@@ -83,7 +83,7 @@
     width: var(--icon-size-small);
   }
 
-  :global(.sable-menu.select-content) {
+  :global(.menu-surface.select-content) {
     --menu-max-height: min(20rem, var(--bits-select-content-available-height));
     --menu-min-width: var(--bits-select-anchor-width);
 

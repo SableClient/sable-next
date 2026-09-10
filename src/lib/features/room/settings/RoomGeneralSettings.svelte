@@ -401,7 +401,7 @@
   }
 
   .read-only-value {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -430,13 +430,13 @@
   }
 
   .save-status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     margin-right: auto;
   }
 
   .save-status.error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
   }
 </style>

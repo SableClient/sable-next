@@ -521,7 +521,7 @@ async fn explicit_room_subscription_delivers_simplified_sliding_sync_events() {
         .build()
         .await
         .unwrap();
-    sliding_sync.subscribe_to_rooms(&[room_id], None, true);
+    sliding_sync.add_room_subscriptions(&[room_id], None, true);
     let stream = sliding_sync.sync();
     pin_mut!(stream);
 
@@ -1723,7 +1723,7 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let sliding_sync = client.sliding_sync(name).unwrap().build().await.unwrap();
-        sliding_sync.subscribe_to_rooms(&[room_id], None, true);
+        sliding_sync.add_room_subscriptions(&[room_id], None, true);
         let stream = sliding_sync.sync();
         pin_mut!(stream);
 

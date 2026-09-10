@@ -224,7 +224,7 @@
 
 <style>
   .status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     padding: var(--space-300) var(--space-400);

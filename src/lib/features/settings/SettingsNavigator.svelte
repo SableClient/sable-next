@@ -71,11 +71,11 @@
 
   {#if showList}
     <aside
-      class="settings-nav sable-settings-nav"
-      class:sable-settings-nav-paged={!desktop}
+      class="settings-nav"
+      class:settings-nav-paged={!desktop}
       aria-label={$i18n.t('settings.title')}
     >
-      <div class="settings-title sable-settings-nav-header">
+      <div class="settings-title settings-nav-header">
         <Dialog.Title class="settings-heading">{$i18n.t('settings.title')}</Dialog.Title>
         <IconButton variant="ghost" size="small" label={$i18n.t('settings.close')} onclick={onClose}
           ><XIcon /></IconButton
@@ -110,7 +110,7 @@
             {@const focus = settingFocusId(hit.setting.key)}
             <li>
               <a
-                class="sable-selection-layer"
+                class="selection-layer"
                 href={`${resolve(`settings/${hit.category.id}`)}?focus=${encodeURIComponent(focus)}`}
                 onclick={(event) => {
                   select(event, hit.category.id, focus);
@@ -154,7 +154,7 @@
   {#if showContent && openSection}
     <div class="settings-content">
       {#if !desktop}
-        <div class="settings-title section-bar sable-settings-nav-header">
+        <div class="settings-title section-bar settings-nav-header">
           <IconButton variant="ghost" size="small" label={$i18n.t('settings.back')} onclick={onBack}
             ><ArrowLeftIcon /></IconButton
           >
@@ -215,8 +215,8 @@
 
   .search-field {
     align-items: center;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     display: flex;
     gap: var(--space-300);
@@ -225,15 +225,15 @@
   }
 
   .search-field :global(svg) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
 
   .search-field:focus-within {
-    border-color: var(--sable-primary-main);
-    box-shadow: inset 0 0 0 var(--border-width-600) var(--sable-primary-main);
+    border-color: var(--primary-main);
+    box-shadow: inset 0 0 0 var(--border-width-600) var(--primary-main);
   }
 
   .search-field :global(.text-input) {
@@ -250,7 +250,7 @@
   }
 
   .search-summary.active {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: var(--space-200) 0 0;
     min-height: 1lh;
   }
@@ -265,7 +265,7 @@
   }
 
   .result-category {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-normal);
   }
@@ -290,7 +290,7 @@
   }
 
   .search-results a:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   .search-results a :global(svg) {
@@ -321,8 +321,8 @@
   }
 
   .section-bar {
-    background: var(--sable-surface-container);
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     flex: 0 0 auto;
     gap: var(--space-300);
     justify-content: flex-start;

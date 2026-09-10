@@ -77,7 +77,7 @@
         <li role="presentation">
           <button
             type="button"
-            class="sable-menu-item option sable-highlight"
+            class="menu-item option selection-highlight"
             id={optionId(index)}
             role="option"
             tabindex="-1"
@@ -122,7 +122,7 @@
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-400) 0 0;
     text-align: center;

@@ -67,7 +67,7 @@ test('participants name themselves in the chip, whatever the room type', async (
   const chip = document.querySelector('.voice-chip');
   expect(chip?.getAttribute('aria-label')).toBe('In voice: Bob, Carol');
   expect(chip?.classList.contains('live')).toBe(true);
-  expect(chip?.querySelectorAll('.sable-avatar')).toHaveLength(2);
+  expect(chip?.querySelectorAll('.avatar-root')).toHaveLength(2);
   expect(chip?.querySelector('.voice-count')?.textContent).toBe('2');
 
   await unmount(instance);

@@ -115,11 +115,11 @@
   }
 
   .member-identity-button:hover {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
   }
 
   .member-identity-button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -139,7 +139,7 @@
   }
 
   .member-identity-status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -152,7 +152,7 @@
 
   .member-identity-trailing {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: inline-flex;
     flex: none;
     font-size: var(--font-size-small);

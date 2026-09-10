@@ -543,11 +543,11 @@
   }
 
   :global(.hero-action-subspace) {
-    --button-container: var(--sable-surface-var-container);
-    --button-container-active: var(--sable-surface-var-container-active);
-    --button-container-hover: var(--sable-surface-var-container-hover);
-    --button-line: var(--sable-surface-var-container-line);
-    --button-on-container: var(--sable-surface-var-on-container);
+    --button-container: var(--surface-var-container);
+    --button-container-active: var(--surface-var-container-active);
+    --button-container-hover: var(--surface-var-container-hover);
+    --button-line: var(--surface-var-container-line);
+    --button-on-container: var(--surface-var-on-container);
   }
 
   h1 {
@@ -559,7 +559,7 @@
   .topic {
     background: none;
     border: 0;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: block;
     font: inherit;
@@ -583,7 +583,7 @@
   }
 
   .topic:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -600,7 +600,7 @@
   }
 
   .topic-full {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     line-height: 1.45;
     margin: 0;
     max-height: 60dvh;
@@ -616,7 +616,7 @@
 
   .loading-note {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-150);
@@ -624,14 +624,14 @@
   }
 
   .placeholder {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     overflow: hidden;
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
   }
 </style>

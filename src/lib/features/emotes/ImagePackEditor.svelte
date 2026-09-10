@@ -386,7 +386,7 @@
   }
 
   .status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     padding: var(--space-400) 0;
     text-align: center;
@@ -413,7 +413,7 @@
   }
 
   .save-status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     margin-right: auto;

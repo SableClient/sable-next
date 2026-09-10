@@ -72,11 +72,11 @@
   }
 
   :global(.identity-row-button:hover) {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
   }
 
   :global(.identity-row-button:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 

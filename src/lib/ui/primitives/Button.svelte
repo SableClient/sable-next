@@ -24,11 +24,11 @@
   disabled={disabled || loading}
   aria-busy={loading ? 'true' : undefined}
   class={[
-    'sable-button',
-    `sable-button-${variant}`,
-    `sable-button-${size}`,
-    { 'sable-button-loading': loading },
-    { 'sable-button-block': block },
+    'btn',
+    `btn-${variant}`,
+    `btn-${size}`,
+    { 'btn-loading': loading },
+    { 'btn-block': block },
     className,
   ]}
 >

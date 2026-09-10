@@ -308,7 +308,7 @@ test('a result row names the sender and shows their avatar initials', async ({ p
   await searchField(page).fill('welcome');
 
   await expect(page.locator('.hit-sender').first()).toHaveText('Alice', INDEXED);
-  await expect(page.locator('.hit-row').first().locator('.sable-avatar')).toBeVisible();
+  await expect(page.locator('.hit-row').first().locator('.avatar-root')).toBeVisible();
 });
 
 test('an operator under the caret stays as text until it is committed', async ({ page }) => {

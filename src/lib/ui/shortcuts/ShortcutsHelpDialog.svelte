@@ -58,7 +58,7 @@
   }
 
   h3 {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0 0 var(--space-100);
     text-transform: uppercase;
@@ -80,7 +80,7 @@
   }
 
   kbd {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radii-300);
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);

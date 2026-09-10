@@ -53,8 +53,8 @@
 <style>
   .context {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -64,7 +64,7 @@
   }
 
   .context-kind {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     flex: 0 0 auto;
     font-weight: var(--font-weight-medium);
   }

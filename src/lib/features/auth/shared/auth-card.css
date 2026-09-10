@@ -1,6 +1,6 @@
 .auth-page .auth-card-surface {
-  background: var(--sable-surface-container);
-  border: var(--border-width) solid var(--sable-surface-container-line);
+  background: var(--surface-container);
+  border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radius);
   display: grid;
   gap: var(--space-400);
@@ -59,7 +59,7 @@
 .auth-page .auth-link-button {
   background: transparent;
   border: 0;
-  color: var(--sable-sec-main);
+  color: var(--sec-main);
   cursor: pointer;
   font: inherit;
   font-size: var(--font-size-small);
@@ -85,12 +85,12 @@
 }
 
 .auth-page .auth-link-button:hover {
-  color: var(--sable-sec-main-hover);
+  color: var(--sec-main-hover);
 }
 
 .auth-page .auth-link-button:focus-visible {
   border-radius: var(--radii-200);
-  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: 0.15rem;
 }
 

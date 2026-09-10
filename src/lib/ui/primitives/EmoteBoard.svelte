@@ -251,7 +251,7 @@
       <div class="tabs" role="group" aria-label={$i18n.t('composer.emotesAndStickers')}>
         <button
           type="button"
-          class="sable-choice"
+          class="choice"
           aria-pressed={tab === 'emoticon'}
           onclick={() => {
             tab = 'emoticon';
@@ -262,7 +262,7 @@
         {#if stickers}
           <button
             type="button"
-            class="sable-choice"
+            class="choice"
             aria-pressed={tab === 'sticker'}
             onclick={() => {
               tab = 'sticker';
@@ -274,7 +274,7 @@
         {#if gifs}
           <button
             type="button"
-            class="sable-choice"
+            class="choice"
             aria-pressed={gifTab}
             onclick={() => {
               tab = 'gif';
@@ -569,7 +569,7 @@
 
   .board-head {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-200);
     padding: var(--space-200);
@@ -585,7 +585,7 @@
     background: transparent;
     border: var(--border-width) solid transparent;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     font-size: var(--font-size-small);
     padding: var(--space-150) var(--space-200);
@@ -605,7 +605,7 @@
   /* Fixed, or a long pack name widens the rail and squeezes the grid. */
   .rail {
     align-items: center;
-    border-right: var(--border-width) solid var(--sable-surface-container-line);
+    border-right: var(--border-width) solid var(--surface-container-line);
     display: flex;
     flex: 0 0 3.25rem;
     flex-direction: column;
@@ -617,7 +617,7 @@
   }
 
   .rail-label {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     max-width: 100%;
     overflow: hidden;
@@ -636,7 +636,7 @@
   }
 
   .rail-pack:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   .grids {
@@ -659,7 +659,7 @@
 
   .section-origin,
   .section-attribution {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-weight: 400;
   }
 
@@ -713,7 +713,7 @@
 
   .grids li button:hover,
   .grids .unicode button:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   .rail.hidden {
@@ -721,8 +721,8 @@
   }
 
   .free-text {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
     color: inherit;
     cursor: pointer;
@@ -738,7 +738,7 @@
   }
 
   .free-text:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   /* Rows are real elements for the grid pattern, so the wrap is laid out here. */
@@ -773,8 +773,8 @@
 
   .preview {
     align-items: center;
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
+    border-top: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-150);
@@ -783,7 +783,7 @@
   }
 
   .preview code {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 
   .preview :global(.preview-image) {
@@ -805,7 +805,7 @@
 
   .board-note {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 1;
     font-size: var(--font-size-small);

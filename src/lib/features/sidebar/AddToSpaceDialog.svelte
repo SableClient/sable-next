@@ -66,7 +66,7 @@
     <ul class="targets">
       {#each targets as space (space.room_id)}
         <li>
-          <label class="sable-menu-item target">
+          <label class="menu-item target">
             <input
               type="checkbox"
               checked={selected.has(space.room_id)}
@@ -116,7 +116,7 @@
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-400) 0 0;
   }

@@ -10,10 +10,10 @@
   let { class: className = '', children, ...rest }: Props = $props();
 </script>
 
-<span {...rest} class={['sable-pronoun-pill', className]}>{@render children?.()}</span>
+<span {...rest} class={['pronoun-pill', className]}>{@render children?.()}</span>
 
 <style>
-  :global(.sable-pronoun-pill) {
+  :global(.pronoun-pill) {
     align-items: center;
     background: color-mix(in oklab, currentcolor 10%, transparent);
     border: var(--border-width) solid color-mix(in oklab, currentcolor 20%, transparent);

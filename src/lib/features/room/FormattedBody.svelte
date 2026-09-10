@@ -368,12 +368,7 @@
   <Tooltip.Provider>
     <Tooltip.Root open>
       <Tooltip.Portal>
-        <Tooltip.Content
-          class="sable-tooltip"
-          customAnchor={definitionAnchor}
-          side="top"
-          sideOffset={8}
-        >
+        <Tooltip.Content class="tooltip" customAnchor={definitionAnchor} side="top" sideOffset={8}>
           {definition}
         </Tooltip.Content>
       </Tooltip.Portal>
@@ -400,7 +395,7 @@
   }
 
   .formatted-body :global(abbr[data-abbr-definition]:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -451,7 +446,7 @@
   }
 
   .formatted-body :global(a) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     text-decoration: var(--link-decoration);
   }
 
@@ -461,10 +456,10 @@
 
   .formatted-body :global(a[data-matrix-link]),
   .formatted-body :global(a[data-settings-link]) {
-    background: var(--sable-sec-container);
-    border: var(--border-width) solid var(--sable-sec-container-line);
+    background: var(--sec-container);
+    border: var(--border-width) solid var(--sec-container-line);
     border-radius: var(--radius);
-    color: var(--sable-sec-on-container);
+    color: var(--sec-on-container);
     display: inline-block;
     font-weight: var(--font-weight-medium);
     padding: 0 var(--space-150);
@@ -472,7 +467,7 @@
   }
 
   .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false'])) {
-    background: var(--sable-surface-var-on-container);
+    background: var(--surface-var-on-container);
     border-radius: var(--radius);
     color: transparent;
     cursor: pointer;
@@ -488,15 +483,15 @@
   }
 
   .formatted-body :global(blockquote) {
-    border-left: calc(var(--border-width) * 2) solid var(--sable-primary-main);
+    border-left: calc(var(--border-width) * 2) solid var(--primary-main);
     margin: var(--space-100) 0;
     padding-left: var(--space-200);
   }
 
   /* Inline code had no rule at all, so it read as prose. */
   .formatted-body :global(:not(pre) > code) {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radii-300);
     font-family: var(--font-family-mono);
     font-size: var(--inline-code-scale);
@@ -504,8 +499,8 @@
   }
 
   .formatted-body :global(.code-block) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     margin: var(--space-100) 0;
     overflow: hidden;
@@ -514,8 +509,8 @@
 
   .formatted-body :global(.code-head) {
     align-items: center;
-    background: var(--sable-surface-var-container);
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-var-container);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-200);
     min-height: var(--control-height-small);
@@ -523,7 +518,7 @@
   }
 
   .formatted-body :global(.code-language) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 1;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
@@ -537,7 +532,7 @@
     background: none;
     border: 0;
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     cursor: pointer;
     flex: 0 0 auto;
     font: inherit;
@@ -546,7 +541,7 @@
   }
 
   .formatted-body :global(.code-action:hover) {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   /* Only long lines scroll. A vertical scroller here would swallow the wheel
@@ -571,7 +566,7 @@
   }
 
   .formatted-body :global(.code-block[data-collapsed])::after {
-    background: linear-gradient(transparent, var(--sable-surface-container));
+    background: linear-gradient(transparent, var(--surface-container));
     bottom: 0;
     content: '';
     height: 2rem;
@@ -602,7 +597,7 @@
 
   .formatted-body :global(th),
   .formatted-body :global(td) {
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     padding: var(--space-050) var(--space-150);
     text-align: left;
   }

@@ -78,9 +78,9 @@
 
   .profile-rooms-monogram {
     align-items: center;
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     display: inline-flex;
     flex: none;
     font-size: var(--font-size-small);
@@ -98,7 +98,7 @@
   }
 
   :global(.profile-rooms-link) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     font-weight: var(--font-weight-medium);
     justify-content: flex-start;
     padding-inline: 0;

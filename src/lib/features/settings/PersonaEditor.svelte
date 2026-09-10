@@ -124,7 +124,7 @@
     <div class="identity">
       <Avatar src={avatarUrl} {name} size="large" />
       <div class="identity-actions">
-        <label class="file-button sable-button sable-button-secondary sable-button-small">
+        <label class="file-button btn btn-secondary btn-small">
           <input type="file" accept="image/*" onchange={(event) => void pickAvatar(event)} />
           {$i18n.t('personas.avatarChoose')}
         </label>
@@ -288,7 +288,7 @@
   }
 
   .field small {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
@@ -298,7 +298,7 @@
   }
 
   .triggers {
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
@@ -312,7 +312,7 @@
   }
 
   .triggers p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }

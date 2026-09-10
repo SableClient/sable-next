@@ -37,38 +37,38 @@
   }
 
   :global(.status-badge-neutral) {
-    background: var(--sable-surface-container);
-    border-color: var(--sable-surface-container-line);
-    color: var(--sable-surface-var-on-container);
+    background: var(--surface-container);
+    border-color: var(--surface-container-line);
+    color: var(--surface-var-on-container);
   }
 
   :global(.status-badge-primary) {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
+    background: var(--primary-container);
+    border-color: var(--primary-container-line);
+    color: var(--primary-on-container);
   }
 
   :global(.status-badge-secondary) {
-    background: var(--sable-sec-container);
-    border-color: var(--sable-sec-container-line);
-    color: var(--sable-sec-on-container);
+    background: var(--sec-container);
+    border-color: var(--sec-container-line);
+    color: var(--sec-on-container);
   }
 
   :global(.status-badge-success) {
-    background: var(--sable-success-container);
-    border-color: var(--sable-success-container-line);
-    color: var(--sable-success-on-container);
+    background: var(--success-container);
+    border-color: var(--success-container-line);
+    color: var(--success-on-container);
   }
 
   :global(.status-badge-warning) {
-    background: var(--sable-warn-container);
-    border-color: var(--sable-warn-container-line);
-    color: var(--sable-warn-on-container);
+    background: var(--warn-container);
+    border-color: var(--warn-container-line);
+    color: var(--warn-on-container);
   }
 
   :global(.status-badge-critical) {
-    background: var(--sable-crit-container);
-    border-color: var(--sable-crit-container-line);
-    color: var(--sable-crit-on-container);
+    background: var(--crit-container);
+    border-color: var(--crit-container-line);
+    color: var(--crit-on-container);
   }
 </style>

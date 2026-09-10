@@ -29,8 +29,8 @@
 <style>
   .banner {
     align-items: center;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     display: flex;
@@ -40,14 +40,14 @@
   }
 
   .banner-warning {
-    border-color: var(--sable-warn-container-line);
+    border-color: var(--warn-container-line);
   }
 
   .icon {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     height: var(--control-height-medium);
@@ -56,8 +56,8 @@
   }
 
   .banner-warning .icon {
-    background: var(--sable-warn-container);
-    color: var(--sable-warn-on-container);
+    background: var(--warn-container);
+    color: var(--warn-on-container);
   }
 
   .icon :global(svg) {
@@ -76,7 +76,7 @@
   }
 
   .body {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
   }

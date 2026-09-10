@@ -77,7 +77,7 @@
 {#if desktop}
   <Popover.Root bind:open>
     <Popover.Trigger
-      class="composer-board-trigger sable-open"
+      class="composer-board-trigger selection-open"
       {disabled}
       aria-label={$i18n.t('composer.emotesAndStickers')}
     >
@@ -102,7 +102,7 @@
 {:else}
   <button
     type="button"
-    class="composer-board-trigger sable-open"
+    class="composer-board-trigger selection-open"
     {disabled}
     data-state={open ? 'open' : 'closed'}
     aria-label={$i18n.t('composer.emotesAndStickers')}
@@ -137,7 +137,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
     flex: 0 0 auto;
@@ -155,11 +155,11 @@
   }
 
   :global(.composer-board-trigger:hover) {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   :global(.composer-board-trigger:disabled) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: default;
   }
 
@@ -169,11 +169,11 @@
   }
 
   :global(.composer-board) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     overflow: hidden;
     z-index: var(--layer-popover);
   }

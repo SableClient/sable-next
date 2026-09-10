@@ -115,12 +115,12 @@
   .eyebrow,
   .user-id,
   .intro {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-size: var(--font-size-small);
   }
 
   .user-id {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius);
     overflow-wrap: anywhere;
     padding: var(--space-250) var(--space-300);
@@ -133,7 +133,7 @@
     grid-template-columns: auto 1fr;
   }
 
-  :global(.sable-avatar.avatar-preview) {
+  :global(.avatar-root.avatar-preview) {
     transition:
       background-color var(--motion-normal) ease,
       transform var(--motion-normal) ease;
@@ -146,23 +146,23 @@
     }
   }
 
-  :global(.sable-avatar.avatar-preview img) {
+  :global(.avatar-root.avatar-preview img) {
     animation: avatar-in var(--motion-normal) ease both;
   }
 
   .more-options {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     padding-top: var(--space-300);
   }
 
   .more-options summary {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: pointer;
     font-size: var(--font-size-small);
   }
 
   .placeholder-list {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     display: grid;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -182,14 +182,14 @@
   }
 
   .placeholder-list span {
-    border: var(--border-width) dashed var(--sable-surface-container-line);
+    border: var(--border-width) dashed var(--surface-container-line);
     border-radius: var(--radius);
     padding: var(--space-250) var(--space-200);
     text-align: center;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(.sable-avatar.avatar-preview),
+    :global(.avatar-root.avatar-preview),
     .more-options[open] .placeholder-list {
       animation: none;
       transition: none;

@@ -1,4 +1,4 @@
-.sable-button {
+.btn {
   --button-height: var(--control-height-400);
   --button-gap: var(--space-200);
   --button-padding-inline: var(--control-padding-400);
@@ -23,116 +23,116 @@
   text-decoration: none;
 }
 
-.sable-button > svg {
+.btn > svg {
   flex: 0 0 auto;
   height: var(--button-icon-size);
   width: var(--button-icon-size);
 }
 
-.sable-button-block {
+.btn-block {
   width: 100%;
 }
 
-.sable-button-primary {
-  --button-container: var(--sable-primary-container);
-  --button-container-hover: var(--sable-primary-container-hover);
-  --button-container-active: var(--sable-primary-container-active);
-  --button-line: var(--sable-primary-container-line);
-  --button-on-container: var(--sable-primary-on-container);
+.btn-primary {
+  --button-container: var(--primary-container);
+  --button-container-hover: var(--primary-container-hover);
+  --button-container-active: var(--primary-container-active);
+  --button-line: var(--primary-container-line);
+  --button-on-container: var(--primary-on-container);
 }
 
-.sable-button-secondary {
-  --button-container: var(--sable-sec-container);
-  --button-container-hover: var(--sable-sec-container-hover);
-  --button-container-active: var(--sable-sec-container-active);
-  --button-line: var(--sable-sec-container-line);
-  --button-on-container: var(--sable-sec-on-container);
+.btn-secondary {
+  --button-container: var(--sec-container);
+  --button-container-hover: var(--sec-container-hover);
+  --button-container-active: var(--sec-container-active);
+  --button-line: var(--sec-container-line);
+  --button-on-container: var(--sec-on-container);
 }
 
-.sable-button-ghost {
-  --button-container: var(--sable-surface-container);
-  --button-container-hover: var(--sable-surface-container-hover);
-  --button-container-active: var(--sable-surface-container-active);
-  --button-line: var(--sable-surface-container-line);
-  --button-on-container: var(--sable-bg-on-container);
+.btn-ghost {
+  --button-container: var(--surface-container);
+  --button-container-hover: var(--surface-container-hover);
+  --button-container-active: var(--surface-container-active);
+  --button-line: var(--surface-container-line);
+  --button-on-container: var(--bg-on-container);
 }
 
-.sable-button-danger {
-  --button-container: var(--sable-crit-container);
-  --button-container-hover: var(--sable-crit-container-hover);
-  --button-container-active: var(--sable-crit-container-active);
-  --button-line: var(--sable-crit-container-line);
-  --button-on-container: var(--sable-crit-on-container);
+.btn-danger {
+  --button-container: var(--crit-container);
+  --button-container-hover: var(--crit-container-hover);
+  --button-container-active: var(--crit-container-active);
+  --button-line: var(--crit-container-line);
+  --button-on-container: var(--crit-on-container);
 }
 
-.sable-button-small {
+.btn-small {
   --button-height: var(--control-height-300);
   --button-gap: var(--space-100);
   --button-padding-inline: var(--control-padding-300);
 }
 
-.sable-button-large {
+.btn-large {
   --button-height: var(--control-height-500);
   --button-gap: var(--space-300);
   --button-padding-inline: var(--control-padding-500);
   --button-icon-size: var(--size-x400);
 }
 
-.sable-button-icon {
+.btn-icon {
   --button-padding-inline: 0;
 
   width: var(--button-height);
 }
 
-.sable-button-loading {
+.btn-loading {
   cursor: wait;
 }
 
-.sable-button:focus-visible {
-  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+.btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
 
-.sable-button:disabled,
-.sable-button[aria-disabled='true'] {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: var(--opacity-disabled);
 }
 
-.sable-button[aria-disabled='true'] {
+.btn[aria-disabled='true'] {
   pointer-events: none;
 }
 
-.sable-button:hover:not(:disabled, [aria-disabled='true']),
-.sable-button:focus-visible:not(:disabled, [aria-disabled='true']) {
+.btn:hover:not(:disabled, [aria-disabled='true']),
+.btn:focus-visible:not(:disabled, [aria-disabled='true']) {
   background: var(--button-container-hover);
 }
 
-.sable-button:active:not(:disabled, [aria-disabled='true']) {
+.btn:active:not(:disabled, [aria-disabled='true']) {
   background: var(--button-container-active);
 }
 
-.sable-icon-button {
+.icon-button {
   --button-icon-size: var(--size-x400);
   --button-padding-inline: 0;
 
   width: var(--button-height);
 }
 
-.sable-icon-button-small {
+.icon-button-small {
   --button-height: var(--control-height-300);
   --button-icon-size: var(--size-x200);
 }
 
-.sable-icon-button-large {
+.icon-button-large {
   --button-height: var(--control-height-500);
   --button-icon-size: var(--size-x500);
 }
 
-.sable-icon-button.sable-button-ghost {
+.icon-button.btn-ghost {
   --button-container: transparent;
-  --button-container-hover: var(--sable-bg-container-hover);
-  --button-container-active: var(--sable-bg-container-active);
+  --button-container-hover: var(--bg-container-hover);
+  --button-container-active: var(--bg-container-active);
   --button-line: transparent;
   --button-on-container: inherit;
 }

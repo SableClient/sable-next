@@ -91,7 +91,7 @@
 <style>
   h2 {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
@@ -102,9 +102,9 @@
   }
 
   .count {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-main);
+    color: var(--primary-on-main);
     font-variant-numeric: tabular-nums;
     letter-spacing: normal;
     min-width: 1.25rem;
@@ -121,8 +121,8 @@
   }
 
   .card {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-400);
@@ -163,7 +163,7 @@
   }
 
   .lock {
-    color: var(--sable-success-main);
+    color: var(--success-main);
     display: flex;
     flex: 0 0 auto;
   }
@@ -175,7 +175,7 @@
 
   .meta {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex-wrap: wrap;
     font-size: var(--font-size-small);
@@ -196,7 +196,7 @@
 
   .topic {
     -webkit-box-orient: vertical;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: -webkit-box;
     -webkit-line-clamp: 3;
     line-clamp: 3;
@@ -210,7 +210,7 @@
     gap: var(--space-300);
   }
 
-  .actions :global(.sable-button) {
+  .actions :global(.btn) {
     flex: 1;
   }
 
@@ -219,7 +219,7 @@
       justify-content: flex-end;
     }
 
-    .actions :global(.sable-button) {
+    .actions :global(.btn) {
       flex: 0 0 auto;
       min-width: 7rem;
     }

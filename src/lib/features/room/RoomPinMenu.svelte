@@ -188,7 +188,7 @@
     {#snippet child({ props })}
       <IconButton
         {...props}
-        class="pin-button sable-open"
+        class="pin-button selection-open"
         variant="ghost"
         size="small"
         label={$i18n.t('room.pinsTitle')}
@@ -201,7 +201,7 @@
     {/snippet}
   </Popover.Trigger>
 
-  <Popover.Content class="sable-menu pin-menu" side="bottom" align="center" sideOffset={4}>
+  <Popover.Content class="menu-surface pin-menu" side="bottom" align="center" sideOffset={4}>
     <IconContext values={{ 'aria-hidden': 'true' }}>
       <header class="pin-header">
         <h2>{$i18n.t('room.pinsTitle')}</h2>
@@ -230,7 +230,7 @@
           {#each ordered as entry (entry.eventId)}
             <li class="pin-item" class:fresh={isNewPin(pinnedIds, marker, entry.eventId)}>
               <button
-                class="pin-open sable-selection-layer"
+                class="pin-open selection-layer"
                 type="button"
                 onclick={() => {
                   jump(entry.eventId);
@@ -272,7 +272,7 @@
 </Popover.Root>
 
 <style>
-  :global(.sable-menu.pin-menu) {
+  :global(.menu-surface.pin-menu) {
     --menu-min-width: 20rem;
     --menu-max-height: min(28rem, 70dvh);
 
@@ -285,9 +285,9 @@
   }
 
   .pin-badge {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-main);
+    color: var(--primary-on-main);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     left: 0;
@@ -329,7 +329,7 @@
   }
 
   .pin-empty :global(svg) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     height: var(--icon-size-large);
     width: var(--icon-size-large);
   }
@@ -340,7 +340,7 @@
   }
 
   .pin-empty-hint {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -362,8 +362,8 @@
   }
 
   .pin-item.fresh {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+    background: var(--primary-container);
+    color: var(--primary-on-container);
   }
 
   .pin-open {
@@ -403,7 +403,7 @@
   }
 
   .pin-time {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
   }

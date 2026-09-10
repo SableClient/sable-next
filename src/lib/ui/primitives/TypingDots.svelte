@@ -6,32 +6,32 @@
   let { class: className = '' }: Props = $props();
 </script>
 
-<span class={['sable-typing-dots', className]} aria-hidden="true"><i></i><i></i><i></i></span>
+<span class={['typing-dots', className]} aria-hidden="true"><i></i><i></i><i></i></span>
 
 <style>
-  :global(.sable-typing-dots) {
+  :global(.typing-dots) {
     display: inline-flex;
     flex: 0 0 auto;
     gap: var(--space-050);
   }
 
-  :global(.sable-typing-dots i) {
-    background: var(--sable-primary-main);
+  :global(.typing-dots i) {
+    background: var(--primary-main);
     border-radius: var(--radii-round);
     height: 0.25rem;
     width: 0.25rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.sable-typing-dots i) {
+    :global(.typing-dots i) {
       animation: typing-dot 1.2s infinite ease-in-out;
     }
 
-    :global(.sable-typing-dots i:nth-child(2)) {
+    :global(.typing-dots i:nth-child(2)) {
       animation-delay: 0.15s;
     }
 
-    :global(.sable-typing-dots i:nth-child(3)) {
+    :global(.typing-dots i:nth-child(3)) {
       animation-delay: 0.3s;
     }
   }

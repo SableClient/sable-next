@@ -9,27 +9,27 @@
   let { value, label }: Props = $props();
 </script>
 
-<Progress.Root class="sable-progress" {value} aria-label={label} aria-valuetext={label}>
-  <span class="sable-progress-fill" style="inline-size: {value}%"></span>
+<Progress.Root class="progress-track" {value} aria-label={label} aria-valuetext={label}>
+  <span class="progress-fill" style="inline-size: {value}%"></span>
 </Progress.Root>
 
 <style>
-  :global(.sable-progress) {
-    background: var(--sable-primary-container);
+  :global(.progress-track) {
+    background: var(--primary-container);
     block-size: var(--space-300);
     border-radius: var(--radii-pill);
     display: flex;
     overflow: hidden;
   }
 
-  :global(.sable-progress-fill) {
-    background: var(--sable-primary-main);
+  :global(.progress-fill) {
+    background: var(--primary-main);
     block-size: 100%;
     display: inline-block;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.sable-progress-fill) {
+    :global(.progress-fill) {
       transition: inline-size var(--motion-normal) var(--motion-easing-standard);
     }
   }

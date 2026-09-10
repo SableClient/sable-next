@@ -70,9 +70,7 @@
         <strong>Chosen value</strong>
         <span>Persistent choice, such as a tab, filter, or toggle.</span>
       </div>
-      <button class="state-sample sable-choice" type="button" aria-pressed={true}>
-        Selected
-      </button>
+      <button class="state-sample choice" type="button" aria-pressed={true}> Selected </button>
     </section>
 
     <section class="state-card">
@@ -80,7 +78,7 @@
         <strong>Current location</strong>
         <span>Where navigation is currently positioned.</span>
       </div>
-      <a class="state-sample sable-current" href="#selection-state-matrix" aria-current="page">
+      <a class="state-sample selection-current" href="#selection-state-matrix" aria-current="page">
         Current page
       </a>
     </section>
@@ -90,7 +88,12 @@
         <strong>Open</strong>
         <span>A menu, popover, or disclosure is currently open.</span>
       </div>
-      <button class="state-sample sable-open" type="button" data-state="open" aria-expanded={true}>
+      <button
+        class="state-sample selection-open"
+        type="button"
+        data-state="open"
+        aria-expanded={true}
+      >
         Open menu
       </button>
     </section>
@@ -100,7 +103,7 @@
         <strong>Keyboard highlight</strong>
         <span>The next item to activate; it is not committed yet.</span>
       </div>
-      <button class="state-sample sable-highlight" type="button" data-highlighted={true}>
+      <button class="state-sample selection-highlight" type="button" data-highlighted={true}>
         Highlighted option
       </button>
     </section>
@@ -122,8 +125,8 @@
 
   .state-card {
     align-items: center;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radii-400);
     display: grid;
     gap: var(--space-300);
@@ -137,7 +140,7 @@
   }
 
   .state-card span {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 

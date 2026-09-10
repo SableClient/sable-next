@@ -43,7 +43,7 @@
 
 <Avatar.Root
   bind:loadingStatus
-  class={['sable-avatar', `sable-avatar-${size}`, className]}
+  class={['avatar-root', `avatar-${size}`, className]}
   style={background ? `background: ${background}` : undefined}
   aria-hidden={decorative ? 'true' : undefined}
   role={decorative ? undefined : 'img'}
@@ -51,7 +51,7 @@
 >
   {#if isMxc && src}
     <MediaImage
-      class="sable-avatar-image"
+      class="avatar-image"
       source={src}
       alt=""
       width={96}
@@ -60,21 +60,21 @@
       onfailed={() => (loadingStatus = 'error')}
     />
   {:else if src}
-    <Avatar.Image {src} alt="" class="sable-avatar-image" />
+    <Avatar.Image {src} alt="" class="avatar-image" />
   {/if}
-  <Avatar.Fallback class="sable-avatar-fallback">
+  <Avatar.Fallback class="avatar-fallback">
     {#if children}{@render children()}{:else}{fallback}{/if}
   </Avatar.Fallback>
 </Avatar.Root>
 
 <style>
-  :global(.sable-avatar) {
+  :global(.avatar-root) {
     --avatar-size: var(--avatar-size-400);
 
     align-items: center;
     background: transparent;
     border-radius: var(--radii-400);
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     display: inline-flex;
     flex: 0 0 var(--avatar-size);
     font-size: var(--font-size-heading);
@@ -88,20 +88,20 @@
     width: var(--avatar-size);
   }
 
-  :global(.sable-avatar-small) {
+  :global(.avatar-small) {
     --avatar-size: var(--avatar-size-300);
 
     font-size: var(--font-size-small);
   }
 
-  :global(.sable-avatar-large) {
+  :global(.avatar-large) {
     --avatar-size: var(--avatar-size-500);
 
     font-size: var(--font-size-display);
   }
 
-  :global(.sable-avatar-image),
-  :global(.sable-avatar-fallback) {
+  :global(.avatar-image),
+  :global(.avatar-fallback) {
     border-radius: inherit;
     height: 100%;
     inset: 0;
@@ -109,12 +109,12 @@
     width: 100%;
   }
 
-  :global(.sable-avatar-image) {
+  :global(.avatar-image) {
     object-fit: cover;
     object-position: center;
   }
 
-  :global(.sable-avatar-fallback) {
+  :global(.avatar-fallback) {
     align-items: center;
     display: flex;
     justify-content: center;

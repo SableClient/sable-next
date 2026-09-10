@@ -42,7 +42,7 @@
 <style>
   .forum-header {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-300);

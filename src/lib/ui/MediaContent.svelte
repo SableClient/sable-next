@@ -216,7 +216,7 @@
   }
 
   .media-frame-video {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -235,7 +235,7 @@
   /* Fallback for a dimensionless event; the timeline estimator assumes it. */
   .media-video {
     aspect-ratio: 16 / 9;
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius);
     height: 100%;
     margin-top: 0;
@@ -245,7 +245,7 @@
 
   .media-file {
     align-items: center;
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     display: inline-flex;
     gap: var(--space-100);
     margin-top: var(--space-100);
@@ -253,9 +253,9 @@
   }
 
   .media-file-ext {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     flex: none;
     font-size: var(--font-size-small);
     padding: var(--space-050) var(--space-100);
@@ -267,13 +267,13 @@
   }
 
   .media-file-size {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);
   }
 
   .media-error {
-    color: var(--sable-crit-on-container);
+    color: var(--crit-on-container);
     display: inline-block;
     margin-top: var(--space-100);
   }

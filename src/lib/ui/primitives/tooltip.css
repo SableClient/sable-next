@@ -1,11 +1,11 @@
-.sable-tooltip {
+.tooltip {
   animation: tooltip-in var(--motion-fast) var(--motion-easing-emphasized) both;
-  background: var(--sable-surface-container);
-  border: var(--border-width) solid var(--sable-surface-container-line);
+  background: var(--surface-container);
+  border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radii-400);
   box-shadow: var(--shadow-e200);
   box-sizing: border-box;
-  color: var(--sable-surface-on-container);
+  color: var(--surface-on-container);
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
   max-width: min(15rem, calc(100vw - 2rem));
@@ -23,7 +23,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sable-tooltip {
+  .tooltip {
     animation: none;
   }
 }

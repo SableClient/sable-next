@@ -38,7 +38,7 @@
   const mainSteps = ['main', 'main-hover', 'main-active', 'main-line'];
   const swatches = (family: string, steps: string[]) => ({
     family,
-    steps: steps.map((step) => ({ step, token: `--sable-${family}-${step}` })),
+    steps: steps.map((step) => ({ step, token: `--${family}-${step}` })),
   });
 
   const families = [
@@ -52,13 +52,13 @@
     'crit',
   ].map((family) => ({
     ...swatches(family, containerSteps),
-    base: `--sable-${family}-container`,
-    on: `--sable-${family}-on-container`,
+    base: `--${family}-container`,
+    on: `--${family}-on-container`,
   }));
   const mainFamilies = ['primary', 'sec', 'success', 'warn', 'crit'].map((family) => ({
     ...swatches(family, mainSteps),
-    base: `--sable-${family}-main`,
-    on: `--sable-${family}-on-main`,
+    base: `--${family}-main`,
+    on: `--${family}-on-main`,
   }));
 </script>
 
@@ -205,27 +205,27 @@
   }
 
   .bar {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     display: block;
     height: var(--space-300);
   }
 
   .rule {
-    border-bottom-color: var(--sable-bg-container-line);
+    border-bottom-color: var(--bg-container-line);
     border-bottom-style: solid;
     display: block;
   }
 
   .tile {
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     display: block;
     height: var(--size-x600);
-    outline: var(--border-width) solid var(--sable-primary-container-line);
+    outline: var(--border-width) solid var(--primary-container-line);
     width: var(--size-x600);
   }
 
   .card {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radii-400);
     display: block;
     height: var(--space-700);
@@ -237,7 +237,7 @@
   }
 
   .specimen code {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     display: inline-block;
     font-size: var(--font-size-small);
     width: 4rem;
@@ -258,7 +258,7 @@
     border-radius: var(--radii-300);
     display: grid;
     height: var(--size-x600);
-    outline: var(--border-width) solid var(--sable-bg-container-line);
+    outline: var(--border-width) solid var(--bg-container-line);
     place-items: center;
     width: 4rem;
   }

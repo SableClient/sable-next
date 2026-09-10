@@ -127,7 +127,7 @@
   }
 
   .explain {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: 1.45;
     margin: 0;

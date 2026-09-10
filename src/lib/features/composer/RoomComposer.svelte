@@ -878,7 +878,7 @@
                 <IconButton
                   variant="ghost"
                   size="small"
-                  class="composer-format sable-open"
+                  class="composer-format selection-open"
                   aria-pressed={formattingOpen}
                   data-state={formattingOpen ? 'open' : 'closed'}
                   label={$i18n.t('composer.formatting')}
@@ -1019,7 +1019,7 @@
 
   .composer {
     /* The panel behind is surface-container, so the fill has to be the variant. */
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border: var(--border-width) solid transparent;
     border-radius: var(--radius);
     display: flex;
@@ -1031,13 +1031,13 @@
 
   /* The text entry only: `:focus-within` ringed the bar for every button too. */
   .composer:has(:global([contenteditable='true']):focus) {
-    border-color: var(--sable-primary-main);
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+    border-color: var(--primary-main);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 
   .drop-overlay {
     align-items: center;
-    background: var(--sable-overlay);
+    background: var(--overlay);
     display: flex;
     inset: 0;
     justify-content: center;
@@ -1049,11 +1049,11 @@
 
   .drop-card {
     align-items: center;
-    background: var(--sable-bg-container);
-    border: var(--border-width) dashed var(--sable-primary-main);
+    background: var(--bg-container);
+    border: var(--border-width) dashed var(--primary-main);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     display: flex;
     flex-direction: column;
     gap: var(--space-200);
@@ -1110,7 +1110,7 @@
 
   .locked {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     grid-column: 1 / -1;
     justify-content: center;
@@ -1160,7 +1160,7 @@
 
   :global(.composer-format) {
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     height: var(--target);
     min-height: var(--target);
@@ -1183,7 +1183,7 @@
 
   :global(.composer-send) {
     border-radius: var(--radius);
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     height: var(--target);
     min-height: var(--target);
     position: relative;
@@ -1198,12 +1198,12 @@
   }
 
   :global(.composer-send:disabled) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
   }
 
   :global(.composer-send:not(:disabled):hover),
   :global(.composer-send:not(:disabled):focus-visible) {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   :global(.composer-send svg) {

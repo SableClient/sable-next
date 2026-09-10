@@ -10,11 +10,11 @@
   let { class: className = '' }: Props = $props();
 </script>
 
-<img class={['sable-brand-mark', className]} src={logo} alt="" />
+<img class={['brand-mark', className]} src={logo} alt="" />
 
 <style>
-  .sable-brand-mark {
-    filter: drop-shadow(0 0.375rem 0.625rem var(--sable-shadow));
+  .brand-mark {
+    filter: drop-shadow(0 0.375rem 0.625rem var(--shadow-color));
     height: 4rem;
     width: 4rem;
   }

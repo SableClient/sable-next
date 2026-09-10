@@ -95,7 +95,7 @@
   }
 
   :global(.read-receipts-popover) {
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     display: flex;

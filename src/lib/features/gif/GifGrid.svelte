@@ -84,7 +84,7 @@
           </button>
           <button
             type="button"
-            class="gif-star sable-choice"
+            class="gif-star choice"
             aria-pressed={kept}
             aria-label={kept ? $i18n.t('composer.gifUnfavorite') : $i18n.t('composer.gifFavorite')}
             onclick={(event) => {
@@ -135,7 +135,7 @@
   }
 
   .gif-cell {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border: 0;
     border-radius: var(--radius);
     cursor: pointer;
@@ -155,15 +155,15 @@
 
   .gif-cell:hover,
   .gif-cell:focus-visible {
-    outline: var(--border-width) solid var(--sable-primary-main);
+    outline: var(--border-width) solid var(--primary-main);
   }
 
   .gif-star {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
     justify-content: center;
@@ -179,14 +179,14 @@
   }
 
   .gif-attribution {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-300) 0 0;
   }
 
   .gif-note {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 1;
     font-size: var(--font-size-small);

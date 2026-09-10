@@ -62,9 +62,9 @@
 
   .settings-section-icon {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     height: var(--control-height-medium);
@@ -84,7 +84,7 @@
   }
 
   p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
   }
@@ -94,7 +94,7 @@
   }
 
   .settings-section-content {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius);
   }
 

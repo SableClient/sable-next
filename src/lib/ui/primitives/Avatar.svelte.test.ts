@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 function root(): HTMLElement | null {
-  return document.querySelector('.sable-avatar');
+  return document.querySelector('.avatar-root');
 }
 
 test('paints the colour behind the initials when there is no picture', () => {
@@ -27,7 +27,7 @@ test('paints the colour behind the initials when there is no picture', () => {
   });
 
   expect(root()?.style.background).toBe('rgb(1, 2, 3)');
-  expect(document.querySelector('.sable-avatar-fallback')).not.toBeNull();
+  expect(document.querySelector('.avatar-fallback')).not.toBeNull();
 });
 
 test('leaves a picture on a transparent box, so a transparent png keeps its own shape', () => {
@@ -37,7 +37,7 @@ test('leaves a picture on a transparent box, so a transparent png keeps its own 
   });
 
   expect(root()?.style.background).toBe('');
-  const fallback = document.querySelector<HTMLElement>('.sable-avatar-fallback');
+  const fallback = document.querySelector<HTMLElement>('.avatar-fallback');
   expect(fallback?.dataset.status).toBe('loaded');
   expect(fallback?.style.display).toBe('none');
 });
@@ -49,12 +49,12 @@ test('removes the old picture when its reactive source is cleared', async () => 
   });
   const instance = mount(Avatar, { target: document.body, props });
 
-  expect(document.querySelector('.sable-avatar-image')).not.toBeNull();
+  expect(document.querySelector('.avatar-image')).not.toBeNull();
 
   props.src = null;
   await tick();
 
-  expect(document.querySelector('.sable-avatar-image')).toBeNull();
-  expect(document.querySelector('.sable-avatar-fallback')).not.toBeNull();
+  expect(document.querySelector('.avatar-image')).toBeNull();
+  expect(document.querySelector('.avatar-fallback')).not.toBeNull();
   await unmount(instance);
 });

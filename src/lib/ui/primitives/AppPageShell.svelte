@@ -64,7 +64,7 @@
   }
 
   .app-page-header p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: var(--space-200) 0 0;
     max-width: 65ch;
   }
@@ -74,7 +74,7 @@
   }
 
   .app-page-eyebrow {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;

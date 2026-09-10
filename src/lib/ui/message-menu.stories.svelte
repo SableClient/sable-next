@@ -28,7 +28,7 @@
 </script>
 
 <Story name="Desktop context menu" asChild>
-  <div class="sable-menu demo">
+  <div class="menu-surface demo">
     <IconContext values={decorative}>
       <MessageQuickReactions count={4} onReact={noop} />
       {#each rows as row (row.key)}
@@ -36,10 +36,7 @@
         {#if row.separated}<div class="line"></div>{/if}
         <button
           type="button"
-          class={[
-            'sable-menu-item sable-menu-item-trailing-icon',
-            row.destructive && 'sable-menu-item-destructive',
-          ]}
+          class={['menu-item menu-item-trailing-icon', row.destructive && 'menu-item-destructive']}
         >
           <RowIcon />
           <span>{row.label.replace('timeline.', '')}</span>
@@ -62,8 +59,8 @@
           <button
             type="button"
             class={[
-              'sable-menu-item sable-menu-item-trailing-icon',
-              row.destructive && 'sable-menu-item-destructive',
+              'menu-item menu-item-trailing-icon',
+              row.destructive && 'menu-item-destructive',
             ]}
           >
             <RowIcon />
@@ -86,7 +83,7 @@
     display: grid;
   }
 
-  .sheet-list :global(.sable-menu-item) {
+  .sheet-list :global(.menu-item) {
     --menu-item-height: var(--control-height-400);
     --menu-item-padding: var(--space-400);
     --menu-item-radius: var(--radii-300);
@@ -95,7 +92,7 @@
   }
 
   .preview {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0 0 var(--space-200);
     overflow: hidden;
@@ -105,7 +102,7 @@
   }
 
   .line {
-    background: var(--sable-surface-container-line);
+    background: var(--surface-container-line);
     block-size: var(--border-width);
   }
 </style>

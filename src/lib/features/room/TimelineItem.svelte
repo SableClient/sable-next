@@ -508,7 +508,7 @@
         {#if !collapsed}<Skeleton class="compact-name placeholder-name" />{/if}
       </div>
     {:else if !collapsed}
-      <Skeleton class="sable-avatar sable-avatar-small message-avatar placeholder-avatar" />
+      <Skeleton class="avatar-root avatar-small message-avatar placeholder-avatar" />
     {/if}
     <div class="message-content">
       {#if !collapsed && layout !== 'compact'}
@@ -531,7 +531,7 @@
     bind:this={messageRow}
     class={[
       'message',
-      'sable-choice',
+      'choice',
       `layout-${layout}`,
       {
         collapsed,
@@ -901,8 +901,8 @@
     pointer-events: none;
   }
 
-  .placeholder-message :global(.sable-skeleton) {
-    background: color-mix(in srgb, var(--sable-bg-on-container) 18%, var(--sable-bg-container));
+  .placeholder-message :global(.skeleton) {
+    background: color-mix(in srgb, var(--bg-on-container) 18%, var(--bg-container));
   }
 
   .placeholder-body {
@@ -910,7 +910,7 @@
   }
 
   .placeholder-copy {
-    background: color-mix(in srgb, var(--sable-bg-on-container) 18%, var(--sable-bg-container));
+    background: color-mix(in srgb, var(--bg-on-container) 18%, var(--bg-container));
     border-radius: var(--radius);
     box-decoration-break: clone;
     color: transparent;
@@ -920,21 +920,21 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .placeholder-copy {
-      animation: sable-skeleton-pulse 1.8s ease-in-out infinite;
+      animation: skeleton-pulse 1.8s ease-in-out infinite;
     }
   }
 
-  :global(.sable-skeleton.placeholder-avatar) {
-    background: color-mix(in srgb, var(--sable-bg-on-container) 24%, var(--sable-bg-container));
+  :global(.skeleton.placeholder-avatar) {
+    background: color-mix(in srgb, var(--bg-on-container) 24%, var(--bg-container));
     border-radius: var(--radii-400);
   }
 
-  :global(.sable-skeleton.placeholder-name) {
+  :global(.skeleton.placeholder-name) {
     height: var(--font-size-body);
     width: 6.5rem;
   }
 
-  :global(.sable-skeleton.placeholder-time) {
+  :global(.skeleton.placeholder-time) {
     height: var(--font-size-small);
     width: 3rem;
   }
@@ -943,7 +943,7 @@
     align-items: center;
     background: none;
     border: none;
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     cursor: pointer;
     display: flex;
     font: inherit;
@@ -965,7 +965,7 @@
   }
 
   .thread-latest {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -989,7 +989,7 @@
   .swipe-action {
     align-items: center;
     bottom: 0;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     display: flex;
     justify-content: center;
     overflow: hidden;
@@ -1000,7 +1000,7 @@
   }
 
   .swipe-action.armed {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
   }
 
   .message:focus-within :global(.message-actions) {
@@ -1018,25 +1018,25 @@
   /* The leading border carries the signal, so the fill stays quiet enough to
      read a long message on. */
   .message.mention-silent {
-    background: color-mix(in oklab, var(--sable-sec-container) 10%, transparent);
-    border-inline-start-color: var(--sable-sec-main);
+    background: color-mix(in oklab, var(--sec-container) 10%, transparent);
+    border-inline-start-color: var(--sec-main);
   }
 
   .message.mention-loud {
-    background: color-mix(in oklab, var(--sable-warn-container) 16%, transparent);
-    border-inline-start-color: var(--sable-warn-main);
+    background: color-mix(in oklab, var(--warn-container) 16%, transparent);
+    border-inline-start-color: var(--warn-main);
   }
 
   /* The sheet pairs multi-select with keyboard focus; focus is the half that
      exists today, and it survives on touch where hover does not. */
   .message[data-selected='true'] {
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     border-radius: var(--radius);
-    box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-container-line);
+    box-shadow: inset 0 0 0 var(--border-width) var(--primary-container-line);
   }
 
   .message:has(:focus-visible):not([data-selected='true']) {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
     border-radius: var(--radius);
   }
 
@@ -1083,11 +1083,11 @@
 
   @keyframes jump {
     0% {
-      background-color: var(--sable-primary-container);
+      background-color: var(--primary-container);
     }
 
     16% {
-      background-color: var(--sable-primary-container-active);
+      background-color: var(--primary-container-active);
     }
 
     33%,
@@ -1104,7 +1104,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .message.highlighted {
-      background-color: var(--sable-primary-container);
+      background-color: var(--primary-container);
     }
   }
 
@@ -1135,7 +1135,7 @@
     }
 
     .message:hover {
-      background-color: var(--sable-surface-container-hover);
+      background-color: var(--surface-container-hover);
     }
 
     .message:hover :global(.message-actions) {
@@ -1151,8 +1151,8 @@
 
   /* Only the hashed sender colours are `-main` fills; an own or persona avatar
      keeps Avatar's own container pair, whose ink this would wash out. */
-  .message:not(.own, .persona) :global(.sable-avatar.message-avatar) {
-    color: var(--sable-primary-on-main);
+  .message:not(.own, .persona) :global(.avatar-root.message-avatar) {
+    color: var(--primary-on-main);
   }
 
   .message-content {
@@ -1198,21 +1198,20 @@
   }
 
   .persona {
-    --pmp-ink: var(--pmp-on-light, var(--sable-sec-on-container));
+    --pmp-ink: var(--pmp-on-light, var(--sec-on-container));
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) .persona,
     :root.dark .persona {
-      --pmp-ink: var(--pmp-on-dark, var(--sable-sec-on-container));
+      --pmp-ink: var(--pmp-on-dark, var(--sec-on-container));
     }
   }
 
   @supports (color: oklch(from red l c h)) {
     .persona {
       --pmp-ink: oklch(
-        from var(--pmp-on-light, var(--sable-sec-on-container)) clamp(0.25, l, 0.52)
-          clamp(0, c, 0.19) h
+        from var(--pmp-on-light, var(--sec-on-container)) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h
       );
     }
 
@@ -1220,22 +1219,20 @@
       :root:not(.light) .persona,
       :root.dark .persona {
         --pmp-ink: oklch(
-          from var(--pmp-on-dark, var(--sable-sec-on-container)) clamp(0.72, l, 0.92)
-            clamp(0, c, 0.16) h
+          from var(--pmp-on-dark, var(--sec-on-container)) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
         );
       }
     }
   }
 
   :root.dark .persona {
-    --pmp-ink: var(--pmp-on-dark, var(--sable-sec-on-container));
+    --pmp-ink: var(--pmp-on-dark, var(--sec-on-container));
   }
 
   @supports (color: oklch(from red l c h)) {
     :root.dark .persona {
       --pmp-ink: oklch(
-        from var(--pmp-on-dark, var(--sable-sec-on-container)) clamp(0.72, l, 0.92)
-          clamp(0, c, 0.16) h
+        from var(--pmp-on-dark, var(--sec-on-container)) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
       );
     }
   }
@@ -1244,8 +1241,8 @@
     color: var(--pmp-ink);
   }
 
-  .message.persona :global(.message-avatar .sable-avatar-fallback) {
-    background: color-mix(in oklab, var(--pmp-ink) 18%, var(--sable-surface-var-container));
+  .message.persona :global(.message-avatar .avatar-fallback) {
+    background: color-mix(in oklab, var(--pmp-ink) 18%, var(--surface-var-container));
   }
 
   .via {
@@ -1272,11 +1269,11 @@
   }
 
   .via:hover {
-    background: var(--sable-surface-var-container-hover);
+    background: var(--surface-var-container-hover);
   }
 
   .emote {
-    color: var(--sable-success-main);
+    color: var(--success-main);
     font-style: italic;
     line-height: var(--line-height-body);
   }
@@ -1299,7 +1296,7 @@
 
   time,
   .edited {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   .message-details time {
@@ -1313,12 +1310,12 @@
 
   /* `m.notice` is usually a bot, and reads as an aside. */
   .notice {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   .send-failure {
     align-items: baseline;
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -1346,12 +1343,12 @@
 
   .send-failure button:focus-visible {
     border-radius: var(--radii-200);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 0.15rem;
   }
 
   .upload {
-    accent-color: var(--sable-primary-main);
+    accent-color: var(--primary-main);
     display: block;
     height: 0.25rem;
     margin-top: var(--space-100);
@@ -1363,7 +1360,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: grid;
     font: inherit;
@@ -1379,11 +1376,11 @@
   }
 
   .reply-preview:hover {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
   }
 
   .reply-preview :global(.reply-icon) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
@@ -1395,7 +1392,7 @@
   }
 
   .reply-preview strong {
-    color: var(--sable-sec-on-container);
+    color: var(--sec-on-container);
   }
 
   .reply-preview.persona strong {
@@ -1406,12 +1403,12 @@
 
   :global(.reaction-tooltip) {
     animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     box-sizing: border-box;
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
     max-width: min(15rem, calc(100vw - 2rem));
@@ -1445,14 +1442,14 @@
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {
-    background: var(--sable-warn-container-active);
-    border-color: var(--sable-warn-container-line);
-    color: var(--sable-warn-on-container);
+    background: var(--warn-container-active);
+    border-color: var(--warn-container-line);
+    color: var(--warn-on-container);
   }
 
   .message[data-selected='true'] .body,
   .message[data-selected='true'] time {
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
   }
 
   /* Layout modes stay in one block at the end: each overrides a base rule
@@ -1478,7 +1475,7 @@
   }
 
   .message.layout-compact .compact-gutter time {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
@@ -1492,10 +1489,10 @@
 
   .message.layout-bubble .content-bubble,
   .message.layout-bubble :global(.formatted-body) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     max-width: 50rem;
     padding: var(--space-200) var(--space-300);
   }
@@ -1512,9 +1509,9 @@
 
   .message.layout-bubble.own .content-bubble,
   .message.layout-bubble.own :global(.formatted-body) {
-    background: var(--sable-primary-container);
-    border-color: var(--sable-primary-container-line);
-    color: var(--sable-primary-on-container);
+    background: var(--primary-container);
+    border-color: var(--primary-container-line);
+    color: var(--primary-on-container);
   }
 
   /* The one mode where your own side changes. */

@@ -476,14 +476,14 @@
   }
 
   .hint {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
     margin: 0;
   }
 
   .error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -503,7 +503,7 @@
   }
 
   .advanced {
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radii-400);
   }
 
@@ -544,7 +544,7 @@
 
   .invites li {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
     display: flex;
     gap: var(--space-300);

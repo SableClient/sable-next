@@ -58,7 +58,7 @@
 
 <style>
   .widget-frame {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border: 0;
     border-radius: var(--radius);
     height: 100%;

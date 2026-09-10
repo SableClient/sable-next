@@ -124,7 +124,7 @@
   }
 
   :global(.dialog-demo-description) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   :global(.dialog-demo-actions) {

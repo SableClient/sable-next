@@ -581,7 +581,7 @@
 
 <style>
   .device-seen {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
@@ -602,7 +602,7 @@
 
   .status-item {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
+    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     gap: var(--space-300);
     min-width: 0;
@@ -622,9 +622,9 @@
   .row-icon,
   .device-icon {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     height: var(--control-height-small);
@@ -633,8 +633,8 @@
   }
 
   .status-icon.positive {
-    background: var(--sable-success-container);
-    color: var(--sable-success-on-container);
+    background: var(--success-container);
+    color: var(--success-on-container);
   }
 
   .status-icon :global(svg),
@@ -645,7 +645,7 @@
   }
 
   .device-name {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-normal);
   }
@@ -656,14 +656,14 @@
 
   .setting-row {
     align-items: stretch;
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
     display: flex;
     flex-direction: column;
     gap: var(--space-400);
     padding: var(--space-300) var(--space-400);
   }
 
-  .setting-row > :global(.sable-button) {
+  .setting-row > :global(.btn) {
     width: 100%;
   }
 
@@ -673,14 +673,14 @@
   }
 
   .row-copy p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
   }
 
   .bulk-bar {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
+    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-300);
@@ -694,13 +694,13 @@
   }
 
   .bulk-count {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
   .bulk-remove-form {
-    background: var(--sable-surface-container);
-    border-bottom: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--surface-container);
+    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: grid;
     gap: var(--space-300);
     padding: var(--space-300) var(--space-400);
@@ -722,7 +722,7 @@
   }
 
   .device + .device {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   .device-summary {
@@ -751,7 +751,7 @@
   }
 
   .device-meta code {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -767,7 +767,7 @@
   .loading-state,
   .empty-state {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     gap: var(--space-300);
     justify-content: center;
@@ -793,7 +793,7 @@
     margin-bottom: var(--space-400);
   }
 
-  :global(.sable-alert.recovery-key) {
+  :global(.alert.recovery-key) {
     gap: var(--space-300);
     padding: var(--space-400);
   }
@@ -805,8 +805,8 @@
   }
 
   :global(.recovery-key) code {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-warn-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--warn-container-line);
     border-radius: var(--radius);
     display: block;
     overflow-wrap: anywhere;
@@ -828,7 +828,7 @@
       flex-direction: row;
     }
 
-    .setting-row > :global(.sable-button) {
+    .setting-row > :global(.btn) {
       width: auto;
     }
 

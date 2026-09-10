@@ -27,13 +27,7 @@
 
 <BitsButton.Root
   {...rest}
-  class={[
-    'sable-button',
-    `sable-button-${variant}`,
-    `sable-button-${size}`,
-    { 'sable-button-block': block },
-    className,
-  ]}
+  class={['btn', `btn-${variant}`, `btn-${size}`, { 'btn-block': block }, className]}
 >
   {@render children?.()}
 </BitsButton.Root>

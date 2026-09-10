@@ -89,17 +89,17 @@
   }
 
   li:hover {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
-  :global(.sable-avatar.invite-icon) {
+  :global(.avatar-root.invite-icon) {
     --avatar-size: 1.75rem;
 
     font-size: var(--font-size-small);
   }
 
-  :global(.sable-avatar.invite-icon .sable-avatar-fallback) {
-    background: var(--sable-surface-var-container);
+  :global(.avatar-root.invite-icon .avatar-fallback) {
+    background: var(--surface-var-container);
   }
 
   .invite-name {

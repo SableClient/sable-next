@@ -100,8 +100,8 @@
 
 <style>
   .call {
-    background: var(--sable-surface-container);
-    border-block-end: var(--space-050) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border-block-end: var(--space-050) solid var(--surface-container-line);
     display: flex;
     flex-direction: column;
     gap: var(--space-200);
@@ -121,13 +121,13 @@
 
   .encrypted {
     align-items: center;
-    color: var(--sable-success-main);
+    color: var(--success-main);
     display: inline-flex;
     margin-inline-start: auto;
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     text-align: center;

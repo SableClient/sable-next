@@ -20,35 +20,35 @@
   <span
     {...rest}
     class={[
-      'sable-unread-badge',
-      `sable-unread-badge-${badge.mode}`,
-      badge.highlight && 'sable-unread-badge-highlight',
+      'unread-badge',
+      `unread-badge-${badge.mode}`,
+      badge.highlight && 'unread-badge-highlight',
       className,
     ]}>{badge.mode === 'count' ? formatUnreadCount(badge.count) : ''}</span
   >
 {/if}
 
 <style>
-  :global(.sable-unread-badge) {
-    background: var(--sable-sec-main);
-    color: var(--sable-sec-on-main);
+  :global(.unread-badge) {
+    background: var(--sec-main);
+    color: var(--sec-on-main);
     flex: none;
     pointer-events: none;
   }
 
-  :global(.sable-unread-badge-highlight) {
-    background: var(--sable-success-main);
-    color: var(--sable-success-on-main);
+  :global(.unread-badge-highlight) {
+    background: var(--success-main);
+    color: var(--success-on-main);
   }
 
-  :global(.sable-unread-badge-dot) {
+  :global(.unread-badge-dot) {
     border-radius: var(--radii-round);
     display: inline-block;
     height: 0.5rem;
     width: 0.5rem;
   }
 
-  :global(.sable-unread-badge-count) {
+  :global(.unread-badge-count) {
     align-items: center;
     border-radius: var(--radii-pill);
     display: inline-flex;

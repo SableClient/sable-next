@@ -83,8 +83,8 @@
 
 <style>
   .pdf-thumbnail {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     cursor: pointer;
     display: block;
@@ -100,11 +100,11 @@
   }
 
   .pdf-thumbnail:hover {
-    border-color: var(--sable-primary-main);
+    border-color: var(--primary-main);
   }
 
   .pdf-thumbnail:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 

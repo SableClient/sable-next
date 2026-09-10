@@ -206,7 +206,7 @@
   }
 
   .muted {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
     margin: 0;

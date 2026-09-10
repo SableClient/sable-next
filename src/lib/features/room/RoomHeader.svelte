@@ -130,7 +130,7 @@
     {/if}
     {@render widgets?.()}
     <IconButton
-      class="members-button sable-open"
+      class="members-button selection-open"
       variant="ghost"
       size="small"
       label={$i18n.t('timeline.members')}
@@ -147,8 +147,8 @@
 <style>
   .room-header {
     align-items: center;
-    background: var(--sable-bg-container);
-    border-bottom: var(--border-width) solid var(--sable-surface-var-container);
+    background: var(--bg-container);
+    border-bottom: var(--border-width) solid var(--surface-var-container);
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-250);
@@ -178,7 +178,7 @@
   .room-topic {
     background: transparent;
     border: 0;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
@@ -192,12 +192,12 @@
   }
 
   .room-topic:hover {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     text-decoration: underline;
   }
 
   .room-topic:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -208,20 +208,20 @@
     gap: var(--space-050);
   }
 
-  :global(.sable-avatar.room-avatar) {
-    color: var(--sable-primary-on-main);
+  :global(.avatar-root.room-avatar) {
+    color: var(--primary-on-main);
     display: none;
   }
 
-  :global(.sable-avatar.room-avatar .sable-avatar-fallback) {
-    background: var(--sable-primary-main);
+  :global(.avatar-root.room-avatar .avatar-fallback) {
+    background: var(--primary-main);
   }
 
   .voice-chip {
     align-items: center;
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-100);
@@ -229,8 +229,8 @@
   }
 
   .voice-chip.live {
-    background: var(--sable-primary-container);
-    color: var(--sable-primary-on-container);
+    background: var(--primary-container);
+    color: var(--primary-on-container);
   }
 
   .voice-chip :global(svg) {
@@ -242,13 +242,13 @@
     display: flex;
   }
 
-  .voice-faces :global(.sable-avatar.voice-face) {
-    border: var(--border-width) solid var(--sable-bg-container);
+  .voice-faces :global(.avatar-root.voice-face) {
+    border: var(--border-width) solid var(--bg-container);
     height: 1.25rem;
     width: 1.25rem;
   }
 
-  .voice-faces :global(.sable-avatar.voice-face:not(:first-child)) {
+  .voice-faces :global(.avatar-root.voice-face:not(:first-child)) {
     margin-left: calc(-1 * var(--space-150));
   }
 
@@ -273,7 +273,7 @@
       display: none;
     }
 
-    :global(.sable-avatar.room-avatar) {
+    :global(.avatar-root.room-avatar) {
       display: inline-flex;
     }
   }

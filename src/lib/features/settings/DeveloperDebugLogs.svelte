@@ -140,7 +140,7 @@
 
   p,
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   .filters > :global(*) {
@@ -163,7 +163,7 @@
   }
 
   .entry {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
     border-radius: var(--radius);
     padding: var(--space-200) var(--space-300);
   }
@@ -182,11 +182,11 @@
   }
 
   .level-error summary span:first-child {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
   }
 
   .level-warn summary span:first-child {
-    color: var(--sable-warn-main);
+    color: var(--warn-main);
   }
 
   .entry p,

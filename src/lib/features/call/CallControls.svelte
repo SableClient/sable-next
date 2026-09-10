@@ -37,7 +37,7 @@
 <div class="controls">
   <IconButton
     variant="ghost"
-    class="sable-choice"
+    class="choice"
     label={$i18n.t('call.microphone')}
     aria-pressed={microphoneEnabled}
     disabled={!ready}
@@ -52,7 +52,7 @@
 
   <IconButton
     variant="ghost"
-    class="sable-choice"
+    class="choice"
     label={$i18n.t('call.camera')}
     aria-pressed={cameraEnabled}
     disabled={!ready}
@@ -68,7 +68,7 @@
   {#if canScreenShare}
     <IconButton
       variant="ghost"
-      class="sable-choice"
+      class="choice"
       label={$i18n.t('call.screenShare')}
       aria-pressed={screenShareEnabled}
       disabled={!ready}

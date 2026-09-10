@@ -47,10 +47,10 @@
 <style>
   .call-bar {
     align-items: center;
-    background: var(--sable-surface-container);
-    border: var(--border-width-500) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width-500) solid var(--surface-container-line);
     border-radius: var(--radii-pill);
-    box-shadow: var(--sable-shadow);
+    box-shadow: var(--shadow-color);
     display: flex;
     gap: var(--space-150);
     padding: var(--space-100) var(--space-200);

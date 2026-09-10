@@ -30,7 +30,7 @@
     <RadioGroup.Item
       value={option.value}
       disabled={disabled || option.disabled}
-      class="option-card sable-choice"
+      class="option-card choice"
       data-selected={option.value === value ? 'true' : undefined}
     >
       {#if Icon}<span class="option-card-icon" aria-hidden="true"><Icon /></span>{/if}
@@ -50,8 +50,8 @@
 
   :global(.option-card) {
     align-items: center;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radii-400);
     color: inherit;
     cursor: pointer;
@@ -64,7 +64,7 @@
   }
 
   :global(.option-card:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -74,7 +74,7 @@
   }
 
   :global(.option-card:hover:not([data-disabled])) {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   :global(.option-card-icon) {
@@ -99,7 +99,7 @@
   }
 
   :global(.option-card-hint) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-small);
   }

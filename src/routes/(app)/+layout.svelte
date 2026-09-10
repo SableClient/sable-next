@@ -523,10 +523,10 @@
 
 <style>
   .skip-link {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-primary-main);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--primary-main);
     border-radius: var(--radius);
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     left: var(--space-300);
     padding: var(--space-300) var(--space-400);
     position: fixed;
@@ -541,7 +541,7 @@
 
   .app-status {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     box-sizing: border-box;
     display: flex;
     justify-content: center;
@@ -551,8 +551,8 @@
 
   .app-status-card {
     align-items: center;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
@@ -575,11 +575,11 @@
   }
 
   .app-status-card p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     line-height: var(--line-height-body);
   }
 
-  .app-status-card :global(.sable-button) {
+  .app-status-card :global(.btn) {
     min-width: 8rem;
   }
 

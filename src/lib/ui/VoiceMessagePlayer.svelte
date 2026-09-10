@@ -135,25 +135,25 @@
   }
 
   .voice-bar {
-    background: var(--sable-surface-var-on-container);
+    background: var(--surface-var-on-container);
     border-radius: var(--radius-pill);
     flex: 1;
     min-height: 2px;
   }
 
   .voice-bar.played {
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
   }
 
   .voice-scrub {
-    accent-color: var(--sable-primary-main);
+    accent-color: var(--primary-main);
     display: block;
     margin: 0;
     width: 100%;
   }
 
   .voice-time {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;

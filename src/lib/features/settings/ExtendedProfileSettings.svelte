@@ -166,7 +166,7 @@
             width="1000"
             height="375"
           />{/if}
-        <label class="file-button sable-button sable-button-secondary sable-button-small">
+        <label class="file-button btn btn-secondary btn-small">
           <input
             type="file"
             accept="image/*"

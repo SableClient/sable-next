@@ -40,8 +40,8 @@
   </Dialog.Description>
 
   {#if showList}
-    <div class="settings-nav sable-settings-nav" class:sable-settings-nav-paged={!desktop}>
-      <div class="nav-header sable-settings-nav-header">
+    <div class="settings-nav" class:settings-nav-paged={!desktop}>
+      <div class="nav-header settings-nav-header">
         {@render header()}
         {#if !desktop}
           <IconButton
@@ -65,7 +65,7 @@
 
   {#if showContent && openSection}
     <div class="settings-page">
-      <div class="page-header sable-settings-nav-header">
+      <div class="page-header settings-nav-header">
         {#if !desktop}
           <IconButton
             variant="ghost"
@@ -91,8 +91,8 @@
 
 <style>
   .room-settings {
-    background: var(--sable-bg-container);
-    color: var(--sable-bg-on-container);
+    background: var(--bg-container);
+    color: var(--bg-on-container);
     display: flex;
     height: 100%;
     min-height: 0;

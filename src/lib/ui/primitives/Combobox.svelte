@@ -99,7 +99,7 @@
 
     <BitsCombobox.Trigger aria-label={$i18n.t('combobox.showOptions')}>
       {#snippet child({ props })}
-        <button {...props} class="combobox-trigger sable-open">
+        <button {...props} class="combobox-trigger selection-open">
           <CaretDownIcon class="combobox-icon" />
         </button>
       {/snippet}
@@ -111,11 +111,11 @@
       {#snippet child({ wrapperProps, props, open })}
         {#if open && filteredItems.length > 0}
           <div {...wrapperProps} class="combobox-positioner">
-            <div {...props} class="sable-menu combobox-menu">
+            <div {...props} class="menu-surface combobox-menu">
               {#each filteredItems as item (item.value)}
                 <BitsCombobox.Item value={item.value} label={item.label} disabled={item.disabled}>
                   {#snippet child({ props })}
-                    <div {...props} class="sable-menu-item">
+                    <div {...props} class="menu-item">
                       {item.label}
                     </div>
                   {/snippet}
@@ -141,7 +141,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: pointer;
     display: flex;
     height: 100%;
@@ -154,7 +154,7 @@
   }
 
   .combobox-trigger:hover {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 
   .combobox-trigger:active {
@@ -163,7 +163,7 @@
 
   .combobox-trigger:focus-visible {
     border-radius: var(--radius);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: -4px;
   }
 

@@ -174,7 +174,7 @@
   .product-name span,
   p,
   .value {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   p {
@@ -194,7 +194,7 @@
   }
 
   .error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     margin: 0;
   }
 </style>

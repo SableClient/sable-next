@@ -20,7 +20,7 @@
     open = $bindable(false),
     label,
     closeLabel,
-    handleColor = 'var(--sable-surface-on-container)',
+    handleColor = 'var(--surface-on-container)',
     handleOpacity = 0.45,
     background,
     contentInset = true,
@@ -138,7 +138,7 @@
   }
 
   :global(.bottom-sheet-pill) {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius-pill);
     display: block;
     height: 0.25rem;
@@ -147,7 +147,7 @@
   }
 
   :global(.bottom-sheet-handle):focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 

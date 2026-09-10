@@ -41,7 +41,7 @@
   }
 
   .topic-full {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     max-height: 60vh;
     overflow-wrap: anywhere;

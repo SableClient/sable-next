@@ -64,7 +64,7 @@
     <IconButton
       variant="ghost"
       size="small"
-      class="format-button sable-choice"
+      class="format-button choice"
       label={$i18n.t(button.label)}
       aria-pressed={active.includes(button.action)}
       onclick={() => {
@@ -77,7 +77,7 @@
   <IconButton
     variant="ghost"
     size="small"
-    class="format-button sable-choice"
+    class="format-button choice"
     label={$i18n.t('composer.markdownSource')}
     aria-pressed={source}
     onclick={onToggleSource}
@@ -92,7 +92,7 @@
 
 <style>
   .formatting {
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-050);
     overflow-x: auto;
@@ -107,7 +107,7 @@
 
   :global(.format-button) {
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     height: var(--target);
     min-height: var(--target);

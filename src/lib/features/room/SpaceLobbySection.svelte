@@ -112,15 +112,15 @@
       {@const sectionSpace = section.space}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
-          class="room-menu-trigger sable-open"
+          class="room-menu-trigger selection-open"
           aria-label={$i18n.t('room.menuLabel')}
         >
           <DotsThreeVerticalIcon />
         </DropdownMenu.Trigger>
-        <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+        <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
           <IconContext values={{ 'aria-hidden': 'true' }}>
             <DropdownMenu.Item
-              class="sable-menu-item"
+              class="menu-item"
               onSelect={() => {
                 onCopyLink(sectionSpace);
               }}
@@ -213,15 +213,15 @@
               {/if}
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger
-                  class="room-menu-trigger sable-open"
+                  class="room-menu-trigger selection-open"
                   aria-label={$i18n.t('room.menuLabel')}
                 >
                   <DotsThreeVerticalIcon />
                 </DropdownMenu.Trigger>
-                <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+                <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
                   <IconContext values={{ 'aria-hidden': 'true' }}>
                     <DropdownMenu.Item
-                      class="sable-menu-item"
+                      class="menu-item"
                       onSelect={() => {
                         onCopyLink(child);
                       }}
@@ -230,7 +230,7 @@
                     </DropdownMenu.Item>
                     {#if canManage}
                       <DropdownMenu.Item
-                        class="sable-menu-item"
+                        class="menu-item"
                         onSelect={() => {
                           onMove(section, child.room_id, -1);
                         }}
@@ -238,7 +238,7 @@
                         <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
-                        class="sable-menu-item"
+                        class="menu-item"
                         onSelect={() => {
                           onMove(section, child.room_id, 1);
                         }}
@@ -246,7 +246,7 @@
                         <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
-                        class="sable-menu-item sable-menu-item-destructive"
+                        class="menu-item menu-item-destructive"
                         onSelect={() => {
                           removeEntry(entry);
                         }}
@@ -301,11 +301,11 @@
   }
 
   :global(.section-toggle:hover) {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   :global(.section-toggle:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -319,7 +319,7 @@
 
   .caret {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: inline-flex;
   }
 
@@ -328,8 +328,8 @@
   }
 
   .category {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -350,7 +350,7 @@
   }
 
   .room + .room {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   .room.dragging {
@@ -358,16 +358,16 @@
   }
 
   .room.drop-above {
-    box-shadow: inset 0 2px 0 0 var(--sable-primary-main);
+    box-shadow: inset 0 2px 0 0 var(--primary-main);
   }
 
   .room.drop-below {
-    box-shadow: inset 0 -2px 0 0 var(--sable-primary-main);
+    box-shadow: inset 0 -2px 0 0 var(--primary-main);
   }
 
   .drag-handle {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: grab;
     display: inline-flex;
     flex: none;
@@ -375,7 +375,7 @@
   }
 
   .room:hover {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .room-text {
@@ -395,7 +395,7 @@
 
   .room-meta {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -409,7 +409,7 @@
   }
 
   .divider {
-    color: var(--sable-surface-var-container-line);
+    color: var(--surface-var-container-line);
   }
 
   .room-topic {
@@ -420,14 +420,14 @@
   }
 
   .room-error {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     font-size: var(--font-size-small);
   }
 
   .badge {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
     padding: 0 var(--space-150);
@@ -442,7 +442,7 @@
   }
 
   .section-failed {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     padding: var(--space-300) var(--space-400);
@@ -453,7 +453,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
     flex: none;
@@ -464,12 +464,12 @@
   }
 
   :global(.room-menu-trigger:hover) {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   :global(.room-menu-trigger:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 

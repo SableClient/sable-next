@@ -321,7 +321,7 @@
   .search-status,
   .platform,
   .similar p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
   }
 
@@ -332,7 +332,7 @@
   }
 
   .similar {
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-200);
@@ -354,7 +354,7 @@
   }
 
   .option input {
-    accent-color: var(--sable-primary-main);
+    accent-color: var(--primary-main);
     flex: 0 0 auto;
     margin: var(--space-100) 0 0;
   }

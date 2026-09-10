@@ -40,7 +40,7 @@
 {#if desktop}
   <DropdownMenu.Root>
     <DropdownMenu.Trigger
-      class="composer-door sable-open"
+      class="composer-door selection-open"
       {disabled}
       aria-label={$i18n.t('composer.insert')}
     >
@@ -48,13 +48,13 @@
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
       <DropdownMenu.Content
-        class="sable-menu composer-menu"
+        class="menu-surface composer-menu"
         side="top"
         align="start"
         sideOffset={8}
       >
         <DropdownMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           onclick={() => {
             onPick(media);
           }}
@@ -63,7 +63,7 @@
           {$i18n.t('composer.photoOrVideo')}
         </DropdownMenu.Item>
         <DropdownMenu.Item
-          class="sable-menu-item"
+          class="menu-item"
           onclick={() => {
             onPick(any);
           }}
@@ -72,19 +72,19 @@
           {$i18n.t('composer.attachFile')}
         </DropdownMenu.Item>
         {#if onPoll}
-          <DropdownMenu.Item class="sable-menu-item" onclick={onPoll}>
+          <DropdownMenu.Item class="menu-item" onclick={onPoll}>
             <ChartBarIcon />
             {$i18n.t('composer.poll')}
           </DropdownMenu.Item>
         {/if}
         {#if onLocation}
-          <DropdownMenu.Item class="sable-menu-item" onclick={onLocation}>
+          <DropdownMenu.Item class="menu-item" onclick={onLocation}>
             <MapPinIcon />
             {$i18n.t('composer.location')}
           </DropdownMenu.Item>
         {/if}
         {#if onSchedule}
-          <DropdownMenu.Item class="sable-menu-item" onclick={onSchedule}>
+          <DropdownMenu.Item class="menu-item" onclick={onSchedule}>
             <ClockIcon />
             {$i18n.t('composer.schedule')}
           </DropdownMenu.Item>
@@ -95,7 +95,7 @@
 {:else}
   <button
     type="button"
-    class="composer-door sable-open"
+    class="composer-door selection-open"
     {disabled}
     data-state={open ? 'open' : 'closed'}
     aria-label={$i18n.t('composer.insert')}
@@ -197,11 +197,11 @@
   }
 
   :global(.door-action:hover:not(:disabled)) {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   :global(.door-action svg) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
   }
@@ -211,7 +211,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     cursor: pointer;
     display: flex;
     flex: 0 0 auto;
@@ -229,11 +229,11 @@
   }
 
   :global(.composer-door:hover) {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   :global(.composer-door:disabled) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: default;
   }
 
@@ -243,13 +243,13 @@
     width: var(--icon-size-small);
   }
 
-  :global(.sable-menu.composer-menu) {
+  :global(.menu-surface.composer-menu) {
     --radius-outer: var(--radii-500);
     --radius-padding: var(--space-150);
     --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius-outer);
     box-shadow: var(--shadow-float);
     display: grid;
@@ -259,8 +259,8 @@
     z-index: var(--layer-popover);
   }
 
-  :global(.composer-menu .sable-menu-item > svg) {
-    color: var(--sable-surface-var-on-container);
+  :global(.composer-menu .menu-item > svg) {
+    color: var(--surface-var-on-container);
   }
 
   @media (prefers-reduced-motion: no-preference) {

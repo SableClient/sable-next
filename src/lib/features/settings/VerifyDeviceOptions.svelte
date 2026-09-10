@@ -127,7 +127,7 @@
     gap: var(--space-300);
   }
 
-  .method-choices :global(.sable-button) {
+  .method-choices :global(.btn) {
     justify-content: flex-start;
   }
 

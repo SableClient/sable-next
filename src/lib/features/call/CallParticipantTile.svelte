@@ -74,7 +74,7 @@
 <style>
   .tile {
     aspect-ratio: 4 / 3;
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border: var(--border-width) solid transparent;
     border-radius: var(--radii-400);
     overflow: hidden;
@@ -82,7 +82,7 @@
   }
 
   .tile.live {
-    border-color: var(--sable-primary-main);
+    border-color: var(--primary-main);
   }
 
   .video {
@@ -101,7 +101,7 @@
 
   .overlay {
     align-items: center;
-    background: linear-gradient(transparent, var(--sable-overlay));
+    background: linear-gradient(transparent, var(--overlay));
     display: flex;
     gap: var(--space-100);
     inset: auto 0 0;
@@ -110,7 +110,7 @@
   }
 
   .name {
-    color: var(--sable-picker-white);
+    color: var(--picker-white);
     font-size: var(--font-size-small);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -119,13 +119,13 @@
 
   .badge {
     align-items: center;
-    color: var(--sable-picker-white);
+    color: var(--picker-white);
     display: inline-flex;
     flex: none;
   }
 
   .badge.crit {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
   }
 
   .visually-hidden {

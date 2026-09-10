@@ -26,7 +26,7 @@ test('offers to refresh when a worker is waiting', async () => {
   await Promise.resolve();
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.sable-button-primary')?.click();
+  document.querySelector<HTMLButtonElement>('.btn-primary')?.click();
 
   expect(postMessage).toHaveBeenCalledWith({ type: 'sable:skip-waiting' });
   expect(reload).not.toHaveBeenCalled();

@@ -139,8 +139,8 @@
       {#snippet trigger({ props }: { props: Record<string, unknown> })}
         <a
           {...props}
-          class="quick-tool compact-tool sable-nav-tab sable-nav-tab-side sable-nav-tab-outlined
-          sable-current sable-selection-layer"
+          class="quick-tool compact-tool nav-tab nav-tab-side nav-tab-outlined
+          selection-current selection-layer"
           href={item.href}
           onclick={(event) => {
             activateTool(event, item.href);
@@ -169,8 +169,8 @@
         {#snippet trigger({ props }: { props: Record<string, unknown> })}
           <a
             {...props}
-            class="quick-tool desktop-tool sable-nav-tab sable-nav-tab-bottom
-            sable-nav-tab-outlined sable-current sable-selection-layer"
+            class="quick-tool desktop-tool nav-tab nav-tab-bottom
+            nav-tab-outlined selection-current selection-layer"
             href={item.href}
             onclick={(event) => {
               activateTool(event, item.href);
@@ -197,7 +197,7 @@
     position: relative;
   }
 
-  .mobile-tool :global(.sable-unread-badge) {
+  .mobile-tool :global(.unread-badge) {
     position: absolute;
     right: 0.125rem;
     top: 0.125rem;
@@ -205,9 +205,9 @@
 
   .desktop-tools {
     align-items: center;
-    background: var(--sable-surface-container);
-    border-right: var(--border-width) solid var(--sable-surface-container-line);
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border-right: var(--border-width) solid var(--surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     display: flex;
     flex: 0 0 4.625rem;
@@ -223,8 +223,8 @@
 
   .compact-tools {
     align-items: center;
-    background: var(--sable-bg-container);
-    border-right: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border-right: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     display: flex;
     flex: 0 0 var(--navigation-rail-width);
@@ -236,9 +236,9 @@
 
   .mobile-tools {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius) var(--radius) 0 0;
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -249,9 +249,9 @@
   }
 
   .mobile-tools::before {
-    background: var(--sable-surface-container-active);
+    background: var(--surface-container-active);
     border-radius: var(--radius-pill);
-    box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-main);
+    box-shadow: inset 0 0 0 var(--border-width) var(--primary-main);
     content: '';
     height: var(--control-height-large);
     left: var(--mobile-selected-position);

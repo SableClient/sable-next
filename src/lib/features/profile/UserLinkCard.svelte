@@ -145,7 +145,7 @@
   }
 
   .user-link p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     overflow-wrap: anywhere;
   }
@@ -159,7 +159,7 @@
   }
 
   .avatar-button:focus-visible {
-    outline: 2px solid var(--sable-primary-main);
+    outline: 2px solid var(--primary-main);
     outline-offset: 3px;
   }
 </style>

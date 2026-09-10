@@ -72,8 +72,8 @@
 
 <style>
   .location {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     display: flex;
     flex-direction: column;
@@ -95,7 +95,7 @@
   }
 
   .summary :global(.pin) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     flex: none;
   }
 
@@ -110,7 +110,7 @@
   }
 
   .coordinates {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
   }
@@ -121,7 +121,7 @@
     background: none;
     border: none;
     border-radius: var(--radii-300);
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     cursor: pointer;
     display: inline-flex;
     font: inherit;
@@ -131,7 +131,7 @@
   }
 
   .reveal:disabled {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: progress;
   }
 
@@ -140,7 +140,7 @@
   }
 
   .failed {
-    color: var(--sable-crit-main);
+    color: var(--crit-main);
     font-size: var(--font-size-small);
     margin: 0;
   }

@@ -66,8 +66,8 @@
 
   header {
     align-items: center;
-    background: var(--sable-bg-container);
-    border-bottom: var(--border-width) solid var(--sable-surface-var-container);
+    background: var(--bg-container);
+    border-bottom: var(--border-width) solid var(--surface-var-container);
     display: flex;
     justify-content: space-between;
     min-height: 3.75rem;

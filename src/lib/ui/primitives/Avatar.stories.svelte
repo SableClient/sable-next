@@ -28,7 +28,7 @@
   <div class="row">
     <Avatar initials="EL" alt="Erwan Leboucher" />
     <Avatar initials="?" alt="Unknown" />
-    <Avatar initials="SB" alt="Sable" color="var(--sable-success-container)" />
+    <Avatar initials="SB" alt="Sable" color="var(--success-container)" />
   </div>
 </Story>
 

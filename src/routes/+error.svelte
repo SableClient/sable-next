@@ -27,7 +27,7 @@
 <style>
   .error-page {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     display: flex;
     justify-content: center;
     min-height: 100dvh;
@@ -46,7 +46,7 @@
   }
 
   .error-code {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     font-size: var(--error-code-size);
     font-weight: var(--font-weight-bold);
     line-height: 0.9;

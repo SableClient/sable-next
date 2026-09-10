@@ -74,7 +74,7 @@
         <Button
           variant="ghost"
           size="small"
-          class="filter sable-choice"
+          class="filter choice"
           aria-pressed={value === filter}
           onclick={() => {
             onFilter(value);
@@ -154,7 +154,7 @@
   }
 
   h2 {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
@@ -172,19 +172,19 @@
     background: transparent;
     border-color: transparent;
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     padding: 0 var(--space-300);
   }
 
   :global(.filter:hover:not(:disabled)) {
-    background: var(--sable-surface-var-container-hover);
-    color: var(--sable-bg-on-container);
+    background: var(--surface-var-container-hover);
+    color: var(--bg-on-container);
   }
 
   .feed {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     list-style: none;
     margin: 0;
@@ -200,11 +200,11 @@
   }
 
   li + li {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   li:hover {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .row {
@@ -219,7 +219,7 @@
   }
 
   .row:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: calc(var(--focus-ring-width) * -1);
   }
 
@@ -247,14 +247,14 @@
   }
 
   .when {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
   }
 
   .preview {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 1;
     font-size: var(--font-size-small);
     overflow: hidden;
@@ -263,9 +263,9 @@
   }
 
   .count {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
@@ -276,12 +276,12 @@
   }
 
   .count.highlight {
-    background: var(--sable-primary-main);
-    color: var(--sable-primary-on-main);
+    background: var(--primary-main);
+    color: var(--primary-on-main);
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     text-align: center;
   }

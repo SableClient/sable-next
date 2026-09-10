@@ -31,7 +31,7 @@
   }
 
   .eyebrow {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-size: var(--font-size-small);
   }
 
@@ -40,13 +40,13 @@
   }
 
   .summary-card p:not(.eyebrow, .user-id) {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
   }
 
   .user-id {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius);
     overflow-wrap: anywhere;
     padding: var(--space-250) var(--space-300);

@@ -365,7 +365,7 @@ test('shows a room abbreviation definition in a tooltip on hover', async () => {
   await tick();
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  expect(document.querySelector('.sable-tooltip')?.textContent.trim()).toBe(
+  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe(
     'Free and open source software'
   );
   await unmount(instance);

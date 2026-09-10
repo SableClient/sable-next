@@ -141,7 +141,7 @@
   }
 
   .fallback-step {
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     justify-items: center;
     padding: var(--space-400) 0;
     text-align: center;
@@ -155,16 +155,16 @@
   }
 
   h3 {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     font-size: var(--font-size-heading);
     margin: 0;
   }
 
   .fallback-icon {
     align-items: center;
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     border-radius: 50%;
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     display: flex;
     height: 3rem;
     justify-content: center;

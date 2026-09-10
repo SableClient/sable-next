@@ -280,7 +280,7 @@
   }
 
   .persona-meta {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -288,7 +288,7 @@
   }
 
   .persona-empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     padding: var(--space-400);
   }
@@ -315,7 +315,7 @@
   }
 
   .field small {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 </style>

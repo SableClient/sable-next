@@ -119,7 +119,7 @@ test('no dialog open reports false', () => {
 
 test('an open dialog is detected by its content class', () => {
   const dialog = document.createElement('div');
-  dialog.className = 'sable-dialog-content';
+  dialog.className = 'dialog-content';
   document.body.append(dialog);
   expect(isDialogOpen(document)).toBe(true);
   dialog.remove();

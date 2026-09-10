@@ -36,7 +36,7 @@
         <li role="presentation">
           <button
             type="button"
-            class="sable-menu-item option sable-highlight"
+            class="menu-item option selection-highlight"
             id={optionId(index)}
             role="option"
             tabindex="-1"
@@ -77,8 +77,8 @@
 
 <style>
   .autocomplete {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     bottom: calc(100% + 0.5rem);
     box-shadow: var(--shadow-float);
@@ -92,23 +92,23 @@
 
   .heading,
   .hint {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     padding: var(--space-150) var(--space-250);
   }
 
   .heading {
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     text-transform: uppercase;
   }
 
   .hint {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     padding: var(--space-250);
@@ -140,14 +140,14 @@
   }
 
   .sigil {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     margin-right: var(--space-150);
   }
 
   .key {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radii-300);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
     padding: 0 var(--space-100);
@@ -161,7 +161,7 @@
   }
 
   .detail {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 </style>

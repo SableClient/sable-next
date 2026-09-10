@@ -14,7 +14,7 @@
 }
 
 .settings-row + .settings-row {
-  border-top: var(--border-width) solid var(--sable-surface-container-line);
+  border-top: var(--border-width) solid var(--surface-container-line);
 }
 
 .settings-row-copy {
@@ -28,7 +28,7 @@
 }
 
 .settings-row-copy p {
-  color: var(--sable-surface-var-on-container);
+  color: var(--surface-var-on-container);
   font-size: var(--font-size-small);
   margin: var(--space-100) 0 0;
   max-width: 60ch;

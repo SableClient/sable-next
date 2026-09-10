@@ -25,9 +25,9 @@
 
 <Dialog.Root bind:open {onOpenChange}>
   <Dialog.Portal>
-    <Dialog.Overlay class={['sable-dialog-backdrop', `sable-dialog-backdrop-${variant}`]} />
+    <Dialog.Overlay class={['dialog-backdrop', `dialog-backdrop-${variant}`]} />
     <Dialog.Content
-      class={['sable-dialog-content', `sable-dialog-content-${variant}`]}
+      class={['dialog-content', `dialog-content-${variant}`]}
       style={contentStyle}
       aria-label={label}
     >
@@ -37,23 +37,23 @@
 </Dialog.Root>
 
 <style>
-  :global(.sable-dialog-backdrop) {
-    background: var(--sable-overlay);
+  :global(.dialog-backdrop) {
+    background: var(--overlay);
     inset: 0;
     position: fixed;
   }
 
-  :global(.sable-dialog-content) {
+  :global(.dialog-content) {
     box-sizing: border-box;
     position: fixed;
   }
 
-  :global(.sable-dialog-backdrop-drawer) {
+  :global(.dialog-backdrop-drawer) {
     border: 0;
     z-index: var(--layer-dialog);
   }
 
-  :global(.sable-dialog-content-drawer) {
+  :global(.dialog-content-drawer) {
     border: 0;
     inset: 0 0 0 auto;
     max-width: min(22rem, 85%);
@@ -62,17 +62,17 @@
     z-index: var(--layer-dialog);
   }
 
-  :global(.sable-dialog-backdrop-verification),
-  :global(.sable-dialog-backdrop-sheet) {
+  :global(.dialog-backdrop-verification),
+  :global(.dialog-backdrop-sheet) {
     z-index: var(--layer-sheet);
   }
 
-  :global(.sable-dialog-backdrop-settings) {
+  :global(.dialog-backdrop-settings) {
     z-index: var(--layer-dialog);
   }
 
-  :global(.sable-dialog-content-settings) {
-    background: var(--sable-surface-container);
+  :global(.dialog-content-settings) {
+    background: var(--surface-container);
     border: 0;
     border-radius: 0;
     box-shadow: var(--shadow-dialog);
@@ -87,10 +87,10 @@
     z-index: var(--layer-dialog);
   }
 
-  :global(.sable-dialog-content-verification),
-  :global(.sable-dialog-content-sheet) {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+  :global(.dialog-content-verification),
+  :global(.dialog-content-sheet) {
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
     box-shadow: var(--shadow-dialog);
@@ -106,17 +106,17 @@
 
   /* Several dialog bodies cap themselves against the viewport. Keep those
      widths inside this panel's padded content box on narrow screens. */
-  :global(.sable-dialog-content-verification > *) {
+  :global(.dialog-content-verification > *) {
     max-width: 100%;
   }
 
-  :global(.sable-dialog-content-sheet) {
+  :global(.dialog-content-sheet) {
     overscroll-behavior: contain;
     padding: 0 0 var(--safe-bottom);
   }
 
   @media (width >= 42rem) {
-    :global(.sable-dialog-content-verification) {
+    :global(.dialog-content-verification) {
       border-radius: var(--radius);
       bottom: auto;
       left: 50%;
@@ -132,8 +132,8 @@
   }
 
   @media (width >= 48rem) {
-    :global(.sable-dialog-content-settings) {
-      border: var(--border-width) solid var(--sable-surface-container-line);
+    :global(.dialog-content-settings) {
+      border: var(--border-width) solid var(--surface-container-line);
       border-radius: var(--radius);
       height: min(52rem, calc(100dvh - 3rem));
       width: calc(100% - 3rem);
@@ -167,23 +167,23 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.sable-dialog-backdrop) {
+    :global(.dialog-backdrop) {
       animation: dialog-backdrop-in var(--motion-normal) var(--motion-easing-standard);
     }
 
-    :global(.sable-dialog-content-drawer) {
+    :global(.dialog-content-drawer) {
       animation: drawer-in var(--motion-slow) var(--motion-easing-emphasized);
     }
 
-    :global(.sable-dialog-content-settings),
-    :global(.sable-dialog-content-verification),
-    :global(.sable-dialog-content-sheet) {
+    :global(.dialog-content-settings),
+    :global(.dialog-content-verification),
+    :global(.dialog-content-sheet) {
       animation: sheet-in var(--motion-slow) var(--motion-easing-emphasized);
     }
   }
 
   @media (prefers-reduced-motion: no-preference) and (width >= 48rem) {
-    :global(.sable-dialog-content-settings) {
+    :global(.dialog-content-settings) {
       animation: dialog-in var(--motion-slow) var(--motion-easing-emphasized);
     }
   }

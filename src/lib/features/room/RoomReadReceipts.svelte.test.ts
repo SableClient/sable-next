@@ -55,7 +55,7 @@ test('shows a face stack and opens the seen-by list', async () => {
   expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
   expect(trigger.getAttribute('title')).toBe('Bob, Carol');
-  expect(trigger.querySelectorAll('.sable-avatar')).toHaveLength(2);
+  expect(trigger.querySelectorAll('.avatar-root')).toHaveLength(2);
   expect(trigger.querySelector('.overflow')).toBeNull();
 
   trigger.click();
@@ -89,7 +89,7 @@ test('caps the stack at three faces and keeps the row reserved when empty', asyn
   });
   await tick();
 
-  expect(document.querySelectorAll('.stack .sable-avatar')).toHaveLength(3);
+  expect(document.querySelectorAll('.stack .avatar-root')).toHaveLength(3);
   expect(document.querySelector('.overflow')?.textContent).toBe('+9');
 
   await unmount(instance);

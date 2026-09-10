@@ -227,11 +227,11 @@
   }
 
   .navigation-panel {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
   }
 
   .content-panel {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     flex-direction: column;
   }
 

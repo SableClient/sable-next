@@ -112,7 +112,7 @@
 
 <style>
   .defaults {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
@@ -125,7 +125,7 @@
   }
 
   .hint {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }

@@ -38,7 +38,7 @@
 
   .row + .row,
   .divided > .row:first-child {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   .row-text {

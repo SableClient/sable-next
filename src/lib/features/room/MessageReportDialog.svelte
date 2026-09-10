@@ -47,7 +47,7 @@
   }
 
   .hint {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-small);
     margin: 0 0 var(--space-400);

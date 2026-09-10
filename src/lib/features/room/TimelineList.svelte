@@ -575,11 +575,11 @@
 
   .history-loading {
     align-items: center;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radii-pill);
     box-shadow: var(--shadow-e200);
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -609,7 +609,7 @@
   }
 
   .viewport:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: calc(-1 * var(--focus-ring-offset));
   }
 
@@ -629,12 +629,12 @@
 
   .viewport:hover,
   .viewport:focus-within {
-    scrollbar-color: var(--sable-surface-container-line) transparent;
+    scrollbar-color: var(--surface-container-line) transparent;
   }
 
   .viewport:hover::-webkit-scrollbar-thumb,
   .viewport:focus-within::-webkit-scrollbar-thumb {
-    background: var(--sable-surface-container-line);
+    background: var(--surface-container-line);
   }
 
   .items {
@@ -672,16 +672,16 @@
   }
 
   .unread-pinned::before {
-    border-top: calc(var(--border-width) * 2) solid var(--sable-primary-main-line);
+    border-top: calc(var(--border-width) * 2) solid var(--primary-main-line);
     content: '';
     flex: 1;
   }
 
   .unread-pinned span {
-    background: var(--sable-primary-container);
-    border: var(--border-width) solid var(--sable-primary-container-line);
+    background: var(--primary-container);
+    border: var(--border-width) solid var(--primary-container-line);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;
@@ -703,11 +703,8 @@
   }
 
   :global(button.jump-to-latest) {
-    background-color: var(--sable-bg-container);
-    background-image: linear-gradient(
-      var(--sable-primary-container),
-      var(--sable-primary-container)
-    );
+    background-color: var(--bg-container);
+    background-image: linear-gradient(var(--primary-container), var(--primary-container));
     bottom: var(--space-400);
     box-shadow: var(--shadow-float);
     left: 50%;

@@ -431,10 +431,10 @@
 
   .play-gif {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: 50%;
     box-shadow: var(--shadow-float);
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     display: flex;
     left: 50%;
     padding: var(--space-200);
@@ -450,8 +450,8 @@
 
   .media-image-unavailable {
     align-items: center;
-    background: var(--sable-surface-container);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
     font-size: var(--font-size-small);
@@ -481,7 +481,7 @@
   }
 
   .media-image.interactive:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 0.2rem;
   }
 

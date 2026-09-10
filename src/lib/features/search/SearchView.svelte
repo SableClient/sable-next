@@ -306,7 +306,7 @@
         <Button
           variant={search.order === option.value ? 'primary' : 'ghost'}
           size="small"
-          class="sable-choice"
+          class="choice"
           aria-pressed={search.order === option.value}
           onclick={() => {
             chooseOrder(option.value);
@@ -326,14 +326,10 @@
           chooseScope(next as 'all' | 'space');
         }}
       >
-        <RadioGroup.Item value="all" class="scope-option sable-choice">
+        <RadioGroup.Item value="all" class="scope-option choice">
           {$i18n.t('search.scopeAll')}
         </RadioGroup.Item>
-        <RadioGroup.Item
-          value="space"
-          class="scope-option sable-choice"
-          disabled={spaces.length === 0}
-        >
+        <RadioGroup.Item value="space" class="scope-option choice" disabled={spaces.length === 0}>
           {$i18n.t('search.scopeSpace')}
         </RadioGroup.Item>
       </RadioGroup.Root>
@@ -552,8 +548,8 @@
   }
 
   .token-field:focus-within {
-    border-color: var(--sable-primary-main);
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+    border-color: var(--primary-main);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 
   .token-input {
@@ -576,10 +572,10 @@
 
   .chip {
     align-items: center;
-    background: var(--sable-sec-container);
-    border: var(--border-width) solid var(--sable-sec-container-line);
+    background: var(--sec-container);
+    border: var(--border-width) solid var(--sec-container-line);
     border-radius: var(--radius-pill);
-    color: var(--sable-sec-on-container);
+    color: var(--sec-on-container);
     display: inline-flex;
     font-size: var(--font-size-small);
     gap: var(--space-050);
@@ -589,9 +585,9 @@
   }
 
   .chip.negated {
-    background: var(--sable-crit-container);
-    border-color: var(--sable-crit-container-line);
-    color: var(--sable-crit-on-container);
+    background: var(--crit-container);
+    border-color: var(--crit-container-line);
+    color: var(--crit-on-container);
   }
 
   .chip-operator {
@@ -620,12 +616,12 @@
 
   .chip-remove:hover,
   .chip-remove:focus-visible {
-    background: var(--sable-sec-container-hover);
+    background: var(--sec-container-hover);
   }
 
   .chip.negated .chip-remove:hover,
   .chip.negated .chip-remove:focus-visible {
-    background: var(--sable-crit-container-hover);
+    background: var(--crit-container-hover);
   }
 
   .search-autocomplete :global(.autocomplete) {
@@ -634,7 +630,7 @@
   }
 
   .empty ul {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
     padding-left: var(--space-500);
@@ -645,7 +641,7 @@
   }
 
   .empty .coverage {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin-block-start: var(--space-100);
   }
@@ -661,7 +657,7 @@
   }
 
   .count {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -685,8 +681,8 @@
   }
 
   :global(.scope-option) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-pill);
     color: inherit;
     cursor: pointer;
@@ -696,7 +692,7 @@
   }
 
   :global(.scope-option:hover:not([data-disabled], [data-state='checked'])) {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   :global(.scope-option[data-disabled]) {
@@ -705,13 +701,13 @@
   }
 
   :global(.scope-option:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
   .scope-space {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: inherit;
     font: inherit;
@@ -732,7 +728,7 @@
 
   .notice,
   .hint {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -744,7 +740,7 @@
   }
 
   .group h2 {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0 0 var(--space-100);
   }
@@ -775,7 +771,7 @@
 
   .hit-row:hover,
   .hit-row:focus-visible {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
   }
 
   .hit-text {
@@ -786,7 +782,7 @@
   }
 
   .hit-meta {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);

@@ -564,7 +564,7 @@
                 onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
               >
               <button
-                class="pixel-toggle desktop-control sable-choice"
+                class="pixel-toggle desktop-control choice"
                 type="button"
                 aria-pressed={pixelated}
                 onclick={() => (pixelated = !pixelated)}
@@ -741,8 +741,8 @@
 
 <style>
   :global(.viewer) {
-    background: var(--sable-surface-var-container);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-var-container);
+    color: var(--surface-on-container);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100dvh;
@@ -756,7 +756,7 @@
   .toolbar,
   .bottom-bar {
     align-items: center;
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     display: flex;
     justify-content: space-between;
     min-width: 0;
@@ -767,7 +767,7 @@
   }
 
   .bottom-bar {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     justify-content: center;
     padding: var(--space-200) max(var(--space-300), var(--safe-left))
       calc(var(--space-200) + var(--safe-bottom));
@@ -819,7 +819,7 @@
 
   .heading span,
   .bottom-bar p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -840,7 +840,7 @@
   .reset {
     background: none;
     border: 0;
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     cursor: pointer;
     font: inherit;
     padding: var(--space-250);
@@ -848,14 +848,14 @@
 
   .pixel-toggle:hover,
   .reset:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
     border-radius: var(--radii-400);
   }
 
   .pixel-toggle:focus-visible,
   .reset:focus-visible {
     border-radius: var(--radii-400);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 0.15rem;
   }
 
@@ -911,7 +911,7 @@
   }
 
   :global(.nav) {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
@@ -919,7 +919,7 @@
   }
 
   :global(.nav:hover) {
-    background: var(--sable-surface-container-active);
+    background: var(--surface-container-active);
   }
 
   :global(.previous) {
@@ -931,14 +931,14 @@
   }
 
   .error {
-    color: var(--sable-crit-on-container);
+    color: var(--crit-on-container);
     display: grid;
     gap: var(--space-200);
     text-align: center;
   }
 
   .error span {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   @media (width >= 48rem) {

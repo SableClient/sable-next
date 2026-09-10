@@ -160,7 +160,7 @@
 
   .pdf-page-frame {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
     display: flex;
     flex: 1 1 auto;
@@ -180,7 +180,7 @@
 
   .pdf-error {
     align-items: center;
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
     gap: var(--space-100);

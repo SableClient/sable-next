@@ -74,10 +74,10 @@ test('signs out the selected devices in one batch', async () => {
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.bulk-bar .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.bulk-bar .btn-danger')?.click();
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.bulk-remove-form .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.bulk-remove-form .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.deleteDevice).toHaveBeenCalledWith('DEV1', null);
     expect(core.deleteDevice).toHaveBeenCalledWith('DEV2', null);
@@ -102,10 +102,10 @@ test('reports which devices failed instead of a blanket success', async () => {
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.bulk-bar .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.bulk-bar .btn-danger')?.click();
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.bulk-remove-form .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.bulk-remove-form .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(document.querySelector('.settings-error')?.textContent).toContain('Tablet');
   });
@@ -121,7 +121,7 @@ test('renames the current device', async () => {
     expect(document.querySelectorAll('.device').length).toBe(3);
   });
 
-  document.querySelectorAll<HTMLButtonElement>('.device-actions .sable-button')[0].click();
+  document.querySelectorAll<HTMLButtonElement>('.device-actions .btn')[0].click();
   await tick();
 
   const input = document.querySelectorAll<HTMLInputElement>('#device-OWN')[0];

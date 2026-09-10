@@ -39,11 +39,11 @@
 
 .compact-tool[aria-current='page'],
 .desktop-tool[aria-current='page'] {
-  color: var(--sable-surface-on-container);
+  color: var(--surface-on-container);
 }
 
 .mobile-tool[aria-current='page'] {
-  color: var(--sable-surface-on-container);
+  color: var(--surface-on-container);
 }
 
 .mobile-tool {
@@ -60,7 +60,7 @@
 }
 
 .quick-tool.mobile-tool:focus-visible {
-  outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: 2px;
 }
 

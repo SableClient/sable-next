@@ -102,7 +102,7 @@
     </div>
     {#if modal}
       <Dialog.Close
-        class="sable-button sable-button-ghost sable-icon-button sable-icon-button-small"
+        class="btn btn-ghost icon-button icon-button-small"
         aria-label={$i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
       >
     {:else}
@@ -121,24 +121,22 @@
         {#if loadMembership}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger
-              class="chip sable-open"
+              class="chip selection-open"
               aria-label={$i18n.t('timeline.memberFilter')}
             >
               <FunnelIcon aria-hidden="true" />
               <span>{$i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
             </DropdownMenu.Trigger>
-            <DropdownMenu.Content class="sable-menu" side="bottom" align="start" sideOffset={4}>
+            <DropdownMenu.Content class="menu-surface" side="bottom" align="start" sideOffset={4}>
               {#each MEMBERSHIP_FILTERS as option (option)}
                 <DropdownMenu.Item
-                  class="sable-menu-item"
+                  class="menu-item"
                   aria-checked={filter === option}
                   onSelect={() => {
                     filter = option;
                   }}
                 >
-                  <span class="sable-menu-check" aria-hidden="true"
-                    >{filter === option ? '✓' : ''}</span
-                  >
+                  <span class="menu-check" aria-hidden="true">{filter === option ? '✓' : ''}</span>
                   {$i18n.t(MEMBERSHIP_FILTER_LABELS[option])}
                 </DropdownMenu.Item>
               {/each}
@@ -146,21 +144,23 @@
           </DropdownMenu.Root>
         {/if}
         <DropdownMenu.Root>
-          <DropdownMenu.Trigger class="chip sable-open" aria-label={$i18n.t('timeline.memberSort')}>
+          <DropdownMenu.Trigger
+            class="chip selection-open"
+            aria-label={$i18n.t('timeline.memberSort')}
+          >
             <span>{$i18n.t(MEMBER_SORT_LABELS[sort])}</span>
             <ArrowsDownUpIcon aria-hidden="true" />
           </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+          <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
             {#each MEMBER_SORTS as option (option)}
               <DropdownMenu.Item
-                class="sable-menu-item"
+                class="menu-item"
                 aria-checked={sort === option}
                 onSelect={() => {
                   setPreference('memberSort', option);
                 }}
               >
-                <span class="sable-menu-check" aria-hidden="true">{sort === option ? '✓' : ''}</span
-                >
+                <span class="menu-check" aria-hidden="true">{sort === option ? '✓' : ''}</span>
                 {$i18n.t(MEMBER_SORT_LABELS[option])}
               </DropdownMenu.Item>
             {/each}
@@ -213,7 +213,7 @@
 
 <style>
   .members-drawer {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
     box-shadow: var(--shadow-dialog);
     display: flex;
     flex-direction: column;
@@ -234,8 +234,8 @@
 
   header {
     align-items: center;
-    background: var(--sable-bg-container);
-    border-bottom: var(--border-width) solid var(--sable-surface-var-container);
+    background: var(--bg-container);
+    border-bottom: var(--border-width) solid var(--surface-var-container);
     display: flex;
     justify-content: space-between;
     min-height: 3.75rem;
@@ -256,7 +256,7 @@
 
   header p,
   .status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
@@ -270,7 +270,7 @@
   }
 
   .controls {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
     display: grid;
     gap: var(--space-200);
     padding: var(--space-300);
@@ -291,7 +291,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
     font: inherit;
@@ -302,12 +302,12 @@
   }
 
   .filters :global(.chip:hover) {
-    background: var(--sable-surface-container);
-    color: var(--sable-bg-on-container);
+    background: var(--surface-container);
+    color: var(--bg-on-container);
   }
 
   .filters :global(.chip:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -317,12 +317,12 @@
   }
 
   .filters :global(.chip:first-child svg) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
   }
 
   :global(.member-search-input) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: inherit;
     min-height: 2.5rem;
@@ -338,7 +338,7 @@
   }
 
   .group-label {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     line-height: var(--line-height-small);
@@ -359,7 +359,7 @@
 
   @media (width > 70.25rem) {
     .members-drawer:not(.compact) {
-      border-left: var(--border-width) solid var(--sable-surface-container-line);
+      border-left: var(--border-width) solid var(--surface-container-line);
       box-shadow: none;
       flex: 0 0 16.625rem;
       inset: auto;

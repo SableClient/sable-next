@@ -243,7 +243,7 @@
   }
 
   .status {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
     padding: var(--space-400) 0;
     text-align: center;

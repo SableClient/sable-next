@@ -60,7 +60,7 @@
       {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
         <button
           {...props}
-          class="reaction sable-choice"
+          class="reaction choice"
           type="button"
           aria-pressed={mine}
           aria-label={$i18n.t('timeline.toggleReaction', {
@@ -134,10 +134,10 @@
 
   .reactions :global(.add-reaction) {
     align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
     justify-content: center;
@@ -147,10 +147,10 @@
 
   .reaction {
     align-items: center;
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
     font: inherit;
@@ -188,7 +188,7 @@
   }
 
   .reaction:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -202,7 +202,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .reaction:hover:not(:disabled, [aria-pressed='true']) {
-      background: var(--sable-surface-var-container-hover);
+      background: var(--surface-var-container-hover);
     }
   }
 </style>

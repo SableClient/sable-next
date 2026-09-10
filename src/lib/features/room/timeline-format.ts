@@ -163,11 +163,11 @@ export function personaLookup(items: readonly TimelineItemView[]): PersonaLookup
 }
 
 const senderColors = [
-  'var(--sable-primary-main)',
-  'var(--sable-sec-main)',
-  'var(--sable-success-main)',
-  'var(--sable-warn-main)',
-  'var(--sable-crit-main)',
+  'var(--primary-main)',
+  'var(--sec-main)',
+  'var(--success-main)',
+  'var(--warn-main)',
+  'var(--crit-main)',
 ];
 
 export function senderColor(sender: string | null): string {

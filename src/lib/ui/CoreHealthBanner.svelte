@@ -38,9 +38,9 @@
 <style>
   .banner {
     align-items: center;
-    background: var(--sable-warn-container);
-    border-block-end: var(--border-width) solid var(--sable-warn-container-line);
-    color: var(--sable-warn-on-container);
+    background: var(--warn-container);
+    border-block-end: var(--border-width) solid var(--warn-container-line);
+    color: var(--warn-on-container);
     display: flex;
     gap: var(--space-300);
     inset-block-start: 0;
@@ -52,16 +52,16 @@
   }
 
   .crash {
-    background: var(--sable-crit-container);
-    border-block-end-color: var(--sable-crit-container-line);
-    color: var(--sable-crit-on-container);
+    background: var(--crit-container);
+    border-block-end-color: var(--crit-container-line);
+    color: var(--crit-on-container);
   }
 
   .message {
     margin: 0;
   }
 
-  :global(.sable-button) {
+  :global(.btn) {
     flex: none;
   }
 </style>

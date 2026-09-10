@@ -18,7 +18,7 @@
 <style>
   .auth-footer {
     align-items: center;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -31,6 +31,6 @@
   }
 
   .auth-footer a:hover {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 </style>

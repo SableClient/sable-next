@@ -50,8 +50,8 @@
     open={page.state.inbox === true}
     label={$i18n.t('nav.inbox')}
     closeLabel={$i18n.t('settings.close')}
-    background="var(--sable-surface-container)"
-    handleColor="var(--sable-surface-on-container)"
+    background="var(--surface-container)"
+    handleColor="var(--surface-on-container)"
     contentInset
     onOpenChange={(open) => {
       if (!open) close();
@@ -63,8 +63,8 @@
 
 <style>
   :global(.inbox-popover) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     max-height: min(42rem, calc(100dvh - 2rem));

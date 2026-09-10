@@ -90,7 +90,7 @@
 
   .reproxy-option:hover,
   .reproxy-option:focus-visible {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
   }
 
   .reproxy-option-name {

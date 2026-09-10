@@ -21,7 +21,7 @@ export function senderDisplayColors(
   const nameColorDark =
     personaTint?.color_on_dark ?? profile?.name_color_dark ?? profile?.name_color_light ?? null;
   const tinted = nameColorLight !== null || nameColorDark !== null;
-  const nameColor = isOwn ? 'var(--sable-primary-on-container)' : senderColor(userId);
+  const nameColor = isOwn ? 'var(--primary-on-container)' : senderColor(userId);
 
   return { nameColor, nameColorLight, nameColorDark, tinted };
 }

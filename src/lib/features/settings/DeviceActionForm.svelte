@@ -65,8 +65,8 @@
 
 <style>
   .device-form {
-    background: var(--sable-surface-container);
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--surface-container);
+    border-top: var(--border-width) solid var(--bg-container-line);
     display: grid;
     gap: var(--space-300);
     grid-template-columns: 1fr;
@@ -79,13 +79,13 @@
   }
 
   .row-copy p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
   }
 
   .danger-form {
-    border-left: var(--border-width-700) solid var(--sable-crit-main);
+    border-left: var(--border-width-700) solid var(--crit-main);
   }
 
   .form-actions {
@@ -94,7 +94,7 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .form-actions :global(.sable-button) {
+  .form-actions :global(.btn) {
     width: 100%;
   }
 
@@ -114,7 +114,7 @@
       display: flex;
     }
 
-    .form-actions :global(.sable-button) {
+    .form-actions :global(.btn) {
       width: auto;
     }
   }

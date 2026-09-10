@@ -27,10 +27,10 @@ test('button variants expose loading and disabled state consistently', () => {
 
   const button = document.querySelector('button');
   expect(button).not.toBeNull();
-  expect(button?.className).toContain('sable-button-primary');
-  expect(button?.className).toContain('sable-button-large');
-  expect(button?.className).toContain('sable-button-loading');
-  expect(button?.className).toContain('sable-button-block');
+  expect(button?.className).toContain('btn-primary');
+  expect(button?.className).toContain('btn-large');
+  expect(button?.className).toContain('btn-loading');
+  expect(button?.className).toContain('btn-block');
   expect(button?.disabled).toBe(true);
   expect(button?.getAttribute('aria-busy')).toBe('true');
 });
@@ -46,10 +46,10 @@ test('icon and link buttons retain accessible labels and shared styling', () => 
   });
 
   expect(document.querySelector('button')?.getAttribute('aria-label')).toBe('Close');
-  expect(document.querySelector('button')?.className).toContain('sable-icon-button-small');
+  expect(document.querySelector('button')?.className).toContain('icon-button-small');
   expect(document.querySelector('a')?.getAttribute('href')).toBe('/home');
-  expect(document.querySelector('a')?.className).toContain('sable-button-primary');
-  expect(document.querySelector('a')?.className).toContain('sable-button-block');
+  expect(document.querySelector('a')?.className).toContain('btn-primary');
+  expect(document.querySelector('a')?.className).toContain('btn-block');
 });
 
 test('content primitives expose semantic state and input affordances', () => {
@@ -72,9 +72,9 @@ test('content primitives expose semantic state and input affordances', () => {
 
   expect(document.querySelector('textarea')?.className).toContain('form-control-error');
   expect(document.querySelector('textarea')?.disabled).toBe(true);
-  expect(document.querySelector('.sable-avatar')?.getAttribute('role')).toBe('img');
-  expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBe('Sable');
-  expect(document.querySelector('[role="alert"]')?.className).toContain('sable-alert-critical');
+  expect(document.querySelector('.avatar-root')?.getAttribute('role')).toBe('img');
+  expect(document.querySelector('.avatar-root')?.getAttribute('aria-label')).toBe('Sable');
+  expect(document.querySelector('[role="alert"]')?.className).toContain('alert-critical');
   expect(document.querySelector('.status-badge')?.className).toContain('status-badge-success');
 });
 
@@ -84,8 +84,8 @@ test('decorative avatars stay out of the accessibility tree', () => {
     props: { initials: 'S', decorative: true },
   });
 
-  expect(document.querySelector('.sable-avatar')?.getAttribute('aria-hidden')).toBe('true');
-  expect(document.querySelector('.sable-avatar')?.getAttribute('aria-label')).toBeNull();
+  expect(document.querySelector('.avatar-root')?.getAttribute('aria-hidden')).toBe('true');
+  expect(document.querySelector('.avatar-root')?.getAttribute('aria-label')).toBeNull();
 });
 
 test('option cards are one radio group with a single checked item', () => {
@@ -129,7 +129,7 @@ test('skeletons are decorative and forward presentation attributes', () => {
     props: { class: 'message-placeholder', style: 'width: 12rem' },
   });
 
-  const skeleton = document.querySelector('.sable-skeleton');
+  const skeleton = document.querySelector('.skeleton');
   expect(skeleton?.getAttribute('aria-hidden')).toBe('true');
   expect(skeleton?.className).toContain('message-placeholder');
   expect(skeleton?.getAttribute('style')).toContain('width: 12rem');

@@ -83,7 +83,7 @@
   }
 
   :global(.setting-row + .setting-row) {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
   }
 
   .row-before {
@@ -94,9 +94,9 @@
 
   .row-icon {
     align-items: center;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     height: var(--control-height-small);
@@ -126,7 +126,7 @@
   }
 
   .row-copy p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
     max-width: 60ch;
@@ -138,7 +138,7 @@
   }
 
   .setting-row.highlighted {
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -167,11 +167,11 @@
   }
 
   .row-share button:hover {
-    background: var(--sable-surface-container-hover);
+    background: var(--surface-container-hover);
   }
 
   .row-share button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 

@@ -27,7 +27,7 @@
   let activeUserId = $derived(core.session?.user_id ?? '');
   let displayName = $derived(profile?.display_name ?? activeUserId);
   let userStatus = $derived(resolveUserStatus(profile, presenceStore.get(activeUserId)));
-  let profileColor = $derived(profile?.hero_color ?? 'var(--sable-primary-container)');
+  let profileColor = $derived(profile?.hero_color ?? 'var(--primary-container)');
   let accountToRemove = $derived(
     core.accounts.find((account) => account.account_id === removeAccountId) ?? null
   );
@@ -116,7 +116,7 @@
     {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
     {#each core.accounts as account (account.account_id)}
       {@const active = account.account_id === activeAccountId}
-      <article class="account-row sable-choice" data-selected={active ? 'true' : undefined}>
+      <article class="account-row choice" data-selected={active ? 'true' : undefined}>
         <button
           class="account-select"
           type="button"
@@ -216,14 +216,14 @@
   }
 
   .section-heading p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin-top: var(--space-200);
   }
 
   .account-row {
     align-items: center;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     display: flex;
     gap: var(--space-300);
@@ -249,7 +249,7 @@
   }
 
   .account-row:not([data-selected='true']) .account-select:not(:disabled):hover {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
   }
 
   .account-identity {
@@ -266,7 +266,7 @@
 
   small,
   .remove-dialog p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 
   .remove-dialog {

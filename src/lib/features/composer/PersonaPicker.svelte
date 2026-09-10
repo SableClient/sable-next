@@ -71,7 +71,7 @@
           {...props}
           variant="ghost"
           size="small"
-          class="persona-button-format sable-open"
+          class="persona-button-format selection-open"
           {label}
         >
           {#if active}
@@ -103,7 +103,7 @@
   <IconButton
     variant="ghost"
     size="small"
-    class="persona-button-format sable-open"
+    class="persona-button-format selection-open"
     {label}
     aria-haspopup="dialog"
     aria-expanded={open}
@@ -134,7 +134,7 @@
 
 <style>
   :global(.persona-picker-popover) {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     padding: var(--space-200);
@@ -143,6 +143,6 @@
   }
 
   :global(.persona-button-format) {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
   }
 </style>

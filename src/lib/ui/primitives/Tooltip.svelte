@@ -44,7 +44,7 @@
 <BitsTooltip.Root>
   <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
   <BitsTooltip.Portal>
-    <BitsTooltip.Content class="sable-tooltip" {side} {align} sideOffset={8}>
+    <BitsTooltip.Content class="tooltip" {side} {align} sideOffset={8}>
       {label}
     </BitsTooltip.Content>
   </BitsTooltip.Portal>
@@ -56,7 +56,7 @@
     background: transparent;
     border: 0;
     border-radius: 50%;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     cursor: pointer;
     display: flex;
     justify-content: center;
@@ -64,13 +64,13 @@
   }
 
   .tooltip-trigger-icon:hover {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   .tooltip-trigger-icon[data-state='open'] {
-    background: var(--sable-surface-container-active);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-active);
+    color: var(--surface-on-container);
   }
 
   .tooltip-trigger-icon :global(svg) {
@@ -92,11 +92,11 @@
 
   .tooltip-trigger-inline:hover,
   .tooltip-trigger-inline[data-state='open'] {
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
   }
 
   .tooltip-trigger:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 

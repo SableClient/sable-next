@@ -53,32 +53,32 @@
 <style>
   .location-map {
     aspect-ratio: 3 / 2;
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     border-radius: var(--radius);
     width: 100%;
     z-index: 0;
   }
 
   .location-map :global(.location-marker svg) {
-    fill: var(--sable-primary-main);
+    fill: var(--primary-main);
   }
 
   .location-map :global(.location-marker circle) {
-    fill: var(--sable-primary-on-main);
+    fill: var(--primary-on-main);
   }
 
   .location-map :global(.leaflet-container) {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
     font: inherit;
   }
 
   .location-map :global(.leaflet-control-attribution) {
-    background: var(--sable-surface-container);
-    color: var(--sable-surface-var-on-container);
+    background: var(--surface-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
   .location-map :global(.leaflet-control-attribution a) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
   }
 </style>

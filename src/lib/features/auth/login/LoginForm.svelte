@@ -242,7 +242,7 @@
 
   .account-switch {
     align-items: center;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     display: flex;
     flex-wrap: wrap;
     font-size: var(--font-size-small);
@@ -255,7 +255,7 @@
   .account-switch-button {
     background: transparent;
     border: 0;
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     cursor: pointer;
     font: inherit;
     font-weight: var(--font-weight-bold);
@@ -268,12 +268,12 @@
   }
 
   .account-switch-button:hover {
-    color: var(--sable-primary-main-hover);
+    color: var(--primary-main-hover);
   }
 
   .account-switch-button:focus-visible {
     border-radius: var(--radii-200);
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 0.15rem;
   }
 

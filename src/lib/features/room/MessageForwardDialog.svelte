@@ -69,7 +69,7 @@
           <li>
             <button
               type="button"
-              class="sable-menu-item"
+              class="menu-item"
               role="checkbox"
               aria-checked={checked}
               onclick={() => {
@@ -123,7 +123,7 @@
     padding: 0;
   }
 
-  .targets :global(.sable-menu-item) {
+  .targets :global(.menu-item) {
     --menu-item-height: var(--control-height-500);
   }
 
@@ -136,7 +136,7 @@
 
   .tick {
     align-items: center;
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     display: inline-flex;
     flex: none;
     height: 1.125rem;
@@ -145,7 +145,7 @@
   }
 
   .empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
   }
@@ -158,7 +158,7 @@
   }
 
   .count {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin-right: auto;
   }

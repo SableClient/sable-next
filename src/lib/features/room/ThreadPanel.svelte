@@ -144,8 +144,8 @@
 
 <style>
   .thread-panel {
-    background: var(--sable-surface-container);
-    border-left: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border-left: var(--border-width) solid var(--surface-container-line);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
@@ -159,7 +159,7 @@
 
   .thread-header {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--sable-surface-container-line);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
@@ -173,7 +173,7 @@
   }
 
   .thread-composer {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     padding: var(--space-300);
   }
 </style>

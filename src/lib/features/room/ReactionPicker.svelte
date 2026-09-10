@@ -37,7 +37,7 @@
 </script>
 
 <Popover.Root bind:open onOpenChange={handleOpenChange}>
-  <Popover.Trigger class={['sable-open', triggerClass]} aria-label={label}>
+  <Popover.Trigger class={['selection-open', triggerClass]} aria-label={label}>
     {@render children()}
   </Popover.Trigger>
   <Popover.Portal>
@@ -51,11 +51,11 @@
 
 <style>
   :global(.reaction-picker) {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     overflow: hidden;
     z-index: var(--layer-popover);
   }

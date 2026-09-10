@@ -28,6 +28,6 @@ test('applies the caller class alongside its own', () => {
   });
 
   const dot = document.querySelector('[data-presence]');
-  expect(dot?.className).toContain('sable-presence-dot');
+  expect(dot?.className).toContain('presence-dot');
   expect(dot?.className).toContain('custom');
 });

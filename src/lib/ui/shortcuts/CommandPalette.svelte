@@ -58,7 +58,7 @@
   }
 
   footer {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
     display: flex;
     justify-content: flex-end;
     padding: var(--space-300) var(--space-400);

@@ -74,7 +74,7 @@
   }
 
   .editor :global(blockquote) {
-    border-inline-start: calc(var(--border-width) * 3) solid var(--sable-primary-main);
+    border-inline-start: calc(var(--border-width) * 3) solid var(--primary-main);
     margin: 0;
     padding-inline-start: var(--space-300);
   }
@@ -86,16 +86,16 @@
   }
 
   .editor :global(:not(pre) > code) {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radii-300);
     font-family: var(--font-family-mono);
     padding: 0 var(--space-050);
   }
 
   .editor :global(pre) {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
     font-family: var(--font-family-mono);
     margin: 0;
@@ -104,18 +104,18 @@
   }
 
   .editor :global([data-mx-spoiler]) {
-    background: var(--sable-surface-container-active);
+    background: var(--surface-container-active);
     border-radius: var(--radii-300);
     padding: 0 var(--space-050);
   }
 
   .editor :global(a) {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     text-decoration: underline;
   }
 
   .editor :global(hr) {
-    background: var(--sable-surface-container-line);
+    background: var(--surface-container-line);
     border: 0;
     height: var(--border-width);
     margin: var(--space-200) 0;
@@ -128,13 +128,13 @@
 
   .editor :global(th),
   .editor :global(td) {
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     padding: var(--space-050) var(--space-150);
     text-align: start;
   }
 
   .editor :global(th) {
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     font-weight: var(--font-weight-bold);
   }
 
@@ -148,9 +148,9 @@
   }
 
   .editor :global([data-sable-room-ping]) {
-    background: var(--sable-warn-container);
+    background: var(--warn-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-warn-on-container);
+    color: var(--warn-on-container);
     padding: 0 var(--space-150);
   }
 
@@ -161,7 +161,7 @@
   }
 
   .editor.empty::before {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     content: attr(data-placeholder);
     left: var(--space-200);
     pointer-events: none;
@@ -170,9 +170,9 @@
   }
 
   .editor :global(.composer-mention) {
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     padding: 0 var(--space-150);
   }
 
@@ -183,7 +183,7 @@
   }
 
   .editor :global(.composer-mention.selected) {
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--sable-focus-ring);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 
   .editor :global(.composer-emoticon img) {
@@ -193,7 +193,7 @@
   }
 
   .editor :global(.composer-emoticon.selected) {
-    background: var(--sable-surface-container-active);
+    background: var(--surface-container-active);
     border-radius: var(--radius);
   }
 </style>

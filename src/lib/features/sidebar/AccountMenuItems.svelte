@@ -32,7 +32,7 @@
 
 {#each otherAccounts as account (account.account_id)}
   <DropdownMenu.Item
-    class="sable-menu-item"
+    class="menu-item"
     disabled={switching}
     onclick={() => {
       onSwitch(account.account_id);
@@ -42,14 +42,14 @@
     <span class="account-name">{account.user_id}</span>
   </DropdownMenu.Item>
 {/each}
-<DropdownMenu.Separator class="sable-menu-separator" />
-<DropdownMenu.Item class="sable-menu-item" onclick={onProfile}
+<DropdownMenu.Separator class="menu-separator" />
+<DropdownMenu.Item class="menu-item" onclick={onProfile}
   >{$i18n.t('nav.editProfile')}</DropdownMenu.Item
 >
-<DropdownMenu.Item class="sable-menu-item" onclick={onAddAccount}
+<DropdownMenu.Item class="menu-item" onclick={onAddAccount}
   >{$i18n.t('nav.addAccount')}</DropdownMenu.Item
 >
-<DropdownMenu.Separator class="sable-menu-separator" />
-<DropdownMenu.Item class="sable-menu-item sable-menu-item-destructive" onclick={onLogout}
+<DropdownMenu.Separator class="menu-separator" />
+<DropdownMenu.Item class="menu-item menu-item-destructive" onclick={onLogout}
   >{$i18n.t('settings.logout')}</DropdownMenu.Item
 >

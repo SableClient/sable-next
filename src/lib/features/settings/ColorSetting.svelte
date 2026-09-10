@@ -17,7 +17,7 @@
   let saturation = $state(100);
   let brightness = $state(100);
   let valid = $derived(/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(value));
-  let swatchColor = $derived(valid ? value : 'var(--sable-bg-container)');
+  let swatchColor = $derived(valid ? value : 'var(--bg-container)');
 
   function hexToHsv(hex: string): [number, number, number] {
     const normalized = hex.replace('#', '');
@@ -164,7 +164,7 @@
   }
 
   :global(.swatch-button) {
-    border: calc(var(--border-width) * 2) solid var(--sable-focus-ring);
+    border: calc(var(--border-width) * 2) solid var(--focus-ring);
     border-radius: 50%;
     cursor: pointer;
     height: var(--control-height-medium);
@@ -179,8 +179,8 @@
   }
 
   :global(.color-popover) {
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
     padding: var(--space-400);
@@ -191,8 +191,8 @@
   .saturation-picker {
     background-color: var(--picker-color);
     background-image:
-      linear-gradient(to top, var(--sable-picker-black), transparent),
-      linear-gradient(to right, var(--sable-picker-white), transparent);
+      linear-gradient(to top, var(--picker-black), transparent),
+      linear-gradient(to right, var(--picker-white), transparent);
     border: 0;
     cursor: crosshair;
     height: 10rem;
@@ -202,9 +202,9 @@
   }
 
   .picker-cursor {
-    border: calc(var(--border-width) * 2) solid var(--sable-bg-container);
+    border: calc(var(--border-width) * 2) solid var(--bg-container);
     border-radius: 50%;
-    box-shadow: 0 0 0 var(--border-width) var(--sable-bg-on-container);
+    box-shadow: 0 0 0 var(--border-width) var(--bg-on-container);
     height: 0.75rem;
     position: absolute;
     transform: translate(-50%, -50%);
@@ -212,7 +212,7 @@
   }
 
   .hue-slider {
-    accent-color: var(--sable-primary-main);
+    accent-color: var(--primary-main);
     margin-top: var(--space-400);
     width: 100%;
   }

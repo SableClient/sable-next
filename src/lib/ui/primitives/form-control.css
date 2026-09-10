@@ -1,7 +1,7 @@
 .form-control {
-  --form-control-container: var(--sable-bg-container);
-  --form-control-line: var(--sable-bg-container-line);
-  --form-control-color: var(--sable-bg-on-container);
+  --form-control-container: var(--bg-container);
+  --form-control-line: var(--bg-container-line);
+  --form-control-color: var(--bg-on-container);
   --form-control-ring: var(--border-width-400);
   --form-control-padding-block: 0;
   --form-control-padding-inline: var(--control-padding-300);
@@ -22,7 +22,7 @@
 
 .form-control:focus,
 .form-control:focus-visible {
-  --form-control-line: var(--sable-primary-main);
+  --form-control-line: var(--primary-main);
   --form-control-ring: var(--border-width-600);
 
   outline: none;
@@ -30,7 +30,7 @@
 
 .form-control[aria-invalid='true'],
 .form-control-error {
-  --form-control-line: var(--sable-crit-main);
+  --form-control-line: var(--crit-main);
 }
 
 .form-control:disabled {

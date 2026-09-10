@@ -125,7 +125,7 @@ test('opens a profile avatar through viewer callback', async () => {
   const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
   if (!avatarButton) throw new Error('profile avatar button missing');
   expect(avatarButton.getAttribute('aria-label')).toBe("View Alice's avatar");
-  expect(avatarButton.querySelector('.sable-avatar')?.getAttribute('aria-hidden')).toBe('true');
+  expect(avatarButton.querySelector('.avatar-root')?.getAttribute('aria-hidden')).toBe('true');
   avatarButton.click();
 
   expect(onAvatarClick).toHaveBeenCalledWith('mxc://example.org/avatar', 'Alice');
@@ -208,7 +208,7 @@ test('reserves the metadata row while the profile is still loading', async () =>
   });
   await tick();
 
-  expect(document.querySelectorAll('.profile-card-meta .sable-skeleton')).toHaveLength(2);
+  expect(document.querySelectorAll('.profile-card-meta .skeleton')).toHaveLength(2);
   await unmount(instance);
 });
 
@@ -288,7 +288,7 @@ test('collects an optional reason before kicking a member', async () => {
   reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.moderation-actions .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.kickUser).toHaveBeenCalledWith(
       '!room:example.org',
@@ -344,7 +344,7 @@ test('sends no reason when the moderation reason is left blank', async () => {
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.moderation-actions .sable-button-danger')?.click();
+  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
   });

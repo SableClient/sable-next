@@ -75,7 +75,7 @@
 
 {#if desktop}
   <Popover.Root bind:open onOpenChange={handleOpenChange}>
-    <Popover.Trigger bind:ref={trigger} class="avatar-button sable-open" aria-label={label}>
+    <Popover.Trigger bind:ref={trigger} class="avatar-button selection-open" aria-label={label}>
       {@render children()}
     </Popover.Trigger>
     <Popover.Portal>
@@ -97,7 +97,7 @@
   </Popover.Root>
 {:else}
   <button
-    class="avatar-button sable-open"
+    class="avatar-button selection-open"
     type="button"
     aria-label={label}
     aria-haspopup="dialog"
@@ -111,7 +111,7 @@
     bind:open
     label={$i18n.t('timeline.personaSheet')}
     closeLabel={$i18n.t('timeline.closeProfile')}
-    handleColor="var(--sable-bg-container)"
+    handleColor="var(--bg-container)"
     handleOpacity={1}
     contentInset={false}
     onOpenChange={handleOpenChange}

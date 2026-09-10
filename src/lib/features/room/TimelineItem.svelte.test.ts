@@ -104,7 +104,7 @@ test('renders placeholders through the standard message layout', async () => {
 
   const message = document.querySelector('.message.placeholder-message');
   expect(message).toBeInstanceOf(HTMLElement);
-  expect(message?.querySelector('.sable-avatar.message-avatar')).toBeInstanceOf(HTMLElement);
+  expect(message?.querySelector('.avatar-root.message-avatar')).toBeInstanceOf(HTMLElement);
   expect(
     message?.querySelector<HTMLElement>('.message-content .formatted-body .placeholder-copy')
       ?.textContent
@@ -340,7 +340,7 @@ test('a per-message profile takes the sender position and names the account behi
   await tick();
 
   expect(document.querySelector('header .sender')?.textContent.trim()).toBe('Kris');
-  expect(document.querySelector('header .sable-pronoun-pill')?.textContent).toBe('they/them');
+  expect(document.querySelector('header .pronoun-pill')?.textContent).toBe('they/them');
   expect(document.querySelector('header .via')?.textContent).toContain('Alice');
   expect(document.querySelector('header .via')?.textContent).not.toContain('@alice:example.org');
   expect(document.querySelector('header .via')?.classList.contains('tinted')).toBe(true);
@@ -480,7 +480,7 @@ test('opens message actions on right click', async () => {
   message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   await tick();
 
-  expect(document.querySelector('.sable-menu')?.textContent).toContain('Reply');
+  expect(document.querySelector('.menu-surface')?.textContent).toContain('Reply');
   await unmount(instance);
 });
 
@@ -569,7 +569,7 @@ test('shows every pronoun set from the sender account profile', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(2);
+    expect(document.querySelectorAll('header .pronoun-pill')).toHaveLength(2);
   });
   await unmount(instance);
 });
@@ -586,7 +586,7 @@ test('shows only the sets tagged with the reader language', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    const pills = document.querySelectorAll('header .sable-pronoun-pill');
+    const pills = document.querySelectorAll('header .pronoun-pill');
     expect(pills).toHaveLength(1);
     expect(pills[0].textContent).toBe('she/her');
   });
@@ -606,11 +606,11 @@ test('shows every set once the language filter is switched off', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(2);
+    expect(document.querySelectorAll('header .pronoun-pill')).toHaveLength(2);
   });
   setPreference('filterPronounsByLanguage', true);
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .sable-pronoun-pill')).toHaveLength(1);
+    expect(document.querySelectorAll('header .pronoun-pill')).toHaveLength(1);
   });
   await unmount(instance);
 });
@@ -629,7 +629,7 @@ test('caps the pills at three and counts the rest', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    const pills = document.querySelectorAll('header .sable-pronoun-pill');
+    const pills = document.querySelectorAll('header .pronoun-pill');
     expect(pills).toHaveLength(4);
     expect(pills[3].textContent).toBe('+1');
     expect(pills[3].getAttribute('title')).toBe('it/its (en)');

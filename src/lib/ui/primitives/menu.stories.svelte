@@ -19,13 +19,13 @@
 </script>
 
 <Story name="Surface" asChild>
-  <div class="sable-menu demo-menu">
+  <div class="menu-surface demo-menu">
     <IconContext values={decorative}>
-      <button class="sable-menu-item" type="button"><StarIcon />Favourite</button>
-      <button class="sable-menu-item" type="button"><LinkIcon />Copy link</button>
-      <button class="sable-menu-item" type="button"><GearIcon />Settings</button>
-      <div class="sable-menu-separator"></div>
-      <button class="sable-menu-item sable-menu-item-destructive" type="button">
+      <button class="menu-item" type="button"><StarIcon />Favourite</button>
+      <button class="menu-item" type="button"><LinkIcon />Copy link</button>
+      <button class="menu-item" type="button"><GearIcon />Settings</button>
+      <div class="menu-separator"></div>
+      <button class="menu-item menu-item-destructive" type="button">
         <SignOutIcon />Leave room
       </button>
     </IconContext>
@@ -33,15 +33,15 @@
 </Story>
 
 <Story name="Roomy rows" asChild>
-  <div class="sable-menu demo-menu">
+  <div class="menu-surface demo-menu">
     <IconContext values={decorative}>
-      <button class="sable-menu-item sable-menu-item-roomy" type="button">
+      <button class="menu-item menu-item-roomy" type="button">
         <StarIcon />Favourite
       </button>
-      <button class="sable-menu-item sable-menu-item-roomy" type="button">
+      <button class="menu-item menu-item-roomy" type="button">
         <LinkIcon />Copy link
       </button>
-      <button class="sable-menu-item sable-menu-item-roomy" type="button">
+      <button class="menu-item menu-item-roomy" type="button">
         <GearIcon />Settings
       </button>
     </IconContext>
@@ -49,33 +49,29 @@
 </Story>
 
 <Story name="States" asChild>
-  <div class="sable-menu demo-menu">
+  <div class="menu-surface demo-menu">
     <IconContext values={decorative}>
-      <button class="sable-menu-item" type="button"><StarIcon />Rest</button>
-      <button class="sable-menu-item" type="button" role="menuitemcheckbox" aria-checked={true}>
+      <button class="menu-item" type="button"><StarIcon />Rest</button>
+      <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={true}>
         <StarIcon />Checked
       </button>
-      <button class="sable-menu-item" type="button" data-highlighted><LinkIcon />Highlighted</button
-      >
-      <button class="sable-menu-item" type="button" disabled><GearIcon />Disabled</button>
+      <button class="menu-item" type="button" data-highlighted><LinkIcon />Highlighted</button>
+      <button class="menu-item" type="button" disabled><GearIcon />Disabled</button>
     </IconContext>
   </div>
 </Story>
 
 <Story name="Trailing icons" asChild>
-  <div class="sable-menu demo-menu demo-sheet">
+  <div class="menu-surface demo-menu demo-sheet">
     <IconContext values={decorative}>
-      <button class="sable-menu-item sable-menu-item-trailing-icon" type="button">
+      <button class="menu-item menu-item-trailing-icon" type="button">
         <StarIcon /><span>Favourite</span>
       </button>
-      <button class="sable-menu-item sable-menu-item-trailing-icon" type="button">
+      <button class="menu-item menu-item-trailing-icon" type="button">
         <LinkIcon /><span>Copy link</span>
       </button>
-      <div class="sable-menu-separator"></div>
-      <button
-        class="sable-menu-item sable-menu-item-trailing-icon sable-menu-item-destructive"
-        type="button"
-      >
+      <div class="menu-separator"></div>
+      <button class="menu-item menu-item-trailing-icon menu-item-destructive" type="button">
         <SignOutIcon /><span>Delete message</span>
       </button>
     </IconContext>
@@ -90,12 +86,12 @@
           <Button {...props}>Room options</Button>
         {/snippet}
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content class="sable-menu" sideOffset={4}>
+      <DropdownMenu.Content class="menu-surface" sideOffset={4}>
         <IconContext values={decorative}>
-          <DropdownMenu.Item class="sable-menu-item"><StarIcon />Favourite</DropdownMenu.Item>
-          <DropdownMenu.Item class="sable-menu-item"><LinkIcon />Copy link</DropdownMenu.Item>
-          <DropdownMenu.Separator class="sable-menu-separator" />
-          <DropdownMenu.Item class="sable-menu-item sable-menu-item-destructive">
+          <DropdownMenu.Item class="menu-item"><StarIcon />Favourite</DropdownMenu.Item>
+          <DropdownMenu.Item class="menu-item"><LinkIcon />Copy link</DropdownMenu.Item>
+          <DropdownMenu.Separator class="menu-separator" />
+          <DropdownMenu.Item class="menu-item menu-item-destructive">
             <SignOutIcon />Leave room
           </DropdownMenu.Item>
         </IconContext>

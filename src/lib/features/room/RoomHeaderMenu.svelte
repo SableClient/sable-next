@@ -72,7 +72,7 @@
     {#snippet child({ props })}
       <IconButton
         {...props}
-        class="room-menu-button sable-open"
+        class="room-menu-button selection-open"
         variant="ghost"
         size="small"
         label={$i18n.t('room.menuMoreOptions')}
@@ -83,13 +83,13 @@
   </DropdownMenu.Trigger>
 
   <DropdownMenu.Content
-    class="sable-menu room-options-menu"
+    class="menu-surface room-options-menu"
     side="bottom"
     align="end"
     sideOffset={4}
   >
     <IconContext values={{ 'aria-hidden': 'true' }}>
-      <DropdownMenu.Item class="sable-menu-item" disabled={!unread} onSelect={onMarkRead}>
+      <DropdownMenu.Item class="menu-item" disabled={!unread} onSelect={onMarkRead}>
         <ChecksIcon />
         {$i18n.t('room.menuMarkRead')}
       </DropdownMenu.Item>
@@ -97,34 +97,34 @@
         <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
       {/if}
 
-      <DropdownMenu.Separator class="sable-menu-separator" />
+      <DropdownMenu.Separator class="menu-separator" />
 
-      <DropdownMenu.Item class="sable-menu-item" disabled={!canInvite} onSelect={onInvite}>
+      <DropdownMenu.Item class="menu-item" disabled={!canInvite} onSelect={onInvite}>
         <UserPlusIcon />
         {$i18n.t('room.menuInvite')}
       </DropdownMenu.Item>
       {#if compact}
-        <DropdownMenu.Item class="sable-menu-item" onSelect={onMembers}>
+        <DropdownMenu.Item class="menu-item" onSelect={onMembers}>
           <UserCircleIcon />
           {$i18n.t('timeline.members')}
         </DropdownMenu.Item>
       {/if}
-      <DropdownMenu.Item class="sable-menu-item" onSelect={copyLink}>
+      <DropdownMenu.Item class="menu-item" onSelect={copyLink}>
         <LinkIcon />
         {$i18n.t('room.menuCopyLink')}
       </DropdownMenu.Item>
-      <DropdownMenu.Item class="sable-menu-item" onSelect={onSettings}>
+      <DropdownMenu.Item class="menu-item" onSelect={onSettings}>
         <GearIcon />
         {$i18n.t('room.menuSettings')}
       </DropdownMenu.Item>
-      <DropdownMenu.Item class="sable-menu-item" onSelect={onJumpToTime}>
+      <DropdownMenu.Item class="menu-item" onSelect={onJumpToTime}>
         <ClockCounterClockwiseIcon />
         {$i18n.t('room.menuJumpToTime')}
       </DropdownMenu.Item>
 
-      <DropdownMenu.Separator class="sable-menu-separator" />
+      <DropdownMenu.Separator class="menu-separator" />
 
-      <DropdownMenu.Item class="sable-menu-item sable-menu-item-destructive" onSelect={onLeave}>
+      <DropdownMenu.Item class="menu-item menu-item-destructive" onSelect={onLeave}>
         <SignOutIcon />
         {room?.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
       </DropdownMenu.Item>

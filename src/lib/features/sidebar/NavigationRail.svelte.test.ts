@@ -104,10 +104,8 @@ test('badges unread direct chats but leaves home alone', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .sable-unread-badge')).toBeNull();
-  expect(document.querySelector('a[href="/direct"] .sable-unread-badge-count')?.textContent).toBe(
-    '3'
-  );
+  expect(document.querySelector('a[href="/home"] .unread-badge')).toBeNull();
+  expect(document.querySelector('a[href="/direct"] .unread-badge-count')?.textContent).toBe('3');
 
   await unmount(instance);
 });
@@ -125,10 +123,8 @@ test('badges the unspaced section, which home no longer repeats', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .sable-unread-badge')).toBeNull();
-  expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-count')?.textContent).toBe(
-    '2'
-  );
+  expect(document.querySelector('a[href="/home"] .unread-badge')).toBeNull();
+  expect(document.querySelector('a[href="/rooms"] .unread-badge-count')?.textContent).toBe('2');
 
   await unmount(instance);
 });
@@ -158,8 +154,8 @@ test('uses a dot for ordinary unread messages outside spaces', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-dot')).not.toBeNull();
-  expect(document.querySelector('a[href="/rooms"] .sable-unread-badge-count')).toBeNull();
+  expect(document.querySelector('a[href="/rooms"] .unread-badge-dot')).not.toBeNull();
+  expect(document.querySelector('a[href="/rooms"] .unread-badge-count')).toBeNull();
 
   await unmount(instance);
 });
@@ -200,8 +196,8 @@ test('shows unread direct rooms as individual avatars', async () => {
   const directLink = document.querySelector('a[href="/direct/!dm%3Aexample.org"]');
   expect(directLink?.getAttribute('aria-label')).toBe('Alice');
   expect(directLink?.querySelector('.space-initial')?.textContent.trim()).toBe('A');
-  expect(directLink?.querySelector('.sable-unread-badge-count')?.textContent).toBe('2');
-  expect(directLink?.querySelector('.sable-unread-badge-dot')).toBeNull();
+  expect(directLink?.querySelector('.unread-badge-count')?.textContent).toBe('2');
+  expect(directLink?.querySelector('.unread-badge-dot')).toBeNull();
 
   await unmount(instance);
 });
@@ -222,9 +218,9 @@ test('badges a space with its mentions and dots one with only unread messages', 
 
   const alpha = document.querySelector('a[aria-label="Alpha"]');
   const beta = document.querySelector('a[aria-label="Beta"]');
-  expect(alpha?.querySelector('.sable-unread-badge-count')?.textContent).toBe('3');
-  expect(beta?.querySelector('.sable-unread-badge-count')).toBeNull();
-  expect(beta?.querySelector('.sable-unread-badge-dot')).not.toBeNull();
+  expect(alpha?.querySelector('.unread-badge-count')?.textContent).toBe('3');
+  expect(beta?.querySelector('.unread-badge-count')).toBeNull();
+  expect(beta?.querySelector('.unread-badge-dot')).not.toBeNull();
 
   await unmount(instance);
 });
@@ -236,11 +232,11 @@ test('outlines every tab but a space avatar', async () => {
   });
   await tick();
 
+  expect(document.querySelector('a[href="/rooms"]')?.classList.contains('nav-tab-outlined')).toBe(
+    true
+  );
   expect(
-    document.querySelector('a[href="/rooms"]')?.classList.contains('sable-nav-tab-outlined')
-  ).toBe(true);
-  expect(
-    document.querySelector('a[aria-label="Alpha"]')?.classList.contains('sable-nav-tab-outlined')
+    document.querySelector('a[aria-label="Alpha"]')?.classList.contains('nav-tab-outlined')
   ).toBe(false);
 
   await unmount(instance);
@@ -302,7 +298,7 @@ test('marks a whole section read from the tab that badges it', async () => {
   await tick();
   await tick();
 
-  const item = [...document.querySelectorAll<HTMLElement>('.sable-menu-item')].find(
+  const item = [...document.querySelectorAll<HTMLElement>('.menu-item')].find(
     (element) => element.textContent.trim() === 'nav.markSectionRead'
   );
   expect(item).not.toBeUndefined();
@@ -408,7 +404,7 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
   expect(folder?.getAttribute('aria-label')).toBe('nav.folderExpand:Alpha, Beta');
   expect(folder?.getAttribute('aria-expanded')).toBe('false');
   expect(folder?.querySelectorAll('.folder-tile')).toHaveLength(2);
-  expect(folder?.querySelector('.sable-unread-badge-dot')).not.toBeNull();
+  expect(folder?.querySelector('.unread-badge-dot')).not.toBeNull();
   expect(document.querySelectorAll('.rail-slot a')).toHaveLength(0);
 
   folder?.click();
@@ -443,7 +439,7 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
   const collapse = document.querySelector<HTMLButtonElement>('.folder-collapse');
   expect(collapse?.getAttribute('aria-label')).toBe('nav.folderCollapse:Work');
   expect(collapse?.getAttribute('aria-expanded')).toBe('true');
-  expect(collapse?.classList.contains('sable-open')).toBe(false);
+  expect(collapse?.classList.contains('selection-open')).toBe(false);
   collapse?.click();
   expect(toggled).toEqual(['f']);
 
@@ -493,7 +489,7 @@ test('offers a way out of a folder holding a single space', async () => {
   await tick();
   await tick();
 
-  const item = [...document.querySelectorAll<HTMLElement>('.sable-menu-item')].find(
+  const item = [...document.querySelectorAll<HTMLElement>('.menu-item')].find(
     (element) => element.textContent.trim() === 'nav.folderRemoveSpace'
   );
   expect(item).not.toBeUndefined();
@@ -552,7 +548,7 @@ test('right-clicking a top-level space opens its options menu', async () => {
   await tick();
   await tick();
 
-  const labels = [...document.querySelectorAll<HTMLElement>('.sable-menu-item')].map((element) =>
+  const labels = [...document.querySelectorAll<HTMLElement>('.menu-item')].map((element) =>
     element.textContent.trim()
   );
   expect(labels).toContain('room.menuMarkRead');

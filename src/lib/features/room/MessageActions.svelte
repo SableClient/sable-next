@@ -54,7 +54,7 @@
       {roomId}
       onPick={onReact}
       onOpenChange={onPickerOpenChange}
-      triggerClass="sable-button sable-button-ghost sable-button-icon sable-icon-button sable-icon-button-small message-action-button"
+      triggerClass="btn btn-ghost btn-icon icon-button icon-button-small message-action-button"
     >
       <EmojiIcon />
     </ReactionPicker>
@@ -89,7 +89,7 @@
             {...props}
             size="small"
             variant="ghost"
-            class="message-action-button sable-open"
+            class="message-action-button selection-open"
             label={$i18n.t('timeline.moreActions')}
           >
             <MoreIcon />
@@ -98,38 +98,35 @@
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          class="sable-menu"
+          class="menu-surface"
           side="bottom"
           align="end"
           sideOffset={4}
           collisionPadding={8}
         >
           {#if onCopyText}
-            <DropdownMenu.Item class="sable-menu-item" onclick={onCopyText}
+            <DropdownMenu.Item class="menu-item" onclick={onCopyText}
               >{$i18n.t('timeline.copyMessage')}</DropdownMenu.Item
             >
           {/if}
           {#if onCopyLink}
-            <DropdownMenu.Item class="sable-menu-item" onclick={onCopyLink}
+            <DropdownMenu.Item class="menu-item" onclick={onCopyLink}
               >{$i18n.t('timeline.copyLink')}</DropdownMenu.Item
             >
           {/if}
           {#if onViewReactions}
-            <DropdownMenu.Item class="sable-menu-item" onclick={onViewReactions}
+            <DropdownMenu.Item class="menu-item" onclick={onViewReactions}
               >{$i18n.t('timeline.viewReactions')}</DropdownMenu.Item
             >
           {/if}
           {#if onReadReceipts}
-            <DropdownMenu.Item class="sable-menu-item" onclick={onReadReceipts}
+            <DropdownMenu.Item class="menu-item" onclick={onReadReceipts}
               >{$i18n.t('timeline.readReceipts')}</DropdownMenu.Item
             >
           {/if}
           {#if onDelete}
-            <DropdownMenu.Separator class="sable-menu-separator" />
-            <DropdownMenu.Item
-              class="sable-menu-item sable-menu-item-destructive"
-              onclick={onDelete}
-            >
+            <DropdownMenu.Separator class="menu-separator" />
+            <DropdownMenu.Item class="menu-item menu-item-destructive" onclick={onDelete}>
               {$i18n.t('timeline.deleteMessage')}
             </DropdownMenu.Item>
           {/if}
@@ -146,8 +143,8 @@
     --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
     align-items: center;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-outer);
     inset-inline-end: var(--space-300);
     bottom: calc(100% - var(--space-200));
@@ -165,7 +162,7 @@
     --button-height: 1.5rem;
 
     border-radius: var(--radius-inner);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     position: relative;
   }
 
@@ -176,7 +173,7 @@
   }
 
   .message-actions :global(button:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: -1px;
   }
 
@@ -188,8 +185,8 @@
 
   @media (hover: hover) and (pointer: fine) {
     .message-actions :global(button:hover) {
-      background: var(--sable-surface-var-container);
-      color: var(--sable-bg-on-container);
+      background: var(--surface-var-container);
+      color: var(--bg-on-container);
     }
   }
 </style>

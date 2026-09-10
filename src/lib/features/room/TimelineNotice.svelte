@@ -82,7 +82,7 @@
   }
 
   .separator {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     padding: var(--space-200);
     text-align: center;
@@ -90,7 +90,7 @@
 
   .state {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -99,14 +99,14 @@
   }
 
   .state-rail {
-    border-top: var(--border-width) dashed var(--sable-surface-var-container-line);
+    border-top: var(--border-width) dashed var(--surface-var-container-line);
     flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
     margin-inline-start: var(--space-300);
   }
 
   .redacted-label {
     align-items: center;
-    border: var(--border-width) dashed var(--sable-surface-var-container-line);
+    border: var(--border-width) dashed var(--surface-var-container-line);
     border-radius: var(--radius-pill);
     display: inline-flex;
     gap: var(--space-100);
@@ -115,9 +115,9 @@
 
   .debug-event {
     align-items: baseline;
-    background: var(--sable-surface-var-container);
-    border-block: var(--border-width) dashed var(--sable-surface-var-container-line);
-    color: var(--sable-surface-var-on-container);
+    background: var(--surface-var-container);
+    border-block: var(--border-width) dashed var(--surface-var-container-line);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -133,7 +133,7 @@
   .debug-body :global(.debug-peek-trigger) {
     background: none;
     border: 0;
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
@@ -144,7 +144,7 @@
   }
 
   .debug-peek {
-    background: var(--sable-bg-container);
+    background: var(--bg-container);
     border-radius: var(--radius);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
@@ -161,7 +161,7 @@
 
   .date-divider {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-300);
@@ -171,14 +171,14 @@
 
   .date-divider::before,
   .date-divider::after {
-    border-top: var(--border-width) solid var(--sable-bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
     content: '';
     flex: 1;
   }
 
   .date-divider span {
-    background: var(--sable-surface-var-container);
-    border: var(--border-width) solid var(--sable-surface-var-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.06em;
@@ -196,13 +196,13 @@
   }
 
   .read-marker::before {
-    border-top: var(--border-width) solid var(--sable-success-main);
+    border-top: var(--border-width) solid var(--success-main);
     content: '';
     flex: 1;
   }
 
   .read-marker span {
-    color: var(--sable-success-main);
+    color: var(--success-main);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.06em;
@@ -210,16 +210,16 @@
   }
 
   .unread::before {
-    border-top: calc(var(--border-width) * 2) solid var(--sable-primary-main-line);
+    border-top: calc(var(--border-width) * 2) solid var(--primary-main-line);
     content: '';
     flex: 1;
   }
 
   .unread span {
-    background: var(--sable-primary-container);
-    border: var(--border-width) solid var(--sable-primary-container-line);
+    background: var(--primary-container);
+    border: var(--border-width) solid var(--primary-container-line);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-container);
+    color: var(--primary-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.04em;

@@ -28,7 +28,7 @@
       <button
         type="button"
         role="tab"
-        class="persona-scope sable-choice"
+        class="persona-scope choice"
         aria-selected={scope === tab.id}
         onclick={() => {
           onScope(tab.id);
@@ -87,7 +87,7 @@
     background: none;
     border: var(--border-width) solid transparent;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     flex: 1;
     font: inherit;
@@ -120,7 +120,7 @@
 
   .persona-option:hover,
   .persona-option:focus-visible {
-    background: var(--sable-surface-container);
+    background: var(--surface-container);
   }
 
   .persona-option-name {

@@ -29,15 +29,15 @@
   }: Props = $props();
 </script>
 
-<nav class="sable-settings-nav-list" aria-label={ariaLabel}>
+<nav class="settings-nav-list" aria-label={ariaLabel}>
   {#each entries as entry (entry.id)}
     {@const active = activeId === entry.id}
     {@const Icon = entry.icon}
     {@const classes = [
-      'sable-settings-nav-item',
-      'sable-current',
-      'sable-selection-layer',
-      { 'sable-settings-nav-item-large': large },
+      'settings-nav-item',
+      'selection-current',
+      'selection-layer',
+      { 'settings-nav-item-large': large },
     ]}
     {#if href}
       <a
@@ -67,7 +67,7 @@
 </nav>
 
 <style>
-  .sable-settings-nav-list {
+  .settings-nav-list {
     align-content: start;
     display: grid;
     flex: 1;
@@ -81,7 +81,7 @@
     scrollbar-gutter: stable;
   }
 
-  .sable-settings-nav-item {
+  .settings-nav-item {
     align-items: center;
     background: transparent;
     border: 0;
@@ -102,46 +102,46 @@
     width: 100%;
   }
 
-  .sable-settings-nav-item-large {
+  .settings-nav-item-large {
     min-height: var(--control-height-large);
   }
 
-  .sable-settings-nav-item:hover {
-    background: var(--sable-surface-container-hover);
+  .settings-nav-item:hover {
+    background: var(--surface-container-hover);
   }
 
-  .sable-settings-nav-item:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+  .settings-nav-item:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 2px;
   }
 
-  .sable-settings-nav-item[aria-current='page'],
-  .sable-settings-nav-item[data-current='true'] {
-    background: var(--sable-surface-container-active);
-    color: var(--sable-surface-on-container);
+  .settings-nav-item[aria-current='page'],
+  .settings-nav-item[data-current='true'] {
+    background: var(--surface-container-active);
+    color: var(--surface-on-container);
     font-weight: var(--font-weight-medium);
   }
 
-  .sable-settings-nav-item[aria-current='page']:hover,
-  .sable-settings-nav-item[data-current='true']:hover {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+  .settings-nav-item[aria-current='page']:hover,
+  .settings-nav-item[data-current='true']:hover {
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
-  .sable-settings-nav-item .icon {
+  .settings-nav-item .icon {
     align-items: center;
     display: flex;
     flex: 0 0 auto;
     justify-content: center;
   }
 
-  .sable-settings-nav-item .icon :global(svg),
-  .sable-settings-nav-item .chevron :global(svg) {
+  .settings-nav-item .icon :global(svg),
+  .settings-nav-item .chevron :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
 
-  .sable-settings-nav-item .label {
+  .settings-nav-item .label {
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -149,9 +149,9 @@
     white-space: nowrap;
   }
 
-  .sable-settings-nav-item .chevron {
+  .settings-nav-item .chevron {
     align-items: center;
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
   }

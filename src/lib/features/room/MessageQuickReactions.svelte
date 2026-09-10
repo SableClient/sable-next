@@ -46,7 +46,7 @@
 
   .quick-reaction {
     align-items: center;
-    background: var(--sable-surface-var-container);
+    background: var(--surface-var-container);
     border: 0;
     border-radius: var(--radii-pill);
     cursor: pointer;
@@ -59,11 +59,11 @@
   }
 
   .quick-reaction:hover {
-    background: var(--sable-surface-var-container-hover);
+    background: var(--surface-var-container-hover);
   }
 
   .quick-reaction:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -73,7 +73,7 @@
   }
 
   .quick-line {
-    background: var(--sable-surface-container-line);
+    background: var(--surface-container-line);
     block-size: var(--border-width);
   }
 </style>

@@ -47,7 +47,7 @@
   }
 
   .empty-state-eyebrow {
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
     letter-spacing: 0.08em;
@@ -62,7 +62,7 @@
   }
 
   .empty-state-description {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: var(--space-400) 0 0;
   }
 

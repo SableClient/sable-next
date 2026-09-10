@@ -195,7 +195,7 @@ test('expanded room disclosures do not use the active-route surface', async () =
   ];
 
   const instance = await mountNav();
-  const current = document.querySelectorAll('.sable-current[aria-current="page"]');
+  const current = document.querySelectorAll('.selection-current[aria-current="page"]');
   const expandedDisclosures = document.querySelectorAll(
     ':is(.rooms-heading, .room-category)[aria-expanded="true"]'
   );
@@ -204,7 +204,7 @@ test('expanded room disclosures do not use the active-route surface', async () =
   expect(current[0]?.classList.contains('room-row')).toBe(true);
   expect(expandedDisclosures).toHaveLength(2);
   expect(
-    Array.from(expandedDisclosures).every((node) => !node.classList.contains('sable-open'))
+    Array.from(expandedDisclosures).every((node) => !node.classList.contains('selection-open'))
   ).toBe(true);
   await unmount(instance);
 });
@@ -302,7 +302,7 @@ test('does not show a badge for a muted room', async () => {
   roomsFixture.mutedRoomIds = new Set(['!muted:example.org']);
 
   const instance = await mountNav();
-  expect(document.querySelector('.sable-unread-badge')).toBeNull();
+  expect(document.querySelector('.unread-badge')).toBeNull();
   await unmount(instance);
 });
 
@@ -317,9 +317,9 @@ test('counts mentions in the badge and marks plain unread with a dot', async () 
   const mentioned = rows.find((row) => row.textContent.includes('Mentioned'));
   const plain = rows.find((row) => row.textContent.includes('Plain'));
 
-  expect(mentioned?.querySelector('.sable-unread-badge-count')?.textContent).toBe('2');
-  expect(plain?.querySelector('.sable-unread-badge-count')).toBeNull();
-  expect(plain?.querySelector('.sable-unread-badge-dot')).not.toBeNull();
+  expect(mentioned?.querySelector('.unread-badge-count')?.textContent).toBe('2');
+  expect(plain?.querySelector('.unread-badge-count')).toBeNull();
+  expect(plain?.querySelector('.unread-badge-dot')).not.toBeNull();
   await unmount(instance);
 });
 
@@ -363,7 +363,7 @@ test('a space list header wears the space avatar when collapsed', async () => {
 
   const instance = await mountNav({ collapsed: true });
   const badge = document.querySelector('.room-nav-badge');
-  expect(badge?.querySelector('.sable-avatar')?.textContent.trim()).toBe('D');
+  expect(badge?.querySelector('.avatar-root')?.textContent.trim()).toBe('D');
   await unmount(instance);
 });
 

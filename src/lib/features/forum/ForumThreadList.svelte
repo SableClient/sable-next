@@ -54,7 +54,7 @@
   }
 
   .forum-thread-list-empty {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     padding: var(--space-500);
     text-align: center;
   }

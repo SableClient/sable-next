@@ -32,7 +32,7 @@
     align-items: center;
     background: transparent;
     border-color: transparent;
-    color: var(--sable-sec-main);
+    color: var(--sec-main);
     font-size: var(--font-size-small);
     gap: var(--space-200);
     justify-content: center;
@@ -40,7 +40,7 @@
   }
 
   :global(.method-toggle:hover:not(:disabled)) {
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
   }
 
   .method-toggle-icon {

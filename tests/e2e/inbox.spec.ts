@@ -121,8 +121,6 @@ test.describe('on a pristine account', () => {
     await expect(page.getByRole('link', { name: 'Inbox, 2 waiting' }).first()).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.locator('a[href="/rooms"] .sable-unread-badge-count').first()).toHaveText(
-      '1'
-    );
+    await expect(page.locator('a[href="/rooms"] .unread-badge-count').first()).toHaveText('1');
   });
 });

@@ -95,7 +95,7 @@
   }
 
   p {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     margin: 0;
   }
 
@@ -105,7 +105,7 @@
   }
 
   .categories {
-    border-top: var(--border-width) solid var(--sable-surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     list-style: none;
     margin: 0;
     padding-left: 0;

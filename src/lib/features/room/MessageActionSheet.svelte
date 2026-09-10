@@ -45,10 +45,7 @@
         {#if row.separated}<div class="sheet-line"></div>{/if}
         <button
           type="button"
-          class={[
-            'sable-menu-item sable-menu-item-trailing-icon',
-            row.destructive && 'sable-menu-item-destructive',
-          ]}
+          class={['menu-item menu-item-trailing-icon', row.destructive && 'menu-item-destructive']}
           onclick={() => {
             run(row.run);
           }}
@@ -63,7 +60,7 @@
 
 <style>
   .sheet-source {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0 0 var(--space-200);
     overflow: hidden;
@@ -73,7 +70,7 @@
   }
 
   .sheet-line {
-    background: var(--sable-surface-container-line);
+    background: var(--surface-container-line);
     block-size: var(--border-width);
   }
 
@@ -81,7 +78,7 @@
     display: grid;
   }
 
-  .sheet-list :global(.sable-menu-item) {
+  .sheet-list :global(.menu-item) {
     --menu-item-height: var(--control-height-400);
     --menu-item-padding: var(--space-400);
     --menu-item-radius: var(--radii-300);

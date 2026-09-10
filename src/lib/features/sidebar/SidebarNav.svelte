@@ -333,11 +333,11 @@
     .resize-handle:hover,
     .resize-handle.dragging,
     .resize-handle:focus-visible {
-      background: var(--sable-primary-main);
+      background: var(--primary-main);
     }
 
     .resize-handle:focus-visible {
-      outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+      outline: var(--focus-ring-width) solid var(--focus-ring);
       outline-offset: -3px;
     }
   }

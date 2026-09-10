@@ -70,7 +70,7 @@
       <li class="answer-row">
         <button
           type="button"
-          class="answer sable-choice"
+          class="answer choice"
           aria-pressed={answer.selected}
           disabled={ended || !eventId}
           onclick={() => {
@@ -141,8 +141,8 @@
 
 <style>
   .poll {
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     display: flex;
     flex-direction: column;
@@ -157,7 +157,7 @@
   }
 
   .edited {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-normal);
     margin-inline-start: var(--space-150);
@@ -180,8 +180,8 @@
 
   .answer {
     align-items: baseline;
-    background: var(--sable-surface-container);
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: inherit;
     cursor: pointer;
@@ -201,11 +201,11 @@
   }
 
   .answer:not(:disabled, [aria-pressed='true']):hover {
-    border-color: var(--sable-primary-main);
+    border-color: var(--primary-main);
   }
 
   .fill {
-    background: var(--sable-primary-container);
+    background: var(--primary-container);
     inset-block: 0;
     inset-inline-start: 0;
     position: absolute;
@@ -228,7 +228,7 @@
   }
 
   .count {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     flex: 0 0 auto;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
@@ -243,12 +243,12 @@
   }
 
   .count-button:hover {
-    color: var(--sable-surface-on-container);
+    color: var(--surface-on-container);
     text-decoration: underline;
   }
 
   .footer {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
@@ -263,9 +263,9 @@
   .end {
     align-self: flex-start;
     background: none;
-    border: var(--border-width) solid var(--sable-surface-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
@@ -273,7 +273,7 @@
   }
 
   .end:hover {
-    border-color: var(--sable-surface-container-line);
-    color: var(--sable-surface-on-container);
+    border-color: var(--surface-container-line);
+    color: var(--surface-on-container);
   }
 </style>

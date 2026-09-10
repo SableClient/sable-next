@@ -507,7 +507,7 @@
         {#if collapsed}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger
-              class="room-nav-badge sable-open"
+              class="room-nav-badge selection-open"
               aria-label={$i18n.t('nav.listOptions')}
             >
               {#if activeSpace}
@@ -516,7 +516,7 @@
                 <TitleIcon />
               {/if}
             </DropdownMenu.Trigger>
-            <DropdownMenu.Content class="sable-menu" side="right" align="start" sideOffset={4}>
+            <DropdownMenu.Content class="menu-surface" side="right" align="start" sideOffset={4}>
               {@render listMenuItems()}
             </DropdownMenu.Content>
           </DropdownMenu.Root>
@@ -537,12 +537,12 @@
           {/if}
           <DropdownMenu.Root>
             <DropdownMenu.Trigger
-              class="room-nav-menu sable-open"
+              class="room-nav-menu selection-open"
               aria-label={$i18n.t('nav.listOptions')}
             >
               <DotsThreeVerticalIcon />
             </DropdownMenu.Trigger>
-            <DropdownMenu.Content class="sable-menu" side="bottom" align="end" sideOffset={4}>
+            <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
               {@render listMenuItems()}
             </DropdownMenu.Content>
           </DropdownMenu.Root>
@@ -552,13 +552,13 @@
   </div>
 
   {#snippet listMenuItems()}
-    <DropdownMenu.Item class="sable-menu-item" disabled={!sectionUnread} onSelect={markSectionRead}>
+    <DropdownMenu.Item class="menu-item" disabled={!sectionUnread} onSelect={markSectionRead}>
       <ChecksIcon />
       {$i18n.t('nav.markSectionRead')}
     </DropdownMenu.Item>
     {#if activeSpace}
       <DropdownMenu.Item
-        class="sable-menu-item"
+        class="menu-item"
         onSelect={() => {
           openSettings(activeSpace);
         }}
@@ -567,7 +567,7 @@
         {$i18n.t('room.menuSettings')}
       </DropdownMenu.Item>
       <DropdownMenu.Item
-        class="sable-menu-item sable-menu-item-destructive"
+        class="menu-item menu-item-destructive"
         onSelect={() => {
           openLeave(activeSpace);
         }}
@@ -586,7 +586,7 @@
         {@const Icon = icon}
         {@const active = page.url.pathname === href}
         <a
-          class="nav-action sable-current sable-selection-layer"
+          class="nav-action selection-current selection-layer"
           {href}
           onclick={() => onNavigate?.(href)}
           aria-label={collapsed ? label : undefined}
@@ -615,30 +615,24 @@
               </button>
             {/snippet}
           </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="sable-menu" side="right" align="start" sideOffset={4}>
+          <DropdownMenu.Content class="menu-surface" side="right" align="start" sideOffset={4}>
             {#if canCreateHere}
-              <DropdownMenu.Item
-                class="sable-menu-item"
-                onSelect={() => navigateTo(createRoomHref)}
-              >
+              <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(createRoomHref)}>
                 <PlusIcon />
                 {createRoomLabel}
               </DropdownMenu.Item>
             {/if}
             {#if canCreateHere}
-              <DropdownMenu.Item
-                class="sable-menu-item"
-                onSelect={() => navigateTo(createSpaceHref)}
-              >
+              <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(createSpaceHref)}>
                 <HouseIcon />
                 {createSpaceLabel}
               </DropdownMenu.Item>
             {/if}
-            <DropdownMenu.Item class="sable-menu-item" onSelect={() => navigateTo(joinHref)}>
+            <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(joinHref)}>
               <LinkIcon />
               {$i18n.t('nav.joinWithAddress')}
             </DropdownMenu.Item>
-            <DropdownMenu.Item class="sable-menu-item" onSelect={() => navigateTo(browseHref)}>
+            <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(browseHref)}>
               <CompassIcon />
               {browseLabel}
             </DropdownMenu.Item>
@@ -657,7 +651,7 @@
     {#if !collapsed}
       <button
         type="button"
-        class="rooms-heading sable-selection-layer"
+        class="rooms-heading selection-layer"
         aria-expanded={!roomsClosed}
         data-state={roomsClosed ? 'closed' : 'open'}
         aria-controls={roomListId}
@@ -688,7 +682,7 @@
               <div class="room-row-wrap">
                 <button
                   type="button"
-                  class="room-category sable-selection-layer"
+                  class="room-category selection-layer"
                   class:collapsed
                   oncontextmenu={(event) => {
                     openContextMenu(event, item.room, null);
@@ -738,7 +732,7 @@
                   oncontextmenu={(event) => {
                     if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
                   }}
-                  class="room-row sable-current sable-selection-layer"
+                  class="room-row selection-current selection-layer"
                   class:unread={mentions > 0 || unread > 0 || marked}
                   {href}
                   style:--room-depth={collapsed ? 0 : item.depth}
@@ -862,10 +856,10 @@
 
 <style>
   .room-nav {
-    background: var(--sable-bg-container);
-    border-right: var(--border-width) solid var(--sable-surface-container-line);
+    background: var(--bg-container);
+    border-right: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
-    color: var(--sable-bg-on-container);
+    color: var(--bg-on-container);
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -902,12 +896,8 @@
   }
 
   .room-nav-header.on-banner {
-    background: linear-gradient(
-      180deg,
-      var(--sable-media-scrim) 0%,
-      var(--sable-media-scrim-clear) 100%
-    );
-    color: var(--sable-media-on-scrim);
+    background: linear-gradient(180deg, var(--media-scrim) 0%, var(--media-scrim-clear) 100%);
+    color: var(--media-on-scrim);
     left: 0;
     position: absolute;
     right: 0;
@@ -920,7 +910,7 @@
 
   .room-nav-header.on-banner :global(.room-nav-menu:hover),
   .room-nav-header.on-banner :global(.room-nav-menu[data-state='open']) {
-    background: var(--sable-media-scrim-hover);
+    background: var(--media-scrim-hover);
     color: inherit;
   }
 
@@ -962,7 +952,7 @@
   }
 
   :global(.room-nav-badge:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 2px;
   }
 
@@ -983,7 +973,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
     flex: none;
@@ -994,12 +984,12 @@
   }
 
   :global(.room-nav-menu:hover) {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   :global(.room-nav-menu:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
@@ -1018,7 +1008,7 @@
   .room-nav-actions a:focus-visible,
   .room-nav-actions :global(.room-nav-trigger:hover),
   .room-nav-actions :global(.room-nav-trigger:focus-visible) {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .room-nav-header.collapsed {
@@ -1080,12 +1070,12 @@
   }
 
   .rooms-heading:focus-visible {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .rooms-heading:hover {
-      background: var(--sable-bg-container-hover);
+      background: var(--bg-container-hover);
     }
   }
 
@@ -1096,7 +1086,7 @@
   }
 
   .empty-rooms {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
     padding: var(--space-200) var(--space-400);
@@ -1138,12 +1128,12 @@
   }
 
   .room-row-wrap:focus-within {
-    background: var(--sable-bg-container-hover);
+    background: var(--bg-container-hover);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .room-row-wrap:hover {
-      background: var(--sable-bg-container-hover);
+      background: var(--bg-container-hover);
     }
   }
 
@@ -1179,23 +1169,23 @@
   }
 
   .room-row[aria-current='page'] {
-    background: var(--sable-surface-container-active);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-active);
+    color: var(--surface-on-container);
   }
 
   .room-row[aria-current='page']:hover {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   .nav-action[aria-current='page'] {
-    background: var(--sable-surface-container-active);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-active);
+    color: var(--surface-on-container);
   }
 
   .nav-action[aria-current='page']:hover {
-    background: var(--sable-surface-container-hover);
-    color: var(--sable-surface-on-container);
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   .room-row.unread {
@@ -1241,7 +1231,7 @@
 
   .room-row[aria-current='page'] :global(.room-avatar-icon)::after {
     border-radius: inherit;
-    box-shadow: inset 0 0 0 var(--border-width) var(--sable-primary-main);
+    box-shadow: inset 0 0 0 var(--border-width) var(--primary-main);
     content: '';
     inset: 0;
     position: absolute;
@@ -1326,8 +1316,8 @@
   }
 
   .room-typing {
-    background: var(--sable-sec-container);
-    border: var(--border-width) solid var(--sable-sec-container-line);
+    background: var(--sec-container);
+    border: var(--border-width) solid var(--sec-container-line);
     border-radius: var(--radius-pill);
     height: 1.25rem;
     padding: 0 var(--space-150);
@@ -1348,9 +1338,9 @@
 
   .voice-badge {
     align-items: center;
-    background: var(--sable-primary-main);
+    background: var(--primary-main);
     border-radius: var(--radius-pill);
-    color: var(--sable-primary-on-main);
+    color: var(--primary-on-main);
     display: flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
@@ -1384,7 +1374,7 @@
   }
 
   :is(.room-nav-actions a, .room-category, .rooms-heading):focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: 2px;
   }
 

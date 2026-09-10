@@ -60,8 +60,8 @@
 <style>
   .action-card {
     align-items: flex-start;
-    background: var(--sable-bg-container);
-    border: var(--border-width) solid var(--sable-bg-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     box-sizing: border-box;
     color: inherit;
@@ -83,18 +83,18 @@
   }
 
   .action-card:focus-visible {
-    outline: var(--focus-ring-width) solid var(--sable-focus-ring);
+    outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
   .action-card:hover:not(.action-card-disabled) {
-    background: var(--sable-bg-container-hover);
-    border-color: var(--sable-primary-container-line);
+    background: var(--bg-container-hover);
+    border-color: var(--primary-container-line);
     transform: translateY(-2px);
   }
 
   .action-card:active:not(.action-card-disabled) {
-    background: var(--sable-bg-container-active);
+    background: var(--bg-container-active);
   }
 
   .action-card-disabled {
@@ -104,7 +104,7 @@
 
   .action-card-icon {
     align-items: center;
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     display: inline-flex;
     flex: 0 0 auto;
     height: var(--icon-size-medium);
@@ -131,14 +131,14 @@
   }
 
   .action-card-description {
-    color: var(--sable-surface-var-on-container);
+    color: var(--surface-var-on-container);
     line-height: var(--line-height-body);
   }
 
   .action-card-arrow {
     align-items: center;
     bottom: var(--space-400);
-    color: var(--sable-primary-main);
+    color: var(--primary-main);
     display: inline-flex;
     height: var(--icon-size-small);
     justify-content: center;
