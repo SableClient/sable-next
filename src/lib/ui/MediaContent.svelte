@@ -1,4 +1,6 @@
 <script lang="ts">
+  import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
+
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
@@ -9,6 +11,13 @@
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
+  import TextAttachmentViewer from '#lib/ui/TextAttachmentViewer.svelte';
+  import {
+    MAX_TEXT_ATTACHMENT_BYTES,
+    isTextAttachment,
+    textAttachmentLanguage,
+  } from '#lib/ui/text-attachment.js';
   import VoiceMessagePlayer from '#lib/ui/VoiceMessagePlayer.svelte';
 
   const BLURHASH_POSTER_WIDTH = 32;
@@ -89,6 +98,13 @@
     }
   });
   let isPdf = $derived(kind === 'file' && isPdfAttachment(mime, body));
+  let isText = $derived(
+    kind === 'file' &&
+      !isPdf &&
+      (size === null || size <= MAX_TEXT_ATTACHMENT_BYTES) &&
+      isTextAttachment(mime, body)
+  );
+  let textLanguage = $derived(isText ? textAttachmentLanguage(mime, body) : null);
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
@@ -210,7 +226,29 @@
       </a>
       {#if isPdf}
         <PdfThumbnail src={url} name={mediaLabel} {onOpen} />
+      {:else if isText}
+        <TextAttachmentViewer
+          src={url}
+          name={mediaLabel}
+          language={textLanguage}
+          onDownload={download}
+        />
       {/if}
+      <div class="media-actions">
+        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->
+        <LinkButton
+          class="media-download"
+          href={url}
+          download={mediaLabel}
+          size="small"
+          onclick={download}
+        >
+          <DownloadSimpleIcon aria-hidden="true" />
+          {sizeLabel
+            ? $i18n.t('timeline.downloadFileSized', { size: sizeLabel })
+            : $i18n.t('timeline.downloadFile')}
+        </LinkButton>
+      </div>
     {/if}
   {:else if kind === 'file'}
     <span class="media-file">
@@ -282,6 +320,10 @@
     color: var(--surface-var-on-container);
     flex: none;
     font-size: var(--font-size-small);
+  }
+
+  .media-actions {
+    margin-top: var(--space-200);
   }
 
   .media-error {

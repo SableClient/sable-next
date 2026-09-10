@@ -12,6 +12,8 @@ const core = vi.hoisted(() => {
 vi.mock('#lib/core/context.js', () => ({
   useCoreClient: () => core,
 }));
+vi.mock('$app/state', () => ({ page: { url: { pathname: '/home' }, params: {}, state: {} } }));
+vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
 
 import MediaContent from './MediaContent.svelte';
 
@@ -73,6 +75,7 @@ test('renders the extension badge and human-readable size for a file attachment'
 
   expect(document.querySelector('.media-file-ext')?.textContent).toBe('zip');
   expect(document.querySelector('.media-file-size')?.textContent).toBe('1.5 MB');
+  expect(document.querySelector('.media-download')?.textContent).toContain('Download (1.5 MB)');
   await unmount(instance);
 });
 
@@ -99,6 +102,56 @@ test('offers a PDF as a file plus a preview that opens the viewer', async () => 
   document.querySelector<HTMLButtonElement>('.pdf-thumbnail')?.click();
   expect(onOpen).toHaveBeenCalledTimes(1);
   await unmount(instance);
+});
+
+test('previews a readable text attachment and leaves an opaque one alone', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response('{ "hello": "world" }')))
+  );
+
+  const previewed = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'file',
+      source: 'mxc://example.org/json',
+      mime: 'application/json',
+      body: 'payload.json',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+
+  const preview = document.querySelector<HTMLButtonElement>('.text-preview');
+  expect(preview?.textContent).toContain('"hello"');
+  expect(preview?.getAttribute('aria-label')).toBe('Open payload.json');
+  await unmount(previewed);
+
+  const opaque = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'file',
+      source: 'mxc://example.org/zip',
+      mime: 'application/zip',
+      body: 'archive.zip',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.text-preview')).toBeNull();
+  expect(document.querySelector('.text-open')).toBeNull();
+  await unmount(opaque);
+  vi.unstubAllGlobals();
 });
 
 test('renders a voice message with a waveform when a waveform is present', async () => {
