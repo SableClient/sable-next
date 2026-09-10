@@ -38,7 +38,7 @@ const NO_GIFS: GifsConfig = {
 };
 
 export const BUILT_IN_HOMESERVERS: HomeserversConfig = {
-  list: ['matrix.org', 'mozilla.org', 'unredacted.org', 'sable.moe', 'kendama.moe'],
+  list: ['matrix.org', 'mozilla.org', 'unredacted.org', 'sable.moe', 'kendama.moe', 'hopium.club'],
   default: 'matrix.org',
   allowCustom: true,
 };

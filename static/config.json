@@ -1,5 +1,12 @@
 {
-  "homeserverList": ["matrix.org", "mozilla.org", "unredacted.org", "sable.moe", "kendama.moe"],
+  "homeserverList": [
+    "matrix.org",
+    "mozilla.org",
+    "unredacted.org",
+    "sable.moe",
+    "kendama.moe",
+    "hopium.club"
+  ],
   "defaultHomeserver": 0,
   "allowCustomHomeservers": true,
   "pushNotificationDetails": {
