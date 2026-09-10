@@ -68,7 +68,8 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
     '$thread',
     formattedCaption,
     JSON.stringify(['@one:example.org']),
-    true
+    true,
+    null
   );
   expect(port.messages).toEqual([{ id: 1, uri: null }]);
 });
