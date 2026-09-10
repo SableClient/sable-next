@@ -37,6 +37,8 @@ const EVENTS_PER_INGEST_YIELD: usize = 16;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MAX_INDEXED_MESSAGES: usize = 50_000;
+
+const INITIAL_DOCUMENTS: usize = 64;
 const PERSIST_INTERVAL: Duration = Duration::from_secs(20);
 const CHANGES_BEFORE_FLUSH: usize = 32;
 const TICKS_BEFORE_FLUSH: u32 = 15;
@@ -175,8 +177,12 @@ struct RoomIndex {
 
 impl RoomIndex {
     fn new() -> Self {
+        Self::sized(INITIAL_DOCUMENTS)
+    }
+
+    fn sized(documents: usize) -> Self {
         Self {
-            index: Index::new(BODY_FIELD_COUNT),
+            index: Index::new_with_capacity(BODY_FIELD_COUNT, documents, documents),
             documents: HashMap::new(),
             key_of: HashMap::new(),
             classified: HashSet::new(),
@@ -193,7 +199,7 @@ impl RoomIndex {
     }
 
     fn restored(documents: Vec<Document>, classified: Vec<OwnedEventId>) -> Self {
-        let mut index = Self::new();
+        let mut index = Self::sized(documents.len().max(INITIAL_DOCUMENTS));
         for document in documents {
             index.upsert(document);
         }
