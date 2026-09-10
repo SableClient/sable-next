@@ -22,6 +22,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import FormActions from '#lib/ui/primitives/FormActions.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -368,7 +369,7 @@
     <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" uniform />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if canManage && space}
-      <div class="hero-actions">
+      <FormActions>
         <Button
           size="small"
           onclick={() => {
@@ -391,7 +392,7 @@
           <UsersThreeIcon />
           {$i18n.t('nav.createSubspace')}
         </Button>
-      </div>
+      </FormActions>
     {/if}
     {#if space?.topic}
       <button
@@ -524,14 +525,6 @@
     position: absolute;
     right: 0;
     top: var(--space-300);
-  }
-
-  .hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-200);
-    justify-content: center;
-    margin-top: var(--space-300);
   }
 
   h1 {
