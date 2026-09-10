@@ -68,6 +68,8 @@ export class TimelineWindow<T> {
   private top = 0;
   private readonly sizes = new Map<string, number>();
   private sizeTotal = 0;
+  private measuredHeight: number | null = null;
+  private measuring = false;
   private prefix: PrefixEstimate<T> | null = null;
   private offset = 0;
   private scrollHeight = 0;
@@ -167,7 +169,18 @@ export class TimelineWindow<T> {
   }
 
   get contentHeight(): number {
-    return this.options.content.getBoundingClientRect().height;
+    this.scopeMeasurements();
+    this.measuredHeight ??= this.options.content.getBoundingClientRect().height;
+    return this.measuredHeight;
+  }
+
+  private scopeMeasurements(): void {
+    if (this.measuring) return;
+    this.measuring = true;
+    queueMicrotask(() => {
+      this.measuredHeight = null;
+      this.measuring = false;
+    });
   }
 
   update(items: readonly TimelineEntry<T>[]): Promise<void> {

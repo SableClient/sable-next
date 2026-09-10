@@ -947,3 +947,18 @@ test('a room opened on its last unread stays flush when the marker row is remove
     f.viewport.getBoundingClientRect().bottom
   );
 });
+
+test('repeated content height reads in one task measure the DOM once', async () => {
+  const { window, content } = fixture();
+  await window.update(entries(100));
+
+  const measure = vi.spyOn(content, 'getBoundingClientRect');
+  const first = window.contentHeight;
+  expect(window.contentHeight).toBe(first);
+  expect(window.contentHeight).toBe(first);
+  expect(measure).toHaveBeenCalledTimes(1);
+
+  await Promise.resolve();
+  expect(window.contentHeight).toBe(first);
+  expect(measure).toHaveBeenCalledTimes(2);
+});
