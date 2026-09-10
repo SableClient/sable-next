@@ -36,6 +36,8 @@
   import { TimelineIdentityTracker } from './timeline-identity';
   import { TIMELINE_LAYOUT, TIMELINE_LAYOUT_STYLE } from './timeline-layout';
 
+  const MAX_EMPTY_REFILLS = 5;
+
   interface Props {
     timeline: RoomTimeline;
     focusEventId?: string | null;
@@ -151,6 +153,8 @@
   let historyRequestPending = $state(false);
   let historyTask: Promise<boolean> | null = null;
   let refillPending = false;
+  let refillItems: readonly TimelineItemView[] | null = null;
+  let emptyRefills = 0;
   let focusFilling = false;
   let visibleItemCount = 0;
   let personas = $derived(personaLookup(timeline.items));
@@ -206,6 +210,16 @@
 
   function fillsViewport(engine: TimelineWindow<RowValue>, node: HTMLElement): boolean {
     return engine.contentHeight >= node.clientHeight || node.scrollHeight > node.clientHeight;
+  }
+  function canRefill(): boolean {
+    const items = timeline.items;
+    if (items !== refillItems) {
+      refillItems = items;
+      emptyRefills = 0;
+    }
+    if (emptyRefills >= MAX_EMPTY_REFILLS) return false;
+    emptyRefills += 1;
+    return true;
   }
   function requestHistory(): Promise<boolean> {
     if (historyTask) return historyTask;
@@ -352,6 +366,7 @@
           await awaitPagination();
           if (timeline.backwardPagination === 'loading') break;
         } else {
+          if (!canRefill()) break;
           historyExhausted = await requestHistory();
           await awaitPagination();
           await engine.update(entries);
@@ -386,6 +401,7 @@
     )
       return;
     if (count > 0 && !(node && windowState.start === 0 && !fillsViewport(engine, node))) return;
+    if (!canRefill()) return;
     refillPending = true;
     void requestHistory()
       .then((end) => {

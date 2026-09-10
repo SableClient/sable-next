@@ -205,10 +205,10 @@ test('a permalink whose context does not fill the viewport paginates on its own'
   await unmount(instance);
 });
 
-test('continues the opening fill past twenty pages until the server reports the start', async () => {
+test('limits empty opening refills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
-  const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
+  const history = vi.fn(() => Promise.resolve(false));
   const instance = mount(TimelineListHarness, {
     target: document.body,
     props: {
@@ -227,7 +227,7 @@ test('continues the opening fill past twenty pages until the server reports the 
     await runAnimationFrames();
   }
 
-  expect(history).toHaveBeenCalledTimes(25);
+  expect(history).toHaveBeenCalledTimes(5);
   await unmount(instance);
 });
 
@@ -1112,7 +1112,7 @@ test('a scrollbar drag leaves follow mode like any other reading back', async ()
   await unmount(instance);
 });
 
-test('keeps filling past a window of events the settings hide', async () => {
+test('limits hidden opening refills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [hiddenItem('renamed')];
   const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
@@ -1134,7 +1134,7 @@ test('keeps filling past a window of events the settings hide', async () => {
     await runAnimationFrames();
   }
 
-  expect(history).toHaveBeenCalledTimes(25);
+  expect(history).toHaveBeenCalledTimes(5);
   await unmount(instance);
 });
 
