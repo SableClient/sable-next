@@ -357,7 +357,10 @@
         handledFocus = focusEventId;
       }
       revealed = true;
-      if (entry) await fillFocusedViewport(engine);
+      if (entry) {
+        await fillFocusedViewport(engine);
+        await engine.jumpTo(entry.key, 'center');
+      }
       return;
     }
     const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
@@ -443,7 +446,8 @@
     handledFocus = target;
     void engine
       .jumpTo(entry.key, 'center', !prefersReducedMotion.current)
-      .then(() => fillFocusedViewport(engine));
+      .then(() => fillFocusedViewport(engine))
+      .then(() => engine.jumpTo(entry.key, 'center'));
   });
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
