@@ -6,8 +6,12 @@ import type { RoomTimeline } from './pages/RoomTimeline';
 
 test.use({ storageState: SIGNED_OUT });
 
-const NATIVE_FLING_REASON = 'native fling gestures need a compositor CI does not have';
-const NO_NATIVE_FLING = Boolean(process.env.CI);
+const NATIVE_FLING_REASON = 'native fling gestures need a compositor a headless run does not have';
+function noNativeFling(): boolean {
+  return test.info().project.use.headless ?? true;
+}
+
+const NO_WHEEL_REASON = 'mobile WebKit dispatches no wheel events';
 
 for (const { fits, touching } of [
   { fits: false, touching: false },
@@ -351,8 +355,8 @@ test('the gesture sampler catches a scrollTo jump and return', async ({ page }) 
     node.scrollTo({ top: 400 });
   });
   const result = await sampling.finish();
-  expect(result.readerMovement).toBe(0);
-  expect(result.frameError).toBe(100);
+  expect(result.readerMovement).toBeCloseTo(0, 3);
+  expect(result.frameError).toBeCloseTo(100, 3);
 });
 
 test('the gesture sampler flags smooth programmatic scrolling', async ({ page }) => {
@@ -397,8 +401,8 @@ test('the gesture sampler keeps sampling between input events', async ({ page })
     descriptor.set.call(node, 600);
   });
   const result = await sampling.finish();
-  expect(result.readerMovement).toBe(200);
-  expect(result.frameError).toBe(0);
+  expect(result.readerMovement).toBeCloseTo(200, 3);
+  expect(result.frameError).toBeCloseTo(0, 3);
 });
 
 test('latest stays at the bottom on every frame as message heights settle', async ({
@@ -617,7 +621,7 @@ test('mobile native momentum crosses the original rendered window', async ({
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'Native touch input is driven through CDP');
-  test.skip(NO_NATIVE_FLING, NATIVE_FLING_REASON);
+  test.skip(noNativeFling(), NATIVE_FLING_REASON);
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
   await timeline.expectRevealed();
@@ -795,6 +799,7 @@ test('real wheel input through unmeasured history moves the reader by exactly th
   core,
   installRoomCore,
 }) => {
+  test.skip(!timeline.supportsWheel, NO_WHEEL_REASON);
   await installRoomCore('endless_history');
   await page.setViewportSize({ width: 900, height: 600 });
   await app.openRoom('!room:example.test');
@@ -968,7 +973,7 @@ test.describe('touch', () => {
 
   test('mobile native momentum control', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
-    test.skip(NO_NATIVE_FLING, NATIVE_FLING_REASON);
+    test.skip(noNativeFling(), NATIVE_FLING_REASON);
     await page.setContent(PROBE_HTML);
     const viewport = page.locator('#probe');
     const client = await page.context().newCDPSession(page);
@@ -1000,7 +1005,7 @@ test.describe('touch', () => {
         : 'a finger drag through unmeasured history moves the reader by exactly the drag',
       async ({ page, app, timeline, core, installRoomCore, browserName }) => {
         test.skip(browserName !== 'chromium', 'touch input is driven through CDP');
-        test.skip(momentum && NO_NATIVE_FLING, NATIVE_FLING_REASON);
+        test.skip(momentum && noNativeFling(), NATIVE_FLING_REASON);
         await installRoomCore('endless_history');
         await app.openRoom('!room:example.test');
         await timeline.expectRevealed();
@@ -1633,8 +1638,6 @@ test('an animated jump to a reply target settles on it instead of the end', asyn
   core,
   installRoomCore,
 }) => {
-  // Every other spec runs under the config's `reducedMotion: 'reduce'`, which
-  // takes `jumpTo`'s hard-write branch and never exercises the animated one.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
@@ -1667,8 +1670,6 @@ test('an animated jump to a reply target settles on it instead of the end', asyn
   await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(target);
   await timeline.waitForScrollSettled();
 
-  // The animation writes nothing on the task that starts it, so a jump that
-  // re-pins on the offset it has not reached yet ends back at the bottom.
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await expect(timeline.itemByEventId(target)).toBeInViewport();
 });

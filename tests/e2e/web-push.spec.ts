@@ -67,10 +67,14 @@ test('a push shows a notification naming the room the app cached', async ({
     return shownNotifications(page);
   };
 
+  const away = await context.newPage();
+  await away.bringToFront();
+
   await expect
     .poll(deliver, { timeout: 30_000 })
     .toEqual([`Sable|New message|${admin.userId} ${roomId}`]);
   await expect
     .poll(deliver, { timeout: 60_000 })
     .toEqual([`${roomName}|New message|${admin.userId} ${roomId}`]);
+  await away.close();
 });

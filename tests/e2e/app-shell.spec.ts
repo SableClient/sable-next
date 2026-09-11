@@ -175,6 +175,7 @@ test('reopens a room after returning to the mobile room list', async ({
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
 
   await app.backToRooms.click();
+  await expect(app.backToRooms).toBeHidden();
   await app.openRoomFromList(TIMELINE_ROOM_NAME);
 
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();

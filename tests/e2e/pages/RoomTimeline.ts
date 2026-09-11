@@ -11,7 +11,10 @@ export class RoomTimeline {
   readonly jumpToLatest: Locator;
   readonly image: Locator;
 
-  constructor(private readonly page: Page) {
+  constructor(
+    private readonly page: Page,
+    readonly supportsWheel = true
+  ) {
     this.container = page.locator('.timeline-viewport');
     this.viewport = page.locator('.timeline-viewport .viewport');
     this.items = page.locator('.timeline-viewport .item');
@@ -27,6 +30,12 @@ export class RoomTimeline {
   // preview, so an unscoped lookup matches twice.
   message(body: string): Locator {
     return this.container.getByText(body, { exact: true });
+  }
+
+  private anchorTop(itemId: string): Promise<number> {
+    return this.itemById(itemId).evaluate(
+      (node) => (node.firstElementChild ?? node).getBoundingClientRect().top
+    );
   }
 
   itemById(itemId: string): Locator {
@@ -153,6 +162,13 @@ export class RoomTimeline {
   }
 
   async wheelUp(distance: number): Promise<void> {
+    if (!this.supportsWheel) {
+      await this.viewport.evaluate((element, delta) => {
+        element.scrollTop = Math.max(0, element.scrollTop + delta);
+        element.dispatchEvent(new Event('scroll', { bubbles: true }));
+      }, -distance);
+      return;
+    }
     await this.viewport.hover();
     await this.page.mouse.wheel(0, -distance);
   }
@@ -183,7 +199,11 @@ export class RoomTimeline {
         const positions: number[] = [];
         const sample = (): void => {
           const anchor = document.querySelector<HTMLElement>(`[data-item-id="${itemId}"]`);
-          positions.push(anchor ? anchor.getBoundingClientRect().top : Number.POSITIVE_INFINITY);
+          positions.push(
+            anchor
+              ? (anchor.firstElementChild ?? anchor).getBoundingClientRect().top
+              : Number.POSITIVE_INFINITY
+          );
         };
         sample();
         const deadline = performance.now() + durationMs;
@@ -215,7 +235,7 @@ export class RoomTimeline {
       if (!itemId) throw new Error('timeline item has no data-item-id');
       if (node.getClientRects().length === 0)
         throw new Error(`timeline item ${itemId} has no bounds`);
-      return { itemId, y: node.getBoundingClientRect().top };
+      return { itemId, y: (node.firstElementChild ?? node).getBoundingClientRect().top };
     });
   }
 
@@ -236,7 +256,7 @@ export class RoomTimeline {
       }, skip);
       if (itemId !== undefined) {
         const box = await this.itemById(itemId).boundingBox();
-        if (box) return { itemId, y: box.y };
+        if (box) return { itemId, y: await this.anchorTop(itemId) };
       }
       if (Date.now() > deadline) {
         throw new Error(
@@ -261,7 +281,9 @@ export class RoomTimeline {
       .poll(
         async () => {
           const box = await this.itemById(anchor.itemId).boundingBox();
-          return box ? Math.abs(box.y - anchor.y) : Number.POSITIVE_INFINITY;
+          return box
+            ? Math.abs((await this.anchorTop(anchor.itemId)) - anchor.y)
+            : Number.POSITIVE_INFINITY;
         },
         { message: `anchor ${anchor.itemId} left ${String(anchor.y)}` }
       )

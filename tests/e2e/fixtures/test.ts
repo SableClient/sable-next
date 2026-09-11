@@ -342,8 +342,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   auth: async ({ page }, use) => {
     await use(new AuthFlow(page));
   },
-  timeline: async ({ page }, use) => {
-    await use(new RoomTimeline(page));
+  timeline: async ({ page, browserName, isMobile }, use) => {
+    await use(new RoomTimeline(page, !(browserName === 'webkit' && isMobile)));
   },
   core: async ({ page }, use) => {
     await use(new FakeCoreDriver(page));

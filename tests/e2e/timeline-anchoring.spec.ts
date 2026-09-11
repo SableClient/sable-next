@@ -8,6 +8,7 @@ import {
   timelineImage,
   timelineItem,
   timelineMessage,
+  timelineWideImageWithoutDimensions,
 } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT });
@@ -627,6 +628,7 @@ test('follows a sent message after a wheel that could not scroll', async ({
   core,
   installRoomCore,
 }) => {
+  test.skip(!timeline.supportsWheel, 'mobile WebKit dispatches no wheel events');
   await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 420 });
   await app.openRooms();
@@ -643,4 +645,39 @@ test('follows a sent message after a wheel that could not scroll', async ({
 
   await expect(timeline.itemById('sent')).toBeInViewport();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+});
+
+test('keeps a visible event fixed when an image without dimensions reshapes on load', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('delayed_media');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await app.openRooms();
+  await app.openRoomFromList('General');
+
+  await timeline.expectRevealed();
+  await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
+
+  const subscription = await core.subscription();
+  const anchor = await timeline.anchorAt(3);
+
+  await core.emitTimelineDiff(subscription, [
+    { op: 'insert', index: 1, value: timelineWideImageWithoutDimensions('reshaping-image') },
+  ]);
+
+  await expect(timeline.image).toBeVisible();
+  await expect(timeline.image.locator('img')).toHaveCount(0);
+  const placeholderBounds = await timeline.image.boundingBox();
+  if (!placeholderBounds) throw new Error('missing image placeholder bounds');
+
+  await expect(timeline.image.locator('img')).toBeVisible();
+  const loadedBounds = await timeline.image.boundingBox();
+  if (!loadedBounds) throw new Error('missing loaded image bounds');
+  expect(loadedBounds.height).not.toBeCloseTo(placeholderBounds.height, 0);
+
+  await timeline.expectAnchorHeld(anchor);
 });

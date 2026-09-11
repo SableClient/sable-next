@@ -59,3 +59,17 @@ export function historyItems(options: {
     timestamp: timestampBase + index,
   }));
 }
+
+export function timelineWideImageWithoutDimensions(id: string) {
+  return {
+    ...timelineItem(id, 'History image'),
+    content: {
+      kind: 'image',
+      body: 'History image',
+      source: JSON.stringify({ Plain: 'mxc://example.test/wide-history-image' }),
+      mime: 'image/png',
+      width: null,
+      height: null,
+    },
+  };
+}

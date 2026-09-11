@@ -31,7 +31,9 @@ export class AppShell {
     this.composer = page.getByRole('combobox', { name: 'Send a message...' });
     this.sendMessage = page.getByRole('button', { name: 'Send message' });
     this.createRoomName = page.getByLabel('Name');
-    this.createRoomSubmit = page.getByRole('button', { name: 'Create room', exact: true });
+    this.createRoomSubmit = page
+      .locator('#main-content')
+      .getByRole('button', { name: 'Create room', exact: true });
     this.closeSettings = page.getByRole('button', { name: 'Close' });
     this.deviceBanner = page.getByRole('status', { name: /not verified/i });
   }
