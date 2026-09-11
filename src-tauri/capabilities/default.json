@@ -9,8 +9,6 @@
     "deep-link:default",
     "os:allow-platform",
     "os:allow-os-type",
-    "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text",
     "notifications:default"
   ]
 }

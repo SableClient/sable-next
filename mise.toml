@@ -56,7 +56,9 @@ run = [
   "pnpm lint",
   "pnpm stylelint",
   "pnpm check",
+  "pnpm knip",
   "cargo fmt --all -- --check",
+  "cargo machete",
   # --all-features would turn on both desktop runtimes and download CEF.
   "cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings",
   "cargo clippy --locked -p app --all-targets -- -D warnings",

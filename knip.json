@@ -1,0 +1,24 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/worker/core.worker.ts",
+    "scripts/**/*.mjs",
+    "tests/e2e/global.setup.ts",
+    "tests/e2e/global.teardown.ts",
+    "tests/e2e/fixtures/*.ts"
+  ],
+  "playwright": {
+    "config": [
+      "playwright.config.ts",
+      "playwright.preload.config.ts",
+      "playwright.timeline.config.ts"
+    ]
+  },
+  "ignoreDependencies": ["@fontsource-variable/nunito", "wrangler", "@sentry/browser"],
+  "ignoreBinaries": ["mise", "ditto", "wasm-bindgen"],
+  "rules": {
+    "exports": "off",
+    "types": "off",
+    "enumMembers": "off"
+  }
+}
