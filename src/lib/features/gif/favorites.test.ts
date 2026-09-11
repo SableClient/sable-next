@@ -5,6 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { GifResult } from './providers';
 
 const storageKey = 'sable.composer.favoriteGifs';
+const recentKey = 'sable.composer.recentGifs';
 
 const gif = (overrides: Partial<GifResult> = {}): GifResult => ({
   id: 'abc',
@@ -95,4 +96,26 @@ test('missing dimensions read back as zero, which the send path treats as absent
     size: 0,
     mimetype: 'image/gif',
   });
+});
+
+test('a picked gif heads the recents once, however often it is picked', async () => {
+  const { recentGifs, rememberGif } = await loadStore();
+  const other = gif({ mediaUrl: 'https://media.tenor.com/def/dog.gif' });
+
+  rememberGif(gif());
+  rememberGif(other);
+  rememberGif(gif());
+
+  expect(recentGifs().map((entry) => entry.mediaUrl)).toEqual([gif().mediaUrl, other.mediaUrl]);
+  expect(JSON.parse(localStorage.getItem(recentKey) ?? '[]')).toHaveLength(2);
+});
+
+test('recents and favourites keep their own stores', async () => {
+  const { favoriteGifs, recentGifs, rememberGif } = await loadStore();
+
+  rememberGif(gif());
+
+  expect(favoriteGifs()).toEqual([]);
+  expect(recentGifs()).toHaveLength(1);
+  expect(localStorage.getItem(storageKey)).toBeNull();
 });

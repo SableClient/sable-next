@@ -4,6 +4,7 @@
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 
   import { runtimeConfig } from '#lib/config/runtime-config.js';
+  import { rememberGif } from '#lib/features/gif/favorites.svelte.js';
   import {
     gifSearchAvailable,
     type GifResult,
@@ -70,6 +71,7 @@
 
   function pickGif(gif: GifResult): void {
     open = false;
+    rememberGif(gif);
     onPickGif?.(gif);
   }
 </script>

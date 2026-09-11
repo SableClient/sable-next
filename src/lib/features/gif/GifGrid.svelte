@@ -5,7 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
-  import { favoriteGifs, isFavorite, toggleFavorite } from './favorites.svelte';
+  import { favoriteGifs, isFavorite, recentGifs, toggleFavorite } from './favorites.svelte';
   import { GifSearch } from './gif-search.svelte';
   import {
     gifProvider,
@@ -38,7 +38,10 @@
   });
 
   let searching = $derived(query.trim() !== '');
-  let shown = $derived(searching ? search.results : favorites);
+  let recent = $derived(recentGifs());
+  let empty = $derived(
+    searching ? search.results.length === 0 : recent.length + favorites.length === 0
+  );
 
   function star(event: MouseEvent, gif: GifResult): void {
     event.stopPropagation();
@@ -46,60 +49,72 @@
   }
 </script>
 
+{#snippet tiles(gifs: readonly GifResult[])}
+  <ul>
+    {#each gifs as gif (gif.mediaUrl)}
+      {@const kept = isFavorite(favorites, gif)}
+      <li>
+        <button
+          type="button"
+          class="gif-cell"
+          title={gif.title}
+          aria-label={gif.title}
+          onclick={() => {
+            onPick(gif);
+          }}
+        >
+          <img
+            src={gif.previewUrl}
+            alt=""
+            width="4"
+            height="3"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          />
+        </button>
+        <button
+          type="button"
+          class="gif-star choice"
+          aria-pressed={kept}
+          aria-label={kept ? $i18n.t('composer.gifUnfavorite') : $i18n.t('composer.gifFavorite')}
+          onclick={(event) => {
+            star(event, gif);
+          }}
+        >
+          {#if kept}
+            <HeartIcon weight="fill" />
+          {:else}
+            <HeartStraightIcon />
+          {/if}
+        </button>
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
 <div class="gif-grid">
   {#if search.loading}
     <div class="gif-note"><Spinner /></div>
   {:else if search.failed}
     <div class="gif-note">{$i18n.t('composer.gifSearchFailed')}</div>
-  {:else if shown.length === 0}
+  {:else if empty}
     <div class="gif-note">
       {searching ? $i18n.t('composer.gifNoMatches') : $i18n.t('composer.gifEmptyFavorites')}
     </div>
   {:else}
-    {#if !searching}
-      <h3>{$i18n.t('composer.gifFavorites')}</h3>
+    {#if searching}
+      {@render tiles(search.results)}
+    {:else}
+      {#if recent.length > 0}
+        <h3>{$i18n.t('composer.gifRecent')}</h3>
+        {@render tiles(recent)}
+      {/if}
+      {#if favorites.length > 0}
+        <h3>{$i18n.t('composer.gifFavorites')}</h3>
+        {@render tiles(favorites)}
+      {/if}
     {/if}
-    <ul>
-      {#each shown as gif (gif.mediaUrl)}
-        {@const kept = isFavorite(favorites, gif)}
-        <li>
-          <button
-            type="button"
-            class="gif-cell"
-            title={gif.title}
-            aria-label={gif.title}
-            onclick={() => {
-              onPick(gif);
-            }}
-          >
-            <img
-              src={gif.previewUrl}
-              alt=""
-              width="4"
-              height="3"
-              loading="lazy"
-              decoding="async"
-              referrerpolicy="no-referrer"
-            />
-          </button>
-          <button
-            type="button"
-            class="gif-star choice"
-            aria-pressed={kept}
-            aria-label={kept ? $i18n.t('composer.gifUnfavorite') : $i18n.t('composer.gifFavorite')}
-            onclick={(event) => {
-              star(event, gif);
-            }}
-          >
-            {#if kept}
-              <HeartIcon weight="fill" />
-            {:else}
-              <HeartStraightIcon />
-            {/if}
-          </button>
-        </li>
-      {/each}
-    </ul>
     <p class="gif-attribution">
       {$i18n.t('composer.gifAttribution', { provider: provider.label })}
     </p>

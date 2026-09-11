@@ -4,8 +4,10 @@ import {
 } from '#lib/features/composer/composer-drafts.svelte.js';
 import {
   adoptFavorites,
+  adoptRecentGifs,
   favoriteGifs,
   parseFavorites,
+  recentGifs,
 } from '#lib/features/gif/favorites.svelte.js';
 import {
   adoptRoomIconOverrides,
@@ -68,6 +70,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         v: DOCUMENT_VERSION,
         recentEmotes: readRecent(),
         favoriteGifs: favoriteGifs(),
+        recentGifs: recentGifs(),
         roomIcons: roomIconOverrides(),
         openFolders: [...sidebar.openFolders],
       },
@@ -79,6 +82,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         return (
           readRecent().length === 0 &&
           favoriteGifs().length === 0 &&
+          recentGifs().length === 0 &&
           Object.keys(roomIconOverrides()).length === 0 &&
           sidebar.openFolders.size === 0
         );
@@ -86,6 +90,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
 
       writeRecent(parseShortcodes(body.recentEmotes));
       adoptFavorites(parseFavorites(body.favoriteGifs));
+      adoptRecentGifs(parseFavorites(body.recentGifs));
       adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));
       sidebar.adoptOpenFolders(stringList(body.openFolders));
       return true;

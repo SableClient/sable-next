@@ -7,7 +7,12 @@ import {
   readDraft,
   writeDraft,
 } from '#lib/features/composer/composer-drafts.svelte.js';
-import { adoptFavorites, favoriteGifs } from '#lib/features/gif/favorites.svelte.js';
+import {
+  adoptFavorites,
+  adoptRecentGifs,
+  favoriteGifs,
+  recentGifs,
+} from '#lib/features/gif/favorites.svelte.js';
 import {
   adoptRoomIconOverrides,
   roomIconOverrides,
@@ -32,6 +37,7 @@ const gif = {
 function reset(): void {
   writeRecent([]);
   adoptFavorites([]);
+  adoptRecentGifs([]);
   adoptRoomIconOverrides([]);
   adoptRecentReactions([]);
   clearDrafts();
@@ -48,6 +54,7 @@ describe('the workspace document', () => {
 
     writeRecent(['blobwave']);
     adoptFavorites([gif]);
+    adoptRecentGifs([gif]);
     adoptRoomIconOverrides([['!room:example.org', 'never']]);
     sidebar.adoptOpenFolders(['folder-1']);
     const { content } = document.snapshot();
@@ -58,6 +65,7 @@ describe('the workspace document', () => {
 
     expect(readRecent()).toEqual(['blobwave']);
     expect(favoriteGifs()).toEqual([gif]);
+    expect(recentGifs()).toEqual([gif]);
     expect(roomIconOverrides()).toEqual({ '!room:example.org': 'never' });
     expect([...sidebar.openFolders]).toEqual(['folder-1']);
   });
@@ -80,6 +88,10 @@ describe('the workspace document', () => {
     expect(document.adopt(null)).toBe(true);
 
     writeRecent(['blobwave']);
+    expect(document.adopt(null)).toBe(false);
+
+    writeRecent([]);
+    adoptRecentGifs([gif]);
     expect(document.adopt(null)).toBe(false);
   });
 });

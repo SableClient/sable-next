@@ -1452,6 +1452,7 @@
     "gifs": "GIFs",
     "searchGifs": "Search GIFs",
     "gifFavorites": "Saved",
+    "gifRecent": "Recent",
     "gifEmptyFavorites": "Search for a GIF, or save one to keep it here.",
     "gifNoMatches": "No GIFs match that search.",
     "gifSearchFailed": "Could not search GIFs.",
