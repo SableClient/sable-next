@@ -44,6 +44,7 @@ export interface Preferences {
   memberSort: MemberSort;
   filterPronounsByLanguage: boolean;
   pronounPillLimit: PronounPillLimit;
+  hidePronounPill: boolean;
 
   enterForNewline: boolean;
   mentionInReplies: boolean;
@@ -168,6 +169,7 @@ const DEFAULTS: Preferences = {
   memberSort: 'name-asc',
   filterPronounsByLanguage: true,
   pronounPillLimit: '3',
+  hidePronounPill: false,
 
   enterForNewline: false,
   mentionInReplies: true,

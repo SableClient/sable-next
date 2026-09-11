@@ -4,6 +4,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import { formatPronouns } from '#lib/personas/pronouns.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import type { SenderDisplayColors } from './members.js';
 
@@ -86,7 +87,7 @@
   >
     {@render name()}
 
-    {#if pronouns.visible.length > 0}<span
+    {#if !preferences.hidePronounPill && pronouns.visible.length > 0}<span
         class="sender-identity-pronouns"
         class:tinted={colors.tinted}
         style:color={colors.tinted ? undefined : colors.nameColor}

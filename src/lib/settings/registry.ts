@@ -483,6 +483,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'hidePronounPill',
+        icon: UserCircleIcon,
+        name: 'settings.hidePronounPill',
+        description: 'settings.hidePronounPillHint',
+        type: 'boolean',
+      },
+      {
         key: 'filterPronounsByLanguage',
         icon: TranslateIcon,
         name: 'settings.filterPronounsByLanguage',

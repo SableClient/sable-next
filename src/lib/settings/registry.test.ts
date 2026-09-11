@@ -39,3 +39,16 @@ describe('developer settings', () => {
     expect(await developerItemKeys()).toContain('developerTools');
   });
 });
+
+describe('every setting', () => {
+  it('binds to a preference that exists', async () => {
+    vi.resetModules();
+    const { settingsCategories } = await import('./registry');
+    const { PREFERENCE_KEYS } = await import('./preferences.svelte');
+    const unknown = settingsCategories
+      .flatMap((category) => category.items)
+      .map((item) => item.key)
+      .filter((key) => !PREFERENCE_KEYS.includes(key));
+    expect(unknown).toEqual([]);
+  });
+});

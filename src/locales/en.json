@@ -1222,6 +1222,8 @@
     "hideTypingIndicatorsHint": "Nobody typing is announced at the foot of the timeline.",
     "filterPronounsByLanguage": "Match pronouns to your language",
     "filterPronounsByLanguageHint": "Show only the pronoun sets tagged with your interface language, falling back to every set when none match.",
+    "hidePronounPill": "Hide pronoun pills",
+    "hidePronounPillHint": "Hides pronoun pills in the timeline. They are still shown in profiles.",
     "pronounPillLimit": "Pronoun pills per message",
     "pronounPillLimitHint": "The rest are counted in a single pill that lists them on hover.",
     "pronounPillLimitOne": "One",
