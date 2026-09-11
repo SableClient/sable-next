@@ -17,6 +17,7 @@ const CRAWL_BATCH: u16 = 25;
 const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const MAX_CRAWLED_EVENTS: usize = 20_000;
+const BLIND_BATCHES_BEFORE_SKIP: usize = 3;
 
 #[derive(Default)]
 pub(crate) struct CrawlProgress {
@@ -27,6 +28,7 @@ pub(crate) struct CrawlProgress {
     visits: HashMap<OwnedRoomId, usize>,
     tokens: HashMap<OwnedRoomId, Option<String>>,
     probed: HashSet<OwnedRoomId>,
+    blind: HashMap<OwnedRoomId, usize>,
     events: usize,
 }
 
@@ -53,6 +55,17 @@ impl CrawlProgress {
             self.exhausted.insert(room_id.clone());
         }
         self.reached_start.insert(room_id);
+    }
+
+    fn blinded(&mut self, room_id: &OwnedRoomId, undecryptable: bool) -> bool {
+        if !undecryptable {
+            self.blind.remove(room_id);
+            return false;
+        }
+
+        let seen = self.blind.entry(room_id.clone()).or_default();
+        *seen += 1;
+        *seen >= BLIND_BATCHES_BEFORE_SKIP
     }
 
     fn token(&self, room_id: &OwnedRoomId) -> Option<String> {
@@ -156,7 +169,12 @@ impl Core {
                         .await
                         .settle(room_id, outcome.exhausted);
                 }
-                Ok(_) => {}
+                Ok(outcome) => {
+                    let mut progress = self.search_crawl.lock().await;
+                    if progress.blinded(&room_id, outcome.undecryptable) {
+                        progress.settle(room_id, false);
+                    }
+                }
                 Err(error) => {
                     warn!(%room_id, "search crawl pagination failed: {error}");
                     self.search_crawl.lock().await.fail(room_id);
@@ -280,6 +298,7 @@ impl Core {
             return Ok(CrawlOutcome {
                 reached_start: true,
                 exhausted: true,
+                undecryptable: false,
             });
         };
 
@@ -290,9 +309,12 @@ impl Core {
         let messages = room.messages(options).await?;
 
         self.search_crawl.lock().await.visit(room_id);
+        let undecryptable =
+            !messages.chunk.is_empty() && messages.chunk.iter().all(|event| event.kind.is_utd());
         let outcome = CrawlOutcome {
             reached_start: messages.end.is_none() || messages.chunk.is_empty(),
             exhausted: messages.end.is_none(),
+            undecryptable,
         };
         self.search_crawl
             .lock()
@@ -326,6 +348,7 @@ impl Core {
 pub(super) struct CrawlOutcome {
     pub(super) reached_start: bool,
     pub(super) exhausted: bool,
+    pub(super) undecryptable: bool,
 }
 
 fn crawls_first(room: &Room) -> bool {
@@ -342,7 +365,7 @@ mod tests {
     use matrix_sdk::test_utils::mocks::MatrixMockServer;
     use matrix_sdk_test::{JoinedRoomBuilder, async_test, event_factory::EventFactory};
 
-    use super::{CrawlProgress, MAX_CRAWLED_EVENTS};
+    use super::{BLIND_BATCHES_BEFORE_SKIP, CrawlProgress, MAX_CRAWLED_EVENTS};
 
     fn room() -> OwnedRoomId {
         room_id!("!crawled:localhost").to_owned()
@@ -356,6 +379,40 @@ mod tests {
         };
 
         assert!(progress.skips(&room()));
+    }
+
+    #[test]
+    fn test_a_room_this_device_cannot_decrypt_stops_after_a_few_blind_batches() {
+        let mut progress = CrawlProgress::default();
+
+        for _ in 1..BLIND_BATCHES_BEFORE_SKIP {
+            assert!(!progress.blinded(&room(), true));
+        }
+        assert!(progress.blinded(&room(), true));
+    }
+
+    #[test]
+    fn test_one_decryptable_batch_clears_the_blind_streak() {
+        let mut progress = CrawlProgress::default();
+
+        for _ in 1..BLIND_BATCHES_BEFORE_SKIP {
+            assert!(!progress.blinded(&room(), true));
+        }
+        assert!(!progress.blinded(&room(), false));
+
+        for _ in 1..BLIND_BATCHES_BEFORE_SKIP {
+            assert!(!progress.blinded(&room(), true));
+        }
+    }
+
+    #[test]
+    fn test_a_blinded_room_is_re_walked_next_session() {
+        let mut progress = CrawlProgress::default();
+        while !progress.blinded(&room(), true) {}
+        progress.settle(room(), false);
+
+        assert!(progress.skips(&room()));
+        assert!(!progress.checkpoints().contains_key(&room()));
     }
 
     #[test]
