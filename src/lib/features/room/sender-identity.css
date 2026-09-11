@@ -7,9 +7,7 @@
 }
 
 .sender-identity-name {
-  flex-shrink: 1;
   font-weight: var(--font-weight-bold);
-  height: var(--font-size-small);
   letter-spacing: -0.005em;
   max-width: 24ch;
   min-width: 0;
@@ -26,12 +24,9 @@
 
 .name-button {
   background: none;
-
-  /* reset */
   border: 0;
   cursor: pointer;
   font: inherit;
-  height: unset;
   padding: 0;
 }
 
@@ -46,9 +41,7 @@
 }
 
 .sender-identity-pronouns {
-  align-items: baseline;
   display: inline;
-  flex-shrink: 1;
 }
 
 .sender-identity-pronouns::before {
@@ -57,10 +50,6 @@
 
 .sender-identity-pronouns::after {
   content: ')';
-}
-
-.sender-identity-pronoun {
-  text-overflow: ellipsis;
 }
 
 .sender-identity-pronoun:not(:last-child)::after {
@@ -103,20 +92,20 @@
       color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
     }
   }
+}
 
-  @media (width <= 25rem) {
-    :has(> .sender-identity-via) .sender-identity-pronouns {
-      max-width: 6rem;
-    }
-
-    :has(> .sender-identity-pronouns) .sender-identity-via {
-      max-width: 3rem;
-    }
+@media (width <= 25rem) {
+  .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
+    max-width: 6rem;
   }
 
-  @media (width <= 20rem) {
-    :has(> .sender-identity-via) .sender-identity-pronouns {
-      display: none;
-    }
+  .sender-identity:has(> .sender-identity-pronouns) .sender-identity-via {
+    max-width: 3rem;
+  }
+}
+
+@media (width <= 20rem) {
+  .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
+    display: none;
   }
 }

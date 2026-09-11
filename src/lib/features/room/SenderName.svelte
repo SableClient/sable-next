@@ -106,16 +106,14 @@
         {/if}</span
       >
     {/if}
-    <!-- (When there is a PMP,) the account's name -->
     {#if accountName}
-      <span
-        aria-label={profileLabel ?? $i18n.t('timeline.senderProfile', { name: displayName })}
-        class="sender-identity-via"
+      <span class="sender-identity-via"
         >|
         {#if onViaProfile}
           <button
-            class={[nameClass, 'name-button', 'sender-identity-name']}
+            class="name-button"
             type="button"
+            aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
             onclick={(event) => {
               onViaProfile(event.currentTarget);
             }}>{accountName}</button

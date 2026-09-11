@@ -713,7 +713,7 @@
               <button
                 class="via via-hidden"
                 type="button"
-                aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
+                aria-label={$i18n.t('timeline.senderProfile', { name: item.sender })}
                 onclick={openSenderProfile}>{item.sender}</button
               >
             {/if}
@@ -1097,12 +1097,8 @@
       padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap));
     }
 
-    /*
-      :root specificity hack.
-
-      Otherwise this competes with the other selector and
-       may lose depending on how the bundler behaves.
-    */
+    /* `:root` outranks the layout block at the end of the file, which carries
+       the same three classes and would otherwise win on source order. */
     :root .message.layout-compact.collapsed {
       padding-inline: var(--page-gutter);
     }

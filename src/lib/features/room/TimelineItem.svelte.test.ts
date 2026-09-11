@@ -372,6 +372,47 @@ test('opens a per-message profile avatar through viewer callback', async () => {
   await unmount(instance);
 });
 
+test('a per-message profile takes the sender position and names the account behind it', async () => {
+  core.userProfile.mockResolvedValue({
+    name_color_light: '#2244aa',
+    name_color_dark: '#88aaff',
+  });
+  const onSenderProfile = vi.fn();
+  const persona = {
+    ...item(false),
+    per_message_profile: {
+      id: 'kris',
+      display_name: 'Kris',
+      avatar_url: null,
+      pronouns: [{ summary: 'they/them', language: null }],
+      color_on_light: '#4f7a3a',
+      color_on_dark: '#9fd07c',
+      has_fallback: false,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core: core.commands,
+      item: { item: persona, collapsed: false, onSenderProfile },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('header .sender')?.textContent.trim()).toBe('Kris');
+  expect(document.querySelector('header .sender-identity-pronoun')?.textContent).toBe('they/them');
+
+  const via = document.querySelector('header .sender-identity-via');
+  expect(via?.textContent).toContain('Alice');
+  expect(via?.textContent).not.toContain('@alice:example.org');
+
+  const viaButton = via?.querySelector<HTMLButtonElement>('.name-button');
+  if (!viaButton) throw new Error('the account behind the persona was not a button');
+  viaButton.click();
+  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', viaButton);
+  await unmount(instance);
+});
+
 test('without a persona the hover-only via keeps the account MXID', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
