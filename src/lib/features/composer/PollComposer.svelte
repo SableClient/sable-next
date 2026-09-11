@@ -6,11 +6,17 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
+  import Slider from '#lib/ui/primitives/Slider.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     open?: boolean;
-    onCreate: (question: string, answers: string[], undisclosed: boolean) => void;
+    onCreate: (
+      question: string,
+      answers: string[],
+      undisclosed: boolean,
+      maxSelections?: number
+    ) => void;
   }
 
   /** MSC3381's ceiling; the core rejects anything past it. */
@@ -20,10 +26,16 @@
   let question = $state('');
   let answers = $state(['', '']);
   let undisclosed = $state(false);
+  let maxSelections = $state(1);
   let filled = $derived(
     answers.map((answer) => answer.trim()).filter((answer) => answer.length > 0)
   );
-  let valid = $derived(question.trim().length > 0 && filled.length > 0);
+  let valid = $derived(
+    question.trim().length > 0 &&
+      filled.length > 0 &&
+      maxSelections > 0 &&
+      maxSelections <= answers.length
+  );
 
   function reset(): void {
     question = '';
@@ -37,7 +49,7 @@
     const options = filled;
     open = false;
     reset();
-    onCreate(asked, options, undisclosed);
+    onCreate(asked, options, undisclosed, maxSelections);
   }
 
   function cancel(): void {
@@ -64,17 +76,17 @@
             autocomplete="off"
             aria-label={$i18n.t('composer.pollAnswerNumber', { number: index + 1 })}
           />
-          {#if answers.length > 1}
-            <Button
-              variant="ghost"
-              aria-label={$i18n.t('composer.pollRemoveAnswer', { number: index + 1 })}
-              onclick={() => {
-                answers = answers.filter((_, at) => at !== index);
-              }}
-            >
-              <TrashIcon />
-            </Button>
-          {/if}
+          <Button
+            variant="ghost"
+            disabled={answers.length <= 1}
+            aria-label={$i18n.t('composer.pollRemoveAnswer', { number: index + 1 })}
+            onclick={() => {
+              if (maxSelections === answers.length) maxSelections -= 1;
+              answers = answers.filter((_, at) => at !== index);
+            }}
+          >
+            <TrashIcon />
+          </Button>
         </div>
       {/each}
       {#if answers.length < MAX_ANSWERS}
@@ -82,6 +94,7 @@
           variant="ghost"
           class="add-answer"
           onclick={() => {
+            if (maxSelections === answers.length) maxSelections += 1;
             answers = [...answers, ''];
           }}
         >
@@ -91,8 +104,25 @@
     </fieldset>
 
     <div class="undisclosed">
-      <Switch bind:checked={undisclosed} label={$i18n.t('composer.pollUndisclosed')} />
       <span>{$i18n.t('composer.pollUndisclosed')}</span>
+      <Switch bind:checked={undisclosed} label={$i18n.t('composer.pollUndisclosed')} />
+    </div>
+    <div class="max-selection">
+      <div class="max-selection-textual">
+        <span>{$i18n.t('composer.pollMaxSelection')}</span>
+        <input
+          class="max-selection-input"
+          min="1"
+          max={answers.length}
+          type="number"
+          bind:value={maxSelections}
+        />
+      </div>
+      <Slider
+        max={answers.length}
+        label={$i18n.t('composer.pollMaxSelection')}
+        bind:value={maxSelections}
+      />
     </div>
 
     <div class="actions">
@@ -141,11 +171,29 @@
     align-items: center;
     display: flex;
     gap: var(--space-300);
+    justify-content: space-between;
   }
 
   .actions {
     display: flex;
     gap: var(--space-300);
     justify-content: flex-end;
+  }
+
+  .max-selection {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-300);
+  }
+
+  .max-selection-textual {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+    justify-content: space-between;
+  }
+
+  .max-selection-input {
+    width: var(--space-900);
   }
 </style>

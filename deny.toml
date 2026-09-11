@@ -7,7 +7,6 @@ unmaintained = "workspace"
 ignore = [
   { id = "RUSTSEC-2026-0194", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
   { id = "RUSTSEC-2026-0195", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
-  { id = "RUSTSEC-2024-0415", reason = "Tauri 2's Linux backend is GTK3; gtk-rs archived the bindings and no GTK4 path exists until Tauri migrates" },
 ]
 
 [licenses]

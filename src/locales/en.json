@@ -1540,6 +1540,7 @@
     "pollRemoveAnswer": "Remove answer {{number}}",
     "pollAddAnswer": "Add answer",
     "pollUndisclosed": "Hide results until the poll closes",
+    "pollMaxSelection": "How many options may one person pick",
     "pollCreate": "Create poll",
     "pollCancel": "Cancel",
     "voiceRecord": "Record a voice message",

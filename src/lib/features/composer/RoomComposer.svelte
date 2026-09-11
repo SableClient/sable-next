@@ -90,7 +90,8 @@
       roomId: string,
       question: string,
       answers: string[],
-      undisclosed: boolean
+      undisclosed: boolean,
+      maxSelections?: number
     ) => Promise<void>;
     onSendLocation?: (roomId: string, body: string, geoUri: string) => Promise<void>;
     onSchedule?: (
@@ -977,8 +978,13 @@
 {#if onCreatePoll}
   <PollComposer
     bind:open={pollOpen}
-    onCreate={(question: string, answers: string[], undisclosed: boolean) => {
-      void onCreatePoll(roomId, question, answers, undisclosed);
+    onCreate={(
+      question: string,
+      answers: string[],
+      undisclosed: boolean,
+      maxSelections?: number
+    ) => {
+      void onCreatePoll(roomId, question, answers, undisclosed, maxSelections);
     }}
   />
 {/if}

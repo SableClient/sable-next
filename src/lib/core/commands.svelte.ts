@@ -968,8 +968,8 @@ export function createCommands(transport: () => Transport) {
       question: string,
       answers: readonly string[],
       undisclosed = false,
-      maxSelections = 1,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      maxSelections?: number
     ): Promise<void> {
       await transport().send({
         type: 'create_poll',
@@ -977,7 +977,7 @@ export function createCommands(transport: () => Transport) {
         question,
         answers: [...answers],
         undisclosed,
-        max_selections: maxSelections,
+        max_selections: maxSelections ?? 1,
         thread_root: threadRoot,
       });
     },
@@ -985,7 +985,7 @@ export function createCommands(transport: () => Transport) {
     async votePoll(
       roomId: string,
       eventId: string,
-      answers: readonly string[],
+      answers: string[],
       threadRoot: string | null = null
     ): Promise<void> {
       await transport().send({
@@ -993,7 +993,7 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
         event_id: eventId,
         thread_root: threadRoot,
-        answers: [...answers],
+        answers,
       });
     },
 

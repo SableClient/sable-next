@@ -23,6 +23,7 @@
     poll.answers.filter((answer) => answer.selected).map((answer) => answer.id)
   );
   let total = $derived(poll.answers.reduce((sum, answer) => sum + (answer.votes ?? 0), 0));
+  let maxValue = $derived(Math.max(...poll.answers.map((answer) => answer.votes ?? 0)));
   let votersAnswers = $derived(poll.answers.filter((answer) => answer.voters !== null));
   let votersOpen = $state(false);
   let votersActive = $state(0);
@@ -35,13 +36,13 @@
   }
 
   function share(votes: number | null): number {
-    if (votes === null || total === 0) return 0;
-    return Math.round((votes / total) * 100);
+    if (votes === null || maxValue === 0) return 0;
+    return Math.round((votes / maxValue) * 100);
   }
 
   // MSC3381 has no unvote event: an empty selection is how you withdraw.
   function pick(answerId: string) {
-    if (ended || !eventId || !onVote) return;
+    if (ended || !eventId || !onVote || poll.max_selections === 0) return;
     if (!multiple) {
       onVote(eventId, selected.includes(answerId) ? [] : [answerId]);
       return;
@@ -53,8 +54,10 @@
       );
       return;
     }
-    if (selected.length >= poll.max_selections) return;
-    onVote(eventId, [...selected, answerId]);
+    if (selected.length > poll.max_selections) return;
+    const newSelection = selected.length === poll.max_selections ? selected.slice(1) : selected;
+    const finalSelection = newSelection.concat([answerId]);
+    onVote(eventId, finalSelection);
   }
 </script>
 
@@ -70,14 +73,15 @@
       <li class="answer-row">
         <button
           type="button"
-          class="answer choice"
+          class="answer"
           aria-pressed={answer.selected}
           disabled={ended || !eventId}
           onclick={() => {
             pick(answer.id);
           }}
         >
-          <span class="fill" style:width={`${String(percent)}%`}></span>
+          <span class="fill" aria-pressed={answer.selected} style:width={`${String(percent)}%`}
+          ></span>
           <span class="text">{answer.text}</span>
         </button>
         {#if answer.votes !== null}
@@ -200,15 +204,19 @@
     cursor: default;
   }
 
-  .answer:not(:disabled, [aria-pressed='true']):hover {
+  .answer:not(:disabled):hover {
     border-color: var(--primary-main);
   }
 
   .fill {
-    background: var(--primary-container);
+    background: var(--sec-container-active);
     inset-block: 0;
     inset-inline-start: 0;
     position: absolute;
+  }
+
+  .fill[aria-pressed='true'] {
+    background: var(--primary-container);
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -219,7 +227,9 @@
 
   .text,
   .count {
+    flex: 0;
     position: relative;
+    width: var(--space-900);
   }
 
   .text {

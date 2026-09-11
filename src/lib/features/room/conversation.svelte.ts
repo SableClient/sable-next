@@ -188,15 +188,16 @@ export class Conversation {
     targetRoomId: string,
     question: string,
     answers: string[],
-    undisclosed: boolean
+    undisclosed: boolean,
+    maxSelections: number = 1
   ): Promise<void> => {
     await this.#core.commands.createPoll(
       targetRoomId,
       question,
       answers,
       undisclosed,
-      1,
-      this.#threadRoot
+      this.#threadRoot,
+      maxSelections
     );
   };
 
