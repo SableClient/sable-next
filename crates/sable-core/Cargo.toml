@@ -45,7 +45,7 @@ sha2 = "0.11"
 getrandom = "0.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
+matrix-sdk = { workspace = true, features = ["bundled-sqlite"] }
 tokio = { workspace = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
