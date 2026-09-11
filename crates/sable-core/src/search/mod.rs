@@ -409,6 +409,25 @@ impl MessageIndex {
         self.rooms.insert(room_id.clone(), index);
     }
 
+    fn unclassified(
+        &self,
+        room_id: &OwnedRoomId,
+        events: Vec<TimelineEvent>,
+    ) -> Vec<TimelineEvent> {
+        let Some(index) = self.rooms.get(room_id) else {
+            return events;
+        };
+
+        events
+            .into_iter()
+            .filter(|event| {
+                event
+                    .event_id()
+                    .is_some_and(|event_id| !index.already_classified(event_id))
+            })
+            .collect()
+    }
+
     fn mark_dirty(&mut self, room_id: &OwnedRoomId) {
         if let Some(index) = self.rooms.get_mut(room_id) {
             index.dirty = true;
@@ -1009,6 +1028,12 @@ impl Core {
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     };
 
+                    let events = core
+                        .search_index
+                        .lock()
+                        .await
+                        .unclassified(&room_id, events);
+
                     if events.is_empty() || core.search_crawl.lock().await.is_ingesting(&room_id) {
                         continue;
                     }
@@ -1312,6 +1337,47 @@ mod tests {
 
         assert!(!hits.contains(&"$elsewhere".to_owned()));
         assert_eq!(hits.len(), 3);
+    }
+
+    #[test]
+    fn test_a_cache_refill_costs_nothing_when_the_index_already_holds_it() {
+        use super::{MessageIndex, RoomIndex};
+        use matrix_sdk::deserialized_responses::TimelineEvent;
+
+        let room_id = room_id!("!refilled:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@a:b.c"));
+        let events: Vec<TimelineEvent> = ["one", "two"]
+            .iter()
+            .enumerate()
+            .map(|(index, body)| {
+                TimelineEvent::from_plaintext(
+                    factory
+                        .text_msg(*body)
+                        .event_id(&EventId::parse(format!("$refill{index}")).expect("an event id"))
+                        .into_raw_sync(),
+                )
+            })
+            .collect();
+
+        let mut index = MessageIndex::new();
+        index
+            .rooms
+            .entry(room_id.clone())
+            .or_insert_with(RoomIndex::new);
+
+        assert_eq!(index.unclassified(&room_id, events.clone()).len(), 2);
+
+        for event in &events {
+            index
+                .rooms
+                .get_mut(&room_id)
+                .expect("the room")
+                .mark_classified(event.event_id().expect("an event id").to_owned());
+        }
+
+        assert!(index.unclassified(&room_id, events).is_empty());
     }
 
     #[async_test]
