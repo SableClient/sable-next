@@ -18,7 +18,7 @@ matrix-sdk-ui = { version = "0.18.0", git = "https://github.com/matrix-org/matri
 matrix-sdk-base = { version = "0.18.0", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "ad1721fe50de606caab3030cab10c706bea344f8", default-features = false, features = [
   "e2e-encryption",
 ] }
-ruma = { git = "https://github.com/ruma/ruma", rev = "0908aaa9847093ecb32bc6edf0af525f726717fd", features = [
+ruma = { version = "0.16.0", git = "https://github.com/ruma/ruma", rev = "0908aaa9847093ecb32bc6edf0af525f726717fd", features = [
   "client-api-c",
   "unstable-msc4143",
   "unstable-msc4195",
