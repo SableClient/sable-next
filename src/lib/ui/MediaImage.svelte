@@ -174,9 +174,11 @@
     const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
     if (cached !== undefined) {
       measured(requestWidth, requestHeight);
-      gifPreviewReady = false;
-      gifPlaying = false;
-      if (url !== cached) imageLoaded = false;
+      if (url !== cached) {
+        imageLoaded = false;
+        gifPreviewReady = false;
+        gifPlaying = false;
+      }
       url = cached;
       failed = false;
       return release;
@@ -428,7 +430,7 @@
       {/if}
     </span>
   {/if}
-  {#if !failed && !painted}
+  {#if !failed && !url}
     <span class="media-image-progress"><Spinner small /></span>
     {#if sizeLabel}<span class="media-image-size">{sizeLabel}</span>{/if}
   {/if}

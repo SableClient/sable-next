@@ -805,3 +805,48 @@ test('measures the thumbnail even once the original has been measured', async ()
   expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:original');
   await unmount(timeline);
 });
+
+test('does not flash the loading overlay over a GIF it has already fetched', async () => {
+  preferences.autoplayGifs = false;
+  const props = {
+    source: 'mxc://example.org/held-gif',
+    alt: 'party.gif',
+    width: 800,
+    height: 600,
+    mime: 'image/gif',
+    size: 2_761_335,
+  };
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:held-gif');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+  );
+  vi.stubGlobal(
+    'ImageDecoder',
+    class {
+      tracks = {
+        ready: Promise.resolve(),
+        selectedTrack: { animated: true, frameCount: 3 },
+      };
+      completed = Promise.resolve();
+      decode() {
+        return Promise.resolve({
+          image: { displayWidth: 4, displayHeight: 4, duration: 20_000, close: () => {} },
+        });
+      }
+      close() {}
+    }
+  );
+
+  const first = mount(MediaImage, { target: document.body, props });
+  await settle();
+  await unmount(first);
+
+  const second = mount(MediaImage, { target: document.body, props });
+  await tick();
+
+  expect(document.querySelector('.media-image-progress')).toBeNull();
+  expect(document.querySelector('.media-image-size')).toBeNull();
+  await unmount(second);
+});
