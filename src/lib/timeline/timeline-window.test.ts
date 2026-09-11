@@ -18,7 +18,10 @@ function entries(count: number) {
   return Array.from({ length: count }, (_, value) => ({ key: String(value), value }));
 }
 
-function fixture(heightForRow?: (value: number) => number) {
+function fixture(
+  heightForRow?: (value: number) => number,
+  estimateForRow?: (value: number) => number | undefined
+) {
   let rowHeight = 50;
   let viewportHeight = 300;
   const size = (value: number) => heightForRow?.(value) ?? rowHeight;
@@ -87,6 +90,7 @@ function fixture(heightForRow?: (value: number) => number) {
     render,
     onChange,
     onScroll,
+    estimateSize: estimateForRow,
   });
   windows.push(window);
   return {
@@ -995,4 +999,17 @@ test('a smooth jump away from the end leaves follow mode', async () => {
   await window.jumpTo('10', 'center', true);
 
   expect(window.state.pinned).toBe(false);
+});
+
+test('a clustered photo dump does not shrink the scrollable extent', async () => {
+  const heightFor = (value: number) => (value < 300 ? 120 + ((value * 37) % 480) : 50);
+  const { window, viewport } = fixture(heightFor, (value) => (value < 300 ? 360 : undefined));
+  const count = 600;
+  await window.update(entries(count));
+
+  let trueTotal = 0;
+  for (let value = 0; value < count; value += 1) trueTotal += heightFor(value);
+
+  const error = Math.abs(viewport.scrollHeight - trueTotal) / trueTotal;
+  expect(error).toBeLessThan(0.15);
 });

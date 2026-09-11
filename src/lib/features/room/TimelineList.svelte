@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick, type Snippet } from 'svelte';
+  import { tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { prefersReducedMotion } from 'svelte/motion';
   import { fade } from 'svelte/transition';
@@ -34,7 +34,7 @@
   } from './timeline-format';
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
-  import { TIMELINE_LAYOUT, TIMELINE_LAYOUT_STYLE } from './timeline-layout';
+  import { estimateRowSize, TIMELINE_LAYOUT, TIMELINE_LAYOUT_STYLE } from './timeline-layout';
 
   const MAX_EMPTY_REFILLS = 5;
 
@@ -282,6 +282,7 @@
       onChange: windowChanged,
       onScroll: readerScrolled,
       isAnchor: ({ item }) => item.event_id !== null,
+      estimateSize: ({ item }) => estimateRowSize(item.content),
     });
     controller = engine;
     return () => {
@@ -411,6 +412,16 @@
       .finally(() => {
         refillPending = false;
       });
+  });
+  let sentEcho: string | null = null;
+  $effect(() => {
+    const engine = controller;
+    const last = entries.at(-1)?.value.item;
+    if (!engine || !revealed) return;
+    const echo = last && last.is_own && last.event_id === null ? last.transaction_id : null;
+    if (echo === null || echo === sentEcho) return;
+    sentEcho = echo;
+    if (untrack(() => nearLatest)) void engine.jumpTo(null, 'start');
   });
   let handledFocus: string | null = null;
   $effect(() => {
@@ -547,7 +558,7 @@
       </div>
     </div>
 
-    {#if (!revealed || awaitingContent) && !noHistory}
+    {#if (!revealed || (awaitingContent && rows.length === 0)) && !noHistory}
       <TimelineSkeleton layout={preferences.layout} />
     {:else if visibleItems.length === 0}
       <EmptyState
