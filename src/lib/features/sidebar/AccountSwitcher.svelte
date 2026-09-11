@@ -6,7 +6,7 @@
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
-  import { DropdownMenu } from 'bits-ui';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
@@ -88,48 +88,52 @@
     <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
   </button>
 {:else}
-  {#snippet profileTrigger({ props }: { props: Record<string, unknown> })}
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger
-        {...props}
-        class="quick-tool nav-tab nav-tab-outlined selection-open selection-layer {mode ===
-        'compact'
-          ? 'compact-tool nav-tab-side'
-          : 'desktop-tool nav-tab-bottom'}"
-        aria-label={$i18n.t('nav.switchAccount')}
-      >
-        <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content
-        class="menu-surface account-popover"
-        side={mode === 'compact' ? 'right' : 'top'}
-        sideOffset={8}
-      >
-        <ProfileCard
-          class="account-profile-header"
-          {displayName}
-          userId={core.session?.user_id ?? ''}
-          {avatarUrl}
-          color={activeProfile?.hero_color ?? 'var(--primary-container)'}
-          heroColor={activeProfile?.hero_color}
-          heroBrightness={activeProfile?.hero_brightness}
-          bannerUrl={activeProfile?.banner_url}
-          status={userStatus?.text}
-          statusEmoji={userStatus?.emoji}
-          nameColorLight={activeProfile?.name_color_light}
-          nameColorDark={activeProfile?.name_color_dark}
-        />
-        <AccountMenuItems
-          accounts={core.accounts}
-          currentAccountId={core.session?.account_id}
-          {switching}
-          onSwitch={switchAccount}
-          onProfile={openProfile}
-          onLogout={logout}
-          onAddAccount={openAddAccount}
-        />
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
+  {#snippet profileTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
+    <ActionMenu
+      label={$i18n.t('nav.switchAccount')}
+      class="account-popover"
+      side={mode === 'compact' ? 'right' : 'top'}
+      align="center"
+      sideOffset={8}
+    >
+      {#snippet trigger({ props })}
+        <button
+          {...tooltipProps}
+          {...props}
+          type="button"
+          class="quick-tool nav-tab nav-tab-outlined selection-open selection-layer {mode ===
+          'compact'
+            ? 'compact-tool nav-tab-side'
+            : 'desktop-tool nav-tab-bottom'}"
+          aria-label={$i18n.t('nav.switchAccount')}
+        >
+          <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
+        </button>
+      {/snippet}
+      <ProfileCard
+        class="account-profile-header"
+        {displayName}
+        userId={core.session?.user_id ?? ''}
+        {avatarUrl}
+        color={activeProfile?.hero_color ?? 'var(--primary-container)'}
+        heroColor={activeProfile?.hero_color}
+        heroBrightness={activeProfile?.hero_brightness}
+        bannerUrl={activeProfile?.banner_url}
+        status={userStatus?.text}
+        statusEmoji={userStatus?.emoji}
+        nameColorLight={activeProfile?.name_color_light}
+        nameColorDark={activeProfile?.name_color_dark}
+      />
+      <AccountMenuItems
+        accounts={core.accounts}
+        currentAccountId={core.session?.account_id}
+        {switching}
+        onSwitch={switchAccount}
+        onProfile={openProfile}
+        onLogout={logout}
+        onAddAccount={openAddAccount}
+      />
+    </ActionMenu>
   {/snippet}
   <Tooltip
     label={$i18n.t('nav.switchAccount')}

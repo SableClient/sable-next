@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { DropdownMenu } from 'bits-ui';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
-  import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import type { NotificationModeView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { settingsChanges } from '#lib/features/notifications/notifications.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
 
   interface Props {
     roomId: string;
@@ -56,29 +56,23 @@
   }
 </script>
 
-<DropdownMenu.Sub>
-  <DropdownMenu.SubTrigger class="menu-item">
+<ActionMenuSub label={$i18n.t('room.menuNotifications')} class="room-options-menu">
+  {#snippet trigger()}
     <BellIcon />
     {$i18n.t('room.menuNotifications')}
-    <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
-  </DropdownMenu.SubTrigger>
-  <DropdownMenu.Portal>
-    <DropdownMenu.SubContent class="menu-surface room-options-menu" sideOffset={4}>
-      <IconContext values={{ 'aria-hidden': 'true' }}>
-        {#each modes as option (option.mode ?? 'default')}
-          {@const selected = mode === option.mode}
-          <DropdownMenu.Item
-            class="menu-item"
-            aria-checked={selected}
-            onSelect={() => {
-              select(option.mode);
-            }}
-          >
-            <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
-            {$i18n.t(option.label, { mode: defaultLabel })}
-          </DropdownMenu.Item>
-        {/each}
-      </IconContext>
-    </DropdownMenu.SubContent>
-  </DropdownMenu.Portal>
-</DropdownMenu.Sub>
+  {/snippet}
+  <IconContext values={{ 'aria-hidden': 'true' }}>
+    {#each modes as option (option.mode ?? 'default')}
+      {@const selected = mode === option.mode}
+      <ActionMenuItem
+        checked={selected}
+        onSelect={() => {
+          select(option.mode);
+        }}
+      >
+        <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+        {$i18n.t(option.label, { mode: defaultLabel })}
+      </ActionMenuItem>
+    {/each}
+  </IconContext>
+</ActionMenuSub>

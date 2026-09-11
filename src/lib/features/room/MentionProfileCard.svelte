@@ -5,7 +5,6 @@
     RoomPermissionsView,
     MutualRoomView,
   } from '#src/generated/protocol';
-  import { DropdownMenu } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -34,6 +33,9 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -369,27 +371,27 @@
 {/snippet}
 
 {#snippet actionRow()}
-  <DropdownMenu.Root>
-    <DropdownMenu.Trigger class="profile-action selection-open">
-      <ShareNetworkIcon size={14} />
-      {$i18n.t('timeline.profileShare')}
-    </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="menu-surface" side="bottom" align="start" sideOffset={4}>
-      <IconContext values={{ 'aria-hidden': 'true' }}>
-        <DropdownMenu.Item class="menu-item" onSelect={copyUserId}>
-          {$i18n.t('timeline.profileCopyId')}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item class="menu-item" onSelect={copyProfileLink}>
-          {$i18n.t('timeline.profileCopyLink')}
-        </DropdownMenu.Item>
-        {#if canShareLink}
-          <DropdownMenu.Item class="menu-item" onSelect={shareProfileLink}>
-            {$i18n.t('timeline.profileShareLink')}
-          </DropdownMenu.Item>
-        {/if}
-      </IconContext>
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
+  <ActionMenu label={$i18n.t('timeline.profileShare')} align="start">
+    {#snippet trigger({ props })}
+      <button {...props} type="button" class="profile-action selection-open">
+        <ShareNetworkIcon size={14} />
+        {$i18n.t('timeline.profileShare')}
+      </button>
+    {/snippet}
+    <IconContext values={{ 'aria-hidden': 'true' }}>
+      <ActionMenuItem onSelect={copyUserId}>
+        {$i18n.t('timeline.profileCopyId')}
+      </ActionMenuItem>
+      <ActionMenuItem onSelect={copyProfileLink}>
+        {$i18n.t('timeline.profileCopyLink')}
+      </ActionMenuItem>
+      {#if canShareLink}
+        <ActionMenuItem onSelect={shareProfileLink}>
+          {$i18n.t('timeline.profileShareLink')}
+        </ActionMenuItem>
+      {/if}
+    </IconContext>
+  </ActionMenu>
   {#if sharedRooms.length > 0}
     <button
       class="profile-action selection-open"
@@ -416,101 +418,94 @@
       {$i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })}
     </button>
   {/if}
-  <DropdownMenu.Root>
-    <DropdownMenu.Trigger
-      class="profile-action profile-action-overflow selection-open"
-      aria-label={$i18n.t('timeline.profileMoreActions')}
-    >
-      <DotsThreeIcon size={14} />
-    </DropdownMenu.Trigger>
-    <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
-      <IconContext values={{ 'aria-hidden': 'true' }}>
-        <DropdownMenu.Item class="menu-item" onSelect={copyServer}>
-          <CopyIcon />
-          {$i18n.t('timeline.profileCopyServer')}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item class="menu-item" onSelect={openServer}>
-          <ArrowSquareOutIcon />
-          {$i18n.t('timeline.profileOpenServer')}
-        </DropdownMenu.Item>
-        {#if canInvite}
-          <DropdownMenu.Item class="menu-item" onSelect={moderate(core.commands.inviteUser)}>
-            <UserPlusIcon />
-            {$i18n.t('timeline.profileInvite')}
-          </DropdownMenu.Item>
-        {/if}
-        {#if canUnban}
-          <DropdownMenu.Item class="menu-item" onSelect={moderate(core.commands.unbanUser)}>
-            <LockOpenIcon />
-            {$i18n.t('timeline.profileUnban')}
-          </DropdownMenu.Item>
-        {/if}
-        {#if canSetPower}
-          <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger class="menu-item">
-              <ShieldIcon />
-              {$i18n.t('timeline.profileChangePower')}
-              <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
-            </DropdownMenu.SubTrigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.SubContent class="menu-surface" sideOffset={4}>
-                <IconContext values={{ 'aria-hidden': 'true' }}>
-                  {#each powerRoles as role (role.level)}
-                    <DropdownMenu.Item
-                      class="menu-item"
-                      onSelect={() => {
-                        setPowerLevel(role.level);
-                      }}
-                    >
-                      <span class="profile-power-name">{role.label}</span>
-                      <span class="profile-power-level">{role.level}</span>
-                    </DropdownMenu.Item>
-                  {/each}
-                </IconContext>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Sub>
-        {/if}
-        {#if canKick}
-          <DropdownMenu.Item
-            class="menu-item menu-item-destructive profile-menu-destructive"
-            onSelect={() => {
-              openModeration('kick');
-            }}
-          >
-            <SignOutIcon />
-            {$i18n.t('timeline.profileKick')}
-          </DropdownMenu.Item>
-        {/if}
-        {#if canBan}
-          <DropdownMenu.Item
-            class={[
-              'menu-item menu-item-destructive profile-menu-destructive',
-              canKick && 'profile-menu-grouped',
-            ]}
-            onSelect={() => {
-              openModeration('ban');
-            }}
-          >
-            <GavelIcon />
-            {$i18n.t('timeline.profileBan')}
-          </DropdownMenu.Item>
-        {/if}
-        {#if !isSelf}
-          <DropdownMenu.Item
-            class={[
-              'menu-item menu-item-destructive profile-menu-destructive',
-              (canKick || canBan) && 'profile-menu-grouped',
-            ]}
-            onSelect={toggleIgnored}
-          >
-            <ProhibitIcon />
-            {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
-          </DropdownMenu.Item>
-        {/if}
-      </IconContext>
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
+  <ActionMenu label={$i18n.t('timeline.profileMoreActions')}>
+    {#snippet trigger({ props })}
+      <button
+        {...props}
+        type="button"
+        class="profile-action profile-action-overflow selection-open"
+        aria-label={$i18n.t('timeline.profileMoreActions')}
+      >
+        <DotsThreeIcon size={14} />
+      </button>
+    {/snippet}
+    <IconContext values={{ 'aria-hidden': 'true' }}>
+      <ActionMenuItem onSelect={copyServer}>
+        <CopyIcon />
+        {$i18n.t('timeline.profileCopyServer')}
+      </ActionMenuItem>
+      <ActionMenuItem onSelect={openServer}>
+        <ArrowSquareOutIcon />
+        {$i18n.t('timeline.profileOpenServer')}
+      </ActionMenuItem>
+      {#if canInvite}
+        <ActionMenuItem onSelect={moderate(core.commands.inviteUser)}>
+          <UserPlusIcon />
+          {$i18n.t('timeline.profileInvite')}
+        </ActionMenuItem>
+      {/if}
+      {#if canUnban}
+        <ActionMenuItem onSelect={moderate(core.commands.unbanUser)}>
+          <LockOpenIcon />
+          {$i18n.t('timeline.profileUnban')}
+        </ActionMenuItem>
+      {/if}
+      {#if canSetPower}
+        <ActionMenuSub label={$i18n.t('timeline.profileChangePower')}>
+          {#snippet trigger()}
+            <ShieldIcon />
+            {$i18n.t('timeline.profileChangePower')}
+          {/snippet}
+          <IconContext values={{ 'aria-hidden': 'true' }}>
+            {#each powerRoles as role (role.level)}
+              <ActionMenuItem
+                onSelect={() => {
+                  setPowerLevel(role.level);
+                }}
+              >
+                <span class="profile-power-name">{role.label}</span>
+                <span class="profile-power-level">{role.level}</span>
+              </ActionMenuItem>
+            {/each}
+          </IconContext>
+        </ActionMenuSub>
+      {/if}
+      {#if canKick}
+        <ActionMenuItem
+          destructive
+          class="profile-menu-destructive"
+          onSelect={() => {
+            openModeration('kick');
+          }}
+        >
+          <SignOutIcon />
+          {$i18n.t('timeline.profileKick')}
+        </ActionMenuItem>
+      {/if}
+      {#if canBan}
+        <ActionMenuItem
+          destructive
+          class={['profile-menu-destructive', canKick && 'profile-menu-grouped']}
+          onSelect={() => {
+            openModeration('ban');
+          }}
+        >
+          <GavelIcon />
+          {$i18n.t('timeline.profileBan')}
+        </ActionMenuItem>
+      {/if}
+      {#if !isSelf}
+        <ActionMenuItem
+          destructive
+          class={['profile-menu-destructive', (canKick || canBan) && 'profile-menu-grouped']}
+          onSelect={toggleIgnored}
+        >
+          <ProhibitIcon />
+          {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
+        </ActionMenuItem>
+      {/if}
+    </IconContext>
+  </ActionMenu>
 {/snippet}
 
 {#snippet metaPlaceholder()}

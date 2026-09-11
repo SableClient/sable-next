@@ -1,9 +1,6 @@
 <script lang="ts">
-  import { DropdownMenu } from 'bits-ui';
-
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
-  import '#lib/ui/primitives/menu.css';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
@@ -15,6 +12,8 @@
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -115,26 +114,27 @@
     </Button>
     {#if section.space}
       {@const sectionSpace = section.space}
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger
-          class="room-menu-trigger selection-open"
-          aria-label={$i18n.t('room.menuLabel')}
-        >
-          <DotsThreeVerticalIcon />
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
-          <IconContext values={{ 'aria-hidden': 'true' }}>
-            <DropdownMenu.Item
-              class="menu-item"
-              onSelect={() => {
-                onCopyLink(sectionSpace);
-              }}
-            >
-              <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
-            </DropdownMenu.Item>
-          </IconContext>
-        </DropdownMenu.Content>
-      </DropdownMenu.Root>
+      <ActionMenu label={$i18n.t('room.menuLabel')}>
+        {#snippet trigger({ props })}
+          <button
+            {...props}
+            type="button"
+            class="room-menu-trigger selection-open"
+            aria-label={$i18n.t('room.menuLabel')}
+          >
+            <DotsThreeVerticalIcon />
+          </button>
+        {/snippet}
+        <IconContext values={{ 'aria-hidden': 'true' }}>
+          <ActionMenuItem
+            onSelect={() => {
+              onCopyLink(sectionSpace);
+            }}
+          >
+            <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
+          </ActionMenuItem>
+        </IconContext>
+      </ActionMenu>
     {/if}
   </div>
 
@@ -216,52 +216,51 @@
                   )}
                 </Button>
               {/if}
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger
-                  class="room-menu-trigger selection-open"
-                  aria-label={$i18n.t('room.menuLabel')}
-                >
-                  <DotsThreeVerticalIcon />
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
-                  <IconContext values={{ 'aria-hidden': 'true' }}>
-                    <DropdownMenu.Item
-                      class="menu-item"
+              <ActionMenu label={$i18n.t('room.menuLabel')}>
+                {#snippet trigger({ props })}
+                  <button
+                    {...props}
+                    type="button"
+                    class="room-menu-trigger selection-open"
+                    aria-label={$i18n.t('room.menuLabel')}
+                  >
+                    <DotsThreeVerticalIcon />
+                  </button>
+                {/snippet}
+                <IconContext values={{ 'aria-hidden': 'true' }}>
+                  <ActionMenuItem
+                    onSelect={() => {
+                      onCopyLink(child);
+                    }}
+                  >
+                    <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
+                  </ActionMenuItem>
+                  {#if canManage}
+                    <ActionMenuItem
                       onSelect={() => {
-                        onCopyLink(child);
+                        onMove(section, child.room_id, -1);
                       }}
                     >
-                      <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
-                    </DropdownMenu.Item>
-                    {#if canManage}
-                      <DropdownMenu.Item
-                        class="menu-item"
-                        onSelect={() => {
-                          onMove(section, child.room_id, -1);
-                        }}
-                      >
-                        <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        class="menu-item"
-                        onSelect={() => {
-                          onMove(section, child.room_id, 1);
-                        }}
-                      >
-                        <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        class="menu-item menu-item-destructive"
-                        onSelect={() => {
-                          removeEntry(entry);
-                        }}
-                      >
-                        <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
-                      </DropdownMenu.Item>
-                    {/if}
-                  </IconContext>
-                </DropdownMenu.Content>
-              </DropdownMenu.Root>
+                      <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      onSelect={() => {
+                        onMove(section, child.room_id, 1);
+                      }}
+                    >
+                      <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      destructive
+                      onSelect={() => {
+                        removeEntry(entry);
+                      }}
+                    >
+                      <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
+                    </ActionMenuItem>
+                  {/if}
+                </IconContext>
+              </ActionMenu>
             </div>
           </li>
         {/each}

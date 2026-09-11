@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/protocol';
-  import { Dialog, DropdownMenu } from 'bits-ui';
+  import { Dialog } from 'bits-ui';
   import ArrowsDownUpIcon from 'phosphor-svelte/lib/ArrowsDownUpIcon';
   import FunnelIcon from 'phosphor-svelte/lib/FunnelIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -24,8 +26,6 @@
   } from './member-listing';
   import { powerTag } from './power-tags';
   import type { PowerLevelTagMap } from './settings/power-level-tags';
-
-  import '#lib/ui/primitives/menu.css';
 
   interface Props {
     members: readonly MemberView[];
@@ -119,53 +119,55 @@
     <div class="controls">
       <div class="filters">
         {#if loadMembership}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger
-              class="chip selection-open"
-              aria-label={$i18n.t('timeline.memberFilter')}
-            >
-              <FunnelIcon aria-hidden="true" />
-              <span>{$i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content class="menu-surface" side="bottom" align="start" sideOffset={4}>
-              {#each MEMBERSHIP_FILTERS as option (option)}
-                <DropdownMenu.Item
-                  class="menu-item"
-                  aria-checked={filter === option}
-                  onSelect={() => {
-                    filter = option;
-                  }}
-                >
-                  <span class="menu-check" aria-hidden="true">{filter === option ? '✓' : ''}</span>
-                  {$i18n.t(MEMBERSHIP_FILTER_LABELS[option])}
-                </DropdownMenu.Item>
-              {/each}
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
-        {/if}
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger
-            class="chip selection-open"
-            aria-label={$i18n.t('timeline.memberSort')}
-          >
-            <span>{$i18n.t(MEMBER_SORT_LABELS[sort])}</span>
-            <ArrowsDownUpIcon aria-hidden="true" />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
-            {#each MEMBER_SORTS as option (option)}
-              <DropdownMenu.Item
-                class="menu-item"
-                aria-checked={sort === option}
+          <ActionMenu label={$i18n.t('timeline.memberFilter')} align="start">
+            {#snippet trigger({ props })}
+              <button
+                {...props}
+                type="button"
+                class="chip selection-open"
+                aria-label={$i18n.t('timeline.memberFilter')}
+              >
+                <FunnelIcon aria-hidden="true" />
+                <span>{$i18n.t(MEMBERSHIP_FILTER_LABELS[filter])}</span>
+              </button>
+            {/snippet}
+            {#each MEMBERSHIP_FILTERS as option (option)}
+              <ActionMenuItem
+                checked={filter === option}
                 onSelect={() => {
-                  setPreference('memberSort', option);
+                  filter = option;
                 }}
               >
-                <span class="menu-check" aria-hidden="true">{sort === option ? '✓' : ''}</span>
-                {$i18n.t(MEMBER_SORT_LABELS[option])}
-              </DropdownMenu.Item>
+                <span class="menu-check" aria-hidden="true">{filter === option ? '✓' : ''}</span>
+                {$i18n.t(MEMBERSHIP_FILTER_LABELS[option])}
+              </ActionMenuItem>
             {/each}
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+          </ActionMenu>
+        {/if}
+        <ActionMenu label={$i18n.t('timeline.memberSort')}>
+          {#snippet trigger({ props })}
+            <button
+              {...props}
+              type="button"
+              class="chip selection-open"
+              aria-label={$i18n.t('timeline.memberSort')}
+            >
+              <span>{$i18n.t(MEMBER_SORT_LABELS[sort])}</span>
+              <ArrowsDownUpIcon aria-hidden="true" />
+            </button>
+          {/snippet}
+          {#each MEMBER_SORTS as option (option)}
+            <ActionMenuItem
+              checked={sort === option}
+              onSelect={() => {
+                setPreference('memberSort', option);
+              }}
+            >
+              <span class="menu-check" aria-hidden="true">{sort === option ? '✓' : ''}</span>
+              {$i18n.t(MEMBER_SORT_LABELS[option])}
+            </ActionMenuItem>
+          {/each}
+        </ActionMenu>
       </div>
       <TextInput
         bind:value={search}

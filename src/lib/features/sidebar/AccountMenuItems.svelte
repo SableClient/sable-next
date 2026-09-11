@@ -1,8 +1,8 @@
 <script lang="ts">
-  import '#lib/ui/primitives/menu.css';
   import type { SessionInfo } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
-  import { DropdownMenu } from 'bits-ui';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   interface Props {
@@ -31,25 +31,18 @@
 </script>
 
 {#each otherAccounts as account (account.account_id)}
-  <DropdownMenu.Item
-    class="menu-item"
+  <ActionMenuItem
     disabled={switching}
-    onclick={() => {
+    onSelect={() => {
       onSwitch(account.account_id);
     }}
   >
     <Avatar size="small" id={account.user_id} name={account.user_id} />
     <span class="account-name">{account.user_id}</span>
-  </DropdownMenu.Item>
+  </ActionMenuItem>
 {/each}
-<DropdownMenu.Separator class="menu-separator" />
-<DropdownMenu.Item class="menu-item" onclick={onProfile}
-  >{$i18n.t('nav.editProfile')}</DropdownMenu.Item
->
-<DropdownMenu.Item class="menu-item" onclick={onAddAccount}
-  >{$i18n.t('nav.addAccount')}</DropdownMenu.Item
->
-<DropdownMenu.Separator class="menu-separator" />
-<DropdownMenu.Item class="menu-item menu-item-destructive" onclick={onLogout}
-  >{$i18n.t('settings.logout')}</DropdownMenu.Item
->
+<ActionMenuSeparator />
+<ActionMenuItem onSelect={onProfile}>{$i18n.t('nav.editProfile')}</ActionMenuItem>
+<ActionMenuItem onSelect={onAddAccount}>{$i18n.t('nav.addAccount')}</ActionMenuItem>
+<ActionMenuSeparator />
+<ActionMenuItem destructive onSelect={onLogout}>{$i18n.t('settings.logout')}</ActionMenuItem>

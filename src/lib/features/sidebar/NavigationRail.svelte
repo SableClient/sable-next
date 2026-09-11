@@ -4,7 +4,7 @@
 
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
-  import { ContextMenu, DropdownMenu } from 'bits-ui';
+  import { ContextMenu } from 'bits-ui';
   import type { RoomSummary } from '#src/generated/protocol';
   import { resolve } from '$app/paths';
   import { afterNavigate } from '$app/navigation';
@@ -25,6 +25,9 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -654,48 +657,45 @@
 </div>
 
 {#if !mobile}
-  <DropdownMenu.Root bind:open={displayOpen}>
-    <DropdownMenu.Content
-      customAnchor={displayAnchor}
-      class="menu-surface rail-display-menu"
-      side="right"
-      align="start"
-      preventScroll={false}
-      aria-label={$i18n.t('nav.displayOptions')}
-    >
-      {#each displayToggles as toggle (toggle.key)}
-        {@const on = preferences[toggle.key]}
-        <DropdownMenu.Item
-          class="menu-item"
-          closeOnSelect={false}
-          aria-checked={on}
-          onSelect={() => {
-            setPreference(toggle.key, !on);
-          }}
-        >
-          <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
-          {$i18n.t(toggle.label)}
-        </DropdownMenu.Item>
-      {/each}
+  <ActionMenu
+    bind:open={displayOpen}
+    label={$i18n.t('nav.displayOptions')}
+    class="rail-display-menu"
+    anchor={displayAnchor}
+    side="right"
+    align="start"
+    preventScroll={false}
+  >
+    {#each displayToggles as toggle (toggle.key)}
+      {@const on = preferences[toggle.key]}
+      <ActionMenuItem
+        closeOnSelect={false}
+        checked={on}
+        onSelect={() => {
+          setPreference(toggle.key, !on);
+        }}
+      >
+        <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+        {$i18n.t(toggle.label)}
+      </ActionMenuItem>
+    {/each}
 
-      <DropdownMenu.Separator class="menu-separator" />
+    <ActionMenuSeparator />
 
-      {#each viewToggles as toggle (toggle.key)}
-        {@const on = preferences[toggle.key]}
-        <DropdownMenu.Item
-          class="menu-item"
-          closeOnSelect={false}
-          aria-checked={on}
-          onSelect={() => {
-            setPreference(toggle.key, !on);
-          }}
-        >
-          <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
-          {$i18n.t(toggle.label)}
-        </DropdownMenu.Item>
-      {/each}
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
+    {#each viewToggles as toggle (toggle.key)}
+      {@const on = preferences[toggle.key]}
+      <ActionMenuItem
+        closeOnSelect={false}
+        checked={on}
+        onSelect={() => {
+          setPreference(toggle.key, !on);
+        }}
+      >
+        <span class="menu-check" aria-hidden="true">{on ? '✓' : ''}</span>
+        {$i18n.t(toggle.label)}
+      </ActionMenuItem>
+    {/each}
+  </ActionMenu>
 {/if}
 
 {#if contextSpace}

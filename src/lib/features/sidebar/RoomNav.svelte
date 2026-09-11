@@ -36,6 +36,8 @@
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
@@ -56,7 +58,6 @@
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
-  import { DropdownMenu } from 'bits-ui';
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
   import { publishVisibleRoomOrder } from './visible-rooms.svelte.js';
   import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
@@ -492,26 +493,28 @@
     <header class="room-nav-header" class:collapsed class:on-banner={bannerShown}>
       <h2 aria-label={collapsed ? title : undefined}>
         {#if collapsed}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger
-              class="room-nav-badge selection-open"
-              aria-label={$i18n.t('nav.listOptions')}
-            >
-              {#if activeSpace}
-                <Avatar
-                  id={activeSpace.room_id}
-                  src={activeSpace.avatar_url}
-                  name={title}
-                  size="small"
-                />
-              {:else}
-                <TitleIcon />
-              {/if}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content class="menu-surface" side="right" align="start" sideOffset={4}>
-              {@render listMenuItems()}
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+          <ActionMenu label={$i18n.t('nav.listOptions')} side="right" align="start">
+            {#snippet trigger({ props })}
+              <button
+                {...props}
+                type="button"
+                class="room-nav-badge selection-open"
+                aria-label={$i18n.t('nav.listOptions')}
+              >
+                {#if activeSpace}
+                  <Avatar
+                    id={activeSpace.room_id}
+                    src={activeSpace.avatar_url}
+                    name={title}
+                    size="small"
+                  />
+                {:else}
+                  <TitleIcon />
+                {/if}
+              </button>
+            {/snippet}
+            {@render listMenuItems()}
+          </ActionMenu>
         {:else}
           {title}
         {/if}
@@ -527,46 +530,47 @@
               <LockSimpleIcon />
             </span>
           {/if}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger
-              class="room-nav-menu selection-open"
-              aria-label={$i18n.t('nav.listOptions')}
-            >
-              <DotsThreeVerticalIcon />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content class="menu-surface" side="bottom" align="end" sideOffset={4}>
-              {@render listMenuItems()}
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+          <ActionMenu label={$i18n.t('nav.listOptions')}>
+            {#snippet trigger({ props })}
+              <button
+                {...props}
+                type="button"
+                class="room-nav-menu selection-open"
+                aria-label={$i18n.t('nav.listOptions')}
+              >
+                <DotsThreeVerticalIcon />
+              </button>
+            {/snippet}
+            {@render listMenuItems()}
+          </ActionMenu>
         </div>
       {/if}
     </header>
   </div>
 
   {#snippet listMenuItems()}
-    <DropdownMenu.Item class="menu-item" disabled={!sectionUnread} onSelect={markSectionRead}>
+    <ActionMenuItem disabled={!sectionUnread} onSelect={markSectionRead}>
       <ChecksIcon />
       {$i18n.t('nav.markSectionRead')}
-    </DropdownMenu.Item>
+    </ActionMenuItem>
     {#if activeSpace}
-      <DropdownMenu.Item
-        class="menu-item"
+      <ActionMenuItem
         onSelect={() => {
           openSettings(activeSpace);
         }}
       >
         <GearIcon />
         {$i18n.t('room.menuSettings')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item
-        class="menu-item menu-item-destructive"
+      </ActionMenuItem>
+      <ActionMenuItem
+        destructive
         onSelect={() => {
           openLeave(activeSpace);
         }}
       >
         <SignOutIcon />
         {$i18n.t('room.menuLeaveSpace')}
-      </DropdownMenu.Item>
+      </ActionMenuItem>
     {/if}
   {/snippet}
 
@@ -591,45 +595,42 @@
         </a>
       {/snippet}
       {#snippet createMenu()}
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger>
-            {#snippet child({ props })}
-              <button
-                {...props}
-                class="room-nav-trigger"
-                aria-label={collapsed ? createRoomLabel : undefined}
-                style="align-items: center; display: flex; gap: var(--space-200); text-align: left"
-              >
-                <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
-                {#if !collapsed}<span class="room-text"
-                    ><span class="room-name">{createRoomLabel}</span></span
-                  >{/if}
-              </button>
-            {/snippet}
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content class="menu-surface" side="right" align="start" sideOffset={4}>
-            {#if canCreateHere}
-              <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(createRoomHref)}>
-                <PlusIcon />
-                {createRoomLabel}
-              </DropdownMenu.Item>
-            {/if}
-            {#if canCreateHere}
-              <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(createSpaceHref)}>
-                <HouseIcon />
-                {createSpaceLabel}
-              </DropdownMenu.Item>
-            {/if}
-            <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(joinHref)}>
-              <LinkIcon />
-              {$i18n.t('nav.joinWithAddress')}
-            </DropdownMenu.Item>
-            <DropdownMenu.Item class="menu-item" onSelect={() => navigateTo(browseHref)}>
-              <CompassIcon />
-              {browseLabel}
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+        <ActionMenu label={createRoomLabel} side="right" align="start">
+          {#snippet trigger({ props })}
+            <button
+              {...props}
+              type="button"
+              class="room-nav-trigger"
+              aria-label={collapsed ? createRoomLabel : undefined}
+              style="align-items: center; display: flex; gap: var(--space-200); text-align: left"
+            >
+              <span class="room-icon" aria-hidden="true"><PlusIcon /></span>
+              {#if !collapsed}<span class="room-text"
+                  ><span class="room-name">{createRoomLabel}</span></span
+                >{/if}
+            </button>
+          {/snippet}
+          {#if canCreateHere}
+            <ActionMenuItem onSelect={() => navigateTo(createRoomHref)}>
+              <PlusIcon />
+              {createRoomLabel}
+            </ActionMenuItem>
+          {/if}
+          {#if canCreateHere}
+            <ActionMenuItem onSelect={() => navigateTo(createSpaceHref)}>
+              <HouseIcon />
+              {createSpaceLabel}
+            </ActionMenuItem>
+          {/if}
+          <ActionMenuItem onSelect={() => navigateTo(joinHref)}>
+            <LinkIcon />
+            {$i18n.t('nav.joinWithAddress')}
+          </ActionMenuItem>
+          <ActionMenuItem onSelect={() => navigateTo(browseHref)}>
+            <CompassIcon />
+            {browseLabel}
+          </ActionMenuItem>
+        </ActionMenu>
       {/snippet}
       {#if directSection}
         {@render action(newChatHref, $i18n.t('nav.newChat'), PlusIcon)}

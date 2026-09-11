@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { RoomSummary, RoomTag } from '#src/generated/protocol';
-  import { DropdownMenu } from 'bits-ui';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
@@ -22,6 +21,9 @@
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import IconContext from 'phosphor-svelte/lib/IconContext';
@@ -29,8 +31,6 @@
   import AddToSpaceDialog from './AddToSpaceDialog.svelte';
   import { wouldCreateCycle } from './add-to-space.js';
   import { markRoomsRead, spaceDescendantRooms } from './nav-rooms.js';
-
-  import '#lib/ui/primitives/menu.css';
 
   interface Props {
     room: RoomSummary;
@@ -177,8 +177,26 @@
   }
 </script>
 
-<DropdownMenu.Root
+{#snippet optionsTrigger({ props }: { props: Record<string, unknown> })}
+  <button
+    {...props}
+    type="button"
+    class="room-options-trigger selection-open"
+    aria-label={$i18n.t('room.menuLabel')}
+  >
+    <DotsThreeVerticalIcon />
+  </button>
+{/snippet}
+
+<ActionMenu
   bind:open
+  label={$i18n.t('room.menuLabel')}
+  class="room-options-menu"
+  {anchor}
+  {side}
+  {align}
+  preventScroll={false}
+  trigger={anchor ? undefined : optionsTrigger}
   onOpenChange={(open) => {
     if (!open) return;
     opened = true;
@@ -186,122 +204,99 @@
     readInvitePermission();
   }}
 >
-  {#if !anchor}
-    <DropdownMenu.Trigger
-      class="room-options-trigger selection-open"
-      aria-label={$i18n.t('room.menuLabel')}
+  <IconContext values={{ 'aria-hidden': 'true' }}>
+    <ActionMenuItem disabled={!unread} onSelect={markRead}>
+      <ChecksIcon />
+      {$i18n.t('room.menuMarkRead')}
+    </ActionMenuItem>
+    <ActionMenuSeparator />
+    <ActionMenuItem
+      onSelect={() => {
+        toggleTag('favourite', favourite);
+      }}
     >
-      <DotsThreeVerticalIcon />
-    </DropdownMenu.Trigger>
-  {/if}
-  <DropdownMenu.Content
-    customAnchor={anchor}
-    class="menu-surface room-options-menu"
-    {side}
-    {align}
-    sideOffset={4}
-    preventScroll={false}
-  >
-    <IconContext values={{ 'aria-hidden': 'true' }}>
-      <DropdownMenu.Item class="menu-item" disabled={!unread} onSelect={markRead}>
-        <ChecksIcon />
-        {$i18n.t('room.menuMarkRead')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Separator class="menu-separator" />
-      <DropdownMenu.Item
-        class="menu-item"
+      <StarIcon weight={favourite ? 'fill' : 'regular'} />
+      {$i18n.t('room.menuFavourite')}
+    </ActionMenuItem>
+    <ActionMenuItem
+      onSelect={() => {
+        toggleTag('low_priority', lowPriority);
+      }}
+    >
+      <TrayIcon weight={lowPriority ? 'fill' : 'regular'} />
+      {$i18n.t('room.menuLowPriority')}
+    </ActionMenuItem>
+
+    {#if room.is_direct}
+      <ActionMenuItem onSelect={convertToGroup}>
+        <ChatCircleIcon />
+        {$i18n.t('room.menuConvertToGroup')}
+      </ActionMenuItem>
+    {/if}
+
+    <ActionMenuSeparator />
+
+    <ActionMenuItem
+      disabled={!canInvite}
+      onSelect={() => {
+        inviteOpen = true;
+      }}
+    >
+      <UserPlusIcon />
+      {$i18n.t('room.menuInvite')}
+    </ActionMenuItem>
+    <ActionMenuItem onSelect={copyLink}>
+      <LinkIcon />
+      {$i18n.t('room.menuCopyLink')}
+    </ActionMenuItem>
+    <ActionMenuItem
+      onSelect={() => {
+        onSettings(room);
+      }}
+    >
+      <GearIcon />
+      {$i18n.t('room.menuSettings')}
+    </ActionMenuItem>
+
+    {#if !room.is_space}
+      <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
+    {/if}
+
+    {#if offeredSpaces.length > 0}
+      <ActionMenuItem
         onSelect={() => {
-          toggleTag('favourite', favourite);
+          addToSpaceOpen = true;
         }}
       >
-        <StarIcon weight={favourite ? 'fill' : 'regular'} />
-        {$i18n.t('room.menuFavourite')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item
-        class="menu-item"
+        <UsersThreeIcon />
+        {$i18n.t('room.menuAddToSpace')}
+      </ActionMenuItem>
+    {/if}
+
+    {#if !room.is_space && removableParent}
+      <ActionMenuItem
         onSelect={() => {
-          toggleTag('low_priority', lowPriority);
+          removeFromSpace(removableParent.room_id);
         }}
       >
-        <TrayIcon weight={lowPriority ? 'fill' : 'regular'} />
-        {$i18n.t('room.menuLowPriority')}
-      </DropdownMenu.Item>
+        <UsersThreeIcon />
+        {$i18n.t('room.menuRemoveFromSpace', {
+          space: removableParent.name ?? removableParent.room_id,
+        })}
+      </ActionMenuItem>
+    {/if}
 
-      {#if room.is_direct}
-        <DropdownMenu.Item class="menu-item" onSelect={convertToGroup}>
-          <ChatCircleIcon />
-          {$i18n.t('room.menuConvertToGroup')}
-        </DropdownMenu.Item>
-      {/if}
-
-      <DropdownMenu.Separator class="menu-separator" />
-
-      <DropdownMenu.Item
-        class="menu-item"
-        disabled={!canInvite}
-        onSelect={() => {
-          inviteOpen = true;
-        }}
-      >
-        <UserPlusIcon />
-        {$i18n.t('room.menuInvite')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item class="menu-item" onSelect={copyLink}>
-        <LinkIcon />
-        {$i18n.t('room.menuCopyLink')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item
-        class="menu-item"
-        onSelect={() => {
-          onSettings(room);
-        }}
-      >
-        <GearIcon />
-        {$i18n.t('room.menuSettings')}
-      </DropdownMenu.Item>
-
-      {#if !room.is_space}
-        <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
-      {/if}
-
-      {#if offeredSpaces.length > 0}
-        <DropdownMenu.Item
-          class="menu-item"
-          onSelect={() => {
-            addToSpaceOpen = true;
-          }}
-        >
-          <UsersThreeIcon />
-          {$i18n.t('room.menuAddToSpace')}
-        </DropdownMenu.Item>
-      {/if}
-
-      {#if !room.is_space && removableParent}
-        <DropdownMenu.Item
-          class="menu-item"
-          onSelect={() => {
-            removeFromSpace(removableParent.room_id);
-          }}
-        >
-          <UsersThreeIcon />
-          {$i18n.t('room.menuRemoveFromSpace', {
-            space: removableParent.name ?? removableParent.room_id,
-          })}
-        </DropdownMenu.Item>
-      {/if}
-
-      <DropdownMenu.Item
-        class="menu-item menu-item-destructive"
-        onSelect={() => {
-          onLeave(room);
-        }}
-      >
-        <SignOutIcon />
-        {room.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
-      </DropdownMenu.Item>
-    </IconContext>
-  </DropdownMenu.Content>
-</DropdownMenu.Root>
+    <ActionMenuItem
+      destructive
+      onSelect={() => {
+        onLeave(room);
+      }}
+    >
+      <SignOutIcon />
+      {room.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
+    </ActionMenuItem>
+  </IconContext>
+</ActionMenu>
 
 <AddToSpaceDialog
   open={addToSpaceOpen}

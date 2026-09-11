@@ -1,12 +1,13 @@
 <script lang="ts">
-  import '#lib/ui/primitives/menu.css';
-  import { DropdownMenu } from 'bits-ui';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
   import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import MoreIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import ReactionPicker from './ReactionPicker.svelte';
@@ -82,57 +83,40 @@
     </IconButton>
   {/if}
   {#if hasOverflow}
-    <DropdownMenu.Root onOpenChange={onOverflowOpenChange}>
-      <DropdownMenu.Trigger>
-        {#snippet child({ props })}
-          <IconButton
-            {...props}
-            size="small"
-            variant="ghost"
-            class="message-action-button selection-open"
-            label={$i18n.t('timeline.moreActions')}
-          >
-            <MoreIcon />
-          </IconButton>
-        {/snippet}
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          class="menu-surface"
-          side="bottom"
-          align="end"
-          sideOffset={4}
-          collisionPadding={8}
+    <ActionMenu label={$i18n.t('timeline.moreActions')} onOpenChange={onOverflowOpenChange}>
+      {#snippet trigger({ props })}
+        <IconButton
+          {...props}
+          size="small"
+          variant="ghost"
+          class="message-action-button selection-open"
+          label={$i18n.t('timeline.moreActions')}
         >
-          {#if onCopyText}
-            <DropdownMenu.Item class="menu-item" onclick={onCopyText}
-              >{$i18n.t('timeline.copyMessage')}</DropdownMenu.Item
-            >
-          {/if}
-          {#if onCopyLink}
-            <DropdownMenu.Item class="menu-item" onclick={onCopyLink}
-              >{$i18n.t('timeline.copyLink')}</DropdownMenu.Item
-            >
-          {/if}
-          {#if onViewReactions}
-            <DropdownMenu.Item class="menu-item" onclick={onViewReactions}
-              >{$i18n.t('timeline.viewReactions')}</DropdownMenu.Item
-            >
-          {/if}
-          {#if onReadReceipts}
-            <DropdownMenu.Item class="menu-item" onclick={onReadReceipts}
-              >{$i18n.t('timeline.readReceipts')}</DropdownMenu.Item
-            >
-          {/if}
-          {#if onDelete}
-            <DropdownMenu.Separator class="menu-separator" />
-            <DropdownMenu.Item class="menu-item menu-item-destructive" onclick={onDelete}>
-              {$i18n.t('timeline.deleteMessage')}
-            </DropdownMenu.Item>
-          {/if}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+          <MoreIcon />
+        </IconButton>
+      {/snippet}
+      {#if onCopyText}
+        <ActionMenuItem onSelect={onCopyText}>{$i18n.t('timeline.copyMessage')}</ActionMenuItem>
+      {/if}
+      {#if onCopyLink}
+        <ActionMenuItem onSelect={onCopyLink}>{$i18n.t('timeline.copyLink')}</ActionMenuItem>
+      {/if}
+      {#if onViewReactions}
+        <ActionMenuItem onSelect={onViewReactions}
+          >{$i18n.t('timeline.viewReactions')}</ActionMenuItem
+        >
+      {/if}
+      {#if onReadReceipts}
+        <ActionMenuItem onSelect={onReadReceipts}>{$i18n.t('timeline.readReceipts')}</ActionMenuItem
+        >
+      {/if}
+      {#if onDelete}
+        <ActionMenuSeparator />
+        <ActionMenuItem destructive onSelect={onDelete}>
+          {$i18n.t('timeline.deleteMessage')}
+        </ActionMenuItem>
+      {/if}
+    </ActionMenu>
   {/if}
 </div>
 

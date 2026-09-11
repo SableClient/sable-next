@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { DropdownMenu } from 'bits-ui';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
@@ -15,11 +14,12 @@
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { matrixToUrl } from '#lib/rooms/permalink.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import RoomNotificationSubmenu from './RoomNotificationSubmenu.svelte';
-
-  import '#lib/ui/primitives/menu.css';
 
   interface Props {
     room: RoomSummary | null;
@@ -62,72 +62,65 @@
   }
 </script>
 
-<DropdownMenu.Root
+<ActionMenu
   bind:open
+  label={$i18n.t('room.menuMoreOptions')}
+  class="room-options-menu"
   onOpenChange={(next) => {
     if (next) opened = true;
   }}
 >
-  <DropdownMenu.Trigger>
-    {#snippet child({ props })}
-      <IconButton
-        {...props}
-        class="room-menu-button selection-open"
-        variant="ghost"
-        size="small"
-        label={$i18n.t('room.menuMoreOptions')}
-      >
-        <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
-      </IconButton>
-    {/snippet}
-  </DropdownMenu.Trigger>
+  {#snippet trigger({ props })}
+    <IconButton
+      {...props}
+      class="room-menu-button selection-open"
+      variant="ghost"
+      size="small"
+      label={$i18n.t('room.menuMoreOptions')}
+    >
+      <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
+    </IconButton>
+  {/snippet}
 
-  <DropdownMenu.Content
-    class="menu-surface room-options-menu"
-    side="bottom"
-    align="end"
-    sideOffset={4}
-  >
-    <IconContext values={{ 'aria-hidden': 'true' }}>
-      <DropdownMenu.Item class="menu-item" disabled={!unread} onSelect={onMarkRead}>
-        <ChecksIcon />
-        {$i18n.t('room.menuMarkRead')}
-      </DropdownMenu.Item>
-      {#if room && !room.is_space}
-        <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
-      {/if}
+  <IconContext values={{ 'aria-hidden': 'true' }}>
+    <ActionMenuItem disabled={!unread} onSelect={onMarkRead}>
+      <ChecksIcon />
+      {$i18n.t('room.menuMarkRead')}
+    </ActionMenuItem>
+    {#if room && !room.is_space}
+      <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
+    {/if}
 
-      <DropdownMenu.Separator class="menu-separator" />
+    <ActionMenuSeparator />
 
-      <DropdownMenu.Item class="menu-item" disabled={!canInvite} onSelect={onInvite}>
-        <UserPlusIcon />
-        {$i18n.t('room.menuInvite')}
-      </DropdownMenu.Item>
-      {#if compact}
-        <DropdownMenu.Item class="menu-item" onSelect={onMembers}>
-          <UserCircleIcon />
-          {$i18n.t('timeline.members')}
-        </DropdownMenu.Item>
-      {/if}
-      <DropdownMenu.Item class="menu-item" onSelect={copyLink}>
-        <LinkIcon />
-        {$i18n.t('room.menuCopyLink')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item class="menu-item" onSelect={onSettings}>
-        <GearIcon />
-        {$i18n.t('room.menuSettings')}
-      </DropdownMenu.Item>
-      <DropdownMenu.Item class="menu-item" onSelect={onJumpToTime}>
-        <ClockCounterClockwiseIcon />
-        {$i18n.t('room.menuJumpToTime')}
-      </DropdownMenu.Item>
+    <ActionMenuItem disabled={!canInvite} onSelect={onInvite}>
+      <UserPlusIcon />
+      {$i18n.t('room.menuInvite')}
+    </ActionMenuItem>
+    {#if compact}
+      <ActionMenuItem onSelect={onMembers}>
+        <UserCircleIcon />
+        {$i18n.t('timeline.members')}
+      </ActionMenuItem>
+    {/if}
+    <ActionMenuItem onSelect={copyLink}>
+      <LinkIcon />
+      {$i18n.t('room.menuCopyLink')}
+    </ActionMenuItem>
+    <ActionMenuItem onSelect={onSettings}>
+      <GearIcon />
+      {$i18n.t('room.menuSettings')}
+    </ActionMenuItem>
+    <ActionMenuItem onSelect={onJumpToTime}>
+      <ClockCounterClockwiseIcon />
+      {$i18n.t('room.menuJumpToTime')}
+    </ActionMenuItem>
 
-      <DropdownMenu.Separator class="menu-separator" />
+    <ActionMenuSeparator />
 
-      <DropdownMenu.Item class="menu-item menu-item-destructive" onSelect={onLeave}>
-        <SignOutIcon />
-        {room?.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
-      </DropdownMenu.Item>
-    </IconContext>
-  </DropdownMenu.Content>
-</DropdownMenu.Root>
+    <ActionMenuItem destructive onSelect={onLeave}>
+      <SignOutIcon />
+      {room?.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}
+    </ActionMenuItem>
+  </IconContext>
+</ActionMenu>
