@@ -36,6 +36,8 @@ export function registrationError(value: unknown): string {
         : t('errors.tooManyAttempts');
     case 'unknown_homeserver':
       return t('errors.homeserverNotFound');
+    case 'auth_provider_unreachable':
+      return t('errors.authProviderUnreachable');
     default:
       return t('errors.registrationFailed');
   }
@@ -66,6 +68,8 @@ export function authenticationError(value: unknown): string {
       return t('errors.homeserverNotFound');
     case 'unsupported':
       return t('errors.passwordUnsupported');
+    case 'auth_provider_unreachable':
+      return t('errors.authProviderUnreachable');
     default:
       return t('errors.coreError');
   }

@@ -1285,6 +1285,8 @@ pub enum CommandErr {
     RegistrationStageFailed {
         stage: String,
     },
+    /// The homeserver advertises OAuth endpoints that cannot be reached.
+    AuthProviderUnreachable,
     /// Detail is in the core's log under `log_id`.
     Failed {
         log_id: String,

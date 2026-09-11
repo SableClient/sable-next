@@ -197,6 +197,8 @@ export type CommandErr = { code: "not_logged_in" } | { code: "unknown_subscripti
 { code: "unavailable" } |
 /**  Refused, recoverable by user action. */
 { code: "denied" } | { code: "rate_limited"; retry_after_ms: number | null } | { code: "registration_unavailable" } | { code: "username_taken" } | { code: "invalid_username" } | { code: "invalid_email" } | { code: "email_verification_failed" } | { code: "weak_password" } | { code: "registration_stage_failed"; stage: string } |
+/**  The homeserver advertises OAuth endpoints that cannot be reached. */
+{ code: "auth_provider_unreachable" } |
 /**  Detail is in the core's log under `log_id`. */
 { code: "failed"; log_id: string };
 
@@ -883,8 +885,7 @@ html: string | null; source: string; mime: string | null; size: number | null } 
  *  The coordinates are absent for a `geo:` URI we cannot read; `geo_uri` is
  *  passed through as sent either way.
  */
-{ kind: "location"; body: string; geo_uri: string; latitude: number | null; longitude: number | null } |
-{ kind: "live_location"; body: string; latitude: number | null; longitude: number | null; live: boolean; expires_at: number; updated_at: number | null } | { kind: "call_invite" } | { kind: "malformed"; event_type: string } |
+{ kind: "location"; body: string; geo_uri: string; latitude: number | null; longitude: number | null } | { kind: "live_location"; body: string; latitude: number | null; longitude: number | null; live: boolean; expires_at: number; updated_at: number | null } | { kind: "call_invite" } | { kind: "malformed"; event_type: string } |
 /**  MSC4274. */
 { kind: "gallery";
 /**  The caption shared by the whole set. */

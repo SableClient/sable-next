@@ -1,5 +1,8 @@
 use std::{fmt::Display, sync::atomic::Ordering};
 
+use matrix_sdk::authentication::oauth::error::{
+    OAuthClientRegistrationError, OAuthError, RequestTokenError,
+};
 use matrix_sdk::encryption::{recovery::RecoveryError, secret_storage::SecretStorageError};
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
 
@@ -12,6 +15,38 @@ impl Core {
         let log_id = format!("e{}", self.next_log_id.fetch_add(1, Ordering::Relaxed));
         tracing::error!(log_id, context, "{error}");
         CommandErr::Failed { log_id }
+    }
+
+    pub(crate) fn failed_with_source(
+        &self,
+        context: &str,
+        error: &dyn std::error::Error,
+    ) -> CommandErr {
+        let mut message = error.to_string();
+        let mut source = error.source();
+        while let Some(cause) = source {
+            message.push_str(": ");
+            message.push_str(&cause.to_string());
+            source = cause.source();
+        }
+        self.failed(context, message)
+    }
+
+    pub(crate) fn oauth_login_error(&self, context: &str, error: &OAuthError) -> CommandErr {
+        if matches!(
+            error,
+            OAuthError::ClientRegistration(OAuthClientRegistrationError::OAuth(
+                RequestTokenError::Request(_)
+            ))
+        ) {
+            tracing::warn!(
+                context,
+                category = "auth_provider_unreachable",
+                "the authorization server did not answer: {error}"
+            );
+            return CommandErr::AuthProviderUnreachable;
+        }
+        self.failed_with_source(context, error)
     }
 
     pub(crate) fn login_error(&self, error: matrix_sdk::Error) -> CommandErr {

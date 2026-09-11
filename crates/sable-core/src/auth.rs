@@ -306,7 +306,7 @@ impl Core {
         let data = login
             .build()
             .await
-            .map_err(|error| self.failed("start_oidc_login", error))?;
+            .map_err(|error| self.oauth_login_error("start_oidc_login", &error))?;
 
         let mut authorization_url = data.url;
         authorization_url
