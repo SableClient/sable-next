@@ -419,7 +419,6 @@
           <ComposerAutocomplete
             id={listboxId}
             {optionId}
-            sigil=""
             heading={$i18n.t('search.suggestions')}
             {suggestions}
             active={activeSuggestion}

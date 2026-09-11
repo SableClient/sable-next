@@ -847,23 +847,6 @@
             />
             <div class="composer-field">
               <ComposerEditorView {editor} {showPlaceholder} {placeholder} />
-              {#if panelOpen && query}
-                <ComposerAutocomplete
-                  id={listboxId}
-                  {optionId}
-                  sigil={query.sigil}
-                  heading={query.sigil === '@'
-                    ? $i18n.t('composer.membersHeading', { query: query.query })
-                    : query.sigil === '#'
-                      ? $i18n.t('composer.roomsHeading', { query: query.query })
-                      : query.sigil === ':'
-                        ? $i18n.t('composer.emotesHeading', { query: query.query })
-                        : $i18n.t('composer.commandsHeading', { query: query.query })}
-                  {suggestions}
-                  {active}
-                  onSelect={commit}
-                />
-              {/if}
             </div>
             <div class="composer-after" bind:this={afterEl}>
               <ComposerBoard
@@ -927,6 +910,22 @@
             </div>
           {/if}
         </form>
+        {#if panelOpen && query}
+          <ComposerAutocomplete
+            id={listboxId}
+            {optionId}
+            heading={query.sigil === '@'
+              ? $i18n.t('composer.membersHeading', { query: query.query })
+              : query.sigil === '#'
+                ? $i18n.t('composer.roomsHeading', { query: query.query })
+                : query.sigil === ':'
+                  ? $i18n.t('composer.emotesHeading', { query: query.query })
+                  : $i18n.t('composer.commandsHeading', { query: query.query })}
+            {suggestions}
+            {active}
+            onSelect={commit}
+          />
+        {/if}
         <div class="composer-measurer" bind:this={measurerEl} aria-hidden="true"></div>
         <p class="composer-hint" id={hintId}>
           {preferences.enterForNewline

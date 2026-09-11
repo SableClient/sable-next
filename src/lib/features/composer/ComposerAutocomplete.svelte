@@ -9,14 +9,13 @@
   interface Props {
     id: string;
     optionId: (index: number) => string;
-    sigil: string;
     heading: string;
     suggestions: readonly Suggestion[];
     active: number;
     onSelect: (suggestion: Suggestion) => void;
   }
 
-  let { id, optionId, sigil, heading, suggestions, active, onSelect }: Props = $props();
+  let { id, optionId, heading, suggestions, active, onSelect }: Props = $props();
 
   function keepActiveInView(node: HTMLElement): void {
     node.querySelector(`[data-index="${String(active)}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -24,9 +23,7 @@
 </script>
 
 <div class="autocomplete">
-  <p class="heading" id="{id}-heading">
-    <span class="sigil" aria-hidden="true">{sigil}</span>{heading}
-  </p>
+  <p class="heading" id="{id}-heading">{heading}</p>
   {#if suggestions.length === 0}
     <p class="empty">{$i18n.t('composer.noSuggestions')}</p>
   {/if}
@@ -43,7 +40,6 @@
             data-index={index}
             aria-selected={index === active}
             onmousedown={(event: MouseEvent) => {
-              // The field must keep focus, or the caret is gone before insertion.
               event.preventDefault();
             }}
             onclick={() => {
@@ -62,17 +58,13 @@
             {:else}
               <Avatar size="small" src={suggestion.avatarUrl} name={suggestion.label} />
             {/if}
-            <span class="text">
-              <span class="label">{suggestion.label}</span>
-              {#if suggestion.detail}<span class="detail">{suggestion.detail}</span>{/if}
-            </span>
-            {#if index === active}<span class="key" aria-hidden="true">⏎</span>{/if}
+            <span class="label">{suggestion.label}</span>
+            {#if suggestion.detail}<span class="detail">{suggestion.detail}</span>{/if}
           </button>
         </li>
       {/each}
     {/if}
   </ul>
-  <p class="hint">{$i18n.t('composer.autocompleteHint')}</p>
 </div>
 
 <style>
@@ -82,44 +74,43 @@
     border-radius: var(--radius);
     bottom: calc(100% + 0.5rem);
     box-shadow: var(--shadow-float);
+    display: flex;
+    flex-direction: column;
     left: 0;
-    max-width: 22rem;
+    max-height: 30dvh;
     overflow: hidden;
     position: absolute;
-    width: max-content;
+    right: 0;
     z-index: var(--layer-popover);
   }
 
-  .heading,
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-    padding: var(--space-150) var(--space-250);
-  }
-
   .heading {
-    border-bottom: var(--border-width) solid var(--surface-container-line);
-    text-transform: uppercase;
-  }
-
-  .hint {
-    border-top: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-var-on-container);
+    flex: 0 0 auto;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    margin: 0;
+    padding: var(--space-200) var(--space-300) var(--space-100);
   }
 
   .empty {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-250);
+    padding: var(--space-100) var(--space-300) var(--space-300);
   }
 
   ul {
+    --radius-inner: var(--radii-300);
+
+    display: grid;
+    flex: 1 1 auto;
+    gap: var(--space-100);
     list-style: none;
     margin: 0;
-    max-height: 13rem;
+    min-height: 0;
     overflow-y: auto;
-    padding: var(--space-100);
+    padding: var(--space-200);
   }
 
   .option :global(.emote) {
@@ -133,28 +124,13 @@
     object-fit: contain;
   }
 
-  .text {
-    display: grid;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .sigil {
-    color: var(--primary-main);
-    margin-right: var(--space-150);
-  }
-
-  .key {
-    background: var(--surface-var-container);
-    border-radius: var(--radii-300);
-    color: var(--surface-var-on-container);
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-    padding: 0 var(--space-100);
+  .label {
+    flex: 1 1 auto;
   }
 
   .label,
   .detail {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -162,6 +138,7 @@
 
   .detail {
     color: var(--surface-var-on-container);
+    flex: 0 1 auto;
     font-size: var(--font-size-small);
   }
 </style>
