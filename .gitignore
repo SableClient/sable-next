@@ -70,6 +70,9 @@ src-tauri/gen/apple/*
 /blob-report
 /tests/e2e/.auth
 
+# Local mise overrides
+mise.local.toml
+
 # Nix things
 ## nix build output
 result
