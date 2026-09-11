@@ -1,7 +1,9 @@
 import { on } from 'svelte/events';
 
 function keyboardInset(viewport: VisualViewport): number {
-  return Math.max(0, Math.round(window.innerHeight - (viewport.height + viewport.offsetTop)));
+  const scale = viewport.scale || 1;
+  const offset = scale === 1 ? viewport.offsetTop : 0;
+  return Math.max(0, Math.round(window.innerHeight - (viewport.height * scale + offset)));
 }
 
 export function trackKeyboardInset(): () => void {

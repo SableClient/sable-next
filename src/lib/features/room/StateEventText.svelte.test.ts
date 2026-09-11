@@ -49,6 +49,20 @@ function membership(change: 'left' | 'joined', userId: string, name: string): Ti
   };
 }
 
+test.each([
+  [{ kind: 'call_invite' }, 'Alice sent a call invitation'],
+  [{ kind: 'malformed', event_type: 'm.room.message' }, 'Could not read event: m.room.message'],
+] satisfies [TimelineItemView['content'], string][])(
+  'renders the event notice for %j',
+  async (content, expected) => {
+    const item = { ...membership('joined', '@alice:example.org', 'Alice'), content };
+    const instance = mount(StateEventText, { target: document.body, props: { item } });
+    await tick();
+    expect(document.body.textContent).toContain(expected);
+    await unmount(instance);
+  }
+);
+
 test('tints a clickable state-event name from the sender profile', async () => {
   core.userProfile.mockResolvedValue({
     user_id: '@bob:example.org',

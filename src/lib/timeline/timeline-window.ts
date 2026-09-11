@@ -23,6 +23,7 @@ interface Options<T> {
   render: (rows: readonly TimelineRow<T>[]) => Promise<void>;
   onChange: (state: TimelineWindowState) => void;
   onScroll: (delta: number) => void;
+  onInteraction?: () => void;
   isAnchor?: (value: T) => boolean;
   estimateSize?: (value: T) => number | undefined;
 }
@@ -213,9 +214,11 @@ export class TimelineWindow<T> {
   async jumpTo(
     key: string | null,
     align: 'start' | 'center' = 'center',
-    smooth = false
+    smooth = false,
+    signal?: AbortSignal
   ): Promise<boolean> {
-    if (this.disposed) return false;
+    const cancelled = () => this.disposed || signal?.aborted === true;
+    if (cancelled()) return false;
     if (key !== null) {
       const index = (this.pending ?? this.items).findIndex((item) => item.key === key);
       if (index < 0) return false;
@@ -233,7 +236,7 @@ export class TimelineWindow<T> {
     this.touching = false;
     clearTimeout(this.timer);
     if (this.pending || this.rendering) await this.drain();
-    if (version !== this.jumpVersion || this.listeners.signal.aborted) return false;
+    if (version !== this.jumpVersion || cancelled()) return false;
     const index =
       key === null ? this.items.length - 1 : this.items.findIndex((item) => item.key === key);
     if (key !== null && index < 0) return false;
@@ -250,8 +253,9 @@ export class TimelineWindow<T> {
         Math.min(this.items.length, index + PAGE + 1)
       );
     }
-    if (version !== this.jumpVersion) {
-      if (this.state.scrolling) await this.restore(previous);
+    if (version !== this.jumpVersion || cancelled()) {
+      if (!this.disposed && (this.state.scrolling || version === this.jumpVersion))
+        await this.restore(previous);
       return false;
     }
     const row = key === null ? null : this.element(key);
@@ -593,6 +597,10 @@ export class TimelineWindow<T> {
     }
     this.scrollHeight = viewport.scrollHeight;
     if (delta !== 0) {
+      if (!this.jumping) {
+        this.jumpVersion++;
+        this.options.onInteraction?.();
+      }
       this.active = true;
       this.scheduleSettle();
       if (this.rendering) {
@@ -622,6 +630,7 @@ export class TimelineWindow<T> {
   }
 
   private interact(): void {
+    this.options.onInteraction?.();
     if (!this.active) this.scrollingUp = false;
     this.jumpVersion++;
     this.jumping = false;

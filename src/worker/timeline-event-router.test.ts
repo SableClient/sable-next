@@ -17,7 +17,7 @@ test('buffers more than eight startup events and delivers them only to the claim
   expect(router.route(events[0])).toBe('first-tab');
 });
 
-test('bounds events for an unknown subscription', () => {
+test('invalidates an overflowing startup instead of replaying a truncated diff stream', () => {
   const router = new TimelineEventRouter<string>();
   router.begin('tab');
   for (let index = 0; index < 101; index += 1) {
@@ -29,7 +29,10 @@ test('bounds events for an unknown subscription', () => {
     });
   }
 
-  expect(router.claim(1, 'tab')).toHaveLength(100);
+  expect(router.claim(1, 'tab')).toBe('overflow');
+  expect(router.owns(1, 'tab')).toBe(false);
+  router.begin('tab');
+  expect(router.claim(2, 'tab')).toEqual([]);
 });
 
 test('isolates two owners and rejects unauthorized pagination or unsubscribe', () => {

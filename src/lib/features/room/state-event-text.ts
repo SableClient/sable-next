@@ -63,6 +63,12 @@ function membershipText(
 export function stateEventText(item: TimelineItemView, t: Translate): string {
   const content = item.content;
   switch (content.kind) {
+    case 'call_invite':
+      return t('timeline.callInvite', {
+        user: item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
+      });
+    case 'malformed':
+      return t('timeline.malformedEvent', { type: content.event_type });
     case 'membership':
       return membershipText(content, item, t);
     case 'profile_change': {

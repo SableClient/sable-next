@@ -2304,6 +2304,22 @@ pub enum TimelineItemContentView {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         longitude: Option<f64>,
     },
+    LiveLocation {
+        body: String,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        latitude: Option<f64>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        longitude: Option<f64>,
+        live: bool,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        expires_at: u64,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        updated_at: Option<u64>,
+    },
+    CallInvite,
+    Malformed {
+        event_type: String,
+    },
     /// MSC4274.
     Gallery {
         /// The caption shared by the whole set.

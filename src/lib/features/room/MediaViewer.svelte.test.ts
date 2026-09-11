@@ -106,6 +106,29 @@ test('renders a video attachment with a player and no zoom controls', async () =
   await unmount(instance);
 });
 
+test('a spoiler opened in the viewer is not fetched or exposed before reveal', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaViewer, {
+    target: document.body,
+    props: {
+      items: [{ ...imageItem, source: 'mxc://example.org/spoiler', spoiler: 'Ending' }],
+      selectedEventId: '$image',
+      onClose: () => {},
+    },
+  });
+  await tick();
+  expect(core.fetchMedia).not.toHaveBeenCalled();
+  expect(document.querySelector('img')).toBeNull();
+  expect(document.body.textContent).not.toContain('photo.png');
+  const reveal = document.querySelector<HTMLButtonElement>('.spoiler-reveal');
+  expect(reveal?.textContent).toContain('Ending');
+  reveal?.click();
+  await vi.waitFor(() => {
+    expect(document.querySelector('img')).not.toBeNull();
+  });
+  await unmount(instance);
+});
+
 test('renders an audio attachment with a player', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const instance = mount(MediaViewer, {

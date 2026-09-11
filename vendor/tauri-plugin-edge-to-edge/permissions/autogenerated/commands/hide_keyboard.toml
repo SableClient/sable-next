@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-hide-keyboard"
+description = "Enables the hide_keyboard command without any pre-configured scope."
+commands.allow = ["hide_keyboard"]
+
+[[permission]]
+identifier = "deny-hide-keyboard"
+description = "Denies the hide_keyboard command without any pre-configured scope."
+commands.deny = ["hide_keyboard"]

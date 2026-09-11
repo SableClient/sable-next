@@ -44,6 +44,11 @@
   </div>
 {:else if item.content.kind === 'unable_to_decrypt'}
   <UndecryptableNotice id={item.id} cause={item.content.reason} />
+{:else if item.content.kind === 'call_invite' || item.content.kind === 'malformed'}
+  <p class="state">
+    <span class="state-rail" aria-hidden="true"></span>
+    <StateEventText {item} {onSenderProfile} />
+  </p>
 {:else if item.content.kind === 'unsupported'}
   <p class="state">
     <span class="state-rail" aria-hidden="true"></span>

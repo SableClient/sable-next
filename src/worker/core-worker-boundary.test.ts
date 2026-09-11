@@ -137,6 +137,63 @@ test('sends the subscription snapshot before startup events buffered for its por
   expect(second.messages).toEqual([]);
 });
 
+test.each([false, true])(
+  'startup overflow resubscribes with a fresh snapshot (repeated: %s)',
+  async (repeated) => {
+    let emit = (() => {}) as (json: string) => void;
+    let subscriptions = 0;
+    const released: number[] = [];
+    const core = fakeCore((command) => {
+      const request = JSON.parse(command) as { type: string; subscription?: number };
+      if (request.type === 'unsubscribe') {
+        if (request.subscription === undefined) throw new Error('Missing subscription');
+        released.push(request.subscription);
+        return Promise.resolve(JSON.stringify({ type: 'unsubscribe' }));
+      }
+      subscriptions += 1;
+      const subscription = subscriptions;
+      const overflow = repeated || subscriptions === 1;
+      emit(
+        JSON.stringify(
+          Array.from({ length: overflow ? 101 : 1 }, () => ({
+            type: 'timeline_diff',
+            subscription,
+            diffs: [{ op: 'clear' }],
+          }))
+        )
+      );
+      return Promise.resolve(
+        JSON.stringify({ type: 'subscribe_timeline', subscription, items: [] })
+      );
+    });
+    const boundary = createCoreWorkerBoundary(Promise.resolve(core));
+    emit = boundary.handleEvent;
+    const port = new FakePort();
+    boundary.connect(port);
+    await port.send({
+      id: 1,
+      command: {
+        type: 'subscribe_timeline',
+        room_id: '!room',
+        focus: { kind: 'live' },
+        hidden_events: false,
+      },
+    });
+    expect(subscriptions).toBe(repeated ? 3 : 2);
+    expect(released).toEqual(repeated ? [1, 2, 3] : [1]);
+    if (repeated) {
+      expect(port.messages).toHaveLength(1);
+      expect(port.messages[0]).toHaveProperty('id', 1);
+      expect(port.messages[0]).toHaveProperty('err.code', 'failed');
+    } else {
+      expect(port.messages).toEqual([
+        { id: 1, ok: { type: 'subscribe_timeline', subscription: 2, items: [] } },
+        { event: { type: 'timeline_diff', subscription: 2, diffs: [{ op: 'clear' }] } },
+      ]);
+    }
+  }
+);
+
 test('denies cross-port pagination and unsubscribe without calling the core', async () => {
   const commands: string[] = [];
   const boundary = createCoreWorkerBoundary(

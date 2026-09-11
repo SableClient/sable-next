@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TimelineItemView } from '#src/generated/protocol';
   import { Dialog } from 'bits-ui';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { tick, untrack } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -23,6 +23,7 @@
   } from '#lib/platform/files.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
@@ -64,7 +65,11 @@
     )
   );
   let item = $derived<MediaItem | undefined>(items[index]);
-  let source = $derived(item?.source ?? null);
+  const revealedSpoilers = new SvelteSet<string>();
+  let spoiler = $derived(item?.kind === 'image' || item?.kind === 'video' ? item.spoiler : null);
+  let spoilerKey = $derived(JSON.stringify([item?.eventId, item?.source, spoiler]));
+  let spoilerHidden = $derived(spoiler !== null && !revealedSpoilers.has(spoilerKey));
+  let source = $derived(spoilerHidden ? null : (item?.source ?? null));
   let mime = $derived(item?.mime ?? null);
   let url = $state<string | null>(null);
   let failed = $state(false);
@@ -607,7 +612,11 @@
               onclick={previous}><ArrowLeftIcon /></IconButton
             >
           {/if}
-          {#if url}
+          {#if spoilerHidden}
+            <Button class="spoiler-reveal" onclick={() => revealedSpoilers.add(spoilerKey)}>
+              {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
+            </Button>
+          {:else if url}
             {#if item.kind === 'video'}
               <!-- Matrix carries no caption track for an attachment. -->
               <!-- svelte-ignore a11y_media_has_caption -->
@@ -734,7 +743,9 @@
               >
             </div>
           {/if}
-          <p>{item.body || $i18n.t('viewer.untitled')}</p>
+          <p>
+            {spoilerHidden ? $i18n.t('composer.spoiler') : item.body || $i18n.t('viewer.untitled')}
+          </p>
           {#if isImage || isPdf}
             <button
               class="reset"

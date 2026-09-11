@@ -1,9 +1,13 @@
 [workspace]
 members = ["crates/*", "src-tauri"]
+exclude = ["vendor/tauri-plugin-edge-to-edge"]
 # sable-wasm only compiles for wasm32 - its session store holds JS functions,
 # which are not Send. Build it with `-p sable-wasm --target wasm32-unknown-unknown`.
 default-members = ["crates/sable-core", "src-tauri"]
 resolver = "3"
+
+[patch."https://github.com/SableClient/tauri-plugin-edge-to-edge.git"]
+tauri-plugin-edge-to-edge = { path = "vendor/tauri-plugin-edge-to-edge" }
 
 [workspace.dependencies]
 matrix-sdk = { version = "0.18.0", git = "https://github.com/SableClient/matrix-rust-sdk", rev = "d8b58d6c61232728e38c4f664bff16d6edc45cf4", default-features = false, features = [

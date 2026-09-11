@@ -175,6 +175,39 @@ test('fills a short live timeline until the server reports the timeline start', 
   await unmount(instance);
 });
 
+test('announces new arrivals separately from virtualized history', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('initial')];
+  roomTimeline.backwardPagination = 'end';
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  viewport();
+  await runAnimationFrames();
+  expect(document.querySelector('[role="log"]')?.getAttribute('aria-live')).toBe('off');
+  const announcement = () =>
+    document.querySelector('[data-timeline-announcements]')?.textContent.trim();
+  expect(announcement()).toBe('');
+  roomTimeline.items = [item('history'), ...roomTimeline.items];
+  await runAnimationFrames();
+  expect(announcement()).toBe('');
+  roomTimeline.items = [...roomTimeline.items, item('new')];
+  await runAnimationFrames();
+  expect(announcement()).toBe('1 new message');
+  roomTimeline.items = [...roomTimeline.items, { ...item('own'), is_own: true }];
+  await runAnimationFrames();
+  expect(announcement()).toBe('1 new message');
+  await unmount(instance);
+});
+
 test('a permalink whose context does not fill the viewport paginates on its own', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('older'), item('target'), item('newer')];
@@ -204,6 +237,101 @@ test('a permalink whose context does not fill the viewport paginates on its own'
   expect(future).toHaveBeenCalled();
   await unmount(instance);
 });
+
+test('stops focused automatic pagination after a failed or empty page', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('target')];
+  roomTimeline.mode = { kind: 'focused', eventId: '$target' };
+  const future = vi.fn(async () => {});
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$target',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: future,
+        onRead: async () => {},
+      },
+    },
+  });
+  viewport();
+  for (let page = 0; page < 20; page += 1) await runAnimationFrames();
+  expect(future).toHaveBeenCalledTimes(5);
+  await unmount(instance);
+});
+
+test('does not keep retrying a focused page when the timeline reports a load error', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('target')];
+  roomTimeline.mode = { kind: 'focused', eventId: '$target' };
+  const future = vi.fn(() => {
+    roomTimeline.error = 'load_failed';
+    return Promise.resolve();
+  });
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$target',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: future,
+        onRead: async () => {},
+      },
+    },
+  });
+  viewport();
+  for (let page = 0; page < 10; page += 1) await runAnimationFrames();
+  expect(future).toHaveBeenCalledTimes(1);
+  await unmount(instance);
+});
+
+test.each(['wheel', 'touchstart', 'pointerdown', 'keydown'])(
+  '%s cancels the final focus correction while a page is pending',
+  async (type) => {
+    const roomTimeline = timeline();
+    roomTimeline.items = [item('older'), item('target'), item('newer')];
+    roomTimeline.mode = { kind: 'focused', eventId: '$target' };
+    let finish!: () => void;
+    const future = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const instance = mount(TimelineListHarness, {
+      target: document.body,
+      props: {
+        list: {
+          timeline: roomTimeline,
+          focusEventId: '$target',
+          onRequestHistory: () => Promise.resolve(true),
+          onRequestFuture: future,
+          onRead: async () => {},
+        },
+      },
+    });
+    const element = viewport();
+    await runAnimationFrames();
+    expect(future).toHaveBeenCalledTimes(1);
+    const event =
+      type === 'wheel'
+        ? new WheelEvent(type, { deltaY: -50 })
+        : type === 'keydown'
+          ? new KeyboardEvent(type, { key: 'PageUp' })
+          : new Event(type);
+    if (type === 'touchstart') touch(element, type, 200);
+    else element.dispatchEvent(event);
+    Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 1000 });
+    element.scrollTop = 500;
+    element.dispatchEvent(new Event('scroll'));
+    finish();
+    await runAnimationFrames();
+    expect(element.scrollTop).toBe(500);
+    await unmount(instance);
+  }
+);
 
 test('limits empty opening refills', async () => {
   const roomTimeline = timeline();

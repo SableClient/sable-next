@@ -1,0 +1,22 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = """
+This permission set configures access to the
+edge-to-edge plugin command surface.
+
+#### Granted Permissions
+
+It allows reading safe-area and keyboard state,
+enabling or disabling edge-to-edge mode, and
+showing or hiding the keyboard.
+"""
+
+permissions = [
+  "allow-get-safe-area-insets",
+  "allow-get-keyboard-info",
+  "allow-enable",
+  "allow-disable",
+  "allow-show-keyboard",
+  "allow-hide-keyboard",
+]

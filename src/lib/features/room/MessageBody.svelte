@@ -5,6 +5,8 @@
 
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -14,6 +16,7 @@
   import { isCaption } from './members.js';
   import TimelineGallery from './TimelineGallery.svelte';
   import TimelineLocation from './TimelineLocation.svelte';
+  import TimelineLiveLocation from './TimelineLiveLocation.svelte';
   import TimelinePoll from './TimelinePoll.svelte';
 
   interface Props {
@@ -40,9 +43,25 @@
   let previewLink = $derived(
     item.content.kind === 'gallery' ? firstPreviewableLink(item.content.html) : null
   );
+  let spoiler = $derived(
+    item.content.kind === 'image' || item.content.kind === 'video' ? item.content.spoiler : null
+  );
+  let spoilerKey = $derived(
+    JSON.stringify([item.id, 'source' in item.content ? item.content.source : null, spoiler])
+  );
+  let revealedSpoiler = $state<string | null>(null);
 </script>
 
-{#if item.content.kind === 'sticker'}
+{#if spoiler !== null && revealedSpoiler !== spoilerKey}
+  <Button
+    class="spoiler-reveal"
+    onclick={() => {
+      revealedSpoiler = spoilerKey;
+    }}
+  >
+    {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
+  </Button>
+{:else if item.content.kind === 'sticker'}
   <MediaImage
     class="sticker"
     source={item.content.source}
@@ -88,10 +107,11 @@
 {:else if item.content.kind === 'location'}
   <TimelineLocation
     body={item.content.body}
-    geoUri={item.content.geo_uri}
     latitude={item.content.latitude}
     longitude={item.content.longitude}
   />
+{:else if item.content.kind === 'live_location'}
+  <TimelineLiveLocation location={item.content} />
 {:else if item.content.kind === 'poll'}
   <TimelinePoll
     poll={item.content.poll}

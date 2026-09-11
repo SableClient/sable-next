@@ -32,8 +32,9 @@ use matrix_sdk_ui::{
     room_list_service::RoomListItem,
     timeline::{
         AnyOtherStateEventContentChange, EncryptedMessage, EventSendState, EventTimelineItem,
-        MembershipChange, MsgLikeContent, MsgLikeKind, OtherState, PollState, Profile,
-        TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
+        LiveLocationState, MembershipChange, MsgLikeContent, MsgLikeKind, OtherState, PollState,
+        Profile, TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind,
+        VirtualTimelineItem,
     },
 };
 
@@ -1266,16 +1267,30 @@ fn message_content(
     }
 }
 
+fn live_location(state: &LiveLocationState) -> TimelineItemContentView {
+    let location = state.latest_location();
+    let coordinates = location.and_then(|location| geo_coordinates(location.geo_uri()));
+    let duration = u64::try_from(state.timeout().as_millis()).unwrap_or(u64::MAX);
+    TimelineItemContentView::LiveLocation {
+        body: location
+            .and_then(|location| location.description())
+            .or_else(|| state.description())
+            .unwrap_or_default()
+            .to_owned(),
+        latitude: coordinates.map(|(latitude, _)| latitude),
+        longitude: coordinates.map(|(_, longitude)| longitude),
+        live: state.is_live(),
+        expires_at: u64::from(state.ts().get()).saturating_add(duration),
+        updated_at: location.map(|location| u64::from(location.ts().get())),
+    }
+}
+
 fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
     raw: &RawFields,
     own_user_id: Option<&UserId>,
 ) -> TimelineItemContentView {
-    let unsupported = |what: &str| TimelineItemContentView::Unsupported {
-        description: what.to_owned(),
-    };
-
     match content {
         TimelineItemContent::MsgLike(msg) => match &msg.kind {
             MsgLikeKind::Message(message) => message_content(message, profile, raw),
@@ -1298,7 +1313,7 @@ fn content(
             MsgLikeKind::Poll(state) => TimelineItemContentView::Poll {
                 poll: poll(state, own_user_id),
             },
-            MsgLikeKind::LiveLocation(_) => unsupported("live location"),
+            MsgLikeKind::LiveLocation(state) => live_location(state),
             MsgLikeKind::Other(other) => TimelineItemContentView::HiddenEvent {
                 event_type: other.event_type().to_string(),
                 content: raw.content.clone(),
@@ -1329,8 +1344,19 @@ fn content(
             change: state_change(state, raw.content.as_ref(), raw.prev_content()),
             content: raw.content.clone(),
         },
-        TimelineItemContent::CallInvite => unsupported("call invite"),
-        _ => unsupported("event"),
+        TimelineItemContent::CallInvite | TimelineItemContent::RtcNotification { .. } => {
+            TimelineItemContentView::CallInvite
+        }
+        TimelineItemContent::FailedToParseMessageLike { event_type, .. } => {
+            TimelineItemContentView::Malformed {
+                event_type: event_type.to_string(),
+            }
+        }
+        TimelineItemContent::FailedToParseState { event_type, .. } => {
+            TimelineItemContentView::Malformed {
+                event_type: event_type.to_string(),
+            }
+        }
     }
 }
 
@@ -1578,6 +1604,51 @@ mod tests {
         per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
+
+    #[test]
+    fn call_invites_have_a_dedicated_view() {
+        let view = super::content(
+            &super::TimelineItemContent::CallInvite,
+            None,
+            &super::RawFields::default(),
+            None,
+        );
+        let serialized = serde_json::to_value(view).unwrap();
+        assert_eq!(serialized["kind"], "call_invite");
+    }
+
+    #[test]
+    fn live_location_sessions_are_not_unsupported_events() {
+        use matrix_sdk::ruma::{
+            MilliSecondsSinceUnixEpoch, events::beacon_info::BeaconInfoEventContent,
+        };
+        use matrix_sdk_ui::timeline::{
+            LiveLocationState, MsgLikeContent, MsgLikeKind, TimelineItemContent,
+        };
+        let beacon = BeaconInfoEventContent::new(
+            None,
+            std::time::Duration::from_mins(1),
+            true,
+            Some(MilliSecondsSinceUnixEpoch::now()),
+        );
+        let content = TimelineItemContent::MsgLike(MsgLikeContent {
+            kind: MsgLikeKind::LiveLocation(LiveLocationState::new(beacon)),
+            reactions: matrix_sdk_ui::timeline::ReactionsByKeyBySender::default(),
+            in_reply_to: None,
+            thread_root: None,
+            thread_summary: None,
+        });
+        let serialized = serde_json::to_value(super::content(
+            &content,
+            None,
+            &super::RawFields::default(),
+            None,
+        ))
+        .unwrap();
+        assert_eq!(serialized["kind"], "live_location");
+        assert_eq!(serialized["live"], true);
+        assert_eq!(serialized["latitude"], serde_json::Value::Null);
+    }
 
     fn members(entries: &[(&str, i32)]) -> Vec<(String, i32)> {
         entries

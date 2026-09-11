@@ -782,6 +782,20 @@ test('user input cancels a jump waiting for its rows', async () => {
   expect(window.state.lastVisible).toBe(before.lastVisible);
 });
 
+test('an aborted navigation does not commit a jump after rendering', async () => {
+  const { window, pause } = fixture();
+  await window.update(entries(1000));
+  const before = window.state;
+  const navigation = new AbortController();
+  const release = pause();
+  const jump = window.jumpTo('0', 'center', false, navigation.signal);
+  navigation.abort();
+  release();
+  expect(await jump).toBe(false);
+  expect(window.state.firstVisible).toBe(before.firstVisible);
+  expect(window.state.lastVisible).toBe(before.lastVisible);
+});
+
 test('retains focused content across incoming updates', async () => {
   const { window, content } = fixture();
   await window.update(entries(100));

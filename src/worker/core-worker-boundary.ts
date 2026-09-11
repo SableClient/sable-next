@@ -156,6 +156,7 @@ export function createCoreWorkerBoundary(
         return;
       }
       const { id } = request;
+      let pendingTimeline = false;
 
       if (panic !== null) {
         port.postMessage({ id, err: { code: 'failed', log_id: `core panicked: ${panic}` } });
@@ -222,29 +223,40 @@ export function createCoreWorkerBoundary(
           return;
         }
 
-        const timelineRequest = request.command.type === 'subscribe_timeline';
-        if (timelineRequest) timelineEvents.begin(port);
+        if (request.command.type === 'subscribe_timeline') {
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            if (!ports.has(port)) return;
+            timelineEvents.begin(port);
+            pendingTimeline = true;
+            const ok = JSON.parse(
+              await instance.submitCommand(JSON.stringify(request.command))
+            ) as CommandOk;
+            if (ok.type !== 'subscribe_timeline')
+              throw new Error('Invalid timeline subscription response');
+            const events = timelineEvents.claim(ok.subscription, port);
+            pendingTimeline = false;
+            if (events === null || events === 'overflow' || !ports.has(port)) {
+              await instance.submitCommand(
+                JSON.stringify({ type: 'unsubscribe', subscription: ok.subscription })
+              );
+              if (events === 'overflow' && ports.has(port)) continue;
+              return;
+            }
+            port.postMessage({ id, ok });
+            for (const event of events) port.postMessage({ event });
+            return;
+          }
+          throw new Error('Timeline startup overflowed; retry opening the room');
+        }
         const ok = JSON.parse(
           await instance.submitCommand(JSON.stringify(request.command))
         ) as CommandOk;
-        if (ok.type === 'subscribe_timeline') {
-          const events = timelineEvents.claim(ok.subscription, port);
-          if (!events || !ports.has(port)) {
-            await instance.submitCommand(
-              JSON.stringify({ type: 'unsubscribe', subscription: ok.subscription })
-            );
-            return;
-          }
-          port.postMessage({ id, ok });
-          for (const event of events) port.postMessage({ event });
-          return;
-        }
         if (request.command.type === 'unsubscribe') {
           timelineEvents.release(request.command.subscription);
         }
         port.postMessage({ id, ok });
       } catch (cause) {
-        if ('command' in request && request.command.type === 'subscribe_timeline') {
+        if (pendingTimeline) {
           timelineEvents.cancelPending(port);
         }
         let err: CommandErr = { code: 'failed', log_id: String(cause) };

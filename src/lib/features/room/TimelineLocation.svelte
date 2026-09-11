@@ -7,14 +7,22 @@
 
   interface Props {
     body: string;
-    geoUri: string;
     latitude: number | null;
     longitude: number | null;
   }
 
-  let { body, geoUri, latitude, longitude }: Props = $props();
+  let { body, latitude, longitude }: Props = $props();
+  let valid = $derived(
+    latitude !== null &&
+      longitude !== null &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      Math.abs(latitude) <= 90 &&
+      Math.abs(longitude) <= 180
+  );
+  let href = $derived(valid ? `geo:${latitude},${longitude}` : undefined);
   let coordinates = $derived(
-    latitude === null || longitude === null
+    !valid || latitude === null || longitude === null
       ? null
       : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
   );
@@ -46,7 +54,7 @@
 </script>
 
 <div class="location">
-  <a class="summary" href={geoUri}>
+  <a class="summary" {href} aria-disabled={!valid || undefined}>
     <MapPinIcon class="pin" size={20} aria-hidden="true" />
     <span class="text">
       <span class="label">{label}</span>
@@ -54,7 +62,7 @@
     </span>
   </a>
 
-  {#if latitude !== null && longitude !== null}
+  {#if valid && latitude !== null && longitude !== null}
     {#if map}
       {@const Map = map}
       <Map {latitude} {longitude} {label} />

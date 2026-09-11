@@ -44,6 +44,23 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test.each(['thread', 'focused'] as const)('%s receipt scope is respected', async (kind) => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.mode = kind === 'thread' ? { kind, rootEventId: '$root' } : { kind, eventId: '$latest' };
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const instance = mount(TimelineReadReceipt, {
+    target: document.body,
+    props: { timeline, visibleEventId: '$latest', onRead: read },
+  });
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).toHaveBeenCalledTimes(kind === 'thread' ? 1 : 0);
+  await unmount(instance);
+  vi.useRealTimers();
+});
+
 test('does not duplicate a read receipt while the first request is pending', async () => {
   vi.useFakeTimers();
   const timeline = new RoomTimeline({} as CoreClient);
@@ -67,6 +84,24 @@ test('does not duplicate a read receipt while the first request is pending', asy
 
   expect(read).toHaveBeenCalledTimes(1);
   pending.resolve(undefined);
+  await unmount(instance);
+  vi.useRealTimers();
+});
+
+test('a queued receipt is discarded when switching to focused history', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const instance = mount(TimelineReadReceipt, {
+    target: document.body,
+    props: { timeline, visibleEventId: '$latest', onRead: read },
+  });
+  await tick();
+  timeline.mode = { kind: 'focused', eventId: '$latest' };
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).not.toHaveBeenCalled();
   await unmount(instance);
   vi.useRealTimers();
 });

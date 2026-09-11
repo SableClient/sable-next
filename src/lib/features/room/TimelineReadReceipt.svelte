@@ -38,6 +38,10 @@
   function flush(): void {
     clearTimeout(coalesceTimer);
     coalesceTimer = undefined;
+    if (timeline.mode.kind === 'focused') {
+      pendingEventId = null;
+      return;
+    }
     const eventId = pendingEventId;
     if (!eventId || readingEventId !== null) return;
     // Queued receipts were already visible, even if the tab is now hidden.
@@ -65,7 +69,7 @@
   });
 
   $effect(() => {
-    if (timeline.mode.kind !== 'live') return;
+    if (timeline.mode.kind === 'focused') return;
     const eventId = readReceiptEventId(timeline.items, {
       visibleEventId,
       documentVisible,

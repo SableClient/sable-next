@@ -140,6 +140,20 @@ test('paginates a focused timeline forwards independently', async () => {
   expect(timeline.forwardPagination).toBe('end');
 });
 
+test('a failed forward page rejects and remains manually retryable', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', '$target');
+  const paginate = vi.spyOn(core, 'paginate').mockRejectedValueOnce(new Error('offline'));
+  await expect(timeline.paginateForward(25)).rejects.toThrow('offline');
+  expect(timeline.error).toBe('load_failed');
+  expect(timeline.forwardPagination).toBe('idle');
+  await expect(timeline.paginateForward(25)).resolves.toBe(true);
+  expect(timeline.error).toBeNull();
+  expect(paginate).toHaveBeenCalledTimes(2);
+  await timeline.stop();
+});
+
 test('does not resubscribe when started again for the same room', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
@@ -214,7 +228,7 @@ test('clears a failed forward pagination error after a successful retry', async 
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   await timeline.start('!room:example.org', '$target');
 
-  await timeline.paginateForward(25);
+  await expect(timeline.paginateForward(25)).rejects.toThrow('pagination failed');
   expect(timeline.error).toBe('load_failed');
 
   await timeline.paginateForward(25);

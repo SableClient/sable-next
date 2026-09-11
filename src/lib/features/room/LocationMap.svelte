@@ -35,9 +35,18 @@
       maxZoom: 19,
     }).addTo(map);
 
-    L.marker(view, { icon: pinIcon, alt, keyboard: false }).addTo(map);
+    const marker = L.marker(view, { icon: pinIcon, alt, keyboard: false }).addTo(map);
+    $effect(() => {
+      const coordinates: [number, number] = [latitude, longitude];
+      marker.setLatLng(coordinates);
+      marker.getElement()?.setAttribute('alt', label);
+      map.panTo(coordinates, { animate: false });
+    });
+    const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    observer.observe(node);
 
     return () => {
+      observer.disconnect();
       map.remove();
     };
   }

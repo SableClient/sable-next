@@ -22,6 +22,7 @@
   import MessageContextMenu from './MessageContextMenu.svelte';
   import TimelineItem from './TimelineItem.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
+  import TimelineAnnouncements from './TimelineAnnouncements.svelte';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import TypingIndicator from './TypingIndicator.svelte';
   import type { MatrixLink } from './matrix-link';
@@ -158,6 +159,7 @@
   let refillItems: readonly TimelineItemView[] | null = null;
   let emptyRefills = 0;
   let focusFilling = false;
+  let focusNavigation: AbortController | null = null;
   let visibleItemCount = 0;
   let personas = $derived(personaLookup(timeline.items));
   let personaOpen = $state(false);
@@ -270,7 +272,7 @@
       windowState.lastVisible !== null &&
       windowState.lastVisible >= entries.length - TIMELINE_LAYOUT.historyPrefetchItems
     ) {
-      void onRequestFuture();
+      void onRequestFuture().catch(() => {});
     }
   }
   function mountWindow(node: HTMLDivElement): () => void {
@@ -287,12 +289,14 @@
       },
       onChange: windowChanged,
       onScroll: readerScrolled,
+      onInteraction: () => focusNavigation?.abort(),
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content),
     });
     controller = engine;
     return () => {
       disposed = true;
+      focusNavigation?.abort();
       engine.destroy();
       controller = null;
     };
@@ -306,30 +310,64 @@
       if (!loading && !disposed) void openTimeline(engine);
     });
   });
-  async function fillFocusedViewport(engine: TimelineWindow<RowValue>): Promise<void> {
-    if (focusFilling) return;
+  async function fillFocusedViewport(
+    engine: TimelineWindow<RowValue>,
+    current: () => boolean
+  ): Promise<void> {
+    let emptyPages = 0;
+    let deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
+    while (current() && timeline.mode.kind === 'focused' && timeline.error === null) {
+      const node = viewport;
+      if (!node || node.scrollHeight - node.clientHeight > 1) break;
+      if (timeline.forwardPagination === 'loading' || timeline.backwardPagination === 'loading') {
+        if (performance.now() >= deadline) break;
+        await new Promise((resolve) =>
+          setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval)
+        );
+        continue;
+      }
+      if (emptyPages >= MAX_EMPTY_REFILLS) break;
+      const before = timeline.items;
+      if (timeline.forwardPagination !== 'end') await onRequestFuture();
+      else if (!historyExhausted && timeline.backwardPagination !== 'end') {
+        const end = await requestHistory();
+        if (!current()) break;
+        historyExhausted = end;
+      } else break;
+      if (!current() || timeline.error !== null) break;
+      emptyPages = timeline.items === before ? emptyPages + 1 : 0;
+      deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
+      await engine.update(entries);
+      await new Promise(requestAnimationFrame);
+    }
+  }
+  async function positionFocus(
+    engine: TimelineWindow<RowValue>,
+    target: string,
+    key: string,
+    smooth: boolean
+  ): Promise<void> {
+    focusNavigation?.abort();
+    const navigation = new AbortController();
+    focusNavigation = navigation;
+    const mode = timeline.mode;
+    const current = () =>
+      !disposed && !navigation.signal.aborted && focusEventId === target && timeline.mode === mode;
+    const needsFill =
+      timeline.mode.kind === 'focused' &&
+      viewport !== null &&
+      viewport.scrollHeight - viewport.clientHeight <= 1;
     focusFilling = true;
     try {
-      while (!disposed && timeline.mode.kind !== 'live') {
-        const node = viewport;
-        if (!node || node.scrollHeight - node.clientHeight > 1) break;
-        if (timeline.forwardPagination === 'loading' || timeline.backwardPagination === 'loading') {
-          await new Promise((resolve) =>
-            setTimeout(resolve, TIMELINE_LAYOUT.initialFillPollInterval)
-          );
-          continue;
-        }
-        if (timeline.forwardPagination !== 'end') await onRequestFuture();
-        else if (!historyExhausted && timeline.backwardPagination !== 'end')
-          historyExhausted = await requestHistory();
-        else break;
-        await engine.update(entries);
-        await new Promise(requestAnimationFrame);
-      }
+      const moved = await engine.jumpTo(key, 'center', smooth && !needsFill, navigation.signal);
+      if (!moved || !current() || !needsFill) return;
+      await fillFocusedViewport(engine, current);
+      if (current() && timeline.error === null)
+        await engine.jumpTo(key, 'center', smooth, navigation.signal);
     } catch {
-      historyExhausted = false;
+      return;
     } finally {
-      focusFilling = false;
+      if (focusNavigation === navigation) focusFilling = false;
     }
   }
   async function awaitPagination(): Promise<void> {
@@ -351,16 +389,11 @@
     }
     await engine.update(entries);
     if (focusEventId) {
+      const target = focusEventId;
       const entry = entries.find(({ value }) => value.item.event_id === focusEventId);
-      if (entry) {
-        await engine.jumpTo(entry.key);
-        handledFocus = focusEventId;
-      }
+      if (entry) handledFocus = target;
       revealed = true;
-      if (entry) {
-        await fillFocusedViewport(engine);
-        await engine.jumpTo(entry.key, 'center');
-      }
+      if (entry) await positionFocus(engine, target, entry.key, false);
       return;
     }
     const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
@@ -400,6 +433,8 @@
     const node = viewport;
     if (
       timeline.loading ||
+      timeline.mode.kind === 'focused' ||
+      timeline.error !== null ||
       !engine ||
       !revealed ||
       historyExhausted ||
@@ -434,6 +469,11 @@
   });
   let handledFocus: string | null = null;
   $effect(() => {
+    void focusEventId;
+    void timeline.mode;
+    untrack(() => focusNavigation?.abort());
+  });
+  $effect(() => {
     const target = focusEventId;
     const engine = controller;
     if (!engine || !revealed || target === handledFocus) return;
@@ -444,10 +484,7 @@
     const entry = entries.find(({ value }) => value.item.event_id === target);
     if (!entry) return;
     handledFocus = target;
-    void engine
-      .jumpTo(entry.key, 'center', !prefersReducedMotion.current)
-      .then(() => fillFocusedViewport(engine))
-      .then(() => engine.jumpTo(entry.key, 'center'));
+    void positionFocus(engine, target, entry.key, !prefersReducedMotion.current);
   });
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
@@ -470,6 +507,7 @@
     };
   }
   function jumpToLatest(): void {
+    focusNavigation?.abort();
     historyController.finishHistoryFill();
     if (!live) {
       onJumpToLive?.();
@@ -480,6 +518,7 @@
 </script>
 
 <TimelineReadReceipt {timeline} visibleEventId={readEventId} {onRead} />
+<TimelineAnnouncements {timeline} {visibleItems} />
 <MessageContextMenu />
 
 {#if timeline.error}
@@ -534,6 +573,7 @@
         {@attach userScrollMarker}
         {@attach scrollLock(scrollLocked || personaOpen)}
         role="log"
+        aria-live="off"
       >
         <div class={['items', `layout-${preferences.layout}`]}>
           <div class="window-rows">

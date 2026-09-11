@@ -54,3 +54,25 @@ test('browsers track keyboard geometry and clean up pending updates', async () =
   await vi.runAllTimersAsync();
   expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('');
 });
+
+test('pinch zoom and panning do not become keyboard insets', async () => {
+  vi.useFakeTimers();
+  const viewport = Object.assign(new EventTarget(), { height: 400, offsetTop: 100, scale: 2 });
+  vi.stubGlobal('visualViewport', viewport);
+  vi.stubGlobal('innerHeight', 800);
+  const stop = trackKeyboardInset();
+  expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
+  viewport.height = 250;
+  viewport.dispatchEvent(new Event('resize'));
+  await vi.runAllTimersAsync();
+  expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('300px');
+  viewport.offsetTop = 200;
+  viewport.dispatchEvent(new Event('scroll'));
+  await vi.runAllTimersAsync();
+  expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('300px');
+  viewport.height = 400;
+  viewport.dispatchEvent(new Event('resize'));
+  await vi.runAllTimersAsync();
+  expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
+  stop();
+});

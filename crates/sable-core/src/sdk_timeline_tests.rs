@@ -944,6 +944,57 @@ async fn a_location_reaches_the_view_with_its_coordinates_parsed() {
 }
 
 #[tokio::test]
+async fn live_location_beacons_reach_the_view_as_updated_coordinates() {
+    use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!live-location:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let timestamp = MilliSecondsSinceUnixEpoch::now();
+    server.mock_room_state_encryption().plain().mount().await;
+    let share_event_id = event_id!("$share");
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(
+                    factory
+                        .beacon_info(
+                            Some("Walk".to_owned()),
+                            Duration::from_mins(1),
+                            true,
+                            Some(timestamp),
+                        )
+                        .state_key(*ALICE)
+                        .event_id(share_event_id),
+                )
+                .add_timeline_event(
+                    factory
+                        .beacon(share_event_id.to_owned(), 48.8, 2.3, 10, Some(timestamp))
+                        .event_id(event_id!("$position")),
+                ),
+        )
+        .await;
+    let views = timeline_views(&client, &room, false).await.unwrap();
+    let location = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(share_event_id))
+        .unwrap();
+    let json = serde_json::to_value(&location.content).unwrap();
+    assert_eq!(json["kind"], "live_location");
+    assert_eq!(json["latitude"], 48.8);
+    assert_eq!(json["longitude"], 2.3);
+    assert_eq!(json["live"], true);
+    assert_eq!(json["updated_at"], u64::from(timestamp.get()));
+    assert!(
+        !views
+            .iter()
+            .any(|view| view.event_id.as_deref() == Some(event_id!("$position")))
+    );
+}
+
+#[tokio::test]
 async fn a_notice_is_marked_as_one_rather_than_read_as_speech() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

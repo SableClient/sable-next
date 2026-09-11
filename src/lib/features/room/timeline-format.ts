@@ -26,6 +26,7 @@ const MESSAGE_ROW_KINDS = [
   'sticker',
   'gallery',
   'location',
+  'live_location',
   'poll',
 ] as const satisfies readonly TimelineItemContentView['kind'][];
 

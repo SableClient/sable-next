@@ -12,6 +12,7 @@ export default {
     'node_modules',
     '.svelte-kit',
     'target',
+    'vendor',
     'src/generated',
     'src-tauri/icons',
     // Handlebars behind a .yml extension; oxfmt parses it as YAML and fails.

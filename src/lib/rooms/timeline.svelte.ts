@@ -213,12 +213,12 @@ export class RoomTimeline {
         this.forwardPagination = response.reached_end ? 'end' : 'idle';
       }
       return response.reached_end;
-    } catch {
+    } catch (error) {
       if (session === this.session && subscription === this.subscription) {
         this.error = 'load_failed';
         this.forwardPagination = 'idle';
       }
-      return true;
+      throw error;
     }
   }
 
