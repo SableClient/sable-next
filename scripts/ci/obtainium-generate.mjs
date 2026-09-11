@@ -10,9 +10,10 @@ if (!version || !tag || !outputPath) {
 }
 
 const repository = 'SableClient/sable-next';
+const server = 'https://git.sable.moe';
 const isNightly = tag === 'nightly';
 const apkName = `sable-next-${version}-android-universal.apk`;
-const apkUrl = `https://github.com/${repository}/releases/download/${tag}/${apkName}`;
+const apkUrl = `${server}/${repository}/releases/download/${tag}/${apkName}`;
 
 // Obtainium fills in every other setting from its own defaults on import.
 const additionalSettings = {
@@ -31,7 +32,7 @@ const config = {
   apps: [
     {
       id: isNightly ? 'moe.sable.next.nightly' : 'moe.sable.next',
-      url: `https://github.com/${repository}`,
+      url: `${server}/${repository}`,
       author: 'SableClient',
       name: isNightly ? 'Sable Next Nightly' : 'Sable Next',
       installedVersion: null,
@@ -45,7 +46,7 @@ const config = {
       categories: ['Communication'],
       releaseDate: null,
       changeLog: null,
-      overrideSource: 'GitHub',
+      overrideSource: 'Codeberg',
       allowIdChange: false,
       pendingRepoRenameUrl: null,
     },

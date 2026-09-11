@@ -68,7 +68,7 @@ tofu -chdir=infra/web plan -var-file="../terraform.tfvars"
 tofu -chdir=infra/web apply -var-file="../terraform.tfvars"
 ```
 
-The GitHub workflow is `.github/workflows/application.yml`. It builds the web
+The workflow is `.forgejo/workflows/cloudflare-web.yml`. It builds the web
 assets once per push or pull request, reuses that artifact for frontend checks,
 Playwright, desktop packaging, and Cloudflare operations, plans infrastructure
 changes, applies the development state on pushes to `main`, and uploads

@@ -7,9 +7,9 @@ on:
     paths:
       - 'infra/**'
       - 'wrangler.jsonc'
-      - '.github/workflows/cloudflare-web.yml'
-      - '.github/actions/prepare-tofu/**'
-      - '.github/actions/setup/**'
+      - '.forgejo/workflows/cloudflare-web.yml'
+      - '.forgejo/actions/prepare-tofu/**'
+      - '.forgejo/actions/setup/**'
   workflow_dispatch:
 
 permissions: {}
@@ -37,7 +37,7 @@ env:
 jobs:
   build:
     name: Build web assets
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -51,17 +51,17 @@ jobs:
       SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up app and build
-        uses: ./.github/actions/setup
+        uses: ./.forgejo/actions/setup
         with:
           build: 'true'
 
       - name: Upload Cloudflare assets
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
         with:
           name: cloudflare-web-assets
           path: dist
@@ -73,72 +73,67 @@ jobs:
     needs: build
     # Forks cannot read the Cloudflare credentials a plan needs.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-      pull-requests: write
-    environment:
-      name: development
-    env:
-      # dflook/tofu-plan reads this to post and update its plan comment.
-      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Download Cloudflare assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: cloudflare-web-assets
           path: dist
 
       - name: Prepare OpenTofu
-        uses: ./.github/actions/prepare-tofu
+        uses: ./.forgejo/actions/prepare-tofu
         with:
           build: 'false'
 
       - name: Plan infrastructure
         working-directory: infra/web
-        run: mise run opentofu -- plan -input=false -no-color
+        run: mise run opentofu -- plan -input=false -no-color | tee "$RUNNER_TEMP/plan.txt"
 
-      - name: Comment PR plan
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: dflook/tofu-plan@cdb4f4d604c9fa695e457744dd1f802853397ce7 # v3.0.0
-        with:
-          path: infra/web
-          label: development
+      - name: Publish plan summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo '## OpenTofu plan (development)'
+            echo
+            echo '```terraform'
+            cat "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   apply:
     name: Cloudflare apply
     needs: plan
     if: ${{ github.event_name != 'pull_request' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-    environment:
-      name: development
-      url: https://next.sable.moe
     concurrency:
       group: cloudflare-infra-development
       cancel-in-progress: false
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Download Cloudflare assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: cloudflare-web-assets
           path: dist
 
       - name: Prepare OpenTofu
-        uses: ./.github/actions/prepare-tofu
+        uses: ./.forgejo/actions/prepare-tofu
         with:
           build: 'false'
 

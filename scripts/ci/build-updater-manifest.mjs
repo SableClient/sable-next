@@ -3,20 +3,21 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const repository = process.env.GITHUB_REPOSITORY ?? 'SableClient/sable-next';
+const server = (process.env.FORGEJO_URL ?? 'https://git.sable.moe').replace(/\/+$/, '');
+const repository = process.env.FORGEJO_REPOSITORY ?? 'SableClient/sable-next';
 const tag = process.env.TAG;
 const version = process.env.VERSION;
 if (!tag) throw new Error('TAG is required');
 if (!version) throw new Error('VERSION is required');
 
-const gh = (...args) => execFileSync('gh', args, { encoding: 'utf8' });
+const release = join(dirname(fileURLToPath(import.meta.url)), 'forgejo-release.mjs');
+const run = (...args) => execFileSync('node', [release, ...args], { encoding: 'utf8' });
 
-const assets = JSON.parse(
-  gh('release', 'view', tag, '--repo', repository, '--json', 'assets')
-).assets;
-const signatures = assets.filter(({ name }) => name.endsWith('.sig'));
+const assets = run('assets', '--tag', tag).split('\n').filter(Boolean);
+const signatures = assets.filter((name) => name.endsWith('.sig'));
 
 if (signatures.length === 0) {
   console.log('No signed assets found; skipping updater manifest.');
@@ -24,11 +25,7 @@ if (signatures.length === 0) {
 }
 
 const directory = mkdtempSync(join(tmpdir(), 'sable-updater-'));
-execFileSync(
-  'gh',
-  ['release', 'download', tag, '--repo', repository, '--pattern', '*.sig', '--dir', directory],
-  { stdio: 'inherit' }
-);
+run('download', '--tag', tag, '--pattern', '*.sig', '--dir', directory);
 
 function targetsFor(name) {
   if (name.endsWith('.app.tar.gz')) return ['darwin-aarch64', 'darwin-x86_64'];
@@ -39,11 +36,11 @@ function targetsFor(name) {
 }
 
 const platforms = {};
-for (const { name: signatureName } of signatures) {
+for (const signatureName of signatures) {
   const artifact = signatureName.replace(/\.sig$/, '');
   const entry = {
     signature: readFileSync(join(directory, signatureName), 'utf8').trim(),
-    url: `https://github.com/${repository}/releases/download/${tag}/${encodeURIComponent(artifact)}`,
+    url: `${server}/${repository}/releases/download/${tag}/${encodeURIComponent(artifact)}`,
   };
   for (const target of targetsFor(artifact)) {
     if (target === 'windows-x86_64' && platforms[target] && artifact.endsWith('.msi')) continue;
@@ -56,17 +53,7 @@ if (Object.keys(platforms).length === 0) {
   process.exit(0);
 }
 
-const notes = gh(
-  'release',
-  'view',
-  tag,
-  '--repo',
-  repository,
-  '--json',
-  'body',
-  '-q',
-  '.body'
-).trim();
+const notes = run('body', '--tag', tag).trim();
 
 writeFileSync(
   'latest.json',

@@ -1,4 +1,4 @@
-<!-- Please read https://github.com/SableClient/sable-next/blob/main/CONTRIBUTING.md before opening a pull request -->
+<!-- Please read https://git.sable.moe/SableClient/sable-next/src/branch/main/CONTRIBUTING.md before opening a pull request -->
 
 ### Description
 
@@ -21,5 +21,5 @@ Fixes #
 
 ### Certificate of origin
 
-- [ ] Every commit is signed off (`git commit -s`), certifying the [DCO](https://github.com/SableClient/sable-next/blob/main/DCO)
-- [ ] No part of this contribution came from an AI content generator ([policy](https://github.com/SableClient/sable-next/blob/main/CONTRIBUTING.md#ai-generated-content))
+- [ ] Every commit is signed off (`git commit -s`), certifying the [DCO](https://git.sable.moe/SableClient/sable-next/src/branch/main/DCO)
+- [ ] No part of this contribution came from an AI content generator ([policy](https://git.sable.moe/SableClient/sable-next/src/branch/main/CONTRIBUTING.md#ai-generated-content))

@@ -1,10 +1,8 @@
 name: GitHub Actions security
 
 on:
-  pull_request:
   push:
     branches: [main]
-  merge_group:
   schedule:
     - cron: '41 1 * * 2'
 
@@ -29,5 +27,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Scan GitHub Actions workflows
+      - name: Scan workflows
         uses: zizmorcore/zizmor-action@70fb788f84895a7701f5643d103d587e460b5c99 # v0.6.3
+        with:
+          inputs: .github/workflows .forgejo/workflows

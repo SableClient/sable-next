@@ -1,0 +1,512 @@
+name: Build apps
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and attach bundles to (e.g. v1.2.3). Empty builds a nightly from HEAD.'
+        required: false
+        type: string
+permissions: {}
+concurrency:
+  group: tauri-build-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
+  FORGEJO_URL: https://git.sable.moe
+  FORGEJO_REPOSITORY: ${{ github.repository }}
+  FORGEJO_TOKEN: ${{ secrets.FORGEJO_RELEASE_TOKEN }}
+jobs:
+  setup-release:
+    name: Resolve release target
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      ref: ${{ steps.meta.outputs.ref }}
+      nightly: ${{ steps.meta.outputs.nightly }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve release meta
+        id: meta
+        uses: ./.forgejo/actions/resolve-release-meta
+        with:
+          input-tag: ${{ inputs.tag }}
+      - name: Wait for release to exist
+        if: ${{ steps.meta.outputs.nightly != 'true' }}
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: node scripts/ci/forgejo-release.mjs wait --attempts 12 --interval 15
+      - name: Ensure nightly prerelease exists
+        if: ${{ steps.meta.outputs.nightly == 'true' }}
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          node scripts/ci/forgejo-release.mjs ensure \
+            --tag nightly \
+            --sha "$SHA" \
+            --prerelease true \
+            --title 'Nightly (main)' \
+            --notes "Rolling nightly build from main at $SHA"
+  build-web:
+    name: Build web assets
+    needs: setup-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # Absent on forks, which builds an app with error reporting switched off.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && 'https://git.sable.moe/SableClient/sable-next/releases/download/nightly/latest.json' || '' }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Set up app and build
+        uses: ./.forgejo/actions/setup
+        with:
+          build: 'true'
+      - name: Upload web assets
+        uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
+        with:
+          name: web-assets
+          path: |
+            .svelte-kit/output
+            dist
+            src/generated/wasm
+          if-no-files-found: error
+          retention-days: 7
+  linux:
+    name: Linux ${{ matrix.arch }} (CEF)
+    needs: [setup-release, build-web]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-latest-arm64
+    env:
+      ARCH: ${{ matrix.arch }}
+      MISE_DISABLE_TOOLS: aqua:WebAssembly/binaryen,cargo:wasm-bindgen-cli
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && 'https://git.sable.moe/SableClient/sable-next/releases/download/nightly/latest.json' || '' }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download web assets
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
+        with:
+          name: web-assets
+      # tauri-runtime depends on webkit2gtk on Linux whatever the runtime, so
+      # the headers stay even though nothing renders through it. --as-needed
+      # keeps it out of the binary, hence no runtime dep in nfpm.yaml.
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            file \
+            libayatana-appindicator3-1 \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libwebkit2gtk-4.1-dev \
+            pkg-config
+      - name: Set up app
+        uses: ./.forgejo/actions/setup
+        with:
+          build: 'false'
+          install-mise-tools: 'false'
+      - name: Stamp release version into tauri.conf.json
+        run: |
+          args=''
+          [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
+          node scripts/ci/set-tauri-version.mjs "$VERSION" $args
+      # `tauri:cef build` stops at the binary; the bundler cannot carry the
+      # Chromium runtime, so cef:package assembles the packages around it.
+      - name: Build and package the CEF bundles
+        run: |
+          config_args=(--config src-tauri/tauri.ci.conf.json)
+          display_name='Sable Next'
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            config_args+=(--config src-tauri/tauri.nightly.conf.json)
+            display_name='Sable Next Nightly'
+          fi
+          pnpm tauri:cef build "${config_args[@]}"
+          mise run cef:package "$VERSION" "$display_name"
+      - name: Check the packages carry what they should
+        run: |
+          deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
+          dpkg-deb --contents "$deb" | grep -q 'etc/apparmor.d/sable-next$'
+          dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './postinst'
+          dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './prerm'
+          dpkg-deb --contents "$deb" | grep -q 'opt/sable-next/CEF-LICENSE.txt$'
+      - name: Sign the AppImage for the updater
+        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
+      - name: Attach Linux bundles to release
+        run: |
+          bundles=()
+          for bundle in "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" \
+                        "target/release/bundle/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm" \
+                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage" \
+                        "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage.sig"; do
+            [ -e "$bundle" ] && bundles+=("$bundle")
+          done
+          node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
+  android:
+    name: Build Android
+    needs: [setup-release, build-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      MISE_ENV: tauri
+      # Matches the ABIs passed to `tauri android build` below.
+      RUST_TARGETS: aarch64-linux-android armv7-linux-androideabi
+      # Read by src-tauri/build.rs, which bakes them into the binary.
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
+      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
+      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && 'https://git.sable.moe/SableClient/sable-next/releases/download/nightly/latest.json' || '' }}
+      ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download web assets
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
+        with:
+          name: web-assets
+      - name: Set up app
+        uses: ./.forgejo/actions/setup
+        with:
+          build: 'false'
+          install-mise-tools: 'false'
+      - name: Set up Android SDK and NDK
+        run: mise run tauri:setup:android
+      - name: Add Rust targets
+        run: |
+          # shellcheck disable=SC2086 # RUST_TARGETS is a space-separated list.
+          rustup target add $RUST_TARGETS
+      - name: Set up Gradle cache
+        uses: https://github.com/gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-disabled: true
+      - name: Stamp release version into tauri.conf.json
+        run: |
+          args=''
+          [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
+          node scripts/ci/set-tauri-version.mjs "$VERSION" $args
+      - name: Prepare nightly Android package
+        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
+        run: |
+          app_dir=src-tauri/gen/android/app
+          build_src_dir=src-tauri/gen/android/buildSrc
+          nightly_package_dir=moe/sable/next/nightly
+          nightly_source_dir="$RUNNER_TEMP/android-nightly-package"
+
+          # Tauri resolves sources from the active identifier's package path.
+          mkdir -p "$nightly_source_dir"
+          cp -a "$app_dir/src/main/java/moe/sable/next" "$nightly_source_dir/app"
+          cp -a "$build_src_dir/src/main/java/moe/sable/next" "$nightly_source_dir/buildSrc"
+          find "$nightly_source_dir" -type f -exec sed -i \
+            's/moe\.sable\.next/moe.sable.next.nightly/g' {} +
+          rm -rf "$app_dir/src/main/java/moe/sable/next" "$build_src_dir/src/main/java/moe/sable/next"
+          mkdir -p "$app_dir/src/main/java/moe/sable/next" "$build_src_dir/src/main/java/moe/sable/next"
+          mv "$nightly_source_dir/app" "$app_dir/src/main/java/$nightly_package_dir"
+          mv "$nightly_source_dir/buildSrc" "$build_src_dir/src/main/java/$nightly_package_dir"
+          sed -i 's/moe\.sable\.next/moe.sable.next.nightly/g' \
+            "$app_dir/build.gradle.kts" "$app_dir/src/main/AndroidManifest.xml"
+          sed -i \
+            -e 's/Java_moe_sable_next_MainActivity/Java_moe_sable_next_nightly_MainActivity/g' \
+            -e 's#moe/sable/next/MainActivity#moe/sable/next/nightly/MainActivity#g' \
+            src-tauri/src/mobile.rs
+      - name: Set up Android signing
+        if: ${{ env.ANDROID_KEY_BASE64 != '' }}
+        run: |
+          cd src-tauri/gen/android
+          echo "keyAlias=$ANDROID_KEY_ALIAS" > keystore.properties
+          echo "password=$ANDROID_KEY_PASSWORD" >> keystore.properties
+          base64 -d <<< "$ANDROID_KEY_BASE64" > "$RUNNER_TEMP/keystore.jks"
+          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
+      - name: Build Android bundles
+        run: |
+          config_args=(--config src-tauri/tauri.ci.conf.json)
+          [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
+          pnpm tauri android build "${config_args[@]}" --apk --aab --target aarch64 armv7
+          out='src-tauri/gen/android/app/build/outputs'
+          apk="$(find "$out/apk/universal/release" -name '*.apk' -type f | head -n 1)"
+          aab="$(find "$out/bundle/universalRelease" -name '*.aab' -type f | head -n 1)"
+          [ -n "$apk" ] || { echo 'APK not found' >&2; exit 1; }
+          [ -n "$aab" ] || { echo 'AAB not found' >&2; exit 1; }
+          mv "$apk" "$(dirname "$apk")/sable-next-${VERSION}-android-universal.apk"
+          mv "$aab" "$(dirname "$aab")/sable-next-${VERSION}-android-universal.aab"
+      - name: Verify the APK is signed
+        if: ${{ env.ANDROID_KEY_BASE64 != '' }}
+        run: |
+          apk="src-tauri/gen/android/app/build/outputs/apk/universal/release/sable-next-${VERSION}-android-universal.apk"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort | tail -n 1)"
+          [ -n "$apksigner" ] || { echo 'apksigner not found' >&2; exit 1; }
+          "$apksigner" verify --print-certs "$apk"
+      - name: Attach Android bundles to release
+        run: |
+          mapfile -d '' bundles < <(find src-tauri/gen/android/app/build/outputs -type f \
+            -name 'sable-next-*' \( -name '*.apk' -o -name '*.aab' \) -print0)
+          [ "${#bundles[@]}" -gt 0 ] || { echo 'No Android bundles found' >&2; exit 1; }
+          node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
+  github-bundles:
+    name: Wait for GitHub bundles
+    needs: setup-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Wait for handoff manifest
+        env:
+          TAG: ${{ needs.setup-release.outputs.tag }}
+        run: |
+          node scripts/ci/forgejo-release.mjs wait-assets \
+            --names github-bundles.json --attempts 120 --interval 30
+  obtainium:
+    name: Publish Obtainium config
+    needs: [setup-release, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Generate obtainium.json
+        run: node scripts/ci/obtainium-generate.mjs "$VERSION" "$TAG" obtainium.json
+      - name: Attach Obtainium config to release
+        run: node scripts/ci/forgejo-release.mjs upload obtainium.json
+  altstore:
+    name: Publish AltStore source
+    needs: [setup-release, github-bundles]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      # One asset name for both channels keeps the subscribed URL stable.
+      - name: Build AltStore source
+        run: |
+          node scripts/ci/forgejo-release.mjs download --pattern github-bundles.json --dir .
+          ipa_name="$(jq -r '.ipa.name' github-bundles.json)"
+          ipa_size="$(jq -r '.ipa.size' github-bundles.json)"
+          ipa_version="$(jq -r '.ipa.version' github-bundles.json)"
+          ipa_build="$(jq -r '.ipa.build' github-bundles.json)"
+
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            # Older entries would 404 once finalize-nightly prunes their IPAs.
+            export ALTSTORE_MAX_VERSIONS=1
+            cp scripts/ci/templates/altstore-source-nightly.json altstore-source.json
+          else
+            previous="$(
+              node scripts/ci/forgejo-release.mjs find-previous --asset altstore-source.json
+            )"
+            if [ -n "$previous" ]; then
+              echo "Carrying versions forward from $previous."
+              node scripts/ci/forgejo-release.mjs download \
+                --tag "$previous" --pattern altstore-source.json --dir .
+            else
+              cp scripts/ci/templates/altstore-source.json altstore-source.json
+            fi
+          fi
+
+          node scripts/ci/update-altstore-source.mjs \
+            altstore-source.json \
+            "$ipa_version" \
+            "$ipa_build" \
+            "$ipa_size" \
+            "https://git.sable.moe/SableClient/sable-next/releases/download/${TAG}/${ipa_name}" \
+            "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            "Sable Next $VERSION"
+      - name: Attach AltStore source to release
+        run: node scripts/ci/forgejo-release.mjs upload altstore-source.json
+  updater-manifest:
+    name: Publish updater manifest
+    needs: [setup-release, linux, android, github-bundles]
+    if: ${{ always() && needs.setup-release.result == 'success' && needs.linux.result == 'success' && needs.android.result == 'success' && needs.github-bundles.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Build updater manifest
+        run: node scripts/ci/build-updater-manifest.mjs
+      - name: Upload updater manifest
+        if: ${{ hashFiles('latest.json') != '' }}
+        run: node scripts/ci/forgejo-release.mjs upload latest.json
+  publish-latest:
+    name: Refresh latest tag
+    needs: [setup-release, updater-manifest, altstore]
+    if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Upload manifests to latest
+        run: |
+          node scripts/ci/forgejo-release.mjs download \
+            --tag "$TAG" --pattern 'latest.json' --dir .
+          node scripts/ci/forgejo-release.mjs download \
+            --tag "$TAG" --pattern 'altstore-source.json' --dir .
+
+          git tag -f latest "$SHA"
+          git push --force \
+            "https://oauth2:${FORGEJO_TOKEN}@git.sable.moe/${FORGEJO_REPOSITORY}.git" \
+            refs/tags/latest
+
+          node scripts/ci/forgejo-release.mjs ensure \
+            --tag latest \
+            --sha "$SHA" \
+            --title 'Latest stable' \
+            --notes "Stable manifests for $VERSION. Bundles live on the $TAG release."
+          node scripts/ci/forgejo-release.mjs edit \
+            --tag latest \
+            --title 'Latest stable' \
+            --notes "Stable manifests for $VERSION. Bundles live on the $TAG release."
+          node scripts/ci/forgejo-release.mjs upload --tag latest latest.json altstore-source.json
+  finalize-nightly:
+    name: Finalize nightly release
+    needs: [setup-release, linux, android, github-bundles, obtainium, altstore]
+    # The prune only removes what this run replaced, so a failed platform
+    # cannot strand the release on the previous run's bundles.
+    if: ${{ always() && needs.setup-release.result == 'success' && needs.setup-release.outputs.nightly == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: nightly
+      SHA: ${{ github.sha }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # What remains after stripping this run's version names the platform:
+      # `linux-x86_64.deb`, `android-universal.apk`.
+      - name: Collect the bundles this run produced
+        id: fresh
+        run: |
+          node scripts/ci/forgejo-release.mjs assets \
+            | sed -n "s/^sable-next-${VERSION}-//p" | sort -u > fresh
+          echo 'This run produced:'
+          cat fresh
+          if [ -s fresh ]; then echo 'any=true' >> "$GITHUB_OUTPUT"; fi
+      - name: Update nightly tag
+        if: ${{ steps.fresh.outputs.any == 'true' }}
+        run: |
+          git tag -f nightly "$SHA"
+          git push --force \
+            "https://oauth2:${FORGEJO_TOKEN}@git.sable.moe/${FORGEJO_REPOSITORY}.git" \
+            refs/tags/nightly
+          node scripts/ci/forgejo-release.mjs edit \
+            --prerelease true \
+            --title 'Nightly (main)' \
+            --notes "Rolling nightly build $VERSION from main at $SHA"
+      # Stamped names never clobber, so they accumulate and Obtainium starts
+      # offering a stale APK. The .json manifests clobber in place.
+      - name: Remove superseded nightly assets
+        run: |
+          node scripts/ci/forgejo-release.mjs assets \
+            | grep -v "^sable-next-${VERSION}-" | grep -v '\.json$' \
+            | while read -r name; do
+                [ -n "$name" ] || continue
+                while read -r suffix; do
+                  case "$name" in
+                    *-"$suffix")
+                      echo "Removing superseded nightly asset: $name"
+                      node scripts/ci/forgejo-release.mjs delete-asset --name "$name"
+                      break
+                      ;;
+                  esac
+                done < fresh
+              done

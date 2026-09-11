@@ -10,7 +10,7 @@ on:
       - 'src/generated/**'
       - 'rust-toolchain.toml'
       - 'deny.toml'
-      - '.github/workflows/rust-quality.yml'
+      - '.forgejo/workflows/rust-quality.yml'
   push:
     branches: [main]
     paths:
@@ -21,8 +21,7 @@ on:
       - 'src/generated/**'
       - 'rust-toolchain.toml'
       - 'deny.toml'
-      - '.github/workflows/rust-quality.yml'
-  merge_group:
+      - '.forgejo/workflows/rust-quality.yml'
 
 permissions: {}
 
@@ -37,18 +36,18 @@ env:
 jobs:
   format:
     name: Rust format
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.97.1
           components: rustfmt
@@ -58,29 +57,29 @@ jobs:
 
   checks:
     name: Rust check, test, and Clippy
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.97.1
           components: clippy
           targets: wasm32-unknown-unknown
 
       - name: Cache Rust artifacts
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       # Supplies wasm-bindgen-test-runner at the version mise pins.
       - name: Set up mise
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: '2026.9.2'
           cache: true
