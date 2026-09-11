@@ -313,57 +313,6 @@
     </div>
   {:else}
     <div class="board-body">
-      <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
-        {#each ['account', 'room', 'global', 'space'] as const as origin (origin)}
-          {@const group = sections.filter((section) => section.pack.origin === origin)}
-          {#if group.length > 0}
-            <span class="rail-label">{originLabels[origin]}</span>
-            {#each group as section (sectionId(section.pack))}
-              <button
-                type="button"
-                class="rail-pack"
-                title={packName(section.pack)}
-                aria-label={packName(section.pack)}
-                onclick={() => {
-                  jumpTo(sectionId(section.pack));
-                }}
-              >
-                {#if section.pack.avatar_url}
-                  <Avatar
-                    size="small"
-                    src={section.pack.avatar_url}
-                    initials={toInitials(packName(section.pack), 2)}
-                  />
-                {:else}
-                  <MediaImage
-                    class="rail-emote"
-                    source={section.images[0].url}
-                    alt={packName(section.pack)}
-                    width={32}
-                    height={32}
-                    original
-                  />
-                {/if}
-              </button>
-            {/each}
-          {/if}
-        {/each}
-        {#if unicodeSections.length > 0}
-          <span class="rail-label">{$i18n.t('emoji.unicode')}</span>
-          {#each unicodeSections as section (section.id)}
-            <button
-              type="button"
-              class="rail-pack rail-glyph"
-              title={section.label}
-              aria-label={section.label}
-              onclick={() => {
-                jumpTo(`emoji-${section.id}`);
-              }}>{section.glyph}</button
-            >
-          {/each}
-        {/if}
-      </nav>
-
       <div class={['grids', { sticker: tab === 'sticker', emoji: tab === 'emoticon' }]}>
         {#if onPickUnicode && query.trim() !== ''}
           {@const text = query.trim()}
@@ -518,6 +467,57 @@
           </section>
         {/each}
       </div>
+
+      <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
+        {#each ['account', 'room', 'global', 'space'] as const as origin (origin)}
+          {@const group = sections.filter((section) => section.pack.origin === origin)}
+          {#if group.length > 0}
+            <span class="rail-label">{originLabels[origin]}</span>
+            {#each group as section (sectionId(section.pack))}
+              <button
+                type="button"
+                class="rail-pack"
+                title={packName(section.pack)}
+                aria-label={packName(section.pack)}
+                onclick={() => {
+                  jumpTo(sectionId(section.pack));
+                }}
+              >
+                {#if section.pack.avatar_url}
+                  <Avatar
+                    size="small"
+                    src={section.pack.avatar_url}
+                    initials={toInitials(packName(section.pack), 2)}
+                  />
+                {:else}
+                  <MediaImage
+                    class="rail-emote"
+                    source={section.images[0].url}
+                    alt={packName(section.pack)}
+                    width={32}
+                    height={32}
+                    original
+                  />
+                {/if}
+              </button>
+            {/each}
+          {/if}
+        {/each}
+        {#if unicodeSections.length > 0}
+          <span class="rail-label">{$i18n.t('emoji.unicode')}</span>
+          {#each unicodeSections as section (section.id)}
+            <button
+              type="button"
+              class="rail-pack rail-glyph"
+              title={section.label}
+              aria-label={section.label}
+              onclick={() => {
+                jumpTo(`emoji-${section.id}`);
+              }}>{section.glyph}</button
+            >
+          {/each}
+        {/if}
+      </nav>
     </div>
 
     <div class="preview">
@@ -525,8 +525,8 @@
         <MediaImage
           source={preview.image.url}
           alt=""
-          width={28}
-          height={28}
+          width={32}
+          height={32}
           class="preview-image"
           original
         />
@@ -548,8 +548,8 @@
   .board {
     display: flex;
     flex-direction: column;
-    height: min(22rem, 60dvh);
-    width: min(24rem, calc(100vw - 2rem));
+    height: min(28rem, 60dvh);
+    width: min(27rem, calc(100vw - 2rem));
   }
 
   .board.resizable {
@@ -567,11 +567,10 @@
   }
 
   .board-head {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
+    flex-direction: column;
     gap: var(--space-200);
-    padding: var(--space-200);
+    padding: var(--space-300) var(--space-300) 0;
   }
 
   .tabs {
@@ -604,7 +603,7 @@
   /* Fixed, or a long pack name widens the rail and squeezes the grid. */
   .rail {
     align-items: center;
-    border-right: var(--border-width) solid var(--surface-container-line);
+    border-left: var(--border-width) solid var(--surface-container-line);
     display: flex;
     flex: 0 0 3.25rem;
     flex-direction: column;
@@ -639,7 +638,7 @@
   }
 
   .grids {
-    --emote-cell: 2.5rem;
+    --emote-cell: 3rem;
 
     flex: 1;
     min-width: 0;
@@ -649,11 +648,21 @@
 
   .grids h3 {
     align-items: baseline;
+    background: var(--surface-var-container);
+    border-radius: var(--radius-pill);
+    color: var(--surface-var-on-container);
     display: flex;
     flex-wrap: wrap;
     font-size: var(--font-size-small);
     gap: var(--space-150);
-    margin: var(--space-100) 0;
+    justify-content: center;
+    margin: 0 auto var(--space-200);
+    padding: var(--space-100) var(--space-200);
+    position: sticky;
+    text-transform: uppercase;
+    top: 0;
+    width: max-content;
+    z-index: 1;
   }
 
   .section-origin,
@@ -673,11 +682,11 @@
   }
 
   .grids.sticker {
-    --emote-cell: 5rem;
+    --emote-cell: 7rem;
   }
 
   .grids.emoji {
-    --emote-cell: 3.5rem;
+    --emote-cell: 3rem;
   }
 
   .grids li button,
@@ -690,22 +699,26 @@
     display: flex;
     height: var(--emote-cell);
     justify-content: center;
-    padding: var(--space-100);
+    padding: var(--space-200);
     width: var(--emote-cell);
+  }
 
-    :global(span) {
-      max-height: 100%;
-      max-width: 100%;
-    }
+  .grids li button :global(.media-image) {
+    height: 100%;
+    width: 100%;
+  }
+
+  .grids li button :global(.media-image-content) {
+    object-fit: contain;
   }
 
   /* The 8-column rows own their width, so a wider emote cell must not stretch them. */
   .grids .unicode {
-    --emote-cell: 2.5rem;
+    --emote-cell: 3rem;
   }
 
   .grids .unicode button {
-    font-size: calc(var(--emote-cell) * 0.5);
+    font-size: calc(var(--emote-cell) * 0.667);
     line-height: 1;
     width: 100%;
   }
@@ -772,23 +785,26 @@
 
   .preview {
     align-items: center;
-    border-top: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border-radius: var(--radius);
     color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
-    gap: var(--space-150);
-    min-height: 2.25rem;
-    padding: 0 var(--space-200);
+    gap: var(--space-300);
+    margin: 0 var(--space-300) var(--space-300);
+    min-height: 2.5rem;
+    padding: var(--space-200);
   }
 
   .preview code {
     color: var(--bg-on-container);
+    font-size: var(--font-size-body);
   }
 
   .preview :global(.preview-image) {
-    flex: 0 0 1.75rem;
-    height: 1.75rem;
-    width: 1.75rem;
+    flex: 0 0 2rem;
+    height: 2rem;
+    width: 2rem;
   }
 
   .preview :global(.preview-image .media-image-content) {
