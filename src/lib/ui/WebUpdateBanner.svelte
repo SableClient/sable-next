@@ -13,6 +13,7 @@
   let live = true;
 
   const VERSION_REPLY_MS = 1_500;
+  const POLL_INTERVAL_MS = 300_000;
 
   function workerVersion(worker: ServiceWorker): Promise<string | null> {
     return new Promise((settle) => {
@@ -55,6 +56,7 @@
 
     let stopInstalling: (() => void) | undefined;
     let stopUpdates: (() => void) | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
     void navigator.serviceWorker.ready
       .then((ready) => {
         if (!live) return;
@@ -74,7 +76,14 @@
           stopInstalling = on(installing, 'statechange', onStateChange);
         };
         stopUpdates = on(ready, 'updatefound', onUpdate);
-        void ready.update();
+
+        const check = (): void => {
+          ready.update().catch((error: unknown) => {
+            console.debug('[sable updates] web update check failed', error);
+          });
+        };
+        check();
+        timer = setInterval(check, POLL_INTERVAL_MS);
       })
       .catch((error: unknown) => {
         console.debug('[sable updates] web update check failed', error);
@@ -84,6 +93,7 @@
       live = false;
       stopInstalling?.();
       stopUpdates?.();
+      clearInterval(timer);
     };
   });
 </script>

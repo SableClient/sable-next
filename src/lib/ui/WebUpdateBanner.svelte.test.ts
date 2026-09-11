@@ -53,6 +53,29 @@ test('offers to refresh when a worker is waiting', async () => {
   await unmount(instance);
 });
 
+test('keeps checking for a new worker while the tab stays open', async () => {
+  vi.useFakeTimers();
+  const update = vi.fn(() => Promise.resolve());
+  const registration = Object.assign(new EventTarget(), {
+    update,
+  }) as unknown as ServiceWorkerRegistration;
+  const serviceWorker = Object.assign(new EventTarget(), { ready: Promise.resolve(registration) });
+  vi.stubGlobal('navigator', { serviceWorker });
+  vi.stubGlobal('location', { reload: vi.fn() });
+
+  const instance = mount(WebUpdateBanner, { target: document.body });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(update).toHaveBeenCalledOnce();
+
+  await vi.advanceTimersByTimeAsync(600_000);
+  expect(update).toHaveBeenCalledTimes(3);
+
+  await unmount(instance);
+  await vi.advanceTimersByTimeAsync(300_000);
+  expect(update).toHaveBeenCalledTimes(3);
+  vi.useRealTimers();
+});
+
 test('activates a worker built from the same version without prompting', async () => {
   const postMessage = answering(version);
   const registration = Object.assign(new EventTarget(), {
