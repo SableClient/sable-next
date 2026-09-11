@@ -35,12 +35,22 @@ test('a browser without the Notification API presents nothing', () => {
 
 // Subscribing to the undefined `navigator.serviceWorker` is what crashed iOS.
 test('a webview without a service worker takes no web push', () => {
+  mocks.isTauri.mockReturnValue(false);
+
   vi.stubGlobal('navigator', {});
   expect(deliversWebPush()).toBe(false);
 
   vi.stubGlobal('navigator', { serviceWorker: {} });
   vi.stubGlobal('PushManager', function PushManager() {});
   expect(deliversWebPush()).toBe(true);
+});
+
+test('a Tauri shell takes no web push even with the APIs present', () => {
+  mocks.isTauri.mockReturnValue(true);
+  vi.stubGlobal('navigator', { serviceWorker: {} });
+  vi.stubGlobal('PushManager', function PushManager() {});
+
+  expect(deliversWebPush()).toBe(false);
 });
 
 test('only a mobile Tauri build registers a native pusher', async () => {

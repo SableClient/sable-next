@@ -1,5 +1,6 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
+import { activeServiceWorker } from '#lib/platform/service-worker.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { unregisterNativePush } from './native-push';
@@ -48,7 +49,8 @@ export async function syncPushSubscription(
   const { resolved: settings } = await pushConfig(override);
   if (!settings) return;
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await activeServiceWorker();
+  if (!registration) return;
   const subscription =
     (await registration.pushManager.getSubscription()) ??
     (await registration.pushManager.subscribe({
@@ -88,9 +90,9 @@ export async function dropPushSubscription(
   const { resolved: settings } = await pushConfig(override);
   if (!settings) return;
 
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
   localStorage.removeItem(REGISTERED_ENDPOINT);
+  const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return;
 
   const { keys } = subscription.toJSON();

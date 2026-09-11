@@ -1,17 +1,15 @@
 import { isTauri } from '@tauri-apps/api/core';
 
+import { hostsServiceWorker } from './service-worker.js';
+
 /** Under Tauri the Rust side alerts through the OS, so a webview
     `new Notification()` would raise a second one beside it. */
 export function presentsInApp(): boolean {
   return !isTauri() && typeof Notification !== 'undefined';
 }
 
-/** Tauri serves the app from `tauri://`, which has no service worker at all:
-    `navigator.serviceWorker` is undefined there, not merely unsubscribed. */
 export function deliversWebPush(): boolean {
-  return (
-    typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in globalThis
-  );
+  return hostsServiceWorker() && 'PushManager' in globalThis;
 }
 
 /** Only a mobile build has a token distributor; `register_push` no-ops on
