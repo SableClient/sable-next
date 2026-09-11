@@ -160,6 +160,10 @@
     moderationReason = '';
   }
 
+  function submitModeration(): void {
+    void confirmModeration();
+  }
+
   async function confirmModeration(): Promise<void> {
     const target = moderationTarget;
     const room = roomId;
@@ -310,6 +314,7 @@
   label={moderationTarget?.action === 'ban'
     ? $i18n.t('timeline.profileBan')
     : $i18n.t('timeline.profileKick')}
+  onConfirm={submitModeration}
 >
   {#if moderationTarget}
     <div class="moderation">
@@ -326,16 +331,10 @@
         <TextInput id="member-moderation-reason" bind:value={moderationReason} autocomplete="off" />
       </FormField>
       <div class="moderation-actions">
-        <Button variant="ghost" disabled={moderationBusy} onclick={cancelModeration}>
+        <Button type="button" variant="ghost" disabled={moderationBusy} onclick={cancelModeration}>
           {$i18n.t('timeline.cancel')}
         </Button>
-        <Button
-          variant="danger"
-          loading={moderationBusy}
-          onclick={() => {
-            void confirmModeration();
-          }}
-        >
+        <Button type="submit" variant="danger" loading={moderationBusy}>
           {moderationTarget.action === 'ban'
             ? $i18n.t('timeline.profileBan')
             : $i18n.t('timeline.profileKick')}

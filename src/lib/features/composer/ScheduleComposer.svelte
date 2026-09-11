@@ -37,9 +37,18 @@
     open = false;
     reset();
   }
+
+  function submit(): void {
+    if (!empty && chosen !== null) confirm(chosen);
+  }
 </script>
 
-<DialogFrame bind:open variant="verification" label={$i18n.t('composer.scheduleTitle')}>
+<DialogFrame
+  bind:open
+  variant="verification"
+  label={$i18n.t('composer.scheduleTitle')}
+  onConfirm={submit}
+>
   <div class="schedule">
     <h2>{$i18n.t('composer.scheduleTitle')}</h2>
     <p class="explain">{$i18n.t('composer.scheduleExplain')}</p>
@@ -76,13 +85,10 @@
     {/if}
 
     <div class="actions">
-      <Button variant="ghost" onclick={cancel}>{$i18n.t('composer.scheduleCancel')}</Button>
-      <Button
-        disabled={empty || chosen === null}
-        onclick={() => {
-          if (chosen !== null) confirm(chosen);
-        }}
-      >
+      <Button type="button" variant="ghost" onclick={cancel}>
+        {$i18n.t('composer.scheduleCancel')}
+      </Button>
+      <Button type="submit" disabled={empty || chosen === null}>
         {$i18n.t('composer.scheduleConfirm')}
       </Button>
     </div>

@@ -13,6 +13,7 @@
     label?: string;
     contentStyle?: string;
     onOpenChange?: (open: boolean) => void;
+    onConfirm?: () => void;
     children: Snippet;
   }
 
@@ -23,8 +24,14 @@
     label,
     contentStyle,
     onOpenChange,
+    onConfirm,
     children,
   }: Props = $props();
+
+  function submit(event: SubmitEvent): void {
+    event.preventDefault();
+    onConfirm?.();
+  }
 
   holdOverlayBack(
     () => open === true && !ownsBack,
@@ -43,12 +50,20 @@
       style={contentStyle}
       aria-label={label}
     >
-      {@render children()}
+      {#if onConfirm}
+        <form class="dialog-form" onsubmit={submit}>{@render children()}</form>
+      {:else}
+        {@render children()}
+      {/if}
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
 
 <style>
+  .dialog-form {
+    display: contents;
+  }
+
   :global(.dialog-backdrop) {
     background: var(--overlay);
     inset: 0;

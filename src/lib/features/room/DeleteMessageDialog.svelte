@@ -27,7 +27,12 @@
   }
 </script>
 
-<DialogFrame bind:open variant="verification" label={$i18n.t('timeline.deleteTitle')}>
+<DialogFrame
+  bind:open
+  variant="verification"
+  label={$i18n.t('timeline.deleteTitle')}
+  onConfirm={confirm}
+>
   <div class="delete">
     <h2>{$i18n.t('timeline.deleteTitle')}</h2>
     <p class="explain">{$i18n.t('timeline.deleteExplain')}</p>
@@ -40,8 +45,8 @@
       </FormField>
     </div>
     <div class="actions">
-      <Button variant="ghost" onclick={cancel}>{$i18n.t('timeline.cancel')}</Button>
-      <Button variant="danger" onclick={confirm}>{$i18n.t('timeline.deleteMessage')}</Button>
+      <Button type="button" variant="ghost" onclick={cancel}>{$i18n.t('timeline.cancel')}</Button>
+      <Button type="submit" variant="danger">{$i18n.t('timeline.deleteMessage')}</Button>
     </div>
   </div>
 </DialogFrame>
