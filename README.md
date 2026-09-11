@@ -43,9 +43,9 @@ mise run tauri:setup:ios      # iOS: Xcode project + CocoaPods (macOS)
 
 Every push to `main` publishes bundles for all five targets to the rolling
 [`nightly` release](https://git.sable.moe/SableClient/sable-next/releases/tag/nightly).
-Linux and Android build here; macOS, Windows and iOS build on the GitHub mirror
-and attach their bundles, with attestations, to the same release. Tagged
-releases are not set up yet.
+Linux x86_64 and Android build here; macOS, Windows, iOS and Linux aarch64
+build on the GitHub mirror and attach their bundles, with attestations, to the
+same release. Tagged releases are not set up yet.
 
 ## Android (Obtainium)
 

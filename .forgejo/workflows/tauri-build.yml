@@ -95,22 +95,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   linux:
-    name: Linux ${{ matrix.arch }} (CEF)
+    name: Linux x86_64 (CEF)
     needs: [setup-release, build-web]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86_64
-            runner: ubuntu-latest
-          - arch: aarch64
-            runner: ubuntu-latest-arm64
     env:
-      ARCH: ${{ matrix.arch }}
+      ARCH: x86_64
       MISE_DISABLE_TOOLS: aqua:WebAssembly/binaryen,cargo:wasm-bindgen-cli
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
