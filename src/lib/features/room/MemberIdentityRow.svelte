@@ -11,7 +11,6 @@
 
   import { memberAvatar, memberName, senderDisplayColors } from './members.js';
   import SenderName from './SenderName.svelte';
-  import { senderColor } from './timeline-format';
 
   interface Props {
     userId: string;
@@ -36,7 +35,6 @@
   let displayName = $derived(memberName(members, userId));
   let avatarUrl = $derived(memberAvatar(members, userId));
   let colors = $derived(senderDisplayColors(userId, profile));
-  let avatarColor = $derived(avatarUrl ? undefined : senderColor(userId));
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
   let userStatus = $derived(
     showStatus ? resolveUserStatus(profile, presenceStore.get(userId)) : null
@@ -62,7 +60,7 @@
 </script>
 
 {#snippet identity()}
-  <Avatar src={avatarUrl} name={displayName} color={avatarColor} size="small" />
+  <Avatar src={avatarUrl} name={displayName} id={userId} size="small" />
   <div class="member-identity-main">
     <span class="member-identity-text">
       <SenderName {displayName} {colors} nameClass="member-name" compact />

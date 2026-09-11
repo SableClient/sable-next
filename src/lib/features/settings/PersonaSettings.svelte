@@ -136,7 +136,12 @@
         {#each personas.personas as persona (persona.id)}
           {@const index = personas.personas.indexOf(persona)}
           <li>
-            <Avatar src={persona.avatar_url} name={persona.display_name} size="small" />
+            <Avatar
+              id={persona.id}
+              src={persona.avatar_url}
+              name={persona.display_name}
+              size="small"
+            />
             <div class="persona-copy">
               <span class="persona-name">{persona.display_name}</span>
               {#if persona.pronouns.length > 0}

@@ -75,7 +75,12 @@
           {label}
         >
           {#if active}
-            <Avatar src={active.avatar_url} name={active.display_name} size="small" />
+            <Avatar
+              id={active.id}
+              src={active.avatar_url}
+              name={active.display_name}
+              size="small"
+            />
           {:else}
             <UserSwitchIcon />
           {/if}
@@ -111,7 +116,7 @@
     onclick={openSheet}
   >
     {#if active}
-      <Avatar src={active.avatar_url} name={active.display_name} size="small" />
+      <Avatar id={active.id} src={active.avatar_url} name={active.display_name} size="small" />
     {:else}
       <UserSwitchIcon />
     {/if}

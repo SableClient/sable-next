@@ -74,7 +74,7 @@
                 toggle(space.room_id);
               }}
             />
-            <Avatar size="small" src={space.avatar_url} name={space.name} />
+            <Avatar size="small" id={space.room_id} src={space.avatar_url} name={space.name} />
             <span class="name">{space.name ?? space.room_id}</span>
           </label>
         </li>

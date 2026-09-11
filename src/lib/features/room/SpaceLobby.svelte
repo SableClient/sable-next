@@ -365,7 +365,13 @@
         </IconButton>
       </div>
     {/if}
-    <Avatar src={space?.avatar_url ?? null} name={space?.name ?? ''} size="large" uniform />
+    <Avatar
+      id={spaceId}
+      src={space?.avatar_url ?? null}
+      name={space?.name ?? ''}
+      size="large"
+      uniform
+    />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if canManage && space}
       <div class="hero-actions">

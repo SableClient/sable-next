@@ -69,7 +69,7 @@
             class="row"
             href={roomSectionPath(roomList.rooms, bookmark.room_id, bookmark.event_id)}
           >
-            <Avatar src={roomAvatarUrl(bookmark.room_id)} {name} />
+            <Avatar id={bookmark.room_id} src={roomAvatarUrl(bookmark.room_id)} {name} />
             <span class="body">
               <span class="head">
                 <span class="name">{name}</span>

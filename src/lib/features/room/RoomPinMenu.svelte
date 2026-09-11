@@ -237,6 +237,7 @@
                 }}
               >
                 <Avatar
+                  id={entry.sender}
                   src={senderAvatar(entry.sender)}
                   name={senderName(entry.sender)}
                   size="small"

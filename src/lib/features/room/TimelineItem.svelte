@@ -62,7 +62,6 @@
     canRedact,
     isMessageRow,
     jumboEmojiLevel,
-    senderColor,
   } from './timeline-format';
 
   interface Props {
@@ -201,7 +200,6 @@
     onReply: () => actions.onReply?.(),
     onEdit: () => actions.onEdit?.(),
   });
-  let avatarColor = $derived(personaTint || item.is_own ? undefined : senderColor(item.sender));
   let senderColors = $derived(
     senderDisplayColors(item.sender ?? '', profile, persona, item.is_own)
   );
@@ -663,7 +661,7 @@
             class="message-avatar"
             src={senderAvatar}
             size="small"
-            color={senderAvatar ? undefined : avatarColor}
+            id={personaTint ? null : item.sender}
             name={senderName}
           />
         </PersonaProfile>
@@ -678,7 +676,7 @@
             class="message-avatar"
             src={senderAvatar}
             size="small"
-            color={senderAvatar ? undefined : avatarColor}
+            id={personaTint ? null : item.sender}
             name={senderName}
           />
         </button>
@@ -687,7 +685,7 @@
           class="message-avatar"
           src={senderAvatar}
           size="small"
-          color={senderAvatar ? undefined : avatarColor}
+          id={personaTint ? null : item.sender}
           name={senderName}
         />
       {/if}
@@ -1130,12 +1128,6 @@
       opacity: 1;
       pointer-events: auto;
     }
-  }
-
-  /* Only the hashed sender colours are `-main` fills; an own or persona avatar
-     keeps Avatar's own container pair, whose ink this would wash out. */
-  .message:not(.own, .persona) :global(.avatar-root.message-avatar) {
-    color: var(--primary-on-main);
   }
 
   .message-content {

@@ -118,7 +118,7 @@
 
 {#snippet header()}
   <div class="room-heading">
-    <Avatar src={room?.avatar_url ?? null} name={roomName} size="small" />
+    <Avatar id={roomId} src={room?.avatar_url ?? null} name={roomName} size="small" />
     <span class="room-name">{roomName}</span>
   </div>
 {/snippet}

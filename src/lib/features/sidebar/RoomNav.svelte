@@ -24,16 +24,13 @@
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import BellRingingIcon from 'phosphor-svelte/lib/BellRingingIcon';
   import BellSlashIcon from 'phosphor-svelte/lib/BellSlashIcon';
-  import GlobeSimpleIcon from 'phosphor-svelte/lib/GlobeSimpleIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
-  import HashStraightIcon from 'phosphor-svelte/lib/HashStraightIcon';
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
-  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -41,6 +38,7 @@
   import { whenVisible } from '#lib/ui/when-visible.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
+  import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
@@ -404,17 +402,6 @@
     return { icon: BellRingingIcon, label: 'room.notifyAll' };
   }
 
-  function roomGlyph(room: RoomSummary | undefined): Component {
-    if (room === undefined) return HashStraightIcon;
-    if (room.is_voice) return SpeakerHighIcon;
-    if (room.join_rule === 'public') return GlobeSimpleIcon;
-    if (room.join_rule === 'invite' || room.join_rule === 'knock' || room.join_rule === 'private') {
-      return LockSimpleIcon;
-    }
-
-    return HashStraightIcon;
-  }
-
   function toggleCategory(key: string) {
     if (closedCategories.has(key)) closedCategories.delete(key);
     else closedCategories.add(key);
@@ -511,7 +498,12 @@
               aria-label={$i18n.t('nav.listOptions')}
             >
               {#if activeSpace}
-                <Avatar src={activeSpace.avatar_url} name={title} size="small" />
+                <Avatar
+                  id={activeSpace.room_id}
+                  src={activeSpace.avatar_url}
+                  name={title}
+                  size="small"
+                />
               {:else}
                 <TitleIcon />
               {/if}
@@ -752,12 +744,17 @@
                           'room-avatar-icon',
                           { glyph: !room?.avatar_url, voice: room?.is_voice },
                         ]}
+                        id={room?.avatar_url ? item.roomId : null}
                         src={room?.avatar_url ?? null}
                         size="small"
                         uniform
                       >
-                        {@const Glyph = roomGlyph(room)}
-                        <Glyph weight={active ? 'fill' : 'regular'} />
+                        <RoomIcon
+                          isSpace={room?.is_space ?? false}
+                          isVoice={room?.is_voice ?? false}
+                          joinRule={room?.join_rule ?? null}
+                          weight={active ? 'fill' : 'regular'}
+                        />
                       </Avatar>
                       {#if peerPresence && peerPresence.presence !== 'offline'}
                         <PresenceDot
@@ -1222,6 +1219,10 @@
 
   :global(.room-avatar-icon.glyph) {
     opacity: var(--opacity-p300);
+  }
+
+  :global(.room-avatar-icon.glyph .avatar-fallback) {
+    background: none;
   }
 
   .room-row.unread :global(.room-avatar-icon.glyph),

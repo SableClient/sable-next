@@ -27,7 +27,7 @@
         {@const name = invite.name ?? invite.room_id}
         {@const busy = answers.isAnswering(invite.room_id)}
         <li>
-          <Avatar class="invite-icon" src={invite.avatar_url} {name} />
+          <Avatar class="invite-icon" id={invite.room_id} src={invite.avatar_url} {name} />
           <span class="invite-name" title={name}>{name}</span>
           <IconButton
             variant="ghost"
@@ -96,10 +96,6 @@
     --avatar-size: 1.75rem;
 
     font-size: var(--font-size-small);
-  }
-
-  :global(.avatar-root.invite-icon .avatar-fallback) {
-    background: var(--surface-var-container);
   }
 
   .invite-name {

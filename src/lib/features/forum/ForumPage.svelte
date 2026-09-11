@@ -161,7 +161,13 @@
 
 <main class="forum-page" aria-label={$i18n.t('forum.label')}>
   <div class="forum-main">
-    <ForumHeader {roomName} {roomAvatar} onBack={goBack} onSearch={openSearch} />
+    <ForumHeader
+      roomId={resolvedRoomId}
+      {roomName}
+      {roomAvatar}
+      onBack={goBack}
+      onSearch={openSearch}
+    />
     <ForumThreadList
       threads={forumThreads.threads}
       loading={forumThreads.loading}

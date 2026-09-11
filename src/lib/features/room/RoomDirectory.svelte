@@ -122,7 +122,7 @@
         {@const joined = joinedIds.has(room.room_id)}
         {@const action = lobbyAction(room.join_rule, invitedIds.has(room.room_id))}
         <li class="room">
-          <Avatar src={room.avatar_url} name={label(room)} size="small" />
+          <Avatar id={room.room_id} src={room.avatar_url} name={label(room)} size="small" />
           <div class="room-text">
             <span class="room-name">
               {label(room)}

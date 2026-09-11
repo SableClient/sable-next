@@ -102,10 +102,10 @@
           avatarOpen = true;
         }}
       >
-        <Avatar src={profile?.avatar_url} {name} size="large" />
+        <Avatar id={userId} src={profile?.avatar_url} {name} size="large" />
       </button>
     {:else}
-      <Avatar src={profile?.avatar_url} {name} size="large" />
+      <Avatar id={userId} src={profile?.avatar_url} {name} size="large" />
     {/if}
     <h1 id="user-link-title">{name}</h1>
     <p class="user-link-id">{userId}</p>

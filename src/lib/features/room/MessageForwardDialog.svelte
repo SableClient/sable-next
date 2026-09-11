@@ -76,7 +76,7 @@
                 toggle(room.room_id);
               }}
             >
-              <Avatar size="small" src={room.avatar_url} name={room.name} />
+              <Avatar size="small" id={room.room_id} src={room.avatar_url} name={room.name} />
               <span class="name">{room.name ?? room.room_id}</span>
               <span class="tick" aria-hidden="true">
                 {#if checked}<CheckIcon size={14} weight="bold" />{/if}

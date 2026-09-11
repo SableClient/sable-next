@@ -11,11 +11,10 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
-  import { senderColor } from './timeline-format';
-
   const MAX_FACES = 3;
 
   interface Props {
+    roomId: string;
     roomName: string;
     roomAvatar: string | null;
     topic?: string | null;
@@ -34,6 +33,7 @@
   }
 
   let {
+    roomId,
     roomName,
     roomAvatar,
     topic = null,
@@ -75,7 +75,7 @@
   >
     <BackIcon />
   </IconButton>
-  <Avatar class="room-avatar" src={roomAvatar} name={roomName} size="small" />
+  <Avatar class="room-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
   <div class="room-identity" class:with-topic={topicShown}>
     <h1>{roomName}</h1>
     {#if topicShown}
@@ -98,7 +98,7 @@
               class="voice-face"
               src={participant.avatar}
               name={participant.name}
-              color={senderColor(participant.userId)}
+              id={participant.userId}
             />
           {/each}
         </span>
@@ -209,12 +209,7 @@
   }
 
   :global(.avatar-root.room-avatar) {
-    color: var(--primary-on-main);
     display: none;
-  }
-
-  :global(.avatar-root.room-avatar .avatar-fallback) {
-    background: var(--primary-main);
   }
 
   .voice-chip {

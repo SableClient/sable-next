@@ -34,6 +34,7 @@
   >
     <Avatar
       class="forum-thread-avatar"
+      id={thread.sender}
       src={thread.senderAvatar}
       name={displayName}
       size="medium"

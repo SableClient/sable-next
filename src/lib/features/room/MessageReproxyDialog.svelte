@@ -47,7 +47,12 @@
             choose(persona);
           }}
         >
-          <Avatar src={persona.avatar_url} name={persona.display_name} size="small" />
+          <Avatar
+            id={persona.id}
+            src={persona.avatar_url}
+            name={persona.display_name}
+            size="small"
+          />
           <span class="reproxy-option-name">{persona.display_name}</span>
           {#if current?.id === persona.id}<CheckIcon aria-hidden="true" />{/if}
         </button>

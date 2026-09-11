@@ -146,7 +146,7 @@
               section="banner"
             />{/if}
           <div class="avatar-row">
-            <Avatar src={avatarUrl} name={displayName || userId} size="large" />
+            <Avatar id={userId} src={avatarUrl} name={displayName || userId} size="large" />
             <div class="avatar-actions">
               <label class="file-button btn btn-secondary btn-small">
                 <input

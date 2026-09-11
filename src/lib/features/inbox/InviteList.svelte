@@ -36,7 +36,7 @@
         {@const busy = answers.isAnswering(invite.room_id)}
         <li class="card">
           <div class="head">
-            <Avatar src={invite.avatar_url} {name} size="large" />
+            <Avatar id={invite.room_id} src={invite.avatar_url} {name} size="large" />
             <div class="identity">
               <p class="name">
                 <span class="name-text">{name}</span>

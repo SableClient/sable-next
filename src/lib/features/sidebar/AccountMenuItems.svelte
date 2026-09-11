@@ -38,7 +38,7 @@
       onSwitch(account.account_id);
     }}
   >
-    <Avatar size="small" name={account.user_id} />
+    <Avatar size="small" id={account.user_id} name={account.user_id} />
     <span class="account-name">{account.user_id}</span>
   </DropdownMenu.Item>
 {/each}

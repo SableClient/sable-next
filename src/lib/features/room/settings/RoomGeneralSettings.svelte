@@ -194,7 +194,7 @@
   >
     <ul class="settings-rows">
       <li class="settings-row">
-        <Avatar src={room?.avatar_url ?? null} name={room?.name ?? ''} />
+        <Avatar id={roomId} src={room?.avatar_url ?? null} name={room?.name ?? ''} />
         <div class="settings-row-copy">
           <span class="settings-row-name">{$i18n.t('room.settingsAvatarLabel')}</span>
           <p>{$i18n.t('room.settingsAvatarHint')}</p>

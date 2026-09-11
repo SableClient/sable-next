@@ -49,6 +49,7 @@
 
   type RailItem = {
     href: string;
+    roomId?: string;
     activePrefix: string;
     label: string;
     icon?: Component;
@@ -157,6 +158,7 @@
       return {
         href,
         activePrefix: href,
+        roomId: room.room_id,
         initial: toInitials(name),
         avatar: room.avatar_url,
         label: name,
@@ -235,6 +237,7 @@
     return {
       href,
       activePrefix: href,
+      roomId: space.room_id,
       navigateHref: spaceNavigationHref(href, savedPath, mobile, lobby),
       initial: toInitials(name),
       avatar: space.avatar_url,
@@ -353,7 +356,13 @@
   {#if item.icon}
     <span class="icon" aria-hidden="true"><item.icon weight={active ? 'fill' : 'regular'} /></span>
   {:else}
-    <Avatar class="space-initial" src={item.avatar} initials={item.initial} uniform />
+    <Avatar
+      class="space-initial"
+      id={item.roomId ?? null}
+      src={item.avatar}
+      initials={item.initial}
+      uniform
+    />
   {/if}
   {#if item.badge !== false}
     {@render unreadMark(item.unread, item.dm ?? false)}
@@ -364,7 +373,7 @@
   {@const active = isActive(item)}
   <a
     {...props}
-    class="rail-item nav-tab nav-tab-side selection-current selection-layer"
+    class="rail-item nav-tab nav-tab-side selection-layer"
     class:nav-tab-outlined={outlined(item)}
     class:space-item={Boolean(item.initial)}
     href={item.navigateHref ?? item.href}
@@ -502,6 +511,7 @@
       {@const space = spacesById.get(roomId)}
       <Avatar
         class="folder-tile"
+        id={roomId}
         src={space?.avatar_url}
         name={spaceName(space?.name ?? null, roomId)}
         size="small"
@@ -514,8 +524,7 @@
   <button
     {...props}
     type="button"
-    class="rail-item folder-preview nav-tab nav-tab-side
-    selection-current selection-layer"
+    class="rail-item folder-preview nav-tab nav-tab-side selection-layer"
     data-current={folderActive(folder) ? 'true' : undefined}
     aria-expanded="false"
     aria-label={$i18n.t('nav.folderExpand', { name: folderLabel(folder) })}

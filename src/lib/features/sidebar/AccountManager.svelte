@@ -134,7 +134,7 @@
               ? reauthenticate(account.homeserver, account.account_id)
               : switchAccount(account.account_id))}
         >
-          <Avatar size="medium" name={account.user_id} />
+          <Avatar size="medium" id={account.user_id} name={account.user_id} />
           <span class="account-identity">
             <strong>{account.user_id}</strong>
             <small>

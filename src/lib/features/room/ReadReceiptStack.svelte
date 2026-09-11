@@ -8,7 +8,6 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import { memberAvatar, memberName } from './members.js';
-  import { senderColor } from './timeline-format';
 
   const MAX_FACES = 3;
 
@@ -51,12 +50,7 @@
             easing: cubicOut,
           }}
         >
-          <Avatar
-            class="receipt-face"
-            src={reader.avatar}
-            name={reader.name}
-            color={senderColor(reader.userId)}
-          />
+          <Avatar class="receipt-face" src={reader.avatar} name={reader.name} id={reader.userId} />
         </span>
       {/each}
       {#if readers.length > MAX_FACES}

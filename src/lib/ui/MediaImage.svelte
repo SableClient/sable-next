@@ -35,7 +35,9 @@
     size?: number | null;
     blurhash?: string | null;
     class?: string;
+    style?: string;
     onclick?: () => void;
+    onloaded?: () => void;
     onfailed?: () => void;
     retryable?: boolean;
     uniform?: boolean;
@@ -53,7 +55,9 @@
     size = null,
     blurhash = null,
     class: className = '',
+    style,
     onclick,
+    onloaded,
     onfailed,
     retryable = false,
     uniform = false,
@@ -134,6 +138,10 @@
       ? $i18n.t('timeline.retryMedia')
       : $i18n.t('timeline.retryMediaIn', { count: Math.ceil(retryWait / 1000) })
   );
+
+  $effect(() => {
+    if (painted) onloaded?.();
+  });
 
   $effect(() => {
     if (!failed || retryWait === 0) return;
@@ -425,6 +433,7 @@
 {#if !failed && (manualGif || onclick)}
   <button
     class={[className, 'media-image', 'interactive', { gif: manualGif }]}
+    {style}
     style:--media-ratio={aspectRatio}
     type="button"
     aria-label={mediaLabel}
@@ -437,7 +446,7 @@
     {@render content()}
   </button>
 {:else}
-  <span class={[className, 'media-image']} style:--media-ratio={aspectRatio}>
+  <span class={[className, 'media-image']} {style} style:--media-ratio={aspectRatio}>
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render content()}
   </span>

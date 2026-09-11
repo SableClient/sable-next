@@ -15,7 +15,7 @@
   import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
-  import { formatDate, formatTime, senderColor } from '../room/timeline-format';
+  import { formatDate, formatTime } from '../room/timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { MessageSearch } from './message-search.svelte.js';
   import {
@@ -475,9 +475,9 @@
                 <li>
                   <button class="hit-row" type="button" onclick={() => void openHit(hit)}>
                     <Avatar
+                      id={hit.sender}
                       src={senders.identity(hit.sender).avatarUrl}
                       name={senders.identity(hit.sender).displayName}
-                      color={senderColor(hit.sender)}
                       size="small"
                     />
                     <span class="hit-text">

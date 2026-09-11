@@ -98,7 +98,7 @@
         <li>
           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomHref resolves the route itself -->
           <a class="row" href={roomHref(room)}>
-            <Avatar src={room.avatar_url} {name} />
+            <Avatar id={room.room_id} src={room.avatar_url} {name} />
             <span class="body">
               <span class="head">
                 <span class="name">{name}</span>

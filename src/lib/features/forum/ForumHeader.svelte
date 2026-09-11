@@ -7,13 +7,14 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   interface Props {
+    roomId: string;
     roomName: string;
     roomAvatar: string | null;
     onBack: () => void;
     onSearch: () => void;
   }
 
-  let { roomName, roomAvatar, onBack, onSearch }: Props = $props();
+  let { roomId, roomName, roomAvatar, onBack, onSearch }: Props = $props();
 </script>
 
 <header class="forum-header">
@@ -26,7 +27,7 @@
   >
     <BackIcon />
   </IconButton>
-  <Avatar class="forum-avatar" src={roomAvatar} name={roomName} size="small" />
+  <Avatar class="forum-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
   <h1>{roomName}</h1>
   <IconButton
     class="search-button"

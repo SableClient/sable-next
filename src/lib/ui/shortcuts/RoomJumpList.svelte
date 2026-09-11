@@ -85,7 +85,12 @@
             aria-selected={index === active}
             onclick={() => onSelect(room)}
           >
-            <Avatar size="small" src={room.avatar_url} name={roomDisplayName(room)} />
+            <Avatar
+              size="small"
+              id={room.room_id}
+              src={room.avatar_url}
+              name={roomDisplayName(room)}
+            />
             <span class="name">{roomDisplayName(room)}</span>
           </button>
         </li>

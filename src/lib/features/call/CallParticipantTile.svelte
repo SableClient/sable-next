@@ -8,7 +8,6 @@
   import { Track } from 'livekit-client';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import { senderColor } from '#lib/features/room/timeline-format.js';
 
   import type { CallParticipant } from './call-transport';
 
@@ -45,7 +44,7 @@
     <video class="video" autoplay muted playsinline {@attach attachVideo}></video>
   {:else}
     <div class="placeholder">
-      <Avatar src={avatar} {name} color={senderColor(userId)} size="large" />
+      <Avatar src={avatar} {name} id={userId} size="large" />
     </div>
   {/if}
 

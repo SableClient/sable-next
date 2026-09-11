@@ -33,6 +33,7 @@ function mountHeader(props: {
   return mount(RoomHeader, {
     target: document.body,
     props: {
+      roomId: '!general:example.org',
       roomName: 'General',
       roomAvatar: null,
       members,
