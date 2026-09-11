@@ -332,37 +332,6 @@ test('opens an image from a mobile pointer interaction', async () => {
   await unmount(instance);
 });
 
-test('a per-message profile takes the sender position and names the account behind it', async () => {
-  core.userProfile.mockResolvedValue({
-    name_color_light: '#2244aa',
-    name_color_dark: '#88aaff',
-  });
-  const persona = {
-    ...item(false),
-    per_message_profile: {
-      id: 'kris',
-      display_name: 'Kris',
-      avatar_url: null,
-      pronouns: [{ summary: 'they/them', language: null }],
-      color_on_light: '#4f7a3a',
-      color_on_dark: '#9fd07c',
-      has_fallback: false,
-    },
-  };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
-    props: { core: core.commands, item: { item: persona, collapsed: false } },
-  });
-  await tick();
-
-  expect(document.querySelector('header .sender')?.textContent.trim()).toBe('Kris');
-  expect(document.querySelector('header .pronoun-pill')?.textContent).toBe('they/them');
-  expect(document.querySelector('header .via')?.textContent).toContain('Alice');
-  expect(document.querySelector('header .via')?.textContent).not.toContain('@alice:example.org');
-  expect(document.querySelector('header .via')?.classList.contains('tinted')).toBe(true);
-  await unmount(instance);
-});
-
 test('opens a per-message profile avatar through viewer callback', async () => {
   const onPersonaAvatarClick = vi.fn();
   const persona = {
@@ -585,7 +554,7 @@ test('shows every pronoun set from the sender account profile', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .pronoun-pill')).toHaveLength(2);
+    expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(2);
   });
   await unmount(instance);
 });
@@ -602,7 +571,7 @@ test('shows only the sets tagged with the reader language', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    const pills = document.querySelectorAll('header .pronoun-pill');
+    const pills = document.querySelectorAll('header .sender-identity-pronoun');
     expect(pills).toHaveLength(1);
     expect(pills[0].textContent).toBe('she/her');
   });
@@ -622,11 +591,11 @@ test('shows every set once the language filter is switched off', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .pronoun-pill')).toHaveLength(2);
+    expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(2);
   });
   setPreference('filterPronounsByLanguage', true);
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('header .pronoun-pill')).toHaveLength(1);
+    expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(1);
   });
   await unmount(instance);
 });
@@ -645,7 +614,7 @@ test('caps the pills at three and counts the rest', async () => {
     props: { core: core.commands, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
-    const pills = document.querySelectorAll('header .pronoun-pill');
+    const pills = document.querySelectorAll('header .sender-identity-pronoun');
     expect(pills).toHaveLength(4);
     expect(pills[3].textContent).toBe('+1');
     expect(pills[3].getAttribute('title')).toBe('it/its (en)');

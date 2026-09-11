@@ -28,7 +28,7 @@ test('SenderName mentions and shows pronoun pills', async () => {
 
   const button = document.querySelector<HTMLButtonElement>('.name-button');
   expect(button?.textContent).toBe('Alice');
-  expect(document.querySelector('.pronoun-pill')?.textContent).toBe('they/them');
+  expect(document.querySelector('.sender-identity-pronoun')?.textContent).toBe('they/them');
   button?.click();
   expect(onMention).toHaveBeenCalledTimes(1);
   await unmount(instance);

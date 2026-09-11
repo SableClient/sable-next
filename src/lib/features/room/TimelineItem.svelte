@@ -203,7 +203,6 @@
   let senderColors = $derived(
     senderDisplayColors(item.sender ?? '', profile, persona, item.is_own)
   );
-  let accountColors = $derived(senderDisplayColors(item.sender ?? '', profile, null, item.is_own));
 
   let senderId = $derived(item.sender);
   $effect(() => {
@@ -636,6 +635,7 @@
             {pronouns}
             nameClass="compact-name"
             onMention={mentionSender}
+            compact={layout === 'compact'}
           />
         {:else if !collapsed}
           <SenderName
@@ -643,6 +643,7 @@
             colors={senderColors}
             {pronouns}
             nameClass="compact-name"
+            compact={layout === 'compact'}
           />
         {/if}
       </div>
@@ -696,27 +697,20 @@
           {#if !emote}
             <SenderName
               displayName={senderName}
+              accountName={persona ? accountName : undefined}
               colors={senderColors}
               {pronouns}
               onMention={onMentionUser && item.sender ? mentionSender : undefined}
+              onViaProfile={persona ? openSenderProfile : undefined}
             />
           {/if}
           <div class="message-details">
             {#if item.sender}
               <button
-                class={!persona
-                  ? 'via via-hidden'
-                  : ['via', 'sender-identity-via', { tinted: accountColors.tinted }]}
-                style:color={persona && !accountColors.tinted ? accountColors.nameColor : undefined}
-                style:--name-color-on-light={persona
-                  ? (accountColors.nameColorLight ?? undefined)
-                  : undefined}
-                style:--name-color-on-dark={persona
-                  ? (accountColors.nameColorDark ?? undefined)
-                  : undefined}
+                class="via via-hidden"
                 type="button"
                 aria-label={$i18n.t('timeline.viaAccount', { user: accountName })}
-                onclick={openSenderProfile}>{persona ? accountName : item.sender}</button
+                onclick={openSenderProfile}>{item.sender}</button
               >
             {/if}
             <time datetime={new Date(item.timestamp).toISOString()}
@@ -1099,6 +1093,16 @@
       padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap));
     }
 
+    /*
+      :root specificity hack.
+
+      Otherwise this competes with the other selector and
+       may lose depending on how the bundler behaves.
+    */
+    :root .message.layout-compact.collapsed {
+      padding-inline: var(--page-gutter);
+    }
+
     /* Matches the base mention rule's specificity, so the gutter the row's
        negative margin assumes survives. */
     .message.mention-silent,
@@ -1435,7 +1439,7 @@
   }
 
   .message.layout-compact.collapsed {
-    padding-left: 0;
+    padding-inline: 0;
   }
 
   .compact-gutter {
@@ -1443,7 +1447,7 @@
     display: flex;
     flex: 0 0 clamp(7.5rem, 20%, 10.625rem);
     gap: var(--space-200);
-    justify-content: flex-end;
+    justify-content: space-between;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
