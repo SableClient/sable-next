@@ -34,6 +34,7 @@ use crate::protocol::{SearchAttachment, SearchFilter, SearchOrder};
 const BODY_FIELD_COUNT: usize = 1;
 const BODY_FIELD_BOOST: [f64; BODY_FIELD_COUNT] = [1.0];
 const EVENTS_PER_INGEST_YIELD: usize = 16;
+const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MAX_INDEXED_MESSAGES: usize = 50_000;
@@ -198,9 +199,12 @@ impl RoomIndex {
         }
     }
 
-    fn restored(documents: Vec<Document>, classified: Vec<OwnedEventId>) -> Self {
+    async fn restored(documents: Vec<Document>, classified: Vec<OwnedEventId>) -> Self {
         let mut index = Self::sized(documents.len().max(INITIAL_DOCUMENTS));
-        for document in documents {
+        for (position, document) in documents.into_iter().enumerate() {
+            if position > 0 && position.is_multiple_of(DOCUMENTS_PER_RESTORE_YIELD) {
+                matrix_sdk::sleep::sleep(Duration::ZERO).await;
+            }
             index.upsert(document);
         }
         index.classified = classified.into_iter().collect();
@@ -395,14 +399,14 @@ impl MessageIndex {
         self.rooms.remove(room_id);
     }
 
-    fn restore_room(
+    async fn restore_room(
         &mut self,
         room_id: &OwnedRoomId,
         documents: Vec<Document>,
         classified: Vec<OwnedEventId>,
     ) {
-        self.rooms
-            .insert(room_id.clone(), RoomIndex::restored(documents, classified));
+        let index = RoomIndex::restored(documents, classified).await;
+        self.rooms.insert(room_id.clone(), index);
     }
 
     fn mark_dirty(&mut self, room_id: &OwnedRoomId) {
@@ -812,7 +816,8 @@ impl Core {
                     self.search_index
                         .lock()
                         .await
-                        .restore_room(&room_id, documents, classified);
+                        .restore_room(&room_id, documents, classified)
+                        .await;
                 }
                 persist::Loaded::Absent | persist::Loaded::Unreadable => {}
             }
