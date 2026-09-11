@@ -68,6 +68,13 @@ impl CrawlProgress {
         *seen >= BLIND_BATCHES_BEFORE_SKIP
     }
 
+    fn blind_rooms(&self) -> usize {
+        self.blind
+            .values()
+            .filter(|seen| **seen >= BLIND_BATCHES_BEFORE_SKIP)
+            .count()
+    }
+
     fn token(&self, room_id: &OwnedRoomId) -> Option<String> {
         self.tokens.get(room_id).cloned().flatten()
     }
@@ -214,6 +221,7 @@ impl Core {
             .filter(|room| !progress.skips(&room.room_id().to_owned()))
             .count();
         let rooms_failed = progress.failed.len();
+        let rooms_blind = progress.blind_rooms();
         let stopped = full || progress.spent();
         drop(progress);
 
@@ -221,7 +229,7 @@ impl Core {
             SearchCoverageState::Stopped
         } else if rooms_pending > 0 {
             SearchCoverageState::Indexing
-        } else if rooms_failed > 0 {
+        } else if rooms_failed > 0 || rooms_blind > 0 {
             SearchCoverageState::Partial
         } else {
             SearchCoverageState::Complete
@@ -413,6 +421,17 @@ mod tests {
 
         assert!(progress.skips(&room()));
         assert!(!progress.checkpoints().contains_key(&room()));
+    }
+
+    #[test]
+    fn test_a_blinded_room_is_never_reported_as_complete_coverage() {
+        let mut progress = CrawlProgress::default();
+        assert_eq!(progress.blind_rooms(), 0);
+
+        while !progress.blinded(&room(), true) {}
+        progress.settle(room(), false);
+
+        assert_eq!(progress.blind_rooms(), 1);
     }
 
     #[test]
