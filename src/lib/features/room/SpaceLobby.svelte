@@ -483,17 +483,19 @@
 </DialogFrame>
 
 {#if space}
-  <RoomOptionsMenu
-    room={space}
-    anchor={optionsAnchor}
-    bind:open={optionsOpen}
-    onSettings={() => {
-      settingsOpen = true;
-    }}
-    onLeave={() => {
-      leaveOpen = true;
-    }}
-  />
+  {#if optionsAnchor}
+    <RoomOptionsMenu
+      room={space}
+      anchor={optionsAnchor}
+      bind:open={optionsOpen}
+      onSettings={() => {
+        settingsOpen = true;
+      }}
+      onLeave={() => {
+        leaveOpen = true;
+      }}
+    />
+  {/if}
 
   {#if settingsOpen}
     <RoomSettingsDialog

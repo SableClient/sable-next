@@ -141,10 +141,12 @@
     align-items: center;
     box-sizing: border-box;
     display: flex;
+    flex: 1;
     flex-direction: column;
     gap: var(--space-300);
     justify-content: center;
     min-height: 100%;
+    min-width: 0;
     padding: var(--space-700) var(--space-600);
     text-align: center;
   }
