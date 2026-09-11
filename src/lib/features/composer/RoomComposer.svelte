@@ -56,6 +56,7 @@
     type StagedFile,
   } from './composer-files';
   import { isMultiline } from './composer-multiline';
+  import { shouldFocusComposer } from './type-to-focus';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
   import type { FormatAction } from './editor/formatting';
@@ -702,6 +703,13 @@
     updateTyping();
   }
 
+  function handleKeydown(event: KeyboardEvent): void {
+    if (readOnly || event.defaultPrevented) return;
+    if (!shouldFocusComposer(event)) return;
+
+    editor.focus();
+  }
+
   function navigate(key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean {
     if (!panelOpen) {
       if (key === 'ArrowUp' && empty && staged.length === 0 && !context && onEditLast) {
@@ -737,6 +745,7 @@
 </script>
 
 <svelte:window
+  onkeydown={handleKeydown}
   ondragover={handleDragover}
   ondragleave={handleDragleave}
   ondrop={handleDrop}
