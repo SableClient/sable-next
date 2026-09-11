@@ -263,7 +263,6 @@
     "pinsUnreadable": "This message could not be loaded.",
     "menuMoreOptions": "More options",
     "menuMarkRead": "Mark as read",
-
     "menuInvite": "Invite",
     "menuJumpToTime": "Jump to time",
     "inviteTitle": "Invite",
@@ -1834,7 +1833,7 @@
     "proxying": "Shorthand triggers",
     "proxyingHint": "Send as a profile for one message by wrapping the text in that profile's trigger, such as k:hello.",
     "latching": "Latch after a shorthand",
-    "latchingHint": "Using a shorthand also makes that profile the room's choice, so the following messages need no trigger.",
+    "latchingHint": "Using a shorthand selects that profile for following messages.",
     "fallback": "Name prefix for older clients",
     "fallbackHint": "Prefixes the message with the profile's name so clients that cannot read profiles still show who wrote it.",
     "manageTitle": "Your per-message profiles",
@@ -1884,6 +1883,9 @@
     "pickerHeading": "Send as",
     "scopeRoom": "This room",
     "scopeAccount": "Everywhere",
+    "scopeLatchOff": "Disabled",
+    "scopeLatchRoom": "Latch in room",
+    "scopeLatchAccount": "Latch globally",
     "sendingAs": "Sending as {{name}}",
     "clearSelection": "Send as default again"
   },

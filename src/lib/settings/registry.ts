@@ -715,7 +715,12 @@ export const settingsCategories: SettingsCategory[] = [
         icon: PushPinIcon,
         name: 'personas.latching',
         description: 'personas.latchingHint',
-        type: 'boolean',
+        type: 'select',
+        options: [
+          { value: 'off', label: 'personas.scopeLatchOff' },
+          { value: 'room', label: 'personas.scopeLatchRoom' },
+          { value: 'account', label: 'personas.scopeLatchAccount' },
+        ],
         gatedBy: 'personaProxying',
       },
       {

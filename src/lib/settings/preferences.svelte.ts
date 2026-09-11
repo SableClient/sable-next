@@ -11,6 +11,7 @@ export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
 export type FontScale = 'small' | 'default' | 'large' | 'largest';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
+export type LatchScope = 'off' | 'room' | 'account';
 
 export interface Preferences {
   language: string;
@@ -55,7 +56,7 @@ export interface Preferences {
 
   personaPicker: boolean;
   personaProxying: boolean;
-  personaLatching: boolean;
+  personaLatching: LatchScope;
   personaFallback: boolean;
 
   sendTypingNotifications: boolean;
@@ -179,7 +180,7 @@ const DEFAULTS: Preferences = {
 
   personaPicker: true,
   personaProxying: false,
-  personaLatching: false,
+  personaLatching: 'off',
   personaFallback: true,
 
   sendTypingNotifications: true,
