@@ -1393,3 +1393,63 @@ test('a reset during a held touch does not paint placeholders over the rendered 
   }).not.toEqual({ placeholder: true, rendered: true });
   await unmount(instance);
 });
+
+test('a permalink offers a way back to the live timeline', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+  roomTimeline.mode = { kind: 'focused', eventId: '$5' };
+  roomTimeline.forwardPagination = 'end';
+  const jumpToLive = vi.fn();
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$5',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        onJumpToLive: jumpToLive,
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  const jump = document.querySelector<HTMLElement>('.jump-to-latest');
+  expect(jump, 'a focused timeline has no other way back to the present').not.toBeNull();
+  jump?.click();
+  expect(jumpToLive).toHaveBeenCalled();
+  await unmount(instance);
+});
+
+test('paginating forward out of a permalink reports that it is loading', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+  roomTimeline.mode = { kind: 'focused', eventId: '$5' };
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$5',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  expect(document.querySelector('.future-loading')).toBeNull();
+
+  roomTimeline.forwardPagination = 'loading';
+  await tick();
+
+  expect(document.querySelector('.future-loading')).not.toBeNull();
+  await unmount(instance);
+});

@@ -535,6 +535,7 @@
     "back": "Back to rooms",
     "loading": "Loading messages...",
     "loadingHistory": "Loading older messages...",
+    "loadingNewer": "Loading newer messages...",
     "loadFailed": "Unable to load messages. Please try again.",
     "messagePlaceholder": "Send a message...",
     "sendMessage": "Send message",

@@ -60,6 +60,7 @@
     roomId?: string;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
+    onJumpToLive?: () => void;
     onOpenMedia?: (eventId: string) => void;
     onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
@@ -95,6 +96,7 @@
     roomId,
     members = [],
     onJumpToEvent,
+    onJumpToLive,
     onOpenMedia,
     onPersonaAvatarClick,
     onVotePoll,
@@ -191,6 +193,10 @@
     revealed &&
       visibleItems.length > 0 &&
       (historyRequestPending || timeline.backwardPagination === 'loading')
+  );
+  let live = $derived(timeline.mode.kind === 'live');
+  let futureLoading = $derived(
+    revealed && !live && visibleItems.length > 0 && timeline.forwardPagination === 'loading'
   );
   let historyLoadingVisible = $state(false);
   $effect(() => {
@@ -461,6 +467,10 @@
   }
   function jumpToLatest(): void {
     historyController.finishHistoryFill();
+    if (!live) {
+      onJumpToLive?.();
+      return;
+    }
     void controller?.jumpTo(null, 'start', !prefersReducedMotion.current);
   }
 </script>
@@ -495,6 +505,18 @@
       >
         <Spinner small />
         <span>{$i18n.t('timeline.loadingHistory')}</span>
+      </div>
+    {/if}
+    {#if futureLoading}
+      <div
+        class="future-loading"
+        role="status"
+        out:fade={{
+          duration: prefersReducedMotion.current ? 0 : TIMELINE_LAYOUT.historyLoadingFade,
+        }}
+      >
+        <Spinner small />
+        <span>{$i18n.t('timeline.loadingNewer')}</span>
       </div>
     {/if}
     <div class={['timeline-viewport', { initial: !revealed }]}>
@@ -571,7 +593,7 @@
     {/if}
   </div>
 
-  {#if revealed && timeline.mode.kind === 'live' && jumpToLatestVisible && visibleItems.length > 0}
+  {#if revealed && visibleItems.length > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
     <Button
       type="button"
       class="jump-to-latest"
@@ -647,6 +669,25 @@
     font-size: var(--font-size-small);
     gap: var(--space-200);
     inset-block-start: var(--space-200);
+    inset-inline-start: 50%;
+    padding: var(--space-100) var(--space-300);
+    pointer-events: none;
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 1;
+  }
+
+  .future-loading {
+    align-items: center;
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--bg-container-line);
+    border-radius: var(--radii-pill);
+    box-shadow: var(--shadow-e200);
+    color: var(--bg-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-200);
+    inset-block-end: var(--space-200);
     inset-inline-start: 50%;
     padding: var(--space-100) var(--space-300);
     pointer-events: none;
