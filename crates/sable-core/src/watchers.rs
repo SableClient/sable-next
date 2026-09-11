@@ -119,6 +119,9 @@ impl Core {
         let route = if let Some(route) = routes.get(&account_id) {
             route.clone()
         } else {
+            // `Room` is not `Send` on wasm, whose runtime is single-threaded; the
+            // alias stays `Arc` because the native target shares it across threads.
+            #[allow(clippy::arc_with_non_send_sync)]
             let route: NotificationRoute = Arc::new(std::sync::Mutex::new(None));
             let handler_route = route.clone();
             client
