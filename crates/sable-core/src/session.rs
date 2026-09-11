@@ -17,6 +17,10 @@ use matrix_sdk_ui::sync_service::SyncService;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(15);
+
+const SESSION_TIMEOUT: Duration = Duration::from_mins(2);
+
 pub struct Session {
     pub account_id: String,
     pub client: Client,
@@ -233,9 +237,7 @@ pub async fn build_client_at(
     store_id: &str,
     homeserver_url: &Url,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
-    let builder = crate::tls::apply_sdk(Client::builder())
-        .homeserver_url(homeserver_url.as_str())
-        .request_config(RequestConfig::new().timeout(Duration::from_secs(15)));
+    let builder = crate::tls::apply_sdk(Client::builder()).homeserver_url(homeserver_url.as_str());
 
     account_builder(builder, store_id).build().await
 }
@@ -255,6 +257,7 @@ pub async fn restore_client(
 
 fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
     let builder = builder
+        .request_config(RequestConfig::new().timeout(SESSION_TIMEOUT))
         .handle_refresh_tokens()
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
@@ -392,7 +395,7 @@ fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
     // usually the server *name*, delegating elsewhere.
     builder
         .server_name_or_homeserver_url(homeserver)
-        .request_config(RequestConfig::new().timeout(Duration::from_secs(15)))
+        .request_config(RequestConfig::new().timeout(DISCOVERY_TIMEOUT))
 }
 
 #[cfg(test)]
