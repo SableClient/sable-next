@@ -1,0 +1,64 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    ':semanticCommitTypeAll(chore)',
+    ':gitSignOff',
+    'helpers:pinGitHubActionDigests',
+  ],
+  timezone: 'Europe/Paris',
+  labels: ['dependencies'],
+  minimumReleaseAge: '7 days',
+  prConcurrentLimit: 10,
+  prHourlyLimit: 0,
+  lockFileMaintenance: {
+    enabled: true,
+  },
+  packageRules: [
+    {
+      matchManagers: ['github-actions'],
+      groupName: 'github actions',
+      addLabels: ['github_actions'],
+    },
+    {
+      matchManagers: ['npm'],
+      groupName: 'npm',
+      addLabels: ['javascript'],
+    },
+    {
+      matchManagers: ['cargo', 'rust-toolchain'],
+      groupName: 'cargo',
+      addLabels: ['rust'],
+    },
+    {
+      matchManagers: ['terraform'],
+      groupName: 'terraform',
+    },
+    {
+      matchManagers: ['mise'],
+      groupName: 'mise',
+    },
+    {
+      matchManagers: ['dockerfile'],
+      groupName: 'docker',
+    },
+    {
+      matchDatasources: ['git-refs'],
+      matchPackageNames: [
+        'https://github.com/matrix-org/matrix-rust-sdk{,.git}',
+        'https://github.com/ruma/ruma{,.git}',
+      ],
+      groupName: 'matrix-rust-sdk',
+      addLabels: ['rust'],
+    },
+    {
+      matchDatasources: ['git-refs'],
+      matchPackageNames: ['https://github.com/SableClient/**'],
+      enabled: false,
+    },
+    {
+      matchManagers: ['gradle', 'gradle-wrapper'],
+      enabled: false,
+    },
+  ],
+}

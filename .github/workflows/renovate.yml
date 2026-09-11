@@ -1,0 +1,68 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .renovaterc.json5
+      - .github/workflows/renovate.yml
+  issues:
+    types: [edited]
+  pull_request:
+    types: [closed, edited]
+
+permissions: {}
+
+concurrency:
+  group: renovate-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Renovate
+    if: >-
+      github.event_name != 'issues' && github.event_name != 'pull_request' ||
+      (
+        github.event_name == 'issues' &&
+        contains(github.event.issue.title, 'Dependency Dashboard') &&
+        contains(github.event.issue.body, '- [x]')
+      ) ||
+      (
+        github.event_name == 'pull_request' &&
+        endsWith(github.event.pull_request.user.login, '[bot]') &&
+        (
+          github.event.action == 'closed' ||
+          contains(github.event.pull_request.body, '- [x]')
+        )
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+          permission-workflows: write
+          permission-vulnerability-alerts: read
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@c314dda4a9a93b08239ec978f2043b9a433b9ac4 # v46.3.0
+        with:
+          configurationFile: .renovaterc.json5
+          token: ${{ steps.app-token.outputs.token }}
+        env:
+          LOG_LEVEL: info
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
