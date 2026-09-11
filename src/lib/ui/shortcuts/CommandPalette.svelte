@@ -20,7 +20,6 @@
   const roomList = useRoomList();
 
   function select(room: RoomSummary): void {
-    open = false;
     void goto(roomSectionPath(roomList.rooms, room.room_id));
   }
 
