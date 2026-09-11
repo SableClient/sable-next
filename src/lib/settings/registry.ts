@@ -35,6 +35,8 @@ import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
+import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
+import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -536,6 +538,27 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.formattingToolbarHint',
         type: 'boolean',
         gatedBy: 'richTextComposer',
+      },
+      {
+        key: 'composerGifButton',
+        icon: GifIcon,
+        name: 'settings.composerGifButton',
+        description: 'settings.composerGifButtonHint',
+        type: 'boolean',
+      },
+      {
+        key: 'composerStickerButton',
+        icon: StickerIcon,
+        name: 'settings.composerStickerButton',
+        description: 'settings.composerStickerButtonHint',
+        type: 'boolean',
+      },
+      {
+        key: 'composerEmoteButton',
+        icon: SmileyIcon,
+        name: 'settings.composerEmoteButton',
+        description: 'settings.composerEmoteButtonHint',
+        type: 'boolean',
       },
     ],
   },

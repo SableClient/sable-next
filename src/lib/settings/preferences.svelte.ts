@@ -49,6 +49,9 @@ export interface Preferences {
   mentionInReplies: boolean;
   formattingToolbar: boolean;
   richTextComposer: boolean;
+  composerGifButton: boolean;
+  composerStickerButton: boolean;
+  composerEmoteButton: boolean;
 
   personaPicker: boolean;
   personaProxying: boolean;
@@ -170,6 +173,9 @@ const DEFAULTS: Preferences = {
   mentionInReplies: true,
   formattingToolbar: false,
   richTextComposer: true,
+  composerGifButton: true,
+  composerStickerButton: true,
+  composerEmoteButton: true,
 
   personaPicker: true,
   personaProxying: false,

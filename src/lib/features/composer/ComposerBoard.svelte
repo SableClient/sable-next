@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
   import { Popover } from 'bits-ui';
+  import GifIcon from 'phosphor-svelte/lib/GifIcon';
+  import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 
   import { runtimeConfig } from '#lib/config/runtime-config.js';
@@ -42,6 +44,7 @@
     onBeforeOpen,
   }: Props = $props();
   let config = $state.raw<GifsConfig | null>(null);
+  let anchor = $state<HTMLElement | null>(null);
 
   $effect(() => {
     let cancelled = false;
@@ -58,6 +61,33 @@
       ? { config, providerSetting: preferences.gifProvider }
       : null
   );
+
+  let triggers = $derived.by(() => {
+    const wanted = [
+      preferences.composerGifButton && gifs ? ('gif' as const) : null,
+      preferences.composerStickerButton ? ('sticker' as const) : null,
+      preferences.composerEmoteButton ? ('emoticon' as const) : null,
+    ].filter((id) => id !== null);
+    return wanted.length > 0 ? wanted : (['emoticon'] as const);
+  });
+
+  const triggerIcons = { gif: GifIcon, sticker: StickerIcon, emoticon: SmileyIcon };
+
+  function triggerLabel(id: BoardTab): string {
+    if (id === 'gif') return $i18n.t('composer.openGifPicker');
+    if (id === 'sticker') return $i18n.t('composer.openStickerPicker');
+    return $i18n.t('composer.emotesAndStickers');
+  }
+
+  function openOn(id: BoardTab, element: HTMLElement): void {
+    if (open && tab === id) {
+      open = false;
+      return;
+    }
+    anchor = element;
+    tab = id;
+    open = true;
+  }
 
   function pick(image: PackImageView, usage: ImageUsageView): void {
     open = false;
@@ -78,15 +108,29 @@
 
 {#if desktop}
   <Popover.Root bind:open>
-    <Popover.Trigger
-      class="composer-board-trigger selection-open"
-      {disabled}
-      aria-label={$i18n.t('composer.emotesAndStickers')}
-    >
-      <StickerIcon />
-    </Popover.Trigger>
+    {#each triggers as id (id)}
+      {@const Icon = triggerIcons[id]}
+      <button
+        type="button"
+        class="composer-board-trigger selection-open"
+        {disabled}
+        data-state={open && tab === id ? 'open' : 'closed'}
+        aria-label={triggerLabel(id)}
+        onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
+          openOn(id, event.currentTarget);
+        }}
+      >
+        <Icon />
+      </button>
+    {/each}
     <Popover.Portal>
-      <Popover.Content class="composer-board" side="top" align="end" sideOffset={10}>
+      <Popover.Content
+        class="composer-board"
+        side="top"
+        align="end"
+        sideOffset={10}
+        customAnchor={anchor}
+      >
         <EmoteBoard
           {roomId}
           bind:tab
@@ -102,19 +146,27 @@
     </Popover.Portal>
   </Popover.Root>
 {:else}
-  <button
-    type="button"
-    class="composer-board-trigger selection-open"
-    {disabled}
-    data-state={open ? 'open' : 'closed'}
-    aria-label={$i18n.t('composer.emotesAndStickers')}
-    onpointerdown={onBeforeOpen}
-    onclick={() => {
-      open = true;
-    }}
-  >
-    <StickerIcon />
-  </button>
+  {#each triggers as id (id)}
+    {@const Icon = triggerIcons[id]}
+    <button
+      type="button"
+      class="composer-board-trigger selection-open"
+      {disabled}
+      data-state={open && tab === id ? 'open' : 'closed'}
+      aria-label={triggerLabel(id)}
+      onpointerdown={onBeforeOpen}
+      onclick={() => {
+        if (open && tab === id) {
+          open = false;
+          return;
+        }
+        tab = id;
+        open = true;
+      }}
+    >
+      <Icon />
+    </button>
+  {/each}
   <BottomSheet
     bind:open
     label={$i18n.t('composer.emotesAndStickers')}
