@@ -15,7 +15,7 @@
   import { i18n } from '#lib/i18n.js';
   import type { DropEdge } from '#lib/ui/drag-list.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
-  import { matrixToUrl } from '#lib/rooms/permalink.js';
+  import { matrixToUrl, viaFor } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -231,18 +231,26 @@
     );
   }
 
-  async function join(child: HierarchyRoomView): Promise<void> {
+  async function join(
+    child: HierarchyRoomView,
+    via: readonly string[],
+    parentId: string
+  ): Promise<void> {
     if (joining.has(child.room_id)) return;
     joining.add(child.room_id);
     joinErrors.delete(child.room_id);
     try {
       const address = child.canonical_alias ?? child.room_id;
+      let routing = viaFor(address, via);
+      if (routing.length === 0 && child.canonical_alias === null) {
+        routing = await core.commands.roomViaServers(parentId);
+      }
       if (lobbyAction(child.join_rule, invitedIds.has(child.room_id)) === 'knock') {
-        await core.commands.knockRoom(address);
+        await core.commands.knockRoom(address, routing);
         knocked.add(child.room_id);
         return;
       }
-      await core.commands.joinRoom(address);
+      await core.commands.joinRoom(address, routing);
       open(child);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
@@ -444,8 +452,8 @@
         {label}
         onToggle={toggle}
         onOpen={open}
-        onJoin={(child: HierarchyRoomView) => {
-          void join(child);
+        onJoin={(child: HierarchyRoomView, via: readonly string[], parentId: string) => {
+          void join(child, via, parentId);
         }}
         onCopyLink={(child: HierarchyRoomView) => {
           void copyLink(child);

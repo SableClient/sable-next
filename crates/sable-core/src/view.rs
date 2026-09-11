@@ -427,6 +427,7 @@ pub fn hierarchy_child_edges(
         .into_iter()
         .map(|event| SpaceChildEdge {
             room_id: event.state_key,
+            via: event.content.via.iter().map(ToString::to_string).collect(),
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
             suggested: event.content.suggested,
@@ -562,6 +563,7 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
         .into_iter()
         .map(|event| SpaceChildEdge {
             room_id: event.state_key,
+            via: event.content.via.iter().map(ToString::to_string).collect(),
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
             suggested: event.content.suggested,

@@ -35,7 +35,7 @@
     label: (child: HierarchyRoomView) => string;
     onToggle: (key: string) => void;
     onOpen: (child: HierarchyRoomView) => void;
-    onJoin: (child: HierarchyRoomView) => void;
+    onJoin: (child: HierarchyRoomView, via: readonly string[], parentId: string) => void;
     onCopyLink: (child: HierarchyRoomView) => void;
     onRemove: (section: HierarchySection, entry: HierarchyRoom) => void;
     onReorder: (
@@ -204,7 +204,7 @@
                   disabled={knocked.has(child.room_id)}
                   loading={joining.has(child.room_id)}
                   onclick={() => {
-                    onJoin(child);
+                    onJoin(child, entry.via, section.parentId);
                   }}
                 >
                   <PlusIcon size={14} />{$i18n.t(

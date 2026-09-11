@@ -7,6 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { roomSectionPath, viaFor } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { childRouting } from '#lib/rooms/spaces.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -37,7 +38,7 @@
     failed = false;
 
     core.commands
-      .roomPreview(address, viaFor(address, via))
+      .roomPreview(address, viaFor(address, listed))
       .then((result) => {
         if (active) preview = result;
       })
@@ -58,16 +59,24 @@
   let canKnock = $derived(mustKnock || preview?.join_rule === 'knock_restricted');
   let knocked = $derived(preview?.state === 'knocked' || sentKnock);
 
+  let parent = $derived(childRouting(roomList.rooms, roomId));
+  let listed = $derived(via.length > 0 ? via : parent.via);
+
   // The alias resolves on servers that have never seen the room id.
   let address = $derived(preview?.canonical_alias ?? roomId);
-  let routing = $derived(viaFor(address, via));
+
+  async function routingFor(): Promise<string[]> {
+    const known = viaFor(address, listed);
+    if (known.length > 0 || parent.parentId === null) return known;
+    return core.commands.roomViaServers(parent.parentId);
+  }
 
   async function join(): Promise<void> {
     if (busy) return;
     busy = true;
     failedAction = null;
     try {
-      const joined = await core.commands.joinRoom(address, routing);
+      const joined = await core.commands.joinRoom(address, await routingFor());
       const target = roomSectionPath(roomList.rooms, joined, eventId);
       await goto(target, { replaceState: true });
     } catch (error) {
@@ -83,7 +92,7 @@
     busy = true;
     failedAction = null;
     try {
-      await core.commands.knockRoom(address, routing);
+      await core.commands.knockRoom(address, await routingFor());
       sentKnock = true;
     } catch (error) {
       console.warn('[sable room] knock failed', error);

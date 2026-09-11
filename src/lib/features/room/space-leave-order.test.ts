@@ -5,7 +5,7 @@ import type { RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
 import { joinedSpaceChildrenLeaveOrder, recursiveSpaceLeaveOrder } from './space-leave-order';
 
 function edge(roomId: string): SpaceChildEdge {
-  return { room_id: roomId, order: null, origin_server_ts: 0, suggested: false };
+  return { room_id: roomId, via: [], order: null, origin_server_ts: 0, suggested: false };
 }
 
 function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary {

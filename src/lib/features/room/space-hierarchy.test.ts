@@ -16,7 +16,14 @@ import {
 } from './space-hierarchy';
 
 function edge(roomId: string, overrides: Partial<SpaceChildEdge> = {}): SpaceChildEdge {
-  return { room_id: roomId, order: null, origin_server_ts: 0, suggested: false, ...overrides };
+  return {
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 0,
+    suggested: false,
+    ...overrides,
+  };
 }
 
 function room(
@@ -109,6 +116,16 @@ test('suggested comes from the edge, so it can differ per parent', () => {
     true,
     false,
   ]);
+});
+
+test('the routing servers come from the edge', () => {
+  const rooms = [
+    room('!space', { is_space: true, children: [edge('!a', { via: ['remote.example'] })] }),
+    room('!a'),
+  ];
+
+  const sections = buildHierarchySections(rooms, '!space');
+  expect(sections[0].rooms[0].via).toEqual(['remote.example']);
 });
 
 test('a room under two parents gets distinct keys', () => {

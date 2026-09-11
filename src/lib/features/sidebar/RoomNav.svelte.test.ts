@@ -141,7 +141,13 @@ test('home lists every joined room, including the children of joined spaces', as
       name: 'Parent space',
       is_space: true,
       space_children: [
-        { room_id: '!child:example.org', order: null, origin_server_ts: 1, suggested: false },
+        {
+          room_id: '!child:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
       ],
     }),
   ];
@@ -182,7 +188,13 @@ test('expanded room disclosures do not use the active-route surface', async () =
       name: 'Root',
       is_space: true,
       space_children: [
-        { room_id: '!nested:example.org', order: null, origin_server_ts: 1, suggested: false },
+        {
+          room_id: '!nested:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
       ],
     }),
     makeRoom({
@@ -190,7 +202,13 @@ test('expanded room disclosures do not use the active-route surface', async () =
       name: 'Nested',
       is_space: true,
       space_children: [
-        { room_id: '!room:example.org', order: null, origin_server_ts: 1, suggested: false },
+        {
+          room_id: '!room:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
       ],
     }),
     makeRoom({ room_id: '!room:example.org', name: 'Current room' }),
@@ -233,7 +251,13 @@ test('the unspaced section leaves out rooms a joined space claims', async () => 
       name: 'Space',
       is_space: true,
       space_children: [
-        { room_id: '!claimed:example.org', order: null, origin_server_ts: 1, suggested: false },
+        {
+          room_id: '!claimed:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
       ],
     }),
   ];
@@ -256,7 +280,13 @@ test('a claim from a space that is not joined keeps the room in the unspaced sec
       is_space: true,
       state: 'invited',
       space_children: [
-        { room_id: '!claimed:example.org', order: null, origin_server_ts: 1, suggested: false },
+        {
+          room_id: '!claimed:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
       ],
     }),
   ];

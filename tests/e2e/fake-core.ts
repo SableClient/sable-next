@@ -222,6 +222,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       order: string | null = null
     ): SpaceChildEdge => ({
       room_id: roomId,
+      via: [],
       order,
       origin_server_ts: position,
       suggested: false,

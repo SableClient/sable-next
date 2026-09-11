@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { spaceUnreadCounts } from './spaces';
+import { childRouting, spaceUnreadCounts } from './spaces';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -39,7 +39,13 @@ test('does not mark a space unread for a muted child room', () => {
     room_id: '!space:example.org',
     is_space: true,
     space_children: [
-      { room_id: '!muted:example.org', order: null, origin_server_ts: 1, suggested: false },
+      {
+        room_id: '!muted:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+      },
     ],
   });
   const muted = room({ room_id: '!muted:example.org', unread: 3 });
@@ -52,16 +58,28 @@ test('sums the mentions of a space across its nested rooms, counting each room o
     room_id: '!root:example.org',
     is_space: true,
     space_children: [
-      { room_id: '!sub:example.org', order: null, origin_server_ts: 1, suggested: false },
-      { room_id: '!shared:example.org', order: null, origin_server_ts: 1, suggested: false },
+      { room_id: '!sub:example.org', via: [], order: null, origin_server_ts: 1, suggested: false },
+      {
+        room_id: '!shared:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+      },
     ],
   });
   const sub = room({
     room_id: '!sub:example.org',
     is_space: true,
     space_children: [
-      { room_id: '!deep:example.org', order: null, origin_server_ts: 1, suggested: false },
-      { room_id: '!shared:example.org', order: null, origin_server_ts: 1, suggested: false },
+      { room_id: '!deep:example.org', via: [], order: null, origin_server_ts: 1, suggested: false },
+      {
+        room_id: '!shared:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+      },
     ],
   });
   const deep = room({ room_id: '!deep:example.org', unread: 4, highlight: 1 });
@@ -80,7 +98,13 @@ test('a hand-marked room dots its parent space, even muted', () => {
     room_id: '!root:example.org',
     is_space: true,
     space_children: [
-      { room_id: '!muted:example.org', order: null, origin_server_ts: 1, suggested: false },
+      {
+        room_id: '!muted:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+      },
     ],
   });
   const muted = room({ room_id: '!muted:example.org', marked_unread: true });
@@ -88,4 +112,26 @@ test('a hand-marked room dots its parent space, even muted', () => {
   expect(spaceUnreadCounts([root], [root, muted], new Set(['!muted:example.org']))).toEqual(
     new Map([['!root:example.org', { unread: 0, highlight: 0, marked: true }]])
   );
+});
+
+test('a joined space lends its edge to a room opened from a link', () => {
+  const space = room({
+    room_id: '!space:example.org',
+    is_space: true,
+    space_children: [
+      {
+        room_id: '!child',
+        via: ['remote.example'],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+      },
+    ],
+  });
+
+  expect(childRouting([space], '!child')).toEqual({
+    via: ['remote.example'],
+    parentId: '!space:example.org',
+  });
+  expect(childRouting([space], '!absent')).toEqual({ via: [], parentId: null });
 });

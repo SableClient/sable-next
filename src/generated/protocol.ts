@@ -795,6 +795,7 @@ export type SidebarItemView = { kind: "space"; room_id: string } | { kind: "fold
 
 export type SpaceChildEdge = {
 	room_id: string,
+	via: string[],
 	/**  `m.space.child.content.order`, unordered children sort last. */
 	order: string | null,
 	origin_server_ts: number,

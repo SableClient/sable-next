@@ -12,6 +12,7 @@ export type HierarchyRoomView = Omit<SpaceHierarchyRoomView, 'num_joined_members
 export type HierarchyRoom = {
   room: HierarchyRoomView;
   suggested: boolean;
+  via: string[];
   key: string;
 };
 
@@ -141,6 +142,7 @@ export function buildHierarchySections(
       ownRooms.push({
         room: child,
         suggested: edge.suggested,
+        via: [...edge.via],
         key: [...ancestry, child.room_id].join('/'),
       });
     }

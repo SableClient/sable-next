@@ -677,8 +677,7 @@
     tombstoneJoining = true;
     tombstoneJoinFailed = false;
     try {
-      const alias = resolvedRoom?.canonical_alias ?? null;
-      const via = alias ? [] : await core.commands.roomViaServers(resolvedRoomId);
+      const via = await core.commands.roomViaServers(resolvedRoomId);
       const joinedId = await core.commands.joinRoom(target, via);
       const isSpace = resolvedRoom?.is_space ?? false;
       void goto(tombstoneSuccessorPath(joinedId, isSpace));

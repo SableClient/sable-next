@@ -53,3 +53,14 @@ export function addUnread(left: UnreadCount, right: UnreadCount): UnreadCount {
     marked: (left.marked ?? false) || (right.marked ?? false),
   };
 }
+
+export type ChildRouting = { via: string[]; parentId: string | null };
+
+export function childRouting(rooms: readonly RoomSummary[], roomId: string): ChildRouting {
+  for (const space of rooms) {
+    if (!space.is_space || space.state !== 'joined') continue;
+    const edge = space.space_children.find((child) => child.room_id === roomId);
+    if (edge) return { via: [...edge.via], parentId: space.room_id };
+  }
+  return { via: [], parentId: null };
+}

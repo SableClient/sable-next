@@ -1895,6 +1895,7 @@ pub struct SpaceHierarchyRoomView {
 pub struct SpaceChildEdge {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub room_id: OwnedRoomId,
+    pub via: Vec<String>,
     /// `m.space.child.content.order`, unordered children sort last.
     pub order: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
