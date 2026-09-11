@@ -117,7 +117,7 @@
             class={[nameClass, 'name-button', 'sender-identity-name']}
             type="button"
             onclick={(event) => {
-              onViaProfile({ currentTarget: event.currentTarget });
+              onViaProfile(event.currentTarget);
             }}>{accountName}</button
           >
         {:else}

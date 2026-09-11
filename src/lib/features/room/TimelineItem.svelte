@@ -460,8 +460,12 @@
     if (item.event_id) onDelete?.(item.event_id, reason);
   }
 
+  function openSenderProfileAt(anchor: HTMLElement): void {
+    if (item.sender) onSenderProfile?.(item.sender, anchor);
+  }
+
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
-    if (item.sender) onSenderProfile?.(item.sender, event.currentTarget);
+    openSenderProfileAt(event.currentTarget);
   }
 
   function mentionSender(): void {
@@ -701,7 +705,7 @@
               colors={senderColors}
               {pronouns}
               onMention={onMentionUser && item.sender ? mentionSender : undefined}
-              onViaProfile={persona ? openSenderProfile : undefined}
+              onViaProfile={persona ? openSenderProfileAt : undefined}
             />
           {/if}
           <div class="message-details">
