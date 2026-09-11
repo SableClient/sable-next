@@ -1196,6 +1196,7 @@ fn message_content(
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
+            size: dimension(image.info.as_ref().and_then(|info| info.size)),
             blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
             spoiler: spoiler_reason(raw.content.as_ref()),
         },

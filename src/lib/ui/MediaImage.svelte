@@ -3,6 +3,7 @@
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { decodeBlurhashPixels } from '#lib/ui/blurhash.js';
+  import { formatByteSize } from '#lib/ui/byte-size.js';
   import { dominantColor } from '#lib/ui/dominant-color.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import {
@@ -13,12 +14,15 @@
     retryMediaUrl,
   } from '#lib/ui/media-url.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
   const BLURHASH_DECODE_WIDTH = 32;
   const ORIENTATION_TOLERANCE = 0.05;
+  const ANIMATED_MIMES = ['image/gif', 'image/apng', 'image/avif', 'image/webp'];
+  const ANIMATED_EXTENSIONS = ['.gif', '.apng', '.avif', '.webp'];
 
   interface Props {
     source: string;
@@ -28,6 +32,7 @@
     intrinsicWidth?: number | null;
     intrinsicHeight?: number | null;
     mime?: string | null;
+    size?: number | null;
     blurhash?: string | null;
     class?: string;
     onclick?: () => void;
@@ -45,6 +50,7 @@
     intrinsicWidth = null,
     intrinsicHeight = null,
     mime = null,
+    size = null,
     blurhash = null,
     class: className = '',
     onclick,
@@ -82,11 +88,14 @@
     if (!image?.complete) return null;
     return dominantColor(image);
   });
-  let animatedGif = $derived(mime === 'image/gif');
+  let animated = $derived(
+    ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
+  );
+  let animatedGif = $derived(mime === 'image/gif' || named('.gif'));
   let manualGif = $derived(animatedGif && !preferences.autoplayGifs);
   let steppedGif = $derived(gifFrames !== null);
   let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
-  let painted = $derived(manualGif ? gifPreviewReady || gifPlaying : imageLoaded);
+  let painted = $derived(manualGif ? gifPreviewReady : imageLoaded);
   let showCanvas = $derived(manualGif && gifPreviewReady && (steppedGif || !gifPlaying));
   let eventRatio = $derived.by(() => {
     const hasIntrinsicSize =
@@ -114,6 +123,7 @@
     alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
   );
   let retryWait = $derived(Math.max(0, retryAt - clock));
+  let sizeLabel = $derived(size !== null && size > 0 ? formatByteSize(size) : null);
   let mediaLabel = $derived(
     manualGif
       ? $i18n.t(gifPlaying ? 'timeline.stopGif' : 'timeline.playGif')
@@ -147,7 +157,7 @@
       retryCount = 0;
       retryAt = 0;
     }
-    const asIs = original || mime === 'image/svg+xml' || animatedGif || servedSideways;
+    const asIs = original || mime === 'image/svg+xml' || animated || servedSideways;
     const requestWidth = asIs ? 0 : width;
     const requestHeight = asIs ? 0 : height;
     const release = holdMediaUrl(core, source, requestWidth, requestHeight);
@@ -258,6 +268,10 @@
     context.putImageData(image, 0, 0);
   });
 
+  function named(extension: string): boolean {
+    return alt.toLowerCase().endsWith(extension) || source.toLowerCase().endsWith(extension);
+  }
+
   function sameRatio(a: number, b: number): boolean {
     return Math.abs(a - b) <= ORIENTATION_TOLERANCE * b;
   }
@@ -314,6 +328,12 @@
     gifPreviewReady = drawFrame();
   }
 
+  function brokenImage(): void {
+    url = null;
+    failed = true;
+    onfailed?.();
+  }
+
   /* A manual GIF is its own play/stop button, so the wrapper never swaps
      element and the canvas survives. */
   function activate(): void {
@@ -346,7 +366,7 @@
       bind:this={gifPreview}
       class={['media-image-content', 'gif-preview', { ready: showCanvas }]}>{alt}</canvas
     >
-    {#if !steppedGif}
+    {#if !steppedGif || !gifPreviewReady}
       <img
         bind:this={gifImage}
         class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
@@ -356,6 +376,7 @@
         {height}
         aria-hidden={showCanvas ? 'true' : undefined}
         onload={freezeFrame}
+        onerror={brokenImage}
       />
     {/if}
     {#if heldGif}
@@ -371,6 +392,7 @@
       {width}
       {height}
       onload={() => (imageLoaded = true)}
+      onerror={brokenImage}
       {@attach (node) => {
         if (node instanceof HTMLImageElement && node.complete) imageLoaded = true;
       }}
@@ -393,6 +415,10 @@
         </Button>
       {/if}
     </span>
+  {/if}
+  {#if !failed && !painted}
+    <span class="media-image-progress"><Spinner small /></span>
+    {#if sizeLabel}<span class="media-image-size">{sizeLabel}</span>{/if}
   {/if}
 {/snippet}
 
@@ -420,6 +446,7 @@
 <style>
   .media-image {
     aspect-ratio: var(--media-ratio);
+    container-type: inline-size;
     display: block;
     overflow: hidden;
     position: relative;
@@ -459,6 +486,33 @@
   .media-image-placeholder :global(svg) {
     height: min(40%, var(--icon-size-medium));
     width: min(40%, var(--icon-size-medium));
+  }
+
+  .media-image-progress {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+  }
+
+  .media-image-size {
+    background: var(--surface-container);
+    border-radius: var(--radius-pill);
+    bottom: var(--space-100);
+    color: var(--surface-on-container);
+    font-size: var(--font-size-small);
+    padding: var(--space-050) var(--space-100);
+    position: absolute;
+    right: var(--space-100);
+  }
+
+  @container (max-width: 8rem) {
+    .media-image-progress,
+    .media-image-size {
+      display: none;
+    }
   }
 
   .gif-preview,

@@ -323,6 +323,51 @@ test('stops a playing GIF instead of opening the viewer', async () => {
   await unmount(instance);
 });
 
+test('keeps the GIF on screen until the decoder has painted a frame', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pending');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+  );
+  vi.stubGlobal(
+    'ImageDecoder',
+    class {
+      tracks = {
+        ready: Promise.resolve(),
+        selectedTrack: { animated: true, frameCount: 3 },
+      };
+      completed = Promise.resolve();
+      decode() {
+        return new Promise(() => undefined);
+      }
+      close() {}
+    }
+  );
+
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/pending-frames',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.gif-preview-source')).not.toBeNull();
+  });
+  await tick();
+  await tick();
+
+  expect(document.querySelector<HTMLImageElement>('.gif-preview-source')?.src).toBe('blob:pending');
+  expect(document.querySelector('.gif-preview-source.ready')).toBeNull();
+  await unmount(instance);
+});
+
 test('steps GIF frames itself and stops on the frame it held', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
@@ -535,6 +580,107 @@ test('holds a placeholder until the image paints', async () => {
   await tick();
 
   expect(document.querySelector('.media-image-placeholder.loaded')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('an undecodable file falls back instead of spinning forever', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const onfailed = vi.fn();
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/corrupt',
+      alt: 'photo',
+      width: 800,
+      height: 600,
+      retryable: true,
+      onfailed,
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img.media-image-content')).not.toBeNull();
+  });
+  document
+    .querySelector<HTMLImageElement>('img.media-image-content')
+    ?.dispatchEvent(new Event('error'));
+  await tick();
+
+  expect(onfailed).toHaveBeenCalledOnce();
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
+  expect(document.querySelector('.media-image-progress')).toBeNull();
+  await unmount(instance);
+});
+
+test('a GIF pressed while it downloads keeps its placeholder', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockReturnValue(new Promise(() => undefined));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/slow-gif',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+    },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await tick();
+
+  expect(document.querySelector('.media-image-placeholder.loaded')).toBeNull();
+  expect(document.querySelector('.media-image-progress')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('shows a spinner and the byte size until the image paints', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/heavy',
+      alt: 'photo',
+      width: 800,
+      height: 600,
+      size: 2_761_335,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.media-image-progress')).not.toBeNull();
+  expect(document.querySelector('.media-image-size')?.textContent).toBe('2.8 MB');
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img.media-image-content')).not.toBeNull();
+  });
+  document
+    .querySelector<HTMLImageElement>('img.media-image-content')
+    ?.dispatchEvent(new Event('load'));
+  await tick();
+
+  expect(document.querySelector('.media-image-progress')).toBeNull();
+  expect(document.querySelector('.media-image-size')).toBeNull();
+  await unmount(instance);
+});
+
+test('loads animation-capable formats from the original', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/animated-webp',
+      alt: 'dancing.webp',
+      width: 800,
+      height: 600,
+      mime: 'image/webp',
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/animated-webp', 0, 0);
   await unmount(instance);
 });
 

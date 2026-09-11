@@ -2246,6 +2246,8 @@ pub enum TimelineItemContentView {
         width: Option<u64>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         height: Option<u64>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        size: Option<u64>,
         blurhash: Option<String>,
         spoiler: Option<String>,
     },

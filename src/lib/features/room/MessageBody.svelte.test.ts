@@ -63,6 +63,7 @@ function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemCon
         filename: 'photo.png',
         width: null,
         height: null,
+        size: null,
         blurhash: null,
         spoiler: null,
       };
@@ -106,6 +107,7 @@ test('keeps an image filename hidden without the alt-text preference', async () 
         mime: 'image/png',
         width: null,
         height: null,
+        size: null,
         blurhash: null,
         spoiler: null,
       }),

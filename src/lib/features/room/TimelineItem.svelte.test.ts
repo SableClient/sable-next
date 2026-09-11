@@ -81,6 +81,7 @@ function imageItem(body = 'photo.png'): TimelineItemView {
       mime: 'image/png',
       width: 800,
       height: 600,
+      size: null,
       blurhash: null,
       spoiler: null,
     },

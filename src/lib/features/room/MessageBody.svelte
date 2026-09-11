@@ -66,6 +66,7 @@
     intrinsicWidth={item.content.width}
     intrinsicHeight={item.content.height}
     mime={item.content.mime}
+    size={item.content.size}
     blurhash={item.content.blurhash}
     retryable
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}

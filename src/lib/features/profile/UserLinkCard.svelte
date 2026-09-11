@@ -39,6 +39,7 @@
           mime: null,
           width: null,
           height: null,
+          size: null,
           blurhash: null,
           spoiler: null,
           eventId: 'profile-avatar',

@@ -34,6 +34,7 @@ const imageItem: MediaItem = {
   mime: 'image/png',
   width: 1600,
   height: 900,
+  size: null,
   blurhash: null,
   spoiler: null,
   eventId: '$image',
