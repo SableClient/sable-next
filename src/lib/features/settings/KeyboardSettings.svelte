@@ -44,11 +44,6 @@
   }
 
   function capture(id: ShortcutId, event: KeyboardEvent): void {
-    if (event.key === 'Escape' && !event.shiftKey && !event.altKey) {
-      capturing = null;
-      return;
-    }
-
     event.preventDefault();
     const binding = bindingFromEvent(event, isMac);
     if (binding === null) return;

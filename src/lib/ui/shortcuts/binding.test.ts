@@ -125,6 +125,14 @@ test('an open dialog is detected by its content class', () => {
   dialog.remove();
 });
 
+test('an overlay that only carries the dialog role is detected', () => {
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  document.body.append(dialog);
+  expect(isDialogOpen(document)).toBe(true);
+  dialog.remove();
+});
+
 test('identical bindings in the same scope conflict', () => {
   const conflicts = findShortcutConflicts(
     [
