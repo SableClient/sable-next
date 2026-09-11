@@ -333,19 +333,19 @@ test('restores a space to its last desktop route', () => {
   ).toBe('/space/!space%3Aexample.org/lobby');
 });
 
-test('records the active desktop space route after navigation', async () => {
+test('records the active desktop space route without its event anchor', async () => {
   const instance = mount(NavigationRail, { target: document.body, props: { spaces: [space()] } });
   await tick();
 
   pageState.url = {
     pathname: '/space/!space%3Aexample.org/!room%3Aexample.org',
-    search: '?event=%24event',
+    search: '?event=%24event&via=example.org',
     hash: '#reply',
   };
   navigation.afterNavigate?.();
 
   expect(savedSpacePaths()).toEqual({
-    '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event#reply',
+    '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org?via=example.org#reply',
   });
 
   await unmount(instance);

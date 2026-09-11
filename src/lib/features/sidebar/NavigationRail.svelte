@@ -329,7 +329,9 @@
   afterNavigate(() => {
     if (mobile) return;
 
-    const path = `${page.url.pathname}${page.url.search}${page.url.hash}`;
+    const kept = [...new URLSearchParams(page.url.search)].filter(([key]) => key !== 'event');
+    const search = new URLSearchParams(kept).toString();
+    const path = `${page.url.pathname}${search ? `?${search}` : ''}${page.url.hash}`;
     const space = spaces.find((candidate) => {
       const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(candidate) });
       return path === href || path.startsWith(`${href}/`);
