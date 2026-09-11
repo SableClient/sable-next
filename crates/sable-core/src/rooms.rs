@@ -5,11 +5,8 @@ use matrix_sdk::ruma::SpaceChildOrder;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::directory::Filter;
-use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
-use matrix_sdk::ruma::{
-    OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt, events::SyncStateEvent,
-};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
 
 use crate::protocol::{CommandErr, CommandOk};
@@ -240,19 +237,9 @@ impl Core {
     }
 }
 
-pub(crate) async fn join_rule_support(room: &Room) -> (bool, bool, bool) {
-    let Ok(Some(event)) = room
-        .get_state_event_static::<RoomCreateEventContent>()
-        .await
-    else {
+pub(crate) fn join_rule_support(room: &Room) -> (bool, bool, bool) {
+    let Some(room_version) = room.version() else {
         return (false, false, false);
-    };
-    let room_version = match event.deserialize() {
-        Ok(SyncOrStrippedState::Sync(SyncStateEvent::Original(event))) => {
-            event.content.room_version
-        }
-        Ok(SyncOrStrippedState::Stripped(event)) => event.content.room_version,
-        _ => return (false, false, false),
     };
     let Some(rules) = room_version.rules() else {
         return (false, false, false);

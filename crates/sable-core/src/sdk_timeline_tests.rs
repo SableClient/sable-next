@@ -1275,7 +1275,7 @@ async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
 }
 
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-async fn mark_read_body(private_receipt: bool) -> serde_json::Value {
+async fn mark_read_body(private_receipt: bool) -> (serde_json::Value, serde_json::Value) {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     client.event_cache().subscribe().unwrap();
@@ -1299,6 +1299,20 @@ async fn mark_read_body(private_receipt: bool) -> serde_json::Value {
         .mount(server.server())
         .await;
 
+    let receipt_type = if private_receipt {
+        "m.read.private"
+    } else {
+        "m.read"
+    };
+    Mock::given(method("POST"))
+        .and(path(format!(
+            "/_matrix/client/v3/rooms/{room_id}/receipt/{receipt_type}/$read"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
     *core.session.write().await = Some(Session {
@@ -1313,6 +1327,8 @@ async fn mark_read_body(private_receipt: bool) -> serde_json::Value {
         room_id: room_id.to_owned(),
         event_id: event_id!("$read").to_owned(),
         private_receipt,
+        thread_root: None,
+        subscription: None,
     })
     .await
     .unwrap();
@@ -1328,7 +1344,14 @@ async fn mark_read_body(private_receipt: bool) -> serde_json::Value {
         .find(|request| request.url.path().ends_with("/read_markers"))
         .expect("a read marker request");
 
-    serde_json::from_slice(&marker.body).expect("a JSON body")
+    let receipt = requests
+        .iter()
+        .find(|request| request.url.path().contains("/receipt/"))
+        .expect("a scoped receipt request");
+    (
+        serde_json::from_slice(&marker.body).expect("a JSON body"),
+        serde_json::from_slice(&receipt.body).expect("a receipt body"),
+    )
 }
 
 #[allow(clippy::unwrap_used, clippy::expect_used)]
@@ -1459,18 +1482,20 @@ async fn marking_unread_from_a_message_walks_the_read_marker_back() {
 
 #[tokio::test]
 async fn marking_read_publishes_a_receipt_and_moves_the_marker() {
-    let body = mark_read_body(false).await;
+    let (body, receipt) = mark_read_body(false).await;
 
-    assert_eq!(body["m.read"], json!("$read"));
+    assert_eq!(receipt["thread_id"], json!("main"));
+    assert!(body.get("m.read").is_none());
     assert_eq!(body["m.fully_read"], json!("$read"));
     assert!(body.get("m.read.private").is_none(), "{body}");
 }
 
 #[tokio::test]
 async fn a_private_reader_still_moves_the_marker_without_telling_the_room() {
-    let body = mark_read_body(true).await;
+    let (body, receipt) = mark_read_body(true).await;
 
-    assert_eq!(body["m.read.private"], json!("$read"));
+    assert_eq!(receipt["thread_id"], json!("main"));
+    assert!(body.get("m.read.private").is_none());
     assert_eq!(
         body["m.fully_read"],
         json!("$read"),
@@ -1526,7 +1551,6 @@ async fn invited_direct_room_summary_is_direct() {
             matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
         let mut cache = std::collections::HashMap::new();
         super::view::enrich_room_fields(
-            &client,
             &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
                 index: 0,
                 value: item.clone(),
@@ -1572,7 +1596,6 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
     let mut cache = std::collections::HashMap::new();
     super::view::enrich_room_fields(
-        &client,
         &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
             index: 0,
             value: item.clone(),
@@ -1607,7 +1630,6 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
     ] {
         server.sync_room(&client, update).await;
         super::view::enrich_room_fields(
-            &client,
             &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
                 index: 0,
                 value: item.clone(),
@@ -1634,7 +1656,6 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         })
         .await;
     super::view::enrich_room_fields(
-        &client,
         &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
             index: 0,
             value: item.clone(),
@@ -1665,7 +1686,6 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
     let mut cache = std::collections::HashMap::new();
     super::view::enrich_room_fields(
-        &client,
         &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
             index: 0,
             value: item.clone(),
@@ -1700,7 +1720,6 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     let item =
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
     super::view::enrich_room_fields(
-        &client,
         &matrix_sdk_ui::eyeball_im::VectorDiff::PushFront {
             value: item.clone(),
         },
@@ -1796,7 +1815,6 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
         let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
         let mut cache = std::collections::HashMap::new();
         super::view::enrich_room_fields(
-            &client,
             &matrix_sdk_ui::eyeball_im::VectorDiff::Set {
                 index: 0,
                 value: item.clone(),

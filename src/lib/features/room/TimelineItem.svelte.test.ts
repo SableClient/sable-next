@@ -230,13 +230,7 @@ test('edits an own image caption without dropping its media details', async () =
   await tick();
   document.querySelector<HTMLButtonElement>('.message-actions button')?.click();
 
-  expect(onEdit).toHaveBeenCalledWith('$item', 'caption', null, {
-    source: 'mxc://example.org/photo',
-    filename: 'photo.png',
-    mime: 'image/png',
-    width: 800,
-    height: 600,
-  });
+  expect(onEdit).toHaveBeenCalledWith('$item', 'caption', null, true);
   await unmount(instance);
 });
 

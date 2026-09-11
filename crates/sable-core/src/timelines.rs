@@ -77,7 +77,7 @@ impl Core {
             .values()
             .filter_map(|subscription| match &subscription.kind {
                 SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
-                SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+                SubscriptionKind::Other | SubscriptionKind::FocusedTimeline(_) => None,
             })
             .collect::<std::collections::HashSet<_>>();
         let mut timelines = self.timelines.lock().await;

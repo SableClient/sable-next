@@ -82,6 +82,10 @@ export class RoomTimeline {
   error = $state<string | null>(null);
   mode = $state<TimelineMode>({ kind: 'live' });
 
+  get subscriptionId(): SubscriptionId | null {
+    return this.subscription;
+  }
+
   private subscription: SubscriptionId | null = null;
   private target: { roomId: string; mode: TimelineMode; hiddenEvents: boolean } | null = null;
   private unsubscribeEvents: (() => void) | null = null;

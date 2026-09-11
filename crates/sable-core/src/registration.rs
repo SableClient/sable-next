@@ -191,21 +191,20 @@ impl Core {
             .session()
             .ok_or_else(|| self.failed("register", "no session after a successful registration"))?;
         let user_id = matrix.meta.user_id.clone();
-        let mut generation = self.claim_session_generation();
+        let generation = self.claim_session_generation().await;
         self.persist(
             &account_id,
             &store_id,
             &PersistedSession {
+                resolved_homeserver: Some(client.homeserver()),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
             },
-            generation.value(),
+            None,
         )
         .await?;
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
-        self.set_active_account(&account_id).await?;
-        generation.commit();
         Ok(RegistrationResultView::Complete { user_id })
     }
 

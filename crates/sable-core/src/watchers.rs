@@ -3,21 +3,44 @@ use std::sync::Arc;
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
-use matrix_sdk::ruma::events::AnyGlobalAccountDataEvent;
 use matrix_sdk::ruma::events::presence::PresenceEvent;
-use matrix_sdk::ruma::events::room::message::OriginalSyncRoomMessageEvent;
+use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
+use matrix_sdk::ruma::events::{AnyGlobalAccountDataEvent, AnyStrippedStateEvent};
 use matrix_sdk::ruma::presence::PresenceState;
-use matrix_sdk_ui::room_list_service::State as RoomListState;
 use matrix_sdk_ui::sync_service::State as SyncState;
 
 use crate::protocol::{CoreEvent, PresenceView, SyncStatus};
-use matrix_sdk::ruma::push::Action;
-use matrix_sdk_ui::notification_client::NotificationProcessSetup;
+use matrix_sdk_base::deserialized_responses::RawAnySyncOrStrippedTimelineEvent;
+use matrix_sdk_base::sync::Notification;
+use matrix_sdk_ui::notification_client::{NotificationClient, NotificationProcessSetup};
 
 use crate::Core;
 use crate::notifications;
 use crate::spaces::{self, SidebarSpacesEvent};
+
+type NotificationSender = tokio::sync::mpsc::UnboundedSender<(Notification, matrix_sdk::Room)>;
+pub(crate) type NotificationRoute = Arc<std::sync::Mutex<Option<NotificationSender>>>;
+
+struct NotificationWorkerRoute {
+    route: NotificationRoute,
+    sender: NotificationSender,
+}
+
+impl Drop for NotificationWorkerRoute {
+    fn drop(&mut self) {
+        let mut route = self
+            .route
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if route
+            .as_ref()
+            .is_some_and(|sender| sender.same_channel(&self.sender))
+        {
+            route.take();
+        }
+    }
+}
 
 impl Core {
     pub(crate) fn watch_account_data(
@@ -25,7 +48,7 @@ impl Core {
         client: &matrix_sdk::Client,
         generation: u64,
     ) {
-        client.add_event_handler({
+        let handle = client.add_event_handler({
             let core = self.clone();
             move |event: AnyGlobalAccountDataEvent| {
                 let core = core.clone();
@@ -42,6 +65,7 @@ impl Core {
                 }
             }
         });
+        self.track_session_handler(client, handle);
     }
 
     pub(crate) fn watch_send_queue(self: &Arc<Self>, client: &matrix_sdk::Client) {
@@ -74,68 +98,115 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_notifications(
+    #[allow(clippy::too_many_lines)] // Keep registration and its worker lifetime together.
+    pub(crate) async fn watch_notifications(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,
         generation: u64,
     ) {
+        let session_start = MilliSecondsSinceUnixEpoch::now();
+        let (sender, mut pending) = tokio::sync::mpsc::unbounded_channel();
+        let Some(account_id) = self
+            .session
+            .read()
+            .await
+            .as_ref()
+            .map(|session| session.account_id.clone())
+        else {
+            return;
+        };
+        let mut routes = self.notification_routes.lock().await;
+        let route = if let Some(route) = routes.get(&account_id) {
+            route.clone()
+        } else {
+            let route: NotificationRoute = Arc::new(std::sync::Mutex::new(None));
+            let handler_route = route.clone();
+            client
+                .register_notification_handler(move |notification, room, _| {
+                    if let Some(sender) = handler_route
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .as_ref()
+                    {
+                        let _ = sender.send((notification, room));
+                    }
+                    async {}
+                })
+                .await;
+            routes.insert(account_id, route.clone());
+            route
+        };
+        *route
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sender.clone());
+        let route_guard = NotificationWorkerRoute { route, sender };
+        drop(routes);
+
         let core = self.clone();
         let client = client.clone();
-        let session_start = MilliSecondsSinceUnixEpoch::now();
         self.track_session_task(
             spawn(async move {
+                let _route_guard = route_guard;
                 let Ok(sync_service) = core.sync_service().await else {
                     return;
                 };
-                let mut state = sync_service.room_list_service().state();
-                while !matches!(state.get(), RoomListState::Running) {
-                    if state.next().await.is_none() {
-                        return;
+                let setup = NotificationProcessSetup::SingleProcess { sync_service };
+                let Ok(notifications_client) = NotificationClient::new(client.clone(), setup).await
+                else {
+                    return;
+                };
+                let mut alerted_invites: std::collections::HashSet<_> = client
+                    .invited_rooms()
+                    .into_iter()
+                    .map(|room| room.room_id().to_owned())
+                    .collect();
+                while let Some((notification, room)) = pending.recv().await {
+                    let Notification { event, actions } = notification;
+                    if !notifications::notifies(&actions) || core.is_read_room(room.room_id()) {
+                        continue;
                     }
-                }
-
-                client.add_event_handler({
-                    let core = core.clone();
-                    move |event: OriginalSyncRoomMessageEvent,
-                          room: matrix_sdk::Room,
-                          client: matrix_sdk::Client,
-                          actions: Vec<Action>| {
-                        let core = core.clone();
-
-                        async move {
-                            if Some(event.sender.as_ref()) == client.user_id() {
-                                return;
-                            }
-                            if !notifications::notifies(&actions) {
-                                return;
-                            }
-                            if notifications::is_backfill(session_start, event.origin_server_ts)
-                                || notifications::is_read(&room)
-                                || core.is_read_room(room.room_id())
-                            {
-                                return;
-                            }
-
-                            let Ok(sync_service) = core.sync_service().await else {
-                                return;
+                    let notification = match event {
+                        RawAnySyncOrStrippedTimelineEvent::Sync(raw) => {
+                            let Ok(event) = raw.deserialize() else {
+                                continue;
                             };
-                            let setup = NotificationProcessSetup::SingleProcess { sync_service };
-                            if let Some(notification) = notifications::notification(
-                                &client,
-                                setup,
-                                room.room_id(),
-                                &event.event_id,
+                            if Some(event.sender()) == client.user_id()
+                                || notifications::is_backfill(
+                                    session_start,
+                                    event.origin_server_ts(),
+                                )
+                                || notifications::is_read(&room)
+                            {
+                                continue;
+                            }
+                            notifications::foreground_notification(
+                                &notifications_client,
+                                &room,
+                                event.event_id(),
                             )
                             .await
-                            {
-                                core.emit_if_current(
-                                    generation,
-                                    CoreEvent::Notification { notification },
-                                );
-                            }
                         }
+                        RawAnySyncOrStrippedTimelineEvent::Stripped(raw) => {
+                            let Ok(AnyStrippedStateEvent::RoomMember(event)) = raw.deserialize()
+                            else {
+                                continue;
+                            };
+                            if event.state_key != room.own_user_id()
+                                || event.content.membership != MembershipState::Invite
+                                || !alerted_invites.insert(room.room_id().to_owned())
+                            {
+                                continue;
+                            }
+                            notifications::invite_notification(&room, &actions).await
+                        }
+                    };
+                    if let Some(notification) = notification
+                        && !core.is_read_room(room.room_id())
+                        && (notification.event_id.is_none() || !notifications::is_read(&room))
+                    {
+                        core.emit_if_current(generation, CoreEvent::Notification { notification });
                     }
-                });
+                }
             })
             .abort_on_drop(),
         );
@@ -151,7 +222,9 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 let mut changes = watched.notification_settings().await.subscribe_to_changes();
-                while changes.recv().await.is_ok() {
+                while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
+                    changes.recv().await
+                {
                     core.emit_if_current(generation, CoreEvent::NotificationSettingsChanged);
                 }
             })
@@ -244,7 +317,7 @@ impl Core {
         client: &matrix_sdk::Client,
         generation: u64,
     ) {
-        client.add_event_handler({
+        let handle = client.add_event_handler({
             let core = self.clone();
             move |event: SidebarSpacesEvent| {
                 let core = core.clone();
@@ -259,6 +332,7 @@ impl Core {
                 }
             }
         });
+        self.track_session_handler(client, handle);
     }
 
     /// Ordinary sync events, so one handler each covers every room. Per-room
@@ -267,7 +341,7 @@ impl Core {
     pub(crate) fn watch_ephemeral(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
         let own_user_id = client.user_id().map(ToOwned::to_owned);
 
-        client.add_event_handler({
+        let handle = client.add_event_handler({
             let core = self.clone();
             move |event: SyncTypingEvent, room: matrix_sdk::Room| {
                 let core = core.clone();
@@ -294,8 +368,9 @@ impl Core {
                 }
             }
         });
+        self.track_session_handler(client, handle);
 
-        client.add_event_handler({
+        let handle = client.add_event_handler({
             let core = self.clone();
             move |event: PresenceEvent| {
                 let core = core.clone();
@@ -319,6 +394,7 @@ impl Core {
                 }
             }
         });
+        self.track_session_handler(client, handle);
     }
 }
 

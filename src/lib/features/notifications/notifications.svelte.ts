@@ -25,6 +25,7 @@ export class NotificationCenter {
   private reading: string | null = null;
   /* eslint-disable svelte/prefer-svelte-reactivity -- a write from a notification would subscribe whichever effect is running */
   private readonly unread = new Set<string>();
+  private readonly invites = new Map<string, boolean>();
   private readonly conversations = new Map<string, ConversationLine[]>();
   private readonly presented = new Map<string, Notification>();
   /* eslint-enable svelte/prefer-svelte-reactivity */
@@ -49,6 +50,7 @@ export class NotificationCenter {
     this.open = null;
     this.reading = null;
     this.unread.clear();
+    this.invites.clear();
     this.conversations.clear();
     this.presented.clear();
   }
@@ -64,7 +66,17 @@ export class NotificationCenter {
   retireRead(rooms: readonly RoomSummary[]): void {
     if (!preferences.clearNotificationsOnRead) return;
 
+    for (const [roomId, appeared] of this.invites) {
+      const room = rooms.find((item) => item.room_id === roomId);
+      if (room?.state === 'invited') {
+        this.invites.set(roomId, true);
+      } else if (room !== undefined || appeared) {
+        this.retire(roomId);
+      }
+    }
+
     for (const room of rooms) {
+      if (room.state === 'invited') continue;
       if (room.unread > 0) {
         this.unread.add(room.room_id);
         continue;
@@ -77,6 +89,7 @@ export class NotificationCenter {
 
   private retire(roomId: string): void {
     this.unread.delete(roomId);
+    this.invites.delete(roomId);
     this.conversations.delete(roomId);
     this.presented.get(roomId)?.close();
     this.presented.delete(roomId);
@@ -87,7 +100,11 @@ export class NotificationCenter {
   }
 
   present(view: NotificationView): void {
-    this.unread.add(view.room_id);
+    if (view.event_id === null) {
+      this.invites.set(view.room_id, this.invites.get(view.room_id) ?? false);
+    } else {
+      this.unread.add(view.room_id);
+    }
 
     const lines = appendLine(this.conversations.get(view.room_id) ?? [], line(view));
     this.conversations.set(view.room_id, lines);

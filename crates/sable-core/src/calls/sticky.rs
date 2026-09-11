@@ -3,6 +3,7 @@ use std::time::Duration;
 use matrix_sdk::{Client, Room};
 use ruma::api::client::{message::send_message_event::v3, sync::sync_events::v5};
 use ruma::events::{MessageLikeEventType, sticky::StickyDurationMs};
+use ruma::exports::http;
 use ruma::serde::Raw;
 use serde_json::Value;
 
@@ -98,59 +99,60 @@ pub(super) async fn send(
     Ok(client.send(request).await?.event_id)
 }
 
+#[derive(Clone, Debug)]
+struct DelayedStickyRequest(
+    ruma::api::client::delayed_events::delayed_message_event::unstable::Request,
+);
+
+type DelayedRequest = ruma::api::client::delayed_events::delayed_message_event::unstable::Request;
+
+impl ruma::api::Metadata for DelayedStickyRequest {
+    const METHOD: http::Method = DelayedRequest::METHOD;
+    const RATE_LIMITED: bool = DelayedRequest::RATE_LIMITED;
+    type Authentication = <DelayedRequest as ruma::api::Metadata>::Authentication;
+    type PathBuilder = <DelayedRequest as ruma::api::Metadata>::PathBuilder;
+    const PATH_BUILDER: Self::PathBuilder = DelayedRequest::PATH_BUILDER;
+}
+
+impl ruma::api::OutgoingRequest for DelayedStickyRequest {
+    type Body = <DelayedRequest as ruma::api::OutgoingRequest>::Body;
+    type EndpointError = <DelayedRequest as ruma::api::OutgoingRequest>::EndpointError;
+    type IncomingResponse = <DelayedRequest as ruma::api::OutgoingRequest>::IncomingResponse;
+
+    fn try_into_http_request_inner(
+        self,
+        base_url: &str,
+        input: <Self::PathBuilder as ruma::api::path_builder::PathBuilder>::Input<'_>,
+    ) -> Result<http::Request<Self::Body>, ruma::api::error::IntoHttpError> {
+        let mut request = self.0.try_into_http_request_inner(base_url, input)?;
+        let separator = if request.uri().query().is_some() {
+            '&'
+        } else {
+            '?'
+        };
+        let uri = format!(
+            "{}{separator}org.matrix.msc4354.sticky_duration_ms={STICKY_DURATION_MS}",
+            request.uri()
+        );
+        *request.uri_mut() = uri.parse().map_err(http::Error::from)?;
+        Ok(request)
+    }
+}
+
 pub(super) async fn send_delayed(
     client: &Client,
     room: &Room,
     content: Value,
     delay: Duration,
-) -> Result<String, &'static str> {
-    let token = client.access_token().ok_or("not logged in")?;
-    let mut endpoint = client
-        .homeserver()
-        .join("/_matrix/client/v3/rooms/")
-        .map_err(|_| "invalid homeserver")?;
-    endpoint
-        .path_segments_mut()
-        .map_err(|()| "invalid homeserver")?
-        .pop_if_empty()
-        .push(room.room_id().as_str())
-        .push("send")
-        .push("m.rtc.member")
-        .push(ruma::TransactionId::new().as_str());
-    endpoint
-        .query_pairs_mut()
-        .append_pair("org.matrix.msc4140.delay", &delay.as_millis().to_string())
-        .append_pair(
-            "org.matrix.msc4354.sticky_duration_ms",
-            &STICKY_DURATION_MS.to_string(),
-        );
-    let builder = crate::tls::apply(matrix_sdk::reqwest::Client::builder());
-    #[cfg(not(target_family = "wasm"))]
-    let builder = builder.timeout(Duration::from_secs(15));
-    let http = builder.build().map_err(|_| "HTTP client unavailable")?;
-    let response = http
-        .put(endpoint)
-        .bearer_auth(token)
-        .header("Content-Type", "application/json")
-        .body(content.to_string())
-        .send()
-        .await
-        .map_err(|_| "delayed sticky event unavailable")?;
-    if !response.status().is_success() {
-        return Err("delayed sticky event refused");
-    }
-    let response = response
-        .text()
-        .await
-        .map_err(|_| "invalid delayed event response")?;
-    let response: Value =
-        serde_json::from_str(&response).map_err(|_| "invalid delayed event response")?;
-    response
-        .get("delay_id")
-        .and_then(Value::as_str)
-        .filter(|id| !id.is_empty())
-        .map(str::to_owned)
-        .ok_or("missing delayed event id")
+) -> Result<String, matrix_sdk::Error> {
+    let request = DelayedRequest::new_raw(
+        room.room_id().to_owned(),
+        ruma::TransactionId::new(),
+        MessageLikeEventType::from("m.rtc.member"),
+        ruma::api::client::delayed_events::DelayParameters::Timeout { timeout: delay },
+        Raw::new(&content)?.cast_unchecked(),
+    );
+    Ok(client.send(DelayedStickyRequest(request)).await?.delay_id)
 }
 
 #[cfg(test)]

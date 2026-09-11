@@ -3,11 +3,9 @@ use std::hash::BuildHasher;
 use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
-use matrix_sdk::Client;
 use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::{ParentSpace, PushContext, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
-use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::directory::PublicRoomsChunk;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
@@ -17,7 +15,9 @@ use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, UnstableAmplitude};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
-use matrix_sdk::ruma::events::space::child::{HierarchySpaceChildEvent, SpaceChildEventContent};
+use matrix_sdk::ruma::events::space::child::{
+    HierarchySpaceChildEvent, SpaceChildEventContent, SpaceChildOrd,
+};
 use matrix_sdk::ruma::events::{MessageLikeEventType, StateEventContentChange, StateEventType};
 use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::room::{
@@ -237,7 +237,6 @@ fn local_preview(local: &LocalLatestEventValue) -> Option<String> {
 
 /// Resolve current room fields for every emitted item, including reordered rooms.
 pub async fn enrich_room_fields<S: BuildHasher>(
-    client: &Client,
     diff: &eyeball_im::VectorDiff<RoomListItem>,
     room_cache: &mut HashMap<OwnedRoomId, RoomInfo, S>,
 ) {
@@ -254,16 +253,16 @@ pub async fn enrich_room_fields<S: BuildHasher>(
 
     let lookups = items
         .into_iter()
-        .map(|item| async move { (item.room_id().to_owned(), room_info(client, item).await) });
+        .map(|item| async move { (item.room_id().to_owned(), room_info(item).await) });
 
     for (room_id, info) in futures_util::future::join_all(lookups).await {
         room_cache.insert(room_id, info);
     }
 }
 
-async fn room_info(client: &Client, room: &Room) -> RoomInfo {
+async fn room_info(room: &Room) -> RoomInfo {
     let is_space = room.is_space();
-    let is_tombstoned = is_tombstoned(client, room, is_space).await;
+    let is_tombstoned = room.is_tombstoned();
     let children = async {
         if is_space {
             space_children(room).await
@@ -272,14 +271,10 @@ async fn room_info(client: &Client, room: &Room) -> RoomInfo {
         }
     };
 
-    let (has_space_parent, join_rules, children, is_direct) = futures_util::future::join4(
-        has_space_parent(room),
-        crate::rooms::join_rule_support(room),
-        children,
-        is_direct(room),
-    )
-    .await;
-    let (supports_knock, supports_restricted, supports_knock_restricted) = join_rules;
+    let (has_space_parent, children, is_direct) =
+        futures_util::future::join3(has_space_parent(room), children, is_direct(room)).await;
+    let (supports_knock, supports_restricted, supports_knock_restricted) =
+        crate::rooms::join_rule_support(room);
 
     RoomInfo {
         is_space,
@@ -346,28 +341,6 @@ async fn direct_avatar_url(room: &Room) -> Option<String> {
         return hero.avatar_url.as_ref().map(ToString::to_string);
     }
     None
-}
-
-async fn is_tombstoned(client: &Client, room: &Room, is_space: bool) -> bool {
-    if room
-        .get_state_event(StateEventType::RoomTombstone, "")
-        .await
-        .is_ok_and(|event| event.is_some())
-    {
-        return true;
-    }
-    if !is_space {
-        return false;
-    }
-
-    client
-        .send(get_state_event_for_key::v3::Request::new(
-            room.room_id().to_owned(),
-            StateEventType::RoomTombstone.to_string().into(),
-            String::new(),
-        ))
-        .await
-        .is_ok()
 }
 
 async fn is_direct(room: &Room) -> bool {
@@ -444,19 +417,20 @@ pub fn space_hierarchy_room(
 pub fn hierarchy_child_edges(
     events: &[matrix_sdk::ruma::serde::Raw<HierarchySpaceChildEvent>],
 ) -> Vec<SpaceChildEdge> {
-    let mut children: Vec<SpaceChildEdge> = events
+    let mut events: Vec<_> = events
         .iter()
         .filter_map(|raw| raw.deserialize().ok())
+        .collect();
+    events.sort_by(SpaceChildOrd::cmp_space_child);
+    events
+        .into_iter()
         .map(|event| SpaceChildEdge {
             room_id: event.state_key,
             order: event.content.order.map(|order| order.to_string()),
             origin_server_ts: u64::from(event.origin_server_ts.get()),
             suggested: event.content.suggested,
         })
-        .collect();
-
-    sort_child_edges(&mut children);
-    children
+        .collect()
 }
 
 /// The routing rules in the spec appendices: the server of the highest-power
@@ -571,34 +545,27 @@ async fn space_children(room: &Room) -> Vec<SpaceChildEdge> {
         return Vec::new();
     };
 
-    let mut children: Vec<SpaceChildEdge> = Vec::new();
-    for event in events {
-        let Ok(SyncOrStrippedState::Sync(SyncStateEvent::Original(original))) = event.deserialize()
-        else {
-            continue;
-        };
-        children.push(SpaceChildEdge {
-            room_id: original.state_key.clone(),
-            order: original.content.order.map(|order| order.to_string()),
-            origin_server_ts: u64::from(original.origin_server_ts.get()),
-            suggested: original.content.suggested,
-        });
-    }
-
-    sort_child_edges(&mut children);
-    children
-}
-
-fn sort_child_edges(children: &mut [SpaceChildEdge]) {
-    children.sort_by(|a, b| {
-        match (&a.order, &b.order) {
-            (Some(left), Some(right)) => left.cmp(right),
-            (Some(_), None) => std::cmp::Ordering::Less,
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-            (None, None) => std::cmp::Ordering::Equal,
-        }
-        .then_with(|| a.origin_server_ts.cmp(&b.origin_server_ts))
-    });
+    let mut events: Vec<_> = events
+        .into_iter()
+        .filter_map(|event| {
+            let SyncOrStrippedState::Sync(SyncStateEvent::Original(original)) =
+                event.deserialize().ok()?
+            else {
+                return None;
+            };
+            Some(original)
+        })
+        .collect();
+    events.sort_by(SpaceChildOrd::cmp_space_child);
+    events
+        .into_iter()
+        .map(|event| SpaceChildEdge {
+            room_id: event.state_key,
+            order: event.content.order.map(|order| order.to_string()),
+            origin_server_ts: u64::from(event.origin_server_ts.get()),
+            suggested: event.content.suggested,
+        })
+        .collect()
 }
 
 #[derive(Default)]

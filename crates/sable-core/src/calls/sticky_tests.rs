@@ -257,3 +257,79 @@ async fn test_sticky_sync_accepts_an_empty_initial_extension_and_keeps_its_posit
             .is_none()
     );
 }
+
+#[async_test]
+async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_query() {
+    use matrix_sdk::{SessionTokens, authentication::matrix::MatrixSession};
+    use wiremock::matchers::{header, path};
+
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .unlogged()
+        .on_builder(matrix_sdk::ClientBuilder::handle_refresh_tokens)
+        .build()
+        .await;
+    let mut session: MatrixSession = matrix_sdk::test_utils::client::mock_matrix_session();
+    session.tokens = SessionTokens {
+        access_token: "expired".into(),
+        refresh_token: Some("refresh".into()),
+    };
+    client
+        .matrix_auth()
+        .restore_session(session, matrix_sdk::store::RoomLoadSettings::default())
+        .await
+        .unwrap();
+    let room = server
+        .sync_joined_room(&client, room_id!("!sticky:example.org"))
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/rooms/.*/send/m\.rtc\.member/.*"))
+        .and(header("authorization", "Bearer expired"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(
+            json!({"errcode":"M_UNKNOWN_TOKEN", "error":"expired", "soft_logout":true}),
+        ))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/refresh"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"access_token":"fresh", "refresh_token":"new-refresh"})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/rooms/.*/send/m\.rtc\.member/.*"))
+        .and(header("authorization", "Bearer fresh"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"delay_id":"cleanup"})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    assert_eq!(
+        send_delayed(
+            &client,
+            &room,
+            json!({"msc4354_sticky_key":"call"}),
+            Duration::from_secs(20)
+        )
+        .await
+        .unwrap(),
+        "cleanup"
+    );
+    let requests = server.received_requests().await.unwrap();
+    let sends: Vec<_> = requests
+        .iter()
+        .filter(|request| request.url.path().contains("/send/m.rtc.member/"))
+        .collect();
+    assert_eq!(sends.len(), 2);
+    assert_eq!(sends[0].url, sends[1].url);
+    assert_eq!(sends[0].body, sends[1].body);
+    assert!(
+        sends[1].url.query_pairs().any(|(key, value)| key
+            == "org.matrix.msc4354.sticky_duration_ms"
+            && value == "900000")
+    );
+}

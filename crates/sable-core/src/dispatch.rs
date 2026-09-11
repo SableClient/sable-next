@@ -42,8 +42,7 @@ use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomId, RoomOrAliasId, ServerName, UInt,
-    events::room::MediaSource, events::room::member::MembershipState,
-    events::room::message::RoomMessageEventContent,
+    events::room::member::MembershipState, events::room::message::RoomMessageEventContent,
 };
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
@@ -182,10 +181,14 @@ impl Core {
             }
 
             Command::Login {
+                reauth_account_id,
                 homeserver,
                 username,
                 password,
-            } => self.login(homeserver, username, password).await,
+            } => {
+                self.login(homeserver, username, password, reauth_account_id)
+                    .await
+            }
 
             Command::LoginFlows { homeserver } => self.login_flows(homeserver).await,
 
@@ -229,11 +232,12 @@ impl Core {
             }
 
             Command::StartOidcLogin {
+                reauth_account_id,
                 homeserver,
                 redirect_uri,
                 intent,
             } => {
-                self.start_oidc_login(homeserver, redirect_uri, intent)
+                self.start_oidc_login(homeserver, redirect_uri, intent, reauth_account_id)
                     .await
             }
 
@@ -242,12 +246,13 @@ impl Core {
             }
 
             Command::StartSsoLogin {
+                reauth_account_id,
                 homeserver,
                 redirect_uri,
                 idp_id,
                 intent,
             } => {
-                self.start_sso_login(homeserver, redirect_uri, idp_id, intent)
+                self.start_sso_login(homeserver, redirect_uri, idp_id, intent, reauth_account_id)
                     .await
             }
 
@@ -299,13 +304,15 @@ impl Core {
                 };
                 let live_room = match &removed.kind {
                     SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
-                    SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+                    SubscriptionKind::Other | SubscriptionKind::FocusedTimeline(_) => None,
                 };
+                let has_room = !matches!(removed.kind, SubscriptionKind::Other);
                 drop(removed);
+                if has_room {
+                    self.sync_timeline_rooms_locked().await?;
+                }
 
                 if let Some(room_id) = live_room {
-                    self.sync_timeline_rooms_locked(None).await?;
-
                     let subscriptions = self.subscriptions.lock().await;
                     let watched = subscriptions.values().any(|subscription| {
                         matches!(
@@ -336,7 +343,7 @@ impl Core {
                         subscription.timeline.clone().map(|timeline| {
                             (
                                 timeline,
-                                matches!(subscription.kind, SubscriptionKind::FocusedTimeline),
+                                matches!(subscription.kind, SubscriptionKind::FocusedTimeline(_)),
                             )
                         })
                     })
@@ -519,29 +526,22 @@ impl Core {
                     ImageMessageEventContent::plain(body, url).info(Box::new(info)),
                 ));
 
-                match in_reply_to {
-                    Some(event_id) => {
-                        timeline
-                            .send_reply(content.into(), event_id)
-                            .await
-                            .map_err(|error| self.failed("send_gif_reply", error))?;
-                    }
-                    None => {
-                        match persona {
-                            Some(persona) => timeline
-                                .send_with_extra_content(
-                                    content.into(),
-                                    Some(crate::personas::profile_extra_content(&persona)),
-                                )
-                                .await
-                                .map_err(|error| self.failed("send_gif", error))?,
-                            None => timeline
-                                .send(content.into())
-                                .await
-                                .map_err(|error| self.failed("send_gif", error))?,
-                        };
-                    }
-                }
+                let content = match thread_reply(in_reply_to, thread_root, false) {
+                    Some(reply) => self
+                        .room(&room_id)
+                        .await?
+                        .make_reply_event(content.into(), reply)
+                        .await
+                        .map_err(|error| self.failed("send_gif_reply", error))?,
+                    None => content,
+                };
+                timeline
+                    .send_with_extra_content(
+                        content.into(),
+                        persona.as_ref().map(crate::personas::profile_extra_content),
+                    )
+                    .await
+                    .map_err(|error| self.failed("send_gif", error))?;
 
                 Ok(CommandOk::SendGif)
             }
@@ -549,27 +549,50 @@ impl Core {
             Command::EditMessage {
                 room_id,
                 event_id,
+                transaction_id,
                 body,
                 formatted,
                 kind,
-                image,
-                thread_root: _,
+                media_caption,
+                thread_root,
                 mentions,
                 mentions_room,
                 persona,
             } => {
-                let edited = EditedContent::RoomMessage(
-                    edit_content(body, formatted, kind, image, mentions, mentions_room)?.into(),
+                let edited = edit_content(
+                    body,
+                    formatted,
+                    kind,
+                    media_caption,
+                    mentions,
+                    mentions_room,
                 );
 
-                let room = self.room(&room_id).await?;
-                let content = room
-                    .make_edit_event(&event_id, edited)
-                    .await
-                    .map_err(|error| self.failed("edit_message", error))?;
-
-                self.edit_with_persona(&room, &content, persona.as_ref())
-                    .await?;
+                let item_id = match (event_id, transaction_id) {
+                    (Some(event_id), None) => TimelineEventItemId::EventId(event_id),
+                    (None, Some(transaction_id)) => {
+                        TimelineEventItemId::TransactionId(transaction_id.into())
+                    }
+                    _ => return Err(CommandErr::Unsupported),
+                };
+                if matches!(item_id, TimelineEventItemId::TransactionId(_)) {
+                    if persona.is_some() {
+                        return Err(CommandErr::Unsupported);
+                    }
+                    self.timeline_for(&room_id, thread_root.as_ref())
+                        .await?
+                        .edit(&item_id, edited)
+                        .await
+                        .map_err(|error| self.failed("edit_message", error))?;
+                } else if let TimelineEventItemId::EventId(event_id) = item_id {
+                    let room = self.room(&room_id).await?;
+                    let content = room
+                        .make_edit_event(&event_id, edited)
+                        .await
+                        .map_err(|error| self.failed("edit_message", error))?;
+                    self.edit_with_persona(&room, &content, persona.as_ref())
+                        .await?;
+                }
                 Ok(CommandOk::EditMessage)
             }
 
@@ -659,7 +682,10 @@ impl Core {
                 )))
             }
 
-            Command::ImagePacks { room_id } => self.image_packs(room_id).await,
+            Command::ImagePacks {
+                room_id,
+                cached_only,
+            } => self.image_packs(room_id, cached_only).await,
             Command::AllImagePacks => self.all_image_packs().await,
 
             Command::UserProfile { user_id } => {
@@ -1606,7 +1632,9 @@ impl Core {
                 let room = self.room(&room_id).await?;
 
                 Ok(CommandOk::NotificationSettings(
-                    notifications::settings(&room).await,
+                    notifications::settings(&room)
+                        .await
+                        .map_err(|error| self.failed("notification_settings", error))?,
                 ))
             }
 
@@ -1752,7 +1780,7 @@ impl Core {
             Command::SetRoomJoinRule { room_id, rule } => {
                 let room = self.room(&room_id).await?;
                 let (supports_knock, supports_restricted, supports_knock_restricted) =
-                    join_rule_support(&room).await;
+                    join_rule_support(&room);
                 let content = match rule {
                     JoinRuleView::Public => RoomJoinRulesEventContent::new(JoinRule::Public),
                     JoinRuleView::Invite => RoomJoinRulesEventContent::new(JoinRule::Invite),
@@ -2244,23 +2272,40 @@ impl Core {
                 room_id,
                 event_id,
                 private_receipt,
+                thread_root,
+                subscription,
             } => {
-                // The read marker line tracks `m.fully_read`, so a receipt alone
-                // would leave it where it was. The server drops either unless
-                // newer, so the UI may send freely.
-                let receipts = Receipts::new().fully_read_marker(event_id.clone());
-                let receipts = if private_receipt {
-                    receipts.private_read_receipt(event_id)
+                let timeline = if let Some(subscription) = subscription {
+                    let timeline = self
+                        .subscriptions
+                        .lock()
+                        .await
+                        .get(&subscription)
+                        .filter(|subscription| subscription.thread_root == thread_root)
+                        .and_then(|subscription| subscription.timeline.clone())
+                        .ok_or(CommandErr::UnknownSubscription)?;
+                    if timeline.room().room_id() != room_id {
+                        return Err(CommandErr::UnknownSubscription);
+                    }
+                    timeline
                 } else {
-                    receipts.public_read_receipt(event_id)
+                    self.timeline_for(&room_id, thread_root.as_ref()).await?
                 };
-
-                self.timeline(&room_id)
-                    .await?
-                    .send_multiple_receipts(receipts)
+                let receipt_type = if private_receipt {
+                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::ReadPrivate
+                } else {
+                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::Read
+                };
+                timeline
+                    .send_single_receipt(receipt_type, event_id.clone())
                     .await
                     .map_err(|error| self.failed("mark_read", error))?;
-
+                if thread_root.is_none() {
+                    timeline
+                        .send_multiple_receipts(Receipts::new().fully_read_marker(event_id))
+                        .await
+                        .map_err(|error| self.failed("mark_read", error))?;
+                }
                 Ok(CommandOk::MarkRead)
             }
 
@@ -2366,30 +2411,20 @@ fn edit_content(
     body: String,
     formatted: Option<String>,
     kind: MessageKind,
-    image: Option<crate::protocol::EditImageView>,
+    media_caption: bool,
     mentions: Vec<OwnedUserId>,
     room: bool,
-) -> Result<RoomMessageEventContent, CommandErr> {
-    let Some(image) = image else {
-        return Ok(message_content(body, formatted, kind, mentions, room));
-    };
-
-    let source = serde_json::from_str(&image.source)
-        .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(image.source)));
-    if let MediaSource::Plain(uri) = &source
-        && uri.parts().is_err()
-    {
-        return Err(CommandErr::InvalidMedia);
+) -> EditedContent {
+    if media_caption {
+        EditedContent::MediaCaption {
+            caption: (!body.is_empty()).then_some(body),
+            formatted_caption: formatted
+                .map(matrix_sdk::ruma::events::room::message::FormattedBody::html),
+            mentions: Some(outgoing_mentions(mentions, room).unwrap_or_default()),
+        }
+    } else {
+        EditedContent::RoomMessage(message_content(body, formatted, kind, mentions, room).into())
     }
-
-    let mut content = ImageMessageEventContent::new(body, source);
-    content.filename = image.filename;
-    let mut info = ImageInfo::new();
-    info.mimetype = image.mime;
-    info.width = image.width.and_then(|width| UInt::try_from(width).ok());
-    info.height = image.height.and_then(|height| UInt::try_from(height).ok());
-    content.info = Some(Box::new(info));
-    Ok(RoomMessageEventContent::new(MessageType::Image(content)))
 }
 
 fn sticker_info(declared: Option<PackImageInfoView>) -> ImageInfo {
@@ -2461,7 +2496,7 @@ mod tests {
     use super::{edit_content, message_content, state_event_content};
     use matrix_sdk::ruma::RoomId;
 
-    use crate::protocol::{CreateJoinRuleView, EditImageView, MessageKind};
+    use crate::protocol::{CreateJoinRuleView, MessageKind};
 
     #[test]
     fn a_silent_reply_carries_no_mention() {
@@ -2611,33 +2646,86 @@ mod tests {
     }
 
     #[test]
-    fn editing_an_image_caption_preserves_the_image_content() {
+    fn editing_an_image_caption_uses_sdk_media_edit_with_formatting_and_mentions() {
         let content = edit_content(
             "updated caption".to_owned(),
-            None,
+            Some("<b>updated caption</b>".to_owned()),
             MessageKind::Text,
-            Some(EditImageView {
-                source: "mxc://example.org/photo".to_owned(),
-                filename: Some("photo.png".to_owned()),
-                mime: Some("image/png".to_owned()),
-                width: Some(800),
-                height: Some(600),
-            }),
-            Vec::new(),
-            false,
-        )
-        .expect("valid image source");
+            true,
+            vec![matrix_sdk::ruma::user_id!("@alice:example.org").to_owned()],
+            true,
+        );
+        let super::EditedContent::MediaCaption {
+            caption,
+            formatted_caption,
+            mentions,
+        } = content
+        else {
+            panic!("expected SDK caption edit");
+        };
+        assert_eq!(caption.as_deref(), Some("updated caption"));
+        assert_eq!(formatted_caption.unwrap().body, "<b>updated caption</b>");
+        let mentions = mentions.unwrap();
+        assert!(mentions.room);
+        assert!(
+            mentions
+                .user_ids
+                .contains(matrix_sdk::ruma::user_id!("@alice:example.org"))
+        );
+    }
 
-        assert_eq!(content.msgtype(), "m.image");
+    #[tokio::test]
+    async fn caption_edit_retains_original_media_metadata() {
+        use matrix_sdk::{
+            ruma::{event_id, room_id, user_id},
+            test_utils::mocks::MatrixMockServer,
+        };
+        use serde_json::json;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!caption:example.org");
+        let room = server.sync_joined_room(&client, room_id).await;
+        let info = json!({"mimetype": "image/png", "w": 800, "h": 600, "size": 12345,
+            "thumbnail_url": "mxc://example.org/thumbnail",
+            "thumbnail_info": {"mimetype": "image/png", "w": 80, "h": 60, "size": 123},
+            "xyz.amorgan.blurhash": "LEHV6nWB2yk8pyo0adR*.7kCMdnj"});
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{room_id}/event/$image"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "type": "m.room.message", "event_id": "$image", "room_id": room_id,
+                "sender": client.user_id().unwrap(), "origin_server_ts": 1,
+                "content": {"msgtype": "m.image", "body": "old caption", "filename": "photo.png",
+                    "url": "mxc://example.org/photo", "info": info}
+            })))
+            .mount(server.server())
+            .await;
+        let edit = edit_content(
+            "new caption".to_owned(),
+            Some("<b>new caption</b>".to_owned()),
+            MessageKind::Text,
+            true,
+            vec![user_id!("@bob:example.org").to_owned()],
+            false,
+        );
+        let content = room
+            .make_edit_event(event_id!("$image"), edit)
+            .await
+            .unwrap();
+        let content = serde_json::to_value(content).unwrap();
+        let updated = &content["m.new_content"];
+        assert_eq!(updated["info"], info);
+        assert_eq!(updated["url"], "mxc://example.org/photo");
+        assert_eq!(updated["filename"], "photo.png");
+        assert_eq!(updated["formatted_body"], "<b>new caption</b>");
         assert_eq!(
-            serde_json::to_value(content).expect("serializable image content"),
-            serde_json::json!({
-                "msgtype": "m.image",
-                "body": "updated caption",
-                "filename": "photo.png",
-                "url": "mxc://example.org/photo",
-                "info": { "mimetype": "image/png", "w": 800, "h": 600 },
-            })
+            updated["m.mentions"]["user_ids"],
+            json!(["@bob:example.org"])
         );
     }
 

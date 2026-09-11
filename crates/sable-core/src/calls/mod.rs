@@ -172,52 +172,78 @@ impl Core {
             return;
         };
 
-        client.add_event_handler({
+        let pending = Arc::new(tokio::sync::Mutex::new(notify::PendingCalls::default()));
+        let handle = client.add_event_handler({
             let core = self.clone();
-            move |event: notify::OriginalSyncRtcNotificationEvent, room: Room| {
+            move |raw: Raw<matrix_sdk::ruma::events::AnySyncMessageLikeEvent>, room: Room| {
                 let core = core.clone();
                 let own_user_id = own_user_id.clone();
-
+                let pending = pending.clone();
                 async move {
-                    let Some(incoming) = notify::accept(
-                        &event.content,
-                        &event.sender,
-                        &own_user_id,
-                        event.origin_server_ts.get().into(),
-                        keys::now_ms(),
-                    ) else {
+                    use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, SyncMessageLikeEvent};
+                    if !notify::is_call_event_type(&raw) {
                         return;
-                    };
-
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::IncomingCall {
-                            room_id: room.room_id().to_owned(),
-                            notification_event_id: event.event_id.to_string(),
-                            sender: event.sender,
-                            ring: incoming.kind == notify::NotificationKind::Ring,
-                            expires_at_ms: incoming.expires_at,
-                        },
-                    );
+                    }
+                    let now = keys::now_ms();
+                    match notify::parse(raw.json().get()) {
+                        Some(AnySyncMessageLikeEvent::RtcNotification(
+                            SyncMessageLikeEvent::Original(event),
+                        )) => {
+                            let Some(incoming) = notify::accept(
+                                &event.content,
+                                &event.sender,
+                                &own_user_id,
+                                event.origin_server_ts.get().into(),
+                                now,
+                            ) else {
+                                return;
+                            };
+                            pending.lock().await.insert(
+                                room.room_id(),
+                                &event.event_id,
+                                incoming.expires_at,
+                                now,
+                            );
+                            core.emit_if_current(
+                                generation,
+                                CoreEvent::IncomingCall {
+                                    room_id: room.room_id().to_owned(),
+                                    notification_event_id: event.event_id.to_string(),
+                                    sender: event.sender,
+                                    ring: incoming.kind == notify::NotificationKind::Ring,
+                                    expires_at_ms: incoming.expires_at,
+                                },
+                            );
+                        }
+                        Some(AnySyncMessageLikeEvent::RtcDecline(
+                            SyncMessageLikeEvent::Original(event),
+                        )) => {
+                            let declined = pending.lock().await.decline(
+                                room.room_id(),
+                                &event.content.relates_to.event_id,
+                                &event.sender,
+                                &own_user_id,
+                                now,
+                            );
+                            if declined {
+                                core.emit_if_current(
+                                    generation,
+                                    CoreEvent::IncomingCallEnded {
+                                        notification_event_id: event
+                                            .content
+                                            .relates_to
+                                            .event_id
+                                            .to_string(),
+                                    },
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
         });
-
-        client.add_event_handler({
-            let core = self.clone();
-            move |event: notify::OriginalSyncRtcDeclineEvent| {
-                let core = core.clone();
-
-                async move {
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::IncomingCallEnded {
-                            notification_event_id: event.content.relates_to.event_id.to_string(),
-                        },
-                    );
-                }
-            }
-        });
+        self.track_session_handler(client, handle);
     }
 
     async fn retract_membership(
@@ -247,17 +273,13 @@ impl Core {
             notify::NotificationKind::Notification
         };
 
-        let content = notify::notification_content(membership_event_id, kind);
-        let Ok(raw) = Raw::new(&content) else {
+        let Some(raw) = notify::announcement(membership_event_id, kind) else {
             return;
         };
 
         if let Err(error) = room
             .send_queue()
-            .send_raw(
-                raw.cast_unchecked(),
-                notify::NOTIFICATION_EVENT_TYPE.to_owned(),
-            )
+            .send_raw(raw, notify::NOTIFICATION_EVENT_TYPE.to_owned())
             .await
         {
             tracing::warn!(?error, "could not announce the call");
@@ -271,13 +293,12 @@ impl Core {
     ) -> Result<CommandOk, CommandErr> {
         let event_id = EventId::parse(&notification_event_id)
             .map_err(|error| self.failed("decline_call", error))?;
-        let content = notify::decline_content(&event_id);
-        let raw = Raw::new(&content).map_err(|error| self.failed("decline_call", error))?;
-
-        self.room(&room_id)
-            .await?
-            .send_queue()
-            .send_raw(raw.cast_unchecked(), notify::DECLINE_EVENT_TYPE.to_owned())
+        let room = self.room(&room_id).await?;
+        let content = notify::make_decline_event(&room, &event_id)
+            .await
+            .map_err(|error| self.failed("decline_call", error))?;
+        room.send_queue()
+            .send(content.into())
             .await
             .map_err(|error| self.failed("decline_call", error))?;
 

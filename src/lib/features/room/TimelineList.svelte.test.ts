@@ -954,7 +954,7 @@ test('shows the jump control once the reader is a page behind the latest message
   await unmount(instance);
 });
 
-test('keeps the latest own echo reachable after appending while reading near latest', async () => {
+test('follows an own echo appended while the reader is still near latest', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
   const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
@@ -979,7 +979,37 @@ test('keeps the latest own echo reachable after appending while reading near lat
   await runAnimationFrames();
 
   expect(document.querySelectorAll('.item')).toHaveLength(21);
-  expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(30);
+  expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
+  expect(followingLive()).toBe(true);
+  await unmount(instance);
+});
+
+test('leaves a reader deep in history where they are when they send', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+  expect(followingLive()).toBe(false);
+
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await tick();
+
+  roomTimeline.items = [
+    ...roomTimeline.items,
+    {
+      ...item('own-echo'),
+      event_id: null,
+      transaction_id: 'txn-own-echo',
+      is_own: true,
+      send_state: { status: 'sending' as const, progress: null },
+    },
+  ];
+  setScrollHeight(2_100);
+  await tick();
+  await runAnimationFrames();
+
   expect(followingLive()).toBe(false);
   await unmount(instance);
 });
@@ -1327,5 +1357,39 @@ test('a failed history request does not pass for the timeline start', async () =
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(2);
+  await unmount(instance);
+});
+
+test('a reset during a held touch does not paint placeholders over the rendered rows', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(false),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  const element = viewport();
+  await tick();
+  await runAnimationFrames();
+  expect(document.querySelectorAll('.window-rows > .item').length).toBeGreaterThan(0);
+
+  touch(element, 'touchstart', 10);
+  element.scrollTop = 10;
+  element.dispatchEvent(new Event('scroll'));
+  roomTimeline.items = [];
+  await tick();
+  await runAnimationFrames();
+
+  expect({
+    placeholder: document.querySelector('.timeline-placeholder') !== null,
+    rendered: document.querySelectorAll('.window-rows > .item').length > 0,
+  }).not.toEqual({ placeholder: true, rendered: true });
   await unmount(instance);
 });

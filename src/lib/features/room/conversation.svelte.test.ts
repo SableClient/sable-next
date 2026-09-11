@@ -22,9 +22,10 @@ function item(eventId: string, sender: string): TimelineItemView {
 
 function setup(items: TimelineItemView[], userId: string) {
   const sendMessage = vi.fn(() => Promise.resolve());
+  const editMessage = vi.fn(() => Promise.resolve());
   const core = {
     session: { user_id: userId },
-    commands: { sendMessage },
+    commands: { sendMessage, editMessage },
   } as unknown as CoreClient;
   const personas = {
     personas: [],
@@ -35,6 +36,7 @@ function setup(items: TimelineItemView[], userId: string) {
 
   return {
     sendMessage,
+    editMessage,
     conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM }),
   };
 }
@@ -82,4 +84,47 @@ test('replying to yourself never mentions', () => {
 
   conversation.reply('$one:example.org');
   expect(conversation.context?.silentReply).toBe(true);
+});
+
+test('editing a pending message uses its transaction ID', async () => {
+  const pending = {
+    ...item('local-id', '@kris:example.org'),
+    event_id: null,
+    transaction_id: 'transaction-1',
+  };
+  const { conversation, editMessage } = setup([pending], '@kris:example.org');
+  conversation.editLast();
+  await conversation.sendMessage(ROOM, 'corrected');
+  expect(editMessage).toHaveBeenCalledWith(
+    ROOM,
+    null,
+    'corrected',
+    expect.objectContaining({ transactionId: 'transaction-1' })
+  );
+});
+
+test('an edit still targets its event after the item leaves the visible timeline', async () => {
+  const { conversation, editMessage } = setup([], '@kris:example.org');
+  conversation.edit('$original', 'before');
+  await conversation.sendMessage(ROOM, 'after');
+  expect(editMessage).toHaveBeenCalledWith(ROOM, '$original', 'after', expect.anything());
+});
+
+test('a pending edit follows its stable timeline ID after sync drops the transaction ID', async () => {
+  const pending = {
+    ...item('local-id', '@kris:example.org'),
+    event_id: null,
+    transaction_id: 'transaction-1',
+  };
+  const items: TimelineItemView[] = [pending];
+  const { conversation, editMessage } = setup(items, '@kris:example.org');
+  conversation.editLast();
+  items[0] = { ...pending, event_id: '$sent', transaction_id: null };
+  await conversation.sendMessage(ROOM, 'corrected');
+  expect(editMessage).toHaveBeenCalledWith(
+    ROOM,
+    '$sent',
+    'corrected',
+    expect.objectContaining({ transactionId: null })
+  );
 });

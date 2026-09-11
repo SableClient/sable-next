@@ -4,6 +4,7 @@
   import GifGrid from '#lib/features/gif/GifGrid.svelte';
   import type { GifProviderSetting, GifResult, GifsConfig } from '#lib/features/gif/providers.js';
   import { i18n } from '#lib/i18n.js';
+  import { loadPacks } from '#lib/emoji/load-packs.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -64,18 +65,16 @@
     let cancelled = false;
     loading = true;
     failed = false;
-    void core.commands.imagePacks(roomId).then(
-      (loaded) => {
-        if (cancelled) return;
-        packs = loaded;
-        loading = false;
-      },
-      () => {
-        if (cancelled) return;
-        failed = true;
-        loading = false;
-      }
-    );
+    packs = [];
+    void loadPacks(core.commands, roomId, (loaded) => {
+      if (cancelled) return;
+      packs = loaded;
+      loading = false;
+    }).catch(() => {
+      if (cancelled) return;
+      failed = true;
+      loading = false;
+    });
     return () => {
       cancelled = true;
     };

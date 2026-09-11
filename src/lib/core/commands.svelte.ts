@@ -101,16 +101,9 @@ export type SendAttachmentOptions = {
   persona?: PerMessageProfileView | null;
 };
 
-export type EditImage = {
-  source: string;
-  filename: string | null;
-  mime: string | null;
-  width: number | null;
-  height: number | null;
-};
-
 export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
-  image?: EditImage | null;
+  mediaCaption?: boolean;
+  transactionId?: string | null;
 };
 
 const EMPTY_SEARCH_FILTER: SearchFilter = {
@@ -428,10 +421,11 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async imagePacks(roomId: string): Promise<ImagePackView[]> {
+    async imagePacks(roomId: string, cachedOnly = false): Promise<ImagePackView[]> {
       const response = await transport().send({
         type: 'image_packs',
         room_id: roomId,
+        cached_only: cachedOnly,
       });
       return response.packs;
     },
@@ -690,7 +684,7 @@ export function createCommands(transport: () => Transport) {
 
     async editMessage(
       roomId: string,
-      eventId: string,
+      eventId: string | null,
       body: string,
       options: EditMessageOptions = {}
     ): Promise<void> {
@@ -699,10 +693,11 @@ export function createCommands(transport: () => Transport) {
         type: 'edit_message',
         room_id: roomId,
         event_id: eventId,
+        transaction_id: options.transactionId ?? null,
         body,
         formatted: options.formatted ?? null,
         kind: options.kind ?? 'text',
-        image: options.image ?? null,
+        media_caption: options.mediaCaption ?? false,
         thread_root: options.threadRoot ?? null,
         mentions: mentions.userIds,
         mentions_room: mentions.room,
@@ -1069,12 +1064,20 @@ export function createCommands(transport: () => Transport) {
       return transport().fetchMedia(source, width, height);
     },
 
-    async markRead(roomId: string, eventId: string, privateReceipt = false): Promise<void> {
+    async markRead(
+      roomId: string,
+      eventId: string,
+      privateReceipt = false,
+      threadRoot: string | null = null,
+      subscription: SubscriptionId | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'mark_read',
         room_id: roomId,
         event_id: eventId,
         private_receipt: privateReceipt,
+        thread_root: threadRoot,
+        subscription,
       });
     },
 

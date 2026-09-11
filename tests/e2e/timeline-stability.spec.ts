@@ -1625,3 +1625,50 @@ test('shows jump to latest for a sent echo while reading a page back and returns
   await expect(timeline.itemById('sent-near-latest')).toBeInViewport();
   await expect(timeline.jumpToLatest).toBeHidden();
 });
+
+test('an animated jump to a reply target settles on it instead of the end', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  // Every other spec runs under the config's `reducedMotion: 'reduce'`, which
+  // takes `jumpTo`'s hard-write branch and never exercises the animated one.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await loadScrollableHistory(core, timeline);
+
+  const target = '$mobile-4:example.test';
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('mobile-answer', 'Answering something older'),
+        in_reply_to: {
+          event_id: target,
+          sender: '@bob:example.test',
+          sender_name: 'Bob',
+          body: 'Mobile history 4',
+        },
+      },
+    },
+  ]);
+  await timeline.expectAtLatest('Answering something older');
+
+  await timeline.container
+    .locator('.item')
+    .filter({ hasText: 'Answering something older' })
+    .locator('.reply-preview')
+    .click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(target);
+  await timeline.waitForScrollSettled();
+
+  // The animation writes nothing on the task that starts it, so a jump that
+  // re-pins on the offset it has not reached yet ends back at the bottom.
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+  await expect(timeline.itemByEventId(target)).toBeInViewport();
+});

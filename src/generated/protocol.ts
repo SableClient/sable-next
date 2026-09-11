@@ -55,13 +55,13 @@ export type CallSupportView = {
 	can_join: boolean,
 };
 
-export type Command = { type: "discover_homeserver"; server_name: string } | { type: "login"; homeserver: string; username: string; password: string } | { type: "login_flows"; homeserver: string } | { type: "registration_flows"; homeserver: string } | { type: "register"; homeserver: string; username: string; password: string; registration_email: string | null; registration_token: string | null } | { type: "request_registration_email"; email: string } | { type: "submit_registration_email"; token: string } | { type: "continue_registration" } | { type: "cancel_registration" } | { type: "start_oidc_login"; homeserver: string; redirect_uri: string; intent: AuthIntent } | { type: "complete_oidc_login"; callback_url: string } | { type: "start_sso_login"; homeserver: string; redirect_uri: string; idp_id: string | null; intent: AuthIntent } | { type: "complete_sso_login"; callback_url: string } | { type: "restore" } | { type: "list_accounts" } | { type: "switch_account"; account_id: string } | { type: "remove_account"; account_id: string } | { type: "logout" } | { type: "homeserver_info" } | { type: "subscribe_room_list" } | { type: "subscribe_timeline"; room_id: string; focus: TimelineFocusView;
+export type Command = { type: "discover_homeserver"; server_name: string } | { type: "login"; reauth_account_id: string | null; homeserver: string; username: string; password: string } | { type: "login_flows"; homeserver: string } | { type: "registration_flows"; homeserver: string } | { type: "register"; homeserver: string; username: string; password: string; registration_email: string | null; registration_token: string | null } | { type: "request_registration_email"; email: string } | { type: "submit_registration_email"; token: string } | { type: "continue_registration" } | { type: "cancel_registration" } | { type: "start_oidc_login"; reauth_account_id: string | null; homeserver: string; redirect_uri: string; intent: AuthIntent } | { type: "complete_oidc_login"; callback_url: string } | { type: "start_sso_login"; reauth_account_id: string | null; homeserver: string; redirect_uri: string; idp_id: string | null; intent: AuthIntent } | { type: "complete_sso_login"; callback_url: string } | { type: "restore" } | { type: "list_accounts" } | { type: "switch_account"; account_id: string } | { type: "remove_account"; account_id: string } | { type: "logout" } | { type: "homeserver_info" } | { type: "subscribe_room_list" } | { type: "subscribe_timeline"; room_id: string; focus: TimelineFocusView;
 /**
  *  Relaxes the event filter so events the SDK would otherwise drop
  *  arrive as `HiddenEvent`. Baked into the timeline, so flipping it
  *  means re-subscribing.
  */
-hidden_events: boolean } | { type: "unsubscribe"; subscription: SubscriptionId } | { type: "paginate"; subscription: SubscriptionId; direction: PaginationDirection; count: number } | { type: "room_members"; room_id: string; memberships: MembershipView[] } | { type: "room_permissions"; room_id: string } | { type: "notification_settings"; room_id: string } | { type: "default_notification_modes" } | { type: "notification"; room_id: string; event_id: string } | { type: "image_packs"; room_id: string } | { type: "all_image_packs" } | { type: "user_profile"; user_id: string } | { type: "user_relations"; user_id: string } | { type: "send_message"; room_id: string; body: string; formatted: string | null; kind: MessageKind; thread_root: string | null;
+hidden_events: boolean } | { type: "unsubscribe"; subscription: SubscriptionId } | { type: "paginate"; subscription: SubscriptionId; direction: PaginationDirection; count: number } | { type: "room_members"; room_id: string; memberships: MembershipView[] } | { type: "room_permissions"; room_id: string } | { type: "notification_settings"; room_id: string } | { type: "default_notification_modes" } | { type: "notification"; room_id: string; event_id: string } | { type: "image_packs"; room_id: string; cached_only: boolean } | { type: "all_image_packs" } | { type: "user_profile"; user_id: string } | { type: "user_relations"; user_id: string } | { type: "send_message"; room_id: string; body: string; formatted: string | null; kind: MessageKind; thread_root: string | null;
 /**
  *  Replying inside a thread needs no extra field: the SDK infers the
  *  thread from the replied-to event.
@@ -72,9 +72,7 @@ url: string; body: string; info: PackImageInfoView | null; in_reply_to: string |
 /**  `mxc://` only; the core rejects anything else. */
 url: string; body: string; width: number | null; height: number | null; mimetype: string; size: number | null; in_reply_to: string | null; thread_root: string | null; persona: PerMessageProfileView | null } |
 /**  `edited` on the view flips once the server has the replacement. */
-{ type: "edit_message"; room_id: string; event_id: string; body: string; formatted: string | null; kind: MessageKind;
-/**  Present when editing an image caption, so the replacement retains its media. */
-image: EditImageView | null; thread_root: string | null; mentions: string[]; mentions_room: boolean; persona: PerMessageProfileView | null } |
+{ type: "edit_message"; room_id: string; event_id: string | null; transaction_id: string | null; body: string; formatted: string | null; kind: MessageKind; media_caption: boolean; thread_root: string | null; mentions: string[]; mentions_room: boolean; persona: PerMessageProfileView | null } |
 /**  The filled-in details arrive as a timeline diff, not as the response. */
 { type: "fetch_event_details"; room_id: string; event_id: string; thread_root: string | null } | { type: "redact"; room_id: string; event_id: string; reason: string | null; thread_root: string | null } | { type: "bulk_redact"; room_id: string; senders: string[]; after_ts: number; event_types: string[]; reason: string | null } | { type: "pinned_events"; room_id: string } | { type: "set_pinned"; room_id: string; event_id: string; pinned: boolean } | { type: "room_power_levels"; room_id: string } | { type: "room_versions" } | { type: "room_aliases"; room_id: string } | { type: "create_room_alias"; room_id: string; alias: string } | { type: "delete_room_alias"; alias: string } | { type: "public_rooms"; server: string | null; search: string | null; since: string | null } | { type: "room_directory_visibility"; room_id: string } | { type: "set_room_directory_visibility"; room_id: string; public: boolean } | { type: "upgrade_room"; room_id: string; new_version: string; additional_creators: string[] } | { type: "room_state_event"; room_id: string; event_type: string; state_key: string } | { type: "room_state_events"; room_id: string; event_type: string } | { type: "url_preview"; url: string } | { type: "list_threads"; room_id: string; from: string | null } | { type: "notification_keywords" } | { type: "add_notification_keyword"; keyword: string } | { type: "remove_notification_keyword"; keyword: string } | { type: "timestamp_to_event"; room_id: string; ts: number; direction: PaginationDirection } | { type: "room_account_data"; room_id: string; event_type: string } | { type: "account_data_types" } | { type: "access_token" } | { type: "account_data"; event_type: string } | { type: "set_account_data"; event_type: string; content: unknown } | { type: "set_room_account_data"; room_id: string; event_type: string; content: unknown } | { type: "report_message"; room_id: string; event_id: string; reason: string | null } | { type: "event_source"; room_id: string; event_id: string } | { type: "forward_message"; room_id: string; event_id: string; to_room_id: string } | { type: "personas" } | { type: "save_persona"; persona: PersonaView; previous_id: string | null } | { type: "remove_persona"; id: string } | { type: "reorder_personas"; ids: string[] } | { type: "set_persona_selection"; room_id: string | null; persona_id: string | null; valid_until: number | null } | { type: "bookmarks" } | { type: "set_bookmark"; room_id: string; event_id: string; bookmarked: boolean; now_ms: number } | { type: "react"; room_id: string; event_id: string; key: string; thread_root: string | null } | { type: "send_location"; room_id: string; body: string; geo_uri: string; in_reply_to: string | null; thread_root: string | null } | { type: "room_timeline_events"; room_id: string; event_type: string; msgtype: string | null; limit: number; since: string | null } | { type: "room_state_events_raw"; room_id: string; event_type: string; state_key: string | null } | { type: "search_user_directory"; term: string; limit: number | null } | { type: "open_id_token" } | { type: "schedule_message"; room_id: string; body: string; formatted: string | null; delay_ms: number } | { type: "scheduled_messages"; room_id: string | null } | { type: "cancel_scheduled_message"; delay_id: string } | { type: "send_scheduled_message"; delay_id: string } | { type: "delayed_events_supported" } |
 /**  MSC3381. */
@@ -88,7 +86,7 @@ event_id: string;
 /**  Answer ids, not their text. */
 answers: string[]; thread_root: string | null } |
 /**  Irreversible. */
-{ type: "end_poll"; room_id: string; event_id: string; thread_root: string | null } | { type: "mark_read"; room_id: string; event_id: string; private_receipt: boolean } | { type: "mark_unread"; room_id: string; read_marker: string | null } | { type: "retry_send"; room_id: string; transaction_id: string; thread_root: string | null } |
+{ type: "end_poll"; room_id: string; event_id: string; thread_root: string | null } | { type: "mark_read"; room_id: string; event_id: string; private_receipt: boolean; thread_root: string | null; subscription: SubscriptionId | null } | { type: "mark_unread"; room_id: string; read_marker: string | null } | { type: "retry_send"; room_id: string; transaction_id: string; thread_root: string | null } |
 /**  A local echo is not on the server, so it cannot be redacted. */
 { type: "cancel_send"; room_id: string; transaction_id: string; thread_root: string | null } | { type: "create_room"; name: string | null; topic: string | null; kind: CreateRoomKind;
 /**  Published in the directory, joinable by link. */
@@ -132,12 +130,7 @@ via: string[] } |
  */
 { type: "enable_recovery";
 /**  A passphrase to unlock the key with. The key is returned either way. */
-passphrase: string | null } |
-/**
- *  Issues a new key and abandons whatever the old backup held. For a key the
- *  user has lost, not for rotation.
- */
-{ type: "reset_recovery_key"; passphrase: string | null } |
+passphrase: string | null } | { type: "reset_recovery_key"; passphrase: string | null } |
 /**
  *  Call without a password first: the server states its terms in an
  *  `interactive_auth_required` error, and only then is there a prompt.
@@ -286,14 +279,6 @@ export type DisplayNameChangeView = {
 	new: string | null,
 };
 
-export type EditImageView = {
-	source: string,
-	filename: string | null,
-	mime: string | null,
-	width: number | null,
-	height: number | null,
-};
-
 export type EmojiView = {
 	symbol: string,
 	/**  English, from the spec's table. */
@@ -407,7 +392,7 @@ export type NotificationSettingsView = {
 export type NotificationView = {
 	user_id: string,
 	room_id: string,
-	event_id: string,
+	event_id: string | null,
 	room_name: string,
 	room_avatar_url: string | null,
 	is_direct: boolean,

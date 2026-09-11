@@ -24,6 +24,7 @@ type FallbackResult = Extract<RegistrationResultView, { state: 'fallback' }>;
 interface RedirectControllerOptions {
   core: CoreClient;
   getHomeserver: () => string;
+  getReauthAccountId?: () => string | undefined;
   getValidationError: () => string | null;
   validateHomeserver: () => Promise<LoginFlowsView | null>;
   onMarkLoggedIn: () => void;
@@ -102,13 +103,15 @@ export class RedirectController {
           ? await this.options.core.startOidcLogin(
               this.options.getHomeserver().trim(),
               callbackUri,
-              intent
+              intent,
+              intent === 'login' ? this.options.getReauthAccountId?.() : undefined
             )
           : await this.options.core.startSsoLogin(
               this.options.getHomeserver().trim(),
               callbackUri,
               id,
-              intent
+              intent,
+              intent === 'login' ? this.options.getReauthAccountId?.() : undefined
             );
       if (deliversDeepLinks()) {
         await openExternalAuthUrl(authorizationUrl);

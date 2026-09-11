@@ -1,13 +1,12 @@
-import type { EditImage } from '#lib/core/commands.svelte.js';
-
 export interface ComposerContext {
   kind: 'reply' | 'edit';
   eventId: string;
+  timelineItemId?: string;
   sender?: string | null;
   silentReply?: boolean;
   body: string;
   html?: string | null;
-  image?: EditImage | null;
+  mediaCaption?: boolean;
 }
 
 export function formattedForEditing(html: string | null | undefined): string | null {

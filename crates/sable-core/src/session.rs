@@ -32,6 +32,7 @@ pub struct Session {
 pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedSession> {
     if let Some(full) = client.oauth().full_session() {
         return Some(PersistedSession {
+            resolved_homeserver: Some(client.homeserver()),
             homeserver,
             credentials: Credentials::oauth(full),
         });
@@ -41,6 +42,7 @@ pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedS
         .matrix_auth()
         .session()
         .map(|matrix| PersistedSession {
+            resolved_homeserver: Some(client.homeserver()),
             homeserver,
             credentials: Credentials::Password(matrix),
         })
@@ -60,8 +62,21 @@ pub enum Credentials {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PersistedSession {
+    #[serde(default)]
+    pub resolved_homeserver: Option<Url>,
     pub homeserver: String,
     pub credentials: Credentials,
+}
+
+impl PersistedSession {
+    #[must_use]
+    pub fn keeping_endpoint_of(mut self, previous: &Self) -> Self {
+        if previous.resolved_homeserver.is_some() {
+            self.resolved_homeserver
+                .clone_from(&previous.resolved_homeserver);
+        }
+        self
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -198,7 +213,6 @@ impl Credentials {
 }
 
 /// A filesystem path natively, an `IndexedDB` name on the web.
-///
 /// # Errors
 ///
 /// Returns the Matrix SDK build error if the local store or homeserver cannot
@@ -226,6 +240,19 @@ pub async fn build_client_at(
     account_builder(builder, store_id).build().await
 }
 
+/// # Errors
+///
+/// Returns the SDK build error if the store or homeserver cannot be initialized.
+pub async fn restore_client(
+    store_id: &str,
+    persisted: &PersistedSession,
+) -> Result<Client, matrix_sdk::ClientBuildError> {
+    match &persisted.resolved_homeserver {
+        Some(url) => build_client_at(store_id, url).await,
+        None => build_client(store_id, &persisted.homeserver).await,
+    }
+}
+
 fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
     let builder = builder
         .handle_refresh_tokens()
@@ -247,7 +274,6 @@ fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
 /// For dynamic client registration. The redirect URI must match the one handed
 /// to `OAuth::login`, and a private-use scheme must be the reverse-DNS of
 /// `client_uri`'s host or MAS rejects it with `invalid_redirect_uri`.
-///
 /// # Panics
 ///
 /// This function relies on `ClientMetadata` being serializable because all
@@ -316,14 +342,24 @@ fn origin_url(redirect_uri: &Url) -> Url {
 pub async fn start_sync(
     client: Client,
 ) -> Result<Arc<SyncService>, matrix_sdk_ui::sync_service::Error> {
-    let sync_service = Arc::new(
+    let sync_service = build_sync(client).await?;
+    sync_service.start().await;
+    Ok(sync_service)
+}
+
+/// # Errors
+///
+/// Returns the sync-service error if its initial state cannot be built.
+#[allow(clippy::arc_with_non_send_sync)]
+pub async fn build_sync(
+    client: Client,
+) -> Result<Arc<SyncService>, matrix_sdk_ui::sync_service::Error> {
+    Ok(Arc::new(
         SyncService::builder(client)
             .with_offline_mode()
             .build()
             .await?,
-    );
-    sync_service.start().await;
-    Ok(sync_service)
+    ))
 }
 
 #[must_use]
@@ -409,6 +445,30 @@ mod tests {
         // Re-anchoring here would point the client at an empty crypto store.
         assert_eq!(account.store_id, "sable-next");
         Ok(())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn resolved_endpoint_restores_without_discovery() {
+        let bytes = registry_json("unused");
+        let (mut registry, _) = AccountRegistry::from_bytes(&bytes, "unused").unwrap();
+        let persisted = &mut registry.accounts[0].session;
+        assert!(persisted.resolved_homeserver.is_none());
+        persisted.homeserver = "does-not-exist.invalid".to_owned();
+        persisted.resolved_homeserver = Some(url::Url::parse("https://endpoint.invalid").unwrap());
+        let directory = std::env::temp_dir().join(format!(
+            "sable-offline-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let client = super::restore_client(directory.to_str().unwrap(), persisted)
+            .await
+            .unwrap();
+        assert_eq!(
+            client.homeserver(),
+            persisted.resolved_homeserver.clone().unwrap()
+        );
+        drop(client);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

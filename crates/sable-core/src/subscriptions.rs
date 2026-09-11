@@ -35,15 +35,6 @@ impl Core {
         let subscription = self.allocate_subscription();
         let core = self.clone();
 
-        let client = {
-            let guard = self.session.read().await;
-            guard
-                .as_ref()
-                .ok_or(CommandErr::NotLoggedIn)?
-                .client
-                .clone()
-        };
-
         let task = spawn(async move {
             let room_list = match sync_service.room_list_service().all_rooms().await {
                 Ok(room_list) => room_list,
@@ -79,7 +70,7 @@ impl Core {
 
                 view::prime_display_names(&diffs).await;
                 for diff in &diffs {
-                    view::enrich_room_fields(&client, diff, &mut room_cache).await;
+                    view::enrich_room_fields(diff, &mut room_cache).await;
                 }
                 core.emit(CoreEvent::RoomListDiff {
                     subscription,
@@ -99,6 +90,7 @@ impl Core {
             Subscription {
                 tasks: vec![task],
                 timeline: None,
+                thread_root: None,
                 kind: SubscriptionKind::Other,
             },
         );
@@ -111,6 +103,7 @@ impl Core {
     }
 
     #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
+    #[allow(clippy::too_many_lines)] // Keep subscription registration and owned tasks together.
     pub(crate) async fn subscribe_timeline(
         self: &Arc<Self>,
         room_id: OwnedRoomId,
@@ -118,7 +111,7 @@ impl Core {
         hidden_events: bool,
     ) -> Result<CommandOk, CommandErr> {
         let subscription = self.allocate_subscription();
-        let live_room_id = matches!(focus, TimelineFocusView::Live).then(|| room_id.clone());
+        let live = matches!(focus, TimelineFocusView::Live);
         let room = self.room(&room_id).await?;
         let timeline = match &focus {
             TimelineFocusView::Live => self.live_timeline(&room_id, hidden_events).await?,
@@ -135,20 +128,24 @@ impl Core {
         let relays = Arc::new(room.service_members().unwrap_or_default());
 
         // The SDK replaces its explicit-room set wholesale. Register before
-        // computing the union so concurrent live subscriptions see each other.
         let _update = self.room_subscription_lock.lock().await;
         self.subscriptions.lock().await.insert(
             subscription,
             Subscription {
                 tasks: Vec::new(),
                 timeline: Some(timeline.clone()),
-                kind: live_room_id.clone().map_or(
-                    SubscriptionKind::FocusedTimeline,
-                    SubscriptionKind::LiveTimeline,
-                ),
+                thread_root: match &focus {
+                    TimelineFocusView::Thread { root_event_id } => Some(root_event_id.clone()),
+                    TimelineFocusView::Live | TimelineFocusView::Event { .. } => None,
+                },
+                kind: if live {
+                    SubscriptionKind::LiveTimeline(room_id.clone())
+                } else {
+                    SubscriptionKind::FocusedTimeline(room_id.clone())
+                },
             },
         );
-        if let Err(error) = self.sync_timeline_rooms_locked(live_room_id.as_ref()).await {
+        if let Err(error) = self.sync_timeline_rooms_locked().await {
             self.subscriptions.lock().await.remove(&subscription);
             return Err(error);
         }
@@ -219,18 +216,15 @@ impl Core {
         })
     }
 
-    pub(crate) async fn sync_timeline_rooms_locked(
-        &self,
-        pending_room: Option<&OwnedRoomId>,
-    ) -> Result<(), CommandErr> {
+    pub(crate) async fn sync_timeline_rooms_locked(&self) -> Result<(), CommandErr> {
         let subscriptions = self.subscriptions.lock().await;
         let room_ids = subscriptions
             .values()
             .filter_map(|subscription| match &subscription.kind {
-                SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
-                SubscriptionKind::Other | SubscriptionKind::FocusedTimeline => None,
+                SubscriptionKind::LiveTimeline(room_id)
+                | SubscriptionKind::FocusedTimeline(room_id) => Some(room_id.clone()),
+                SubscriptionKind::Other => None,
             })
-            .chain(pending_room.cloned())
             .collect::<std::collections::HashSet<_>>();
         drop(subscriptions);
         let room_refs = room_ids.iter().map(OwnedRoomId::as_ref).collect::<Vec<_>>();

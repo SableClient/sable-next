@@ -4,6 +4,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
@@ -76,8 +77,14 @@
     await timeline.paginateForward(25);
   }
 
-  function markRead(): Promise<void> {
-    return Promise.resolve();
+  function markRead(eventId: string): Promise<void> {
+    return core.commands.markRead(
+      roomId,
+      eventId,
+      readReceiptIsPrivate(),
+      rootEventId,
+      timeline.subscriptionId
+    );
   }
 </script>
 

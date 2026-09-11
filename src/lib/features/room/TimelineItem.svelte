@@ -81,18 +81,7 @@
     onToggleReaction?: (eventId: string, key: string) => void;
     onReply?: (eventId: string) => void;
     onOpenThread?: (rootEventId: string) => void;
-    onEdit?: (
-      eventId: string,
-      body: string,
-      html: string | null,
-      image?: {
-        source: string;
-        filename: string | null;
-        mime: string | null;
-        width: number | null;
-        height: number | null;
-      }
-    ) => void;
+    onEdit?: (eventId: string, body: string, html: string | null, mediaCaption?: boolean) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
     onCopyLink?: (eventId: string) => void;
     onMarkUnread?: (eventId: string) => void;
@@ -240,6 +229,7 @@
 
   let actions = $derived.by(() => {
     const eventId = item.event_id ?? '';
+    const editId = item.event_id ?? item.transaction_id ?? '';
     const body =
       item.content.kind === 'message' || item.content.kind === 'image' ? item.content.body : null;
     const html = item.content.kind === 'message' ? item.content.html : null;
@@ -277,20 +267,7 @@
       onEdit:
         editable && onEdit && body !== null
           ? () => {
-              onEdit(
-                eventId,
-                body,
-                html,
-                item.content.kind === 'image'
-                  ? {
-                      source: item.content.source,
-                      filename: item.content.filename,
-                      mime: item.content.mime,
-                      width: item.content.width,
-                      height: item.content.height,
-                    }
-                  : undefined
-              );
+              onEdit(editId, body, html, item.content.kind === 'image');
             }
           : undefined,
       onReproxy:
@@ -586,6 +563,9 @@
         onOverflowOpenChange={pinActions}
         {...actions}
       />
+    {/if}
+    {#if !actionable && editable && item.transaction_id && !item.per_message_profile && engaged}
+      <MessageActions {roomId} onEdit={actions.onEdit} />
     {/if}
     {#if actionable}
       {#if sourceOpen}

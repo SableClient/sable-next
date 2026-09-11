@@ -166,11 +166,15 @@ pub async fn show<R: Runtime>(
         .channel_id(MESSAGES_CHANNEL)
         .group(group_key(view))
         .group_conversation(!view.is_direct)
-        .action_type_id(MESSAGE_ACTIONS)
         .auto_cancel()
         .extra("user_id", view.user_id.as_str())
-        .extra("room_id", view.room_id.as_str())
-        .extra("event_id", view.event_id.as_str());
+        .extra("room_id", view.room_id.as_str());
+
+    if let Some(event_id) = &view.event_id {
+        builder = builder
+            .action_type_id(MESSAGE_ACTIONS)
+            .extra("event_id", event_id.as_str());
+    }
 
     if cfg!(target_os = "android") {
         builder = builder.icon("notification_icon");
@@ -233,7 +237,7 @@ fn test_view(sequence: u32) -> NotificationView {
     NotificationView {
         user_id: owned_user_id!("@sable:notification.test"),
         room_id: owned_room_id!("!notification:notification.test"),
-        event_id: owned_event_id!("$notification-test"),
+        event_id: Some(owned_event_id!("$notification-test")),
         room_name: "Notification test".to_owned(),
         room_avatar_url: None,
         is_direct: false,
@@ -512,7 +516,7 @@ mod tests {
         NotificationView {
             user_id: "@me:example.org".parse().expect("a user id"),
             room_id: "!room:example.org".parse().expect("a room id"),
-            event_id: "$event".parse().expect("an event id"),
+            event_id: Some("$event".parse().expect("an event id")),
             room_name: "Design crew".to_owned(),
             room_avatar_url: None,
             is_direct,

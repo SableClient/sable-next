@@ -9,7 +9,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
-import type { EditImage, SendAttachmentOptions } from '#lib/core/commands.svelte.js';
+import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
 import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure.js';
@@ -71,15 +71,26 @@ export class Conversation {
     if (body === '') return;
 
     if (pending?.kind === 'edit') {
-      const edited = this.#timeline.items.find((entry) => entry.event_id === pending.eventId);
-      await this.#core.commands.editMessage(targetRoomId, pending.eventId, body, {
-        formatted,
-        mentions,
-        kind: editedKind(edited),
-        image: pending.image,
-        threadRoot: this.#threadRoot,
-        persona: edited?.per_message_profile ?? null,
-      });
+      const edited = this.#timeline.items.find(
+        (entry) =>
+          entry.id === pending.timelineItemId ||
+          entry.event_id === pending.eventId ||
+          entry.transaction_id === pending.eventId
+      );
+      await this.#core.commands.editMessage(
+        targetRoomId,
+        edited?.event_id ?? (pending.eventId.startsWith('$') ? pending.eventId : null),
+        body,
+        {
+          transactionId: edited?.event_id ? null : edited?.transaction_id,
+          formatted,
+          mentions,
+          kind: editedKind(edited),
+          mediaCaption: pending.mediaCaption,
+          threadRoot: this.#threadRoot,
+          persona: edited?.per_message_profile ?? null,
+        }
+      );
       this.context = null;
       return;
     }
@@ -281,9 +292,12 @@ export class Conversation {
     eventId: string,
     body: string,
     html: string | null = null,
-    image: EditImage | null = null
+    mediaCaption = false
   ): void => {
-    this.context = { kind: 'edit', eventId, body, html, image };
+    const item = this.#timeline.items.find(
+      (entry) => entry.event_id === eventId || entry.transaction_id === eventId
+    );
+    this.context = { kind: 'edit', eventId, timelineItemId: item?.id, body, html, mediaCaption };
   };
 
   readonly editLast = (): void => {
@@ -292,10 +306,12 @@ export class Conversation {
 
     for (let index = this.#timeline.items.length - 1; index >= 0; index -= 1) {
       const item = this.#timeline.items[index];
-      if (!item.event_id || item.sender !== userId) continue;
+      const itemId = item.event_id ?? item.transaction_id;
+      if (!itemId || item.sender !== userId) continue;
+      if (!item.event_id && item.per_message_profile) continue;
       if (item.content.kind !== 'message') continue;
 
-      this.edit(item.event_id, item.content.body, item.content.html);
+      this.edit(itemId, item.content.body, item.content.html);
       return;
     }
   };

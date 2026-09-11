@@ -2,37 +2,16 @@ use std::time::Duration;
 
 use matrix_sdk::ruma::api::FeatureFlag;
 use matrix_sdk::ruma::api::client::delayed_events::{
-    DelayParameters, delayed_message_event, update_delayed_event,
+    DelayParameters, delayed_message_event, get_all_delayed_events, update_delayed_event,
 };
 use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
 use matrix_sdk::ruma::{OwnedRoomId, TransactionId};
-use serde::Deserialize;
 
 use crate::Core;
 use crate::protocol::{CommandErr, ScheduledMessageView};
 
 const MSC4140: &str = "org.matrix.msc4140";
-
-#[derive(Debug, Deserialize)]
-struct DelayedEventsResponse {
-    #[serde(default)]
-    delayed_events: Vec<DelayedEventItem>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DelayedEventItem {
-    delay_id: String,
-    room_id: OwnedRoomId,
-    #[serde(rename = "type")]
-    event_type: String,
-    #[serde(default)]
-    delay: u64,
-    #[serde(default)]
-    running_since: Option<u64>,
-    #[serde(default)]
-    content: serde_json::Value,
-}
 
 impl Core {
     pub(crate) async fn delayed_events_supported(&self) -> Result<bool, CommandErr> {
@@ -117,63 +96,48 @@ impl Core {
             return Ok(Vec::new());
         }
         let client = self.client().await?;
-        let endpoint = client
-            .homeserver()
-            .join(&format!(
-                "/_matrix/client/unstable/{MSC4140}/delayed_events"
-            ))
-            .map_err(|error| self.failed("scheduled_messages", error))?;
-        let token = client
-            .access_token()
-            .ok_or_else(|| self.failed("scheduled_messages", "no access token"))?;
-
-        let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
-            .build()
-            .map_err(|error| self.failed("scheduled_messages", error))?;
-
-        let response = http
-            .get(endpoint)
-            .bearer_auth(token)
-            .send()
+        let response = client
+            .send(get_all_delayed_events::unstable::Request::new())
             .await
-            .map_err(|error| self.failed("scheduled_messages", error))?;
-        if !response.status().is_success() {
-            return Err(self.failed(
-                "scheduled_messages",
-                format!("delayed events refused with {}", response.status()),
-            ));
-        }
+            .map_err(|error| self.homeserver_http_error("scheduled_messages", error))?;
 
-        let body = response
-            .text()
-            .await
-            .map_err(|error| self.failed("scheduled_messages", error))?;
-        let parsed: DelayedEventsResponse = serde_json::from_str(&body)
-            .map_err(|error| self.failed("scheduled_messages", error))?;
-
-        Ok(parsed
+        Ok(response
             .delayed_events
             .into_iter()
-            .filter(|item| item.event_type == "m.room.message")
+            .filter(|item| {
+                item.event_type == matrix_sdk::ruma::events::TimelineEventType::RoomMessage
+            })
+            .filter(|item| item.finalized_ts.is_none())
             .filter(|item| room_id.is_none_or(|wanted| &item.room_id == wanted))
-            .map(|item| ScheduledMessageView {
-                delivery_ts: item
-                    .running_since
-                    .map(|since| since.saturating_add(item.delay)),
-                body: item
+            .filter_map(|item| {
+                let content = item
                     .content
-                    .get("body")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned(),
-                formatted: item
-                    .content
-                    .get("formatted_body")
-                    .and_then(serde_json::Value::as_str)
-                    .map(str::to_owned),
-                delay_id: item.delay_id,
-                room_id: item.room_id,
-                delay_ms: item.delay,
+                    .deserialize_as_unchecked::<RoomMessageEventContent>()
+                    .ok()?;
+                let delay_ms = u64::try_from(item.delay.as_millis()).unwrap_or(u64::MAX);
+                let formatted = match &content.msgtype {
+                    matrix_sdk::ruma::events::room::message::MessageType::Text(text) => text
+                        .formatted
+                        .as_ref()
+                        .map(|formatted| formatted.body.clone()),
+                    matrix_sdk::ruma::events::room::message::MessageType::Notice(notice) => notice
+                        .formatted
+                        .as_ref()
+                        .map(|formatted| formatted.body.clone()),
+                    matrix_sdk::ruma::events::room::message::MessageType::Emote(emote) => emote
+                        .formatted
+                        .as_ref()
+                        .map(|formatted| formatted.body.clone()),
+                    _ => None,
+                };
+                Some(ScheduledMessageView {
+                    delivery_ts: Some(u64::from(item.running_since.get()).saturating_add(delay_ms)),
+                    body: content.body().to_owned(),
+                    formatted,
+                    delay_id: item.delay_id,
+                    room_id: item.room_id,
+                    delay_ms,
+                })
             })
             .collect())
     }

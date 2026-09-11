@@ -13,35 +13,110 @@ use crate::{Core, PendingLogin};
 use crate::{protocol, session};
 
 impl Core {
+    async fn reauthentication_account(
+        &self,
+        account_id: Option<String>,
+    ) -> Result<Option<session::PersistedAccount>, CommandErr> {
+        let Some(account_id) = account_id else {
+            return Ok(None);
+        };
+        let account = self
+            .accounts()
+            .await?
+            .accounts
+            .into_iter()
+            .find(|account| account.account_id == account_id && account.needs_reauth)
+            .ok_or(CommandErr::NotLoggedIn)?;
+        Ok(Some(account))
+    }
+
+    async fn login_client(
+        &self,
+        store_id: &str,
+        homeserver: &str,
+        account: Option<&session::PersistedAccount>,
+    ) -> Result<matrix_sdk::Client, matrix_sdk::ClientBuildError> {
+        match account {
+            Some(account) => session::restore_client(store_id, &account.session).await,
+            None => self.build_account_client(store_id, homeserver).await,
+        }
+    }
+
+    async fn validate_reauthentication(
+        &self,
+        expected: Option<&session::PersistedAccount>,
+        client: &matrix_sdk::Client,
+    ) -> Result<(), CommandErr> {
+        let Some(expected) = expected else {
+            return Ok(());
+        };
+        let outcome = match self
+            .reauthentication_account(Some(expected.account_id.clone()))
+            .await
+        {
+            Err(error) => Err(error),
+            Ok(None) => Err(CommandErr::NotLoggedIn),
+            Ok(Some(account))
+                if client.user_id().map(ToString::to_string)
+                    != Some(account.session.credentials.user_id())
+                    || client.device_id().map(ToString::to_string)
+                        != Some(account.session.credentials.device_id()) =>
+            {
+                Err(CommandErr::Denied)
+            }
+            Ok(Some(_)) => Ok(()),
+        };
+        if outcome.is_err()
+            && let Err(error) = client.logout().await
+        {
+            tracing::warn!(?error, "could not log out a rejected reauthentication");
+        }
+        outcome
+    }
+
     pub(crate) async fn login(
         self: &Arc<Self>,
         homeserver: String,
         username: String,
         password: String,
+        reauth_account_id: Option<String>,
     ) -> Result<CommandOk, CommandErr> {
-        let (account_id, account_store_id) = self.allocate_account().await?;
+        let reauth = self.reauthentication_account(reauth_account_id).await?;
+        let homeserver = reauth
+            .as_ref()
+            .map_or(homeserver, |account| account.session.homeserver.clone());
+        let (account_id, account_store_id) = match &reauth {
+            Some(account) => (account.account_id.clone(), account.store_id.clone()),
+            None => self.allocate_account().await?,
+        };
         tracing::info!(
             operation = "password_login",
             homeserver,
             "building Matrix client"
         );
         let client = self
-            .build_account_client(&account_store_id, &homeserver)
+            .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await
             .map_err(|error| self.failed("build_client", error))?;
+        let endpoint = client.homeserver();
 
         tracing::info!(
             operation = "password_login",
             homeserver,
             "requesting an authenticated session"
         );
-        client
+        let username = reauth
+            .as_ref()
+            .map_or(username, |account| account.session.credentials.user_id());
+        let mut login = client
             .matrix_auth()
             .login_username(&username, &password)
             .initial_device_display_name("Sable")
-            .request_refresh_token()
-            .await
-            .map_err(|error| self.login_error(error))?;
+            .request_refresh_token();
+        if let Some(account) = &reauth {
+            login = login.device_id(&account.session.credentials.device_id());
+        }
+        login.await.map_err(|error| self.login_error(error))?;
 
         let matrix = client
             .matrix_auth()
@@ -49,15 +124,18 @@ impl Core {
             .ok_or_else(|| self.failed("login", "no session after a successful login"))?;
 
         let user_id = matrix.meta.user_id.clone();
-        let mut generation = self.claim_session_generation();
+        self.validate_reauthentication(reauth.as_ref(), &client)
+            .await?;
+        let generation = self.claim_session_generation().await;
         self.persist(
             &account_id,
             &account_store_id,
             &PersistedSession {
+                resolved_homeserver: Some(endpoint),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
             },
-            generation.value(),
+            reauth.as_ref(),
         )
         .await?;
         tracing::info!(
@@ -67,10 +145,8 @@ impl Core {
         );
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
-        self.set_active_account(&account_id).await?;
         self.pending_login.lock().await.take();
         self.pending_registration.lock().await.take();
-        generation.commit();
 
         tracing::info!(operation = "password_login", "login completed");
         Ok(CommandOk::Login { user_id })
@@ -175,22 +251,53 @@ impl Core {
         homeserver: String,
         redirect_uri: String,
         intent: AuthIntent,
+        reauth_account_id: Option<String>,
     ) -> Result<CommandOk, CommandErr> {
-        let (account_id, account_store_id) = self.allocate_account().await?;
+        let reauth = self.reauthentication_account(reauth_account_id).await?;
+        let homeserver = reauth
+            .as_ref()
+            .map_or(homeserver, |account| account.session.homeserver.clone());
+        let (account_id, account_store_id) = match &reauth {
+            Some(account) => (account.account_id.clone(), account.store_id.clone()),
+            None => self.allocate_account().await?,
+        };
         tracing::info!(operation = "oidc_login", intent = ?intent, "starting OAuth login");
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_oidc_login: redirect_uri", error))?;
 
         let client = self
-            .build_account_client(&account_store_id, &homeserver)
+            .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await
             .map_err(|error| self.failed("start_oidc_login: build_client", error))?;
 
         let registration = session::client_metadata(&redirect_uri).into();
+        if let Some(account) = &reauth {
+            if matches!(intent, AuthIntent::Register) {
+                return Err(CommandErr::Denied);
+            }
+            if let Credentials::OAuth { client_id, .. } = &account.session.credentials {
+                client.oauth().restore_registered_client(
+                    matrix_sdk::authentication::oauth::ClientId::new(client_id.clone()),
+                );
+            }
+        }
+        let device_id = reauth
+            .as_ref()
+            .map(|account| account.session.credentials.device_id().into());
 
-        let mut login = client
-            .oauth()
-            .login(redirect_uri.clone(), None, Some(registration), None);
+        let mut login =
+            client
+                .oauth()
+                .login(redirect_uri.clone(), device_id, Some(registration), None);
+        if let Some(account) = &reauth {
+            let user_id: matrix_sdk::ruma::OwnedUserId = account
+                .session
+                .credentials
+                .user_id()
+                .parse()
+                .map_err(|error| self.failed("reauth user", error))?;
+            login = login.user_id_hint(&user_id);
+        }
         if matches!(intent, AuthIntent::Register) {
             login = login.prompt(vec![
                 matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::Prompt::Create,
@@ -207,7 +314,7 @@ impl Core {
             .append_pair("response_mode", response_mode(&redirect_uri));
         let authorization_url = authorization_url.to_string();
         let mut pending = self.pending_login.lock().await;
-        if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _, _, _))) {
+        if matches!(pending.as_ref(), Some(PendingLogin::Sso(_, _, _, _, _, _))) {
             return Err(CommandErr::Unavailable);
         }
 
@@ -220,6 +327,7 @@ impl Core {
             homeserver,
             redirect_uri,
             client,
+            reauth,
         ));
 
         tracing::info!(
@@ -238,7 +346,7 @@ impl Core {
             .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Oidc(_, _, _, expected_redirect_uri, client)) = pending.as_ref()
+        let Some(PendingLogin::Oidc(_, _, _, expected_redirect_uri, client, _)) = pending.as_ref()
         else {
             tracing::warn!("no pending OIDC login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
@@ -258,7 +366,7 @@ impl Core {
             .await
             .map_err(|error| self.failed("complete_oidc_login", error))?;
 
-        let Some(PendingLogin::Oidc(account_id, account_store_id, homeserver, _, client)) =
+        let Some(PendingLogin::Oidc(account_id, account_store_id, homeserver, _, client, reauth)) =
             pending.take()
         else {
             return Err(CommandErr::Unavailable);
@@ -271,23 +379,24 @@ impl Core {
             .ok_or_else(|| self.failed("complete_oidc_login", "no session after finish_login"))?;
 
         let user_id = full.user.meta.user_id.clone();
-        let mut generation = self.claim_session_generation();
+        self.validate_reauthentication(reauth.as_ref(), &client)
+            .await?;
+        let generation = self.claim_session_generation().await;
         self.persist(
             &account_id,
             &account_store_id,
             &PersistedSession {
+                resolved_homeserver: Some(client.homeserver()),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::oauth(full),
             },
-            generation.value(),
+            reauth.as_ref(),
         )
         .await?;
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
-        self.set_active_account(&account_id).await?;
         self.pending_login.lock().await.take();
         self.pending_registration.lock().await.take();
-        generation.commit();
 
         tracing::info!(operation = "oidc_login", "OAuth login completed");
         Ok(CommandOk::CompleteOidcLogin { user_id })
@@ -299,8 +408,19 @@ impl Core {
         redirect_uri: String,
         idp_id: Option<String>,
         intent: AuthIntent,
+        reauth_account_id: Option<String>,
     ) -> Result<CommandOk, CommandErr> {
-        let (account_id, account_store_id) = self.allocate_account().await?;
+        let reauth = self.reauthentication_account(reauth_account_id).await?;
+        let homeserver = reauth
+            .as_ref()
+            .map_or(homeserver, |account| account.session.homeserver.clone());
+        let (account_id, account_store_id) = match &reauth {
+            Some(account) => (account.account_id.clone(), account.store_id.clone()),
+            None => self.allocate_account().await?,
+        };
+        if reauth.is_some() && matches!(intent, AuthIntent::Register) {
+            return Err(CommandErr::Denied);
+        }
         tracing::info!(operation = "sso_login", intent = ?intent, "starting SSO login");
         let redirect_uri = Url::parse(&redirect_uri)
             .map_err(|error| self.failed("start_sso_login: redirect_uri", error))?;
@@ -309,7 +429,7 @@ impl Core {
         }
 
         let client = self
-            .build_account_client(&account_store_id, &homeserver)
+            .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await
             .map_err(|error| self.failed("start_sso_login: build_client", error))?;
 
@@ -340,6 +460,7 @@ impl Core {
             homeserver,
             redirect_uri,
             client,
+            reauth,
         ));
 
         tracing::info!(
@@ -365,7 +486,7 @@ impl Core {
         }
 
         let mut pending = self.pending_login.lock().await;
-        let Some(PendingLogin::Sso(_, _, _, expected_redirect_uri, _)) = pending.as_ref() else {
+        let Some(PendingLogin::Sso(_, _, _, expected_redirect_uri, _, _)) = pending.as_ref() else {
             tracing::warn!("no pending SSO login: it was started elsewhere or the core restarted");
             return Err(CommandErr::Unavailable);
         };
@@ -378,19 +499,24 @@ impl Core {
             ));
         }
 
-        let Some(PendingLogin::Sso(account_id, account_store_id, homeserver, _, client)) =
+        let Some(PendingLogin::Sso(account_id, account_store_id, homeserver, _, client, reauth)) =
             pending.take()
         else {
             return Err(CommandErr::Unavailable);
         };
         drop(pending);
 
-        client
+        let endpoint = client.homeserver();
+        let mut login = client
             .matrix_auth()
             .login_with_sso_callback(callback_url.into())
             .map_err(|error| self.failed("complete_sso_login: callback_url", error))?
             .initial_device_display_name("Sable")
-            .request_refresh_token()
+            .request_refresh_token();
+        if let Some(account) = &reauth {
+            login = login.device_id(&account.session.credentials.device_id());
+        }
+        login
             .await
             .map_err(|error| self.failed("complete_sso_login", error))?;
 
@@ -399,23 +525,24 @@ impl Core {
         })?;
         let user_id = matrix.meta.user_id.clone();
 
-        let mut generation = self.claim_session_generation();
+        self.validate_reauthentication(reauth.as_ref(), &client)
+            .await?;
+        let generation = self.claim_session_generation().await;
         self.persist(
             &account_id,
             &account_store_id,
             &PersistedSession {
+                resolved_homeserver: Some(endpoint),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
             },
-            generation.value(),
+            reauth.as_ref(),
         )
         .await?;
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
-        self.set_active_account(&account_id).await?;
         self.pending_login.lock().await.take();
         self.pending_registration.lock().await.take();
-        generation.commit();
 
         tracing::info!(operation = "sso_login", "SSO login completed");
         Ok(CommandOk::CompleteSsoLogin { user_id })
@@ -484,6 +611,170 @@ fn has_single_nonempty_query_parameter(url: &Url, name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn password_reauthentication_reuses_account_device_and_identity() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{body_partial_json, method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/login"))
+            .and(body_partial_json(serde_json::json!({
+                "device_id": "EXISTING", "identifier": {"user": "@alice:example.org"}
+            })))
+            .respond_with(ResponseTemplate::new(403).set_body_json(
+                serde_json::json!({"errcode": "M_FORBIDDEN", "error": "bad password"}),
+            ))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let directory = std::env::temp_dir().join(format!(
+            "sable-reauth-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let store_id = directory.to_str().unwrap();
+        let (core, _events) = Core::new(
+            store_id,
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": null, "next_account_id": 2,
+            "accounts": [{"account_id": "a1", "store_id": store_id, "needs_reauth": true,
+                "session": {"homeserver": "example.org", "resolved_homeserver": server.server().uri(),
+                    "credentials": {"kind": "password", "user_id": "@alice:example.org", "device_id": "EXISTING", "access_token": "old"}}
+            }]
+        })).unwrap();
+        *core.accounts.lock().await = Some(
+            session::AccountRegistry::from_bytes(&bytes, store_id)
+                .unwrap()
+                .0,
+        );
+        core.login(
+            "ignored.invalid".to_owned(),
+            "different-user".to_owned(),
+            "bad".to_owned(),
+            Some("a1".to_owned()),
+        )
+        .await
+        .expect_err("invalid credentials reject reauthentication");
+        let accounts = core.accounts().await.unwrap();
+        assert_eq!(accounts.accounts.len(), 1);
+        assert!(accounts.accounts[0].needs_reauth);
+        assert_eq!(
+            accounts.accounts[0].session.credentials.device_id(),
+            "EXISTING"
+        );
+        drop(core);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_login_persists_the_endpoint_it_was_built_at_not_the_advertised_one() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "user_id": "@alice:example.org", "device_id": "FRESH", "access_token": "token",
+                "well_known": {"m.homeserver": {"base_url": "http://advertised.invalid"}}
+            })))
+            .mount(server.server())
+            .await;
+        let directory = std::env::temp_dir().join(format!(
+            "sable-endpoint-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let store_id = directory.to_str().unwrap();
+        let (core, _events) = Core::new(
+            store_id,
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+
+        core.login(
+            server.server().uri(),
+            "alice".to_owned(),
+            "pw".to_owned(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let entered = Url::parse(&server.server().uri()).unwrap();
+        let live = core.session.read().await.as_ref().unwrap().client.clone();
+        assert_eq!(live.homeserver().host_str(), Some("advertised.invalid"));
+        let persisted = core.accounts().await.unwrap().accounts.remove(0).session;
+        assert_eq!(persisted.resolved_homeserver, Some(entered.clone()));
+        let restored = session::restore_client(store_id, &persisted).await.unwrap();
+        assert_eq!(restored.homeserver(), entered);
+        if let Some(session) = core.take_session().await {
+            session.sync_service.stop().await;
+        }
+        drop((core, restored, live));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_rejected_reauthentication_logs_the_issued_session_out() {
+        use matrix_sdk::ruma::{device_id, user_id};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        let client = server
+            .client_builder()
+            .logged_in_with_token(
+                "fresh".to_owned(),
+                user_id!("@bob:example.org").to_owned(),
+                device_id!("OTHER").to_owned(),
+            )
+            .build()
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/logout"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let store_id = "reauth-logout";
+        let (core, _events) = Core::new(
+            store_id,
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "active_account_id": null, "next_account_id": 2,
+            "accounts": [{"account_id": "a1", "store_id": store_id, "needs_reauth": true,
+                "session": {"homeserver": "example.org", "resolved_homeserver": server.server().uri(),
+                    "credentials": {"kind": "password", "user_id": "@alice:example.org", "device_id": "EXISTING", "access_token": "old"}}
+            }]
+        })).unwrap();
+        *core.accounts.lock().await = Some(
+            session::AccountRegistry::from_bytes(&bytes, store_id)
+                .unwrap()
+                .0,
+        );
+        let account = core.accounts().await.unwrap().accounts.remove(0);
+
+        let result = core
+            .validate_reauthentication(Some(&account), &client)
+            .await;
+
+        assert!(matches!(result, Err(CommandErr::Denied)));
+        server.server().verify().await;
+    }
 
     #[test]
     fn oauth_callback_must_match_its_redirect_target() -> Result<(), url::ParseError> {

@@ -358,3 +358,25 @@ async fn schedule_hangup_does_not_write_when_delayed_events_are_unsupported() {
             .any(|(key, _)| key == "org.matrix.msc4140.delay")
     }));
 }
+
+#[test]
+fn renewal_extends_membership_beyond_four_hours_without_changing_session_identity() {
+    let created = 1_000;
+    let now = created + 5 * 60 * 60 * 1000;
+    for mode in [CallMode::Legacy, CallMode::Compatibility] {
+        let member = member(mode, created, &["https://sfu.example.org"]);
+        let body = super::content_at(&owned_room_id!("!room:example.org"), &member, now);
+        assert_eq!(body["created_ts"], created);
+        assert_eq!(body["membershipID"], member.identity);
+        assert_eq!(
+            body["expires"].as_u64().unwrap() + created,
+            now + 14_400_000
+        );
+        let membership: matrix_sdk::ruma::events::call::member::CallMemberEventContent =
+            serde_json::from_value(body).unwrap();
+        assert_eq!(
+            serde_json::to_value(membership).unwrap()["created_ts"],
+            created
+        );
+    }
+}

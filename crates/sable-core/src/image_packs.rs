@@ -179,7 +179,11 @@ fn push_canonical(parents: &mut Vec<OwnedRoomId>, event: &SpaceParentEvent) {
 }
 
 impl Core {
-    pub(crate) async fn image_packs(&self, room_id: OwnedRoomId) -> Result<CommandOk, CommandErr> {
+    pub(crate) async fn image_packs(
+        &self,
+        room_id: OwnedRoomId,
+        cached_only: bool,
+    ) -> Result<CommandOk, CommandErr> {
         let client = self.client().await?;
         let mut packs = Vec::new();
 
@@ -200,9 +204,15 @@ impl Core {
         }
 
         let room = self.room(&room_id).await?;
-        let own_room = Self::room_packs(&client, &room, ImagePackOriginView::Room, None, true)
-            .await
-            .map_err(|error| self.failed("image_packs_room", error))?;
+        let own_room = Self::room_packs(
+            &client,
+            &room,
+            ImagePackOriginView::Room,
+            None,
+            !cached_only,
+        )
+        .await
+        .map_err(|error| self.failed("image_packs_room", error))?;
         packs.extend(own_room.packs);
 
         let mut subscribed = client
@@ -237,7 +247,7 @@ impl Core {
                         &subscribed_room,
                         ImagePackOriginView::Global,
                         Some(&wanted),
-                        true,
+                        !cached_only,
                     )
                     .await
                     .map_err(|error| self.failed("image_packs_global_room", error))?
@@ -247,7 +257,7 @@ impl Core {
         }
 
         packs.extend(
-            self.space_packs(&client, &room_id, own_room.canonical_parents)
+            self.space_packs(&client, &room_id, own_room.canonical_parents, cached_only)
                 .await,
         );
 
@@ -263,6 +273,7 @@ impl Core {
         client: &matrix_sdk::Client,
         room_id: &RoomId,
         parents: Vec<OwnedRoomId>,
+        cached_only: bool,
     ) -> Vec<ImagePackView> {
         let mut packs = Vec::new();
         let mut seen: BTreeSet<OwnedRoomId> = BTreeSet::from([room_id.to_owned()]);
@@ -283,7 +294,14 @@ impl Core {
                 if space.state() != matrix_sdk::RoomState::Joined {
                     continue;
                 }
-                match Self::room_packs(client, &space, ImagePackOriginView::Space, None, true).await
+                match Self::room_packs(
+                    client,
+                    &space,
+                    ImagePackOriginView::Space,
+                    None,
+                    !cached_only,
+                )
+                .await
                 {
                     Ok(found) => {
                         packs.extend(found.packs);
@@ -348,7 +366,6 @@ impl Core {
     ///
     /// `im.ponies.room_emotes` is not in the SDK's sliding-sync `required_state`
     /// and that list has no extension point, so the store holds these events
-    /// only by luck. A room with none falls back to `/state` on the server.
     async fn room_packs(
         client: &matrix_sdk::Client,
         room: &matrix_sdk::Room,
@@ -383,13 +400,25 @@ impl Core {
             }
         }
 
-        if parsed.is_empty() && network_fallback {
+        if network_fallback {
             let response = client
                 .send(get_state_events::v3::Request::new(
                     room.room_id().to_owned(),
                 ))
-                .await?;
-            for raw in &response.room_state {
+                .await;
+            let state = match response {
+                Ok(response) => {
+                    parsed.clear();
+                    canonical_parents.clear();
+                    response.room_state
+                }
+                Err(error) if !parsed.is_empty() => {
+                    tracing::warn!(room = %room.room_id(), %error, "using cached image packs after state refresh failed");
+                    Vec::new()
+                }
+                Err(error) => return Err(error.into()),
+            };
+            for raw in &state {
                 let json = raw.json();
                 if let Ok(pack) = serde_json::from_str::<RoomPackEvent>(json.get()) {
                     if pack.event_type == ROOM_IMAGE_PACK {

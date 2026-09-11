@@ -143,7 +143,15 @@
     const login = resolve('login');
     if (core.status === 'signed-out' && !page.url.pathname.startsWith(login)) {
       untrack(clearDrafts);
-      void goto(login, { replace: true });
+      const account = core.accounts.find(
+        (account) => account.account_id === core.reauthenticationAccountId
+      );
+      const target = account
+        ? resolve(
+            `login?reauth=${encodeURIComponent(account.account_id)}&server=${encodeURIComponent(account.homeserver)}`
+          )
+        : login;
+      void goto(target, { replace: true });
     }
   });
 

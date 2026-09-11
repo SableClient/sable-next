@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use futures_util::StreamExt;
@@ -9,7 +8,7 @@ use matrix_sdk::encryption::{VerificationState, recovery::RecoveryState};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
-use matrix_sdk::ruma::{OwnedDeviceId, OwnedUserId, UserId};
+use matrix_sdk::ruma::{OwnedUserId, UserId};
 
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, RecoveryStateView,
@@ -22,7 +21,7 @@ impl Core {
     /// Self-verification travels to-device, verifying someone else as a DM
     /// message, so both need a handler or one direction never prompts.
     pub(crate) fn watch_incoming_verifications(self: &Arc<Self>, client: &matrix_sdk::Client) {
-        client.add_event_handler({
+        let handle = client.add_event_handler({
             let core = self.clone();
             move |event: ToDeviceKeyVerificationRequestEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
@@ -48,8 +47,9 @@ impl Core {
                 }
             }
         });
+        self.track_session_handler(client, handle);
 
-        client.add_event_handler({
+        let handle = client.add_event_handler({
             let core = self.clone();
             move |event: OriginalSyncRoomMessageEvent, client: matrix_sdk::Client| {
                 let core = core.clone();
@@ -69,6 +69,7 @@ impl Core {
                 }
             }
         });
+        self.track_session_handler(client, handle);
     }
 
     /// The request and the SAS it becomes are two objects with two state enums.
@@ -264,39 +265,46 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
         return Vec::new();
     };
     let own_device_id = client.device_id();
-    let Ok(devices) = client.encryption().get_user_devices(user_id).await else {
-        return Vec::new();
-    };
-
-    let mut seen: BTreeMap<OwnedDeviceId, (Option<u64>, Option<String>)> = BTreeMap::new();
-    if let Ok(response) = client.devices().await {
-        for device in response.devices {
-            seen.insert(
-                device.device_id,
-                (
-                    device.last_seen_ts.map(|ts| u64::from(ts.get())),
-                    device.last_seen_ip,
-                ),
-            );
+    let encryption = client.encryption().get_user_devices(user_id).await.ok();
+    let mut views: Vec<DeviceView> = match client.devices().await {
+        Ok(response) => response
+            .devices
+            .into_iter()
+            .map(|device| {
+                let crypto = encryption
+                    .as_ref()
+                    .and_then(|devices| devices.get(&device.device_id));
+                DeviceView {
+                    is_own: Some(device.device_id.as_ref()) == own_device_id,
+                    is_verified: crypto
+                        .as_ref()
+                        .is_some_and(matrix_sdk::encryption::identities::Device::is_verified),
+                    display_name: device.display_name,
+                    device_id: device.device_id,
+                    last_seen_ts: device.last_seen_ts.map(|ts| u64::from(ts.get())),
+                    last_seen_ip: device.last_seen_ip,
+                }
+            })
+            .collect(),
+        Err(error) => {
+            tracing::warn!(%error, "could not refresh devices; using the crypto store");
+            encryption
+                .map(|devices| {
+                    devices
+                        .devices()
+                        .map(|device| DeviceView {
+                            is_own: Some(device.device_id()) == own_device_id,
+                            is_verified: device.is_verified(),
+                            display_name: device.display_name().map(str::to_owned),
+                            device_id: device.device_id().to_owned(),
+                            last_seen_ts: None,
+                            last_seen_ip: None,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
         }
-    }
-
-    let mut views: Vec<DeviceView> = devices
-        .devices()
-        .map(|device| {
-            let device_id = device.device_id().to_owned();
-            let (last_seen_ts, last_seen_ip) = seen.get(&device_id).cloned().unwrap_or_default();
-
-            DeviceView {
-                is_own: Some(device.device_id()) == own_device_id,
-                display_name: device.display_name().map(str::to_owned),
-                is_verified: device.is_verified(),
-                device_id,
-                last_seen_ts,
-                last_seen_ip,
-            }
-        })
-        .collect();
+    };
 
     views.sort_by(|a, b| {
         b.is_own

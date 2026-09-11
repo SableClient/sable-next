@@ -65,7 +65,14 @@ pub struct Core {
     next_timeline_access: AtomicU64,
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
+    session_attempt_generation: AtomicU64,
+    session_activation_lock: Mutex<()>,
     session_store_lock: Mutex<()>,
+    credential_writers: Mutex<HashMap<String, u64>>,
+    account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
+    session_handlers: std::sync::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
+    probed_pinned_rooms: std::sync::Mutex<std::collections::HashSet<matrix_sdk::ruma::OwnedRoomId>>,
+    notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
     accounts: Mutex<Option<AccountRegistry>>,
@@ -121,20 +128,35 @@ struct CachedTimeline {
 }
 
 enum PendingLogin {
-    Oidc(String, String, String, Url, matrix_sdk::Client),
-    Sso(String, String, String, Url, matrix_sdk::Client),
+    Oidc(
+        String,
+        String,
+        String,
+        Url,
+        matrix_sdk::Client,
+        Option<session::PersistedAccount>,
+    ),
+    Sso(
+        String,
+        String,
+        String,
+        Url,
+        matrix_sdk::Client,
+        Option<session::PersistedAccount>,
+    ),
 }
 
 struct Subscription {
     tasks: Vec<Task>,
     timeline: Option<Arc<Timeline>>,
+    thread_root: Option<OwnedEventId>,
     kind: SubscriptionKind,
 }
 
 enum SubscriptionKind {
     Other,
     LiveTimeline(OwnedRoomId),
-    FocusedTimeline,
+    FocusedTimeline(OwnedRoomId),
 }
 
 impl Core {
@@ -157,7 +179,14 @@ impl Core {
             next_timeline_access: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
+            session_attempt_generation: AtomicU64::new(1),
+            session_activation_lock: Mutex::new(()),
             session_store_lock: Mutex::new(()),
+            credential_writers: Mutex::new(HashMap::new()),
+            account_clients: Mutex::new(HashMap::new()),
+            session_handlers: std::sync::Mutex::new(Vec::new()),
+            probed_pinned_rooms: std::sync::Mutex::new(std::collections::HashSet::new()),
+            notification_routes: Mutex::new(HashMap::new()),
             session_swap_lock: Mutex::new(()),
             restore_lock: Mutex::new(()),
             accounts: Mutex::new(None),
@@ -217,6 +246,17 @@ impl Core {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(task);
+    }
+
+    pub(crate) fn track_session_handler(
+        &self,
+        client: &matrix_sdk::Client,
+        handle: matrix_sdk::event_handler::EventHandlerHandle,
+    ) {
+        self.session_handlers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(client.event_handler_drop_guard(handle));
     }
 
     pub(crate) fn emit_if_current(&self, generation: u64, event: CoreEvent) {
@@ -639,6 +679,14 @@ mod tests {
 #[allow(clippy::large_futures)]
 mod sdk_timeline_tests;
 
+#[cfg(all(test, not(target_family = "wasm")))]
+#[allow(clippy::large_futures)]
+mod sdk_notification_tests;
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[allow(clippy::large_futures)]
+mod sdk_helpers_tests;
+
 #[cfg(test)]
 #[allow(clippy::large_futures)]
 mod live_tests {
@@ -678,6 +726,7 @@ mod live_tests {
                 homeserver: "https://matrix.org".into(),
                 username: "sable-next-does-not-exist".into(),
                 password: "definitely-wrong".into(),
+                reauth_account_id: None,
             })
             .await
             .expect_err("login should fail");

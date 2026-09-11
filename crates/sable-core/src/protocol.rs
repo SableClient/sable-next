@@ -9,6 +9,7 @@ pub enum Command {
         server_name: String,
     },
     Login {
+        reauth_account_id: Option<String>,
         homeserver: String,
         username: String,
         password: String,
@@ -35,6 +36,7 @@ pub enum Command {
     ContinueRegistration,
     CancelRegistration,
     StartOidcLogin {
+        reauth_account_id: Option<String>,
         homeserver: String,
         redirect_uri: String,
         intent: AuthIntent,
@@ -43,6 +45,7 @@ pub enum Command {
         callback_url: String,
     },
     StartSsoLogin {
+        reauth_account_id: Option<String>,
         homeserver: String,
         redirect_uri: String,
         idp_id: Option<String>,
@@ -106,6 +109,8 @@ pub enum Command {
     ImagePacks {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
+        #[serde(default)]
+        cached_only: bool,
     },
     AllImagePacks,
     UserProfile {
@@ -191,15 +196,16 @@ pub enum Command {
     EditMessage {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
-        #[cfg_attr(feature = "typegen", specta(type = String))]
-        event_id: OwnedEventId,
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        event_id: Option<OwnedEventId>,
+        #[serde(default)]
+        transaction_id: Option<String>,
         body: String,
         formatted: Option<String>,
         #[serde(default)]
         kind: MessageKind,
-        /// Present when editing an image caption, so the replacement retains its media.
         #[serde(default)]
-        image: Option<EditImageView>,
+        media_caption: bool,
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
@@ -507,6 +513,11 @@ pub enum Command {
         event_id: OwnedEventId,
         #[serde(default)]
         private_receipt: bool,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        thread_root: Option<OwnedEventId>,
+        #[serde(default)]
+        subscription: Option<SubscriptionId>,
     },
     MarkUnread {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -640,8 +651,6 @@ pub enum Command {
         /// A passphrase to unlock the key with. The key is returned either way.
         passphrase: Option<String>,
     },
-    /// Issues a new key and abandons whatever the old backup held. For a key the
-    /// user has lost, not for rotation.
     ResetRecoveryKey {
         passphrase: Option<String>,
     },
@@ -2075,18 +2084,6 @@ pub enum MessageKind {
     Notice,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct EditImageView {
-    pub source: String,
-    pub filename: Option<String>,
-    pub mime: Option<String>,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub width: Option<u64>,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub height: Option<u64>,
-}
-
 #[derive(Debug, Clone, Default, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(default)]
@@ -2601,8 +2598,8 @@ pub struct NotificationView {
     pub user_id: OwnedUserId,
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub room_id: OwnedRoomId,
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub event_id: OwnedEventId,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub event_id: Option<OwnedEventId>,
     pub room_name: String,
     pub room_avatar_url: Option<String>,
     pub is_direct: bool,

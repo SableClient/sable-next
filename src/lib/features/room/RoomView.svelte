@@ -595,7 +595,13 @@
   }
 
   async function markRead(eventId: string): Promise<void> {
-    await core.commands.markRead(resolvedRoomId, eventId, readReceiptIsPrivate());
+    await core.commands.markRead(
+      resolvedRoomId,
+      eventId,
+      readReceiptIsPrivate(),
+      null,
+      timeline.subscriptionId
+    );
   }
 
   function markUnreadFrom(eventId: string): void {

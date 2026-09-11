@@ -47,8 +47,12 @@
     };
   });
 
-  function reauthenticate(homeserver: string): Promise<void> {
-    return goto(resolve(`login?addAccount=1&server=${encodeURIComponent(homeserver)}`));
+  function reauthenticate(homeserver: string, accountId: string): Promise<void> {
+    return goto(
+      resolve(
+        `login?addAccount=1&reauth=${encodeURIComponent(accountId)}&server=${encodeURIComponent(homeserver)}`
+      )
+    );
   }
 
   async function switchAccount(accountId: string): Promise<void> {
@@ -127,7 +131,7 @@
           disabled={active || switching}
           onclick={() =>
             void (account.needs_reauth
-              ? reauthenticate(account.homeserver)
+              ? reauthenticate(account.homeserver, account.account_id)
               : switchAccount(account.account_id))}
         >
           <Avatar size="medium" name={account.user_id} />
@@ -148,7 +152,7 @@
           <Button
             variant="secondary"
             size="small"
-            onclick={() => void reauthenticate(account.homeserver)}
+            onclick={() => void reauthenticate(account.homeserver, account.account_id)}
             >{$i18n.t('nav.accountSignInAgain')}</Button
           >
           <Button

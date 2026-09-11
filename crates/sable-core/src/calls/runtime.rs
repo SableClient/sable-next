@@ -117,6 +117,10 @@ fn select_mode(
 }
 
 fn content(room_id: &OwnedRoomId, own: &CallMember) -> Value {
+    content_at(room_id, own, keys::now_ms())
+}
+
+fn content_at(room_id: &OwnedRoomId, own: &CallMember, now_ms: u64) -> Value {
     if own.mode == CallMode::Matrix2 {
         json!({
             "application": {"type": "m.call"}, "slot_id": "m.call#ROOM",
@@ -127,7 +131,7 @@ fn content(room_id: &OwnedRoomId, own: &CallMember) -> Value {
     } else {
         json!({
             "application":"m.call", "call_id":"", "scope":"m.room", "device_id":own.device_id,
-            "membershipID":own.identity, "created_ts":own.created_ts, "expires":14_400_000,
+            "membershipID":own.identity, "created_ts":own.created_ts, "expires":now_ms.saturating_sub(own.created_ts).saturating_add(14_400_000),
             "focus_active":{"type":"livekit", "focus_selection":if own.mode == CallMode::Compatibility {"multi_sfu"} else {"oldest_membership"}},
             "foci_preferred":own.foci.iter().map(|service| json!({"type":"livekit", "livekit_service_url":service, "livekit_alias":room_id})).collect::<Vec<_>>()
         })
@@ -151,16 +155,7 @@ async fn publish_membership(
     room: &Room,
     own: &CallMember,
 ) -> Result<matrix_sdk::ruma::OwnedEventId, matrix_sdk::Error> {
-    let mut body = content(&room.room_id().to_owned(), own);
-    if own.mode != CallMode::Matrix2
-        && let Some(expires) = body.get_mut("expires")
-    {
-        *expires = json!(
-            keys::now_ms()
-                .saturating_sub(own.created_ts)
-                .saturating_add(14_400_000)
-        );
-    }
+    let body = content(&room.room_id().to_owned(), own);
     if own.mode == CallMode::Matrix2 {
         sticky::send(&room.client(), room, body).await
     } else {

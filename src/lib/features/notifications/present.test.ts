@@ -8,7 +8,7 @@ vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { body, tag, title } from './present';
+import { body, line, tag, title } from './present';
 
 function view(overrides: Partial<NotificationView> = {}): NotificationView {
   return {
@@ -61,4 +61,9 @@ test('an encrypted room keeps its content back until it is allowed', () => {
 test('one alert per room and account, so a busy room replaces its own', () => {
   expect(tag(view())).toBe('@me:example.org !room:example.org');
   expect(tag(view({ room_id: '!other:example.org' }))).not.toBe(tag(view()));
+});
+
+test('an invite keeps its room destination without a fabricated event id', () => {
+  const invite = view({ event_id: null, body: 'invited you' });
+  expect(line(invite)).toEqual({ sender: 'Ada', body: 'invited you', eventId: null });
 });

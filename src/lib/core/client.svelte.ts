@@ -92,6 +92,7 @@ function discardAccountStore(transport: Transport, accountId: string): void {
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
+  reauthenticationAccountId = $state<string | null>(null);
   accounts = $state.raw<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
@@ -158,7 +159,12 @@ export class CoreClient {
     }
   }
 
-  async login(homeserver: string, username: string, password: string): Promise<void> {
+  async login(
+    homeserver: string,
+    username: string,
+    password: string,
+    reauthAccountId?: string
+  ): Promise<void> {
     let transport: Transport;
     try {
       transport = this.ensureTransport();
@@ -178,6 +184,7 @@ export class CoreClient {
       );
       const response = await transport.send({
         type: 'login',
+        reauth_account_id: reauthAccountId ?? null,
         homeserver: resolvedHomeserver,
         username,
         password,
@@ -285,12 +292,14 @@ export class CoreClient {
   async startOidcLogin(
     homeserver: string,
     redirectUri: string,
-    intent: AuthIntent = 'login'
+    intent: AuthIntent = 'login',
+    reauthAccountId?: string
   ): Promise<string> {
     const transport = this.ensureTransport();
     const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     const response = await transport.send({
       type: 'start_oidc_login',
+      reauth_account_id: reauthAccountId ?? null,
       homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       intent,
@@ -337,12 +346,14 @@ export class CoreClient {
     homeserver: string,
     redirectUri: string,
     idpId?: string,
-    intent: AuthIntent = 'login'
+    intent: AuthIntent = 'login',
+    reauthAccountId?: string
   ): Promise<string> {
     const transport = this.ensureTransport();
     const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
     const response = await transport.send({
       type: 'start_sso_login',
+      reauth_account_id: reauthAccountId ?? null,
       homeserver: resolvedHomeserver,
       redirect_uri: redirectUri,
       idp_id: idpId ?? null,
@@ -636,6 +647,7 @@ export class CoreClient {
       this.resetCachedState();
     }
     this.session = session;
+    if (session) this.reauthenticationAccountId = null;
     if (changed && session) {
       void this.primeEncryptionStatus();
       void this.primeSyncStatus();
@@ -764,6 +776,8 @@ export class CoreClient {
         this.searchCoverageUnavailable = false;
         return;
       case 'session_ended':
+        this.reauthenticationAccountId =
+          event.reason === 'soft_logout' ? (this.session?.account_id ?? null) : null;
         this.replaceSession(null);
         this.status = 'authenticating';
         void this.restoreFallbackAccount();

@@ -44,23 +44,31 @@ impl From<RoomNotificationMode> for NotificationModeView {
     }
 }
 
-fn room_kind(room: &matrix_sdk::Room) -> (IsEncrypted, IsOneToOne) {
-    let encrypted = if room.encryption_state().is_encrypted() {
+async fn room_kind(room: &matrix_sdk::Room) -> Result<(IsEncrypted, IsOneToOne), String> {
+    let encrypted = if room
+        .latest_encryption_state()
+        .await
+        .map_err(|error| error.to_string())?
+        .is_encrypted()
+    {
         IsEncrypted::Yes
     } else {
         IsEncrypted::No
     };
-    (
+    Ok((
         encrypted,
         IsOneToOne::from(room.active_members_count() == 2),
-    )
+    ))
 }
 
-pub async fn settings(room: &matrix_sdk::Room) -> NotificationSettingsView {
+/// # Errors
+///
+/// When the room encryption state cannot be resolved.
+pub async fn settings(room: &matrix_sdk::Room) -> Result<NotificationSettingsView, String> {
     let settings = room.client().notification_settings().await;
-    let (encrypted, one_to_one) = room_kind(room);
+    let (encrypted, one_to_one) = room_kind(room).await?;
 
-    NotificationSettingsView {
+    Ok(NotificationSettingsView {
         room: settings
             .get_user_defined_room_notification_mode(room.room_id())
             .await
@@ -69,7 +77,7 @@ pub async fn settings(room: &matrix_sdk::Room) -> NotificationSettingsView {
             .get_default_room_notification_mode(encrypted, one_to_one)
             .await
             .into(),
-    }
+    })
 }
 
 pub async fn default_modes(client: &Client) -> (NotificationModeView, NotificationModeView) {
@@ -144,8 +152,54 @@ pub async fn notification(
     }
 }
 
+pub(crate) async fn foreground_notification(
+    notifications: &NotificationClient,
+    room: &matrix_sdk::Room,
+    event_id: &EventId,
+) -> Option<NotificationView> {
+    match notifications
+        .get_notification_with_context(room.room_id(), event_id)
+        .await
+    {
+        Ok(NotificationStatus::Event(item)) => Some(view(
+            room.own_user_id().to_owned(),
+            room.room_id(),
+            event_id,
+            *item,
+        )),
+        _ => None,
+    }
+}
+
+pub(crate) async fn invite_notification(
+    room: &matrix_sdk::Room,
+    actions: &[Action],
+) -> Option<NotificationView> {
+    let invite = room.invite_details().await.ok()?;
+    Some(NotificationView {
+        user_id: room.own_user_id().to_owned(),
+        room_id: room.room_id().to_owned(),
+        event_id: None,
+        room_name: room.display_name().await.ok()?.to_string(),
+        room_avatar_url: room.avatar_url().map(|url| url.to_string()),
+        is_direct: room.is_direct().await.unwrap_or(false),
+        encrypted: room.encryption_state().is_encrypted(),
+        sender: invite.inviter_id,
+        sender_name: invite
+            .inviter
+            .as_ref()
+            .and_then(|member| member.display_name().map(ToOwned::to_owned)),
+        sender_avatar_url: invite
+            .inviter
+            .as_ref()
+            .and_then(|member| member.avatar_url().map(ToString::to_string)),
+        body: "invited you".to_owned(),
+        mention: actions.iter().any(Action::is_highlight),
+        noisy: Some(actions.iter().any(|action| action.sound().is_some())),
+    })
+}
+
 /// A device token must not be handed to anything but a Matrix push gateway.
-///
 /// # Errors
 ///
 /// When the address is not a gateway's.
@@ -162,7 +216,6 @@ fn gateway(url: &str) -> Result<String, String> {
 
 /// A cold platform notification is built from this payload, and it derives its
 /// identity from `user_id`, so leaving it out stops a running app replacing it.
-///
 /// # Errors
 ///
 /// When the gateway is not a push gateway, or the server rejects the registration.
@@ -313,7 +366,7 @@ fn view(
     NotificationView {
         user_id,
         room_id: room_id.to_owned(),
-        event_id: event_id.to_owned(),
+        event_id: Some(event_id.to_owned()),
         room_name: item.room_computed_display_name,
         room_avatar_url: item.room_avatar_url,
         is_direct: item.is_direct_message_room,

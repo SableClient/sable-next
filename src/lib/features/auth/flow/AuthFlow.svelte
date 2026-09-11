@@ -56,6 +56,14 @@
     },
   ];
 
+  function reauthAccountId(): string | undefined {
+    const explicit = page.url.searchParams.get('reauth');
+    if (explicit) return explicit;
+    if (page.url.searchParams.has('addAccount')) return undefined;
+    const account = core.accounts.length === 1 ? core.accounts[0] : undefined;
+    return account?.needs_reauth ? account.account_id : undefined;
+  }
+
   const flow = new AuthFlowController(
     core,
     homeserverFromAuthUrl(page.url, page.route.id) ?? homeservers.default,
@@ -88,6 +96,7 @@
 
   const redirect = new RedirectController({
     core,
+    getReauthAccountId: reauthAccountId,
     getHomeserver: () => flow.homeserver,
     getValidationError: () => flow.error,
     validateHomeserver: () => flow.validateHomeserver(0),
@@ -124,6 +133,7 @@
 
   const login = new LoginController({
     core,
+    getReauthAccountId: reauthAccountId,
     getHomeserver: () => flow.homeserver,
     getValidationError: () => flow.error,
     validateHomeserver: () => flow.validateHomeserver(0),
@@ -134,6 +144,12 @@
     onMarkHomeserverChanged: () => {
       flow.clearLoginHomeserverValidation();
     },
+  });
+
+  $effect(() => {
+    const accountId = reauthAccountId();
+    const account = core.accounts.find((account) => account.account_id === accountId);
+    if (account && !login.username) login.username = account.user_id;
   });
 
   let requestedStage = $derived(stageIndexForPath(page.url.pathname, stageRegistry));
@@ -221,6 +237,8 @@
   $effect(() => {
     if ((!isAddingAccount && core.status !== 'signed-out') || initialized) return;
     initialized = true;
+    const reauth = core.accounts.find((account) => account.account_id === reauthAccountId());
+    if (reauth) flow.homeserver = reauth.homeserver;
     void untrack(() =>
       flow.validateHomeserver(displayedStage).finally(() => {
         hasCompletedInitialHomeserverCheck = true;

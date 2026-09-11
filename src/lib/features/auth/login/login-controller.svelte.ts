@@ -11,6 +11,7 @@ export type LoginField = 'homeserver' | 'username' | 'password';
 interface LoginControllerOptions {
   core: CoreClient;
   getHomeserver: () => string;
+  getReauthAccountId?: () => string | undefined;
   getValidationError: () => string | null;
   validateHomeserver: () => Promise<LoginFlowsView | null>;
   onInvalidateStage: () => void;
@@ -55,7 +56,8 @@ export class LoginController {
       await this.options.core.login(
         this.options.getHomeserver().trim(),
         this.username.trim(),
-        this.password
+        this.password,
+        this.options.getReauthAccountId?.()
       );
       this.options.onMarkLoggedIn();
     } catch (value) {

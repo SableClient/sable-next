@@ -20,6 +20,7 @@
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
   import { i18n } from '#lib/i18n.js';
+  import { loadPacks } from '#lib/emoji/load-packs.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -391,13 +392,18 @@
 
   async function loadEmotes(): Promise<void> {
     if (loadedEmotesFor === roomId) return;
-    loadedEmotesFor = roomId;
+    const target = roomId;
+    loadedEmotesFor = target;
+    emotes = [];
     try {
-      emotes = (await core.commands.imagePacks(roomId))
-        .flatMap((pack) => pack.images)
-        .filter((image) => image.usage.includes('emoticon'));
+      await loadPacks(core.commands, target, (packs) => {
+        if (roomId !== target) return;
+        emotes = packs
+          .flatMap((pack) => pack.images)
+          .filter((image) => image.usage.includes('emoticon'));
+      });
     } catch {
-      loadedEmotesFor = null;
+      if (roomId === target) loadedEmotesFor = null;
     }
   }
 

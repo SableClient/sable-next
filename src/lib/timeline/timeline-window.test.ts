@@ -79,13 +79,14 @@ function fixture(heightForRow?: (value: number) => number) {
     });
   });
   const onChange = vi.fn();
+  const onScroll = vi.fn();
   const window = new TimelineWindow({
     viewport,
     canvas,
     content,
     render,
     onChange,
-    onScroll: vi.fn(),
+    onScroll,
   });
   windows.push(window);
   return {
@@ -100,6 +101,7 @@ function fixture(heightForRow?: (value: number) => number) {
     content,
     render,
     onChange,
+    onScroll,
     keys: () =>
       Array.from(content.children).map((node) => (node as HTMLElement).dataset.timelineKey),
     resizeViewport: (height: number, notify = true) => {
@@ -961,4 +963,36 @@ test('repeated content height reads in one task measure the DOM once', async () 
   await Promise.resolve();
   expect(window.contentHeight).toBe(first);
   expect(measure).toHaveBeenCalledTimes(2);
+});
+
+test('scrolling while a render is in flight still asks for history', async () => {
+  const { window, viewport, onScroll, pause } = fixture();
+  await window.update(entries(200));
+  viewport.scrollTop = 5000;
+  viewport.dispatchEvent(new Event('scroll'));
+  await vi.advanceTimersByTimeAsync(200);
+  onScroll.mockClear();
+
+  const resume = pause();
+  void window.update(entries(201));
+  await Promise.resolve();
+  for (const offset of [4800, 4600, 4400]) {
+    viewport.scrollTop = offset;
+    viewport.dispatchEvent(new Event('scroll'));
+  }
+  resume();
+  await vi.advanceTimersByTimeAsync(0);
+
+  expect(onScroll).toHaveBeenCalled();
+});
+
+test('a smooth jump away from the end leaves follow mode', async () => {
+  const { window, viewport } = fixture();
+  await window.update(entries(60));
+  expect(window.state.pinned).toBe(true);
+  viewport.scrollTo = () => {};
+
+  await window.jumpTo('10', 'center', true);
+
+  expect(window.state.pinned).toBe(false);
 });
