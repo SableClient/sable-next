@@ -153,13 +153,12 @@
   });
 
   let requestedStage = $derived(stageIndexForPath(page.url.pathname, stageRegistry));
+  let signedIn = $derived(core.status === 'ready' && !isAddingAccount);
   let stages = $derived(
     stageRegistry.map((stage, index) => ({
       ...stage,
       completed:
-        index === 0 ||
-        (index === 1 && core.status === 'ready') ||
-        (index === 2 && recoveryOnboardingComplete),
+        index === 0 || (index === 1 && signedIn) || (index === 2 && recoveryOnboardingComplete),
     }))
   );
 
@@ -197,7 +196,7 @@
       ? verificationDisplayedStage === 0
       : displayedStage < furthestReached ||
           (displayedStage === 0 && hasSecondaryStage) ||
-          (displayedStage === 1 && core.status === 'ready') ||
+          (displayedStage === 1 && signedIn) ||
           (displayedStage === 2 && recoveryOnboardingComplete)
   );
 
@@ -259,7 +258,8 @@
   });
 
   $effect(() => {
-    if (core.status !== 'ready' || !userId || pendingOnboardingTransition) return;
+    if (core.status !== 'ready' || !userId || pendingOnboardingTransition || isAddingAccount)
+      return;
     if (loginVerificationActive || loginVerificationPending) return;
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     const rawMarker = localStorage.getItem(profileOnboardingMarker(userId));
@@ -281,7 +281,7 @@
   async function signInWithPassword(): Promise<void> {
     loginVerificationPending = true;
     await login.login();
-    if (core.status === 'ready') {
+    if (!login.error && !login.fieldError && core.status === 'ready') {
       await navigateToLoginVerification();
     } else {
       loginVerificationPending = false;
@@ -355,7 +355,7 @@
   function forward(): void {
     if (displayedStage < furthestReached) activateStage(displayedStage + 1);
     else if (displayedStage === 0 && hasSecondaryStage) activateStage(1);
-    else if (displayedStage === 1 && core.status === 'ready') activateStage(2);
+    else if (displayedStage === 1 && signedIn) activateStage(2);
     else if (displayedStage === 2 && recoveryOnboardingComplete) activateStage(3);
   }
 
@@ -516,7 +516,7 @@
                   onComplete={finishLoginVerification}
                   onSkip={finishLoginVerification}
                 />
-              {:else if displayedStage >= 2 || core.status === 'ready'}
+              {:else if displayedStage >= 2 || signedIn}
                 <AccountSummaryCard
                   homeserver={flow.homeserver}
                   {userId}
