@@ -27,6 +27,7 @@
   interface Props {
     source: string;
     alt: string;
+    title?: string;
     width: number;
     height: number;
     intrinsicWidth?: number | null;
@@ -47,6 +48,7 @@
   let {
     source,
     alt,
+    title,
     width,
     height,
     intrinsicWidth = null,
@@ -380,6 +382,7 @@
         class={['media-image-content', 'gif-preview-source', { ready: showCanvas }]}
         src={url}
         alt={showCanvas ? '' : alt}
+        {title}
         {width}
         {height}
         aria-hidden={showCanvas ? 'true' : undefined}
@@ -397,6 +400,7 @@
       style:background-color={plate ?? undefined}
       src={url}
       {alt}
+      {title}
       {width}
       {height}
       onload={() => (imageLoaded = true)}

@@ -285,7 +285,9 @@ const extensions: Record<string, string> = { 'image/gif': 'gif', 'image/webp': '
 
 export function gifFilename(title: string, mimetype: string): string {
   const ext = extensions[mimetype] ?? 'gif';
-  return title.endsWith(`.${ext}`) ? title : `${title}.${ext}`;
+  const stem = title.replace(/[\s/\\:*?"<>|]+/g, '-').replace(/^-+|-+$/g, '') || 'gif';
+
+  return stem.endsWith(`.${ext}`) ? stem : `${stem}.${ext}`;
 }
 
 export function isAllowedGifMediaUrl(value: string): boolean {

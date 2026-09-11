@@ -154,7 +154,8 @@ test('search needs both a key and a proxy', () => {
 });
 
 test('a filename gets the extension the proxy will actually serve', () => {
-  expect(gifFilename('a cat', 'image/gif')).toBe('a cat.gif');
-  expect(gifFilename('a cat.gif', 'image/gif')).toBe('a cat.gif');
-  expect(gifFilename('a cat', 'image/webp')).toBe('a cat.webp');
+  expect(gifFilename('a cat', 'image/gif')).toBe('a-cat.gif');
+  expect(gifFilename('a cat.gif', 'image/gif')).toBe('a-cat.gif');
+  expect(gifFilename('a cat', 'image/webp')).toBe('a-cat.webp');
+  expect(gifFilename('  ', 'image/gif')).toBe('gif.gif');
 });

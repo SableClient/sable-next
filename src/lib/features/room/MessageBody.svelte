@@ -47,6 +47,7 @@
     class="sticker"
     source={item.content.source}
     alt={item.content.body}
+    title={item.content.body}
     width={304}
     height={304}
     intrinsicWidth={item.content.width}
@@ -61,6 +62,7 @@
     class="image"
     source={item.content.source}
     alt={item.content.body}
+    title={item.content.body}
     width={800}
     height={600}
     intrinsicWidth={item.content.width}
