@@ -14,6 +14,7 @@
   } from '#lib/ui/media-url.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
+  import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
   const BLURHASH_DECODE_WIDTH = 32;
@@ -85,6 +86,7 @@
   let manualGif = $derived(animatedGif && !preferences.autoplayGifs);
   let steppedGif = $derived(gifFrames !== null);
   let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
+  let painted = $derived(manualGif ? gifPreviewReady || gifPlaying : imageLoaded);
   let showCanvas = $derived(manualGif && gifPreviewReady && (steppedGif || !gifPlaying));
   let eventRatio = $derived.by(() => {
     const hasIntrinsicSize =
@@ -328,12 +330,16 @@
 </script>
 
 {#snippet content()}
-  {#if blurhash && !manualGif && !failed}
+  {#if blurhashPixels && !failed}
     <canvas
       bind:this={blurhashCanvas}
-      class={['media-image-blurhash', { loaded: imageLoaded }]}
+      class={['media-image-blurhash', { loaded: painted }]}
       aria-hidden="true"
     ></canvas>
+  {:else if !failed}
+    <span class={['media-image-placeholder', { loaded: painted }]} aria-hidden="true">
+      <ImageIcon />
+    </span>
   {/if}
   {#if url && manualGif}
     <canvas
@@ -426,7 +432,8 @@
     width: 100%;
   }
 
-  .media-image-blurhash {
+  .media-image-blurhash,
+  .media-image-placeholder {
     height: 100%;
     inset: 0;
     opacity: 1;
@@ -435,9 +442,23 @@
     width: 100%;
   }
 
-  .media-image-blurhash.loaded {
+  .media-image-blurhash.loaded,
+  .media-image-placeholder.loaded {
     opacity: 0;
     pointer-events: none;
+  }
+
+  .media-image-placeholder {
+    align-items: center;
+    background: var(--surface-container);
+    color: var(--surface-var-on-container);
+    display: flex;
+    justify-content: center;
+  }
+
+  .media-image-placeholder :global(svg) {
+    height: min(40%, var(--icon-size-medium));
+    width: min(40%, var(--icon-size-medium));
   }
 
   .gif-preview,

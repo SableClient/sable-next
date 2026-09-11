@@ -510,6 +510,93 @@ test('a cached image does not come back blurred', async () => {
   await unmount(second);
 });
 
+test('holds a placeholder until the image paints', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/slow-photo',
+      alt: 'photo',
+      width: 320,
+      height: 240,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.media-image-placeholder.loaded')).toBeNull();
+  expect(document.querySelector('.media-image-placeholder')).not.toBeNull();
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('img.media-image-content')).not.toBeNull();
+  });
+  document
+    .querySelector<HTMLImageElement>('img.media-image-content')
+    ?.dispatchEvent(new Event('load'));
+  await tick();
+
+  expect(document.querySelector('.media-image-placeholder.loaded')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('a held GIF with no blurhash is covered while it downloads', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://gifs.example.org/picked',
+      alt: 'a group of people dancing.gif',
+      width: 800,
+      height: 600,
+      intrinsicWidth: 220,
+      intrinsicHeight: 280,
+      mime: 'image/gif',
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.media-image-placeholder.loaded')).toBeNull();
+  expect(document.querySelector('.media-image-placeholder')).not.toBeNull();
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.gif-preview-source')).not.toBeNull();
+  });
+  document.querySelector('.gif-preview-source')?.dispatchEvent(new Event('load'));
+  await tick();
+
+  expect(document.querySelector('.media-image-placeholder.loaded')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('a held GIF is covered while it downloads', async () => {
+  preferences.autoplayGifs = false;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/covered',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+      blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.media-image-blurhash.loaded')).toBeNull();
+  expect(document.querySelector('.media-image-blurhash')).not.toBeNull();
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.gif-preview-source')).not.toBeNull();
+  });
+  document.querySelector('.gif-preview-source')?.dispatchEvent(new Event('load'));
+  await tick();
+
+  expect(document.querySelector('.media-image-blurhash.loaded')).not.toBeNull();
+  await unmount(instance);
+});
+
 test('falls back to the original when the thumbnail comes back sideways', async () => {
   const dispose = await mountAndLoad(
     {
