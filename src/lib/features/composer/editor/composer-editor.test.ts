@@ -778,6 +778,18 @@ describe('link', () => {
     expect(doc && serializeComposer(doc).formatted).toBeNull();
   });
 
+  test('mod+shift+k asks for a link and mod+k is left to the global shortcut', () => {
+    const onLinkRequest = vi.fn();
+    const editor = openWith({ onLinkRequest });
+    editor.setText('docs');
+
+    press(editor, 'k', { mod: true });
+    expect(onLinkRequest).not.toHaveBeenCalled();
+
+    press(editor, 'k', { mod: true, shift: true });
+    expect(onLinkRequest).toHaveBeenCalledOnce();
+  });
+
   test('applyLink marks the current selection', () => {
     const editor = open();
     editor.setText('docs');
