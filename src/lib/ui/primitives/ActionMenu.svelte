@@ -78,17 +78,19 @@
         {#snippet child({ props })}{@render trigger({ props })}{/snippet}
       </DropdownMenu.Trigger>
     {/if}
-    <DropdownMenu.Content
-      class={['menu-surface', surfaceClass]}
-      customAnchor={anchor}
-      aria-label={label}
-      {side}
-      {align}
-      {sideOffset}
-      {preventScroll}
-    >
-      {@render children()}
-    </DropdownMenu.Content>
+    <DropdownMenu.Portal>
+      <DropdownMenu.Content
+        class={['menu-surface', surfaceClass]}
+        customAnchor={anchor}
+        aria-label={label}
+        {side}
+        {align}
+        {sideOffset}
+        {preventScroll}
+      >
+        {@render children()}
+      </DropdownMenu.Content>
+    </DropdownMenu.Portal>
   </DropdownMenu.Root>
 {/if}
 

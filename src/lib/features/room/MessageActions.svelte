@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconContext from 'phosphor-svelte/lib/IconContext';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
   import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import MoreIcon from 'phosphor-svelte/lib/DotsThreeIcon';
@@ -11,78 +12,54 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import ReactionPicker from './ReactionPicker.svelte';
+  import { messageMenuRows, type MessageActions } from './message-menu-items';
 
-  interface Props {
+  type Props = MessageActions & {
     roomId?: string;
-    onReact?: (emoji: string) => void;
-    onViewReactions?: () => void;
-    onReadReceipts?: () => void;
     onPickerOpenChange?: (open: boolean) => void;
     onOverflowOpenChange?: (open: boolean) => void;
-    onReply?: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-    onCopyText?: () => void;
-    onCopyLink?: () => void;
-  }
+  };
 
-  let {
-    roomId = '',
-    onReact,
-    onViewReactions,
-    onReadReceipts,
-    onPickerOpenChange,
-    onOverflowOpenChange,
-    onReply,
-    onEdit,
-    onDelete,
-    onCopyText,
-    onCopyLink,
-  }: Props = $props();
-  let hasOverflow = $derived(
-    onCopyText !== undefined ||
-      onCopyLink !== undefined ||
-      onViewReactions !== undefined ||
-      onReadReceipts !== undefined ||
-      onDelete !== undefined
-  );
+  let { roomId = '', onPickerOpenChange, onOverflowOpenChange, ...actions }: Props = $props();
+
+  let rows = $derived(messageMenuRows(actions));
 </script>
 
 <div class="message-actions">
-  {#if onReact}
+  {#if actions.onReact}
     <ReactionPicker
       label={$i18n.t('timeline.addReaction')}
       {roomId}
-      onPick={onReact}
+      onPick={actions.onReact}
       onOpenChange={onPickerOpenChange}
       triggerClass="btn btn-ghost btn-icon icon-button icon-button-small message-action-button"
     >
       <EmojiIcon />
     </ReactionPicker>
   {/if}
-  {#if onReply}
+  {#if actions.onReply}
     <IconButton
       class="message-action-button"
       size="small"
       variant="ghost"
       label={$i18n.t('timeline.reply')}
-      onclick={onReply}
+      onclick={actions.onReply}
     >
       <ReplyIcon />
     </IconButton>
   {/if}
-  {#if onEdit}
+  {#if actions.onEdit}
     <IconButton
       class="message-action-button"
       size="small"
       variant="ghost"
       label={$i18n.t('timeline.editMessage')}
-      onclick={onEdit}
+      onclick={actions.onEdit}
     >
       <EditIcon />
     </IconButton>
   {/if}
-  {#if hasOverflow}
+  {#if rows.length > 0}
     <ActionMenu label={$i18n.t('timeline.moreActions')} onOpenChange={onOverflowOpenChange}>
       {#snippet trigger({ props })}
         <IconButton
@@ -95,27 +72,22 @@
           <MoreIcon />
         </IconButton>
       {/snippet}
-      {#if onCopyText}
-        <ActionMenuItem onSelect={onCopyText}>{$i18n.t('timeline.copyMessage')}</ActionMenuItem>
-      {/if}
-      {#if onCopyLink}
-        <ActionMenuItem onSelect={onCopyLink}>{$i18n.t('timeline.copyLink')}</ActionMenuItem>
-      {/if}
-      {#if onViewReactions}
-        <ActionMenuItem onSelect={onViewReactions}
-          >{$i18n.t('timeline.viewReactions')}</ActionMenuItem
-        >
-      {/if}
-      {#if onReadReceipts}
-        <ActionMenuItem onSelect={onReadReceipts}>{$i18n.t('timeline.readReceipts')}</ActionMenuItem
-        >
-      {/if}
-      {#if onDelete}
-        <ActionMenuSeparator />
-        <ActionMenuItem destructive onSelect={onDelete}>
-          {$i18n.t('timeline.deleteMessage')}
-        </ActionMenuItem>
-      {/if}
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        {#each rows as row (row.key)}
+          {@const RowIcon = row.icon}
+          {#if row.separated}
+            <ActionMenuSeparator />
+          {/if}
+          <ActionMenuItem
+            class="menu-item-trailing-icon"
+            destructive={row.destructive}
+            onSelect={row.run}
+          >
+            <RowIcon />
+            <span>{$i18n.t(row.label)}</span>
+          </ActionMenuItem>
+        {/each}
+      </IconContext>
     </ActionMenu>
   {/if}
 </div>
