@@ -20,6 +20,7 @@ import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
+import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
@@ -527,6 +528,7 @@ export class CoreClient {
     });
     await this.refreshAccounts();
     discardAccountStore(transport, accountId);
+    clearRoomListSnapshot(accountId);
   }
 
   async logout(): Promise<void> {
@@ -538,7 +540,10 @@ export class CoreClient {
     this.accounts = [];
     this.verification = null;
     this.status = 'signed-out';
-    if (accountId !== null) discardAccountStore(transport, accountId);
+    if (accountId !== null) {
+      discardAccountStore(transport, accountId);
+      clearRoomListSnapshot(accountId);
+    }
   }
 
   async resetCaches(): Promise<void> {

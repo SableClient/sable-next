@@ -1,4 +1,4 @@
-import { createContext } from 'svelte';
+import { createContext, untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 import type {
@@ -12,10 +12,13 @@ import { applyDiffs } from '#src/transport';
 import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
+import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
+
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 
 type RoomNotificationModes = { room: NotificationModeView | null; fallback: NotificationModeView };
 const NOTIFICATION_MODE_LOAD_CONCURRENCY = 8;
+const SNAPSHOT_WRITE_DELAY_MS = 1_000;
 
 export function roomPathId(room: RoomSummary): string {
   return room.canonical_alias ?? room.room_id;
@@ -53,6 +56,9 @@ export class RoomList {
   private generation = 0;
   private notificationModes = new SvelteMap<string, RoomNotificationModes>();
   private loadingNotificationModes = new SvelteSet<string>();
+  private snapshotAccountId: string | null = null;
+  private snapshotWriteTimer: ReturnType<typeof setTimeout> | undefined;
+  private live = false;
 
   constructor(private readonly core: CoreClient) {}
 
@@ -68,6 +74,9 @@ export class RoomList {
     if (this.subscription !== null) return;
     if (this.startPromise) return this.startPromise;
 
+    untrack(() => {
+      this.paintSnapshot();
+    });
     const promise = this.startSubscription();
     this.startPromise = promise;
 
@@ -81,6 +90,11 @@ export class RoomList {
   stop(): void {
     this.generation += 1;
     this.startPromise = null;
+    untrack(() => {
+      this.flushSnapshot();
+    });
+    this.live = false;
+    this.snapshotAccountId = null;
     this.rooms = [];
     this.mutedRoomIds = new SvelteSet();
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -125,7 +139,8 @@ export class RoomList {
     }
 
     this.subscription = response.subscription;
-    this.setRooms(buffered.activate(response.subscription, response.rooms));
+    const rooms = buffered.activate(response.subscription, response.rooms);
+    if (rooms.length > 0 || !this.snapshotPainted()) this.setRooms(rooms);
     this.unsubscribeEvents = buffered.stop;
     this.unsubscribeNotificationSettings = this.core.subscribeEvents((event) => {
       if (event.type === 'notification_settings_changed')
@@ -142,8 +157,36 @@ export class RoomList {
     });
   }
 
+  private paintSnapshot(): void {
+    const accountId = this.core.session?.account_id ?? null;
+    this.snapshotAccountId = accountId;
+    if (accountId === null || this.rooms.length > 0) return;
+    const snapshot = readRoomListSnapshot(accountId);
+    if (snapshot && snapshot.length > 0) this.rooms = snapshot;
+  }
+
+  private snapshotPainted(): boolean {
+    return !this.live && this.rooms.length > 0;
+  }
+
+  private scheduleSnapshotWrite(): void {
+    if (this.snapshotAccountId === null || this.snapshotWriteTimer !== undefined) return;
+    this.snapshotWriteTimer = setTimeout(() => {
+      this.flushSnapshot();
+    }, SNAPSHOT_WRITE_DELAY_MS);
+  }
+
+  private flushSnapshot(): void {
+    if (this.snapshotWriteTimer !== undefined) clearTimeout(this.snapshotWriteTimer);
+    this.snapshotWriteTimer = undefined;
+    if (this.snapshotAccountId === null || !this.live) return;
+    writeRoomListSnapshot(this.snapshotAccountId, this.rooms);
+  }
+
   private setRooms(rooms: RoomSummary[]): void {
+    this.live = true;
     this.rooms = rooms;
+    this.scheduleSnapshotWrite();
     const roomIds = new SvelteSet(rooms.map((room) => room.room_id));
     for (const roomId of this.notificationModes.keys()) {
       if (!roomIds.has(roomId)) this.notificationModes.delete(roomId);

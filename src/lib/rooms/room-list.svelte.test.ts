@@ -7,7 +7,22 @@ import { RoomList } from './room-list.svelte.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
+
+function stubLocalStorage(): Map<string, string> {
+  const stored = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => stored.get(key) ?? null,
+    removeItem: (key: string) => {
+      stored.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      stored.set(key, value);
+    },
+  });
+  return stored;
+}
 
 test('limits concurrent notification-settings requests after room-list hydration', async () => {
   let active = 0;
@@ -104,4 +119,61 @@ test('holds the typing user ids so a room opened later reads them', async () => 
 
   expect(roomList.typingUserIds(room.room_id)).toEqual([]);
   roomList.stop();
+});
+
+test('paints the persisted room list before the subscription answers', async () => {
+  const room = { room_id: '!persisted:example.org', name: 'Persisted' } as RoomSummary;
+  stubLocalStorage().set('sable.room-list.acct', JSON.stringify([room]));
+  let resolveSubscription: (value: {
+    subscription: number;
+    rooms: RoomSummary[];
+  }) => void = () => {};
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(
+        () =>
+          new Promise<{ subscription: number; rooms: RoomSummary[] }>((resolve) => {
+            resolveSubscription = resolve;
+          })
+      ),
+      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  const started = roomList.start();
+  expect(roomList.rooms).toEqual([room]);
+
+  resolveSubscription({ subscription: 1, rooms: [] });
+  await started;
+  expect(roomList.rooms).toEqual([room]);
+
+  roomList.stop();
+});
+
+test('persists the live room list for the next launch', async () => {
+  vi.useFakeTimers();
+  const stored = stubLocalStorage();
+  const room = { room_id: '!live:example.org', name: 'Live' } as RoomSummary;
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
+      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  expect(stored.has('sable.room-list.acct')).toBe(false);
+  vi.advanceTimersByTime(1_000);
+  expect(JSON.parse(stored.get('sable.room-list.acct') ?? '[]')).toEqual([room]);
+
+  roomList.stop();
+  vi.useRealTimers();
 });
