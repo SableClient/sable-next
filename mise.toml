@@ -16,7 +16,7 @@ experimental = true
 includes = ["scripts"]
 
 [tools]
-"cargo:wasm-bindgen-cli" = "0.2.127"
+"ubi:rustwasm/wasm-bindgen" = { version = "0.2.127", extract_all = true }
 "aqua:WebAssembly/binaryen" = "132"
 "aqua:watchexec/watchexec" = "2.5.1"
 "aqua:evilmartians/lefthook" = "2.1.10"
