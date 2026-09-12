@@ -19,7 +19,7 @@ env:
   CARGO_TERM_COLOR: always
   FORGEJO_URL: https://git.sable.moe
   FORGEJO_REPOSITORY: ${{ github.repository }}
-  FORGEJO_TOKEN: ${{ secrets.FORGEJO_RELEASE_TOKEN }}
+  FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
 jobs:
   setup-release:
     name: Resolve release target
