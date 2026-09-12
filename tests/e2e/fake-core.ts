@@ -725,6 +725,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         room: null,
         default: 'all',
       }),
+      room_notification_modes: (command) => ({
+        type: 'room_notification_modes',
+        modes: command.room_ids.map((room_id) => ({ room_id, room: null, default: 'all' })),
+      }),
       default_notification_modes: () => ({
         type: 'default_notification_modes',
         direct: 'all',

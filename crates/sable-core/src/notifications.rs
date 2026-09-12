@@ -10,7 +10,7 @@ use matrix_sdk::ruma::push::{
     Action, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule, PushFormat,
     RuleKind, SoundTweakValue, Tweak,
 };
-use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId};
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
     NotificationStatus,
@@ -20,6 +20,7 @@ use url::Url;
 
 use crate::protocol::{
     NotificationModeView, NotificationSettingsView, NotificationView, PusherView,
+    RoomNotificationModeView,
 };
 
 const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
@@ -78,6 +79,36 @@ pub async fn settings(room: &matrix_sdk::Room) -> Result<NotificationSettingsVie
             .await
             .into(),
     })
+}
+
+pub async fn room_modes(
+    client: &Client,
+    room_ids: Vec<OwnedRoomId>,
+) -> Vec<RoomNotificationModeView> {
+    let settings = client.notification_settings().await;
+    let lookups = room_ids.into_iter().filter_map(|room_id| {
+        let room = client.get_room(&room_id)?;
+        let settings = &settings;
+        Some(async move {
+            let (encrypted, one_to_one) = room_kind(&room).await.ok()?;
+            Some(RoomNotificationModeView {
+                room: settings
+                    .get_user_defined_room_notification_mode(&room_id)
+                    .await
+                    .map(Into::into),
+                default: settings
+                    .get_default_room_notification_mode(encrypted, one_to_one)
+                    .await
+                    .into(),
+                room_id,
+            })
+        })
+    });
+    futures_util::future::join_all(lookups)
+        .await
+        .into_iter()
+        .flatten()
+        .collect()
 }
 
 pub async fn default_modes(client: &Client) -> (NotificationModeView, NotificationModeView) {

@@ -15,6 +15,7 @@ import type {
   MessageKind,
   NotificationModeView,
   NotificationSettingsView,
+  RoomNotificationModeView,
   PresenceView,
   PublicRoomView,
   PusherView,
@@ -1101,6 +1102,14 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
         read_marker: readMarker,
       });
+    },
+
+    async roomNotificationModes(roomIds: readonly string[]): Promise<RoomNotificationModeView[]> {
+      const response = await transport().send({
+        type: 'room_notification_modes',
+        room_ids: [...roomIds],
+      });
+      return response.modes;
     },
 
     async notificationSettings(roomId: string): Promise<NotificationSettingsView> {

@@ -17,7 +17,7 @@ import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapsho
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 
 type RoomNotificationModes = { room: NotificationModeView | null; fallback: NotificationModeView };
-const NOTIFICATION_MODE_LOAD_CONCURRENCY = 8;
+const NOTIFICATION_MODE_BATCH = 200;
 const SNAPSHOT_WRITE_DELAY_MS = 1_000;
 
 export function roomPathId(room: RoomSummary): string {
@@ -201,18 +201,19 @@ export class RoomList {
     const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
     for (const room of pending) this.loadingNotificationModes.add(room.room_id);
     const modes: { roomId: string; mode: RoomNotificationModes }[] = [];
-    for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_LOAD_CONCURRENCY) {
-      const results = await Promise.allSettled(
-        pending.slice(index, index + NOTIFICATION_MODE_LOAD_CONCURRENCY).map(async (room) => {
-          const settings = await this.core.commands.notificationSettings(room.room_id);
-          return {
-            roomId: room.room_id,
-            mode: { room: settings.room, fallback: settings.default },
-          };
-        })
-      );
-      for (const result of results) {
-        if (result.status === 'fulfilled') modes.push(result.value);
+    for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_BATCH) {
+      const batch = pending
+        .slice(index, index + NOTIFICATION_MODE_BATCH)
+        .map((room) => room.room_id);
+      try {
+        for (const entry of await this.core.commands.roomNotificationModes(batch)) {
+          modes.push({
+            roomId: entry.room_id,
+            mode: { room: entry.room, fallback: entry.default },
+          });
+        }
+      } catch (error) {
+        console.debug('[sable rooms] notification modes unavailable', error);
       }
     }
     for (const room of pending) this.loadingNotificationModes.delete(room.room_id);

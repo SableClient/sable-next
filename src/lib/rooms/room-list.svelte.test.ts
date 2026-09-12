@@ -24,16 +24,16 @@ function stubLocalStorage(): Map<string, string> {
   return stored;
 }
 
-test('limits concurrent notification-settings requests after room-list hydration', async () => {
-  let active = 0;
-  let maximumActive = 0;
-  const notificationSettings = vi.fn(async () => {
-    active += 1;
-    maximumActive = Math.max(maximumActive, active);
-    await Promise.resolve();
-    active -= 1;
-    return { room: null, default: 'all' };
-  });
+test('resolves notification modes for the whole list in one command', async () => {
+  const roomNotificationModes = vi.fn((roomIds: readonly string[]) =>
+    Promise.resolve(
+      roomIds.map((room_id) => ({
+        room_id,
+        room: room_id.startsWith('!room-1') ? ('mute' as const) : null,
+        default: 'all' as const,
+      }))
+    )
+  );
   const rooms = Array.from({ length: 20 }, (_, index) => ({
     room_id: `!room-${String(index)}:example.org`,
   })) as RoomSummary[];
@@ -43,7 +43,7 @@ test('limits concurrent notification-settings requests after room-list hydration
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms })),
-      notificationSettings,
+      roomNotificationModes,
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -51,10 +51,11 @@ test('limits concurrent notification-settings requests after room-list hydration
 
   await roomList.start();
   await vi.waitFor(() => {
-    expect(notificationSettings).toHaveBeenCalledTimes(rooms.length);
+    expect(roomList.mutedRoomIds.size).toBe(11);
   });
 
-  expect(maximumActive).toBeLessThanOrEqual(8);
+  expect(roomNotificationModes).toHaveBeenCalledTimes(1);
+  expect(roomNotificationModes.mock.calls[0]?.[0]).toHaveLength(20);
   roomList.stop();
 });
 
@@ -72,7 +73,7 @@ test('clears a room avatar when a room-list diff supplies null', async () => {
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -99,7 +100,7 @@ test('holds the typing user ids so a room opened later reads them', async () => 
     }),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -138,7 +139,7 @@ test('paints the persisted room list before the subscription answers', async () 
             resolveSubscription = resolve;
           })
       ),
-      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;
@@ -163,7 +164,7 @@ test('persists the live room list for the next launch', async () => {
     subscribeEvents: vi.fn(() => () => {}),
     commands: {
       subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
-      notificationSettings: vi.fn(() => Promise.resolve({ room: null, default: 'all' })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
       unsubscribe: vi.fn(() => Promise.resolve()),
     },
   } as unknown as CoreClient;

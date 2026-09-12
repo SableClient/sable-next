@@ -1594,6 +1594,10 @@ impl Core {
                 ))
             }
 
+            Command::RoomNotificationModes { room_ids } => Ok(CommandOk::RoomNotificationModes {
+                modes: notifications::room_modes(&self.client().await?, room_ids).await,
+            }),
+
             Command::DefaultNotificationModes => {
                 let (direct, group) = notifications::default_modes(&self.client().await?).await;
 

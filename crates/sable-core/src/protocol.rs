@@ -99,6 +99,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    RoomNotificationModes {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        room_ids: Vec<OwnedRoomId>,
+    },
     DefaultNotificationModes,
     Notification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -972,6 +976,9 @@ pub enum CommandOk {
     DeclineCall,
     RoomPermissions(RoomPermissionsView),
     NotificationSettings(NotificationSettingsView),
+    RoomNotificationModes {
+        modes: Vec<RoomNotificationModeView>,
+    },
     DefaultNotificationModes {
         direct: NotificationModeView,
         group: NotificationModeView,
@@ -2631,6 +2638,15 @@ pub enum NotificationModeView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
+    pub room: Option<NotificationModeView>,
+    pub default: NotificationModeView,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomNotificationModeView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
     pub room: Option<NotificationModeView>,
     pub default: NotificationModeView,
 }
