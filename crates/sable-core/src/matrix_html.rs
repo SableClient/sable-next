@@ -4,7 +4,7 @@
 //! has to decide what is safe.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::LazyLock;
+use std::sync::{LazyLock, Mutex, PoisonError};
 
 use ammonia::{Builder, UrlRelative};
 use linkify::{LinkFinder, LinkKind};
@@ -518,6 +518,30 @@ fn sanitize(formatted: &str) -> String {
 /// sanitised, or the plain body linkified.
 #[must_use]
 pub fn display_html(body: &str, formatted: Option<&str>) -> String {
+    let Some(formatted) = formatted else {
+        return render_html(body, None);
+    };
+    let key = (body.to_owned(), formatted.to_owned());
+    let mut cache = DISPLAY_HTML_CACHE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    if let Some(html) = cache.get(&key) {
+        return html.clone();
+    }
+    let html = render_html(body, Some(formatted));
+    if cache.len() >= DISPLAY_HTML_CACHE_ENTRIES {
+        cache.clear();
+    }
+    cache.insert(key, html.clone());
+    html
+}
+
+const DISPLAY_HTML_CACHE_ENTRIES: usize = 2048;
+
+static DISPLAY_HTML_CACHE: LazyLock<Mutex<HashMap<(String, String), String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn render_html(body: &str, formatted: Option<&str>) -> String {
     let sanitized = formatted.map(sanitize);
     // Markup rejected in full would otherwise leave the message blank.
     match sanitized {
