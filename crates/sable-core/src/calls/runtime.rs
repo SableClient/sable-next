@@ -80,15 +80,15 @@ fn backend_id(room_id: &OwnedRoomId, service: &str) -> String {
 }
 
 fn member_service<'a>(member: &'a CallMember, members: &'a [CallMember]) -> Option<&'a str> {
-    let focus_owner = if member.mode == CallMode::Legacy {
-        members
-            .iter()
-            .min_by_key(|entry| entry.created_ts)
-            .unwrap_or(member)
-    } else {
-        member
-    };
-    focus_owner.foci.first().map(String::as_str)
+    if member.mode != CallMode::Legacy {
+        return member.foci.first().map(String::as_str);
+    }
+    let mut owners: Vec<&CallMember> = members.iter().collect();
+    owners.sort_by_key(|entry| entry.created_ts);
+    owners
+        .iter()
+        .find_map(|entry| entry.foci.first())
+        .map(String::as_str)
 }
 
 fn select_mode(
@@ -693,22 +693,29 @@ fn emit_pending(
                         .is_none_or(|id| id == member.identity),
                 }
         });
-        if let Some(member) = member {
-            if let Some(service) = member_service(member, &state.members) {
-                core.emit_if_current(
-                    generation,
-                    CoreEvent::CallEncryptionKey {
-                        session,
-                        identity: member.identity.clone(),
-                        backend_id: Some(backend_id(room_id, service)),
-                        key_index: pending.content.keys.index,
-                        key: pending.content.keys.key,
-                        own: false,
-                    },
-                );
-            }
+        if let Some(member) = member
+            && let Some(service) = member_service(member, &state.members)
+        {
+            core.emit_if_current(
+                generation,
+                CoreEvent::CallEncryptionKey {
+                    session,
+                    identity: member.identity.clone(),
+                    backend_id: Some(backend_id(room_id, service)),
+                    key_index: pending.content.keys.index,
+                    key: pending.content.keys.key,
+                    own: false,
+                },
+            );
         } else if keys::now_ms().saturating_sub(pending.received) < 30_000 {
             state.pending_keys.push(pending);
+        } else {
+            tracing::warn!(
+                sender = %pending.sender,
+                device = %pending.device,
+                known_member = member.is_some(),
+                "dropping a call media key whose member never resolved"
+            );
         }
     }
 }
@@ -729,21 +736,34 @@ fn watch_keys(
             let room_id = room_id.clone();
             let state = state.clone();
             async move {
-                if event.content.room_id != room_id
-                    || !event.content.session.is_legacy_room_call()
-                    || keys::decode_key(&event.content.keys.key).is_none()
-                {
+                if event.content.room_id != room_id {
+                    return;
+                }
+                if !event.content.session.is_legacy_room_call() {
+                    tracing::warn!(sender = %event.sender, "ignoring a call media key for another session");
+                    return;
+                }
+                if keys::decode_key(&event.content.keys.key).is_none() {
+                    tracing::warn!(sender = %event.sender, "ignoring a call media key that is not 16 bytes");
                     return;
                 }
                 let Some(encryption) = encryption else {
+                    tracing::warn!(sender = %event.sender, "ignoring a call media key sent in clear");
                     return;
                 };
                 let Some(device) = encryption.sender_device else {
+                    tracing::warn!(sender = %event.sender, "ignoring a call media key from an unknown device");
                     return;
                 };
                 if encryption.sender != event.sender
                     || device.as_str() != event.content.member.claimed_device_id
                 {
+                    tracing::warn!(
+                        sender = %event.sender,
+                        %device,
+                        claimed = %event.content.member.claimed_device_id,
+                        "ignoring a call media key whose claimed device is not the sender"
+                    );
                     return;
                 }
                 let mut state = state.lock().await;

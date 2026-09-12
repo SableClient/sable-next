@@ -158,23 +158,24 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
 
     let mut members = Vec::new();
     for raw in events {
-        let membership_id = match &raw {
-            matrix_sdk::deserialized_responses::RawSyncOrStrippedState::Sync(raw) => raw
-                .deserialize_as::<serde_json::Value>()
-                .ok()
-                .and_then(|event| {
-                    event
-                        .get("content")?
-                        .get("membershipID")?
-                        .as_str()
-                        .map(str::to_owned)
-                }),
-            matrix_sdk::deserialized_responses::RawSyncOrStrippedState::Stripped(_) => None,
-        };
-        let Ok(event) = raw.deserialize() else {
+        let matrix_sdk::deserialized_responses::RawSyncOrStrippedState::Sync(raw) = raw else {
             continue;
         };
-        let Some(event) = event.as_sync().and_then(|sync| sync.as_original()) else {
+        let Ok(mut value) = raw.deserialize_as::<serde_json::Value>() else {
+            continue;
+        };
+        let membership_id = value
+            .get("content")
+            .and_then(|content| content.get("membershipID"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        alias_foci(&mut value, room.room_id().as_str());
+        let Ok(event) = serde_json::from_value::<
+            matrix_sdk::ruma::events::SyncStateEvent<CallMemberEventContent>,
+        >(value) else {
+            continue;
+        };
+        let Some(event) = event.as_original() else {
             continue;
         };
 
@@ -330,6 +331,23 @@ impl StickyMemberships {
                 })
             })
             .collect()
+    }
+}
+
+fn alias_foci(event: &mut serde_json::Value, room_id: &str) {
+    let Some(foci) = event
+        .get_mut("content")
+        .and_then(|content| content.get_mut("foci_preferred"))
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return;
+    };
+    for focus in foci.iter_mut().filter_map(serde_json::Value::as_object_mut) {
+        if focus.get("type").and_then(serde_json::Value::as_str) == Some("livekit")
+            && !focus.contains_key("livekit_alias")
+        {
+            focus.insert("livekit_alias".to_owned(), room_id.into());
+        }
     }
 }
 

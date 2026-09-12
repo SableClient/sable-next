@@ -45,6 +45,24 @@ fn legacy_mode_uses_the_oldest_state_membership_focus() {
 }
 
 #[test]
+fn legacy_mode_skips_an_oldest_member_that_advertises_no_focus() {
+    let mut oldest = member(CallMode::Legacy, 1, &[]);
+    oldest.device_id = device_id!("PEER").to_owned();
+    let own = member(CallMode::Legacy, 2, &["https://own.example.org"]);
+    let members = vec![own.clone(), oldest.clone()];
+
+    assert_eq!(
+        member_service(&oldest, &members),
+        Some("https://own.example.org")
+    );
+    assert_eq!(
+        member_service(&own, &members),
+        Some("https://own.example.org")
+    );
+    assert_eq!(member_service(&oldest, &[oldest.clone()]), None);
+}
+
+#[test]
 fn mode_selection_preserves_legacy_and_selects_sticky_only_when_available() {
     assert!(matches!(
         select_mode(None, &[member(CallMode::Legacy, 1, &[])], true),
@@ -227,6 +245,125 @@ async fn pending_key_with_a_custom_membership_id_is_emitted() {
     assert_eq!(
         events.try_recv().unwrap_err(),
         tokio::sync::mpsc::error::TryRecvError::Empty
+    );
+}
+
+#[tokio::test]
+async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
+    use matrix_sdk::ruma::{events::AnySyncStateEvent, serde::Raw};
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use serde_json::json;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let parsed_room_id = room_id!("!call:example.org");
+    let now = super::keys::now_ms();
+    let event = json!({
+        "type": "org.matrix.msc3401.call.member",
+        "state_key": "_@genchu:federated.nexus_spDmuPm52O_m.call",
+        "sender": "@genchu:federated.nexus", "event_id": "$peer",
+        "origin_server_ts": now - 5_000,
+        "content": {
+            "application": "m.call", "call_id": "", "scope": "m.room",
+            "device_id": "spDmuPm52O", "membershipID": "@genchu:federated.nexus:spDmuPm52O",
+            "created_ts": now - 5_000, "expires": 14_400_000, "m.call.intent": "video",
+            "focus_active": {"type":"livekit", "focus_selection":"oldest_membership"},
+            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.federated.nexus", "livekit_alias":parsed_room_id}]
+        }
+    });
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(parsed_room_id).add_state_event(
+                Raw::new(&event)
+                    .unwrap()
+                    .cast_unchecked::<AnySyncStateEvent>(),
+            ),
+        )
+        .await;
+    let mut members = super::membership::active_members(&room).await;
+    assert_eq!(members.len(), 1);
+    members.push(member(
+        CallMode::Compatibility,
+        now,
+        &["https://sfu.example.org"],
+    ));
+
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let room_id = owned_room_id!("!call:example.org");
+    let content: super::keys::ToDeviceCallEncryptionKeysEventContent = serde_json::from_value(json!({
+        "keys": {"index": 1, "key": "ag8zYq5ohmf0xrnZrzJ2Bw=="},
+        "room_id": room_id,
+        "member": {"claimed_device_id": "spDmuPm52O", "id": "@genchu:federated.nexus:spDmuPm52O"},
+        "session": {"call_id": "", "application": "m.call", "scope": "m.room"},
+        "sent_ts": now
+    }))
+    .unwrap();
+    let mut state = State {
+        own: member(CallMode::Compatibility, now, &["https://sfu.example.org"]),
+        sticky: super::StickyMemberships::default(),
+        members,
+        backends: BTreeMap::new(),
+        pending_keys: vec![super::PendingKey {
+            sender: owned_user_id!("@genchu:federated.nexus"),
+            device: owned_device_id!("spDmuPm52O"),
+            content,
+            received: now,
+        }],
+        distributor: None,
+        own_observed: false,
+        revision: 0,
+    };
+
+    super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
+
+    let expected = backend_id(&room_id, "https://sfu.federated.nexus");
+    assert!(matches!(
+        events.try_recv(),
+        Ok(crate::protocol::CoreEvent::CallEncryptionKey { identity, key_index: 1, own: false, backend_id: Some(id), .. })
+            if identity == "@genchu:federated.nexus:spDmuPm52O" && id == expected
+    ));
+    assert!(state.pending_keys.is_empty());
+}
+
+#[tokio::test]
+async fn an_element_call_focus_without_an_alias_still_counts() {
+    use matrix_sdk::ruma::{events::AnySyncStateEvent, serde::Raw};
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use serde_json::json;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let parsed_room_id = room_id!("!call:example.org");
+    let now = super::keys::now_ms();
+    let event = json!({
+        "type": "org.matrix.msc3401.call.member",
+        "state_key": "_@genchu:federated.nexus_spDmuPm52O_m.call",
+        "sender": "@genchu:federated.nexus", "event_id": "$peer",
+        "origin_server_ts": now - 5_000,
+        "content": {
+            "application": "m.call", "call_id": "", "scope": "m.room",
+            "device_id": "spDmuPm52O", "membershipID": "@genchu:federated.nexus:spDmuPm52O",
+            "created_ts": now - 5_000, "expires": 14_400_000, "m.call.intent": "video",
+            "focus_active": {"type":"livekit", "focus_selection":"oldest_membership"},
+            "foci_preferred": [{"type":"livekit", "livekit_service_url":"https://sfu.federated.nexus"}]
+        }
+    });
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(parsed_room_id).add_state_event(
+                Raw::new(&event)
+                    .unwrap()
+                    .cast_unchecked::<AnySyncStateEvent>(),
+            ),
+        )
+        .await;
+    let members = super::membership::active_members(&room).await;
+    assert_eq!(members.len(), 1);
+    assert_eq!(
+        members[0].foci,
+        vec!["https://sfu.federated.nexus".to_owned()]
     );
 }
 
