@@ -1007,7 +1007,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       close(): void {}
 
       emit(event: CoreEvent): void {
-        this.onmessage?.({ data: { event } } as MessageEvent);
+        this.onmessage?.({ data: { events: [event] } } as MessageEvent);
       }
 
       postMessage(request: {

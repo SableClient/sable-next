@@ -172,8 +172,10 @@ export function createWebTransport(): Transport {
       const data = message.data;
       markWorkerResponsive();
 
-      if ('event' in data) {
-        for (const listener of listeners) listener(data.event);
+      if ('events' in data) {
+        for (const event of data.events) {
+          for (const listener of listeners) listener(event);
+        }
         return;
       }
 

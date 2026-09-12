@@ -131,10 +131,54 @@ test('sends the subscription snapshot before startup events buffered for its por
   expect(first.messages).toEqual([
     { id: 1, ok: { type: 'subscribe_timeline', subscription: 7, items: [] } },
     {
-      event: { type: 'timeline_pagination', subscription: 7, loading: true, reached_start: false },
+      events: [
+        { type: 'timeline_pagination', subscription: 7, loading: true, reached_start: false },
+      ],
     },
   ]);
   expect(second.messages).toEqual([]);
+});
+
+test('forwards a core batch as one message per port', async () => {
+  const boundary = createCoreWorkerBoundary(
+    Promise.resolve(
+      fakeCore(() =>
+        Promise.resolve(JSON.stringify({ type: 'subscribe_timeline', subscription: 7, items: [] }))
+      )
+    )
+  );
+  const owner = new FakePort();
+  boundary.connect(owner);
+  await owner.send({
+    id: 1,
+    command: {
+      type: 'subscribe_timeline',
+      room_id: '!room',
+      focus: { kind: 'live' as const },
+      hidden_events: false,
+    },
+  });
+  owner.messages.length = 0;
+
+  boundary.handleEvent(
+    JSON.stringify([
+      { type: 'timeline_diff', subscription: 7, diffs: [] },
+      { type: 'timeline_diff', subscription: 7, diffs: [] },
+      { type: 'sync_status', status: 'running' },
+      { type: 'timeline_pagination', subscription: 7, loading: false, reached_start: false },
+    ])
+  );
+
+  expect(owner.messages).toEqual([
+    { events: [{ type: 'sync_status', status: 'running' }] },
+    {
+      events: [
+        { type: 'timeline_diff', subscription: 7, diffs: [] },
+        { type: 'timeline_diff', subscription: 7, diffs: [] },
+        { type: 'timeline_pagination', subscription: 7, loading: false, reached_start: false },
+      ],
+    },
+  ]);
 });
 
 test.each([false, true])(
@@ -188,7 +232,7 @@ test.each([false, true])(
     } else {
       expect(port.messages).toEqual([
         { id: 1, ok: { type: 'subscribe_timeline', subscription: 2, items: [] } },
-        { event: { type: 'timeline_diff', subscription: 2, diffs: [{ op: 'clear' }] } },
+        { events: [{ type: 'timeline_diff', subscription: 2, diffs: [{ op: 'clear' }] }] },
       ]);
     }
   }
