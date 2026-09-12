@@ -37,9 +37,6 @@ one, `git rebase --signoff origin/main` a whole branch. Force-push with
 AI-generated content, including ChatGPT, Claude, Copilot, Llama and similar
 tools.**
 
-**Other uses of AI are fine — researching APIs, static analysis, debugging — as
-long as their output stays out of the contribution.**
-
 Signing off means you understand the copyright and license status of what you
 submit. For AI-generated output that status is ill-defined: training material is
 often under restrictive terms, and open source terms are not all AGPL-3.0
