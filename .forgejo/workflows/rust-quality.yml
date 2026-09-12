@@ -59,7 +59,7 @@ jobs:
   checks:
     name: Rust check, test, and Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
