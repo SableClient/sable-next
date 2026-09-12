@@ -5,6 +5,7 @@
     MembershipView,
     ProfileView,
     RoomPermissionsView,
+    RoomStateEventView,
     CallSupportView,
   } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
@@ -63,11 +64,7 @@
   import TimelineList from './TimelineList.svelte';
   import MediaViewer, { type MediaItem } from './MediaViewer.svelte';
   import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
-  import {
-    POWER_LEVEL_TAGS_EVENT_TYPE,
-    parsePowerLevelTags,
-    type PowerLevelTagMap,
-  } from './settings/power-level-tags.js';
+  import { parsePowerLevelTags, type PowerLevelTagMap } from './settings/power-level-tags.js';
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
@@ -197,7 +194,7 @@
   providePinnedEvents(pinnedEvents);
 
   $effect(() => {
-    void pinRevision;
+    if (pinRevision === 0) return;
     const target = resolvedRoomId;
     if (target) void pinnedEvents.load(target);
   });
@@ -305,31 +302,20 @@
   $effect(() => {
     const activeRoomId = resolvedRoomId;
     permissions = null;
-    let current = true;
-    void core.commands
-      .roomPermissions(activeRoomId)
-      .then((next) => {
-        if (current) permissions = next;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] permissions unavailable', error);
-      });
-    return () => {
-      current = false;
-    };
-  });
-
-  $effect(() => {
-    const activeRoomId = resolvedRoomId;
     powerTags = {};
+    widgets = [];
     let current = true;
     void core.commands
-      .roomStateEvent(activeRoomId, POWER_LEVEL_TAGS_EVENT_TYPE)
-      .then((content) => {
-        if (current) powerTags = parsePowerLevelTags(content);
+      .roomOpen(activeRoomId)
+      .then((opened) => {
+        if (!current) return;
+        permissions = opened.permissions;
+        powerTags = parsePowerLevelTags(opened.power_level_tags);
+        widgets = parseRoomWidgets(opened.widgets);
+        pinnedEvents.set(activeRoomId, opened.pinned_event_ids);
       })
       .catch((error: unknown) => {
-        console.debug('[sable room] power level tags unavailable', error);
+        console.debug('[sable room] room details unavailable', error);
       });
     return () => {
       current = false;
@@ -359,22 +345,6 @@
       })
       .finally(() => {
         if (current) tombstoneChecked = true;
-      });
-    return () => {
-      current = false;
-    };
-  });
-
-  $effect(() => {
-    const activeRoomId = resolvedRoomId;
-    widgets = [];
-    let current = true;
-    void loadWidgets(activeRoomId)
-      .then((next) => {
-        if (current) widgets = next;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] widgets unavailable', error);
       });
     return () => {
       current = false;
@@ -452,12 +422,17 @@
     else membersOpen = false;
   }
 
-  async function loadWidgets(activeRoomId: string): Promise<RoomWidget[]> {
-    const events = await core.commands.roomStateEvents(activeRoomId, 'im.vector.modular.widgets');
+  function parseRoomWidgets(events: readonly RoomStateEventView[]): RoomWidget[] {
     return events.flatMap((event) => {
       const widget = parseRoomWidget(event.state_key, event.content);
       return widget ? [widget] : [];
     });
+  }
+
+  async function loadWidgets(activeRoomId: string): Promise<RoomWidget[]> {
+    return parseRoomWidgets(
+      await core.commands.roomStateEvents(activeRoomId, 'im.vector.modular.widgets')
+    );
   }
 
   function toggleWidgets(): void {

@@ -32,6 +32,12 @@ export class PinnedEvents {
     }
   }
 
+  set(roomId: string, ids: readonly string[]): void {
+    this.#generation += 1;
+    this.#roomId = roomId;
+    this.#replace(ids);
+  }
+
   async toggle(roomId: string, eventId: string): Promise<void> {
     const generation = ++this.#generation;
     const ids = await this.commands.setPinned(roomId, eventId, !this.has(eventId));

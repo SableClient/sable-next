@@ -41,8 +41,9 @@ use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedUserId, RoomId, RoomOrAliasId, ServerName, UInt,
-    events::room::member::MembershipState, events::room::message::RoomMessageEventContent,
+    MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId, RoomOrAliasId,
+    ServerName, UInt, events::room::member::MembershipState,
+    events::room::message::RoomMessageEventContent,
 };
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
@@ -52,10 +53,13 @@ use matrix_sdk_ui::timeline::TimelineEventItemId;
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
     JoinRuleView, MembershipView, MessageKind, MutualRoomView, PackImageInfoView,
-    PaginationDirection, PresenceView, RoomStateEventView, RoomTag, RoomVersionView,
+    PaginationDirection, PresenceView, RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView,
     RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
+
+const POWER_LEVEL_TAGS_EVENT_TYPE: &str = "in.cinny.room.power_level_tags";
+const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
 
 use crate::media::mxc_uri;
 use crate::messages::outgoing_mentions;
@@ -665,22 +669,9 @@ impl Core {
                 })
             }
 
-            Command::RoomPermissions { room_id } => {
-                let room = self.room(&room_id).await?;
-                let user_id = room
-                    .client()
-                    .user_id()
-                    .ok_or_else(|| self.failed("room_permissions", "no session"))?
-                    .to_owned();
-                // An invited room carries only stripped state, so the levels are
-                // often absent. Spec defaults beat failing the whole command.
-                let power_levels = room.power_levels_or_default().await;
-
-                Ok(CommandOk::RoomPermissions(view::room_permissions(
-                    &power_levels,
-                    &user_id,
-                )))
-            }
+            Command::RoomPermissions { room_id } => Ok(CommandOk::RoomPermissions(
+                self.room_permissions(&room_id).await?,
+            )),
 
             Command::ImagePacks {
                 room_id,
@@ -953,89 +944,54 @@ impl Core {
             Command::RoomStateEvents {
                 room_id,
                 event_type,
-            } => {
-                let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
-                let stored = room
-                    .get_state_events(event_type.as_str().into())
-                    .await
-                    .map_err(|error| self.room_error("room_state_events", error))?;
-
-                let events: Vec<RoomStateEventView> = stored
-                    .iter()
-                    .filter_map(|raw| {
-                        let (state_key, content) = match raw {
-                            RawAnySyncOrStrippedState::Sync(event) => (
-                                event.get_field::<String>("state_key"),
-                                event.get_field::<serde_json::Value>("content"),
-                            ),
-                            RawAnySyncOrStrippedState::Stripped(event) => (
-                                event.get_field::<String>("state_key"),
-                                event.get_field::<serde_json::Value>("content"),
-                            ),
-                        };
-                        Some(RoomStateEventView {
-                            state_key: state_key.ok().flatten()?,
-                            content: content.ok().flatten()?,
-                        })
-                    })
-                    .collect();
-
-                if !events.is_empty() {
-                    return Ok(CommandOk::RoomStateEvents { events });
-                }
-
-                let events = room_state_events_from_server(&client, &room, &event_type)
-                    .await
-                    .map_err(|error| self.room_error("room_state_events", error))?;
-
-                Ok(CommandOk::RoomStateEvents { events })
-            }
+            } => Ok(CommandOk::RoomStateEvents {
+                events: self.room_state_events(&room_id, &event_type).await?,
+            }),
 
             Command::RoomStateEvent {
                 room_id,
                 event_type,
                 state_key,
-            } => {
+            } => Ok(CommandOk::RoomStateEvent {
+                content: self
+                    .room_state_event_content(room_id, event_type, state_key)
+                    .await?,
+            }),
+
+            Command::RoomHasSpaceParent { room_id } => {
                 let client = self.client().await?;
                 let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
-                let event = room
-                    .get_state_event(event_type.clone().into(), &state_key)
-                    .await
-                    .ok()
-                    .flatten();
+                Ok(CommandOk::RoomHasSpaceParent {
+                    has_space_parent: view::has_space_parent(&room).await,
+                })
+            }
 
-                let content = event.and_then(|raw| {
-                    let field = match raw {
-                        RawAnySyncOrStrippedState::Sync(event) => event.get_field("content"),
-                        RawAnySyncOrStrippedState::Stripped(event) => event.get_field("content"),
-                    };
-                    field.ok().flatten()
-                });
-
-                let content = match content {
-                    Some(content) => Some(content),
-                    None => match client
-                        .send(get_state_event_for_key::v3::Request::new(
-                            room_id,
-                            event_type.into(),
-                            state_key,
-                        ))
-                        .await
-                    {
-                        Ok(response) => state_event_content(response.event_or_content.get()),
-                        Err(error)
-                            if error.client_api_error_kind() == Some(&ErrorKind::NotFound) =>
-                        {
-                            None
-                        }
-                        Err(error) => {
-                            return Err(self.room_error("room_state_event", error.into()));
-                        }
-                    },
-                };
-
-                Ok(CommandOk::RoomStateEvent { content })
+            Command::RoomOpen { room_id } => {
+                let (permissions, power_level_tags, widgets, pinned_event_ids) = futures_util::join!(
+                    self.room_permissions(&room_id),
+                    self.room_state_event_content(
+                        room_id.clone(),
+                        POWER_LEVEL_TAGS_EVENT_TYPE.to_owned(),
+                        String::new(),
+                    ),
+                    self.room_state_events(&room_id, WIDGETS_EVENT_TYPE),
+                    self.pinned_events(&room_id),
+                );
+                Ok(CommandOk::RoomOpen(RoomOpenView {
+                    permissions: permissions?,
+                    power_level_tags: power_level_tags.unwrap_or_else(|error| {
+                        tracing::warn!(?error, "power level tags unavailable");
+                        None
+                    }),
+                    widgets: widgets.unwrap_or_else(|error| {
+                        tracing::warn!(?error, "widgets unavailable");
+                        Vec::new()
+                    }),
+                    pinned_event_ids: pinned_event_ids.unwrap_or_else(|error| {
+                        tracing::warn!(?error, "pinned events unavailable");
+                        Vec::new()
+                    }),
+                }))
             }
 
             Command::TimestampToEvent {
@@ -2451,6 +2407,111 @@ fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {
                     MembershipView::Ban => RoomMemberships::BAN,
                 }
         })
+}
+
+impl Core {
+    async fn room_permissions(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> Result<crate::protocol::RoomPermissionsView, CommandErr> {
+        let room = self.room(room_id).await?;
+        let user_id = room
+            .client()
+            .user_id()
+            .ok_or_else(|| self.failed("room_permissions", "no session"))?
+            .to_owned();
+        // An invited room carries only stripped state, so the levels are
+        // often absent. Spec defaults beat failing the whole command.
+        let power_levels = room.power_levels_or_default().await;
+
+        Ok(view::room_permissions(&power_levels, &user_id))
+    }
+
+    async fn room_state_events(
+        &self,
+        room_id: &OwnedRoomId,
+        event_type: &str,
+    ) -> Result<Vec<RoomStateEventView>, CommandErr> {
+        let client = self.client().await?;
+        let room = client.get_room(room_id).ok_or(CommandErr::UnknownRoom)?;
+        let stored = room
+            .get_state_events(event_type.into())
+            .await
+            .map_err(|error| self.room_error("room_state_events", error))?;
+
+        let events: Vec<RoomStateEventView> = stored
+            .iter()
+            .filter_map(|raw| {
+                let (state_key, content) = match raw {
+                    RawAnySyncOrStrippedState::Sync(event) => (
+                        event.get_field::<String>("state_key"),
+                        event.get_field::<serde_json::Value>("content"),
+                    ),
+                    RawAnySyncOrStrippedState::Stripped(event) => (
+                        event.get_field::<String>("state_key"),
+                        event.get_field::<serde_json::Value>("content"),
+                    ),
+                };
+                Some(RoomStateEventView {
+                    state_key: state_key.ok().flatten()?,
+                    content: content.ok().flatten()?,
+                })
+            })
+            .collect();
+
+        if !events.is_empty() {
+            return Ok(events);
+        }
+
+        let events = room_state_events_from_server(&client, &room, event_type)
+            .await
+            .map_err(|error| self.room_error("room_state_events", error))?;
+
+        Ok(events)
+    }
+
+    async fn room_state_event_content(
+        &self,
+        room_id: OwnedRoomId,
+        event_type: String,
+        state_key: String,
+    ) -> Result<Option<serde_json::Value>, CommandErr> {
+        let client = self.client().await?;
+        let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+        let event = room
+            .get_state_event(event_type.clone().into(), &state_key)
+            .await
+            .ok()
+            .flatten();
+
+        let content = event.and_then(|raw| {
+            let field = match raw {
+                RawAnySyncOrStrippedState::Sync(event) => event.get_field("content"),
+                RawAnySyncOrStrippedState::Stripped(event) => event.get_field("content"),
+            };
+            field.ok().flatten()
+        });
+
+        let content = match content {
+            Some(content) => Some(content),
+            None => match client
+                .send(get_state_event_for_key::v3::Request::new(
+                    room_id,
+                    event_type.into(),
+                    state_key,
+                ))
+                .await
+            {
+                Ok(response) => state_event_content(response.event_or_content.get()),
+                Err(error) if error.client_api_error_kind() == Some(&ErrorKind::NotFound) => None,
+                Err(error) => {
+                    return Err(self.room_error("room_state_event", error.into()));
+                }
+            },
+        };
+
+        Ok(content)
+    }
 }
 
 async fn room_state_events_from_server(

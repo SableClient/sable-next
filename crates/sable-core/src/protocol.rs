@@ -306,6 +306,14 @@ pub enum Command {
         room_id: OwnedRoomId,
         event_type: String,
     },
+    RoomHasSpaceParent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    RoomOpen {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     UrlPreview {
         url: String,
     },
@@ -1043,6 +1051,10 @@ pub enum CommandOk {
     RoomStateEvents {
         events: Vec<RoomStateEventView>,
     },
+    RoomHasSpaceParent {
+        has_space_parent: bool,
+    },
+    RoomOpen(RoomOpenView),
     UrlPreview {
         preview: Option<UrlPreviewView>,
     },
@@ -1684,13 +1696,13 @@ pub struct RoomSummary {
     pub encrypted: Option<bool>,
     pub is_space: bool,
     pub is_tombstoned: bool,
+    pub room_type: Option<String>,
     /// An `m.room.create` with the MSC3417 call type.
     pub is_voice: bool,
     /// Members in the room's call, oldest first and one entry per user however
     /// many devices they joined with.
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub call_participants: Vec<OwnedUserId>,
-    pub has_space_parent: bool,
     pub supports_knock: bool,
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,
@@ -2000,6 +2012,17 @@ pub struct RoomStateEventView {
     pub state_key: String,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
     pub content: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomOpenView {
+    pub permissions: RoomPermissionsView,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
+    pub power_level_tags: Option<serde_json::Value>,
+    pub widgets: Vec<RoomStateEventView>,
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub pinned_event_ids: Vec<OwnedEventId>,
 }
 
 /// What this account may do in one room, resolved from `m.room.power_levels`.

@@ -120,7 +120,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_tombstoned: false,
       is_voice: false,
       call_participants: [],
-      has_space_parent: false,
+      room_type: null,
       supports_knock: false,
       supports_restricted: false,
       supports_knock_restricted: false,
@@ -752,6 +752,30 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       ignored_users: () => ({ type: 'ignored_users', users: [] }),
       bulk_redact: () => ({ type: 'bulk_redact', redacted: 0 }),
       pinned_events: () => ({ type: 'pinned_events', event_ids: [] }),
+      room_has_space_parent: () => ({ type: 'room_has_space_parent', has_space_parent: false }),
+      room_open: (command, port) => {
+        const permissions = handlers.room_permissions(
+          { type: 'room_permissions', room_id: command.room_id },
+          port
+        );
+        const widgets = handlers.room_state_events(
+          {
+            type: 'room_state_events',
+            room_id: command.room_id,
+            event_type: 'im.vector.modular.widgets',
+          },
+          port
+        );
+        if (permissions === NO_REPLY || widgets === NO_REPLY) return NO_REPLY;
+        const { type: _type, ...rest } = permissions;
+        return {
+          type: 'room_open',
+          permissions: rest,
+          power_level_tags: null,
+          widgets: widgets.events,
+          pinned_event_ids: [],
+        };
+      },
       set_pinned: () => ({ type: 'set_pinned', event_ids: [] }),
       room_power_levels: () => ({
         type: 'room_power_levels',

@@ -91,7 +91,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
     is_tombstoned: false,
     is_voice: false,
     call_participants: [],
-    has_space_parent: false,
+    room_type: null,
     supports_knock: true,
     supports_restricted: true,
     supports_knock_restricted: true,

@@ -63,7 +63,6 @@ pub struct RoomInfo {
     pub is_space: bool,
     pub is_direct: bool,
     pub is_tombstoned: bool,
-    pub has_space_parent: bool,
     pub supports_knock: bool,
     pub supports_restricted: bool,
     pub supports_knock_restricted: bool,
@@ -117,9 +116,9 @@ pub fn room_summary<S: BuildHasher>(
         },
         is_space: info.is_some_and(|i| i.is_space),
         is_tombstoned: info.is_some_and(|i| i.is_tombstoned),
+        room_type: item.room_type().map(|kind| kind.to_string()),
         is_voice: item.is_call(),
         call_participants: call_participants(item.active_room_call_participants()),
-        has_space_parent: info.is_some_and(|i| i.has_space_parent),
         supports_knock: info.is_some_and(|i| i.supports_knock),
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
@@ -272,8 +271,7 @@ async fn room_info(room: &Room) -> RoomInfo {
         }
     };
 
-    let (has_space_parent, children, is_direct) =
-        futures_util::future::join3(has_space_parent(room), children, is_direct(room)).await;
+    let (children, is_direct) = futures_util::future::join(children, is_direct(room)).await;
     let (supports_knock, supports_restricted, supports_knock_restricted) =
         crate::rooms::join_rule_support(room);
 
@@ -281,7 +279,6 @@ async fn room_info(room: &Room) -> RoomInfo {
         is_space,
         is_direct,
         is_tombstoned,
-        has_space_parent,
         supports_knock,
         supports_restricted,
         supports_knock_restricted,
@@ -348,7 +345,7 @@ async fn is_direct(room: &Room) -> bool {
     room.is_direct().await.unwrap_or(false)
 }
 
-async fn has_space_parent(room: &Room) -> bool {
+pub async fn has_space_parent(room: &Room) -> bool {
     let Ok(parents) = room.parent_spaces().await else {
         return false;
     };
