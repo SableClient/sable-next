@@ -62,7 +62,7 @@ jobs:
     name: Build web assets
     needs: setup-release
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
