@@ -14,8 +14,8 @@ on:
       - 'pnpm-workspace.yaml'
       - 'vite.config.ts'
       - 'wrangler.jsonc'
-      - '.forgejo/workflows/cloudflare-web-preview.yml'
-      - '.forgejo/actions/setup/**'
+      - '.github/workflows/cloudflare-web-preview.yml'
+      - '.github/actions/setup/**'
 
 permissions: {}
 
@@ -28,19 +28,19 @@ jobs:
     name: Deploy preview
     # Forks cannot read the Cloudflare credentials wrangler needs.
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
     steps:
       - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up app and build
-        uses: ./.forgejo/actions/setup
+        uses: ./.github/actions/setup
         with:
           build: 'true'
         env:
@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload Worker preview
         id: deploy
-        uses: https://github.com/cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         env:
           PREVIEW_MESSAGE: ${{ steps.metadata.outputs.preview_message }}
         with:
@@ -103,40 +103,50 @@ jobs:
           echo "preview_url=${preview_url}" >> "$GITHUB_OUTPUT"
 
       - name: Publish summary and PR comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MARKER: '<!-- cloudflare-worker-preview -->'
           PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
           PREVIEW_ALIAS: ${{ steps.alias.outputs.alias }}
           SHORT_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPOSITORY: ${{ github.repository }}
-          API_URL: ${{ github.api_url }}
-          TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = process.env.MARKER;
+            const previewUrl = process.env.PREVIEW_URL;
+            const previewAlias = process.env.PREVIEW_ALIAS;
+            const shortSha = process.env.SHORT_SHA?.slice(0, 7);
+            const now = new Date().toUTCString().replace(':00 GMT', ' UTC');
 
-          now="$(date -u +'%a, %d %b %Y %H:%M UTC')"
-          row="| Deployment successful! | <a href=\"${PREVIEW_URL}\">${PREVIEW_URL}</a> | ${SHORT_SHA:0:7} | \`${PREVIEW_ALIAS}\` | ${now} |"
-          body="$(printf '%s\n' \
-            "$MARKER" \
-            '## Deploying with &nbsp;<a href="https://workers.dev"><img alt="Cloudflare" src="https://workers.cloudflare.com/logo.svg" width="16"></a> &nbsp;Cloudflare Workers' \
-            '' \
-            '| Status | Preview URL | Commit | Alias | Updated (UTC) |' \
-            '| - | - | - | - | - |' \
-            "$row")"
+            if (!previewUrl) {
+              core.setFailed('Missing preview URL from Cloudflare deploy step.');
+              return;
+            }
 
-          printf '%s\n' "$body" | tail -n +2 >> "$GITHUB_STEP_SUMMARY"
+            const tableRow = '| Deployment successful! | <a href="' + previewUrl + '">' + previewUrl + '</a> | ' + shortSha + ' | `' + previewAlias + '` | ' + now + ' |';
+            const comment = [
+              marker,
+              '## Deploying with &nbsp;<a href="https://workers.dev"><img alt="Cloudflare" src="https://workers.cloudflare.com/logo.svg" width="16"></a> &nbsp;Cloudflare Workers',
+              '',
+              '| Status | Preview URL | Commit | Alias | Updated (UTC) |',
+              '| - | - | - | - | - |',
+              tableRow,
+            ].join('\n');
 
-          api() { curl -sSf -H "Authorization: token ${TOKEN}" -H 'Content-Type: application/json' "$@"; }
+            await core.summary.addRaw(comment.replace(marker + '\n', '')).write();
 
-          existing="$(
-            api "${API_URL}/repos/${REPOSITORY}/issues/${PR_NUMBER}/comments?limit=100" \
-              | jq -r --arg marker "$MARKER" \
-                  'map(select(.body | contains($marker))) | last | .id // empty'
-          )"
-          if [ -n "$existing" ]; then
-            api -X DELETE "${API_URL}/repos/${REPOSITORY}/issues/comments/${existing}" -o /dev/null
-          fi
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            );
+            if (existing) {
+              await github.rest.issues.deleteComment({
+                owner, repo, comment_id: existing.id,
+              });
+            }
 
-          jq -n --arg body "$body" '{body: $body}' \
-            | api -X POST "${API_URL}/repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" -d @- -o /dev/null
+            await github.rest.issues.createComment({ owner, repo, issue_number, body: comment });

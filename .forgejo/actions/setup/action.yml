@@ -27,6 +27,7 @@ runs:
       uses: https://github.com/jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
       with:
         version: '2026.9.2'
+        github_token: ''
         cache: true
         env: false
         install: ${{ inputs.install-mise-tools }}

@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   REGISTRY: git.sable.moe
   IMAGE_NAME: ${{ github.repository }}
 

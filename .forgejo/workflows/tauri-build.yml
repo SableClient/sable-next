@@ -14,6 +14,7 @@ concurrency:
   group: tauri-build-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 env:
+  MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   CARGO_INCREMENTAL: 0
   CARGO_TERM_COLOR: always
   FORGEJO_URL: https://git.sable.moe
@@ -181,116 +182,6 @@ jobs:
             [ -e "$bundle" ] && bundles+=("$bundle")
           done
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
-  android:
-    name: Build Android
-    needs: [setup-release, build-web]
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
-    env:
-      TAG: ${{ needs.setup-release.outputs.tag }}
-      VERSION: ${{ needs.setup-release.outputs.version }}
-      MISE_ENV: tauri
-      # Matches the ABIs passed to `tauri android build` below.
-      RUST_TARGETS: aarch64-linux-android armv7-linux-androideabi
-      # Read by src-tauri/build.rs, which bakes them into the binary.
-      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-      VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
-      VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
-      SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
-      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
-      UPDATER_ENDPOINT: ${{ needs.setup-release.outputs.nightly == 'true' && 'https://git.sable.moe/SableClient/sable-next/releases/download/nightly/latest.json' || '' }}
-      ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.setup-release.outputs.ref }}
-          persist-credentials: false
-      - name: Download web assets
-        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
-        with:
-          name: web-assets
-      - name: Set up app
-        uses: ./.forgejo/actions/setup
-        with:
-          build: 'false'
-          install-mise-tools: 'false'
-      - name: Set up Android SDK and NDK
-        run: mise run tauri:setup:android
-      - name: Add Rust targets
-        run: |
-          # shellcheck disable=SC2086 # RUST_TARGETS is a space-separated list.
-          rustup target add $RUST_TARGETS
-      - name: Set up Gradle cache
-        uses: https://github.com/gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-disabled: true
-      - name: Stamp release version into tauri.conf.json
-        run: |
-          args=''
-          [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
-          node scripts/ci/set-tauri-version.mjs "$VERSION" $args
-      - name: Prepare nightly Android package
-        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
-        run: |
-          app_dir=src-tauri/gen/android/app
-          build_src_dir=src-tauri/gen/android/buildSrc
-          nightly_package_dir=moe/sable/next/nightly
-          nightly_source_dir="$RUNNER_TEMP/android-nightly-package"
-
-          # Tauri resolves sources from the active identifier's package path.
-          mkdir -p "$nightly_source_dir"
-          cp -a "$app_dir/src/main/java/moe/sable/next" "$nightly_source_dir/app"
-          cp -a "$build_src_dir/src/main/java/moe/sable/next" "$nightly_source_dir/buildSrc"
-          find "$nightly_source_dir" -type f -exec sed -i \
-            's/moe\.sable\.next/moe.sable.next.nightly/g' {} +
-          rm -rf "$app_dir/src/main/java/moe/sable/next" "$build_src_dir/src/main/java/moe/sable/next"
-          mkdir -p "$app_dir/src/main/java/moe/sable/next" "$build_src_dir/src/main/java/moe/sable/next"
-          mv "$nightly_source_dir/app" "$app_dir/src/main/java/$nightly_package_dir"
-          mv "$nightly_source_dir/buildSrc" "$build_src_dir/src/main/java/$nightly_package_dir"
-          sed -i 's/moe\.sable\.next/moe.sable.next.nightly/g' \
-            "$app_dir/build.gradle.kts" "$app_dir/src/main/AndroidManifest.xml"
-          sed -i \
-            -e 's/Java_moe_sable_next_MainActivity/Java_moe_sable_next_nightly_MainActivity/g' \
-            -e 's#moe/sable/next/MainActivity#moe/sable/next/nightly/MainActivity#g' \
-            src-tauri/src/mobile.rs
-      - name: Set up Android signing
-        if: ${{ env.ANDROID_KEY_BASE64 != '' }}
-        run: |
-          cd src-tauri/gen/android
-          echo "keyAlias=$ANDROID_KEY_ALIAS" > keystore.properties
-          echo "password=$ANDROID_KEY_PASSWORD" >> keystore.properties
-          base64 -d <<< "$ANDROID_KEY_BASE64" > "$RUNNER_TEMP/keystore.jks"
-          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
-      - name: Build Android bundles
-        run: |
-          config_args=(--config src-tauri/tauri.ci.conf.json)
-          [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
-          pnpm tauri android build "${config_args[@]}" --apk --aab --target aarch64 armv7
-          out='src-tauri/gen/android/app/build/outputs'
-          apk="$(find "$out/apk/universal/release" -name '*.apk' -type f | head -n 1)"
-          aab="$(find "$out/bundle/universalRelease" -name '*.aab' -type f | head -n 1)"
-          [ -n "$apk" ] || { echo 'APK not found' >&2; exit 1; }
-          [ -n "$aab" ] || { echo 'AAB not found' >&2; exit 1; }
-          mv "$apk" "$(dirname "$apk")/sable-next-${VERSION}-android-universal.apk"
-          mv "$aab" "$(dirname "$aab")/sable-next-${VERSION}-android-universal.aab"
-      - name: Verify the APK is signed
-        if: ${{ env.ANDROID_KEY_BASE64 != '' }}
-        run: |
-          apk="src-tauri/gen/android/app/build/outputs/apk/universal/release/sable-next-${VERSION}-android-universal.apk"
-          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort | tail -n 1)"
-          [ -n "$apksigner" ] || { echo 'apksigner not found' >&2; exit 1; }
-          "$apksigner" verify --print-certs "$apk"
-      - name: Attach Android bundles to release
-        run: |
-          mapfile -d '' bundles < <(find src-tauri/gen/android/app/build/outputs -type f \
-            -name 'sable-next-*' \( -name '*.apk' -o -name '*.aab' \) -print0)
-          [ "${#bundles[@]}" -gt 0 ] || { echo 'No Android bundles found' >&2; exit 1; }
-          node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
   github-bundles:
     name: Wait for GitHub bundles
     needs: setup-release
@@ -310,7 +201,7 @@ jobs:
             --names github-bundles.json --attempts 120 --interval 30
   obtainium:
     name: Publish Obtainium config
-    needs: [setup-release, android]
+    needs: [setup-release, github-bundles]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -383,8 +274,8 @@ jobs:
         run: node scripts/ci/forgejo-release.mjs upload altstore-source.json
   updater-manifest:
     name: Publish updater manifest
-    needs: [setup-release, linux, android, github-bundles]
-    if: ${{ always() && needs.setup-release.result == 'success' && needs.linux.result == 'success' && needs.android.result == 'success' && needs.github-bundles.result == 'success' }}
+    needs: [setup-release, linux, github-bundles]
+    if: ${{ always() && needs.setup-release.result == 'success' && needs.linux.result == 'success' && needs.github-bundles.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -445,7 +336,7 @@ jobs:
           node scripts/ci/forgejo-release.mjs upload --tag latest latest.json altstore-source.json
   finalize-nightly:
     name: Finalize nightly release
-    needs: [setup-release, linux, android, github-bundles, obtainium, altstore]
+    needs: [setup-release, linux, github-bundles, obtainium, altstore]
     # The prune only removes what this run replaced, so a failed platform
     # cannot strand the release on the previous run's bundles.
     if: ${{ always() && needs.setup-release.result == 'success' && needs.setup-release.outputs.nightly == 'true' }}
