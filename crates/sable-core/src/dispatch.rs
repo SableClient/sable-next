@@ -2066,6 +2066,27 @@ impl Core {
                         .map_err(|error| self.failed("create_room: call state", error))?
                         .cast_unchecked(),
                     );
+                    let mut slot = serde_json::Map::new();
+                    slot.insert("status".to_owned(), serde_json::json!("open"));
+                    slot.insert(
+                        "application".to_owned(),
+                        serde_json::json!({"type": "m.call"}),
+                    );
+                    if encrypted && !public {
+                        slot.insert(
+                            "encryption".to_owned(),
+                            serde_json::json!({"type": "m.per_member"}),
+                        );
+                    }
+                    request.initial_state.push(
+                        Raw::new(&serde_json::json!({
+                            "type": view::RTC_SLOT_TYPE,
+                            "state_key": view::CALL_SLOT_ID,
+                            "content": slot,
+                        }))
+                        .map_err(|error| self.failed("create_room: call slot", error))?
+                        .cast_unchecked(),
+                    );
                 }
 
                 // Anyone can join and read a public room, so encryption only

@@ -1139,6 +1139,10 @@ pub(crate) const CALL_MEMBER_TYPE: &str = "org.matrix.msc3401.call.member";
 /// back: it is there for other clients.
 pub(crate) const CALL_TYPE: &str = "org.matrix.msc3401.call";
 
+pub(crate) const RTC_SLOT_TYPE: &str = "org.matrix.msc4143.rtc.slot";
+
+pub(crate) const CALL_SLOT_ID: &str = "m.call#ROOM";
+
 fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
     const SPOILER: &str = "page.codeberg.everypizza.msc4193.spoiler";
     const REASON: &str = "page.codeberg.everypizza.msc4193.spoiler.reason";

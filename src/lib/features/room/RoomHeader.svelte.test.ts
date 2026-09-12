@@ -29,6 +29,8 @@ const members = [
 function mountHeader(props: {
   isVoice: boolean;
   callParticipants: readonly string[];
+  onToggleChat?: (() => void) | null;
+  chatOpen?: boolean;
 }): ReturnType<typeof mount> {
   return mount(RoomHeader, {
     target: document.body,
@@ -79,6 +81,34 @@ test('a text room with no call shows no chip', async () => {
   await tick();
 
   expect(document.querySelector('.voice-chip')).toBeNull();
+
+  await unmount(instance);
+});
+
+test('a voice room swaps the timeline in and out from the header', async () => {
+  let toggled = 0;
+  const instance = mountHeader({
+    isVoice: true,
+    callParticipants: [],
+    onToggleChat: () => {
+      toggled += 1;
+    },
+  });
+  await tick();
+
+  const toggle = document.querySelector<HTMLButtonElement>('.chat-toggle');
+  expect(toggle?.getAttribute('aria-label')).toBe('Show chat');
+  toggle?.click();
+  expect(toggled).toBe(1);
+
+  await unmount(instance);
+});
+
+test('a text room has no chat toggle', async () => {
+  const instance = mountHeader({ isVoice: false, callParticipants: [] });
+  await tick();
+
+  expect(document.querySelector('.chat-toggle')).toBeNull();
 
   await unmount(instance);
 });

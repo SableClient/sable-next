@@ -1945,7 +1945,11 @@
     "microphone": "Microphone",
     "camera": "Camera",
     "screenShare": "Share screen",
-    "returnTo": "Return to {{room}}"
+    "returnTo": "Return to {{room}}",
+    "lobbyEmpty": "Voice chat's empty - be the first to hop in!",
+    "lobbyNoPermission": "You don't have permission to join.",
+    "showChat": "Show chat",
+    "showCall": "Show call"
   },
   "presence": {
     "online": "Online",

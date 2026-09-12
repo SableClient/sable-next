@@ -47,6 +47,7 @@
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
+  import VoiceLobby from '#lib/features/call/VoiceLobby.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
   import JumpToTimeDialog from './JumpToTimeDialog.svelte';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
@@ -244,6 +245,10 @@
   );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
+  let isVoiceRoom = $derived(resolvedRoom?.is_voice ?? false);
+  let voiceChatOpen = $state(false);
+  let voiceView = $derived(isVoiceRoom && !voiceChatOpen);
+  let callShown = $derived(call.roomId === resolvedRoomId && (call.active || call.failure));
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
   let roomTopic = $derived(resolvedRoom?.topic ?? null);
@@ -707,7 +712,9 @@
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
       membersOpen={desktop ? desktopMembersOpen : membersOpen}
-      onCall={callable ? openPrescreen : null}
+      onCall={callable && !isVoiceRoom ? openPrescreen : null}
+      onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
+      chatOpen={voiceChatOpen}
       onBack={goBack}
       onMembers={toggleMembers}
       onSearch={openSearch}
@@ -737,97 +744,111 @@
         />
       {/snippet}
     </RoomHeader>
-    {#if call.roomId === resolvedRoomId && (call.active || call.failure)}
+    {#if callShown}
       {#await import('#lib/features/call/CallView.svelte') then { default: CallView }}
         <CallView session={call} members={memberLoader.members} />
       {/await}
     {/if}
-    {#key resolvedRoomId}
-      <TimelineList
-        {timeline}
-        focusEventId={eventId}
-        onRequestHistory={requestHistory}
-        onRequestFuture={requestFuture}
-        onRead={markRead}
-        onMarkUnread={markUnreadFrom}
-        onMatrixLink={handleMatrixLink}
-        onCopyLink={copyEventLink}
-        onSenderProfile={openProfile}
-        onMentionUser={mentionUser}
-        onRetrySend={conversation.retrySend}
-        onCancelSend={conversation.cancelSend}
-        onToggleReaction={conversation.toggleReaction}
-        onDelete={conversation.redact}
-        onReply={conversation.reply}
-        onOpenThread={openThread}
-        onEdit={conversation.edit}
-        roomId={resolvedRoomId}
-        members={memberLoader.members}
-        onJumpToEvent={jumpToEvent}
-        onJumpToLive={jumpToLive}
-        onOpenMedia={openMedia}
-        onPersonaAvatarClick={openProfileAvatar}
-        onVotePoll={conversation.votePoll}
-        onEndPoll={conversation.endPoll}
-        readOnly={permissions ? !permissions.can_post : false}
-        canRedactOthers={permissions?.can_redact_others ?? false}
-        currentUserId={core.session?.user_id ?? null}
-        scrollLocked={profileOpen || receiptsOpen}
-        {typingLabel}
-        bind:nearLatest={timelineAtBottom}
-        bind:followingLive={timelineFollowingLive}
-      >
-        {#snippet footTrailing()}
-          {#if showReceiptFooter}
-            <RoomReadReceipts
-              bind:open={receiptsOpen}
-              readers={latestReadBy}
-              members={receiptMembers}
-              visible={timelineAtBottom}
-              onMemberProfile={openProfile}
-            />
-          {/if}
-        {/snippet}
-      </TimelineList>
-    {/key}
-    <div class="composer-dock">
-      {#if isTombstoned}
-        <RoomTombstoneBanner
-          isSpace={resolvedRoom?.is_space ?? false}
-          body={tombstoneBody}
-          resolved={tombstoneChecked}
-          successorId={tombstoneReplacementId}
-          joined={tombstoneSuccessorJoined}
-          joining={tombstoneJoining}
-          failed={tombstoneJoinFailed}
-          onOpen={openTombstoneSuccessor}
-          onJoin={() => void joinTombstoneSuccessor()}
+    {#if voiceView}
+      {#if !callShown}
+        <VoiceLobby
+          participants={callParticipants}
+          members={memberLoader.members}
+          media={prescreenMedia}
+          joining={call.lifecycle === 'joining'}
+          canJoin={callable}
+          onChange={(media: CallMedia) => (prescreenMedia = media)}
+          onJoin={() => void joinCall()}
         />
-      {:else}
-        {#key resolvedRoomId}
-          <ScheduledMessages roomId={resolvedRoomId} />
-          <RoomComposer
-            bind:this={composer}
-            roomId={resolvedRoomId}
-            onSend={conversation.sendMessage}
-            onSendAttachment={conversation.sendAttachment}
-            onSendSticker={conversation.sendSticker}
-            onSendGif={conversation.sendGif}
-            onCreatePoll={conversation.createPoll}
-            onSendLocation={conversation.sendLocation}
-            onSchedule={conversation.schedule}
-            onTyping={conversation.setTyping}
-            {roomName}
-            readOnly={permissions ? !permissions.can_post : false}
-            context={conversation.context}
-            onCancelContext={conversation.clearContext}
-            onToggleSilentReply={conversation.toggleSilentReply}
-            onDeleteEdited={conversation.redact}
-            onEditLast={conversation.editLast}
-          />
-        {/key}
       {/if}
-    </div>
+    {:else}
+      {#key resolvedRoomId}
+        <TimelineList
+          {timeline}
+          focusEventId={eventId}
+          onRequestHistory={requestHistory}
+          onRequestFuture={requestFuture}
+          onRead={markRead}
+          onMarkUnread={markUnreadFrom}
+          onMatrixLink={handleMatrixLink}
+          onCopyLink={copyEventLink}
+          onSenderProfile={openProfile}
+          onMentionUser={mentionUser}
+          onRetrySend={conversation.retrySend}
+          onCancelSend={conversation.cancelSend}
+          onToggleReaction={conversation.toggleReaction}
+          onDelete={conversation.redact}
+          onReply={conversation.reply}
+          onOpenThread={openThread}
+          onEdit={conversation.edit}
+          roomId={resolvedRoomId}
+          members={memberLoader.members}
+          onJumpToEvent={jumpToEvent}
+          onJumpToLive={jumpToLive}
+          onOpenMedia={openMedia}
+          onPersonaAvatarClick={openProfileAvatar}
+          onVotePoll={conversation.votePoll}
+          onEndPoll={conversation.endPoll}
+          readOnly={permissions ? !permissions.can_post : false}
+          canRedactOthers={permissions?.can_redact_others ?? false}
+          currentUserId={core.session?.user_id ?? null}
+          scrollLocked={profileOpen || receiptsOpen}
+          {typingLabel}
+          bind:nearLatest={timelineAtBottom}
+          bind:followingLive={timelineFollowingLive}
+        >
+          {#snippet footTrailing()}
+            {#if showReceiptFooter}
+              <RoomReadReceipts
+                bind:open={receiptsOpen}
+                readers={latestReadBy}
+                members={receiptMembers}
+                visible={timelineAtBottom}
+                onMemberProfile={openProfile}
+              />
+            {/if}
+          {/snippet}
+        </TimelineList>
+      {/key}
+      <div class="composer-dock">
+        {#if isTombstoned}
+          <RoomTombstoneBanner
+            isSpace={resolvedRoom?.is_space ?? false}
+            body={tombstoneBody}
+            resolved={tombstoneChecked}
+            successorId={tombstoneReplacementId}
+            joined={tombstoneSuccessorJoined}
+            joining={tombstoneJoining}
+            failed={tombstoneJoinFailed}
+            onOpen={openTombstoneSuccessor}
+            onJoin={() => void joinTombstoneSuccessor()}
+          />
+        {:else}
+          {#key resolvedRoomId}
+            <ScheduledMessages roomId={resolvedRoomId} />
+            <RoomComposer
+              bind:this={composer}
+              roomId={resolvedRoomId}
+              onSend={conversation.sendMessage}
+              onSendAttachment={conversation.sendAttachment}
+              onSendSticker={conversation.sendSticker}
+              onSendGif={conversation.sendGif}
+              onCreatePoll={conversation.createPoll}
+              onSendLocation={conversation.sendLocation}
+              onSchedule={conversation.schedule}
+              onTyping={conversation.setTyping}
+              {roomName}
+              readOnly={permissions ? !permissions.can_post : false}
+              context={conversation.context}
+              onCancelContext={conversation.clearContext}
+              onToggleSilentReply={conversation.toggleSilentReply}
+              onDeleteEdited={conversation.redact}
+              onEditLast={conversation.editLast}
+            />
+          {/key}
+        {/if}
+      </div>
+    {/if}
   </div>
 
   {#if desktop}

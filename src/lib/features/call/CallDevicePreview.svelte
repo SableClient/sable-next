@@ -15,10 +15,10 @@
     joining: boolean;
     onChange: (media: CallMedia) => void;
     onJoin: () => void;
-    onCancel: () => void;
+    onCancel?: (() => void) | null;
   }
 
-  let { media, joining, onChange, onJoin, onCancel }: Props = $props();
+  let { media, joining, onChange, onJoin, onCancel = null }: Props = $props();
 
   let stream = $state.raw<MediaStream | undefined>(undefined);
   let wantsCamera = $derived(media.camera);
@@ -113,7 +113,9 @@
   </div>
 
   <div class="actions">
-    <Button variant="ghost" onclick={onCancel}>{$i18n.t('call.cancel')}</Button>
+    {#if onCancel}
+      <Button variant="ghost" onclick={onCancel}>{$i18n.t('call.cancel')}</Button>
+    {/if}
     <Button variant="primary" disabled={joining} onclick={onJoin}>
       {joining ? $i18n.t('call.joining') : $i18n.t('call.join')}
     </Button>

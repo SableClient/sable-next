@@ -3,6 +3,7 @@
   import { i18n } from '#lib/i18n.js';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+  import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
@@ -23,6 +24,8 @@
     members: readonly MemberView[];
     membersOpen?: boolean;
     onCall?: (() => void) | null;
+    onToggleChat?: (() => void) | null;
+    chatOpen?: boolean;
     onBack: () => void;
     onMembers: () => void;
     onSearch: () => void;
@@ -42,6 +45,8 @@
     members,
     membersOpen = false,
     onCall = null,
+    onToggleChat = null,
+    chatOpen = false,
     onBack,
     onMembers,
     onSearch,
@@ -117,6 +122,22 @@
       <MagnifyingGlassIcon />
     </IconButton>
     {@render pins?.()}
+    {#if onToggleChat}
+      <IconButton
+        class="chat-toggle"
+        variant="ghost"
+        size="small"
+        label={chatOpen ? $i18n.t('call.showCall') : $i18n.t('call.showChat')}
+        aria-pressed={chatOpen}
+        onclick={onToggleChat}
+      >
+        {#if chatOpen}
+          <SpeakerHighIcon />
+        {:else}
+          <ChatCircleIcon />
+        {/if}
+      </IconButton>
+    {/if}
     {#if onCall}
       <IconButton
         class="call-button"
