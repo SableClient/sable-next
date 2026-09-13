@@ -4,14 +4,17 @@
   import 'leaflet/dist/leaflet.css';
 
   import { i18n } from '#lib/i18n.js';
+  import { TILE_ATTRIBUTION, tileUrl } from '#lib/platform/map-tiles.js';
 
   interface Props {
-    latitude: number;
-    longitude: number;
+    latitude: number | null;
+    longitude: number | null;
     label: string;
+    zoom?: number;
+    onPick?: (latitude: number, longitude: number) => void;
   }
 
-  let { latitude, longitude, label }: Props = $props();
+  let { latitude, longitude, label, zoom = 16, onPick }: Props = $props();
 
   const pinIcon = L.divIcon({
     className: 'location-marker',
@@ -21,27 +24,55 @@
   });
 
   function leaflet(node: HTMLDivElement) {
-    const view = untrack<[number, number]>(() => [latitude, longitude]);
-    const alt = untrack(() => label);
+    const start = untrack<[number, number] | null>(() =>
+      latitude === null || longitude === null ? null : [latitude, longitude]
+    );
+    const picking = untrack(() => onPick !== undefined);
 
     const map = L.map(node, {
       attributionControl: true,
       keyboard: true,
-      scrollWheelZoom: false,
-    }).setView(view, 16);
+      scrollWheelZoom: picking,
+    }).setView(
+      start ?? [20, 0],
+      untrack(() => zoom)
+    );
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(map);
+    L.tileLayer(tileUrl(), { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
 
-    const marker = L.marker(view, { icon: pinIcon, alt, keyboard: false }).addTo(map);
+    if (picking) map.on('click', (event) => onPick?.(event.latlng.lat, event.latlng.lng));
+
+    let marker: L.Marker | null = null;
     $effect(() => {
+      if (latitude === null || longitude === null) {
+        marker?.remove();
+        marker = null;
+        return;
+      }
+
       const coordinates: [number, number] = [latitude, longitude];
-      marker.setLatLng(coordinates);
+      if (marker === null) {
+        const pin = L.marker(coordinates, {
+          icon: pinIcon,
+          alt: label,
+          keyboard: false,
+          draggable: picking,
+        }).addTo(map);
+        if (picking) {
+          pin.on('dragend', () => {
+            const moved = pin.getLatLng();
+            onPick?.(moved.lat, moved.lng);
+          });
+        }
+        marker = pin;
+      } else {
+        marker.setLatLng(coordinates);
+      }
+
       marker.getElement()?.setAttribute('alt', label);
       map.panTo(coordinates, { animate: false });
     });
+
     const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }));
     observer.observe(node);
 
@@ -54,8 +85,10 @@
 
 <div
   class="location-map"
-  role="img"
-  aria-label={$i18n.t('timeline.locationMapAlt', { label })}
+  role={onPick ? 'application' : 'img'}
+  aria-label={onPick
+    ? $i18n.t('composer.locationPickerAlt')
+    : $i18n.t('timeline.locationMapAlt', { label })}
   {@attach leaflet}
 ></div>
 

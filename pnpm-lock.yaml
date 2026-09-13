@@ -29,6 +29,9 @@ importers:
       '@tauri-apps/plugin-fs':
         specifier: 2.5.2
         version: 2.5.2
+      '@tauri-apps/plugin-geolocation':
+        specifier: 2.3.3
+        version: 2.3.3
       '@tauri-apps/plugin-os':
         specifier: 2.3.2
         version: 2.3.2
@@ -2487,6 +2490,9 @@ packages:
 
   '@tauri-apps/plugin-fs@2.5.2':
     resolution: {integrity: sha512-XXvMSnFiob+G1H+YHCDf+bzWVumseQuEIhzpbOJzevUfL4k0U+sTApZWJHpoLiamggnVPJm5dJ5sDsniRyWxlg==}
+
+  '@tauri-apps/plugin-geolocation@2.3.3':
+    resolution: {integrity: sha512-8TDI9YS9I2eXj1IwUfeiFY4OLkhVan08vpgHSSTM1tl7p/fNA7APlS6QAgLX9j73zqVp5Pl9HrFHG2gJtIunqg==}
 
   '@tauri-apps/plugin-os@2.3.2':
     resolution: {integrity: sha512-n+nXWeuSeF9wcEsSPmRnBEGrRgOy6jjkSU+UVCOV8YUGKb2erhDOxis7IqRXiRVHhY8XMKks00BJ0OAdkpf6+A==}
@@ -6624,6 +6630,10 @@ snapshots:
       '@tauri-apps/api': 2.11.1
 
   '@tauri-apps/plugin-fs@2.5.2':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  '@tauri-apps/plugin-geolocation@2.3.3':
     dependencies:
       '@tauri-apps/api': 2.11.1
 

@@ -24,12 +24,12 @@ pub mod spaces;
 pub mod store;
 mod subscriptions;
 mod timelines;
-mod tls;
+pub mod tls;
 mod verification;
 pub mod view;
 mod watchers;
 
-pub use matrix_sdk::ruma;
+pub use matrix_sdk::{reqwest, ruma};
 
 mod widgets;
 

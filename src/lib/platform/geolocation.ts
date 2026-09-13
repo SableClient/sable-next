@@ -1,3 +1,11 @@
+import { isTauri } from '@tauri-apps/api/core';
+import {
+  checkPermissions,
+  getCurrentPosition,
+  requestPermissions,
+} from '@tauri-apps/plugin-geolocation';
+import { type as osType } from '@tauri-apps/plugin-os';
+
 export type Fix = { latitude: number; longitude: number };
 
 export type FixResult =
@@ -6,13 +14,36 @@ export type FixResult =
   | { kind: 'unavailable' }
   | { kind: 'unsupported' };
 
+function nativeLocates(): boolean {
+  return isTauri() && (osType() === 'ios' || osType() === 'android');
+}
+
 export function locates(): boolean {
+  if (isTauri()) return nativeLocates();
   return typeof navigator !== 'undefined' && 'geolocation' in navigator;
 }
 
-export function currentFix(timeoutMs = 10_000): Promise<FixResult> {
-  if (!locates()) return Promise.resolve({ kind: 'unsupported' });
+async function nativeFix(timeoutMs: number): Promise<FixResult> {
+  try {
+    let status = await checkPermissions();
+    if (status.location === 'prompt' || status.location === 'prompt-with-rationale') {
+      status = await requestPermissions(['location']);
+    }
+    if (status.location !== 'granted') return { kind: 'denied' };
 
+    const { coords } = await getCurrentPosition({
+      timeout: timeoutMs,
+      enableHighAccuracy: false,
+      maximumAge: 0,
+    });
+    return { kind: 'fix', fix: { latitude: coords.latitude, longitude: coords.longitude } };
+  } catch (error) {
+    console.debug('[sable location] the native fix failed', error);
+    return { kind: 'unavailable' };
+  }
+}
+
+function webFix(timeoutMs: number): Promise<FixResult> {
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
@@ -24,4 +55,11 @@ export function currentFix(timeoutMs = 10_000): Promise<FixResult> {
       { timeout: timeoutMs, enableHighAccuracy: false }
     );
   });
+}
+
+export function currentFix(timeoutMs = 10_000): Promise<FixResult> {
+  if (nativeLocates()) return nativeFix(timeoutMs);
+  if (!locates()) return Promise.resolve({ kind: 'unsupported' });
+
+  return webFix(timeoutMs);
 }

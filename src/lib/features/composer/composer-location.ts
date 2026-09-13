@@ -1,4 +1,4 @@
-function round(value: number): string {
+export function coordinateText(value: number): string {
   return String(Number(value.toFixed(6)));
 }
 
@@ -7,7 +7,7 @@ export function geoUriFor(latitude: number, longitude: number): string | null {
   if (latitude < -90 || latitude > 90) return null;
   if (longitude < -180 || longitude > 180) return null;
 
-  return `geo:${round(latitude)},${round(longitude)}`;
+  return `geo:${coordinateText(latitude)},${coordinateText(longitude)}`;
 }
 
 export function coordinate(value: string): number {

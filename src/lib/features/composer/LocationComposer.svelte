@@ -1,5 +1,7 @@
 <script lang="ts">
+  import type { Component } from 'svelte';
   import CrosshairIcon from 'phosphor-svelte/lib/CrosshairIcon';
+  import MapTrifoldIcon from 'phosphor-svelte/lib/MapTrifoldIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { currentFix, locates } from '#lib/platform/geolocation.js';
@@ -10,7 +12,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { coordinate, geoUriFor } from './composer-location';
+  import { coordinate, coordinateText, geoUriFor } from './composer-location';
 
   interface Props {
     open?: boolean;
@@ -25,6 +27,42 @@
   let failure = $state<string | null>(null);
 
   let geoUri = $derived(geoUriFor(coordinate(latitude), coordinate(longitude)));
+  let pin = $derived.by(() => {
+    const north = coordinate(latitude);
+    const east = coordinate(longitude);
+    return geoUriFor(north, east) === null ? null : { north, east };
+  });
+
+  interface MapProps {
+    latitude: number | null;
+    longitude: number | null;
+    label: string;
+    zoom?: number;
+    onPick?: (latitude: number, longitude: number) => void;
+  }
+
+  let map = $state.raw<Component<MapProps> | null>(null);
+  let loadingMap = $state(false);
+  let mapFailed = $state(false);
+
+  async function showMap(): Promise<void> {
+    loadingMap = true;
+    mapFailed = false;
+    try {
+      const module = await import('#lib/features/room/LocationMap.svelte');
+      map = module.default;
+    } catch (error) {
+      console.warn('[sable composer] loading the map failed', error);
+      mapFailed = true;
+    } finally {
+      loadingMap = false;
+    }
+  }
+
+  function pick(north: number, east: number): void {
+    latitude = coordinateText(north);
+    longitude = coordinateText(east);
+  }
 
   function reset(): void {
     latitude = '';
@@ -103,6 +141,25 @@
       </FormField>
     </div>
 
+    {#if map}
+      {@const Map = map}
+      <Map
+        latitude={pin?.north ?? null}
+        longitude={pin?.east ?? null}
+        zoom={pin ? 16 : 2}
+        label={label.trim()}
+        onPick={pick}
+      />
+    {:else}
+      <Button variant="ghost" class="reveal-map" disabled={loadingMap} onclick={showMap}>
+        <MapTrifoldIcon />
+        {loadingMap ? $i18n.t('composer.locationMapLoading') : $i18n.t('composer.locationShowMap')}
+      </Button>
+      {#if mapFailed}
+        <Alert variant="critical" role="alert">{$i18n.t('composer.locationMapFailed')}</Alert>
+      {/if}
+    {/if}
+
     <FormField fieldId="location-label" label={$i18n.t('composer.locationLabel')}>
       <TextInput id="location-label" bind:value={label} autocomplete="off" />
     </FormField>
@@ -133,7 +190,8 @@
     margin: 0;
   }
 
-  :global(.locate) {
+  :global(.locate),
+  :global(.reveal-map) {
     gap: var(--space-200);
     justify-self: start;
   }

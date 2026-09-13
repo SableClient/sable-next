@@ -13,6 +13,7 @@ pub mod deep_link_ipc;
 // of the Rust-only application code.
 #[allow(unsafe_code)]
 mod ios;
+mod map_tiles;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;
@@ -322,6 +323,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     #[cfg(all(not(feature = "cef"), target_os = "linux"))]
     webkit::configure(app.handle());
 
+    map_tiles::cleanup_cache(app.handle());
+
     Ok(())
 }
 
@@ -457,6 +460,7 @@ pub fn run() {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let builder = builder
         .plugin(tauri_plugin_edge_to_edge::init())
+        .plugin(tauri_plugin_geolocation::init())
         .plugin(tauri_plugin_livekit_mobile::init());
 
     #[cfg(any(
@@ -477,6 +481,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notifications::init())
+        .register_asynchronous_uri_scheme_protocol(map_tiles::TILE_URI_SCHEME, map_tiles::respond)
         .setup(setup)
         .invoke_handler(tauri::generate_handler![
             submit_command,
