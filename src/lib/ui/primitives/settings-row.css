@@ -38,15 +38,16 @@
 .settings-row-control {
   align-items: center;
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   flex-wrap: wrap;
   gap: var(--space-300);
   justify-content: flex-end;
   margin-left: auto;
+  min-width: 0;
 }
 
 .settings-row-control .select {
-  min-width: 11rem;
+  min-width: min(11rem, 100%);
 }
 
 .settings-form {
