@@ -16,7 +16,7 @@ async function request(method, path, { body, headers = {}, allow404 = false } = 
   const response = await fetch(`${api}${path}`, {
     method,
     headers: { Authorization: `token ${token}`, ...headers },
-    body,
+    ...(body === undefined ? {} : { body }),
   });
   if (response.status === 404 && allow404) return undefined;
   if (!response.ok) {
