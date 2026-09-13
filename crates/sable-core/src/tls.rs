@@ -1,11 +1,13 @@
 use matrix_sdk::reqwest::ClientBuilder;
 
 #[cfg(not(target_os = "android"))]
+#[must_use = "returns the configured builder"]
 pub const fn apply(builder: ClientBuilder) -> ClientBuilder {
     builder
 }
 
 #[cfg(target_os = "android")]
+#[must_use = "returns the configured builder"]
 pub fn apply(builder: ClientBuilder) -> ClientBuilder {
     let Some(config) = client_config() else {
         return builder;
