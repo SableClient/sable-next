@@ -69,22 +69,40 @@ impl Core {
     }
 
     pub(crate) fn watch_send_queue(self: &Arc<Self>, client: &matrix_sdk::Client) {
+        use matrix_sdk::send_queue::RoomSendQueueUpdate;
+        use tokio::sync::broadcast::error::RecvError;
+
         let queue = client.send_queue();
         let mut errors = queue.subscribe_errors();
+        let mut updates = queue.subscribe();
 
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
                 loop {
-                    let recoverable = match errors.recv().await {
-                        Ok(error) => error.is_recoverable,
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => true,
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    let recoverable = tokio::select! {
+                        update = updates.recv() => match update {
+                            Ok(update) => {
+                                if matches!(update.update, RoomSendQueueUpdate::SentEvent { .. }) {
+                                    failures = 0;
+                                }
+                                continue;
+                            }
+                            Err(RecvError::Lagged(_)) => continue,
+                            Err(RecvError::Closed) => break,
+                        },
+                        error = errors.recv() => match error {
+                            Ok(error) => error.is_recoverable,
+                            Err(RecvError::Lagged(_)) => true,
+                            Err(RecvError::Closed) => break,
+                        },
                     };
 
                     if !recoverable {
                         continue;
                     }
+
+                    while errors.try_recv().is_ok() {}
 
                     failures = failures.saturating_add(1);
                     matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
