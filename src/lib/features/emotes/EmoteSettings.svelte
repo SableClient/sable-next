@@ -16,6 +16,8 @@
   import Switch from '#lib/ui/primitives/Switch.svelte';
 
   import ImagePackEditor from './ImagePackEditor.svelte';
+  import { packDraft } from './pack-content.js';
+  import { exportPacks } from './pack-transfer.js';
   import PersonalPackSettings from './PersonalPackSettings.svelte';
   import {
     EMOTE_ROOMS_EVENT_TYPE,
@@ -120,6 +122,21 @@
     }
   }
 
+  async function exportRoom(roomsPacks: ImagePackView[]): Promise<void> {
+    if (busy) return;
+
+    busy = true;
+    failed = false;
+    try {
+      if ((await exportPacks(core, roomsPacks.map(packDraft))) === 'failed') failed = true;
+    } catch (error) {
+      console.warn('[sable emotes] the room packs could not be exported', error);
+      failed = true;
+    } finally {
+      busy = false;
+    }
+  }
+
   async function toggleRoom(roomId: string, roomsPacks: ImagePackView[]): Promise<void> {
     const all = roomsPacks.every(isChosen);
     const addresses = roomsPacks.map(address);
@@ -185,17 +202,28 @@
             <div class="room-group">
               <div class="room-heading">
                 <span>{roomName(roomId)}</span>
-                <Button
-                  size="small"
-                  disabled={busy}
-                  onclick={() => {
-                    void toggleRoom(roomId, roomsPacks);
-                  }}
-                >
-                  {roomsPacks.every(isChosen)
-                    ? $i18n.t('emotes.unselectAll')
-                    : $i18n.t('emotes.selectAll')}
-                </Button>
+                <div class="room-actions">
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onclick={() => {
+                      void exportRoom(roomsPacks);
+                    }}
+                  >
+                    {$i18n.t('emotes.exportAll')}
+                  </Button>
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onclick={() => {
+                      void toggleRoom(roomId, roomsPacks);
+                    }}
+                  >
+                    {roomsPacks.every(isChosen)
+                      ? $i18n.t('emotes.unselectAll')
+                      : $i18n.t('emotes.selectAll')}
+                  </Button>
+                </div>
               </div>
               <ul class="settings-rows">
                 {#each roomsPacks as pack (pack.id)}
@@ -266,6 +294,11 @@
     gap: var(--space-200);
     justify-content: space-between;
     padding: var(--space-200) var(--space-300) 0;
+  }
+
+  .room-actions {
+    display: flex;
+    gap: var(--space-200);
   }
 
   .status {

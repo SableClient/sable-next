@@ -1,12 +1,15 @@
 <script lang="ts">
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
+  import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import UploadSimpleIcon from 'phosphor-svelte/lib/UploadSimpleIcon';
 
   import type { ImagePackView, ImageUsageView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { pickFiles } from '#lib/platform/files.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -27,6 +30,7 @@
     type PackDraft,
     type PackImageDraft,
   } from './pack-content.js';
+  import { exportPacks, importArchive } from './pack-transfer.js';
   import { readImageInfo } from './read-image-info.js';
 
   import '#lib/ui/primitives/settings-row.css';
@@ -50,12 +54,15 @@
   let shortcode = $state('');
   let imageInput = $state<HTMLInputElement | null>(null);
   let avatarInput = $state<HTMLInputElement | null>(null);
+  let archiveInput = $state<HTMLInputElement | null>(null);
+  let transferFailed = $state<'export' | 'import' | null>(null);
 
   let dirty = $derived(draft !== null);
 
   function edit(next: PackDraft): void {
     draft = next;
     failed = false;
+    transferFailed = null;
   }
 
   function taken(candidate: string): boolean {
@@ -152,6 +159,70 @@
     }
   }
 
+  async function exportPack(): Promise<void> {
+    if (busy) return;
+
+    busy = true;
+    transferFailed = null;
+    try {
+      if ((await exportPacks(core, [$state.snapshot(current)])) === 'failed') {
+        transferFailed = 'export';
+      }
+    } catch (error) {
+      console.warn('[sable emotes] the pack could not be exported', error);
+      transferFailed = 'export';
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function importArchives(files: File[]): Promise<void> {
+    if (files.length === 0 || busy) return;
+
+    busy = true;
+    transferFailed = null;
+    try {
+      const imported = (
+        await Promise.all(
+          files.map(async (file) => importArchive(core, new Uint8Array(await file.arrayBuffer())))
+        )
+      ).flat();
+
+      const added: PackImageDraft[] = [];
+      for (const image of imported.flatMap((pack) => pack.images)) {
+        added.push({
+          ...image,
+          shortcode: uniqueShortcode(
+            image.shortcode,
+            (candidate) => taken(candidate) || added.some((entry) => entry.shortcode === candidate)
+          ),
+        });
+      }
+
+      const [first] = imported;
+      edit({
+        ...current,
+        name: current.name === '' ? (first?.name ?? '') : current.name,
+        avatarUrl: current.avatarUrl ?? first?.avatarUrl ?? null,
+        attribution: current.attribution === '' ? (first?.attribution ?? '') : current.attribution,
+        images: [...current.images, ...added],
+      });
+    } catch (error) {
+      console.warn('[sable emotes] the pack file could not be read', error);
+      transferFailed = 'import';
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function chooseArchive(): Promise<void> {
+    if (busy) return;
+
+    const picked = await pickFiles('*/*');
+    if (picked === null) archiveInput?.click();
+    else await importArchives(picked);
+  }
+
   async function apply(): Promise<void> {
     if (draft === null || busy) return;
 
@@ -172,6 +243,13 @@
 <div class="pack-editor">
   {#if failed}
     <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>
+  {/if}
+  {#if transferFailed !== null}
+    <Alert variant="critical" role="alert">
+      {transferFailed === 'export'
+        ? $i18n.t('emotes.exportFailed')
+        : $i18n.t('emotes.importFailed')}
+    </Alert>
   {/if}
 
   <SettingsSection
@@ -337,6 +415,51 @@
     {/if}
   </SettingsSection>
 
+  <SettingsSection
+    headingId="pack-transfer"
+    title={$i18n.t('emotes.transfer')}
+    description={$i18n.t('emotes.transferHint')}
+  >
+    <div class="transfer">
+      <Button
+        size="small"
+        disabled={busy || current.images.length === 0}
+        onclick={() => {
+          void exportPack();
+        }}
+      >
+        <DownloadSimpleIcon />
+        {$i18n.t('emotes.export')}
+      </Button>
+      {#if canEdit}
+        <Button
+          size="small"
+          disabled={busy}
+          onclick={() => {
+            void chooseArchive();
+          }}
+        >
+          <UploadSimpleIcon />
+          {$i18n.t('emotes.import')}
+        </Button>
+        <input
+          bind:this={archiveInput}
+          class="file-input"
+          type="file"
+          accept=".zip,application/zip"
+          multiple
+          tabindex="-1"
+          aria-hidden="true"
+          onchange={(event) => {
+            const files = [...(event.currentTarget.files ?? [])];
+            event.currentTarget.value = '';
+            void importArchives(files);
+          }}
+        />
+      {/if}
+    </div>
+  </SettingsSection>
+
   {#if canEdit}
     <div class="save-bar">
       {#if dirty}
@@ -390,6 +513,12 @@
     margin: 0;
     padding: var(--space-400) 0;
     text-align: center;
+  }
+
+  .transfer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-300);
   }
 
   .inline {

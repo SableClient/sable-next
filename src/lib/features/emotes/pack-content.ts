@@ -38,14 +38,24 @@ export function emptyDraft(): PackDraft {
   return { name: '', avatarUrl: null, attribution: '', usage: ALL_USAGES, images: [] };
 }
 
-function usageContent(usage: ImageUsageView[]): ImageUsageView[] | undefined {
+export const MAX_SHORTCODE_LENGTH = 100;
+const SHORTCODE_ALLOWED = /[^a-zA-Z0-9_-]/gu;
+
+export function usageContent(usage: ImageUsageView[]): ImageUsageView[] | undefined {
   return usage.length === ALL_USAGES.length ? undefined : usage;
 }
 
-function infoContent(info: PackImageInfoView | null): Record<string, unknown> | undefined {
+export interface PackImageInfoContent {
+  w?: number;
+  h?: number;
+  mimetype?: string;
+  size?: number;
+}
+
+export function infoContent(info: PackImageInfoView | null): PackImageInfoContent | undefined {
   if (info === null) return undefined;
 
-  const content: Record<string, unknown> = {};
+  const content: PackImageInfoContent = {};
   if (info.width !== null) content.w = info.width;
   if (info.height !== null) content.h = info.height;
   if (info.mimetype !== null) content.mimetype = info.mimetype;
@@ -77,7 +87,11 @@ export function packEventContent(draft: PackDraft): Record<string, unknown> {
 }
 
 export function normalizeShortcode(raw: string): string {
-  return raw.trim().replaceAll(':', '').replaceAll(/\s+/gu, '-');
+  return raw
+    .trim()
+    .replaceAll(/\s+/gu, '-')
+    .replaceAll(SHORTCODE_ALLOWED, '')
+    .slice(0, MAX_SHORTCODE_LENGTH);
 }
 
 export function suffixRename(shortcode: string, taken: (candidate: string) => boolean): string {

@@ -38,7 +38,7 @@ function startsWith(bytes: Uint8Array, signature: number[], offset = 0): boolean
   return signature.every((byte, index) => bytes[offset + index] === byte);
 }
 
-function imageMime(bytes: Uint8Array): string | undefined {
+export function imageMime(bytes: Uint8Array): string | undefined {
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47])) return 'image/png';
   if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
   if (startsWith(bytes, [0x47, 0x49, 0x46])) return 'image/gif';

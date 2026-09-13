@@ -2076,12 +2076,19 @@
     "reset": "Reset",
     "apply": "Apply changes",
     "saveFailed": "Those changes could not be saved.",
+    "transfer": "Export and import",
+    "transferHint": "A pack file carries the pictures themselves, so it imports on a server that cannot reach this one.",
+    "export": "Export pack",
+    "import": "Import pack",
+    "exportFailed": "That pack could not be exported.",
+    "importFailed": "That pack file could not be read.",
     "roomPacksTitle": "Packs from rooms",
     "roomPacksHint": "Turn a pack on to use it in every room, not just the one that publishes it.",
     "noRoomPacks": "None of your rooms publishes a pack yet.",
     "selectAll": "Select all",
     "unselectAll": "Unselect all",
     "useEverywhere": "Use {{name}} everywhere",
-    "pageDescription": "Your own emoji, and the packs you use from rooms."
+    "pageDescription": "Your own emoji, and the packs you use from rooms.",
+    "exportAll": "Export all"
   }
 }
