@@ -77,7 +77,7 @@
     display: flex;
     flex-direction: column;
     left: 0;
-    max-height: 30dvh;
+    max-height: min(30dvh, calc((100dvh - var(--keyboard-height, 0px)) / 3));
     overflow: hidden;
     position: absolute;
     right: 0;
@@ -106,10 +106,11 @@
     display: grid;
     flex: 1 1 auto;
     gap: var(--space-100);
+    grid-template-columns: minmax(0, 1fr);
     list-style: none;
     margin: 0;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden auto;
     padding: var(--space-200);
   }
 
