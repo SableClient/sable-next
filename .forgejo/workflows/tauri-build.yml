@@ -168,10 +168,12 @@ jobs:
       - name: Check the packages carry what they should
         run: |
           deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
-          dpkg-deb --contents "$deb" | grep -q 'etc/apparmor.d/sable-next$'
-          dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './postinst'
-          dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './prerm'
-          dpkg-deb --contents "$deb" | grep -q 'opt/sable-next/CEF-LICENSE.txt$'
+          contents=$(dpkg-deb --contents "$deb")
+          ctrl=$(dpkg-deb --ctrl-tarfile "$deb" | tar -t)
+          grep -q 'etc/apparmor.d/sable-next$' <<<"$contents"
+          grep -qx './postinst' <<<"$ctrl"
+          grep -qx './prerm' <<<"$ctrl"
+          grep -q 'opt/sable-next/CEF-LICENSE.txt$' <<<"$contents"
       - name: Sign the AppImage for the updater
         if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
