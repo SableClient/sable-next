@@ -7,6 +7,7 @@ export default defineConfig({
     'timeline-gap.spec.ts',
     'timeline-keyboard.spec.ts',
     'timeline-lifecycle.spec.ts',
+    'timeline-media.spec.ts',
   ],
   workers: 1,
   timeout: 60_000,

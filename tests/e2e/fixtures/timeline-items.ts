@@ -37,6 +37,7 @@ export function timelineImage(id: string) {
       // reserves is the height the loaded image takes.
       width: 800,
       height: 600,
+      spoiler: null,
     },
   };
 }
@@ -70,6 +71,7 @@ export function timelineWideImageWithoutDimensions(id: string) {
       mime: 'image/png',
       width: null,
       height: null,
+      spoiler: null,
     },
   };
 }

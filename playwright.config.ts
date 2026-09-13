@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const port = process.env.SABLE_PREVIEW_PORT ?? '4173';
 const origin = `http://127.0.0.1:${port}`;
 const SCRIPTED_TIMELINE_SPECS =
-  /(?:^|\/)timeline-(?:anchoring|stability|gap|keyboard|lifecycle)\.spec\.ts$/;
+  /(?:^|\/)timeline-(?:anchoring|stability|gap|keyboard|lifecycle|media)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: 'tests/e2e',
