@@ -7,6 +7,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import { i18n } from '#lib/i18n.js';
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -61,6 +62,13 @@
   >
     {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
   </Button>
+{:else if item.content.kind === 'redacted'}
+  <p class="redacted">
+    <TrashIcon size={14} aria-hidden="true" />
+    {item.content.reason
+      ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
+      : $i18n.t('timeline.redacted')}
+  </p>
 {:else if item.content.kind === 'sticker'}
   <MediaImage
     class="sticker"
@@ -150,6 +158,15 @@
     line-height: var(--line-height-body);
     margin: 0;
     white-space: pre-wrap;
+  }
+
+  .redacted {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: inline-flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-100);
+    margin: 0;
   }
 
   :global(.image) {

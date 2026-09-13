@@ -17,6 +17,7 @@ import {
   canRedact,
   eventBefore,
   isCollapsed,
+  isMessageRow,
   jumboEmojiLevel,
   personaLookup,
   readReceiptEventId,
@@ -360,6 +361,11 @@ test('anything you sent is yours to redact, not only your text', () => {
   // A divider or a state row is not an event anyone can redact.
   expect(canRedact(own(divider.content), true)).toBe(false);
   expect(canRedact(own(joined.content), true)).toBe(false);
+  expect(canRedact(own({ kind: 'redacted', reason: null }), true)).toBe(false);
+});
+
+test('a tombstone is a message row, so it keeps the sender and the menu', () => {
+  expect(isMessageRow({ kind: 'redacted', reason: null })).toBe(true);
 });
 
 test('a room whose every event is redacted is not blank at the shipped default', () => {

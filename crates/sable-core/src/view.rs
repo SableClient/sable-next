@@ -823,6 +823,13 @@ impl RawFields {
         self.unsigned.as_ref()?.prev_content.as_ref()
     }
 
+    fn content_stripped(&self) -> bool {
+        self.content
+            .as_ref()
+            .and_then(serde_json::Value::as_object)
+            .is_some_and(serde_json::Map::is_empty)
+    }
+
     fn redaction_reason(&self) -> Option<String> {
         self.unsigned
             .as_ref()?
@@ -1288,6 +1295,18 @@ fn live_location(state: &LiveLocationState) -> TimelineItemContentView {
     }
 }
 
+fn unparsed(event_type: &str, raw: &RawFields) -> TimelineItemContentView {
+    if raw.content_stripped() {
+        TimelineItemContentView::Redacted {
+            reason: raw.redaction_reason(),
+        }
+    } else {
+        TimelineItemContentView::Malformed {
+            event_type: event_type.to_owned(),
+        }
+    }
+}
+
 fn content(
     content: &TimelineItemContent,
     profile: Option<&PerMessageProfileView>,
@@ -1351,14 +1370,10 @@ fn content(
             TimelineItemContentView::CallInvite
         }
         TimelineItemContent::FailedToParseMessageLike { event_type, .. } => {
-            TimelineItemContentView::Malformed {
-                event_type: event_type.to_string(),
-            }
+            unparsed(&event_type.to_string(), raw)
         }
         TimelineItemContent::FailedToParseState { event_type, .. } => {
-            TimelineItemContentView::Malformed {
-                event_type: event_type.to_string(),
-            }
+            unparsed(&event_type.to_string(), raw)
         }
     }
 }
@@ -1618,6 +1633,29 @@ mod tests {
         );
         let serialized = serde_json::to_value(view).unwrap();
         assert_eq!(serialized["kind"], "call_invite");
+    }
+
+    #[test]
+    fn a_stripped_event_reads_as_redacted_without_redacted_because() {
+        let raw = serde_json::from_value::<super::RawFields>(json!({
+            "content": {},
+            "unsigned": { "age": 137_912 },
+        }))
+        .unwrap();
+        let serialized = serde_json::to_value(super::unparsed("m.room.message", &raw)).unwrap();
+        assert_eq!(serialized["kind"], "redacted");
+        assert_eq!(serialized["reason"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn an_event_that_kept_its_content_is_still_malformed() {
+        let raw = serde_json::from_value::<super::RawFields>(json!({
+            "content": { "msgtype": "m.text" },
+        }))
+        .unwrap();
+        let serialized = serde_json::to_value(super::unparsed("m.room.message", &raw)).unwrap();
+        assert_eq!(serialized["kind"], "malformed");
+        assert_eq!(serialized["event_type"], "m.room.message");
     }
 
     #[test]

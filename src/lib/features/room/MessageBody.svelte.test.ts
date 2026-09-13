@@ -203,3 +203,14 @@ test('live location expires without another SDK update and keeps its last known 
   await unmount(instance);
   vi.useRealTimers();
 });
+
+test('a deleted message keeps its reason', async () => {
+  const instance = mount(MessageBody, {
+    target: document.body,
+    props: { item: item({ kind: 'redacted', reason: 'spam' }), canRedactOthers: false },
+  });
+  await tick();
+
+  expect(document.querySelector('.redacted')?.textContent).toContain('spam');
+  await unmount(instance);
+});

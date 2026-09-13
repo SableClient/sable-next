@@ -685,3 +685,29 @@ test('a touch long press opens the sheet without also opening the context menu',
   await unmount(instance);
   vi.useRealTimers();
 });
+
+test('a deleted message keeps its sender, its time and its menu', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: { ...item(false), content: { kind: 'redacted', reason: null } },
+        collapsed: false,
+        roomId: '!room:example.org',
+        onReply: () => undefined,
+      },
+    },
+  });
+  await tick();
+
+  const message = document.querySelector('article.message');
+  if (!message) throw new Error('the tombstone was not rendered as a message row');
+  expect(document.querySelector('header .sender')?.textContent).toContain('Alice');
+  expect(document.querySelector('.redacted')?.textContent.trim()).toBe('Message deleted');
+
+  message.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await tick();
+  expect(document.querySelector('.message-actions')).not.toBeNull();
+  await unmount(instance);
+});

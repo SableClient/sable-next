@@ -28,6 +28,7 @@ const MESSAGE_ROW_KINDS = [
   'location',
   'live_location',
   'poll',
+  'redacted',
 ] as const satisfies readonly TimelineItemContentView['kind'][];
 
 export type MessageContent = Extract<
@@ -42,7 +43,7 @@ export function isMessageRow(content: TimelineItemContentView): content is Messa
 
 /** An image, a poll or a location you posted is yours to delete too. */
 export function canRedact(item: TimelineItemView, canRedactOthers: boolean): boolean {
-  if (!isMessageRow(item.content)) return false;
+  if (!isMessageRow(item.content) || item.content.kind === 'redacted') return false;
   return item.is_own || canRedactOthers;
 }
 
