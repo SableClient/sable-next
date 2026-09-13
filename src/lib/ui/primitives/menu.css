@@ -38,6 +38,7 @@
   min-height: var(--menu-item-height);
   padding: 0 var(--menu-item-padding);
   text-align: left;
+  user-select: none;
   width: 100%;
 }
 

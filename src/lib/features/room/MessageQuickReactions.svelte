@@ -56,6 +56,7 @@
     justify-content: center;
     line-height: 1;
     min-width: var(--control-height-300);
+    user-select: none;
   }
 
   .quick-reaction:hover {
