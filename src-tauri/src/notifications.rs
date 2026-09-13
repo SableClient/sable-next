@@ -36,6 +36,7 @@ struct Line {
     sender_key: String,
     body: String,
     at: i64,
+    event_id: Option<String>,
 }
 
 static CONVERSATIONS: LazyLock<Mutex<HashMap<String, Vec<Line>>>> =
@@ -77,13 +78,14 @@ fn line(view: &NotificationView, content: bool) -> Line {
             "New message".to_owned()
         },
         at: now_ms(),
+        event_id: view.event_id.as_ref().map(ToString::to_string),
     }
 }
 
-fn remember(view: &NotificationView, content: bool) -> Vec<Line> {
+fn remember(view: &NotificationView, content: bool) -> Option<Vec<Line>> {
     let fresh = line(view, content);
     let Ok(mut conversations) = CONVERSATIONS.lock() else {
-        return vec![fresh];
+        return Some(vec![fresh]);
     };
 
     let lines = conversations
@@ -97,11 +99,14 @@ fn remember(view: &NotificationView, content: bool) -> Vec<Line> {
             "New message".clone_into(&mut line.body);
         }
     }
+    if fresh.event_id.is_some() && lines.iter().any(|line| line.event_id == fresh.event_id) {
+        return None;
+    }
     lines.push(fresh);
     if lines.len() > MAX_CONVERSATION_LINES {
         lines.drain(..lines.len() - MAX_CONVERSATION_LINES);
     }
-    lines.clone()
+    Some(lines.clone())
 }
 
 fn forget(user_id: &str, room_id: &str) {
@@ -152,7 +157,9 @@ pub async fn show<R: Runtime>(
         core.notification_content(),
         core.notification_encrypted_content(),
     );
-    let lines = remember(view, content);
+    let Some(lines) = remember(view, content) else {
+        return;
+    };
 
     let mut builder = app
         .notifications()
@@ -674,14 +681,21 @@ mod tests {
         }
     }
 
+    fn at_event(view: &NotificationView, event: &str) -> NotificationView {
+        NotificationView {
+            event_id: Some(event.parse().expect("an event id")),
+            ..view.clone()
+        }
+    }
+
     #[test]
     fn a_conversation_keeps_the_newest_lines() {
         let view = in_room("!trimmed:example.org");
-        for _ in 0..=MAX_CONVERSATION_LINES {
-            remember(&view, true);
+        for index in 0..=MAX_CONVERSATION_LINES {
+            remember(&at_event(&view, &format!("$trim{index}")), true);
         }
 
-        let lines = remember(&view, true);
+        let lines = remember(&at_event(&view, "$trim-last"), true).expect("a fresh line");
         assert_eq!(lines.len(), MAX_CONVERSATION_LINES);
         forget(view.user_id.as_str(), view.room_id.as_str());
     }
@@ -689,18 +703,26 @@ mod tests {
     #[test]
     fn reading_the_room_empties_its_conversation() {
         let view = in_room("!read:example.org");
-        remember(&view, true);
-        remember(&view, true);
+        remember(&at_event(&view, "$read-one"), true);
+        remember(&at_event(&view, "$read-two"), true);
         forget(view.user_id.as_str(), view.room_id.as_str());
 
-        assert_eq!(remember(&view, true).len(), 1);
+        assert_eq!(remember(&view, true).expect("a fresh line").len(), 1);
+        forget(view.user_id.as_str(), view.room_id.as_str());
+    }
+
+    #[test]
+    fn one_event_notified_twice_is_alerted_once() {
+        let view = in_room("!repeat:example.org");
+        assert_eq!(remember(&view, true).map(|lines| lines.len()), Some(1));
+        assert!(remember(&view, true).is_none());
         forget(view.user_id.as_str(), view.room_id.as_str());
     }
 
     #[test]
     fn a_hidden_body_reaches_the_conversation_too() {
         let view = in_room("!hidden:example.org");
-        let lines = remember(&view, false);
+        let lines = remember(&view, false).expect("a fresh line");
 
         assert_eq!(collapsed(&lines), "Ada: New message");
         forget(view.user_id.as_str(), view.room_id.as_str());
@@ -714,11 +736,11 @@ mod tests {
         ] {
             let mut view = in_room(room);
             view.encrypted = encrypted;
-            remember(&view, true);
+            remember(&at_event(&view, "$privacy-one"), true);
             let content = shows_content(encrypted, encrypted, false);
-            let lines = remember(&view, content);
+            let lines = remember(&at_event(&view, "$privacy-two"), content).expect("a fresh line");
             assert!(lines.iter().all(|line| line.body == "New message"));
-            let lines = remember(&view, true);
+            let lines = remember(&at_event(&view, "$privacy-three"), true).expect("a fresh line");
             assert_eq!(lines[0].body, "New message");
             forget(view.user_id.as_str(), view.room_id.as_str());
         }
@@ -732,12 +754,14 @@ mod tests {
                 sender_key: "@ada:example.org".to_owned(),
                 body: "one".to_owned(),
                 at: 0,
+                event_id: None,
             },
             Line {
                 sender_name: "Bo".to_owned(),
                 sender_key: "@bo:example.org".to_owned(),
                 body: "two".to_owned(),
                 at: 1,
+                event_id: None,
             },
         ];
 
