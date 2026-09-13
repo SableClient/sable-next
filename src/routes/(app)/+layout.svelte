@@ -290,12 +290,12 @@
 
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
-        | { type?: string; roomId?: string; eventId?: string }
+        | { type?: string; roomId?: string }
         | undefined;
 
       if (message?.type === 'sable:push-resubscribe') resync();
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
-        void goto(roomSectionPath(roomList.rooms, message.roomId, message.eventId));
+        void goto(roomSectionPath(roomList.rooms, message.roomId));
       }
     });
   });
@@ -357,8 +357,8 @@
     };
   });
 
-  function openNotification(roomId: string, eventId: string | null): void {
-    void goto(roomSectionPath(roomList.rooms, roomId, eventId ?? undefined));
+  function openNotification(roomId: string): void {
+    void goto(roomSectionPath(roomList.rooms, roomId));
   }
 
   $effect(() => {
@@ -396,7 +396,7 @@
         );
       }),
       watchNativeNotificationClicks((target) => {
-        openNotification(target.roomId, target.eventId);
+        openNotification(target.roomId);
       }),
     ])
       .then((offs) => {

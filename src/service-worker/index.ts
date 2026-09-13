@@ -106,7 +106,7 @@ async function present(payload: PushPayload | undefined): Promise<void> {
     icon: favicon,
     badge: favicon,
     timestamp: Date.now(),
-    data: { roomId: showing.roomId, eventId: showing.eventId, lines },
+    data: { roomId: showing.roomId, lines },
   };
 
   await worker.registration.showNotification(showing.title, options);
@@ -125,11 +125,11 @@ async function conversation(tag: string): Promise<ReturnType<typeof readLines>> 
 
 worker.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const data = event.notification.data as { roomId?: string; eventId?: string } | undefined;
-  event.waitUntil(open(data?.roomId, data?.eventId));
+  const data = event.notification.data as { roomId?: string } | undefined;
+  event.waitUntil(open(data?.roomId));
 });
 
-async function open(roomId: string | undefined, eventId: string | undefined): Promise<void> {
+async function open(roomId: string | undefined): Promise<void> {
   const clients = await worker.clients.matchAll({
     type: 'window',
     includeUncontrolled: true,
@@ -137,18 +137,17 @@ async function open(roomId: string | undefined, eventId: string | undefined): Pr
 
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:open-room', roomId, eventId });
+    client.postMessage({ type: 'sable:open-room', roomId });
     await client.focus();
     return;
   }
 
-  await worker.clients.openWindow(roomId === undefined ? resolve('/') : permalink(roomId, eventId));
+  await worker.clients.openWindow(roomId === undefined ? resolve('/') : permalink(roomId));
 }
 
-function permalink(roomId: string, eventId: string | undefined): string {
-  const segments = eventId === undefined ? [roomId] : [roomId, eventId];
+function permalink(roomId: string): string {
   return resolve('/(app)/to/[...permalink]', {
-    permalink: segments.map((segment) => encodeURIComponent(segment)).join('/'),
+    permalink: encodeURIComponent(roomId),
   });
 }
 
