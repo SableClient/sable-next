@@ -187,7 +187,8 @@ jobs:
       - name: Attach desktop bundles to release
         shell: bash
         run: |
-          mapfile -t bundles < bundles
+          bundles=()
+          while IFS= read -r bundle; do bundles+=("$bundle"); done < bundles
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
   ios:
     name: Build iOS

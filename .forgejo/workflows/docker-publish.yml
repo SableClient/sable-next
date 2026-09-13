@@ -32,7 +32,7 @@ jobs:
   build-and-push:
     name: Build and push
     runs-on: multiarch
-    timeout-minutes: 45
+    timeout-minutes: 120
     permissions:
       contents: read
       packages: write
