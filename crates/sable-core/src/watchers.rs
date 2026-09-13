@@ -163,6 +163,7 @@ impl Core {
                     .into_iter()
                     .map(|room| room.room_id().to_owned())
                     .collect();
+                let mut alerted_events = std::collections::HashSet::new();
                 while let Some((notification, room)) = pending.recv().await {
                     let Notification { event, actions } = notification;
                     if !notifications::notifies(&actions) || core.is_read_room(room.room_id()) {
@@ -179,6 +180,7 @@ impl Core {
                                     event.origin_server_ts(),
                                 )
                                 || notifications::is_read(&room)
+                                || !alerted_events.insert(event.event_id().to_owned())
                             {
                                 continue;
                             }

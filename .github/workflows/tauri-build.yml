@@ -379,6 +379,7 @@ jobs:
   android:
     name: Build Android
     needs: [setup-release, build-web]
+    if: ${{ vars.BUILD_ANDROID == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -496,7 +497,7 @@ jobs:
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
   handoff:
     name: Publish handoff manifest
-    needs: [setup-release, desktop, linux, android, ios]
+    needs: [setup-release, desktop, linux, ios]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

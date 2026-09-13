@@ -143,6 +143,97 @@ async fn a_replayed_invite_alerts_once() {
 }
 
 #[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn a_replayed_message_alerts_once() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!replay:example.org");
+    server.mock_room_state_encryption().plain().mount().await;
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(client.user_id().unwrap()))
+                .add_state_event(factory.default_power_levels()),
+        )
+        .await;
+    let (core, mut events) = watching(&server, &client).await;
+    let mut rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+    rules
+        .insert(
+            matrix_sdk::ruma::push::NewPushRule::Room(
+                matrix_sdk::ruma::push::NewSimplePushRule::new(
+                    room_id.to_owned(),
+                    vec![matrix_sdk::ruma::push::Action::Notify],
+                ),
+            ),
+            None,
+            None,
+        )
+        .unwrap();
+
+    let message = |event_id: &str, body: &str| {
+        json!({
+            "type": "m.room.message", "event_id": event_id, "room_id": room_id,
+            "sender": *ALICE, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+            "content": { "msgtype": "m.text", "body": body }
+        })
+    };
+    for (event_id, body) in [("$one", "first"), ("$two", "second")] {
+        Mock::given(method("GET"))
+            .and(path_regex(format!(
+                r"/context/.*{}$",
+                event_id.trim_start_matches('$')
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "event": message(event_id, body), "events_before": [], "events_after": [],
+                "state": [], "start": "s", "end": "e"
+            })))
+            .mount(server.server())
+            .await;
+    }
+
+    for (event_id, body) in [("$one", "first"), ("$one", "first"), ("$two", "second")] {
+        let message = message(event_id, body);
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_global_account_data(factory.push_rules(rules.clone()));
+                builder.add_joined_room(
+                    JoinedRoomBuilder::new(room_id)
+                        .set_unread_notifications_count(
+                            json!({"notification_count": 1, "highlight_count": 0}),
+                        )
+                        .add_timeline_event(
+                            matrix_sdk::ruma::serde::Raw::new(&message)
+                                .unwrap()
+                                .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                        ),
+                );
+            })
+            .await;
+    }
+
+    assert_eq!(
+        next_notification(&mut events)
+            .await
+            .event_id
+            .map(|event_id| event_id.to_string()),
+        Some("$one".to_owned())
+    );
+    assert_eq!(
+        next_notification(&mut events)
+            .await
+            .event_id
+            .map(|event_id| event_id.to_string()),
+        Some("$two".to_owned()),
+        "the replayed event must not alert a second time"
+    );
+    core.session_tasks.lock().unwrap().clear();
+}
+
+#[tokio::test]
 async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
     for mark_read in [false, true] {
         let server = MatrixMockServer::new().await;
