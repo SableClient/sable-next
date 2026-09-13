@@ -145,6 +145,7 @@ test('a message with no reply action never moves', async () => {
 test('a gesture starting in a scrollable code block does not swipe', async () => {
   const { swipe, onReply } = await harness();
   const code = document.createElement('pre');
+  code.style.overflowX = 'auto';
   Object.defineProperty(code, 'scrollWidth', { value: 900, configurable: true });
   Object.defineProperty(code, 'clientWidth', { value: 300, configurable: true });
   node.append(code);
@@ -157,6 +158,24 @@ test('a gesture starting in a scrollable code block does not swipe', async () =>
 
   expect(swipe.offset).toBe(0);
   expect(onReply).not.toHaveBeenCalled();
+});
+
+test('a gesture starting on a clipped media box still swipes', async () => {
+  const { swipe, onReply } = await harness();
+  const media = document.createElement('button');
+  media.style.overflow = 'hidden';
+  Object.defineProperty(media, 'scrollWidth', { value: 321, configurable: true });
+  Object.defineProperty(media, 'clientWidth', { value: 320, configurable: true });
+  node.append(media);
+
+  const start = new Event('touchstart', { bubbles: true });
+  Object.defineProperty(start, 'touches', { value: [{ clientX: 0, clientY: 0 }] });
+  media.dispatchEvent(start);
+  fire('touchmove', -PAST_REPLY);
+  fire('touchend', 0);
+
+  expect(swipe.offset).toBe(0);
+  expect(onReply).toHaveBeenCalledOnce();
 });
 
 test('detaching stops the gesture from firing', async () => {

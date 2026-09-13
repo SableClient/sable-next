@@ -11,15 +11,6 @@ export interface MessageSwipeOptions {
   onEdit: () => void;
 }
 
-function scrollsSideways(target: EventTarget | null, root: HTMLElement): boolean {
-  let node = target instanceof Element ? target : null;
-  while (node !== null && node !== root) {
-    if (node.scrollWidth > node.clientWidth) return true;
-    node = node.parentElement;
-  }
-  return false;
-}
-
 export class MessageSwipe {
   offset = $state(0);
   action = $state<SwipeAction>('none');
@@ -36,7 +27,7 @@ export class MessageSwipe {
   attach = (node: HTMLElement): (() => void) => {
     const start = (event: TouchEvent): void => {
       this.#reset();
-      if (!this.#options.enabled() || scrollsSideways(event.target, node)) return;
+      if (!this.#options.enabled()) return;
 
       this.#gesture = startSwipeGesture(event, 0);
       this.#width = node.clientWidth;
