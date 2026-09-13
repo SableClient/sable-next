@@ -423,7 +423,7 @@ pub fn run() {
     // builder choking on the bare `{}` a space child removal carries.
     let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
         tracing_subscriber::EnvFilter::new(
-            "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off",
+            "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off,matrix_sdk::http_client=off",
         )
     });
     if let Err(error) = tracing_subscriber::fmt().with_env_filter(filter).try_init() {
