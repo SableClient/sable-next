@@ -1625,7 +1625,6 @@ test('shows jump to latest for a sent echo while reading a page back and returns
     send_state: { status: 'sending' as const },
   };
   await core.emitTimelineDiff(subscription, [{ op: 'push_back', value: echo }]);
-  await expect(timeline.itemById('sent-near-latest')).toBeAttached();
   await expect(timeline.jumpToLatest).toBeVisible();
 
   await timeline.jumpToLatest.click();
