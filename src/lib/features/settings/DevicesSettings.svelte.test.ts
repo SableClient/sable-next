@@ -5,21 +5,16 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    encryptionStatus: vi.fn<() => Promise<EncryptionStatusView>>(),
-    devices: vi.fn<() => Promise<{ devices: DeviceView[]; accountManagement: boolean }>>(),
-    deleteDevice: vi.fn<(deviceId: string, password: string | null) => Promise<string | null>>(),
-    renameDevice: vi.fn<(deviceId: string, displayName: string) => Promise<void>>(),
-    subscribeEvents: vi.fn(() => () => {}),
-  };
+vi.mock('#lib/core/context.js');
 
-  return Object.assign(stub, { commands: stub });
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  encryptionStatus: vi.fn<() => Promise<EncryptionStatusView>>(),
+  devices: vi.fn<() => Promise<{ devices: DeviceView[]; accountManagement: boolean }>>(),
+  deleteDevice: vi.fn<(deviceId: string, password: string | null) => Promise<string | null>>(),
+  renameDevice: vi.fn<(deviceId: string, displayName: string) => Promise<void>>(),
 });
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
 
 import DevicesSettings from './DevicesSettings.svelte';
 

@@ -3,15 +3,9 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const coreStub = vi.hoisted(() => {
-  const stub = {
-    fetchMedia: vi.fn((): Promise<Uint8Array> => new Promise(() => {})),
-    session: null,
-  };
-  return Object.assign(stub, { commands: stub });
-});
+vi.mock('#lib/core/context.js');
 
-vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
+import { core } from '#lib/core/__mocks__/context.js';
 
 import Avatar from './Avatar.svelte';
 import { identityColor } from './identity-color.js';
@@ -60,7 +54,7 @@ test('tints the picture box until the picture paints, and never the root', () =>
 });
 
 test('a picture the media layer cannot fetch falls back to the initials', async () => {
-  coreStub.fetchMedia.mockRejectedValueOnce(new Error('gone'));
+  core.fetchMedia.mockRejectedValueOnce(new Error('gone'));
   mount(Avatar, {
     target: document.body,
     props: { src: 'mxc://example.org/gone', name: 'Sable', id: '@sable:example.org' },

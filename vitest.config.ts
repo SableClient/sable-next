@@ -62,7 +62,13 @@ export default mergeConfig(
         provider: 'v8',
         reporter: ['text', 'html', 'lcov'],
         include: ['src/**/*.{ts,svelte}'],
-        exclude: ['src/**/*.d.ts', 'src/**/*.test.ts', 'src/app.d.ts', 'src/generated/**'],
+        exclude: [
+          'src/**/*.d.ts',
+          'src/**/*.test.ts',
+          'src/**/__mocks__/**',
+          'src/app.d.ts',
+          'src/generated/**',
+        ],
         thresholds: {
           lines: COVERAGE_MINIMUM,
           functions: COVERAGE_MINIMUM,

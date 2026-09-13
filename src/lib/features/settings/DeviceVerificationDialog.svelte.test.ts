@@ -3,31 +3,27 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => {
-  const commands = {
-    acceptVerification: vi.fn(() => Promise.resolve()),
-    cancelVerification: vi.fn(() => Promise.resolve()),
-    confirmVerification: vi.fn(() => Promise.resolve()),
-  };
-  return {
-    commands,
-    session: { user_id: '@alice:example.org' },
-    subscribeEvents: vi.fn(() => () => {}),
-    verification: {
-      flowId: 'flow',
-      state: {
-        phase: 'compare' as const,
-        emojis: [
-          { symbol: '🐶', description: 'Dog' },
-          { symbol: '🐶', description: 'Dog again' },
-        ],
-        decimals: [1, 2, 3] as [number, number, number],
-      },
-    },
-  };
-});
+vi.mock('#lib/core/context.js');
 
-vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
+import { core } from '#lib/core/__mocks__/context.js';
+
+Object.assign(core, {
+  acceptVerification: vi.fn(() => Promise.resolve()),
+  cancelVerification: vi.fn(() => Promise.resolve()),
+  confirmVerification: vi.fn(() => Promise.resolve()),
+  session: { user_id: '@alice:example.org' },
+  verification: {
+    flowId: 'flow',
+    state: {
+      phase: 'compare' as const,
+      emojis: [
+        { symbol: '🐶', description: 'Dog' },
+        { symbol: '🐶', description: 'Dog again' },
+      ],
+      decimals: [1, 2, 3] as [number, number, number],
+    },
+  },
+});
 
 import DeviceVerificationDialog from './DeviceVerificationDialog.svelte';
 

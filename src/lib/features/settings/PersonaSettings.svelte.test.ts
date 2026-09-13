@@ -15,9 +15,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => ({ commands: { uploadMedia: mocks.uploadMedia } }),
-}));
+vi.mock('#lib/core/context.js');
+
+import { core } from '#lib/core/__mocks__/context.js';
+
+Object.assign(core, { uploadMedia: mocks.uploadMedia });
 vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: [], loading: false, error: null, ...mocks }),
 }));

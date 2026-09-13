@@ -5,21 +5,17 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
 
-const coreStub = vi.hoisted(() => {
-  const stub = {
-    roomPermissions: vi.fn(),
-    roomPowerLevels: vi.fn(),
-    roomStateEvent: vi.fn(),
-    roomStateEventsRaw: vi.fn(),
-    roomAliases: vi.fn(),
-    roomDirectoryVisibility: vi.fn(),
-    roomHasSpaceParent: vi.fn(),
-  };
+vi.mock('#lib/core/context.js');
 
-  return Object.assign(stub, { commands: stub });
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  roomPowerLevels: vi.fn(),
+  roomStateEventsRaw: vi.fn(),
+  roomAliases: vi.fn(),
+  roomDirectoryVisibility: vi.fn(),
+  roomHasSpaceParent: vi.fn(),
 });
-
-vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
 vi.mock('#lib/i18n.js', () => ({
   i18n: {
     subscribe(run: (value: { t: (key: string) => string }) => void) {
@@ -79,8 +75,8 @@ async function render(
   hasSpaceParent = false,
   isSpace = false
 ): Promise<ReturnType<typeof mount>> {
-  coreStub.roomPermissions.mockResolvedValue(permissions(canChangeJoinRule));
-  coreStub.roomPowerLevels.mockResolvedValue({
+  core.roomPermissions.mockResolvedValue(permissions(canChangeJoinRule));
+  core.roomPowerLevels.mockResolvedValue({
     ban: 50,
     kick: 50,
     redact: 50,
@@ -92,10 +88,10 @@ async function render(
     users: {},
     notifications_room: 50,
   });
-  coreStub.roomStateEvent.mockResolvedValue(null);
-  coreStub.roomAliases.mockResolvedValue([]);
-  coreStub.roomDirectoryVisibility.mockResolvedValue(false);
-  coreStub.roomHasSpaceParent.mockResolvedValue(hasSpaceParent);
+  core.roomStateEvent.mockResolvedValue(null);
+  core.roomAliases.mockResolvedValue([]);
+  core.roomDirectoryVisibility.mockResolvedValue(false);
+  core.roomHasSpaceParent.mockResolvedValue(hasSpaceParent);
   const instance = mount(RoomSettingsDialog, {
     target: document.body,
     props: {
@@ -146,7 +142,7 @@ test.each([false, true])('non-admins can inspect and copy data (space: %s)', asy
     state_key: '',
     content: { url: 'mxc://example.org/room-avatar' },
   };
-  coreStub.roomStateEventsRaw.mockImplementation((_roomId: string, type: string) => {
+  core.roomStateEventsRaw.mockImplementation((_roomId: string, type: string) => {
     if (type === 'm.space.child') return Promise.reject(new Error('state unavailable'));
     return Promise.resolve(type === 'm.room.avatar' ? [avatarEvent] : []);
   });
@@ -183,7 +179,7 @@ test.each([false, true])('non-admins can inspect and copy data (space: %s)', asy
         'm.space.child': { error: 'state unavailable' },
       },
     });
-    expect(coreStub.roomStateEventsRaw).toHaveBeenCalledWith(room.room_id, 'm.space.parent', null);
+    expect(core.roomStateEventsRaw).toHaveBeenCalledWith(room.room_id, 'm.space.parent', null);
     await click('room.devDataCopy');
     expect(writeText).toHaveBeenCalledWith(field.value);
   } finally {

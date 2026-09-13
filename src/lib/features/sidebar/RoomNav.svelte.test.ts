@@ -18,21 +18,11 @@ const roomsFixture = vi.hoisted(() => ({
   notificationOverride: () => null,
 }));
 
-const coreStub = vi.hoisted(() => {
-  const stub = {
-    roomPermissions: vi.fn(() => new Promise<never>(() => {})),
-    roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
-    fetchMedia: vi.fn(() => new Promise<never>(() => {})),
-    userProfile: vi.fn((): Promise<unknown> => Promise.reject(new Error('no profile'))),
-    session: null,
-  };
-
-  return Object.assign(stub, { commands: stub });
-});
-
 vi.mock('$app/state', () => ({ page: pageState }));
 vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
-vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => coreStub }));
+vi.mock('#lib/core/context.js');
+
+import { core } from '#lib/core/__mocks__/context.js';
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string> = {}) => {
     const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
@@ -121,8 +111,8 @@ beforeEach(() => {
   roomsFixture.rooms = [];
   roomsFixture.mutedRoomIds = new Set();
   presenceFixture.entry = null;
-  coreStub.userProfile.mockReset();
-  coreStub.userProfile.mockRejectedValue(new Error('no profile'));
+  core.userProfile.mockReset();
+  core.userProfile.mockRejectedValue(new Error('no profile'));
 });
 
 afterEach(() => {
@@ -361,7 +351,7 @@ test('a space list header shows the space banner above it', async () => {
   ];
   pageState.url.pathname = '/space/!space:example.org';
   pageState.params = { spaceId: '!space:example.org' };
-  coreStub.roomStateEvent.mockResolvedValue({
+  core.roomStateEvent.mockResolvedValue({
     type: 'page.codeberg.everypizza.room.banner',
     content: { url: 'mxc://example.org/banner' },
   });
@@ -370,14 +360,14 @@ test('a space list header shows the space banner above it', async () => {
   await tick();
   await tick();
 
-  expect(coreStub.roomStateEvent).toHaveBeenCalledWith(
+  expect(core.roomStateEvent).toHaveBeenCalledWith(
     '!space:example.org',
     'page.codeberg.everypizza.room.banner'
   );
   expect(document.querySelector('.room-banner')).not.toBeNull();
   expect(document.querySelector('.room-nav-header')?.classList.contains('on-banner')).toBe(true);
 
-  coreStub.roomStateEvent.mockResolvedValue(null);
+  core.roomStateEvent.mockResolvedValue(null);
   await unmount(instance);
 });
 
@@ -464,7 +454,7 @@ function roomTopics(): (string | null)[] {
 
 test('a DM row shows the peer status once its profile arrives', async () => {
   observeImmediately();
-  coreStub.userProfile.mockResolvedValue({ status: { text: 'Shipping', emoji: '\u{1F680}' } });
+  core.userProfile.mockResolvedValue({ status: { text: 'Shipping', emoji: '\u{1F680}' } });
   roomsFixture.rooms = [
     makeRoom({
       room_id: '!dm:example.org',
@@ -477,7 +467,7 @@ test('a DM row shows the peer status once its profile arrives', async () => {
   await tick();
   await tick();
 
-  expect(coreStub.userProfile).toHaveBeenCalledWith('@bob:example.org');
+  expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
   expect(roomTopics()).toEqual(['\u{1F680}Shipping']);
   await unmount(instance);
 });

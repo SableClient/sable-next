@@ -3,11 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => ({
-    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
-  }),
-}));
+vi.mock('#lib/core/context.js');
 
 vi.mock('#lib/rooms/presence.svelte.js', async () => {
   const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(

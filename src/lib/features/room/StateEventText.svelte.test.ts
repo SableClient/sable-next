@@ -3,13 +3,9 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => ({
-  userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
-}));
+vi.mock('#lib/core/context.js');
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+import { core } from '#lib/core/__mocks__/context.js';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 

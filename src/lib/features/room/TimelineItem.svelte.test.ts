@@ -5,22 +5,16 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
-    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
-    pinnedEvents: vi.fn(() => Promise.resolve<string[]>([])),
-    setPinned: vi.fn(() => Promise.resolve<string[]>([])),
-    bookmarks: vi.fn(() => Promise.resolve([])),
-    setBookmark: vi.fn(() => Promise.resolve(false)),
-  };
+vi.mock('#lib/core/context.js');
 
-  return Object.assign(stub, { commands: stub });
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  pinnedEvents: vi.fn(() => Promise.resolve<string[]>([])),
+  setPinned: vi.fn(() => Promise.resolve<string[]>([])),
+  bookmarks: vi.fn(() => Promise.resolve([])),
+  setBookmark: vi.fn(() => Promise.resolve(false)),
 });
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
@@ -92,7 +86,7 @@ test('renders placeholders through the standard message layout', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: {
         item: item(false),
         collapsed: false,
@@ -118,7 +112,7 @@ test('renders placeholders through the standard message layout', async () => {
 test('reads an emote as one sentence, with the name only in the action', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(true), collapsed: false } },
+    props: { core, item: { item: item(true), collapsed: false } },
   });
   await tick();
 
@@ -144,7 +138,7 @@ test('badges a message with its own readers, and only in that placement', async 
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: { item: read, collapsed: false, members, currentUserId: '@alice:example.org' },
     },
   });
@@ -170,7 +164,7 @@ test('badges a message with its own readers, and only in that placement', async 
 test('keeps the sender header for an ordinary message', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
 
@@ -184,7 +178,7 @@ test('clicking the sender name mentions the account behind it', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: {
         item: {
           ...item(false),
@@ -221,7 +215,7 @@ test('edits an own image caption without dropping its media details', async () =
   };
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: image, collapsed: false, onEdit } },
+    props: { core, item: { item: image, collapsed: false, onEdit } },
   });
   await tick();
 
@@ -244,7 +238,7 @@ test('drops the right-hand side of a bubble when own alignment is off', async ()
     const instance = mount(TimelineItemHarness, {
       target: document.body,
       props: {
-        core: core.commands,
+        core,
         item: { item: own, collapsed: false, layout: 'bubble', alignOwn },
       },
     });
@@ -260,7 +254,7 @@ test('wraps non-text messages in a bubble in bubble layout', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: {
         item: imageItem('A caption'),
         collapsed: false,
@@ -284,7 +278,7 @@ test('uses the sender profile name color in every message layout', async () => {
   });
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
 
@@ -302,7 +296,7 @@ test('uses the sender profile name color in every message layout', async () => {
 test('does not mount hidden message dialogs', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
 
@@ -318,7 +312,7 @@ test('opens an image from a mobile pointer interaction', async () => {
   const onOpenMedia = vi.fn();
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: imageItem(), collapsed: false, onOpenMedia } },
+    props: { core, item: { item: imageItem(), collapsed: false, onOpenMedia } },
   });
   await tick();
   const image = document.querySelector<HTMLButtonElement>('.media-image');
@@ -349,7 +343,7 @@ test('opens a per-message profile avatar through viewer callback', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: { item: persona, collapsed: false, layout: 'modern', onPersonaAvatarClick },
     },
   });
@@ -393,7 +387,7 @@ test('a per-message profile takes the sender position and names the account behi
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: { item: persona, collapsed: false, onSenderProfile },
     },
   });
@@ -416,7 +410,7 @@ test('a per-message profile takes the sender position and names the account behi
 test('without a persona the hover-only via keeps the account MXID', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
 
@@ -470,7 +464,7 @@ test('mounts the action bar on hover and keeps it while its menu is open', async
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: {
-      core: core.commands,
+      core,
       item: { item: item(false), collapsed: false, onReply: vi.fn(), onCopyLink: vi.fn() },
     },
   });
@@ -497,7 +491,7 @@ test('mounts the action bar on hover and keeps it while its menu is open', async
 test('opens message actions on right click', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
+    props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
   const message = document.querySelector('.message');
@@ -573,7 +567,7 @@ test('renders a redacted row and a worded state change without throwing', async 
     document.body.append(target);
     const component = mount(TimelineItemHarness, {
       target,
-      props: { core: core.commands, item: { item: { ...item(false), content }, collapsed: false } },
+      props: { core, item: { item: { ...item(false), content }, collapsed: false } },
     });
     await tick();
 
@@ -592,7 +586,7 @@ test('shows every pronoun set from the sender account profile', async () => {
   });
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
     expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(2);
@@ -609,7 +603,7 @@ test('shows only the sets tagged with the reader language', async () => {
   });
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
     const pills = document.querySelectorAll('header .sender-identity-pronoun');
@@ -629,7 +623,7 @@ test('shows every set once the language filter is switched off', async () => {
   });
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
     expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(2);
@@ -652,7 +646,7 @@ test('caps the pills at three and counts the rest', async () => {
   });
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false } },
+    props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
     const pills = document.querySelectorAll('header .sender-identity-pronoun');
@@ -667,7 +661,7 @@ test('a touch long press opens the sheet without also opening the context menu',
   vi.useFakeTimers();
   const instance = mount(TimelineItemHarness, {
     target: document.body,
-    props: { core: core.commands, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
+    props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
 

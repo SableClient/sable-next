@@ -5,15 +5,11 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { UrlPreviewView } from '#src/generated/protocol';
 
-const core = vi.hoisted(() => {
-  const urlPreview = vi.fn<() => Promise<UrlPreviewView | null>>();
+vi.mock('#lib/core/context.js');
 
-  return { urlPreview, commands: { urlPreview } };
-});
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+const core = Object.assign(baseCore, { urlPreview: vi.fn<() => Promise<UrlPreviewView | null>>() });
 
 import LinkPreviewCard from './LinkPreviewCard.svelte';
 import { preferences } from '#lib/settings/preferences.svelte.js';

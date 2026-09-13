@@ -4,14 +4,11 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = {
-  session: { account_id: 'a', user_id: '@erwan:example.org', device_id: 'DEV' },
-  commands: {},
-};
+vi.mock('#lib/core/context.js');
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+import { core } from '#lib/core/__mocks__/context.js';
+
+core.session = { account_id: 'a', user_id: '@erwan:example.org', device_id: 'DEV' };
 
 import WidgetsPanel from './WidgetsPanel.svelte';
 import type { RoomWidget } from './widget-content.js';

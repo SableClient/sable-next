@@ -5,17 +5,11 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
 
-const core = vi.hoisted(() => ({
-  commands: {
-    fetchMedia: vi
-      .fn<() => Promise<Uint8Array<ArrayBuffer>>>()
-      .mockResolvedValue(new Uint8Array(new ArrayBuffer(1))),
-  },
-}));
+vi.mock('#lib/core/context.js');
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+import { core } from '#lib/core/__mocks__/context.js';
+
+core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),

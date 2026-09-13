@@ -5,22 +5,17 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { MemberView, RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    roomMembers: vi.fn<() => Promise<MemberView[]>>(),
-    userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
-    kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
-    banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
-    unbanUser: vi.fn<() => Promise<void>>(),
-    setUserPowerLevel: vi.fn<() => Promise<void>>(),
-  };
+vi.mock('#lib/core/context.js');
 
-  return Object.assign(stub, { commands: stub });
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  roomMembers: vi.fn<() => Promise<MemberView[]>>(),
+  kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
+  banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
+  unbanUser: vi.fn<() => Promise<void>>(),
+  setUserPowerLevel: vi.fn<() => Promise<void>>(),
 });
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
 
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => null }),

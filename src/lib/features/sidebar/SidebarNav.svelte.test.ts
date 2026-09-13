@@ -51,16 +51,11 @@ vi.mock('#lib/spaces/sidebar-layout.svelte.js', () => ({
 vi.mock('./RoomNav.svelte', () => ({ default: () => null }));
 vi.mock('./UserQuickTools.svelte', () => ({ default: () => null }));
 vi.mock('./FolderRenameDialog.svelte', () => ({ default: () => null }));
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => ({
-    commands: {
-      roomPermissions: () => Promise.resolve({ can_manage_children: false }),
-      roomViaServers: () => Promise.resolve([]),
-      setRoomTag: () => Promise.resolve(),
-      markRead: () => Promise.resolve(),
-    },
-  }),
-}));
+vi.mock('#lib/core/context.js');
+
+import { core } from '#lib/core/__mocks__/context.js';
+
+core.roomPermissions.mockResolvedValue({ can_manage_children: false });
 vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
 import SidebarNav from './SidebarNav.svelte';

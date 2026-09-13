@@ -3,15 +3,9 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => {
-  const fetchMedia = vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>();
+vi.mock('#lib/core/context.js');
 
-  return { fetchMedia, commands: { fetchMedia } };
-});
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+import { core } from '#lib/core/__mocks__/context.js';
 vi.mock('$app/state', () => ({ page: { url: { pathname: '/home' }, params: {}, state: {} } }));
 vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
 

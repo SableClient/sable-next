@@ -9,12 +9,7 @@ import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { TIMELINE_LAYOUT } from './timeline-layout';
 
-const core = vi.hoisted(() => ({
-  fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
-  userProfile: vi.fn().mockRejectedValue(new Error('profile unavailable')),
-}));
-
-vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
+vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: [] }) }));
 vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),

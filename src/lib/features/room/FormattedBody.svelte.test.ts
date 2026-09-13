@@ -3,15 +3,6 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
-    roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
-  };
-
-  return Object.assign(stub, { commands: stub });
-});
-
 const roomList = vi.hoisted(() => ({
   rooms: [] as { room_id: string; canonical_alias: string | null; name: string | null }[],
 }));
@@ -20,9 +11,13 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => roomList,
 }));
 
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+vi.mock('#lib/core/context.js');
+
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
+});
 
 import FormattedBody from './FormattedBody.svelte';
 import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';

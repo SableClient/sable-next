@@ -5,15 +5,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { MediaItem } from './MediaViewer.svelte';
 
-const core = vi.hoisted(() => {
-  const fetchMedia = vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>();
+vi.mock('#lib/core/context.js');
 
-  return { fetchMedia, commands: { fetchMedia } };
-});
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+import { core } from '#lib/core/__mocks__/context.js';
 vi.mock('#lib/i18n.js', () => ({
   i18n: {
     subscribe(run: (value: { t: (key: string) => string }) => void) {

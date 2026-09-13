@@ -3,19 +3,15 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    notificationKeywords: vi.fn<() => Promise<string[]>>(),
-    addNotificationKeyword: vi.fn<(keyword: string) => Promise<void>>(),
-    removeNotificationKeyword: vi.fn<(keyword: string) => Promise<void>>(),
-  };
+vi.mock('#lib/core/context.js');
 
-  return Object.assign(stub, { commands: stub });
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  notificationKeywords: vi.fn<() => Promise<string[]>>(),
+  addNotificationKeyword: vi.fn<(keyword: string) => Promise<void>>(),
+  removeNotificationKeyword: vi.fn<(keyword: string) => Promise<void>>(),
 });
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
 
 import NotificationKeywords from './NotificationKeywords.svelte';
 

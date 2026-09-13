@@ -44,16 +44,11 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.room_id),
   useRoomList: () => ({ rooms: [] }),
 }));
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => ({
-    commands: {
-      roomPermissions: () => Promise.resolve({ can_manage_children: false }),
-      roomViaServers: () => Promise.resolve([]),
-      setRoomTag: () => Promise.resolve(),
-      markRead: () => Promise.resolve(),
-    },
-  }),
-}));
+vi.mock('#lib/core/context.js');
+
+import { core } from '#lib/core/__mocks__/context.js';
+
+core.roomPermissions.mockResolvedValue({ can_manage_children: false });
 vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
 import NavigationRail from './NavigationRail.svelte';

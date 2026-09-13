@@ -3,17 +3,13 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    createDm: vi.fn<() => Promise<string>>(),
-  };
-
-  return Object.assign(stub, { commands: stub });
-});
-
 const navigation = vi.hoisted(() => ({ goto: vi.fn<() => Promise<void>>() }));
 
-vi.mock('#lib/core/context.js', () => ({ useCoreClient: () => core }));
+vi.mock('#lib/core/context.js');
+
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, { createDm: vi.fn<() => Promise<string>>() });
 vi.mock('$app/navigation', () => ({ goto: navigation.goto }));
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string>) =>

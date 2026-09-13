@@ -3,15 +3,9 @@
 import { mount, tick, unmount, type ComponentProps } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const core = vi.hoisted(() => {
-  const fetchMedia = vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>();
+vi.mock('#lib/core/context.js');
 
-  return { fetchMedia, commands: { fetchMedia } };
-});
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
+import { core } from '#lib/core/__mocks__/context.js';
 
 import MediaImage from './MediaImage.svelte';
 import { preferences } from '#lib/settings/preferences.svelte.js';

@@ -5,24 +5,19 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ProfileView } from '#src/generated/protocol';
 
-const core = vi.hoisted(() => {
-  const stub = {
-    fetchMedia: vi.fn<() => Promise<Uint8Array<ArrayBuffer>>>(),
-    session: { user_id: '@me:example.org' },
-    createDm: vi.fn<() => Promise<string>>(),
-    userRelations: vi.fn<() => Promise<{ mutualRooms: never[]; ignored: boolean }>>(),
-    setUserIgnored: vi.fn<() => Promise<void>>(),
-    sendMessage: vi.fn<() => Promise<void>>(),
-    kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
-    banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
-  };
+vi.mock('#lib/core/context.js');
 
-  return Object.assign(stub, { commands: stub });
+import { core as baseCore } from '#lib/core/__mocks__/context.js';
+
+const core = Object.assign(baseCore, {
+  session: { user_id: '@me:example.org' },
+  createDm: vi.fn<() => Promise<string>>(),
+  userRelations: vi.fn<() => Promise<{ mutualRooms: never[]; ignored: boolean }>>(),
+  setUserIgnored: vi.fn<() => Promise<void>>(),
+  sendMessage: vi.fn<() => Promise<void>>(),
+  kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
+  banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
 });
-
-vi.mock('#lib/core/context.js', () => ({
-  useCoreClient: () => core,
-}));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
