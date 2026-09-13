@@ -13,6 +13,7 @@ import MarkUnreadIcon from 'phosphor-svelte/lib/CircleDashedIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
+import StealIcon from 'phosphor-svelte/lib/StickerIcon';
 import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
@@ -33,6 +34,8 @@ export type MessageActions = {
   onPin?: () => void;
   onBookmark?: () => void;
   onForward?: () => void;
+  onStealEmotes?: () => void;
+  stealCount?: number;
   onReport?: () => void;
   onViewSource?: () => void;
   pinned?: boolean;
@@ -119,6 +122,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.forwardMessage',
       icon: ForwardIcon,
       run: actions.onForward,
+    });
+  }
+  if (actions.onStealEmotes) {
+    rows.push({
+      key: 'steal-emotes',
+      label: actions.stealCount === 1 ? 'emotes.stealOne' : 'emotes.stealMany',
+      icon: StealIcon,
+      run: actions.onStealEmotes,
     });
   }
   if (actions.onMarkUnread) {

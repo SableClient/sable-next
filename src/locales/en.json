@@ -2089,6 +2089,12 @@
     "unselectAll": "Unselect all",
     "useEverywhere": "Use {{name}} everywhere",
     "pageDescription": "Your own emoji, and the packs you use from rooms.",
-    "exportAll": "Export all"
+    "exportAll": "Export all",
+    "stealOne": "Add emote to my pack",
+    "stealMany": "Add emotes to my pack",
+    "stealTitle": "Add to your pack",
+    "stealExplain": "The picture is copied to your own account, so it keeps working if the message or its room goes away.",
+    "stealConfirm": "Add",
+    "stealFailed": "That could not be added to your pack."
   }
 }

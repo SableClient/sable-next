@@ -41,6 +41,9 @@
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
 
+  import StealEmotesDialog from '#lib/features/emotes/StealEmotesDialog.svelte';
+  import { emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
+
   import MessageForwardDialog from './MessageForwardDialog.svelte';
   import MessageReportDialog from './MessageReportDialog.svelte';
   import MessageSourceDialog from './MessageSourceDialog.svelte';
@@ -306,6 +309,13 @@
               forwardOpen = true;
             }
           : undefined,
+      stealCount: stealable.length,
+      onStealEmotes:
+        stealable.length > 0
+          ? () => {
+              stealOpen = true;
+            }
+          : undefined,
       onViewSource: roomId && eventId ? () => void openSource(eventId) : undefined,
       onReport:
         roomId && eventId && !item.is_own
@@ -392,6 +402,8 @@
   let sourceOpen = $state(false);
   let reportOpen = $state(false);
   let forwardOpen = $state(false);
+  let stealOpen = $state(false);
+  let stealable = $derived(emoteCandidates(item.content));
   let reproxyOpen = $state(false);
   let source = $state('');
   let threadTarget = $derived(item.thread_root ?? item.event_id);
@@ -580,6 +592,9 @@
       {/if}
       {#if reportOpen}
         <MessageReportDialog bind:open={reportOpen} onReport={report} />
+      {/if}
+      {#if stealOpen}
+        <StealEmotesDialog bind:open={stealOpen} candidates={stealable} />
       {/if}
       {#if forwardOpen}
         <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
