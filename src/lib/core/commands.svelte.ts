@@ -1401,7 +1401,7 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+    uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
       return transport().uploadMedia(mime, bytes);
     },
 

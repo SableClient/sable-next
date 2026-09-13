@@ -27,7 +27,7 @@ export class SableWidgetDriver extends WidgetDriver {
     this.#approve = approve;
   }
 
-  override async validateCapabilities(requested: Set<Capability>): Promise<Set<Capability>> {
+  override validateCapabilities(requested: Set<Capability>): Promise<Set<Capability>> {
     return this.#approve(requested);
   }
 
