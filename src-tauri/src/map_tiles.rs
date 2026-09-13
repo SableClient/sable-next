@@ -16,7 +16,7 @@ pub const TILE_URI_SCHEME: &str = "sable-tiles";
 
 const TILE_ORIGIN: &str = "https://tile.openstreetmap.org";
 const CACHE_SUBDIR: &str = "sable-tiles";
-const CACHE_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+const CACHE_TTL: Duration = Duration::from_hours(24 * 7);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_CONCURRENT_REQUESTS: usize = 6;
@@ -25,6 +25,7 @@ const MAX_ZOOM: u32 = 19;
 static CLIENT: OnceLock<Client> = OnceLock::new();
 static LANE: Semaphore = Semaphore::const_new(MAX_CONCURRENT_REQUESTS);
 
+#[allow(clippy::needless_pass_by_value)] // Tauri hands the handler both by value.
 pub fn respond<R: Runtime>(
     ctx: UriSchemeContext<'_, R>,
     request: Request<Vec<u8>>,
