@@ -62,7 +62,10 @@ jobs:
     name: Build web assets
     needs: setup-release
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Cold, this compiles the dependency tree twice: generate:types builds
+    # sable-core for the host in dev, then wasm:build rebuilds it for wasm32 in
+    # release. Neither shares artifacts with the other.
+    timeout-minutes: 120
     permissions:
       contents: read
     env:
@@ -186,7 +189,9 @@ jobs:
     name: Wait for GitHub bundles
     needs: setup-release
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # github-bundles.json is published by the GitHub-side handoff job, which
+    # waits on the whole desktop/linux/android/ios matrix.
+    timeout-minutes: 120
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -198,7 +203,7 @@ jobs:
           TAG: ${{ needs.setup-release.outputs.tag }}
         run: |
           node scripts/ci/forgejo-release.mjs wait-assets \
-            --names github-bundles.json --attempts 120 --interval 30
+            --names github-bundles.json --attempts 220 --interval 30
   obtainium:
     name: Publish Obtainium config
     needs: [setup-release, github-bundles]
