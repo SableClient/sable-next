@@ -149,6 +149,7 @@
     --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
     --profile-avatar-size: var(--avatar-size-large);
     --profile-cover-height: var(--avatar-size-large);
+    --profile-bio-lines: 4;
     --profile-card-ground: var(--bg-container);
     --profile-panel-ground: var(--surface-container);
 
@@ -187,6 +188,7 @@
 
   .profile-card-sheet {
     --profile-cover-height: 6rem;
+    --profile-bio-lines: 6;
   }
 
   /* Both dimensions, so the ratio MediaImage sets inline stops applying. */
@@ -335,7 +337,10 @@
   .profile-card-bio {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
+    max-height: calc(var(--profile-bio-lines) * var(--line-height-body) * 1em);
     overflow-wrap: break-word;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .profile-card-bio :global(.formatted-body) {
