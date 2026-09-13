@@ -21,6 +21,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
+  import { resetUrlPreviews } from '#lib/features/room/link-preview-cache.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import {
     alertsNatively,
@@ -143,6 +144,7 @@
     const login = resolve('login');
     if (core.status === 'signed-out' && !page.url.pathname.startsWith(login)) {
       untrack(clearDrafts);
+      resetUrlPreviews();
       const account = core.accounts.find(
         (account) => account.account_id === core.reauthenticationAccountId
       );
