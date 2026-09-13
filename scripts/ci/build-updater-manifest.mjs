@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,16 +16,14 @@ if (!version) throw new Error('VERSION is required');
 const release = join(dirname(fileURLToPath(import.meta.url)), 'forgejo-release.mjs');
 const run = (...args) => execFileSync('node', [release, ...args], { encoding: 'utf8' });
 
-const assets = run('assets', '--tag', tag).split('\n').filter(Boolean);
-const signatures = assets.filter((name) => name.endsWith('.sig'));
+const directory = mkdtempSync(join(tmpdir(), 'sable-updater-'));
+run('download', '--tag', tag, '--pattern', '*.sig', '--dir', directory);
+const signatures = readdirSync(directory).filter((name) => name.endsWith('.sig'));
 
 if (signatures.length === 0) {
   console.log('No signed assets found; skipping updater manifest.');
   process.exit(0);
 }
-
-const directory = mkdtempSync(join(tmpdir(), 'sable-updater-'));
-run('download', '--tag', tag, '--pattern', '*.sig', '--dir', directory);
 
 function targetsFor(name) {
   if (name.endsWith('.app.tar.gz')) return ['darwin-aarch64', 'darwin-x86_64'];
