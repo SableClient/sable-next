@@ -150,6 +150,12 @@ impl Core {
             return Err(error);
         }
         let (items, stream) = timeline.subscribe().await;
+        let (echoes, mut queue_updates) = match room.send_queue().subscribe().await {
+            Ok((echoes, updates)) => (echoes, Some(updates)),
+            Err(_) => (Vec::new(), None),
+        };
+        let local_profiles = view::LocalProfiles::new(&echoes);
+        let mut stream_profiles = view::LocalProfiles::new(&echoes);
         let pagination = timeline.live_back_pagination_status().await;
         let own_user_id = self.client().await?.user_id().map(ToOwned::to_owned);
         let core = self.clone();
@@ -159,6 +165,11 @@ impl Core {
         let task = spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
+                if let Some(updates) = queue_updates.as_mut() {
+                    while let Ok(update) = updates.try_recv() {
+                        stream_profiles.apply(&update);
+                    }
+                }
                 let push = stream_room.push_context().await.ok().flatten();
                 let highlights = view::Highlights::for_diffs(push.as_ref(), &diffs).await;
                 core.emit(CoreEvent::TimelineDiff {
@@ -172,6 +183,7 @@ impl Core {
                                     stream_user_id.as_deref(),
                                     &stream_relays,
                                     &highlights,
+                                    &stream_profiles,
                                 )
                             })
                         })
@@ -211,7 +223,15 @@ impl Core {
             subscription,
             items: items
                 .iter()
-                .map(|item| view::timeline_item(item, own_user_id.as_deref(), &relays, &highlights))
+                .map(|item| {
+                    view::timeline_item(
+                        item,
+                        own_user_id.as_deref(),
+                        &relays,
+                        &highlights,
+                        &local_profiles,
+                    )
+                })
                 .collect(),
         })
     }

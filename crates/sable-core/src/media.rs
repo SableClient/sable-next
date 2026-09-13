@@ -155,6 +155,22 @@ impl Core {
             .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let (caption, formatted_caption, persona) = match persona {
+            Some(persona) => match caption {
+                Some(text) => {
+                    let (text, formatted, persona) =
+                        crate::personas::outgoing_with_fallback(text, formatted_caption, &persona);
+                    (Some(text), formatted, Some(persona))
+                }
+                None => (
+                    None,
+                    formatted_caption,
+                    Some(crate::personas::without_fallback(&persona)),
+                ),
+            },
+            None => (caption, formatted_caption, None),
+        };
+
         let config = AttachmentConfig {
             caption: attachment_caption(caption, formatted_caption),
             mentions: outgoing_mentions(mentions, mentions_room),

@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
 use matrix_sdk::Room;
-use matrix_sdk::ruma::OwnedRoomId;
+use matrix_sdk::ruma::events::room::message::RoomMessageEventContentWithoutRelation;
 use matrix_sdk::ruma::events::{
     AnyGlobalAccountDataEventContent, AnyMessageLikeEventContent, GlobalAccountDataEventType,
     MessageLikeEventContent,
 };
 use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk::ruma::{OwnedRoomId, TransactionId};
+use matrix_sdk::send_queue::LocalEchoContent;
 use serde_json::{Map, Value, json};
 
 use crate::Core;
@@ -265,16 +267,39 @@ fn selection_to_json(selection: &PersonaSelectionView) -> Value {
     Value::Object(object)
 }
 
+const MAX_FIELD_BYTES: usize = 255;
+
+fn clamp_field(value: &str) -> String {
+    value
+        .chars()
+        .filter(|character| *character != '\0')
+        .scan(0usize, |used, character| {
+            let next = *used + character.len_utf8();
+            if next > MAX_FIELD_BYTES {
+                return None;
+            }
+            *used = next;
+            Some(character)
+        })
+        .collect()
+}
+
 pub(crate) fn profile_to_json(profile: &PerMessageProfileView) -> Value {
     let mut object = Map::new();
-    if let Some(id) = &profile.id {
-        object.insert("id".to_owned(), id.clone().into());
+    if let Some(id) = profile
+        .id
+        .as_deref()
+        .map(clamp_field)
+        .filter(|id| !id.is_empty())
+    {
+        object.insert("id".to_owned(), id.into());
     }
     if let Some(display_name) = profile
         .display_name
         .as_deref()
         .map(str::trim)
         .filter(|name| !name.is_empty())
+        .map(clamp_field)
     {
         object.insert("displayname".to_owned(), display_name.into());
     }
@@ -302,47 +327,37 @@ pub(crate) fn profile_extra_content(profile: &PerMessageProfileView) -> Map<Stri
         .collect()
 }
 
-pub(crate) fn stamp_profile(content: &mut Value, profile: &PerMessageProfileView) {
-    let Some(object) = content.as_object_mut() else {
-        return;
-    };
+pub(crate) fn without_fallback(profile: &PerMessageProfileView) -> PerMessageProfileView {
+    PerMessageProfileView {
+        has_fallback: false,
+        ..profile.clone()
+    }
+}
 
-    object.insert(PER_MESSAGE_PROFILE.to_owned(), profile_to_json(profile));
-
-    let Some(name) = profile
+pub(crate) fn fallback_body(
+    body: &str,
+    formatted: Option<&str>,
+    profile: &PerMessageProfileView,
+) -> Option<(String, String)> {
+    if !profile.has_fallback {
+        return None;
+    }
+    let name = profile
         .display_name
         .as_deref()
         .map(str::trim)
         .filter(|name| !name.is_empty())
-    else {
-        return;
-    };
-    if !profile.has_fallback {
-        return;
-    }
+        .map(clamp_field)
+        .filter(|name| !name.is_empty())?;
 
     let plain_prefix = format!("{name}: ");
     let html_prefix = format!(
         "<strong data-mx-profile-fallback>{}: </strong>",
-        html_escape::encode_text(name)
+        html_escape::encode_text(&name)
     );
 
-    let raw_body = object
-        .get("body")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_owned();
-    let raw_formatted = object
-        .get("formatted_body")
-        .and_then(Value::as_str)
-        .map(ToOwned::to_owned);
-
-    let (marker, body) = split_edit_marker(&raw_body);
-    let (_, formatted) = raw_formatted.as_deref().map_or((marker, None), |html| {
-        let (marker, rest) = split_edit_marker(html);
-        (marker, Some(rest.to_owned()))
-    });
-
+    let (marker, body) = split_edit_marker(body);
+    let formatted = formatted.map(|html| split_edit_marker(html).1.to_owned());
     let stripped = body.strip_prefix(&plain_prefix).unwrap_or(body);
 
     let formatted = match formatted {
@@ -354,17 +369,51 @@ pub(crate) fn stamp_profile(content: &mut Value, profile: &PerMessageProfileView
         ),
     };
 
-    object.insert("format".to_owned(), "org.matrix.custom.html".into());
-    object.insert(
-        "formatted_body".to_owned(),
-        format!("{marker}{formatted}").into(),
-    );
-    if !body.starts_with(&plain_prefix) {
-        object.insert(
-            "body".to_owned(),
-            format!("{marker}{plain_prefix}{body}").into(),
-        );
+    Some((
+        format!("{marker}{plain_prefix}{stripped}"),
+        format!("{marker}{formatted}"),
+    ))
+}
+
+pub(crate) fn outgoing_with_fallback(
+    body: String,
+    formatted: Option<String>,
+    profile: &PerMessageProfileView,
+) -> (String, Option<String>, PerMessageProfileView) {
+    match fallback_body(&body, formatted.as_deref(), profile) {
+        Some((body, formatted)) => (body, Some(formatted), profile.clone()),
+        None => (body, formatted, without_fallback(profile)),
     }
+}
+
+pub(crate) fn stamp_profile(content: &mut Value, profile: &PerMessageProfileView) {
+    let Some(object) = content.as_object_mut() else {
+        return;
+    };
+
+    let raw_body = object
+        .get("body")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let raw_formatted = object
+        .get("formatted_body")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+
+    let Some((body, formatted)) = fallback_body(&raw_body, raw_formatted.as_deref(), profile)
+    else {
+        object.insert(
+            PER_MESSAGE_PROFILE.to_owned(),
+            profile_to_json(&without_fallback(profile)),
+        );
+        return;
+    };
+
+    object.insert(PER_MESSAGE_PROFILE.to_owned(), profile_to_json(profile));
+    object.insert("format".to_owned(), "org.matrix.custom.html".into());
+    object.insert("formatted_body".to_owned(), formatted.into());
+    object.insert("body".to_owned(), body.into());
 }
 
 const EDIT_MARKER: &str = "* ";
@@ -376,6 +425,58 @@ fn split_edit_marker(value: &str) -> (&str, &str) {
 }
 
 impl Core {
+    pub(crate) async fn edit_local_with_persona(
+        &self,
+        room: &Room,
+        transaction_id: &TransactionId,
+        message: RoomMessageEventContentWithoutRelation,
+        profile: &PerMessageProfileView,
+    ) -> Result<bool, CommandErr> {
+        let (echoes, _updates) = room
+            .send_queue()
+            .subscribe()
+            .await
+            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+
+        let Some((serialized, handle)) = echoes.into_iter().find_map(|echo| {
+            if echo.transaction_id != *transaction_id {
+                return None;
+            }
+            match echo.content {
+                LocalEchoContent::Event {
+                    serialized_event,
+                    send_handle,
+                    ..
+                } => Some((serialized_event, send_handle)),
+                _ => None,
+            }
+        }) else {
+            return Ok(false);
+        };
+
+        let previous = serialized
+            .raw()
+            .0
+            .deserialize_as_unchecked::<Value>()
+            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+        let mut value = serde_json::to_value(&message)
+            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+        if let Some(object) = value.as_object_mut()
+            && let Some(relation) = previous.get("m.relates_to")
+        {
+            object.insert("m.relates_to".to_owned(), relation.clone());
+        }
+        stamp_profile(&mut value, profile);
+
+        let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(value.to_string())
+            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+
+        handle
+            .edit_raw(raw, "m.room.message".to_owned())
+            .await
+            .map_err(|error| self.failed("edit_local_with_persona", error))
+    }
+
     pub(crate) async fn edit_with_persona(
         &self,
         room: &Room,
@@ -677,7 +778,10 @@ impl Core {
 
 #[cfg(test)]
 mod tests {
-    use super::{persona_from_json, personas_from_catalog, stamp_profile};
+    use super::{
+        fallback_body, outgoing_with_fallback, persona_from_json, personas_from_catalog,
+        profile_to_json, stamp_profile,
+    };
     use crate::protocol::{PerMessageProfileView, PronounView};
     use serde_json::json;
 
@@ -806,5 +910,69 @@ mod tests {
                 .get("has_fallback")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn a_nameless_profile_does_not_claim_a_fallback_it_cannot_write() {
+        let mut nameless = profile("Kris", true);
+        nameless.display_name = None;
+
+        let mut content = json!({ "msgtype": "m.text", "body": "hello" });
+        stamp_profile(&mut content, &nameless);
+
+        assert_eq!(content["body"], "hello");
+        assert!(
+            content["com.beeper.per_message_profile"]
+                .get("has_fallback")
+                .is_none()
+        );
+        assert!(fallback_body("hello", None, &nameless).is_none());
+    }
+
+    #[test]
+    fn an_outgoing_message_carries_the_fallback_it_advertises() {
+        let (body, formatted, profile) =
+            outgoing_with_fallback("hello".to_owned(), None, &profile("Kris", true));
+
+        assert_eq!(body, "Kris: hello");
+        assert_eq!(
+            formatted.as_deref(),
+            Some("<strong data-mx-profile-fallback>Kris: </strong>hello")
+        );
+        assert!(profile.has_fallback);
+
+        let (body, formatted, profile) =
+            outgoing_with_fallback("hello".to_owned(), None, &profile_without_name());
+        assert_eq!(body, "hello");
+        assert!(formatted.is_none());
+        assert!(!profile.has_fallback);
+    }
+
+    #[test]
+    fn oversized_fields_are_clamped_on_a_char_boundary() {
+        let mut long = profile(&"é".repeat(200), true);
+        long.id = Some("k".repeat(300));
+
+        let stamped = profile_to_json(&long);
+        let name = stamped["displayname"].as_str().expect("a display name");
+
+        assert!(name.len() <= 255);
+        assert_eq!(name.chars().count(), 127);
+        assert_eq!(stamped["id"].as_str().expect("an id").len(), 255);
+    }
+
+    #[test]
+    fn a_null_byte_never_reaches_the_wire() {
+        let profile = profile("Kr\0is", true);
+        let stamped = profile_to_json(&profile);
+
+        assert_eq!(stamped["displayname"], "Kris");
+    }
+
+    fn profile_without_name() -> PerMessageProfileView {
+        PerMessageProfileView {
+            display_name: None,
+            ..profile("Kris", true)
+        }
     }
 }

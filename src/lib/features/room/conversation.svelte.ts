@@ -309,7 +309,6 @@ export class Conversation {
       const item = this.#timeline.items[index];
       const itemId = item.event_id ?? item.transaction_id;
       if (!itemId || item.sender !== userId) continue;
-      if (!item.event_id && item.per_message_profile) continue;
       if (item.content.kind !== 'message') continue;
 
       this.edit(itemId, item.content.body, item.content.html);

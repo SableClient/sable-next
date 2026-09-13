@@ -387,6 +387,14 @@ impl Core {
                 persona,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                let (body, formatted, persona) = match persona {
+                    Some(persona) => {
+                        let (body, formatted, persona) =
+                            crate::personas::outgoing_with_fallback(body, formatted, &persona);
+                        (body, formatted, Some(persona))
+                    }
+                    None => (body, formatted, None),
+                };
                 let content = message_content(body, formatted, kind, mentions, mentions_room);
 
                 let content = match thread_reply(in_reply_to, thread_root.clone(), silent_reply) {
@@ -495,7 +503,9 @@ impl Core {
                     Some(persona) => timeline
                         .send_with_extra_content(
                             content.into(),
-                            Some(crate::personas::profile_extra_content(&persona)),
+                            Some(crate::personas::profile_extra_content(
+                                &crate::personas::without_fallback(&persona),
+                            )),
                         )
                         .await
                         .map_err(|error| self.failed("send_sticker", error))?,
@@ -548,7 +558,11 @@ impl Core {
                 timeline
                     .send_with_extra_content(
                         content.into(),
-                        persona.as_ref().map(crate::personas::profile_extra_content),
+                        persona.as_ref().map(|persona| {
+                            crate::personas::profile_extra_content(
+                                &crate::personas::without_fallback(persona),
+                            )
+                        }),
                     )
                     .await
                     .map_err(|error| self.failed("send_gif", error))?;
@@ -585,15 +599,27 @@ impl Core {
                     }
                     _ => return Err(CommandErr::Unsupported),
                 };
-                if matches!(item_id, TimelineEventItemId::TransactionId(_)) {
-                    if persona.is_some() {
-                        return Err(CommandErr::Unsupported);
+                if let TimelineEventItemId::TransactionId(transaction_id) = &item_id {
+                    let queued = match (&persona, &edited) {
+                        (Some(persona), EditedContent::RoomMessage(message)) => {
+                            let room = self.room(&room_id).await?;
+                            self.edit_local_with_persona(
+                                &room,
+                                transaction_id,
+                                message.clone(),
+                                persona,
+                            )
+                            .await?
+                        }
+                        _ => false,
+                    };
+                    if !queued {
+                        self.timeline_for(&room_id, thread_root.as_ref())
+                            .await?
+                            .edit(&item_id, edited)
+                            .await
+                            .map_err(|error| self.failed("edit_message", error))?;
                     }
-                    self.timeline_for(&room_id, thread_root.as_ref())
-                        .await?
-                        .edit(&item_id, edited)
-                        .await
-                        .map_err(|error| self.failed("edit_message", error))?;
                 } else if let TimelineEventItemId::EventId(event_id) = item_id {
                     let room = self.room(&room_id).await?;
                     let content = room

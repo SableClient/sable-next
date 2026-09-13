@@ -158,7 +158,9 @@
   let persona = $derived(item.per_message_profile);
   let senderName = $derived(persona?.display_name ?? accountName);
   let senderAvatar = $derived(
-    persona?.avatar_url ?? item.sender_avatar ?? senderMember?.avatar_url ?? null
+    persona?.avatar_url === ''
+      ? null
+      : (persona?.avatar_url ?? item.sender_avatar ?? senderMember?.avatar_url ?? null)
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
@@ -583,7 +585,7 @@
         {...actions}
       />
     {/if}
-    {#if !actionable && editable && item.transaction_id && !item.per_message_profile && engaged}
+    {#if !actionable && editable && item.transaction_id && engaged}
       <MessageActions {roomId} onEdit={actions.onEdit} />
     {/if}
     {#if actionable}

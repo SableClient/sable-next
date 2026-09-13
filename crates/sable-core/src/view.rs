@@ -24,9 +24,11 @@ use matrix_sdk::ruma::room::{
     JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
 };
 use matrix_sdk::ruma::{Int, UInt};
-use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UserId};
+use matrix_sdk::ruma::{OwnedRoomId, OwnedTransactionId, OwnedUserId, TransactionId, UserId};
+use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_base::crypto::types::events::UtdCause;
+use matrix_sdk_base::store::SerializableEventContent;
 use matrix_sdk_ui::{
     eyeball_im,
     room_list_service::RoomListItem,
@@ -616,12 +618,74 @@ impl Highlights {
     }
 }
 
+#[derive(Default)]
+pub struct LocalProfiles(HashMap<OwnedTransactionId, PerMessageProfileView>);
+
+impl LocalProfiles {
+    #[must_use]
+    pub fn new(echoes: &[LocalEcho]) -> Self {
+        let mut profiles = Self::default();
+        for echo in echoes {
+            if let LocalEchoContent::Event {
+                serialized_event, ..
+            } = &echo.content
+            {
+                profiles.remember(&echo.transaction_id, serialized_event);
+            }
+        }
+        profiles
+    }
+
+    pub fn apply(&mut self, update: &RoomSendQueueUpdate) {
+        match update {
+            RoomSendQueueUpdate::NewLocalEvent(LocalEcho {
+                transaction_id,
+                content:
+                    LocalEchoContent::Event {
+                        serialized_event, ..
+                    },
+            }) => self.remember(transaction_id, serialized_event),
+            RoomSendQueueUpdate::ReplacedLocalEvent {
+                transaction_id,
+                new_content,
+            } => self.remember(transaction_id, new_content),
+            RoomSendQueueUpdate::CancelledLocalEvent { transaction_id }
+            | RoomSendQueueUpdate::SentEvent { transaction_id, .. } => {
+                self.0.remove(transaction_id);
+            }
+            _ => {}
+        }
+    }
+
+    fn remember(&mut self, transaction_id: &TransactionId, content: &SerializableEventContent) {
+        let profile = content
+            .raw()
+            .0
+            .deserialize_as_unchecked::<serde_json::Value>()
+            .ok()
+            .and_then(|content| per_message_profile(Some(&content)));
+        match profile {
+            Some(profile) => {
+                self.0.insert(transaction_id.to_owned(), profile);
+            }
+            None => {
+                self.0.remove(transaction_id);
+            }
+        }
+    }
+
+    fn get(&self, transaction_id: &TransactionId) -> Option<PerMessageProfileView> {
+        self.0.get(transaction_id).cloned()
+    }
+}
+
 #[must_use]
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
     own_user_id: Option<&UserId>,
     relays: &BTreeSet<OwnedUserId>,
     highlights: &Highlights,
+    local_profiles: &LocalProfiles,
 ) -> TimelineItemView {
     let id = item.unique_id().0.clone();
 
@@ -632,12 +696,18 @@ pub fn timeline_item(
                 _ => None,
             };
             let raw = RawFields::read(event);
-            let message_profile = per_message_profile(raw.content.as_ref()).or_else(|| {
-                relays
-                    .contains(event.sender())
-                    .then(|| relay_profile(raw.content.as_ref()))
-                    .flatten()
-            });
+            let message_profile = per_message_profile(raw.content.as_ref())
+                .or_else(|| {
+                    event
+                        .transaction_id()
+                        .and_then(|transaction_id| local_profiles.get(transaction_id))
+                })
+                .or_else(|| {
+                    relays
+                        .contains(event.sender())
+                        .then(|| relay_profile(raw.content.as_ref()))
+                        .flatten()
+                });
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
 
@@ -863,10 +933,18 @@ fn per_message_profile(content: Option<&serde_json::Value>) -> Option<PerMessage
             .map(ToOwned::to_owned)
     };
 
+    let avatar_url = profile
+        .get("avatar_url")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|url| url.is_empty() || url.starts_with("mxc://"))
+        .map(ToOwned::to_owned)
+        .or_else(|| profile.get("avatar_file").map(|_| String::new()));
+
     Some(PerMessageProfileView {
         id: text("id"),
         display_name: text("displayname"),
-        avatar_url: text("avatar_url"),
+        avatar_url,
         pronouns: pronoun_sets(profile.get("io.fsky.nyx.pronouns")),
         color_on_light: color("on_light"),
         color_on_dark: color("on_dark"),
@@ -1618,10 +1696,13 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        call_participants, clamp_power_level, formatted_caption_html, geo_coordinates, in_call,
-        per_message_profile, relay_author, relay_profile, via_servers,
+        LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, call_participants,
+        clamp_power_level, formatted_caption_html, geo_coordinates, in_call, per_message_profile,
+        relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
+    use matrix_sdk::ruma::serde::Raw;
+    use matrix_sdk::ruma::{OwnedEventId, OwnedTransactionId};
 
     #[test]
     fn call_invites_have_a_dedicated_view() {
@@ -1862,6 +1943,71 @@ mod tests {
 
         assert!(per_message_profile(Some(&json!({}))).is_none());
         assert!(per_message_profile(None).is_none());
+    }
+
+    #[test]
+    fn an_empty_or_unreadable_avatar_clears_it_instead_of_falling_back() {
+        let cleared = json!({ "m.per_message_profile": { "avatar_url": "" } });
+        let encrypted =
+            json!({ "m.per_message_profile": { "avatar_file": { "url": "mxc://e/1" } } });
+        let foreign =
+            json!({ "m.per_message_profile": { "avatar_url": "https://example.org/a.png" } });
+        let mxc = json!({ "m.per_message_profile": { "avatar_url": "mxc://example.org/a" } });
+
+        for content in [&cleared, &encrypted] {
+            let profile = per_message_profile(Some(content)).expect("a profile");
+            assert_eq!(profile.avatar_url.as_deref(), Some(""));
+        }
+        assert_eq!(
+            per_message_profile(Some(&foreign))
+                .expect("a profile")
+                .avatar_url,
+            None
+        );
+        assert_eq!(
+            per_message_profile(Some(&mxc))
+                .expect("a profile")
+                .avatar_url
+                .as_deref(),
+            Some("mxc://example.org/a")
+        );
+    }
+
+    #[test]
+    fn a_local_echo_takes_its_profile_from_the_send_queue() {
+        let transaction_id = OwnedTransactionId::from("txn");
+        let content = SerializableEventContent::from_raw(
+            Raw::from_json_string(
+                json!({
+                    "msgtype": "m.text",
+                    "body": "Kris: hello",
+                    "com.beeper.per_message_profile": { "id": "kris", "displayname": "Kris" },
+                })
+                .to_string(),
+            )
+            .expect("raw content"),
+            "m.room.message".to_owned(),
+        );
+
+        let mut profiles = LocalProfiles::default();
+        profiles.apply(&RoomSendQueueUpdate::ReplacedLocalEvent {
+            transaction_id: transaction_id.clone(),
+            new_content: content,
+        });
+        assert_eq!(
+            profiles
+                .get(&transaction_id)
+                .expect("the queued profile")
+                .display_name
+                .as_deref(),
+            Some("Kris")
+        );
+
+        profiles.apply(&RoomSendQueueUpdate::SentEvent {
+            transaction_id: transaction_id.clone(),
+            event_id: OwnedEventId::try_from("$sent:example.org").expect("an event id"),
+        });
+        assert!(profiles.get(&transaction_id).is_none());
     }
 
     #[test]
