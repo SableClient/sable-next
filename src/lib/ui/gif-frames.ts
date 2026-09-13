@@ -10,15 +10,28 @@ const MIN_FRAME_MS = 20;
 export const DEFAULT_FRAME_MS = 100;
 
 export interface GifFrame {
-  /** The caller owns this and must `close()` it once drawn. */
   image: VideoFrame;
   durationMs: number;
+  release(): void;
 }
 
 export interface GifPlayback {
   readonly frameCount: number;
   frame(index: number): Promise<GifFrame | null>;
   close(): void;
+}
+
+async function ownsFrames(decoder: ImageDecoder): Promise<boolean> {
+  try {
+    const first = await decoder.decode({ frameIndex: 0 });
+    const second = await decoder.decode({ frameIndex: 0 });
+    if (first.image === second.image) return false;
+    first.image.close();
+    second.image.close();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -46,6 +59,8 @@ export async function openGifPlayback(url: string): Promise<GifPlayback | null> 
     return null;
   }
 
+  const owned = await ownsFrames(decoder);
+
   return {
     frameCount: track.frameCount,
     async frame(index: number): Promise<GifFrame | null> {
@@ -56,7 +71,13 @@ export async function openGifPlayback(url: string): Promise<GifPlayback | null> 
           image.duration === null
             ? DEFAULT_FRAME_MS
             : Math.max(image.duration / 1000, MIN_FRAME_MS);
-        return { image, durationMs };
+        return {
+          image,
+          durationMs,
+          release: (): void => {
+            if (owned) image.close();
+          },
+        };
       } catch {
         return null;
       }

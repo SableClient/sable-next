@@ -303,7 +303,7 @@
       gifPreview.height = frame.image.displayHeight;
       gifPreview.getContext('2d')?.drawImage(frame.image, 0, 0);
     }
-    frame.image.close();
+    frame.release();
     paintedCanvas = gifPreview;
     paintedIndex = index;
     gifFrameIndex = index;

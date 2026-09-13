@@ -62,3 +62,57 @@ test('gives up when the bytes cannot be fetched', async () => {
 
   expect(await openGifPlayback('blob:gone')).toBeNull();
 });
+
+function stubFrames(decode: (request: { frameIndex: number }) => unknown): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+  );
+  vi.stubGlobal(
+    'ImageDecoder',
+    class {
+      tracks = { ready: Promise.resolve(), selectedTrack: { animated: true, frameCount: 3 } };
+      completed = Promise.resolve();
+      decode(request: { frameIndex: number }) {
+        return Promise.resolve({ image: decode(request) });
+      }
+      close() {}
+    }
+  );
+}
+
+test('leaves a decoder its own cached frame, which closing would empty', async () => {
+  const frames = new Map<number, { displayWidth: number }>();
+  stubFrames(({ frameIndex }) => {
+    let image = frames.get(frameIndex);
+    if (image === undefined) {
+      const frame = {
+        displayWidth: 4,
+        displayHeight: 4,
+        duration: 300_000,
+        close: (): void => {
+          frame.displayWidth = 0;
+        },
+      };
+      image = frame;
+      frames.set(frameIndex, frame);
+    }
+    return image;
+  });
+  const playback = await openGifPlayback('blob:gif');
+
+  (await playback?.frame(1))?.release();
+
+  expect((await playback?.frame(1))?.image.displayWidth).toBe(4);
+});
+
+test('closes a frame the decoder hands over', async () => {
+  const closed = vi.fn();
+  stubFrames(() => ({ displayWidth: 4, displayHeight: 4, duration: 300_000, close: closed }));
+  const playback = await openGifPlayback('blob:gif');
+  closed.mockClear();
+
+  (await playback?.frame(1))?.release();
+
+  expect(closed).toHaveBeenCalledOnce();
+});
