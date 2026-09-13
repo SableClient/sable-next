@@ -11,6 +11,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { LongPress } from './long-press.svelte.js';
   import {
@@ -387,6 +388,7 @@
 
   let sheetOpen = $state(false);
   let emoteOpen = $state(false);
+  let emoteAnchor = $state.raw<CursorAnchor | null>(null);
   let sourceOpen = $state(false);
   let reportOpen = $state(false);
   let forwardOpen = $state(false);
@@ -431,6 +433,7 @@
   }
 
   function pinActions(open: boolean): void {
+    if (open) emoteAnchor = null;
     actionsPinned = open;
     onPersonaOpenChange?.(open);
   }
@@ -442,6 +445,7 @@
     }
     if (!actionable) return;
     event.preventDefault();
+    emoteAnchor = cursorAnchor(event);
     openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => actions);
   }
 
@@ -592,6 +596,7 @@
         <ReactionSheet
           bind:open={emoteOpen}
           {roomId}
+          anchor={emoteAnchor ?? messageRow}
           onPick={(key: string) => {
             onToggleReaction?.(item.event_id ?? '', key);
           }}

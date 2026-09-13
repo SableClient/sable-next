@@ -8,6 +8,7 @@ export default defineConfig({
     'timeline-keyboard.spec.ts',
     'timeline-lifecycle.spec.ts',
     'timeline-media.spec.ts',
+    'reaction-sheet.spec.ts',
   ],
   workers: 1,
   timeout: 60_000,

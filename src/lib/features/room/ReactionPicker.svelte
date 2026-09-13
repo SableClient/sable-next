@@ -3,19 +3,30 @@
   import type { Snippet } from 'svelte';
   import type { PackImageView } from '#src/generated/protocol';
 
+  import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
 
   interface Props {
     label: string;
+    open?: boolean;
     roomId?: string;
     triggerClass?: string;
+    anchor?: HTMLElement | CursorAnchor | null;
     onPick: (key: string) => void;
     onOpenChange?: (open: boolean) => void;
-    children: Snippet;
+    children?: Snippet;
   }
 
-  let { label, roomId = '', triggerClass = '', onPick, onOpenChange, children }: Props = $props();
-  let open = $state(false);
+  let {
+    label,
+    open = $bindable(false),
+    roomId = '',
+    triggerClass = '',
+    anchor = null,
+    onPick,
+    onOpenChange,
+    children,
+  }: Props = $props();
   let revision = $state(0);
 
   function handleOpenChange(next: boolean): void {
@@ -37,11 +48,20 @@
 </script>
 
 <Popover.Root bind:open onOpenChange={handleOpenChange}>
-  <Popover.Trigger class={['selection-open', triggerClass]} aria-label={label}>
-    {@render children()}
-  </Popover.Trigger>
+  {#if children}
+    <Popover.Trigger class={['selection-open', triggerClass]} aria-label={label}>
+      {@render children()}
+    </Popover.Trigger>
+  {/if}
   <Popover.Portal>
-    <Popover.Content class="reaction-picker" side="top" align="end" collisionPadding={12}>
+    <Popover.Content
+      class="reaction-picker"
+      side="top"
+      align="end"
+      collisionPadding={12}
+      customAnchor={anchor}
+      aria-label={label}
+    >
       {#key revision}
         <EmoteBoard {roomId} unicode stickers={false} onPick={pickImage} onPickUnicode={pick} />
       {/key}
