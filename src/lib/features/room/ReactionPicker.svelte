@@ -28,10 +28,18 @@
     children,
   }: Props = $props();
   let revision = $state(0);
+  let trigger = $state<HTMLElement | null>(null);
+  let frozen = $state.raw<CursorAnchor | null>(null);
 
   function handleOpenChange(next: boolean): void {
     open = next;
-    if (next) revision += 1;
+    if (next) {
+      revision += 1;
+      const rect = (anchor ?? trigger)?.getBoundingClientRect() ?? null;
+      frozen = rect ? { getBoundingClientRect: () => rect } : null;
+    } else {
+      frozen = null;
+    }
     onOpenChange?.(next);
   }
 
@@ -49,7 +57,7 @@
 
 <Popover.Root bind:open onOpenChange={handleOpenChange}>
   {#if children}
-    <Popover.Trigger class={['selection-open', triggerClass]} aria-label={label}>
+    <Popover.Trigger bind:ref={trigger} class={['selection-open', triggerClass]} aria-label={label}>
       {@render children()}
     </Popover.Trigger>
   {/if}
@@ -59,7 +67,7 @@
       side="top"
       align="end"
       collisionPadding={12}
-      customAnchor={anchor}
+      customAnchor={frozen ?? anchor}
       aria-label={label}
     >
       {#key revision}
