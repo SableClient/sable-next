@@ -5,7 +5,9 @@ import type { RoomSummary } from '#src/generated/protocol';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
 import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 export class InviteActions {
   /** Rendered from, so the set has to be reactive. */
@@ -35,6 +37,7 @@ export class InviteActions {
       await run();
     } catch (error) {
       console.warn('[sable room] answering the invitation failed', error);
+      toasts.error(t('errors.actionFailed'));
     } finally {
       this.answering.delete(room.room_id);
     }
