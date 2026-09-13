@@ -31,8 +31,13 @@ test('an inline emote is offered with its alt as the shortcode', () => {
   expect(candidate.usage).toEqual(['emoticon']);
 });
 
-test('a plain image in a message is not an emote', () => {
-  expect(emoteCandidates(message('<img src="mxc://a/photo" alt="a photo">'))).toEqual([]);
+test('an inline image is offered even though the sdk strips data-mx-emoticon', () => {
+  const [candidate] = emoteCandidates(message('<img src="mxc://a/wave" alt=":wave:">'));
+
+  expect(candidate.shortcode).toBe('wave');
+});
+
+test('a message with no html offers nothing', () => {
   expect(emoteCandidates(message(null))).toEqual([]);
 });
 

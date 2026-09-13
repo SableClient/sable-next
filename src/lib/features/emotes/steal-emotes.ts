@@ -36,7 +36,7 @@ function inlineEmotes(html: string): EmoteCandidate[] {
   const document = new DOMParser().parseFromString(html, 'text/html');
   const found = new Map<string, EmoteCandidate>();
 
-  for (const image of document.querySelectorAll('img[data-mx-emoticon]')) {
+  for (const image of document.querySelectorAll('img')) {
     const source = image.getAttribute('src') ?? '';
     if (!source.startsWith('mxc://') || found.has(source)) continue;
 

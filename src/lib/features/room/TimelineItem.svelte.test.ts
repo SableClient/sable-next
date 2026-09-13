@@ -711,3 +711,33 @@ test('a deleted message keeps its sender, its time and its menu', async () => {
   expect(document.querySelector('.message-actions')).not.toBeNull();
   await unmount(instance);
 });
+
+test('offers to add a message inline emote to your own pack', async () => {
+  // The SDK sanitises `data-mx-emoticon` away before the core sees the message.
+  const html =
+    '<img src="mxc://sable.moe/As8m" alt=":neocat_amogus:" title=":neocat_amogus:" height="32"> ';
+  const emoteItem = {
+    ...item(false),
+    content: {
+      kind: 'message' as const,
+      body: ':neocat_amogus:',
+      html,
+      emote: false,
+      notice: false,
+      edited: false,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: emoteItem, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+
+  expect(document.querySelector('.menu-surface')?.textContent).toContain('Add emote to my pack');
+  await unmount(instance);
+});
