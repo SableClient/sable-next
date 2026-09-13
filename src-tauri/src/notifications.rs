@@ -186,6 +186,10 @@ pub async fn show<R: Runtime>(
     if cfg!(target_os = "android") {
         builder = builder.icon("notification_icon");
     }
+    builder = builder.only_alert_once(false);
+    if pusher_registered() {
+        builder = builder.silent();
+    }
     if lines.len() > 1 {
         builder = builder.large_body(collapsed(&lines));
     }
@@ -466,6 +470,13 @@ pub async fn register_push<R: Runtime>(
     Box::pin(core.dispatch(command)).await.map(|_| ())?;
     remember_pusher(pushkey, app_id);
     Ok(())
+}
+
+fn pusher_registered() -> bool {
+    REGISTERED_PUSHER
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .is_some()
 }
 
 #[cfg(mobile)]
