@@ -156,10 +156,12 @@
     border-radius: var(--radius);
     display: block;
     margin-top: var(--space-100);
+    max-height: var(--timeline-media-max);
+    max-width: 100%;
     width: min(
-      100%,
+      var(--timeline-media-fill),
       var(--timeline-media-max),
-      calc(var(--timeline-media-max) * var(--media-ratio))
+      max(var(--timeline-media-min), calc(var(--timeline-media-max) * var(--media-ratio)))
     );
   }
 
@@ -171,6 +173,16 @@
   }
 
   :global(.media) {
-    width: min(100%, var(--timeline-media-max));
+    max-width: 100%;
+    width: min(var(--timeline-media-fill), var(--timeline-media-max));
+  }
+
+  :global(.media.media-frame-video) {
+    max-height: var(--timeline-media-max);
+    width: min(
+      var(--timeline-media-fill),
+      var(--timeline-media-max),
+      max(var(--timeline-media-min), calc(var(--timeline-media-max) * var(--media-ratio)))
+    );
   }
 </style>

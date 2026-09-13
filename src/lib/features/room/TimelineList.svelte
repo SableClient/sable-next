@@ -35,7 +35,13 @@
   } from './timeline-format';
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
-  import { estimateRowSize, TIMELINE_LAYOUT, TIMELINE_LAYOUT_STYLE } from './timeline-layout';
+  import {
+    estimatedColumnPx,
+    estimateRowSize,
+    mediaColumnPx,
+    TIMELINE_LAYOUT,
+    TIMELINE_LAYOUT_STYLE,
+  } from './timeline-layout';
 
   const MAX_EMPTY_REFILLS = 5;
 
@@ -146,6 +152,7 @@
     scrolling: false,
   });
   let controller = $state.raw<TimelineWindow<RowValue> | null>(null);
+  let mediaColumn = mediaColumnPx(0);
   let viewport = $state<HTMLDivElement | null>(null);
   let revealed = $state(false);
   let jumpToLatestVisible = $state(false);
@@ -247,10 +254,15 @@
     isScrolling: () => windowState.scrolling,
     requestHistory,
   });
+  function measureMediaColumn(node: HTMLElement): number {
+    const main = node.querySelector<HTMLElement>('.message-main');
+    return mediaColumnPx(main?.clientWidth ?? estimatedColumnPx(node.clientWidth));
+  }
   function windowChanged(state: TimelineWindowState): void {
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;
+    if (node !== null) mediaColumn = measureMediaColumn(node);
     const distance = node === null ? 0 : node.scrollHeight - node.clientHeight - node.scrollTop;
     jumpToLatestVisible =
       !state.pinned &&
@@ -279,6 +291,11 @@
     const canvas = node.querySelector<HTMLElement>('.items');
     const content = node.querySelector<HTMLElement>('.window-rows');
     if (!canvas || !content) throw new Error('Timeline window elements are missing');
+    mediaColumn = measureMediaColumn(node);
+    const widths = new ResizeObserver(() => {
+      mediaColumn = measureMediaColumn(node);
+    });
+    widths.observe(node);
     const engine = new TimelineWindow<RowValue>({
       viewport: node,
       canvas,
@@ -291,12 +308,13 @@
       onScroll: readerScrolled,
       onInteraction: () => focusNavigation?.abort(),
       isAnchor: ({ item }) => item.event_id !== null,
-      estimateSize: ({ item }) => estimateRowSize(item.content),
+      estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
     });
     controller = engine;
     return () => {
       disposed = true;
       focusNavigation?.abort();
+      widths.disconnect();
       engine.destroy();
       controller = null;
     };
@@ -786,10 +804,20 @@
   }
 
   .items {
+    --timeline-media-fill: 100%;
+    --timeline-bubble-width: 100%;
+
     flex: 0 0 auto;
     margin-top: auto;
     position: relative;
     width: 100%;
+  }
+
+  @media (width >= 30rem) {
+    .items {
+      --timeline-media-fill: var(--timeline-media-max);
+      --timeline-bubble-width: fit-content;
+    }
   }
 
   .item {

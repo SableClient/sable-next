@@ -1472,7 +1472,7 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: var(--surface-on-container);
-    max-width: 50rem;
+    max-width: min(50rem, 100%);
     padding: var(--space-200) var(--space-300);
   }
 
@@ -1484,6 +1484,10 @@
 
   .message.layout-bubble .content-bubble :global(.image) {
     margin-top: 0;
+  }
+
+  .message.layout-bubble .content-bubble {
+    width: var(--timeline-bubble-width);
   }
 
   .message.layout-bubble .has-edited :global(.formatted-body) {

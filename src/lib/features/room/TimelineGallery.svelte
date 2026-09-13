@@ -54,7 +54,8 @@
     display: grid;
     gap: var(--space-100);
     grid-template-columns: repeat(var(--gallery-columns), minmax(0, 1fr));
-    max-width: var(--timeline-media-max);
+    max-width: 100%;
+    width: min(var(--timeline-media-fill), var(--timeline-media-max));
   }
 
   .caption {

@@ -186,6 +186,7 @@
 <div
   class={['media-frame', `media-frame-${kind}`, className]}
   style:aspect-ratio={aspectRatio}
+  style:--media-ratio={aspectRatio}
   aria-busy={!url && !failed ? 'true' : undefined}
 >
   {#if failed}
