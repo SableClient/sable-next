@@ -17,7 +17,7 @@ function popEntries(count: number): void {
   queueMicrotask(() => {
     const total = queued;
     queued = 0;
-    history.go(-total);
+    if (total > 0) history.go(-total);
   });
 }
 
@@ -44,12 +44,17 @@ export function holdOverlayBack(open: () => boolean, close: () => void): void {
 
     let mine = true;
     const depth = (pushed += 1);
-    pushing += 1;
-    void pushEntry(depth).then((ok) => {
-      if (!ok) pushed = depth - 1;
-      else if (mine) held = depth;
-      else popEntries(1);
-    });
+    if (queued > 0) {
+      queued -= 1;
+      held = depth;
+    } else {
+      pushing += 1;
+      void pushEntry(depth).then((ok) => {
+        if (!ok) pushed = depth - 1;
+        else if (mine) held = depth;
+        else popEntries(1);
+      });
+    }
 
     return () => {
       const armed = held;
