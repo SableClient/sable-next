@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { IncomingCalls } from './incoming-calls.svelte.js';
 
@@ -32,12 +33,16 @@ const incoming = (overrides: Partial<Record<string, unknown>> = {}): CoreEvent =
   room_id: '!room:example.org',
   notification_event_id: '$notify',
   sender: '@bob:example.org',
+  sender_name: 'Bob',
+  room_name: 'Room',
   ring: true,
+  has_video: false,
   expires_at_ms: Date.now() + 30_000,
   ...overrides,
 });
 
 beforeEach(() => {
+  preferences.ringForGroupCalls = false;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
 });
@@ -55,6 +60,19 @@ test('an incoming call is surfaced', () => {
 
   expect(calls.calls).toHaveLength(1);
   expect(calls.calls[0].sender).toBe('@bob:example.org');
+});
+
+test('a group call is silent until the reader asks to be rung for them', () => {
+  const { client, emit } = harness();
+  const calls = new IncomingCalls(client);
+  calls.start();
+
+  emit(incoming({ ring: false }));
+  expect(calls.calls).toHaveLength(0);
+
+  preferences.ringForGroupCalls = true;
+  emit(incoming({ ring: false }));
+  expect(calls.calls).toHaveLength(1);
 });
 
 test('an already-expired notification never appears', () => {

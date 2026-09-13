@@ -3,6 +3,16 @@ import type { NativeNotificationAction } from '#lib/platform/native-notification
 
 const REPLY_ACTION = 'sable-reply';
 const MARK_READ_ACTION = 'sable-mark-read';
+const ANSWER_CALL_ACTION = 'sable-call-answer';
+const DECLINE_CALL_ACTION = 'sable-call-decline';
+
+export function callNotificationAction(
+  action: NativeNotificationAction
+): 'answer' | 'decline' | null {
+  if (action.actionId === ANSWER_CALL_ACTION) return 'answer';
+  if (action.actionId === DECLINE_CALL_ACTION) return 'decline';
+  return null;
+}
 
 type Replier = Pick<CoreClient, 'session' | 'commands' | 'switchAccount'>;
 

@@ -4,7 +4,7 @@
 
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
 
-  type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet';
+  type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet' | 'fullscreen';
 
   interface Props {
     open?: boolean;
@@ -96,6 +96,20 @@
 
   :global(.dialog-backdrop-settings) {
     z-index: var(--layer-dialog);
+  }
+
+  :global(.dialog-backdrop-fullscreen) {
+    z-index: var(--layer-sheet);
+  }
+
+  :global(.dialog-content-fullscreen) {
+    background: var(--bg-container);
+    border: 0;
+    border-radius: 0;
+    inset: 0;
+    overflow: hidden;
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+    z-index: var(--layer-sheet);
   }
 
   :global(.dialog-content-settings) {

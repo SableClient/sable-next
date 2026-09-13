@@ -32,6 +32,7 @@ import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
+import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
@@ -700,6 +701,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: CheckCircleIcon,
         name: 'settings.clearNotificationsOnRead',
         description: 'settings.clearNotificationsOnReadHint',
+        type: 'boolean',
+      },
+      {
+        key: 'ringForGroupCalls',
+        icon: PhoneIcon,
+        name: 'settings.ringForGroupCalls',
+        description: 'settings.ringForGroupCallsHint',
         type: 'boolean',
       },
     ],

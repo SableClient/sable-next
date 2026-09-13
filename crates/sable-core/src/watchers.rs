@@ -171,6 +171,9 @@ impl Core {
                     }
                     let notification = match event {
                         RawAnySyncOrStrippedTimelineEvent::Sync(raw) => {
+                            if crate::calls::is_call_event_type(&raw) {
+                                continue;
+                            }
                             let Ok(event) = raw.deserialize() else {
                                 continue;
                             };

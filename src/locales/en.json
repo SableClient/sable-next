@@ -1302,6 +1302,8 @@
     "richPushPayloadsHint": "Sends the message with the push so an alert arrives without a round trip. Your push gateway can then read anything an unencrypted room says.",
     "clearNotificationsOnRead": "Clear notifications when read",
     "clearNotificationsOnReadHint": "Dismiss a room's alerts once it is read, including on another device.",
+    "ringForGroupCalls": "Ring for group calls",
+    "ringForGroupCallsHint": "Show the full-screen call screen for calls in group rooms and voice channels, not just one-to-one calls.",
     "notificationDefaults": "Default notification level",
     "notificationDefaultsHint": "Applies to rooms you have not set individually. Stored on your account, so every session follows it.",
     "notificationDefaultDirect": "Direct messages",

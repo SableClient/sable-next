@@ -75,6 +75,7 @@ export interface Preferences {
   notificationEncryptedContent: boolean;
   richPushPayloads: boolean;
   clearNotificationsOnRead: boolean;
+  ringForGroupCalls: boolean;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
   pushGatewayUrl: string;
@@ -201,6 +202,7 @@ const DEFAULTS: Preferences = {
   notificationEncryptedContent: false,
   richPushPayloads: true,
   clearNotificationsOnRead: true,
+  ringForGroupCalls: false,
 
   pushGatewayUrl: '',
   pushVapidKey: '',

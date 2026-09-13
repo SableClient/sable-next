@@ -45,7 +45,10 @@
   } from '#lib/settings/sync-documents.js';
   import { registerNativePush } from '#lib/features/notifications/native-push.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
-  import { performNotificationAction } from '#lib/features/notifications/native-actions.js';
+  import {
+    callNotificationAction,
+    performNotificationAction,
+  } from '#lib/features/notifications/native-actions.js';
   import {
     NotificationCenter,
     provideNotificationCenter,
@@ -108,7 +111,7 @@
     }
 
     let cancelled = false;
-    incomingProfile = { name: sender, avatar: null };
+    incomingProfile = { name: incoming?.senderName ?? sender, avatar: null };
     void core
       .userProfile(sender)
       .then((profile) => {
@@ -136,7 +139,26 @@
   function acceptIncoming(call: IncomingCall): void {
     incomingCalls.accept(call);
     void goto(roomSectionPath(roomList.rooms, call.roomId));
-    void callSession.join(call.roomId, { microphone: true, camera: false });
+    void callSession.join(call.roomId, { microphone: true, camera: call.hasVideo });
+  }
+
+  function answerFromNotification(
+    roomId: string,
+    eventId: string | null,
+    outcome: 'answer' | 'decline'
+  ): void {
+    const known = incomingCalls.calls.find((call) => call.notificationEventId === eventId);
+    if (known) {
+      if (outcome === 'answer') acceptIncoming(known);
+      else void incomingCalls.decline(known);
+      return;
+    }
+    if (outcome === 'decline') {
+      if (eventId !== null) void core.commands.declineCall(roomId, eventId).catch(() => {});
+      return;
+    }
+    void goto(roomSectionPath(roomList.rooms, roomId));
+    void callSession.join(roomId, { microphone: true, camera: false });
   }
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
@@ -389,6 +411,11 @@
 
     void Promise.all([
       watchNativeNotificationActions((action) => {
+        const call = callNotificationAction(action);
+        if (call !== null) {
+          answerFromNotification(action.roomId, action.eventId, call);
+          return;
+        }
         void performNotificationAction(core, action, readReceiptIsPrivate()).catch(
           (error: unknown) => {
             console.debug('[sable notifications] action not performed', error);
@@ -510,7 +537,7 @@
       call={incoming}
       senderName={incomingProfile?.name ?? incoming?.sender ?? ''}
       senderAvatar={incomingProfile?.avatar ?? null}
-      roomName={incomingRoom?.name ?? incoming?.roomId ?? ''}
+      roomName={incomingRoom?.name ?? incoming?.roomName ?? incoming?.roomId ?? ''}
       onAccept={acceptIncoming}
       onDecline={(call: IncomingCall) => void incomingCalls.decline(call)}
     />

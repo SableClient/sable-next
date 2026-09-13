@@ -1478,7 +1478,10 @@ pub enum CoreEvent {
         notification_event_id: String,
         #[cfg_attr(feature = "typegen", specta(type = String))]
         sender: OwnedUserId,
+        sender_name: Option<String>,
+        room_name: Option<String>,
         ring: bool,
+        has_video: bool,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
         expires_at_ms: u64,
     },

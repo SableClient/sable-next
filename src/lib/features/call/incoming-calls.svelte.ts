@@ -1,5 +1,7 @@
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { endSystemCall, reportIncomingSystemCall } from '#lib/platform/calls.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { ignoreError } from './call-transport';
 import { startRingtone, type Ringtone } from './ringtone';
@@ -8,7 +10,10 @@ export type IncomingCall = {
   roomId: string;
   notificationEventId: string;
   sender: string;
+  senderName: string | null;
+  roomName: string | null;
   ring: boolean;
+  hasVideo: boolean;
   expiresAtMs: number;
 };
 
@@ -18,6 +23,8 @@ export class IncomingCalls {
   readonly #client: CoreClient;
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- timers, never rendered from
   readonly #timers = new Map<string, ReturnType<typeof setTimeout>>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- never rendered from
+  readonly #system = new Set<string>();
   #ringtone: Ringtone | undefined;
   #unsubscribe: (() => void) | undefined;
 
@@ -39,6 +46,8 @@ export class IncomingCalls {
     this.#unsubscribe = undefined;
     for (const timer of this.#timers.values()) clearTimeout(timer);
     this.#timers.clear();
+    for (const callId of this.#system) void endSystemCall(callId);
+    this.#system.clear();
     this.calls = [];
     this.#syncRingtone();
   }
@@ -62,12 +71,16 @@ export class IncomingCalls {
       return;
     }
     if (event.type !== 'incoming_call') return;
+    if (!event.ring && !preferences.ringForGroupCalls) return;
 
     const call: IncomingCall = {
       roomId: event.room_id,
       notificationEventId: event.notification_event_id,
       sender: event.sender,
+      senderName: event.sender_name,
+      roomName: event.room_name,
       ring: event.ring,
+      hasVideo: event.has_video,
       expiresAtMs: event.expires_at_ms,
     };
 
@@ -84,6 +97,24 @@ export class IncomingCalls {
         this.#drop(call.notificationEventId);
       }, remaining)
     );
+    void this.#raiseSystemCall(call);
+    this.#syncRingtone();
+  }
+
+  async #raiseSystemCall(call: IncomingCall): Promise<void> {
+    const taken = await reportIncomingSystemCall({
+      callId: call.notificationEventId,
+      uuid: crypto.randomUUID(),
+      callerName: call.senderName ?? call.roomName ?? call.sender,
+      hasVideo: call.hasVideo,
+      roomId: call.roomId,
+    });
+    if (!taken) return;
+    if (!this.calls.some((c) => c.notificationEventId === call.notificationEventId)) {
+      void endSystemCall(call.notificationEventId);
+      return;
+    }
+    this.#system.add(call.notificationEventId);
     this.#syncRingtone();
   }
 
@@ -93,12 +124,13 @@ export class IncomingCalls {
       clearTimeout(timer);
       this.#timers.delete(notificationEventId);
     }
+    if (this.#system.delete(notificationEventId)) void endSystemCall(notificationEventId);
     this.calls = this.calls.filter((call) => call.notificationEventId !== notificationEventId);
     this.#syncRingtone();
   }
 
   #syncRingtone(): void {
-    const shouldRing = this.calls.some((call) => call.ring);
+    const shouldRing = this.calls.some((call) => !this.#system.has(call.notificationEventId));
     if (shouldRing && !this.#ringtone) {
       this.#ringtone = startRingtone();
       return;

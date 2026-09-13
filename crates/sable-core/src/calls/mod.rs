@@ -1,6 +1,8 @@
 mod keys;
 mod membership;
 mod notify;
+
+pub(crate) use notify::is_call_event_type;
 mod runtime;
 mod sfu;
 mod sticky;
@@ -19,7 +21,7 @@ use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{CallMemberEventContent, CallMemberStateKey};
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, UserId};
+use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{Client, Room};
 use serde_json::Value;
 
@@ -260,13 +262,24 @@ impl Core {
                                 incoming.expires_at,
                                 now,
                             );
+                            let sender_name = room
+                                .get_member_no_sync(&event.sender)
+                                .await
+                                .ok()
+                                .flatten()
+                                .and_then(|member| member.display_name().map(ToOwned::to_owned));
+                            let room_name = room.cached_display_name().map(|name| name.to_string());
+
                             core.emit_if_current(
                                 generation,
                                 CoreEvent::IncomingCall {
                                     room_id: room.room_id().to_owned(),
                                     notification_event_id: event.event_id.to_string(),
                                     sender: event.sender,
+                                    sender_name,
+                                    room_name,
                                     ring: incoming.kind == notify::NotificationKind::Ring,
+                                    has_video: incoming.has_video,
                                     expires_at_ms: incoming.expires_at,
                                 },
                             );
@@ -322,6 +335,17 @@ impl Core {
         }
     }
 
+    async fn ring_targets(&self, room: &Room) -> Vec<OwnedUserId> {
+        let own_user_id = room.own_user_id();
+        room.joined_user_ids()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|user_id| user_id != own_user_id)
+            .take(notify::MAX_RING_TARGETS)
+            .collect()
+    }
+
     async fn announce_call(self: &Arc<Self>, room: &Room, membership_event_id: &EventId) {
         let kind = if room.is_direct().await.unwrap_or(false) {
             notify::NotificationKind::Ring
@@ -329,7 +353,12 @@ impl Core {
             notify::NotificationKind::Notification
         };
 
-        let Some(raw) = notify::announcement(membership_event_id, kind) else {
+        let ring = match kind {
+            notify::NotificationKind::Ring => self.ring_targets(room).await,
+            notify::NotificationKind::Notification => Vec::new(),
+        };
+
+        let Some(raw) = notify::announcement(membership_event_id, kind, &ring) else {
             return;
         };
 
