@@ -30,6 +30,7 @@ function preview(overrides: Partial<UrlPreviewView> = {}): UrlPreviewView {
 afterEach(() => {
   core.urlPreview.mockReset();
   preferences.urlPreviews = false;
+  preferences.encryptedUrlPreviews = false;
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
@@ -39,7 +40,7 @@ test('renders the resolved preview as a link', async () => {
   core.urlPreview.mockResolvedValue(preview({ url: 'https://example.org/render' }));
   const instance = mount(LinkPreviewCard, {
     target: document.body,
-    props: { url: 'https://example.org/render' },
+    props: { url: 'https://example.org/render', encrypted: false },
   });
 
   await tick();
@@ -57,7 +58,7 @@ test('a second card for the same url does not re-request it', async () => {
   core.urlPreview.mockResolvedValue(preview({ url: 'https://example.org/cached' }));
   const first = mount(LinkPreviewCard, {
     target: document.body,
-    props: { url: 'https://example.org/cached' },
+    props: { url: 'https://example.org/cached', encrypted: false },
   });
   await tick();
   await Promise.resolve();
@@ -66,7 +67,7 @@ test('a second card for the same url does not re-request it', async () => {
 
   const second = mount(LinkPreviewCard, {
     target: document.body,
-    props: { url: 'https://example.org/cached' },
+    props: { url: 'https://example.org/cached', encrypted: false },
   });
   await tick();
   await Promise.resolve();
@@ -86,7 +87,7 @@ test('an in-flight request does not write into a torn-down component', async () 
   );
   const instance = mount(LinkPreviewCard, {
     target: document.body,
-    props: { url: 'https://example.org/b' },
+    props: { url: 'https://example.org/b', encrypted: false },
   });
   await tick();
 
@@ -102,7 +103,7 @@ test('does nothing while url previews are disabled', async () => {
   core.urlPreview.mockResolvedValue(preview());
   const instance = mount(LinkPreviewCard, {
     target: document.body,
-    props: { url: 'https://example.org/c' },
+    props: { url: 'https://example.org/c', encrypted: false },
   });
 
   await tick();
@@ -112,4 +113,37 @@ test('does nothing while url previews are disabled', async () => {
   expect(core.urlPreview).not.toHaveBeenCalled();
   expect(document.body.querySelector('a.link-preview')).toBeNull();
   await unmount(instance);
+});
+
+test('an encrypted room needs its own consent, and an unknown one is treated as encrypted', async () => {
+  preferences.urlPreviews = true;
+  core.urlPreview.mockResolvedValue(preview());
+  const encrypted = mount(LinkPreviewCard, {
+    target: document.body,
+    props: { url: 'https://example.org/d', encrypted: true },
+  });
+  const unknown = mount(LinkPreviewCard, {
+    target: document.body,
+    props: { url: 'https://example.org/e', encrypted: null },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(core.urlPreview).not.toHaveBeenCalled();
+  await unmount(encrypted);
+  await unmount(unknown);
+
+  preferences.encryptedUrlPreviews = true;
+  const consented = mount(LinkPreviewCard, {
+    target: document.body,
+    props: { url: 'https://example.org/f', encrypted: true },
+  });
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(core.urlPreview).toHaveBeenCalledWith('https://example.org/f');
+  await unmount(consented);
 });

@@ -791,6 +791,7 @@
           onEndPoll={conversation.endPoll}
           readOnly={permissions ? !permissions.can_post : false}
           canRedactOthers={permissions?.can_redact_others ?? false}
+          encrypted={resolvedRoom?.encrypted ?? null}
           currentUserId={core.session?.user_id ?? null}
           scrollLocked={profileOpen || receiptsOpen}
           {typingLabel}
@@ -861,6 +862,7 @@
           members={memberLoader.members}
           readOnly={permissions ? !permissions.can_post : false}
           canRedactOthers={permissions?.can_redact_others ?? false}
+          encrypted={resolvedRoom?.encrypted ?? null}
           onClose={closeThread}
           onSenderProfile={openProfile}
           onCopyLink={copyEventLink}
@@ -922,6 +924,7 @@
             members={memberLoader.members}
             readOnly={permissions ? !permissions.can_post : false}
             canRedactOthers={permissions?.can_redact_others ?? false}
+            encrypted={resolvedRoom?.encrypted ?? null}
             modal
             onClose={closeThread}
             onSenderProfile={openProfile}

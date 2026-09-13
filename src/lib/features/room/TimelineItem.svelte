@@ -85,6 +85,7 @@
     onCopyLink?: (eventId: string) => void;
     onMarkUnread?: (eventId: string) => void;
     canRedactOthers?: boolean;
+    encrypted?: boolean | null;
     selected?: boolean;
     layout?: TimelineLayout;
     alignOwn?: boolean;
@@ -120,6 +121,7 @@
     onCopyLink,
     onMarkUnread,
     canRedactOthers = false,
+    encrypted = null,
     selected = false,
     layout = 'modern',
     alignOwn = true,
@@ -764,7 +766,7 @@
           </div>
           {@const previewUrl = firstPreviewableLink(item.content.html)}
           {#if previewUrl}
-            <LinkPreviewCard url={previewUrl} />
+            <LinkPreviewCard url={previewUrl} {encrypted} />
           {/if}
         {:else}
           <div class:content-bubble={layout === 'bubble' && nonTextContent}>
@@ -772,6 +774,7 @@
               {item}
               {members}
               {canRedactOthers}
+              {encrypted}
               {onMatrixLink}
               {onOpenMedia}
               {onVotePoll}

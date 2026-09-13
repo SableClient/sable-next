@@ -67,6 +67,7 @@ export interface Preferences {
   autoplayGifs: boolean;
   gifProvider: GifProviderChoice;
   urlPreviews: boolean;
+  encryptedUrlPreviews: boolean;
 
   desktopNotifications: boolean;
   notificationSounds: boolean;
@@ -192,6 +193,7 @@ const DEFAULTS: Preferences = {
   autoplayGifs: true,
   gifProvider: 'default',
   urlPreviews: false,
+  encryptedUrlPreviews: false,
 
   desktopNotifications: false,
   notificationSounds: true,

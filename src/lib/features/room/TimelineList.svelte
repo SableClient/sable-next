@@ -74,6 +74,7 @@
     onEndPoll?: (eventId: string) => void;
     readOnly?: boolean;
     canRedactOthers?: boolean;
+    encrypted?: boolean | null;
     scrollLocked?: boolean;
     nearLatest?: boolean;
     followingLive?: boolean;
@@ -110,6 +111,7 @@
     onEndPoll,
     readOnly = false,
     canRedactOthers = false,
+    encrypted = null,
     scrollLocked = false,
     nearLatest = $bindable(true),
     /* eslint-disable-next-line no-useless-assignment */
@@ -624,6 +626,7 @@
                   {onEdit}
                   {onDelete}
                   {canRedactOthers}
+                  {encrypted}
                   {members}
                   layout={preferences.layout}
                   alignOwn={preferences.alignOwnMessages}

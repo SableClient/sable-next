@@ -23,6 +23,7 @@
   interface Props {
     item: TimelineItemView;
     canRedactOthers: boolean;
+    encrypted?: boolean | null;
     members?: readonly MemberView[];
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onOpenMedia?: (eventId: string) => void;
@@ -34,6 +35,7 @@
   let {
     item,
     canRedactOthers,
+    encrypted = null,
     members = [],
     onMatrixLink,
     onOpenMedia,
@@ -150,7 +152,7 @@
   {/if}
 {/if}
 {#if previewLink}
-  <LinkPreviewCard url={previewLink} />
+  <LinkPreviewCard url={previewLink} {encrypted} />
 {/if}
 
 <style>

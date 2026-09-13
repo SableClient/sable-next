@@ -9,14 +9,18 @@
 
   interface Props {
     url: string;
+    encrypted: boolean | null;
   }
 
-  let { url }: Props = $props();
+  let { url, encrypted }: Props = $props();
   const core = useCoreClient();
   let preview = $state<UrlPreviewView | null>(null);
+  let allowed = $derived(
+    encrypted === false ? preferences.urlPreviews : preferences.encryptedUrlPreviews
+  );
 
   $effect(() => {
-    if (!preferences.urlPreviews) {
+    if (!allowed) {
       preview = null;
       return;
     }

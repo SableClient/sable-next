@@ -640,6 +640,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.urlPreviewsHint',
         type: 'boolean',
       },
+      {
+        key: 'encryptedUrlPreviews',
+        icon: LinkSimpleIcon,
+        name: 'settings.encryptedUrlPreviews',
+        description: 'settings.encryptedUrlPreviewsHint',
+        type: 'boolean',
+      },
     ],
   },
   {

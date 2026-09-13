@@ -1286,6 +1286,8 @@
     "gifProviderGiphy": "Giphy",
     "urlPreviews": "Link previews",
     "urlPreviewsHint": "Asks the server to unfurl links posted in a room.",
+    "encryptedUrlPreviews": "Link previews in encrypted rooms",
+    "encryptedUrlPreviewsHint": "Sends links from encrypted rooms to your server to unfurl them.",
     "notificationsTitle": "Notifications",
     "notificationsDescription": "When and how Sable interrupts you.",
     "desktopNotifications": "System notifications",

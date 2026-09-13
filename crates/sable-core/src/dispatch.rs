@@ -87,6 +87,12 @@ fn thread_root(raw: &Raw<AnySyncTimelineEvent>) -> Option<ThreadRootView> {
     })
 }
 
+fn preview_refused(error: &matrix_sdk::HttpError) -> bool {
+    error
+        .as_client_api_error()
+        .is_some_and(|api_error| api_error.status_code.as_u16() == 403)
+}
+
 fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPreviewView> {
     let text = |key: &str| {
         data.get(key)
@@ -926,12 +932,20 @@ impl Core {
             }
 
             Command::UrlPreview { url } => {
-                let response = self
+                let sent = self
                     .client()
                     .await?
                     .send(get_media_preview::v1::Request::new(url.clone()))
-                    .await
-                    .map_err(|error| self.homeserver_http_error("url_preview", error))?;
+                    .await;
+
+                let response = match sent {
+                    Ok(response) => response,
+                    Err(error) if preview_refused(&error) => {
+                        tracing::info!(context = "url_preview", "the homeserver refused the url");
+                        return Ok(CommandOk::UrlPreview { preview: None });
+                    }
+                    Err(error) => return Err(self.homeserver_http_error("url_preview", error)),
+                };
 
                 let preview = response
                     .data

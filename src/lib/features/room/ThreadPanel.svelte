@@ -21,6 +21,7 @@
     members?: readonly MemberView[];
     readOnly?: boolean;
     canRedactOthers?: boolean;
+    encrypted?: boolean | null;
     modal?: boolean;
     onClose: () => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
@@ -36,6 +37,7 @@
     members = [],
     readOnly = false,
     canRedactOthers = false,
+    encrypted = null,
     modal = false,
     onClose,
     onSenderProfile,
@@ -107,6 +109,7 @@
     {members}
     {readOnly}
     {canRedactOthers}
+    {encrypted}
     {onSenderProfile}
     onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
     {onCopyLink}
