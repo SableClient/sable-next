@@ -1374,7 +1374,10 @@ test('deleting the last composer character keeps following latest', async ({
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 900, height: 420 });
   await page.addInitScript(() => {
-    localStorage.setItem('sable-preferences', JSON.stringify({ urlPreviews: true }));
+    localStorage.setItem(
+      'sable-preferences',
+      JSON.stringify({ urlPreviews: true, encryptedUrlPreviews: true })
+    );
   });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
