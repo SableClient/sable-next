@@ -124,7 +124,7 @@ unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
-  "https://github.com/matrix-org/matrix-rust-sdk",
+  "https://github.com/SableClient/matrix-rust-sdk",
   "https://github.com/matrix-org/vodozemac",
   "https://github.com/ruma/ruma",
   "https://github.com/SableClient/tauri-plugin-edge-to-edge",
