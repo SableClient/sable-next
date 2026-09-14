@@ -107,7 +107,6 @@ jobs:
       packages: write
     env:
       REGISTRY: git.sable.moe
-      IMAGE_NAME: ${{ github.repository }}
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,11 +119,17 @@ jobs:
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
+      # `github.repository` keeps the owner's capitals and an image reference
+      # cannot. metadata-action lowercases its own tags; the cache refs below
+      # are handed to buildx verbatim.
+      - name: Resolve the image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >>"$GITHUB_OUTPUT"
       - name: Extract image metadata
         id: meta
         uses: https://github.com/docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           flavor: latest=false
           tags: |
             type=raw,value=dev,enable=${{ needs.setup-release.outputs.nightly == 'true' }}
@@ -151,8 +156,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:buildcache,mode=max
 
   linux:
     name: Linux x86_64 (CEF)
