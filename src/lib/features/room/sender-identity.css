@@ -41,23 +41,34 @@
 }
 
 .sender-identity-pronouns {
-  display: inline;
+  display: inline-flex;
+  flex-flow: row nowrap;
+  font-size: var(--font-size-x-small);
+  gap: var(--space-050);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sender-identity-pronouns::before {
-  content: '(';
+.sender-identity-pronoun {
+  background: var(--surface-var-container);
+  border-radius: var(--radii-0);
+  display: block;
 }
 
-.sender-identity-pronouns::after {
-  content: ')';
+.sender-identity-pronoun:first-child {
+  border-bottom-left-radius: var(--radii-pill);
+  border-top-left-radius: var(--radii-pill);
+  padding-left: var(--space-150);
 }
 
-.sender-identity-pronoun:not(:last-child)::after {
-  content: ', ';
-  white-space-collapse: preserve-spaces;
+.sender-identity-pronoun:last-child {
+  border-bottom-right-radius: var(--radii-pill);
+  border-top-right-radius: var(--radii-pill);
+  padding-right: var(--space-150);
 }
 
-:is(.sender-identity-via, .sender-identity-pronouns) {
+.sender-identity-via {
   font-size: var(--font-size-small);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -73,8 +84,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not(.light)
-    :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
+  :root:not(.light) :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
   :root.dark :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted {
     color: var(--name-color-on-dark);
   }
@@ -86,15 +96,14 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not(.light)
-      :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
+    :root:not(.light) :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
     :root.dark :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted {
       color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
     }
   }
 }
 
-@media (width <= 25rem) {
+@media (width <=25rem) {
   .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
     max-width: 6rem;
   }
@@ -104,7 +113,7 @@
   }
 }
 
-@media (width <= 20rem) {
+@media (width <=20rem) {
   .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
     display: none;
   }
