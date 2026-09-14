@@ -18,8 +18,8 @@ importers:
         specifier: 5.3.0
         version: 5.3.0
       '@sableclient/tauri-plugin-livekit-mobile':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.3.0
+        version: 0.3.0
       '@tauri-apps/api':
         specifier: 2.11.1
         version: 2.11.1
@@ -2095,8 +2095,8 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@sableclient/tauri-plugin-livekit-mobile@0.2.0':
-    resolution: {integrity: sha512-xpv+9qDEIYM1lmbdLpLgD8fwctyT7QNq8R7uwhm7T1Wt95MF7TqgtGUo8kHAUZq4v4ung0jxacbvkp9POMVutw==}
+  '@sableclient/tauri-plugin-livekit-mobile@0.3.0':
+    resolution: {integrity: sha512-tKca6+NJ1S9EtQuCBTraa5r4lsj4jgsOStYIWvQNi3HvG0pHPGCcVN3paKa1Q7qOd+36KilDH4Yq6dQAYDh7/A==}
 
   '@sentry/browser-utils@10.74.0':
     resolution: {integrity: sha512-/Rh3WH4i2nStdOqHpaWocbpSMFPjKhlxKQgp9vkJBSolqjJzXlIpLYXOrldZHHZLG1iDoX3PFBQkNDYcPXCg0A==}
@@ -6225,7 +6225,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@sableclient/tauri-plugin-livekit-mobile@0.2.0':
+  '@sableclient/tauri-plugin-livekit-mobile@0.3.0':
     dependencies:
       '@tauri-apps/api': 2.11.1
 
