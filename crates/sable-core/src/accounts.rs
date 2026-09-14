@@ -740,13 +740,13 @@ impl Core {
                 session.sync_service.stop().await;
             }
 
-            let outcome = if soft_logout {
-                core.mark_account_needs_reauth(account_id.as_deref()).await
-            } else {
-                core.remove_account(account_id.as_deref()).await
+            let outcome = match account_id.as_deref() {
+                Some(account_id) => core.mark_account_needs_reauth(Some(account_id)).await,
+                None if soft_logout => Ok(()),
+                None => core.clear_persisted_session().await,
             };
             if let Err(error) = outcome {
-                tracing::error!(soft_logout, "could not clear rejected session: {error:?}");
+                tracing::error!(soft_logout, "could not retire rejected session: {error:?}");
             }
 
             core.emit(CoreEvent::SessionEnded {
@@ -864,6 +864,37 @@ mod regression_tests {
         .await
         .unwrap();
         assert!(core.session.read().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_hard_token_rejection_keeps_the_account() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        let (server, core, room) = core_with_room().await;
+        let mut registry = AccountRegistry::empty();
+        registry.active_account_id = Some("first".to_owned());
+        registry.upsert(PersistedAccount {
+            account_id: "first".to_owned(),
+            store_id: "regression".to_owned(),
+            session: current_session(&room.client(), server.server().uri()).unwrap(),
+            needs_reauth: false,
+        });
+        *core.accounts.lock().await = Some(registry);
+        let rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
+        assert!(core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let accounts = core.accounts().await.unwrap().accounts;
+                if accounts.first().is_some_and(|account| account.needs_reauth) {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let accounts = core.accounts().await.unwrap().accounts;
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].account_id, "first");
     }
 
     #[tokio::test]

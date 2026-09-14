@@ -270,6 +270,22 @@ test('soft logout retains the account to reauthenticate', async () => {
   });
   expect(core.reauthenticationAccountId).toBe(session.account_id);
   expect(core.session).toBeNull();
+  core.stop();
+});
+
+test('a rejected token retains the account to reauthenticate', async () => {
+  const accounts = { accounts: [session] };
+  const fake = fakeTransport({ restore: { session }, list_accounts: accounts });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  accounts.accounts = [{ ...session, needs_reauth: true }];
+  fake.emit({ type: 'session_ended', reason: 'token_rejected' });
+  await vi.waitFor(() => {
+    expect(core.status).toBe('signed-out');
+  });
+  expect(core.reauthenticationAccountId).toBe(session.account_id);
+  expect(core.session).toBeNull();
+  core.stop();
 });
 
 test('a transient sync error keeps the current session ready', async () => {

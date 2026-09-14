@@ -781,8 +781,7 @@ export class CoreClient {
         this.searchCoverageUnavailable = false;
         return;
       case 'session_ended':
-        this.reauthenticationAccountId =
-          event.reason === 'soft_logout' ? (this.session?.account_id ?? null) : null;
+        this.reauthenticationAccountId = this.session?.account_id ?? null;
         this.replaceSession(null);
         this.status = 'authenticating';
         void this.restoreFallbackAccount();
