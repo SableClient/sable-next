@@ -21,6 +21,16 @@ export function timelineItem(id: string, body: string) {
   };
 }
 
+export function readMarkerItem(id: string) {
+  return {
+    ...timelineItem(id, ''),
+    event_id: null,
+    sender: null,
+    sender_name: null,
+    content: { kind: 'read_marker' },
+  };
+}
+
 export function timelineMessage(id: string, sender: string, timestamp: number, body: string) {
   return { ...timelineItem(id, body), sender, sender_name: sender, timestamp };
 }

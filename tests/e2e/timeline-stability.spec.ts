@@ -1,6 +1,10 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
-import { historyItems, timelineItem } from './fixtures/timeline-items';
-import { instrumentSelfWrites, startGestureSample } from './fixtures/timeline-probe';
+import { historyItems, readMarkerItem, timelineItem } from './fixtures/timeline-items';
+import {
+  instrumentSelfWrites,
+  startArrivalSample,
+  startGestureSample,
+} from './fixtures/timeline-probe';
 import type { FakeCoreDriver } from './pages/FakeCoreDriver';
 import type { RoomTimeline } from './pages/RoomTimeline';
 
@@ -290,6 +294,32 @@ test('continuous touch reaches taller older history without a false boundary', a
   expect(result.blank).toBe(false);
   expect(result.drift).toBeLessThanOrEqual(2);
   expect(result.maxRows).toBeLessThanOrEqual(120);
+});
+
+test('an arrival the reader is watching does not bounce the timeline', async ({
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await loadScrollableHistory(core, timeline);
+  const subscription = await core.subscription();
+  await expect.poll(() => core.commands()).toContain('mark_read');
+  const sample = await startArrivalSample(timeline.viewport);
+  for (let index = 0; index < 3; index += 1) {
+    await core.emitTimelineDiff(subscription, [
+      { op: 'push_back', value: readMarkerItem(`watched-marker-${index}`) },
+      { op: 'push_back', value: timelineItem(`watched-${index}`, `Watched arrival ${index}`) },
+    ]);
+    await expect(timeline.itemById(`watched-${index}`)).toBeAttached();
+  }
+  const { overshoot, travelled } = await sample.finish();
+  expect(travelled).toBeLessThan(0);
+  expect(overshoot).toBeLessThanOrEqual(1);
+  await expect(timeline.container.locator('.unread')).toHaveCount(0);
+  await expect(timeline.itemById('watched-2')).toBeInViewport();
 });
 
 async function loadScrollableHistory(core: FakeCoreDriver, timeline: RoomTimeline): Promise<void> {

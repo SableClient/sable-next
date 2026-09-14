@@ -127,7 +127,11 @@
     unreadCount: number;
   }
   const identity = new TimelineIdentityTracker();
-  let visibleItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
+  let followingRead = $state(false);
+  let allItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
+  let visibleItems = $derived(
+    followingRead ? allItems.filter((item) => item.content.kind !== 'read_marker') : allItems
+  );
   let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
     identity.reconcile(visibleItems);
     return visibleItems.map((item, index) => {
@@ -274,6 +278,7 @@
       state.end === entries.length &&
       node !== null &&
       distance <= TIMELINE_LAYOUT.jumpToLatestRem * 16;
+    if (!state.pinned) followingRead = false;
     if (wasScrolling && !state.scrolling) historyController.onScrollSettled();
   }
   function readerScrolled(delta: number): void {
@@ -526,6 +531,10 @@
       };
     };
   }
+  function markRead(eventId: string): Promise<void> {
+    if (windowState.pinned) followingRead = true;
+    return onRead(eventId);
+  }
   function jumpToLatest(): void {
     focusNavigation?.abort();
     historyController.finishHistoryFill();
@@ -537,7 +546,7 @@
   }
 </script>
 
-<TimelineReadReceipt {timeline} visibleEventId={readEventId} {onRead} />
+<TimelineReadReceipt {timeline} visibleEventId={readEventId} onRead={markRead} />
 <TimelineAnnouncements {timeline} {visibleItems} />
 <MessageContextMenu />
 

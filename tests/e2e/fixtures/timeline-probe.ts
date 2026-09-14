@@ -8,6 +8,8 @@ declare global {
     __e2eSelfWriteCount: number;
     __e2eUnexpectedScrolls: string[];
     __e2eRevealReport: Promise<{ gaps: number[]; readerTops: number[]; hiddenAgain: boolean }>;
+    __e2eArrivalsReady: boolean;
+    __e2eArrivalsActive: boolean;
   }
 }
 
@@ -127,5 +129,46 @@ export async function sampleGesture(
     clamped,
     moved,
     unexpectedScrolls: window.__e2eUnexpectedScrolls.slice(initialUnexpected),
+  };
+}
+
+export async function startArrivalSample(viewport: Locator) {
+  await viewport.evaluate(() => {
+    window.__e2eArrivalsReady = false;
+    window.__e2eArrivalsActive = true;
+  });
+  const result = viewport.evaluate(async (node) => {
+    const bounds = node.getBoundingClientRect();
+    const anchor = Array.from(node.querySelectorAll<HTMLElement>('.item[data-event-id]')).find(
+      (row) => {
+        const rect = row.getBoundingClientRect();
+        return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+      }
+    );
+    if (!anchor) throw new Error('no fully visible row to anchor on');
+    const content = anchor.firstElementChild ?? anchor;
+    const start = content.getBoundingClientRect().top;
+    let travelled = 0;
+    let extreme = 0;
+    window.__e2eArrivalsReady = true;
+    for (let frame = 0; window.__e2eArrivalsActive && frame < 600; frame += 1) {
+      await new Promise(requestAnimationFrame);
+      if (!anchor.isConnected)
+        throw new Error(
+          `Reader row ${anchor.dataset.timelineKey ?? 'unknown'} was unmounted at frame ${frame}`
+        );
+      travelled = content.getBoundingClientRect().top - start;
+      if (Math.abs(travelled) > Math.abs(extreme)) extreme = travelled;
+    }
+    return { travelled, overshoot: Math.abs(extreme) - Math.abs(travelled) };
+  });
+  await viewport.page().waitForFunction(() => window.__e2eArrivalsReady);
+  return {
+    async finish() {
+      await viewport.evaluate(() => {
+        window.__e2eArrivalsActive = false;
+      });
+      return result;
+    },
   };
 }

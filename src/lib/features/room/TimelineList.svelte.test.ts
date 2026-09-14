@@ -1576,3 +1576,35 @@ test('paginating forward out of a permalink reports that it is loading', async (
   expect(document.querySelector('.future-loading')).not.toBeNull();
   await unmount(instance);
 });
+
+test('stops rendering the read marker once the reader is following live', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = Array.from({ length: 5 }, (_, index) => item(`old-${String(index)}`));
+  const read = vi.fn(() => Promise.resolve());
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: read,
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  await vi.waitFor(() => {
+    expect(read).toHaveBeenCalled();
+  });
+
+  roomTimeline.items = [...roomTimeline.items, readMarker('marker'), item('arrival')];
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('.unread')).toBeNull();
+  expect(document.querySelector('[data-item-id="arrival"]')).not.toBeNull();
+  await unmount(instance);
+});
