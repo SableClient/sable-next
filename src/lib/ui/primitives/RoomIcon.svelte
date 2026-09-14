@@ -86,4 +86,9 @@
     height: 100%;
     width: 100%;
   }
+
+  .room-icon-badge-glyph :global(svg) {
+    height: 100%;
+    width: 100%;
+  }
 </style>
