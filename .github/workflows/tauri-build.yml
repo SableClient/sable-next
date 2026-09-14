@@ -676,6 +676,12 @@ jobs:
             echo "Pulling $src"
             ostree --repo=site/repo pull-local "$src"
           done
+          # build-update-repo signs the summary, not the commits under it.
+          ostree --repo=site/repo refs | while read -r ref; do
+            commit="$(ostree --repo=site/repo rev-parse "$ref")"
+            ostree --repo=site/repo gpg-sign \
+              --gpg-homedir="$GNUPGHOME" "$commit" "$FLATPAK_GPG_KEY_ID"
+          done
           flatpak build-update-repo \
             --title='Sable Next Nightly' \
             --default-branch=master \
