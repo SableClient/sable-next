@@ -129,15 +129,28 @@ jobs:
           targets: wasm32-unknown-unknown
           mise: 'true'
 
-      - name: Run WASM-target tests on Chromium
+      # Not a GitHub-hosted image, so it carries no browser and no driver, and
+      # Debian packages no geckodriver. Chromium needs its sandbox off because
+      # the job has no user namespaces; that is what webdriver.json carries.
+      - name: Install browsers and drivers
+        id: drivers
         run: |
-          export CHROMEDRIVER="${CHROMEWEBDRIVER:?chromedriver comes from the runner image}/chromedriver"
-          cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y chromium chromium-driver firefox-esr
+          sudo ln -sf /usr/bin/firefox-esr /usr/local/bin/firefox
+          mise use --global ubi:mozilla/geckodriver@0.37.1
+          echo "geckodriver=$(mise which geckodriver)" >>"$GITHUB_OUTPUT"
+
+      - name: Run WASM-target tests on Chromium
+        env:
+          CHROMEDRIVER: /usr/bin/chromedriver
+          WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/.forgejo/webdriver.json
+        run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
       - name: Run WASM-target tests on Firefox
-        run: |
-          export GECKODRIVER="${GECKOWEBDRIVER:?geckodriver comes from the runner image}/geckodriver"
-          cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
+        env:
+          GECKODRIVER: ${{ steps.drivers.outputs.geckodriver }}
+        run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
   policy:
     name: Bindings and dependency policy
