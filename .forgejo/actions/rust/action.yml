@@ -19,6 +19,10 @@ inputs:
     description: Whether the job needs the tools declared in mise.toml.
     required: false
     default: 'false'
+  cache-key:
+    description: rust-cache's shared-key, one per dependency tree.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -33,9 +37,7 @@ runs:
     - name: Cache Rust artifacts
       uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
-        # The split jobs compile the same dependency tree, so they share one
-        # entry instead of each warming its own.
-        shared-key: rust-quality
+        shared-key: ${{ inputs.cache-key }}
         cache-on-failure: true
 
     - name: Set up mise

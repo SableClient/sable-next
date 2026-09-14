@@ -48,7 +48,6 @@ jobs:
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Set up Rust
         uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
@@ -58,10 +57,13 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
 
-  clippy:
-    name: Clippy
+  # Grouped by dependency tree, not by command: the workspace at --all-features
+  # and the app crate share almost no compiled artifacts, so a job spanning both
+  # builds two trees and pays for each again in every other such job.
+  workspace:
+    name: Workspace
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -69,70 +71,83 @@ jobs:
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          components: clippy
+          cache-key: workspace
 
+      - name: Run Clippy
+        run: cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --locked --workspace --exclude app --all-features
+
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --locked --workspace --exclude app --all-features --no-deps
+
+      - name: Check generated bindings are current
+        run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
+
+  # --all-features would turn on both desktop runtimes and download CEF, so the
+  # app crate stays on its default runtime. The Linux release job covers CEF.
+  app:
+    name: App crate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          components: clippy
+          tauri-dependencies: 'true'
+          cache-key: app
+
+      - name: Run Clippy
+        run: cargo clippy --locked -p app --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --locked -p app
+
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --locked -p app --no-deps
+
+  wasm:
+    name: WASM target
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Supplies wasm-bindgen-test-runner at the version mise pins.
       - name: Set up the Rust workspace
         uses: ./.forgejo/actions/rust
         with:
           components: clippy
           targets: wasm32-unknown-unknown
-          tauri-dependencies: 'true'
+          mise: 'true'
+          cache-key: wasm
 
-      # --all-features would turn on both desktop runtimes and download CEF,
-      # so the app crate is checked on its default runtime. The CEF build is
-      # covered by the Linux release job.
-      - name: Run workspace Clippy
-        run: |
-          cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings
-          cargo clippy --locked -p app --all-targets -- -D warnings
-
-      - name: Run WASM-target Clippy
+      - name: Run Clippy
         run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
-  test:
-    name: Rust tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up the Rust workspace
-        uses: ./.forgejo/actions/rust
-        with:
-          tauri-dependencies: 'true'
-
-      - name: Run Rust tests
-        run: |
-          cargo test --locked --workspace --exclude app --all-features
-          cargo test --locked -p app
-
-  wasm-test:
-    name: WASM tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Supplies wasm-bindgen-test-runner at the version mise pins.
-      - name: Set up the Rust workspace
-        uses: ./.forgejo/actions/rust
-        with:
-          targets: wasm32-unknown-unknown
-          mise: 'true'
-
-      # Not a GitHub-hosted image, so it carries neither browser nor driver.
-      # noble's `firefox` is a transitional package for the snap, which cannot
-      # run here, so Firefox comes from Mozilla's own repository; the pin is
-      # what stops apt preferring the stub. Ubuntu ships no geckodriver at all.
+      # Not a GitHub-hosted image, so it carries neither browser nor driver, and
+      # Ubuntu packages no geckodriver. noble's `firefox` is a stub for the
+      # snap, which cannot run here; the pin is what stops apt preferring it.
       - name: Install browsers and drivers
         id: drivers
         run: |
@@ -148,23 +163,23 @@ jobs:
           mise use --global ubi:mozilla/geckodriver@0.37.1
           echo "geckodriver=$(mise which geckodriver)" >>"$GITHUB_OUTPUT"
 
-      # Chromium needs its sandbox off because the job has no user namespaces;
-      # that is what webdriver.json carries. Firefox's sandbox copes.
-      - name: Run WASM-target tests on Chromium
+      # Chromium needs its sandbox off, having no user namespaces here; that is
+      # what webdriver.json carries. Firefox's sandbox copes.
+      - name: Run tests on Chromium
         env:
           CHROMEDRIVER: /usr/bin/chromedriver
           WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/.forgejo/webdriver.json
         run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
-      - name: Run WASM-target tests on Firefox
+      - name: Run tests on Firefox
         env:
           GECKODRIVER: ${{ steps.drivers.outputs.geckodriver }}
         run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
   policy:
-    name: Bindings and dependency policy
+    name: Dependency policy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -172,39 +187,25 @@ jobs:
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Set up the Rust workspace
-        uses: ./.forgejo/actions/rust
+      # cargo-deny resolves the graph through `cargo metadata`, so cargo has to
+      # be on PATH, but it compiles nothing and wants no artifact cache.
+      - name: Set up Rust
+        uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
-          mise: 'true'
+          toolchain: 1.97.1
 
-      - name: Check generated bindings are current
-        run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
+      - name: Set up mise
+        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: '2026.9.2'
+          github_token: ''
+          cache: false
+          env: false
+          install: false
+
+      - name: Trust project mise configuration
+        run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
 
       # Prebuilt, rather than a `cargo install` that compiles it every run.
       - name: Check dependency policy
         run: mise exec aqua:EmbarkStudios/cargo-deny@0.20.2 -- cargo-deny check
-
-  doc:
-    name: Rust documentation
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up the Rust workspace
-        uses: ./.forgejo/actions/rust
-        with:
-          tauri-dependencies: 'true'
-
-      - name: Check Rust documentation
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: |
-          cargo doc --locked --workspace --exclude app --all-features --no-deps
-          cargo doc --locked -p app --no-deps
