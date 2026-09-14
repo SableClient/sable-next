@@ -1,4 +1,4 @@
-import type { CustomTheme, StoredThemes } from './custom-themes.svelte.js';
+import type { CustomTheme, CustomTweak, StoredThemes } from './custom-themes.svelte.js';
 import { PREFERENCE_KEYS, sanitize } from './preferences.svelte.js';
 import type { Preferences } from './preferences.svelte.js';
 
@@ -37,10 +37,7 @@ export interface PreparedSettings {
   excludedThemeIds: string[];
 }
 
-export function prepareSettings(
-  current: Preferences,
-  themes: Pick<StoredThemes, 'themes' | 'lightThemeId' | 'darkThemeId'>
-): PreparedSettings {
+export function prepareSettings(current: Preferences, themes: StoredThemes): PreparedSettings {
   const settings: Partial<Preferences> = {};
   for (const key of PREFERENCE_KEYS) {
     if (!NON_SYNCABLE_KEYS.has(key)) (settings as Record<string, unknown>)[key] = current[key];
@@ -48,25 +45,31 @@ export function prepareSettings(
 
   const excludedThemeIds: string[] = [];
   let used = 0;
-  const kept = themes.themes.filter((theme) => {
-    const bytes = new TextEncoder().encode(theme.css).byteLength;
+  const fits = (entry: { id: string; css: string }): boolean => {
+    const bytes = new TextEncoder().encode(entry.css).byteLength;
     if (used + bytes > MAX_SYNCED_THEME_CSS_BYTES) {
-      excludedThemeIds.push(theme.id);
+      excludedThemeIds.push(entry.id);
       return false;
     }
     used += bytes;
     return true;
-  });
+  };
+
+  const kept = themes.themes.filter(fits);
+  const keptTweaks = themes.tweaks.filter(fits);
 
   const keptIds = new Set(kept.map((theme) => theme.id));
+  const keptTweakIds = new Set(keptTweaks.map((tweak) => tweak.id));
   return {
     content: {
       v: SETTINGS_SYNC_VERSION,
       settings,
       themes: {
         themes: kept,
+        tweaks: keptTweaks,
         lightThemeId: keepId(themes.lightThemeId, keptIds),
         darkThemeId: keepId(themes.darkThemeId, keptIds),
+        enabledTweakIds: themes.enabledTweakIds.filter((id) => keptTweakIds.has(id)),
       },
     },
     excludedThemeIds,
@@ -120,12 +123,23 @@ function mergeThemes(
     ...remote.themes,
     ...current.themes.filter((theme) => excluded.has(theme.id) && !remoteIds.has(theme.id)),
   ];
+  const remoteTweakIds = new Set(remote.tweaks.map((tweak) => tweak.id));
+  const tweaks = [
+    ...remote.tweaks,
+    ...current.tweaks.filter((tweak) => excluded.has(tweak.id) && !remoteTweakIds.has(tweak.id)),
+  ];
   const held = new Set(themes.map((theme) => theme.id));
+  const heldTweaks = new Set(tweaks.map((tweak) => tweak.id));
 
   return {
     themes,
+    tweaks,
     lightThemeId: keepId(remote.lightThemeId ?? current.lightThemeId, held),
     darkThemeId: keepId(remote.darkThemeId ?? current.darkThemeId, held),
+    enabledTweakIds: [
+      ...remote.enabledTweakIds,
+      ...current.enabledTweakIds.filter((id) => excluded.has(id) && !remoteTweakIds.has(id)),
+    ].filter((id) => heldTweaks.has(id)),
   };
 }
 
@@ -136,8 +150,12 @@ function readThemes(data: unknown): StoredThemes | null {
 
   return {
     themes: value.themes.filter(isCustomTheme),
+    tweaks: Array.isArray(value.tweaks) ? value.tweaks.filter(isCustomTweak) : [],
     lightThemeId: typeof value.lightThemeId === 'string' ? value.lightThemeId : null,
     darkThemeId: typeof value.darkThemeId === 'string' ? value.darkThemeId : null,
+    enabledTweakIds: Array.isArray(value.enabledTweakIds)
+      ? value.enabledTweakIds.filter((id: unknown): id is string => typeof id === 'string')
+      : [],
   };
 }
 
@@ -149,5 +167,13 @@ function isCustomTheme(value: unknown): value is CustomTheme {
     typeof theme.name === 'string' &&
     (theme.kind === 'light' || theme.kind === 'dark') &&
     typeof theme.css === 'string'
+  );
+}
+
+function isCustomTweak(value: unknown): value is CustomTweak {
+  if (value === null || typeof value !== 'object') return false;
+  const tweak = value as Partial<CustomTweak>;
+  return (
+    typeof tweak.id === 'string' && typeof tweak.name === 'string' && typeof tweak.css === 'string'
   );
 }

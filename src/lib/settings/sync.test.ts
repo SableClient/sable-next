@@ -7,10 +7,26 @@ import { fingerprint } from './fingerprint';
 import { applySettings, prepareSettings } from './sync';
 
 const base: Preferences = { ...preferences };
-const noThemes: StoredThemes = { themes: [], lightThemeId: null, darkThemeId: null };
+
+function stored(partial: Partial<StoredThemes> = {}): StoredThemes {
+  return {
+    themes: [],
+    tweaks: [],
+    lightThemeId: null,
+    darkThemeId: null,
+    enabledTweakIds: [],
+    ...partial,
+  };
+}
+
+const noThemes: StoredThemes = stored();
 
 function theme(id: string, css: string): StoredThemes['themes'][number] {
   return { id, name: id, kind: 'dark', css };
+}
+
+function tweak(id: string, css: string): StoredThemes['tweaks'][number] {
+  return { id, name: id, css };
 }
 
 describe('prepareSettings', () => {
@@ -28,15 +44,24 @@ describe('prepareSettings', () => {
 
   it('drops a custom theme that does not fit the budget', () => {
     const large = theme('large', 'a'.repeat(300 * 1024));
-    const { content, excludedThemeIds } = prepareSettings(base, {
-      themes: [theme('small', 'body{}'), large],
-      lightThemeId: null,
-      darkThemeId: 'large',
-    });
+    const { content, excludedThemeIds } = prepareSettings(
+      base,
+      stored({ themes: [theme('small', 'body{}'), large], darkThemeId: 'large' })
+    );
 
     expect(excludedThemeIds).toEqual(['large']);
     expect(content.themes.themes.map((entry) => entry.id)).toEqual(['small']);
     expect(content.themes.darkThemeId).toBeNull();
+  });
+
+  it('uploads tweaks with the ids that are enabled', () => {
+    const { content } = prepareSettings(
+      base,
+      stored({ tweaks: [tweak('crt', 'body{}')], enabledTweakIds: ['crt', 'gone'] })
+    );
+
+    expect(content.themes.tweaks.map((entry) => entry.id)).toEqual(['crt']);
+    expect(content.themes.enabledTweakIds).toEqual(['crt']);
   });
 });
 
@@ -98,17 +123,25 @@ describe('applySettings', () => {
 
   it('keeps a local theme that was too large to upload', () => {
     const large = theme('large', 'a'.repeat(300 * 1024));
-    const local: StoredThemes = { themes: [large], lightThemeId: null, darkThemeId: 'large' };
-    const { content } = prepareSettings(base, {
-      themes: [theme('remote', 'body{}')],
-      lightThemeId: null,
-      darkThemeId: null,
-    });
+    const local: StoredThemes = stored({ themes: [large], darkThemeId: 'large' });
+    const { content } = prepareSettings(base, stored({ themes: [theme('remote', 'body{}')] }));
 
     const applied = applySettings(content, base, local, ['large']);
 
     expect(applied?.themes.themes.map((entry) => entry.id)).toEqual(['remote', 'large']);
     expect(applied?.themes.darkThemeId).toBe('large');
+  });
+
+  it('adopts remote tweaks and the ids they enable', () => {
+    const { content } = prepareSettings(
+      base,
+      stored({ tweaks: [tweak('crt', 'body{}')], enabledTweakIds: ['crt'] })
+    );
+
+    const applied = applySettings(content, base, noThemes, []);
+
+    expect(applied?.themes.tweaks.map((entry) => entry.id)).toEqual(['crt']);
+    expect(applied?.themes.enabledTweakIds).toEqual(['crt']);
   });
 });
 

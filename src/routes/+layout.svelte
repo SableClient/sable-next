@@ -27,8 +27,13 @@
     type TitleBarKind,
   } from '#lib/platform/window-decorations.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
-  import { activeCustomThemeCss } from '#lib/settings/custom-themes.svelte.js';
-  import { applyCustomTheme, applyTheme, resolveTheme } from '#lib/settings/theme.js';
+  import { activeCustomThemeCss, activeTweakCss } from '#lib/settings/custom-themes.svelte.js';
+  import {
+    applyCustomTheme,
+    applyCustomTweaks,
+    applyTheme,
+    resolveTheme,
+  } from '#lib/settings/theme.js';
 
   interface Props {
     children: Snippet;
@@ -86,6 +91,10 @@
   $effect(() => {
     applyTheme(preferences.theme, systemPrefersDark);
     applyCustomTheme(activeCustomThemeCss(resolveTheme(preferences.theme, systemPrefersDark)));
+  });
+
+  $effect(() => {
+    applyCustomTweaks(activeTweakCss());
   });
 </script>
 

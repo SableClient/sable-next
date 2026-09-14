@@ -1,23 +1,28 @@
 <script lang="ts">
   import {
     customThemes,
+    enableCustomTweak,
     installCustomTheme,
+    installCustomTweak,
     selectCustomTheme,
     selectedCustomThemeId,
   } from '#lib/settings/custom-themes.svelte.js';
   import { pickFiles } from '#lib/platform/files.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
 
-  type CatalogTheme = { basename: string; fullUrl: string };
+  type CatalogEntry = { basename: string; fullUrl: string };
 
   const catalogUrl = 'https://raw.githubusercontent.com/SableClient/themes/main/catalog.json';
   const themeKinds = ['light', 'dark'] as const;
-  let catalog = $state.raw<CatalogTheme[]>([]);
+  let catalog = $state.raw<CatalogEntry[]>([]);
+  let tweakCatalog = $state.raw<CatalogEntry[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
   let picker = $state<HTMLInputElement>();
   let catalogSelection = $state('');
+  let tweakSelection = $state('');
 
   function metadata(css: string, fallback: string): { name: string; kind: 'light' | 'dark' } {
     const field = (name: string): string | undefined =>
@@ -30,8 +35,13 @@
       error = 'Themes must be smaller than 1 MiB.';
       return;
     }
+    if (css.includes('@sable-tweak')) {
+      installCustomTweak({ id: crypto.randomUUID(), name: metadata(css, fallback).name, css });
+      return;
+    }
     if (!css.includes('@sable-theme')) {
-      error = 'This file is not a Sable theme. It must include @sable-theme metadata.';
+      error =
+        'This file is not a Sable theme or tweak. It must include @sable-theme or @sable-tweak metadata.';
       return;
     }
     const theme = metadata(css, fallback);
@@ -52,13 +62,8 @@
       ) {
         throw new Error('Catalog unavailable');
       }
-      catalog = (data as { themes: unknown[] }).themes.filter(
-        (theme): theme is CatalogTheme =>
-          typeof theme === 'object' &&
-          theme !== null &&
-          typeof (theme as CatalogTheme).basename === 'string' &&
-          typeof (theme as CatalogTheme).fullUrl === 'string'
-      );
+      catalog = catalogEntries((data as { themes: unknown[] }).themes);
+      tweakCatalog = catalogEntries((data as { tweaks?: unknown }).tweaks);
     } catch {
       error = 'Could not load the official theme catalog.';
     } finally {
@@ -66,18 +71,36 @@
     }
   }
 
-  async function installCatalog(): Promise<void> {
-    const entry = catalog.find((theme) => theme.fullUrl === catalogSelection);
+  function catalogEntries(rows: unknown): CatalogEntry[] {
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(
+      (row): row is CatalogEntry =>
+        typeof row === 'object' &&
+        row !== null &&
+        typeof (row as CatalogEntry).basename === 'string' &&
+        typeof (row as CatalogEntry).fullUrl === 'string'
+    );
+  }
+
+  async function installFromCatalog(entry: CatalogEntry | undefined): Promise<void> {
     if (!entry) return;
     try {
       const response = await fetch(entry.fullUrl);
-      if (!response.ok) throw new Error('theme unavailable');
+      if (!response.ok) throw new Error('unavailable');
       install(await response.text(), entry.basename);
     } catch {
       error = `Could not install ${entry.basename}.`;
-    } finally {
-      catalogSelection = '';
     }
+  }
+
+  async function installCatalogTheme(): Promise<void> {
+    await installFromCatalog(catalog.find((theme) => theme.fullUrl === catalogSelection));
+    catalogSelection = '';
+  }
+
+  async function installCatalogTweak(): Promise<void> {
+    await installFromCatalog(tweakCatalog.find((tweak) => tweak.fullUrl === tweakSelection));
+    tweakSelection = '';
   }
 
   async function importFiles(files: FileList | File[]): Promise<void> {
@@ -104,8 +127,8 @@
   <div>
     <h3 id="custom-themes-title">Custom themes</h3>
     <p>
-      Install a theme from Sable's official catalog or import a local <code>.sable.css</code> file. Only
-      import CSS you trust.
+      Install a theme or a tweak from Sable's official catalog, or import a local
+      <code>.sable.css</code> file. A tweak layers on top of the active theme. Only import CSS you trust.
     </p>
   </div>
   <div class="actions">
@@ -128,7 +151,19 @@
         { value: '', label: 'Choose an official theme' },
         ...catalog.map((theme) => ({ value: theme.fullUrl, label: theme.basename })),
       ]}
-      onValueChange={() => void installCatalog()}
+      onValueChange={() => void installCatalogTheme()}
+    />
+  {/if}
+  {#if tweakCatalog.length > 0}
+    <Select
+      bind:value={tweakSelection}
+      aria-label="Install an official tweak"
+      placeholder="Choose an official tweak"
+      items={[
+        { value: '', label: 'Choose an official tweak' },
+        ...tweakCatalog.map((tweak) => ({ value: tweak.fullUrl, label: tweak.basename })),
+      ]}
+      onValueChange={() => void installCatalogTweak()}
     />
   {/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -153,6 +188,22 @@
         </label>
       {/each}
     </div>
+  {/if}
+  {#if customThemes.tweaks.length > 0}
+    <ul class="tweaks">
+      {#each customThemes.tweaks as tweak (tweak.id)}
+        <li>
+          <span>{tweak.name}</span>
+          <Switch
+            label={tweak.name}
+            checked={customThemes.enabledTweakIds.includes(tweak.id)}
+            onCheckedChange={(checked) => {
+              enableCustomTweak(tweak.id, checked);
+            }}
+          />
+        </li>
+      {/each}
+    </ul>
   {/if}
 </section>
 
@@ -188,6 +239,22 @@
     flex: 1 1 12rem;
     font-size: var(--font-size-small);
     gap: var(--space-100);
+  }
+
+  .tweaks {
+    display: grid;
+    gap: var(--space-200);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .tweaks li {
+    align-items: center;
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-300);
+    justify-content: space-between;
   }
 
   .error {

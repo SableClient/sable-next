@@ -37,16 +37,36 @@ export function renameLegacyThemeIdentifiers(css: string): string {
     });
 }
 
+const THEME_STYLE_ID = 'sable-custom-theme';
+const TWEAK_STYLE_ID = 'sable-custom-tweaks';
+
 export function applyCustomTheme(css: string | undefined): void {
-  const id = 'sable-custom-theme';
-  const existing = document.getElementById(id);
+  const existing = document.getElementById(THEME_STYLE_ID);
   document.body.classList.toggle('remote-theme', css !== undefined);
   if (!css) {
     existing?.remove();
     return;
   }
 
-  const style = existing ?? document.head.appendChild(document.createElement('style'));
-  style.id = id;
+  const style = existing ?? createStyle(THEME_STYLE_ID, document.getElementById(TWEAK_STYLE_ID));
   style.textContent = renameLegacyThemeIdentifiers(css);
+}
+
+export function applyCustomTweaks(css: readonly string[]): void {
+  const existing = document.getElementById(TWEAK_STYLE_ID);
+  if (css.length === 0) {
+    existing?.remove();
+    return;
+  }
+
+  const style = existing ?? createStyle(TWEAK_STYLE_ID, null);
+  style.textContent = css.map(renameLegacyThemeIdentifiers).join('\n');
+}
+
+function createStyle(id: string, anchor: Element | null): HTMLStyleElement {
+  const style = document.createElement('style');
+  style.id = id;
+  if (anchor) anchor.before(style);
+  else document.head.append(style);
+  return style;
 }
