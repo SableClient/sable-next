@@ -1,0 +1,73 @@
+name: Setup Rust
+description: Installs the pinned Rust toolchain, its cache and the system
+  libraries the workspace links against.
+
+inputs:
+  components:
+    description: Extra rustup components, comma-separated.
+    required: false
+    default: ''
+  targets:
+    description: Extra rustup targets, comma-separated.
+    required: false
+    default: ''
+  tauri-dependencies:
+    description: Whether the job compiles the app crate, which links webkit2gtk.
+    required: false
+    default: 'false'
+  mise:
+    description: Whether the job needs the tools declared in mise.toml.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Rust
+      uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+      with:
+        toolchain: 1.97.1
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Cache Rust artifacts
+      uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        # The split jobs compile the same dependency tree, so they share one
+        # entry instead of each warming its own.
+        shared-key: rust-quality
+        cache-on-failure: true
+
+    - name: Set up mise
+      if: ${{ inputs.mise == 'true' }}
+      uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      with:
+        version: '2026.9.2'
+        github_token: ''
+        cache: true
+        env: false
+
+    - name: Trust project mise configuration
+      if: ${{ inputs.mise == 'true' }}
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
+
+    # tauri-runtime depends on webkit2gtk on Linux whatever the runtime, so the
+    # headers stay even though nothing renders through it.
+    - name: Install Linux Tauri dependencies
+      if: ${{ inputs.tauri-dependencies == 'true' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y \
+          build-essential \
+          curl \
+          file \
+          libayatana-appindicator3-dev \
+          libssl-dev \
+          libwebkit2gtk-4.1-dev \
+          libxdo-dev \
+          librsvg2-dev \
+          patchelf \
+          wget

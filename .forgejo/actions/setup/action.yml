@@ -3,9 +3,17 @@ description: Installs the Sable web toolchain and optionally builds the app.
 
 inputs:
   build:
-    description: Whether to build the static web app after generating WASM.
+    description: Whether to build the WASM bindings and the static web app.
     required: false
     default: 'false'
+  rust:
+    description: Whether the job compiles Rust of its own.
+    required: false
+    default: 'false'
+  rust-cache-key:
+    description: rust-cache's shared-key.
+    required: false
+    default: 'wasm'
   install-mise-tools:
     description: Whether to install tools declared in mise.toml.
     required: false
@@ -24,11 +32,11 @@ runs:
         cache: pnpm
 
     - name: Set up mise
-      uses: https://github.com/jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+      uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
       with:
         version: '2026.9.2'
         github_token: ''
-        cache: true
+        cache: ${{ inputs.install-mise-tools }}
         env: false
         install: ${{ inputs.install-mise-tools }}
 
@@ -37,28 +45,46 @@ runs:
       working-directory: ${{ github.workspace }}
       run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
 
-    - name: Set up Rust for WASM generation
+    # The bindings are a pure function of the Rust sources and the pinned
+    # toolchain, so every job that builds shares one entry and only the first
+    # miss compiles.
+    - name: Restore WASM bindings
+      id: wasm
+      if: ${{ inputs.build == 'true' }}
+      uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: src/generated/wasm
+        key: wasm-${{ runner.os }}-${{ hashFiles('crates/**', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'mise.toml', 'scripts/build-wasm.mjs') }}
+
+    - name: Set up Rust
+      if: ${{ inputs.rust == 'true' || (inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true') }}
       uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
       with:
         toolchain: 1.97.1
         targets: wasm32-unknown-unknown
 
     - name: Cache Rust artifacts
+      if: ${{ inputs.rust == 'true' || (inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true') }}
       uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        shared-key: ${{ inputs.rust-cache-key }}
+        cache-on-failure: true
 
     - name: Install JavaScript dependencies
       shell: bash
       working-directory: ${{ github.workspace }}
       run: pnpm install --frozen-lockfile
 
-    - name: Generate TypeScript protocol
-      if: ${{ inputs.build == 'true' }}
+    - name: Build the WASM bindings
+      if: ${{ inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}
-      run: mise run generate:types
+      run: pnpm wasm:build
 
+    # `vite build` rather than `pnpm build`, whose prebuild hook would recompile
+    # the bindings the cache just restored.
     - name: Build app
       if: ${{ inputs.build == 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}
-      run: pnpm run build
+      run: pnpm exec vite build

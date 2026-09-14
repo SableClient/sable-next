@@ -13,6 +13,7 @@ concurrency:
 
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
+  SABLE_E2E_PREBUILT: '1'
 jobs:
   e2e:
     name: Playwright
@@ -26,17 +27,27 @@ jobs:
         with:
           persist-credentials: false
 
-      # Playwright's webServer builds the app itself, so this only needs tools.
-      - name: Set up app
+      # Built here rather than by Playwright's webServer, which would miss the
+      # WASM cache.
+      - name: Set up app and build
         uses: ./.forgejo/actions/setup
         with:
-          build: 'false'
+          build: 'true'
 
-      - name: Generate TypeScript protocol
-        run: mise run generate:types
+      - name: Restore Playwright browsers
+        id: browsers
+        uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium webkit
+        if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: pnpm exec playwright install chromium webkit
+
+      # The shared libraries the browsers link against live outside the cache.
+      - name: Install Playwright system libraries
+        run: pnpm exec playwright install-deps chromium webkit
 
       - name: Run Playwright tests
         if: ${{ github.event_name == 'pull_request' }}

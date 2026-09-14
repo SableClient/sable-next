@@ -5,6 +5,10 @@ const origin = `http://127.0.0.1:${port}`;
 const SCRIPTED_TIMELINE_SPECS =
   /(?:^|\/)timeline-(?:anchoring|stability|gap|keyboard|lifecycle|media)\.spec\.ts$/;
 
+const build = process.env.SABLE_E2E_PREBUILT
+  ? ''
+  : 'SABLE_WASM_OUTPUT=src/generated/wasm-e2e pnpm run build && ';
+
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
@@ -55,7 +59,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `SABLE_WASM_OUTPUT=src/generated/wasm-e2e pnpm run build && pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    command: `${build}pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
     url: origin,
     reuseExistingServer: !process.env.CI,
     timeout: 600_000,

@@ -62,10 +62,9 @@ jobs:
     name: Build web assets
     needs: setup-release
     runs-on: ubuntu-latest
-    # Cold, this compiles the dependency tree twice: generate:types builds
-    # sable-core for the host in dev, then wasm:build rebuilds it for wasm32 in
-    # release. Neither shares artifacts with the other.
-    timeout-minutes: 120
+    # Cold, this compiles the workspace for wasm32 in release. Warm, the setup
+    # action restores the bindings and only Vite runs.
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -146,7 +145,8 @@ jobs:
       - name: Set up app
         uses: ./.forgejo/actions/setup
         with:
-          build: 'false'
+          rust: 'true'
+          rust-cache-key: tauri-linux
           install-mise-tools: 'false'
       - name: Stamp release version into tauri.conf.json
         run: |

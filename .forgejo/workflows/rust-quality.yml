@@ -11,6 +11,7 @@ on:
       - 'rust-toolchain.toml'
       - 'deny.toml'
       - '.forgejo/workflows/rust-quality.yml'
+      - '.forgejo/actions/rust/**'
   push:
     branches: [main]
     paths:
@@ -22,6 +23,7 @@ on:
       - 'rust-toolchain.toml'
       - 'deny.toml'
       - '.forgejo/workflows/rust-quality.yml'
+      - '.forgejo/actions/rust/**'
 
 permissions: {}
 
@@ -56,10 +58,10 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
 
-  checks:
-    name: Rust check, test, and Clippy
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -68,45 +70,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Rust
-        uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
         with:
-          toolchain: 1.97.1
           components: clippy
           targets: wasm32-unknown-unknown
-
-      - name: Cache Rust artifacts
-        uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-
-      # Supplies wasm-bindgen-test-runner at the version mise pins.
-      - name: Set up mise
-        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: '2026.9.2'
-          github_token: ''
-          cache: true
-          env: false
-
-      - name: Trust project mise configuration
-        run: mise settings set trusted_config_paths "$GITHUB_WORKSPACE"
-
-      - name: Install Linux Tauri dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            build-essential \
-            curl \
-            file \
-            libayatana-appindicator3-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            librsvg2-dev \
-            patchelf \
-            wget
-
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --version 0.20.2 --locked
+          tauri-dependencies: 'true'
 
       # --all-features would turn on both desktop runtimes and download CEF,
       # so the app crate is checked on its default runtime. The CEF build is
@@ -119,18 +88,48 @@ jobs:
       - name: Run WASM-target Clippy
         run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
+  test:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          tauri-dependencies: 'true'
+
       - name: Run Rust tests
         run: |
           cargo test --locked --workspace --exclude app --all-features
           cargo test --locked -p app
 
-      - name: Check generated bindings are current
-        run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
+  wasm-test:
+    name: WASM tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Check dependency policy
-        run: cargo deny check
+      # Supplies wasm-bindgen-test-runner at the version mise pins.
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          targets: wasm32-unknown-unknown
+          mise: 'true'
 
-      - name: Run WASM-target tests
+      - name: Run WASM-target tests on Chromium
         run: |
           export CHROMEDRIVER="${CHROMEWEBDRIVER:?chromedriver comes from the runner image}/chromedriver"
           cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
@@ -139,6 +138,47 @@ jobs:
         run: |
           export GECKODRIVER="${GECKOWEBDRIVER:?geckodriver comes from the runner image}/geckodriver"
           cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
+
+  policy:
+    name: Bindings and dependency policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          mise: 'true'
+
+      - name: Check generated bindings are current
+        run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
+
+      # Prebuilt, rather than a `cargo install` that compiles it every run.
+      - name: Check dependency policy
+        run: mise exec aqua:EmbarkStudios/cargo-deny@0.20.2 -- cargo-deny check
+
+  doc:
+    name: Rust documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up the Rust workspace
+        uses: ./.forgejo/actions/rust
+        with:
+          tauri-dependencies: 'true'
 
       - name: Check Rust documentation
         env:

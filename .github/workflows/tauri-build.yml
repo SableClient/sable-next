@@ -135,7 +135,8 @@ jobs:
       - name: Set up app
         uses: ./.github/actions/setup
         with:
-          build: 'false'
+          rust: 'true'
+          rust-cache-key: tauri-desktop
           install-mise-tools: 'false'
       - name: Add Rust targets
         if: ${{ matrix.rust-targets != '' }}
@@ -227,7 +228,8 @@ jobs:
       - name: Set up app
         uses: ./.github/actions/setup
         with:
-          build: 'false'
+          rust: 'true'
+          rust-cache-key: tauri-ios
           install-mise-tools: 'false'
       - name: Set up iOS project
         run: |
@@ -330,7 +332,8 @@ jobs:
       - name: Set up app
         uses: ./.github/actions/setup
         with:
-          build: 'false'
+          rust: 'true'
+          rust-cache-key: tauri-linux
           install-mise-tools: 'false'
       - name: Stamp release version into tauri.conf.json
         run: |
@@ -415,7 +418,8 @@ jobs:
       - name: Set up app
         uses: ./.github/actions/setup
         with:
-          build: 'false'
+          rust: 'true'
+          rust-cache-key: tauri-android
           install-mise-tools: 'false'
       - name: Set up Android SDK and NDK
         run: mise run tauri:setup:android
