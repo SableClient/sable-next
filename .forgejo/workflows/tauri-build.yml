@@ -141,7 +141,7 @@ jobs:
         uses: https://github.com/docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ vars.PACKAGES_USER }}
+          username: ${{ secrets.PACKAGES_USER }}
           password: ${{ secrets.PACKAGES_TOKEN }}
       # The base image is multi-arch but `setcap` still runs under emulation.
       - name: Set up QEMU

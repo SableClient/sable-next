@@ -26,14 +26,14 @@ env:
   TF_HTTP_USERNAME: ${{ secrets.TF_HTTP_USERNAME }}
   TF_HTTP_PASSWORD: ${{ secrets.TF_HTTP_PASSWORD }}
   TF_VAR_workers_message: ${{ github.event_name == 'pull_request' && github.event.pull_request.title || github.ref_name }}
-  TF_HTTP_ADDRESS: ${{ vars.TF_HTTP_ADDRESS }}
-  TF_HTTP_LOCK_ADDRESS: ${{ vars.TF_HTTP_LOCK_ADDRESS }}
-  TF_HTTP_UNLOCK_ADDRESS: ${{ vars.TF_HTTP_UNLOCK_ADDRESS }}
+  TF_HTTP_ADDRESS: ${{ secrets.TF_HTTP_ADDRESS }}
+  TF_HTTP_LOCK_ADDRESS: ${{ secrets.TF_HTTP_LOCK_ADDRESS }}
+  TF_HTTP_UNLOCK_ADDRESS: ${{ secrets.TF_HTTP_UNLOCK_ADDRESS }}
   TF_HTTP_LOCK_METHOD: 'POST'
   TF_HTTP_UNLOCK_METHOD: 'DELETE'
   TF_HTTP_RETRY_WAIT_MIN: '5'
-  TF_VAR_custom_domain: ${{ vars.TF_VAR_CUSTOM_DOMAIN }}
-  TF_VAR_worker_name: ${{ vars.TF_VAR_WORKER_NAME }}
+  TF_VAR_custom_domain: ${{ secrets.TF_VAR_CUSTOM_DOMAIN }}
+  TF_VAR_worker_name: ${{ secrets.TF_VAR_WORKER_NAME }}
 
 jobs:
   build:
