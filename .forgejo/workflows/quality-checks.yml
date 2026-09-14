@@ -189,7 +189,8 @@ jobs:
   e2e:
     name: Playwright
     needs: build
-    runs-on: ubuntu-latest
+    # The homeserver fixture needs a daemon; ubuntu-latest has none.
+    runs-on: docker
     timeout-minutes: 45
     permissions:
       contents: read
