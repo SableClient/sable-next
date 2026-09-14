@@ -589,7 +589,7 @@ label[for],
   opacity: 1;
 }
 
-.selection-layer>* {
+.selection-layer > * {
   position: relative;
   z-index: 1;
 }
@@ -644,7 +644,7 @@ a:not([class]):hover {
   }
 }
 
-@media (width >=42rem) {
+@media (width >= 42rem) {
   :root {
     --page-gutter: var(--space-400);
   }
