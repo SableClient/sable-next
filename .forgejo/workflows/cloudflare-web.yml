@@ -96,7 +96,7 @@ jobs:
           build: 'false'
 
       - name: Plan infrastructure
-        working-directory: infra/web
+        working-directory: ${{ github.workspace }}/infra/web
         run: mise run opentofu -- plan -input=false -no-color | tee "$RUNNER_TEMP/plan.txt"
 
       - name: Publish plan summary
@@ -139,5 +139,5 @@ jobs:
           build: 'false'
 
       - name: Apply infrastructure
-        working-directory: infra/web
+        working-directory: ${{ github.workspace }}/infra/web
         run: mise run opentofu -- apply -input=false -auto-approve
