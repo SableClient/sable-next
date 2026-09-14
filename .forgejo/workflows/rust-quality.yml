@@ -129,18 +129,27 @@ jobs:
           targets: wasm32-unknown-unknown
           mise: 'true'
 
-      # Not a GitHub-hosted image, so it carries no browser and no driver, and
-      # Debian packages no geckodriver. Chromium needs its sandbox off because
-      # the job has no user namespaces; that is what webdriver.json carries.
+      # Not a GitHub-hosted image, so it carries neither browser nor driver.
+      # noble's `firefox` is a transitional package for the snap, which cannot
+      # run here, so Firefox comes from Mozilla's own repository; the pin is
+      # what stops apt preferring the stub. Ubuntu ships no geckodriver at all.
       - name: Install browsers and drivers
         id: drivers
         run: |
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL https://packages.mozilla.org/apt/repo-signing-key.gpg \
+            | sudo tee /etc/apt/keyrings/packages.mozilla.org.asc >/dev/null
+          echo 'deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main' \
+            | sudo tee /etc/apt/sources.list.d/mozilla.list >/dev/null
+          printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
+            | sudo tee /etc/apt/preferences.d/mozilla >/dev/null
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y chromium chromium-driver firefox-esr
-          sudo ln -sf /usr/bin/firefox-esr /usr/local/bin/firefox
+          sudo apt-get install --no-install-recommends -y chromium chromium-driver firefox
           mise use --global ubi:mozilla/geckodriver@0.37.1
           echo "geckodriver=$(mise which geckodriver)" >>"$GITHUB_OUTPUT"
 
+      # Chromium needs its sandbox off because the job has no user namespaces;
+      # that is what webdriver.json carries. Firefox's sandbox copes.
       - name: Run WASM-target tests on Chromium
         env:
           CHROMEDRIVER: /usr/bin/chromedriver
