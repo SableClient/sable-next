@@ -365,8 +365,10 @@ export class Conversation {
     });
 
     if (!persona) return { body, formatted, persona: null };
-    if (proxied && preferences.personaLatching) {
-      void personas.select(targetRoomId, proxied.persona.id).catch(() => {});
+    if (proxied && preferences.personaLatching !== 'off') {
+      void personas
+        .select(preferences.personaLatching === 'room' ? targetRoomId : null, proxied.persona.id)
+        .catch(() => {});
     }
 
     return {
