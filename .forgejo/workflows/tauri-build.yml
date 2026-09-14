@@ -119,12 +119,13 @@ jobs:
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
-      # `github.repository` keeps the owner's capitals and an image reference
-      # cannot. metadata-action lowercases its own tags; the cache refs below
-      # are handed to buildx verbatim.
+      # The registry wants the owner lowercased in the reference and in the
+      # credentials; metadata-action only lowercases its own tags.
       - name: Resolve the image name
         id: image
-        run: echo "name=${GITHUB_REPOSITORY,,}" >>"$GITHUB_OUTPUT"
+        run: |
+          echo "name=${GITHUB_REPOSITORY,,}" >>"$GITHUB_OUTPUT"
+          echo "actor=${GITHUB_ACTOR,,}" >>"$GITHUB_OUTPUT"
       - name: Extract image metadata
         id: meta
         uses: https://github.com/docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -141,7 +142,7 @@ jobs:
         uses: https://github.com/docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ steps.image.outputs.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       # The base image is multi-arch but `setcap` still runs under emulation.
       - name: Set up QEMU
