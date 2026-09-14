@@ -31,6 +31,12 @@
       addLabels: ['rust'],
     },
     {
+      description: 'Tauri and its plugins move together',
+      matchPackageNames: ['/^tauri(?:-.*)?$/'],
+      groupName: 'tauri',
+      addLabels: ['rust'],
+    },
+    {
       matchManagers: ['terraform'],
       groupName: 'terraform',
     },
