@@ -240,24 +240,21 @@ impl Core {
         room_id: &OwnedRoomId,
         error: &matrix_sdk::Error,
     ) -> Option<Duration> {
-        let retry_after = match pushback(error) {
-            Pushback::Permanent => {
-                warn!(%room_id, "search crawl pagination failed: {error}");
-                self.search_crawl.lock().await.fail(room_id.clone());
-                return None;
-            }
-            Pushback::Transient(retry_after) => retry_after,
-        };
-
         let mut progress = self.search_crawl.lock().await;
-        progress.visit(room_id);
-        let Some(delay) = progress.stall(room_id, retry_after) else {
-            drop(progress);
-            warn!(%room_id, "search crawl stopped after repeated pushback: {error}");
-            self.search_crawl.lock().await.fail(room_id.clone());
+
+        let Pushback::Transient(retry_after) = pushback(error) else {
+            progress.fail(room_id.clone());
+            warn!(%room_id, "search crawl pagination failed: {error}");
             return None;
         };
-        drop(progress);
+
+        progress.visit(room_id);
+        let Some(delay) = progress.stall(room_id, retry_after) else {
+            progress.fail(room_id.clone());
+            warn!(%room_id, "search crawl stopped after repeated pushback: {error}");
+            return None;
+        };
+
         warn!(%room_id, "search crawl backing off {delay:?}: {error}");
         Some(delay)
     }
