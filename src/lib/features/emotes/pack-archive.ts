@@ -43,7 +43,7 @@ export interface ArchivePack {
   images: Record<string, ArchiveImage>;
 }
 
-function extensionFor(mime: string | null): string {
+export function extensionFor(mime: string | null): string {
   return EXTENSION_BY_MIME[(mime ?? '').toLowerCase()] ?? 'bin';
 }
 

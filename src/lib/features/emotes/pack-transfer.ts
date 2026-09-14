@@ -1,5 +1,5 @@
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
-import { savesNatively, saveFile, mimeFromName, type SaveOutcome } from '#lib/platform/files.js';
+import { saveBytes, mimeFromName, type SaveOutcome } from '#lib/platform/files.js';
 import { imageMime } from '#lib/ui/media-url.js';
 
 import {
@@ -87,20 +87,7 @@ export async function exportPacks(
   drafts: PackDraft[]
 ): Promise<SaveOutcome> {
   const bytes = await buildArchive(core, drafts);
-  const filename = archiveName(drafts);
-  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
-
-  try {
-    if (savesNatively()) return await saveFile(url, filename);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    return 'saved';
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  return saveBytes(bytes, archiveName(drafts), 'application/zip');
 }
 
 function declaredMimes(packs: ArchivePack[]): Map<string, string> {

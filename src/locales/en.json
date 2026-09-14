@@ -2099,6 +2099,8 @@
     "stealTitle": "Add to your pack",
     "stealExplain": "The picture is copied to your own account, so it keeps working if the message or its room goes away.",
     "stealConfirm": "Add",
-    "stealFailed": "That could not be added to your pack."
+    "stealFailed": "That could not be added to your pack.",
+    "downloadOne": "Download emote",
+    "downloadMany": "Download emotes"
   }
 }

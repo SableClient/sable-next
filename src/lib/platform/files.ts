@@ -45,6 +45,25 @@ export async function saveFile(url: string, filename: string): Promise<SaveOutco
   }
 }
 
+export async function saveBytes(
+  bytes: Uint8Array<ArrayBuffer>,
+  filename: string,
+  mime: string
+): Promise<SaveOutcome> {
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  try {
+    if (savesNatively()) return await saveFile(url, filename);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    return 'saved';
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function supportsPhotoLibrary(): Promise<boolean> {
   if (!isTauri()) return false;
   const { type } = await import('@tauri-apps/plugin-os');
@@ -159,6 +178,7 @@ async function saveAndroidFile(
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   aac: 'audio/aac',
+  apng: 'image/apng',
   avif: 'image/avif',
   flac: 'audio/flac',
   gif: 'image/gif',
@@ -182,6 +202,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   wav: 'audio/wav',
   webm: 'video/webm',
   webp: 'image/webp',
+  zip: 'application/zip',
 };
 
 export function fileNameFromPath(path: string, index: number): string {

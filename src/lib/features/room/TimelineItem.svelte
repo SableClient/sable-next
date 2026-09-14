@@ -42,7 +42,7 @@
   import MessageActionSheet from './MessageActionSheet.svelte';
 
   import StealEmotesDialog from '#lib/features/emotes/StealEmotesDialog.svelte';
-  import { emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
+  import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
 
   import MessageForwardDialog from './MessageForwardDialog.svelte';
   import MessageReportDialog from './MessageReportDialog.svelte';
@@ -318,6 +318,12 @@
               stealOpen = true;
             }
           : undefined,
+      onDownloadEmotes:
+        stealable.length > 0
+          ? () => {
+              void downloadEmotes();
+            }
+          : undefined,
       onViewSource: roomId && eventId ? () => void openSource(eventId) : undefined,
       onReport:
         roomId && eventId && !item.is_own
@@ -327,6 +333,17 @@
           : undefined,
     };
   });
+
+  async function downloadEmotes(): Promise<void> {
+    try {
+      if ((await downloadCandidates(core, stealable)) === 'failed') {
+        toasts.error($i18n.t('errors.actionFailed'));
+      }
+    } catch (error) {
+      console.warn('[sable timeline] emote download failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+    }
+  }
 
   async function togglePin(eventId: string): Promise<void> {
     try {

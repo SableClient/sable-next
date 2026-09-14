@@ -1,7 +1,9 @@
 import type { ImageUsageView, TimelineItemContentView } from '#src/generated/protocol';
 
+import { saveBytes, type SaveOutcome } from '#lib/platform/files.js';
 import { imageMime } from '#lib/ui/media-url.js';
 
+import { extensionFor } from './pack-archive.js';
 import type { PackTransferCore } from './pack-transfer.js';
 import {
   infoContent,
@@ -11,6 +13,7 @@ import {
   usageContent,
   type PackImageDraft,
 } from './pack-content.js';
+import { writeZip } from './zip.js';
 
 export interface EmoteCandidate {
   source: string;
@@ -90,6 +93,29 @@ export async function uploadCandidates(
     });
   }
   return added;
+}
+
+export async function downloadCandidates(
+  core: PackTransferCore,
+  picks: EmoteCandidate[]
+): Promise<SaveOutcome> {
+  const files: { name: string; bytes: Uint8Array<ArrayBuffer>; mime: string | null }[] = [];
+  const used = new Set<string>();
+
+  for (const pick of picks) {
+    const bytes = await core.commands.fetchMedia(pick.source, 0, 0);
+    const mime = pick.mime ?? imageMime(bytes) ?? null;
+    const shortcode = uniqueShortcode(pick.shortcode, (candidate) => used.has(candidate));
+    used.add(shortcode);
+    files.push({ name: `${shortcode}.${extensionFor(mime)}`, bytes, mime });
+  }
+
+  const [only] = files;
+  if (files.length === 1) {
+    return saveBytes(only.bytes, only.name, only.mime ?? 'application/octet-stream');
+  }
+
+  return saveBytes(writeZip(files), `sable-emotes-${String(Date.now())}.zip`, 'application/zip');
 }
 
 export function mergedPackContent(

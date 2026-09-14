@@ -3,6 +3,7 @@ import type { Component } from 'svelte';
 import BookmarkIcon from 'phosphor-svelte/lib/BookmarkSimpleIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
+import DownloadIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 import ForwardIcon from 'phosphor-svelte/lib/ShareFatIcon';
 import PinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import ReportIcon from 'phosphor-svelte/lib/FlagIcon';
@@ -35,6 +36,7 @@ export type MessageActions = {
   onBookmark?: () => void;
   onForward?: () => void;
   onStealEmotes?: () => void;
+  onDownloadEmotes?: () => void;
   stealCount?: number;
   onReport?: () => void;
   onViewSource?: () => void;
@@ -130,6 +132,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: actions.stealCount === 1 ? 'emotes.stealOne' : 'emotes.stealMany',
       icon: StealIcon,
       run: actions.onStealEmotes,
+    });
+  }
+  if (actions.onDownloadEmotes) {
+    rows.push({
+      key: 'download-emotes',
+      label: actions.stealCount === 1 ? 'emotes.downloadOne' : 'emotes.downloadMany',
+      icon: DownloadIcon,
+      run: actions.onDownloadEmotes,
     });
   }
   if (actions.onMarkUnread) {

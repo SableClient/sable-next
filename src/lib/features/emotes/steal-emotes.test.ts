@@ -4,8 +4,21 @@ import { expect, test, vi } from 'vitest';
 
 import type { TimelineItemContentView } from '#src/generated/protocol';
 
-import { emoteCandidates, mergedPackContent, uploadCandidates } from './steal-emotes';
+import { saveBytes } from '#lib/platform/files.js';
+
+import {
+  downloadCandidates,
+  emoteCandidates,
+  mergedPackContent,
+  uploadCandidates,
+  type EmoteCandidate,
+} from './steal-emotes';
 import type { PackTransferCore } from './pack-transfer';
+import { readZip } from './zip';
+
+vi.mock('#lib/platform/files.js', () => ({
+  saveBytes: vi.fn(() => Promise.resolve('saved')),
+}));
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7]);
 
@@ -148,4 +161,58 @@ test('an empty account data event becomes a pack rather than throwing', () => {
   ]);
 
   expect(Object.keys(next.images as Record<string, unknown>)).toEqual(['wave']);
+});
+
+function candidate(overrides: Partial<EmoteCandidate> = {}): EmoteCandidate {
+  return {
+    source: 'mxc://theirs/wave',
+    shortcode: 'wave',
+    body: null,
+    width: null,
+    height: null,
+    mime: null,
+    usage: ['emoticon'],
+    ...overrides,
+  };
+}
+
+function downloadCore(): PackTransferCore {
+  return {
+    commands: {
+      fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(PNG))),
+      uploadMedia: vi.fn(() => Promise.resolve('mxc://mine/1')),
+    },
+  };
+}
+
+test('one emote downloads as a single image named after its shortcode', async () => {
+  vi.mocked(saveBytes).mockClear();
+
+  expect(await downloadCandidates(downloadCore(), [candidate()])).toBe('saved');
+
+  const [bytes, filename, mime] = vi.mocked(saveBytes).mock.calls[0] ?? [];
+  expect(filename).toBe('wave.png');
+  expect(mime).toBe('image/png');
+  expect(bytes).toEqual(PNG);
+});
+
+test('the download asks for the original, so an animated emote keeps its frames', async () => {
+  const core = downloadCore();
+  await downloadCandidates(core, [candidate()]);
+
+  expect(vi.mocked(core.commands.fetchMedia).mock.calls[0]).toEqual(['mxc://theirs/wave', 0, 0]);
+});
+
+test('several emotes download as one zip, and a repeated shortcode is suffixed', async () => {
+  vi.mocked(saveBytes).mockClear();
+
+  await downloadCandidates(downloadCore(), [
+    candidate(),
+    candidate({ source: 'mxc://theirs/wave2' }),
+  ]);
+
+  const [bytes, filename, mime] = vi.mocked(saveBytes).mock.calls[0] ?? [];
+  expect(filename).toMatch(/^sable-emotes-\d+\.zip$/u);
+  expect(mime).toBe('application/zip');
+  expect([...readZip(bytes).keys()]).toEqual(['wave.png', 'wave-1.png']);
 });

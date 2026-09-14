@@ -5,6 +5,7 @@ import {
   filtersFor,
   mimeFromName,
   pickFiles,
+  saveBytes,
   saveFile,
   saveImageToPhotos,
   savesNatively,
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
     writeFile: vi.fn(),
   },
   dialogOpen: vi.fn(),
+  dialogSave: vi.fn(),
   fsReadFile: vi.fn(),
   fsRemove: vi.fn(),
   isTauri: vi.fn(),
@@ -38,7 +40,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.dialogOpen }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.dialogOpen, save: mocks.dialogSave }));
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readFile: mocks.fsReadFile,
   remove: mocks.fsRemove,
@@ -56,6 +58,7 @@ beforeEach(() => {
   mocks.isTauri.mockReturnValue(false);
   mocks.osType.mockReturnValue('linux');
   mocks.dialogOpen.mockReset();
+  mocks.dialogSave.mockReset();
   mocks.fsReadFile.mockReset();
   mocks.fsRemove.mockReset();
   mocks.invoke.mockReset();
@@ -100,6 +103,11 @@ test('a path with no basename still names the attachment', () => {
 test('the media type comes from the extension, which the path does not carry', () => {
   expect(mimeFromName('holiday.PNG')).toBe('image/png');
   expect(mimeFromName('clip.mov')).toBe('video/quicktime');
+});
+
+test('an archive and an animated png carry the type their handler needs', () => {
+  expect(mimeFromName('sable-emotes-1.zip')).toBe('application/zip');
+  expect(mimeFromName('wave.apng')).toBe('image/apng');
 });
 
 test('an unknown or absent extension falls back to a generic type', () => {
@@ -352,4 +360,52 @@ test('a refused share reports the failure rather than throwing', async () => {
   mocks.shareNative.mockRejectedValue(new Error('cancelled'));
 
   expect(await shareFile('blob:media', 'holiday.png')).toBe('failed');
+});
+
+test('saved bytes reach Android Downloads with the type their name declares', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
+  vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:bytes', revokeObjectURL: () => {} });
+
+  await expect(saveBytes(new Uint8Array([1, 2, 3]), 'wave.png', 'image/png')).resolves.toBe(
+    'saved'
+  );
+
+  expect(mocks.androidFs.createNewPublicFile).toHaveBeenCalledWith(
+    'Download',
+    'wave.png',
+    'image/png',
+    {
+      isPending: true,
+      requestPermission: true,
+    }
+  );
+});
+
+test('saved bytes go through the iOS save dialog rather than an anchor', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('ios');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
+  vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:bytes', revokeObjectURL: () => {} });
+  mocks.dialogSave.mockResolvedValue('/Documents/wave.png');
+
+  await expect(saveBytes(new Uint8Array([1, 2, 3]), 'wave.png', 'image/png')).resolves.toBe(
+    'saved'
+  );
+
+  expect(mocks.dialogSave).toHaveBeenCalledWith({ defaultPath: 'wave.png' });
+  expect(mocks.fsWriteFile).toHaveBeenCalled();
+});
+
+test('a cancelled save dialog is not reported as a failure', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('ios');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
+  vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:bytes', revokeObjectURL: () => {} });
+  mocks.dialogSave.mockResolvedValue(null);
+
+  await expect(saveBytes(new Uint8Array([1, 2, 3]), 'wave.png', 'image/png')).resolves.toBe(
+    'cancelled'
+  );
 });
