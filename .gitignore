@@ -82,3 +82,7 @@ result
 ## auto-generated pre-commit config
 .pre-commit-config.yaml
 storybook-static
+
+# Rendered by scripts/ci/render-flatpak-nightly.mjs
+packaging/flatpak/nightly/moe.sable.next.Nightly.yml
+packaging/flatpak/nightly/moe.sable.next.Nightly.metainfo.xml

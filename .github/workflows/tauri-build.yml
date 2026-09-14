@@ -368,12 +368,14 @@ jobs:
           subject-path: |
             target/release/bundle/deb/sable-next-*.deb
             target/release/bundle/rpm/sable-next-*.rpm
+            target/release/bundle/sable-next-*.tar.gz
             target/release/bundle/appimage/sable-next-*.AppImage
       - name: Attach Linux bundles to release
         run: |
           bundles=()
           for bundle in "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" \
                         "target/release/bundle/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm" \
+                        "target/release/bundle/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
                         "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage" \
                         "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage.sig"; do
             [ -e "$bundle" ] && bundles+=("$bundle")
@@ -499,6 +501,214 @@ jobs:
             -name 'sable-next-*' \( -name '*.apk' -o -name '*.aab' \) -print0)
           [ "${#bundles[@]}" -gt 0 ] || { echo 'No Android bundles found' >&2; exit 1; }
           node scripts/ci/forgejo-release.mjs upload "${bundles[@]}"
+  build-nightly-flatpak:
+    name: Build nightly Flatpak ${{ matrix.arch }}
+    needs: [setup-release, linux]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    if: ${{ needs.setup-release.outputs.nightly == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    permissions:
+      contents: read
+    env:
+      ARCH: ${{ matrix.arch }}
+      TAG: nightly
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      # x86_64 is built on Forgejo, so its tarball can lag this run or never
+      # arrive. That arch is skipped rather than failing the nightly.
+      - name: Measure the release tarball
+        id: tarball
+        shell: bash
+        run: |
+          tarball="sable-next-${VERSION}-linux-${ARCH}.tar.gz"
+          if ! node scripts/ci/forgejo-release.mjs wait-assets \
+                 --names "$tarball" --attempts 40 --interval 30; then
+            echo "::warning::$tarball never appeared; skipping the $ARCH Flatpak."
+            exit 0
+          fi
+          mkdir -p tarball
+          node scripts/ci/forgejo-release.mjs download --pattern "$tarball" --dir tarball
+          {
+            echo "SHA256=$(sha256sum "tarball/$tarball" | awk '{print $1}')"
+            echo "SIZE=$(stat -c %s "tarball/$tarball")"
+          } >> "$GITHUB_ENV"
+          echo 'built=true' >> "$GITHUB_OUTPUT"
+      - name: Install flatpak-builder
+        if: ${{ steps.tarball.outputs.built == 'true' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          # elfutils supplies eu-strip, which flatpak-builder needs.
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Render the manifest
+        if: ${{ steps.tarball.outputs.built == 'true' }}
+        shell: bash
+        run: |
+          if [ "$ARCH" = 'x86_64' ]; then
+            node scripts/ci/render-flatpak-nightly.mjs "$VERSION" "$SHA256:$SIZE" -
+          else
+            node scripts/ci/render-flatpak-nightly.mjs "$VERSION" - "$SHA256:$SIZE"
+          fi
+      - name: Build the Flatpak
+        if: ${{ steps.tarball.outputs.built == 'true' }}
+        shell: bash
+        run: |
+          # rofiles-fuse is unavailable on hosted runners.
+          flatpak-builder \
+            --user \
+            --install-deps-from=flathub \
+            --force-clean \
+            --disable-rofiles-fuse \
+            --default-branch=master \
+            --repo=repo \
+            builddir packaging/flatpak/nightly/moe.sable.next.Nightly.yml
+      - name: Upload the exported repo
+        if: ${{ steps.tarball.outputs.built == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-nightly-repo-${{ matrix.arch }}
+          path: repo
+          if-no-files-found: error
+          retention-days: 1
+          include-hidden-files: true
+  publish-nightly-flatpak:
+    name: Publish the nightly Flatpak repo
+    needs: [setup-release, build-nightly-flatpak]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    if: ${{ always() && needs.setup-release.outputs.nightly == 'true' }}
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Check for the signing key and the built repos
+        id: gate
+        shell: bash
+        env:
+          FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${FLATPAK_GPG_KEY:-}" ] || [ -z "${FLATPAK_GPG_KEY_ID:-}" ]; then
+            echo "::notice::FLATPAK_GPG_KEY/FLATPAK_GPG_KEY_ID are not set; skipping the Flatpak publish."
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A skipped arch uploads nothing, and download-artifact fails on a
+          # pattern that matches none.
+          if ! gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                 --paginate --jq '.artifacts[].name' | grep -q '^flatpak-nightly-repo-'; then
+            echo '::notice::No Flatpak repo was built; skipping the publish.'
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'enabled=true' >> "$GITHUB_OUTPUT"
+      - name: Install flatpak
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak ostree
+      - name: Download the exported repos
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: flatpak-nightly-repo-*
+          path: arch-repos
+      - name: Import the signing key
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          FLATPAK_GPG_KEY: ${{ secrets.FLATPAK_GPG_KEY }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          printf '%s\n' "$FLATPAK_GPG_KEY" | gpg --batch --import
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+      - name: Assemble and sign the repo
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+        run: |
+          # A fresh repo each night: older commits point at pruned assets.
+          mkdir -p site/repo
+          ostree --repo=site/repo init --mode=archive-z2
+          # download-artifact extracts a solo pattern match directly into the
+          # path; multiple matches land in per-artifact subdirectories.
+          if [ -e arch-repos/config ]; then
+            repos=(arch-repos/)
+          else
+            repos=(arch-repos/*/)
+          fi
+          for src in "${repos[@]}"; do
+            # Zip artifacts drop empty directories; ostree needs refs/remotes
+            # to exist when listing the source repo's refs.
+            mkdir -p "$src/refs/remotes"
+            echo "Pulling $src"
+            ostree --repo=site/repo pull-local "$src"
+          done
+          flatpak build-update-repo \
+            --title='Sable Next Nightly' \
+            --default-branch=master \
+            --gpg-sign="$FLATPAK_GPG_KEY_ID" \
+            --gpg-homedir="$GNUPGHOME" \
+            site/repo
+          ostree --repo=site/repo refs
+      - name: Write the .flatpakrepo and landing page
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          FLATPAK_GPG_KEY_ID: ${{ secrets.FLATPAK_GPG_KEY_ID }}
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          name="${GITHUB_REPOSITORY##*/}"
+          base="https://$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]').github.io/$name"
+          gpgkey="$(gpg --homedir "$GNUPGHOME" --export "$FLATPAK_GPG_KEY_ID" | base64 -w0)"
+
+          sed -e "s|@REPO_URL@|$base/repo/|" -e "s|@GPGKEY@|$gpgkey|" \
+            packaging/flatpak/nightly/sable-next-nightly.flatpakrepo.in \
+            > site/sable-next-nightly.flatpakrepo
+
+          sed -e "s|@BASE_URL@|$base|g" -e "s|@VERSION@|$VERSION|g" \
+            packaging/flatpak/nightly/index.html.in > site/index.html
+      - name: Upload the Pages artifact
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        id: deploy
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
   handoff:
     name: Publish handoff manifest
     needs: [setup-release, desktop, linux, ios]

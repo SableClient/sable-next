@@ -47,6 +47,18 @@ Linux x86_64 and Android build here; macOS, Windows, iOS and Linux aarch64
 build on the GitHub mirror and attach their bundles, with attestations, to the
 same release. Tagged releases are not set up yet.
 
+## Linux (Flatpak)
+
+Nightly builds have their own Flatpak remote, rebuilt from `main` on every push:
+
+```sh
+flatpak remote-add --if-not-exists sable-next-nightly https://sableclient.github.io/sable-next/sable-next-nightly.flatpakrepo
+flatpak install sable-next-nightly moe.sable.next.Nightly
+```
+
+Built by the `build-nightly-flatpak` and `publish-nightly-flatpak` jobs in
+[`tauri-build.yml`](.github/workflows/tauri-build.yml).
+
 ## Android (Obtainium)
 
 APKs ship with every build, and [Obtainium](https://obtainium.imranr.dev) updates them straight from Forgejo. Each build also publishes an `obtainium.json` app config.

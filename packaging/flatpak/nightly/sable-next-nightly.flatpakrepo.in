@@ -1,0 +1,9 @@
+[Flatpak Repo]
+Title=Sable Next Nightly
+Url=@REPO_URL@
+Homepage=https://sable.moe
+Comment=Nightly builds of the Sable Next Matrix client
+Description=Rolling nightly builds of Sable Next, straight from the main branch. Expect breakage.
+Icon=https://git.sable.moe/SableClient/sable-next/raw/branch/main/src-tauri/icons/128x128@2x.png
+DefaultBranch=master
+GPGKey=@GPGKEY@

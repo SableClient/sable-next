@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Package the Linux CEF build as a deb, an rpm and an AppImage"
+#MISE description="Package the Linux CEF build as a deb, an rpm, an AppImage and a tarball"
 #MISE tools={nfpm="2.47.0", "github:AppImage/appimagetool" = {version = "1.9.1", matching = ".AppImage"}}
 # The tauri bundler cannot carry the CEF runtime, so the packages are assembled
 # here instead.
@@ -69,6 +69,15 @@ PKGROOT="$PKGROOT" PKG_ARCH="$NFPM_ARCH" PKG_VERSION="$DEB_VERSION" PKG_RELEASE=
   nfpm pkg -f nfpm.yaml -p deb -t "$OUT/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
 PKGROOT="$PKGROOT" PKG_ARCH="$NFPM_ARCH" PKG_VERSION="$RPM_VERSION" PKG_RELEASE="$RPM_RELEASE" \
   nfpm pkg -f nfpm.yaml -p rpm -t "$OUT/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm"
+
+# The Flatpak takes this as extra-data; apply_extra unpacks this layout.
+TARROOT="$WORK/tarball"
+mkdir -p "$TARROOT"
+cp -f "$BIN_PATH" "$TARROOT/sable-next"
+chmod 755 "$TARROOT/sable-next"
+cp -a "$WORK/stage/runtime" "$WORK/stage/share" "$TARROOT/"
+tar -C "$TARROOT" -czf "$OUT/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
+  sable-next runtime share
 
 APPDIR="$WORK/SableNext.AppDir"
 mkdir -p "$APPDIR/usr/bin"

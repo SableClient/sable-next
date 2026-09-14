@@ -239,6 +239,7 @@ jobs:
           bundles=()
           for bundle in "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" \
                         "target/release/bundle/rpm/sable-next-${VERSION}-linux-${ARCH}.rpm" \
+                        "target/release/bundle/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
                         "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage" \
                         "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage.sig"; do
             [ -e "$bundle" ] && bundles+=("$bundle")

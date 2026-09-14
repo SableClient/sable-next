@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Sable Next Nightly
+Comment=A Matrix client
+Exec=sable-next %U
+Icon=moe.sable.next.Nightly
+Terminal=false
+Categories=Network;InstantMessaging;Chat;
+StartupWMClass=sable-next
+MimeType=x-scheme-handler/sable;x-scheme-handler/moe.sable.next;
