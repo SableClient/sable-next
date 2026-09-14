@@ -138,12 +138,14 @@ jobs:
             type=raw,value=latest,enable=${{ needs.setup-release.outputs.nightly == 'false' }}
             type=semver,pattern={{version}},value=${{ needs.setup-release.outputs.version }},enable=${{ needs.setup-release.outputs.nightly == 'false' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.setup-release.outputs.version }},enable=${{ needs.setup-release.outputs.nightly == 'false' }}
+      # The automatic token has no package scope, so only a PAT with
+      # `write:package` gets past `reqPackageAccess`.
       - name: Log in to the container registry
         uses: https://github.com/docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ steps.image.outputs.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.FORGEJO_TOKEN }}
       # The base image is multi-arch but `setcap` still runs under emulation.
       - name: Set up QEMU
         uses: https://github.com/docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
