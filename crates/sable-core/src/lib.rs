@@ -94,6 +94,7 @@ pub struct Core {
     search_crawl: Mutex<search::CrawlProgress>,
     server_search: Mutex<search::ServerSearch>,
     foreground_paginations: AtomicU32,
+    token_probe: AtomicBool,
     call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
 }
 
@@ -175,6 +176,7 @@ impl Core {
             read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
             foreground_paginations: AtomicU32::new(0),
+            token_probe: AtomicBool::new(false),
             next_log_id: AtomicU64::new(1),
             next_timeline_access: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
@@ -471,7 +473,7 @@ mod tests {
         assert!(!core.handle_session_change(&matrix_sdk::SessionChange::TokensRefreshed, 1));
         assert_eq!(*bytes.lock().await, Some(b"session".to_vec()));
 
-        assert!(core.handle_session_change(
+        assert!(!core.handle_session_change(
             &matrix_sdk::SessionChange::UnknownToken(
                 matrix_sdk::ruma::api::error::UnknownTokenErrorData::new(),
             ),

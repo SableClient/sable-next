@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::room::MessagesOptions;
+use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
 use matrix_sdk::ruma::{OwnedRoomId, UInt};
 use matrix_sdk::{EncryptionState, Room};
 use tracing::warn;
@@ -18,6 +19,29 @@ const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const MAX_CRAWLED_EVENTS: usize = 20_000;
 const BLIND_BATCHES_BEFORE_SKIP: usize = 3;
+const CRAWL_BACKOFF_CAP: Duration = Duration::from_mins(5);
+const PUSHBACKS_BEFORE_SKIP: u32 = 5;
+
+enum Pushback {
+    Transient(Option<Duration>),
+    Permanent,
+}
+
+fn pushback(error: &matrix_sdk::Error) -> Pushback {
+    let Some(api) = error.as_client_api_error() else {
+        return Pushback::Transient(None);
+    };
+    if let Some(ErrorKind::LimitExceeded(limit)) = api.error_kind() {
+        return Pushback::Transient(match limit.retry_after {
+            Some(RetryAfter::Delay(delay)) => Some(delay),
+            _ => None,
+        });
+    }
+    if api.status_code.as_u16() == 429 || api.status_code.is_server_error() {
+        return Pushback::Transient(None);
+    }
+    Pushback::Permanent
+}
 
 #[derive(Default)]
 pub(crate) struct CrawlProgress {
@@ -29,6 +53,7 @@ pub(crate) struct CrawlProgress {
     tokens: HashMap<OwnedRoomId, Option<String>>,
     probed: HashSet<OwnedRoomId>,
     blind: HashMap<OwnedRoomId, usize>,
+    stalled: HashMap<OwnedRoomId, u32>,
     events: usize,
 }
 
@@ -124,6 +149,20 @@ impl CrawlProgress {
         self.failed.insert(room_id);
     }
 
+    fn stall(&mut self, room_id: &OwnedRoomId, retry_after: Option<Duration>) -> Option<Duration> {
+        let attempts = self.stalled.entry(room_id.clone()).or_default();
+        *attempts += 1;
+        if *attempts > PUSHBACKS_BEFORE_SKIP {
+            return None;
+        }
+        let backoff = retry_after.unwrap_or_else(|| CRAWL_PAUSE * 2u32.saturating_pow(*attempts));
+        Some(backoff.min(CRAWL_BACKOFF_CAP))
+    }
+
+    fn steady(&mut self, room_id: &OwnedRoomId) {
+        self.stalled.remove(room_id);
+    }
+
     pub(crate) fn reset(&mut self) {
         *self = Self::default();
     }
@@ -171,20 +210,21 @@ impl Core {
 
             match self.crawl_once(client, &room_id).await {
                 Ok(outcome) if outcome.reached_start => {
-                    self.search_crawl
-                        .lock()
-                        .await
-                        .settle(room_id, outcome.exhausted);
+                    let mut progress = self.search_crawl.lock().await;
+                    progress.steady(&room_id);
+                    progress.settle(room_id, outcome.exhausted);
                 }
                 Ok(outcome) => {
                     let mut progress = self.search_crawl.lock().await;
+                    progress.steady(&room_id);
                     if progress.blinded(&room_id, outcome.undecryptable) {
                         progress.settle(room_id, false);
                     }
                 }
                 Err(error) => {
-                    warn!(%room_id, "search crawl pagination failed: {error}");
-                    self.search_crawl.lock().await.fail(room_id);
+                    if let Some(delay) = self.settle_pushback(&room_id, &error).await {
+                        matrix_sdk::sleep::sleep(delay).await;
+                    }
                 }
             }
 
@@ -193,6 +233,30 @@ impl Core {
 
             matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
         }
+    }
+
+    async fn settle_pushback(
+        &self,
+        room_id: &OwnedRoomId,
+        error: &matrix_sdk::Error,
+    ) -> Option<Duration> {
+        let mut progress = self.search_crawl.lock().await;
+
+        let Pushback::Transient(retry_after) = pushback(error) else {
+            progress.fail(room_id.clone());
+            warn!(%room_id, "search crawl pagination failed: {error}");
+            return None;
+        };
+
+        progress.visit(room_id);
+        let Some(delay) = progress.stall(room_id, retry_after) else {
+            progress.fail(room_id.clone());
+            warn!(%room_id, "search crawl stopped after repeated pushback: {error}");
+            return None;
+        };
+
+        warn!(%room_id, "search crawl backing off {delay:?}: {error}");
+        Some(delay)
     }
 
     async fn report_coverage(
@@ -368,12 +432,16 @@ fn crawls_first(room: &Room) -> bool {
 #[allow(clippy::large_futures)]
 mod tests {
     use std::collections::HashSet;
+    use std::time::Duration;
 
     use matrix_sdk::ruma::{OwnedRoomId, room_id, user_id};
     use matrix_sdk::test_utils::mocks::MatrixMockServer;
     use matrix_sdk_test::{JoinedRoomBuilder, async_test, event_factory::EventFactory};
 
-    use super::{BLIND_BATCHES_BEFORE_SKIP, CrawlProgress, MAX_CRAWLED_EVENTS};
+    use super::{
+        BLIND_BATCHES_BEFORE_SKIP, CRAWL_BACKOFF_CAP, CrawlProgress, MAX_CRAWLED_EVENTS,
+        PUSHBACKS_BEFORE_SKIP,
+    };
 
     fn room() -> OwnedRoomId {
         room_id!("!crawled:localhost").to_owned()
@@ -387,6 +455,63 @@ mod tests {
         };
 
         assert!(progress.skips(&room()));
+    }
+
+    #[test]
+    fn test_a_room_that_keeps_pushing_back_is_given_up_on_eventually() {
+        let mut progress = CrawlProgress::default();
+
+        for _ in 0..PUSHBACKS_BEFORE_SKIP {
+            assert!(progress.stall(&room(), None).is_some());
+        }
+        assert!(progress.stall(&room(), None).is_none());
+    }
+
+    #[test]
+    fn test_the_server_retry_after_wins_but_cannot_park_the_crawl() {
+        let mut progress = CrawlProgress::default();
+
+        assert_eq!(
+            progress.stall(&room(), Some(Duration::from_secs(9))),
+            Some(Duration::from_secs(9))
+        );
+        assert_eq!(
+            progress.stall(&room(), Some(Duration::from_hours(1))),
+            Some(CRAWL_BACKOFF_CAP)
+        );
+    }
+
+    #[test]
+    fn test_a_batch_that_lands_clears_the_backoff() {
+        let mut progress = CrawlProgress::default();
+
+        for _ in 0..PUSHBACKS_BEFORE_SKIP {
+            progress.stall(&room(), None);
+        }
+        progress.steady(&room());
+
+        assert!(progress.stall(&room(), None).is_some());
+    }
+
+    #[async_test]
+    async fn test_a_server_error_backs_the_crawl_off_instead_of_dropping_the_room() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+        let room_id = room();
+        server.sync_joined_room(&client, &room_id).await;
+        server.mock_room_messages().error500().mount().await;
+
+        let (core, _events) = crate::Core::new(
+            "crawl",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        let Err(error) = core.crawl_once(&client, &room_id).await else {
+            panic!("the mocked server error should have surfaced");
+        };
+
+        assert!(core.settle_pushback(&room_id, &error).await.is_some());
+        assert!(!core.search_crawl.lock().await.skips(&room_id));
     }
 
     #[test]
