@@ -97,6 +97,63 @@ jobs:
             src/generated/wasm
           if-no-files-found: error
           retention-days: 7
+  docker:
+    name: Build and push image
+    needs: [setup-release, build-web]
+    runs-on: multiarch
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: git.sable.moe
+      IMAGE_NAME: ${{ github.repository }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      # The Dockerfile only copies `dist`, so the image reuses the bundle
+      # build-web already produced for the desktop packages.
+      - name: Download web assets
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
+        with:
+          name: web-assets
+      - name: Extract image metadata
+        id: meta
+        uses: https://github.com/docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=dev,enable=${{ needs.setup-release.outputs.nightly == 'true' }}
+            type=sha,prefix=,format=short,enable=${{ needs.setup-release.outputs.nightly == 'true' }}
+            type=raw,value=latest,enable=${{ needs.setup-release.outputs.nightly == 'false' }}
+            type=semver,pattern={{version}},value=${{ needs.setup-release.outputs.version }},enable=${{ needs.setup-release.outputs.nightly == 'false' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.setup-release.outputs.version }},enable=${{ needs.setup-release.outputs.nightly == 'false' }}
+      - name: Log in to the container registry
+        uses: https://github.com/docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The base image is multi-arch but `setcap` still runs under emulation.
+      - name: Set up QEMU
+        uses: https://github.com/docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+      - name: Set up Docker Buildx
+        uses: https://github.com/docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build and push image
+        uses: https://github.com/docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
   linux:
     name: Linux x86_64 (CEF)
     needs: [setup-release, build-web]

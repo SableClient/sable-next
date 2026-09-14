@@ -38,6 +38,8 @@ jobs:
         with:
           name: web-assets
           path: |
+            .svelte-kit/output
+            dist
             src/generated/wasm
           if-no-files-found: error
           retention-days: 7
@@ -102,7 +104,6 @@ jobs:
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
-          path: src/generated/wasm
 
       - name: Set up app
         uses: ./.forgejo/actions/setup
@@ -139,7 +140,6 @@ jobs:
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
-          path: src/generated/wasm
 
       - name: Set up app
         uses: ./.forgejo/actions/setup
@@ -167,7 +167,6 @@ jobs:
         uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
         with:
           name: web-assets
-          path: src/generated/wasm
 
       - name: Set up app
         uses: ./.forgejo/actions/setup
@@ -184,5 +183,64 @@ jobs:
         with:
           name: coverage
           path: coverage
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e:
+    name: Playwright
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      SABLE_E2E_PREBUILT: '1'
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download web assets
+        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
+        with:
+          name: web-assets
+
+      - name: Set up app
+        uses: ./.forgejo/actions/setup
+        with:
+          install-mise-tools: 'false'
+
+      - name: Restore Playwright browsers
+        id: browsers
+        uses: https://github.com/actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: pnpm exec playwright install chromium webkit
+
+      # The shared libraries the browsers link against live outside the cache.
+      - name: Install Playwright system libraries
+        run: pnpm exec playwright install-deps chromium webkit
+
+      - name: Run Playwright tests
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm test:e2e
+
+      - name: Run Playwright tests, failing on flake
+        if: ${{ github.event_name != 'pull_request' }}
+        run: pnpm test:e2e --fail-on-flaky-tests
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
           if-no-files-found: ignore
           retention-days: 7
