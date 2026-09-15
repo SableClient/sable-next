@@ -408,7 +408,15 @@ async function main() {
   fillRect(dmg, 0, 0, 659, 3, ACCENT);
   const y = 170;
   drawLine(dmg, 260, y, 400, y, ARROW, 4);
-  fillPolygon(dmg, [[400, y], [382, y - 12], [382, y + 12]], ARROW);
+  fillPolygon(
+    dmg,
+    [
+      [400, y],
+      [382, y - 12],
+      [382, y + 12],
+    ],
+    ARROW
+  );
   for (const cx of [180, 480]) strokeEllipse(dmg, cx, y, 52, 52, MUTED, 2);
   await writeAsset('dmg-background.png', dmg, encodePng);
 
