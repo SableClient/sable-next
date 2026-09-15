@@ -12,6 +12,18 @@ use crate::search;
 use crate::session;
 use crate::watchers::sync_status;
 
+fn recoverable(error: &matrix_sdk::HttpError) -> bool {
+    match error {
+        matrix_sdk::HttpError::RefreshToken(matrix_sdk::RefreshTokenError::MatrixAuth(inner)) => {
+            recoverable(inner)
+        }
+        matrix_sdk::HttpError::RefreshToken(_) => false,
+        _ => error
+            .as_client_api_error()
+            .is_none_or(|api| api.status_code.is_server_error()),
+    }
+}
+
 pub(crate) struct SessionGeneration<'core> {
     value: u64,
     _guard: tokio::sync::MutexGuard<'core, ()>,
@@ -780,10 +792,7 @@ impl Core {
         };
         match client.whoami().await {
             Ok(_) => false,
-            Err(error) => matches!(
-                error.client_api_error_kind(),
-                Some(matrix_sdk::ruma::api::error::ErrorKind::UnknownToken(_))
-            ),
+            Err(error) => !recoverable(&error),
         }
     }
 }
@@ -961,6 +970,36 @@ mod regression_tests {
         .unwrap();
         assert!(core.session.read().await.is_some());
         assert!(!core.accounts().await.unwrap().accounts[0].needs_reauth);
+    }
+
+    #[tokio::test]
+    async fn a_homeserver_that_cannot_refresh_ends_the_session_instead_of_wedging() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        let (server, core, room) = core_with_room().await;
+        let mut registry = AccountRegistry::empty();
+        registry.active_account_id = Some("first".to_owned());
+        registry.upsert(PersistedAccount {
+            account_id: "first".to_owned(),
+            store_id: "regression".to_owned(),
+            session: current_session(&room.client(), server.server().uri()).unwrap(),
+            needs_reauth: false,
+        });
+        *core.accounts.lock().await = Some(registry);
+        server.mock_who_am_i().error_unrecognized().mount().await;
+        let rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
+        assert!(!core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let accounts = core.accounts().await.unwrap().accounts;
+                if accounts.first().is_some_and(|account| account.needs_reauth) {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(core.session.read().await.is_none());
     }
 
     #[tokio::test]
