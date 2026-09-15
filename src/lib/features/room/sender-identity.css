@@ -58,7 +58,7 @@
   display: block;
   padding: 0 var(--space-050);
   position: relative;
-  z-index: 10;
+  z-index: 0;
 
   &:not(:last-child)::before {
     background: var(--surface-var-container);
@@ -75,7 +75,7 @@
     padding-right: var(--space-150);
     position: absolute;
     right: -1.5em;
-    z-index: 9;
+    z-index: -1;
   }
 }
 
@@ -107,8 +107,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not(.light)
-    :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
+
+  :root:not(.light) :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
   :root.dark :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted {
     color: var(--name-color-on-dark);
   }
@@ -120,15 +120,15 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not(.light)
-      :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
+
+    :root:not(.light) :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted,
     :root.dark :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns).tinted {
       color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
     }
   }
 }
 
-@media (width <= 25rem) {
+@media (width <=25rem) {
   .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
     max-width: 6rem;
   }
@@ -138,7 +138,7 @@
   }
 }
 
-@media (width <= 20rem) {
+@media (width <=20rem) {
   .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
     display: none;
   }
