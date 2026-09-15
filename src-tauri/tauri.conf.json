@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "sable-next",
+  "productName": "Sable Next",
   "version": "0.1.0",
   "identifier": "moe.sable.next",
   "build": {
@@ -29,6 +29,14 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "publisher": "SableClient",
+    "copyright": "Copyright © SableClient contributors",
+    "shortDescription": "A Matrix client",
+    "longDescription": "Sable Next, a Matrix client.",
+    "license": "AGPL-3.0-only",
+    "licenseFile": "../LICENSE",
+    "category": "SocialNetworking",
+    "homepage": "https://sable.moe",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,6 +44,24 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "headerImage": "icons/installer/nsis-header.bmp",
+        "sidebarImage": "icons/installer/nsis-sidebar.bmp",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "startMenuFolder": "Sable"
+      },
+      "wix": {
+        "bannerPath": "icons/installer/wix-banner.bmp",
+        "dialogImagePath": "icons/installer/wix-dialog.bmp"
+      }
+    },
+    "macOS": {
+      "dmg": {
+        "background": "icons/installer/dmg-background.png"
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     },
