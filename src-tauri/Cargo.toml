@@ -29,6 +29,7 @@ tauri = { version = "2.11.3", default-features = false, features = [
   "common-controls-v6",
   "compression",
   "dbus",
+  "devtools",
   "dynamic-acl",
   "tray-icon",
   "x11",
@@ -117,7 +118,7 @@ objc2-photos = { version = "0.3.2", default-features = false, features = [
 [features]
 default = ["wry"]
 wry = ["tauri/wry", "dep:webkit2gtk"]
-cef = ["dep:tauri-runtime-cef", "dep:cef"]
+cef = ["dep:tauri-runtime-cef", "dep:cef", "tauri-runtime-cef/devtools"]
 
 [lints]
 workspace = true

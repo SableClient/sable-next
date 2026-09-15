@@ -374,6 +374,17 @@ fn pending_deep_links() -> Vec<String> {
     deep_link_ipc::take_pending_urls()
 }
 
+#[cfg(desktop)]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
+fn toggle_devtools(window: tauri::WebviewWindow<BrowserEngine>) {
+    if window.is_devtools_open() {
+        window.close_devtools();
+    } else {
+        window.open_devtools();
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
 fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
@@ -493,6 +504,8 @@ pub fn run() {
             upload_media,
             upload_media_base64,
             open_external_url,
+            #[cfg(desktop)]
+            toggle_devtools,
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,
             register_push,
