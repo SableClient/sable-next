@@ -121,7 +121,7 @@ test('places a connected reply preview above the sender header', async () => {
   expect(message?.querySelector(':scope > .message-avatar')).not.toBeNull();
   expect(reply?.nextElementSibling?.tagName).toBe('HEADER');
   expect(reply?.style.getPropertyValue('--reply-name-color')).toBe(senderColor('@bob:example.org'));
-  expect(reply?.querySelector('strong')?.textContent).toBe('Bob');
+  expect(reply?.querySelector('.reply-name')?.textContent).toBe('Bob');
   reply?.click();
   expect(onJumpToEvent).toHaveBeenCalledWith('$original');
 
@@ -145,7 +145,7 @@ test.each(['connected', 'compact', 'expanded'] as const)(
     });
     await tick();
 
-    expect(document.querySelector('.reply-preview strong')?.textContent).toBe('@Bob');
+    expect(document.querySelector('.reply-preview .reply-name')?.textContent).toBe('@Bob');
 
     await unmount(instance);
   }
@@ -166,7 +166,7 @@ test('leaves an unpinged reply target without an at sign', async () => {
   });
   await tick();
 
-  expect(document.querySelector('.reply-preview strong')?.textContent).toBe('Bob');
+  expect(document.querySelector('.reply-preview .reply-name')?.textContent).toBe('Bob');
 
   await unmount(instance);
 });
