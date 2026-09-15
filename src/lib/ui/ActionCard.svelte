@@ -76,9 +76,6 @@
     position: relative;
     text-align: left;
     text-decoration: none;
-    transition:
-      border-color var(--motion-normal) var(--motion-easing-standard),
-      transform var(--motion-normal) var(--motion-easing-standard);
     width: 100%;
   }
 
@@ -90,7 +87,6 @@
   .action-card:hover:not(.action-card-disabled) {
     background: var(--bg-container-hover);
     border-color: var(--primary-container-line);
-    transform: translateY(-2px);
   }
 
   .action-card:active:not(.action-card-disabled) {
@@ -159,11 +155,21 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
+    .action-card {
+      transition:
+        border-color var(--motion-normal) var(--motion-easing-standard),
+        transform var(--motion-normal) var(--ease-smooth-out);
+    }
+
     .action-card:active:not(.action-card-disabled) {
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
         border-color var(--motion-normal) var(--motion-easing-standard),
-        transform var(--motion-normal) var(--motion-easing-standard);
+        transform var(--motion-normal) var(--ease-smooth-out);
+    }
+
+    :global(html:not([data-reduced-motion='on'])) .action-card:hover:not(.action-card-disabled) {
+      transform: translateY(-2px);
     }
   }
 

@@ -667,7 +667,7 @@
               <span>{$i18n.t('timeline.mediaUnavailableDetail')}</span>
             </div>
           {:else}
-            <Spinner />
+            <Spinner label={$i18n.t('a11y.loading')} />
           {/if}
           {#if index < items.length - 1}
             <IconButton class="nav next" label={$i18n.t('viewer.next')} size="large" onclick={next}
@@ -918,7 +918,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .stage img {
-      transition: transform 100ms linear;
+      transition: transform var(--motion-normal) var(--ease-smooth-out);
     }
 
     .stage img.dragging,
@@ -1000,12 +1000,6 @@
 
     :global(.next) {
       right: 1.5rem;
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .stage img {
-      transition: transform 160ms ease;
     }
   }
 </style>

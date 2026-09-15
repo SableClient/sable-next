@@ -195,4 +195,10 @@
       transition: none;
     }
   }
+
+  :global(html[data-reduced-motion='on'] .avatar-root.avatar-preview),
+  :global(html[data-reduced-motion='on']) .more-options[open] .placeholder-list {
+    animation: none;
+    transition: none;
+  }
 </style>

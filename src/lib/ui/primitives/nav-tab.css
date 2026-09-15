@@ -74,37 +74,41 @@
 
 .nav-tab-side::before {
   border-radius: 0 var(--radii-300) var(--radii-300) 0;
-  height: 1rem;
+  height: 1.5rem;
   left: -13.5px;
+  transform: scaleY(0.67);
+  transform-origin: center left;
   width: 5px;
 }
 
 .nav-tab-side:hover::before {
   display: block;
-  width: 3px;
+  transform: scaleX(0.6) scaleY(0.67);
 }
 
 .nav-tab-side[aria-current='page']::before,
 .nav-tab-side[data-current='true']::before {
   display: block;
-  height: 1.5rem;
+  transform: scaleY(1);
 }
 
 .nav-tab-side[aria-current='page']:hover::before,
 .nav-tab-side[data-current='true']:hover::before {
-  width: 5px;
+  transform: scaleY(1);
 }
 
 .nav-tab-bottom::before {
   border-radius: var(--radii-300) var(--radii-300) 0 0;
   bottom: -14.5px;
   height: 6px;
+  transform: scaleY(1);
+  transform-origin: center bottom;
   width: 1rem;
 }
 
 .nav-tab-bottom:hover::before {
   display: block;
-  height: 3px;
+  transform: scaleY(0.5);
 }
 
 .nav-tab-bottom[aria-current='page']::before,
@@ -115,28 +119,28 @@
 
 .nav-tab-bottom[aria-current='page']:hover::before,
 .nav-tab-bottom[data-current='true']:hover::before {
-  height: 6px;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .nav-tab-side:hover {
-    transform: translateX(0.125rem);
-  }
-
-  .nav-tab-bottom:hover {
-    transform: translateY(-0.1875rem);
-  }
+  transform: scaleY(1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .nav-tab::before {
-    transition: height var(--motion-slow) linear;
+  html:not([data-reduced-motion='on']) .nav-tab::before {
+    transition: transform var(--duration-fast) var(--ease-smooth-out);
   }
 
-  .nav-tab {
+  html:not([data-reduced-motion='on']) .nav-tab {
     transition:
       border-color var(--motion-normal) var(--motion-easing-standard),
       color var(--motion-normal) var(--motion-easing-standard),
-      transform var(--motion-slow) cubic-bezier(0, 0.8, 0.67, 0.97);
+      transform var(--duration-fast) var(--ease-smooth-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    html:not([data-reduced-motion='on']) .nav-tab-side:hover {
+      transform: translateX(0.125rem);
+    }
+
+    html:not([data-reduced-motion='on']) .nav-tab-bottom:hover {
+      transform: translateY(-0.1875rem);
+    }
   }
 }

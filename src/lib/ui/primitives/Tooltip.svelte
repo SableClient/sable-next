@@ -104,8 +104,7 @@
     .tooltip-trigger {
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
-        color var(--motion-normal) var(--motion-easing-standard),
-        box-shadow var(--motion-normal) var(--motion-easing-standard);
+        color var(--motion-normal) var(--motion-easing-standard);
     }
   }
 </style>

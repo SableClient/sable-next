@@ -1,10 +1,10 @@
 <script lang="ts">
   import { cubicOut } from 'svelte/easing';
-  import { prefersReducedMotion } from 'svelte/motion';
   import { scale } from 'svelte/transition';
   import type { MemberView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import { memberAvatar, memberName } from './members.js';
@@ -45,8 +45,8 @@
       {#each seen.slice(0, MAX_FACES) as reader (reader.userId)}
         <span
           transition:scale={{
-            duration: prefersReducedMotion.current ? 0 : 200,
-            start: 0.72,
+            duration: motionMs(MOTION_MS.fast),
+            start: 0.96,
             easing: cubicOut,
           }}
         >
@@ -78,11 +78,16 @@
     max-width: 100%;
     padding: 0 var(--space-150);
     position: relative;
-    transition:
-      background-color var(--motion-fast) var(--motion-easing-standard),
-      border-color var(--motion-fast) var(--motion-easing-standard),
-      color var(--motion-fast) var(--motion-easing-standard);
     white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    button {
+      transition:
+        background-color var(--motion-fast) var(--motion-easing-standard),
+        border-color var(--motion-fast) var(--motion-easing-standard),
+        color var(--motion-fast) var(--motion-easing-standard);
+    }
   }
 
   button::after {

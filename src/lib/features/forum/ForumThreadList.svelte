@@ -34,7 +34,7 @@
       </div>
     {:else if loading}
       <div class="forum-thread-list-more">
-        <Spinner small />
+        <Spinner small label={$i18n.t('a11y.loading')} />
       </div>
     {/if}
   {/if}

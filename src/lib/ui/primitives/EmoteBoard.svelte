@@ -4,6 +4,7 @@
   import GifGrid from '#lib/features/gif/GifGrid.svelte';
   import type { GifProviderSetting, GifResult, GifsConfig } from '#lib/features/gif/providers.js';
   import { i18n } from '#lib/i18n.js';
+  import { shouldReduceMotion } from '#lib/ui/motion.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -165,7 +166,7 @@
   }
 
   function jumpTo(id: string): void {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = shouldReduceMotion();
     document
       .getElementById(id)
       ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
@@ -304,7 +305,7 @@
       }}
     />
   {:else if loading}
-    <div class="board-note"><Spinner /></div>
+    <div class="board-note"><Spinner label={$i18n.t('a11y.loading')} /></div>
   {:else if failed}
     <div class="board-note">{$i18n.t('composer.packsFailed')}</div>
   {:else if sections.length === 0 && !unicode}

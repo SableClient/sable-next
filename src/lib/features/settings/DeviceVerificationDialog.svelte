@@ -68,7 +68,7 @@
         <Dialog.Description class="verification-description">
           {$i18n.t('settings.acceptOtherDevice')}
         </Dialog.Description>
-        <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
+        <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
       {:else}
         <Dialog.Description class="verification-description">
           {$i18n.t('settings.verificationRequested')}
@@ -81,7 +81,7 @@
       <Dialog.Description class="verification-description">
         {$i18n.t('settings.startingEmojiComparison')}
       </Dialog.Description>
-      <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
+      <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'compare'}
       <Dialog.Description class="verification-description">
         {$i18n.t('settings.compareEmoji')}
@@ -110,7 +110,7 @@
       <Dialog.Description class="verification-description">
         {$i18n.t('settings.finishing')}
       </Dialog.Description>
-      <p class="verification-wait">{$i18n.t('settings.waiting')}</p>
+      <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'done'}
       <Dialog.Description class="verification-description">
         {$i18n.t('settings.verificationComplete')}
@@ -202,7 +202,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .verification-wait::before {
+    :global(html:not([data-reduced-motion='on'])) .verification-wait::before {
       animation: pulse 1.25s ease-in-out infinite;
     }
   }

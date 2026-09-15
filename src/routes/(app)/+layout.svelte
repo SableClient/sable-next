@@ -215,10 +215,6 @@
   });
 
   $effect(() => {
-    document.documentElement.dataset.reducedMotion = preferences.reducedMotion ? 'on' : 'off';
-  });
-
-  $effect(() => {
     // The bars only matter once the shell paints under them; the observer then
     // re-samples on navigation, overlays and theme swaps by itself.
     if (core.status !== 'ready') return;

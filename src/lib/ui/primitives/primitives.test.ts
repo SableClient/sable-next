@@ -12,6 +12,7 @@ import IconButton from './IconButton.svelte';
 import LinkButton from './LinkButton.svelte';
 import OptionCards from './OptionCards.svelte';
 import Skeleton from './Skeleton.svelte';
+import Spinner from './Spinner.svelte';
 import StatusBadge from './StatusBadge.svelte';
 import TextArea from './TextArea.svelte';
 
@@ -121,6 +122,24 @@ test('option cards are one radio group with a single checked item', () => {
   radios[1].click();
 
   expect(onSelect).toHaveBeenCalledWith('public');
+});
+
+test('a labelled spinner announces loading without exposing the glyph', () => {
+  mount(Spinner, {
+    target: document.body,
+    props: { label: 'Loading' },
+  });
+
+  const status = document.querySelector('[role="status"]');
+  expect(status?.textContent).toContain('Loading');
+  expect(document.querySelector('.spinner')?.getAttribute('aria-hidden')).toBe('true');
+});
+
+test('an unlabelled spinner stays a decorative glyph', () => {
+  mount(Spinner, { target: document.body });
+
+  expect(document.querySelector('[role="status"]')).toBeNull();
+  expect(document.querySelector('.spinner')?.getAttribute('aria-hidden')).toBe('true');
 });
 
 test('skeletons are decorative and forward presentation attributes', () => {

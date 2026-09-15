@@ -377,7 +377,7 @@
           </div>
         {/if}
       {:else if loading}
-        <div class="loading-state">
+        <div class="loading-state" role="status">
           <Spinner /><span>{$i18n.t('settings.loadingEncryption')}</span>
         </div>
       {/if}
@@ -389,7 +389,7 @@
       titleActions={devicesActions}
     >
       {#if loading}
-        <div class="loading-state">
+        <div class="loading-state" role="status">
           <Spinner /><span>{$i18n.t('settings.loadingDevices')}</span>
         </div>
       {:else if devices.length === 0}
