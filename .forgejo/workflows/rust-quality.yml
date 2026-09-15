@@ -51,7 +51,7 @@ jobs:
       - name: Set up Rust
         uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
-          toolchain: 1.97.1
+          toolchain: 1.98.1
           components: rustfmt
 
       - name: Check Rust formatting
@@ -192,12 +192,12 @@ jobs:
       - name: Set up Rust
         uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
-          toolchain: 1.97.1
+          toolchain: 1.98.1
 
       - name: Set up mise
         uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          version: '2026.9.2'
+          version: '2026.9.3'
           github_token: ''
           cache: true
           env: false
