@@ -12,18 +12,6 @@ use crate::search;
 use crate::session;
 use crate::watchers::sync_status;
 
-fn recoverable(error: &matrix_sdk::HttpError) -> bool {
-    match error {
-        matrix_sdk::HttpError::RefreshToken(matrix_sdk::RefreshTokenError::MatrixAuth(inner)) => {
-            recoverable(inner)
-        }
-        matrix_sdk::HttpError::RefreshToken(_) => false,
-        _ => error
-            .as_client_api_error()
-            .is_none_or(|api| api.status_code.is_server_error()),
-    }
-}
-
 pub(crate) struct SessionGeneration<'core> {
     value: u64,
     _guard: tokio::sync::MutexGuard<'core, ()>,
@@ -734,18 +722,8 @@ impl Core {
             return true;
         }
 
-        if self.token_probe.swap(true, Ordering::SeqCst) {
-            return false;
-        }
-
         let core = self.clone();
         drop(spawn(async move {
-            let rejected = core.token_is_rejected().await;
-            core.token_probe.store(false, Ordering::SeqCst);
-            if !rejected {
-                return;
-            }
-
             let _activation = core.session_activation_lock.lock().await;
             let _swap = core.session_swap_lock.lock().await;
             if core.session_generation.load(Ordering::SeqCst) != generation {
@@ -779,21 +757,7 @@ impl Core {
                 },
             });
         }));
-        false
-    }
-
-    async fn token_is_rejected(&self) -> bool {
-        let client = {
-            let session = self.session.read().await;
-            let Some(session) = session.as_ref() else {
-                return true;
-            };
-            session.client.clone()
-        };
-        match client.whoami().await {
-            Ok(_) => false,
-            Err(error) => !recoverable(&error),
-        }
+        true
     }
 }
 
@@ -882,15 +846,10 @@ mod regression_tests {
             needs_reauth: false,
         });
         *core.accounts.lock().await = Some(registry);
-        server
-            .mock_who_am_i()
-            .error_unknown_token(true)
-            .mount()
-            .await;
         let pending = core.claim_session_generation().await;
         let mut rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
         rejected.soft_logout = true;
-        assert!(!core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
+        assert!(core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
         tokio::task::yield_now().await;
         assert!(core.session.read().await.is_some());
         drop(pending);
@@ -920,13 +879,8 @@ mod regression_tests {
             needs_reauth: false,
         });
         *core.accounts.lock().await = Some(registry);
-        server
-            .mock_who_am_i()
-            .error_unknown_token(false)
-            .mount()
-            .await;
         let rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
-        assert!(!core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
+        assert!(core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
         tokio::time::timeout(std::time::Duration::from_secs(5), async {
             loop {
                 let accounts = core.accounts().await.unwrap().accounts;
@@ -941,65 +895,6 @@ mod regression_tests {
         let accounts = core.accounts().await.unwrap().accounts;
         assert_eq!(accounts.len(), 1);
         assert_eq!(accounts[0].account_id, "first");
-    }
-
-    #[tokio::test]
-    async fn a_refresh_that_failed_in_transit_keeps_the_session() {
-        use std::sync::atomic::Ordering;
-
-        use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, core, room) = core_with_room().await;
-        let mut registry = AccountRegistry::empty();
-        registry.active_account_id = Some("first".to_owned());
-        registry.upsert(PersistedAccount {
-            account_id: "first".to_owned(),
-            store_id: "regression".to_owned(),
-            session: current_session(&room.client(), server.server().uri()).unwrap(),
-            needs_reauth: false,
-        });
-        *core.accounts.lock().await = Some(registry);
-        server.mock_who_am_i().error500().mount().await;
-        let rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
-        assert!(!core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            while core.token_probe.load(Ordering::SeqCst) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        assert!(core.session.read().await.is_some());
-        assert!(!core.accounts().await.unwrap().accounts[0].needs_reauth);
-    }
-
-    #[tokio::test]
-    async fn a_homeserver_that_cannot_refresh_ends_the_session_instead_of_wedging() {
-        use crate::session::{AccountRegistry, PersistedAccount, current_session};
-        let (server, core, room) = core_with_room().await;
-        let mut registry = AccountRegistry::empty();
-        registry.active_account_id = Some("first".to_owned());
-        registry.upsert(PersistedAccount {
-            account_id: "first".to_owned(),
-            store_id: "regression".to_owned(),
-            session: current_session(&room.client(), server.server().uri()).unwrap(),
-            needs_reauth: false,
-        });
-        *core.accounts.lock().await = Some(registry);
-        server.mock_who_am_i().error_unrecognized().mount().await;
-        let rejected = matrix_sdk::ruma::api::error::UnknownTokenErrorData::new();
-        assert!(!core.handle_session_change(&matrix_sdk::SessionChange::UnknownToken(rejected), 1));
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            loop {
-                let accounts = core.accounts().await.unwrap().accounts;
-                if accounts.first().is_some_and(|account| account.needs_reauth) {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        assert!(core.session.read().await.is_none());
     }
 
     #[tokio::test]
