@@ -15,6 +15,11 @@ const literalFontSizePattern = /font-size\s*:\s*(?!\s*(?:var|inherit|max|min|cla
 const literalSpacingPattern =
   /(?:padding|margin)(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?\s*:[^;}]*-?(?:\d*\.)?\d+(?:px|rem|em)\b|(?:gap|row-gap|column-gap)\s*:[^;}]*-?(?:\d*\.)?\d+(?:px|rem|em)\b/gi;
 const safeAreaPattern = /--safe-(?:top|right|bottom|left)\b/gi;
+const literalLayerPattern = /z-index\s*:\s*(-?\d+)/gi;
+
+// Below this a z-index only orders siblings inside a component's own stacking
+// context; at or above it, it competes with the overlay scale.
+const localLayerCeiling = 10;
 
 // An inset must be applied once, by the element that paints under the system
 // bar. Everything nested inside one of these already sits in cleared space, so a
@@ -70,6 +75,7 @@ const literalColors = [];
 const literalFontSizes = [];
 const literalSpacingValues = [];
 const safeAreaTrespassers = [];
+const literalLayers = [];
 
 for (const file of files) {
   const source = await readFile(file, 'utf8');
@@ -116,6 +122,12 @@ for (const file of files) {
     for (const match of source.matchAll(literalSpacingPattern)) {
       literalSpacingValues.push(`${relative(root, file)}:${lineNumber(source, match.index)}`);
     }
+    for (const match of source.matchAll(literalLayerPattern)) {
+      if (Math.abs(Number(match[1])) < localLayerCeiling) continue;
+      literalLayers.push(
+        `${relative(root, file)}:${lineNumber(source, match.index)} (${match[0]})`
+      );
+    }
   }
 }
 
@@ -128,6 +140,7 @@ if (
   literalColors.length > 0 ||
   literalFontSizes.length > 0 ||
   literalSpacingValues.length > 0 ||
+  literalLayers.length > 0 ||
   safeAreaTrespassers.length > 0
 ) {
   if (missing.length > 0) {
@@ -152,6 +165,12 @@ if (
     );
     for (const location of literalSpacingValues) console.error(`  ${location}`);
   }
+  if (literalLayers.length > 0) {
+    console.error(
+      'A z-index that competes with the overlay scale must use a --layer-* token from src/styles.css:'
+    );
+    for (const location of literalLayers) console.error(`  ${location}`);
+  }
   if (safeAreaTrespassers.length > 0) {
     console.error('Safe-area insets may only be applied by a surface root:');
     for (const owner of [...safeAreaOwners].sort()) console.error(`  owner: ${owner}`);
@@ -162,4 +181,5 @@ if (
   const checked = [...new Set([...declared.keys(), ...referenced.keys()])].sort();
   console.log(`Checked ${checked.length} project custom properties; all references are declared.`);
   console.log(`Safe-area insets are applied only by the ${safeAreaOwners.size} surface roots.`);
+  console.log(`Every z-index at or above ${localLayerCeiling} resolves through a --layer-* token.`);
 }

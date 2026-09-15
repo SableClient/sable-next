@@ -127,7 +127,7 @@
     height: var(--titlebar-height);
     inset: 0 0 auto;
     position: fixed;
-    z-index: 600;
+    z-index: var(--layer-chrome);
   }
 
   .drag {
@@ -183,7 +183,7 @@
 
   .handle {
     position: fixed;
-    z-index: 601;
+    z-index: calc(var(--layer-chrome) + 1);
   }
 
   :global([data-tauri-drag-region]) {

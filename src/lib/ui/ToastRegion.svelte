@@ -32,7 +32,7 @@
     pointer-events: none;
     position: fixed;
     right: var(--space-400);
-    z-index: 100;
+    z-index: var(--layer-notify);
   }
 
   .toast {

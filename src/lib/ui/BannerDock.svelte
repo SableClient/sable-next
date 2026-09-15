@@ -21,7 +21,7 @@
     justify-items: center;
     pointer-events: none;
     position: fixed;
-    z-index: 100;
+    z-index: var(--layer-notify);
   }
 
   .dock > :global(*) {

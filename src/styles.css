@@ -356,6 +356,8 @@ html {
   --layer-popover: 300;
   --layer-menu: 400;
   --layer-tooltip: 500;
+  --layer-notify: 600;
+  --layer-chrome: 700;
   --page-gutter: var(--space-300);
   --navigation-rail-width: 4.125rem;
   --timeline-row-gap: var(--space-250);

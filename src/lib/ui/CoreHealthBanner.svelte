@@ -48,7 +48,7 @@
     justify-content: center;
     padding: var(--space-300) var(--space-400);
     position: fixed;
-    z-index: 100;
+    z-index: var(--layer-notify);
   }
 
   .crash {
