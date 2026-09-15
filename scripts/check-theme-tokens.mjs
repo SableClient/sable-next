@@ -39,7 +39,6 @@ const externalProperties = new Set([
   '--bits-combobox-anchor-width',
   '--bits-select-anchor-width',
   '--bits-select-content-available-height',
-  '--bits-floating-transform-origin',
   '--keyboard-height',
 ]);
 

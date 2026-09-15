@@ -128,7 +128,7 @@
     headingId="settings-personas"
   >
     {#if personas.loading && personas.personas.length === 0}
-      <p class="persona-empty"><Spinner small label={$i18n.t('a11y.loading')} /></p>
+      <p class="persona-empty"><Spinner small /></p>
     {:else if personas.personas.length === 0}
       <p class="persona-empty">{$i18n.t('personas.empty')}</p>
     {:else}

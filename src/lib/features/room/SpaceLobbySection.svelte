@@ -327,12 +327,6 @@
     display: inline-flex;
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .caret {
-      transition: transform var(--duration-fast) var(--ease-smooth-out);
-    }
-  }
-
   .caret.closed {
     transform: rotate(-90deg);
   }

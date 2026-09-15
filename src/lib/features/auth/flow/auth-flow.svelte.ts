@@ -9,6 +9,7 @@ import {
 } from '#lib/features/auth/registration/registration-errors.js';
 import { LEGACY_REGISTRATION_FALLBACK } from '#lib/features/auth/registration/registration-methods.js';
 
+export const AUTH_CARD_MOTION_MS = 450;
 export const LOGGED_IN_MARKER = 'sable-has-logged-in';
 
 export function readReturningUser(storage: Storage | undefined): boolean {

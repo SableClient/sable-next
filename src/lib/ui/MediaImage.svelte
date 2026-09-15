@@ -476,28 +476,18 @@
 
   .media-image-blurhash,
   .media-image-placeholder {
-    filter: blur(var(--blur-small));
     height: 100%;
     inset: 0;
     opacity: 1;
     position: absolute;
+    transition: opacity var(--motion-fast) var(--motion-easing-standard);
     width: 100%;
   }
 
   .media-image-blurhash.loaded,
   .media-image-placeholder.loaded {
-    filter: blur(0);
     opacity: 0;
     pointer-events: none;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .media-image-blurhash,
-    .media-image-placeholder {
-      transition:
-        opacity var(--duration-slow) ease-in-out,
-        filter var(--duration-slow) ease-in-out;
-    }
   }
 
   .media-image-placeholder {

@@ -277,7 +277,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .voice-level {
-      transition: transform var(--duration-micro) linear;
+      transition: transform 80ms linear;
     }
   }
 </style>

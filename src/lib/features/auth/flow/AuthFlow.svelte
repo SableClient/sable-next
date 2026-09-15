@@ -5,7 +5,6 @@
   import { page } from '$app/state';
   import { onMount, untrack } from 'svelte';
   import { i18n } from '#lib/i18n.js';
-  import { shouldReduceMotion } from '#lib/ui/motion.js';
   import { useCoreClient } from '#lib/core/context.js';
   import AuthFooter from '#lib/features/auth/shared/AuthFooter.svelte';
   import AuthHeader from '#lib/features/auth/shared/AuthHeader.svelte';
@@ -366,7 +365,7 @@
     if (index > furthestReached) {
       furthestReached = index;
       enteringStage = index;
-      if (shouldReduceMotion()) enteringStage = null;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) enteringStage = null;
     }
     pendingStage = index;
     void goto(stageRoute(index), { reset: false }).finally(() => {
@@ -393,7 +392,7 @@
   function invalidateAfter(index: number): void {
     if (furthestReached <= index || retiringAfter !== null) return;
     retiringAfter = index;
-    if (shouldReduceMotion()) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       furthestReached = index;
       retiringAfter = null;
     }
@@ -470,7 +469,7 @@
     <AuthHeader {hasLoggedInBefore} />
     <div class="auth-main">
       {#if core.status === 'starting' || core.status === 'idle' || (core.status === 'signed-out' && !hasCompletedInitialHomeserverCheck)}
-        <div class="bootstrap" role="status">
+        <div class="bootstrap">
           <Spinner />
           <p>{$i18n.t('auth.starting')}</p>
         </div>

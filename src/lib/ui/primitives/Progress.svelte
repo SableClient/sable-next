@@ -10,7 +10,7 @@
 </script>
 
 <Progress.Root class="progress-track" {value} aria-label={label} aria-valuetext={label}>
-  <span class="progress-fill" style="scale: {value / 100} 1;"></span>
+  <span class="progress-fill" style="inline-size: {value}%"></span>
 </Progress.Root>
 
 <style>
@@ -26,13 +26,11 @@
     background: var(--primary-main);
     block-size: 100%;
     display: inline-block;
-    inline-size: 100%;
-    transform-origin: left center;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     :global(.progress-fill) {
-      transition: scale var(--motion-normal) var(--ease-smooth-out);
+      transition: inline-size var(--motion-normal) var(--motion-easing-standard);
     }
   }
 </style>

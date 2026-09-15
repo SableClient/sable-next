@@ -1,5 +1,5 @@
 .tooltip {
-  animation: tooltip-in var(--motion-normal) ease-out both;
+  animation: tooltip-in var(--motion-fast) var(--motion-easing-emphasized) both;
   background: var(--surface-container);
   border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radii-400);
@@ -18,7 +18,7 @@
 @keyframes tooltip-in {
   from {
     opacity: 0;
-    transform: translateY(var(--space-100)) scale(var(--scale-subtle));
+    transform: translateY(0.25rem) scale(0.96);
   }
 }
 
@@ -26,8 +26,4 @@
   .tooltip {
     animation: none;
   }
-}
-
-html[data-reduced-motion='on'] .tooltip {
-  animation: none;
 }

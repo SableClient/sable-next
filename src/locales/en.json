@@ -2110,8 +2110,5 @@
     "stealFailed": "That could not be added to your pack.",
     "downloadOne": "Download emote",
     "downloadMany": "Download emotes"
-  },
-  "a11y": {
-    "loading": "Loading"
   }
 }

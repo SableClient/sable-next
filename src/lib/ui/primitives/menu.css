@@ -14,32 +14,7 @@
   min-width: var(--menu-min-width);
   overflow: auto;
   padding: var(--radius-padding);
-  transform-origin: var(--bits-floating-transform-origin, top);
   z-index: var(--layer-menu);
-}
-
-@keyframes menu-in {
-  from {
-    opacity: 0;
-    transform: scale(var(--scale-enter));
-  }
-}
-
-@keyframes menu-out {
-  to {
-    opacity: 0;
-    transform: scale(var(--scale-subtle));
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  html:not([data-reduced-motion='on']) .menu-surface[data-state='open'] {
-    animation: menu-in var(--duration-fast) var(--ease-smooth-out);
-  }
-
-  html:not([data-reduced-motion='on']) .menu-surface[data-state='closed'] {
-    animation: menu-out var(--motion-normal) var(--ease-smooth-out);
-  }
 }
 
 .menu-item {

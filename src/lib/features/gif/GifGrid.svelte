@@ -95,7 +95,7 @@
 
 <div class="gif-grid">
   {#if search.loading}
-    <div class="gif-note"><Spinner label={$i18n.t('a11y.loading')} /></div>
+    <div class="gif-note"><Spinner /></div>
   {:else if search.failed}
     <div class="gif-note">{$i18n.t('composer.gifSearchFailed')}</div>
   {:else if empty}

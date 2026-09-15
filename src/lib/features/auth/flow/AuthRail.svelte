@@ -1,16 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { prefersReducedMotion } from 'svelte/motion';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import { cubicOut } from 'svelte/easing';
   import { i18n } from '#lib/i18n.js';
-  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import {
     finishSwipeGesture,
     startSwipeGesture,
     updateSwipeGesture,
     type SwipeGesture,
   } from '#lib/ui/swipe-gesture.js';
+  import { AUTH_CARD_MOTION_MS } from './auth-flow.svelte';
 
   interface Props {
     activeIndex: number;
@@ -45,7 +46,7 @@
     const start = rail.scrollLeft;
     const target = cardTarget(rail, card);
     const distance = target - start;
-    const duration = motionMs(MOTION_MS.fast);
+    const duration = prefersReducedMotion.current ? 0 : AUTH_CARD_MOTION_MS;
 
     if (duration === 0 || Math.abs(distance) < 1) {
       rail.scrollLeft = target;
@@ -200,7 +201,7 @@
   });
 </script>
 
-<div class="rail-shell">
+<div class="rail-shell" style:--auth-card-motion-duration={`${String(AUTH_CARD_MOTION_MS)}ms`}>
   {#if total > 1}
     <nav class="mobile-nav" aria-label={$i18n.t('auth.stageNavigation')}>
       {#if canBack}
@@ -229,6 +230,7 @@
     class:is-dragging={isDragging}
     role="group"
     aria-label={$i18n.t('auth.stageNavigation')}
+    aria-live="polite"
     ontouchstart={handleTouchStart}
     ontouchmove={handleTouchMove}
     ontouchend={() => {
@@ -315,37 +317,41 @@
 
   .rail.motion-ready :global(.auth-card) {
     transition:
-      opacity var(--duration-fast) var(--ease-smooth-out),
-      transform var(--duration-fast) var(--ease-smooth-out);
+      filter var(--auth-card-motion-duration) var(--motion-easing-emphasized),
+      opacity var(--auth-card-motion-duration) var(--motion-easing-emphasized),
+      transform var(--auth-card-motion-duration) var(--motion-easing-emphasized);
   }
 
   .rail :global(.auth-card.before),
   .rail :global(.auth-card.after) {
+    filter: brightness(0.7) saturate(0.55);
     opacity: 1;
-    transform: scale(var(--scale-subtle));
+    transform: scale(0.99);
   }
 
   .rail :global(.auth-card.removing) {
+    filter: saturate(0.4);
     opacity: 0;
     pointer-events: none;
-    transform: translateX(var(--space-200)) scale(var(--scale-subtle));
+    transform: translateX(0.5rem) scale(0.98);
   }
 
   .rail :global(.auth-card.before) {
-    transform: translateX(calc(var(--space-150) * -1)) scale(var(--scale-subtle));
+    transform: translateX(-0.375rem) scale(0.99);
   }
 
   .rail :global(.auth-card.after) {
-    transform: translateX(var(--space-150)) scale(var(--scale-subtle));
+    transform: translateX(0.375rem) scale(0.99);
   }
 
   .rail :global(.auth-card.active) {
+    filter: none;
     opacity: 1;
     transform: translateX(0) scale(1);
   }
 
   .rail.motion-ready :global(.auth-card.entering) {
-    animation: card-enter var(--duration-fast) var(--ease-smooth-out) both;
+    animation: card-enter var(--auth-card-motion-duration) var(--motion-easing-emphasized) both;
   }
 
   @keyframes card-enter {
@@ -376,6 +382,9 @@
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
+    transition:
+      color var(--motion-normal) var(--motion-easing-standard),
+      transform var(--motion-normal) var(--motion-easing-standard);
     width: 2.25rem;
   }
 
@@ -386,18 +395,7 @@
 
   .panel-nav:hover {
     color: var(--bg-on-container);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    :global(html:not([data-reduced-motion='on'])) .panel-nav {
-      transition:
-        color var(--motion-normal) var(--motion-easing-standard),
-        transform var(--motion-normal) var(--motion-easing-standard);
-    }
-
-    :global(html:not([data-reduced-motion='on'])) .panel-nav:hover {
-      transform: translateY(-50%) scale(1.05);
-    }
+    transform: translateY(-50%) scale(1.05);
   }
 
   .panel-nav :global(svg) {
@@ -429,14 +427,6 @@
     .panel-nav:hover {
       transform: translateY(-50%);
     }
-  }
-
-  :global(html[data-reduced-motion='on']) .rail.motion-ready :global(.auth-card) {
-    transition: none;
-  }
-
-  :global(html[data-reduced-motion='on']) .rail.motion-ready :global(.auth-card.entering) {
-    animation: none;
   }
 
   @media (width <= 48rem) {

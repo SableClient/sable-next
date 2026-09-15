@@ -133,7 +133,7 @@
 <div class="pdf-viewer" bind:this={container}>
   <div class="pdf-page-frame">
     {#if loading}
-      <Spinner label={$i18n.t('a11y.loading')} />
+      <Spinner />
     {:else if failed}
       <div class="pdf-error">
         <WarningIcon />

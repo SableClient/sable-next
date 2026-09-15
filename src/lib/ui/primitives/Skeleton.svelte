@@ -16,7 +16,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(html:not([data-reduced-motion='on']) .skeleton) {
+    :global(.skeleton) {
       animation: skeleton-pulse 1.8s ease-in-out infinite;
     }
   }

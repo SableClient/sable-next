@@ -20,9 +20,9 @@
   }: Props = $props();
 </script>
 
-<div class="auth-status-slot">
+<div class="auth-status-slot" aria-live="polite">
   {#if loading && loadingMessage}
-    <div class="auth-status-message auth-status-loading" role="status">
+    <div class="auth-status-message auth-status-loading">
       <Spinner small />
       {loadingMessage}
     </div>
@@ -86,28 +86,14 @@
   }
 
   @keyframes error-in {
-    0% {
+    from {
       opacity: 0;
-      transform: translateX(var(--space-200));
-    }
-
-    40% {
-      transform: translateX(calc(var(--space-150) * -1));
-    }
-
-    70% {
-      transform: translateX(var(--space-150));
-    }
-
-    100% {
-      opacity: 1;
-      transform: translateX(0);
     }
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .auth-status-error {
-      animation: error-in var(--duration-fast) var(--ease-smooth-out);
+      animation: error-in var(--motion-normal) var(--motion-easing-standard);
     }
   }
 </style>

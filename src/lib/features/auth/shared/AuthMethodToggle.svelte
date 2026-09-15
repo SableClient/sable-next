@@ -46,7 +46,7 @@
   .method-toggle-icon {
     align-items: center;
     display: flex;
-    transition: transform var(--motion-normal) var(--ease-smooth-out);
+    transition: transform var(--motion-normal) ease;
   }
 
   .method-toggle-icon.expanded {
@@ -62,9 +62,5 @@
     .method-toggle-icon {
       transition: none;
     }
-  }
-
-  :global(html[data-reduced-motion='on']) .method-toggle-icon {
-    transition: none;
   }
 </style>

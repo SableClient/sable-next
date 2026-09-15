@@ -37,3 +37,9 @@
   cursor: not-allowed;
   opacity: var(--opacity-disabled);
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .form-control {
+    transition: box-shadow var(--motion-normal) var(--motion-easing-standard);
+  }
+}

@@ -89,7 +89,6 @@
   $effect(() => {
     document.documentElement.dataset.fontScale = preferences.fontScale;
     document.documentElement.dataset.highContrast = preferences.highContrast ? 'on' : 'off';
-    document.documentElement.dataset.reducedMotion = preferences.reducedMotion ? 'on' : 'off';
   });
 
   $effect(() => {
@@ -122,7 +121,7 @@
     <WebUpdateBanner />
   </BannerDock>
 
-  <Tooltip.Provider delayDuration={400} skipDelayDuration={80}>
+  <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
     {@render children()}
   </Tooltip.Provider>
 </IconContext>

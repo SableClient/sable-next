@@ -969,7 +969,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(html:not([data-reduced-motion='on'])) .placeholder-copy {
+    .placeholder-copy {
       animation: skeleton-pulse 1.8s ease-in-out infinite;
     }
   }
@@ -1032,7 +1032,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .message {
-      transition: transform var(--duration-fast) var(--ease-smooth-out);
+      transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
     }
   }
 
@@ -1147,7 +1147,7 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(html:not([data-reduced-motion='on'])) .message.highlighted {
+    .message.highlighted {
       animation: jump 6s var(--motion-easing-standard);
     }
   }
@@ -1156,10 +1156,6 @@
     .message.highlighted {
       background-color: var(--primary-container);
     }
-  }
-
-  :global(html[data-reduced-motion='on']) .message.highlighted {
-    background-color: var(--primary-container);
   }
 
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
@@ -1542,7 +1538,7 @@
   /* bits-ui renders the trigger, so the row's scoped `.reaction` cannot reach it. */
 
   :global(.reaction-tooltip) {
-    animation: tooltip-in var(--motion-normal) ease-out both;
+    animation: tooltip-in var(--motion-slow) var(--motion-easing-emphasized) both;
     background: var(--bg-container);
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
@@ -1561,7 +1557,7 @@
   @keyframes tooltip-in {
     from {
       opacity: 0;
-      transform: translateY(var(--space-100)) scale(var(--scale-subtle));
+      transform: translateY(0.25rem) scale(0.96);
     }
   }
 
@@ -1579,10 +1575,6 @@
     :global(.reaction-tooltip) {
       animation: none;
     }
-  }
-
-  :global(html[data-reduced-motion='on'] .reaction-tooltip) {
-    animation: none;
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {

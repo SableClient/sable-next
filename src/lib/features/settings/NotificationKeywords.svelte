@@ -99,7 +99,7 @@
   {/if}
 
   {#if loading}
-    <p class="keywords-empty"><Spinner small label={$i18n.t('a11y.loading')} /></p>
+    <p class="keywords-empty"><Spinner small /></p>
   {:else if keywords.length === 0}
     <p class="keywords-empty">{$i18n.t('settings.notificationKeywordsEmpty')}</p>
   {:else}
