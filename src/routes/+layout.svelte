@@ -19,6 +19,7 @@
   import UnverifiedDeviceBanner from '#lib/ui/UnverifiedDeviceBanner.svelte';
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
+  import { trackInspectorShortcut } from '#lib/platform/devtools.js';
   import { registerServiceWorker } from '#lib/platform/service-worker.js';
   import { guardTouchClicks } from '#lib/ui/trailing-click.js';
   import {
@@ -59,12 +60,14 @@
 
     const stopTrackingKeyboard = trackKeyboardInset();
     const stopGuardingClicks = guardTouchClicks();
+    const stopInspectorShortcut = trackInspectorShortcut();
     void registerServiceWorker();
     void core.start();
     return () => {
       stopListening();
       stopTrackingKeyboard();
       stopGuardingClicks();
+      stopInspectorShortcut();
       core.stop();
     };
   });
