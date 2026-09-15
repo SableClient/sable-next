@@ -34,9 +34,11 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
+import { senderColor } from './timeline-format';
 
 afterEach(() => {
   document.body.replaceChildren();
+  setPreference('replyPreviewStyle', 'connected');
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 });
@@ -81,6 +83,112 @@ function imageItem(body = 'photo.png'): TimelineItemView {
     },
   };
 }
+
+function replyItem(
+  body = 'A reply with enough text to show how the preview is rendered.',
+  mention: TimelineItemView['mention'] = 'none',
+  isMentioned = false
+): TimelineItemView {
+  return {
+    ...item(false),
+    mention,
+    in_reply_to: {
+      event_id: '$original',
+      sender: '@bob:example.org',
+      sender_mentioned: isMentioned,
+      sender_name: 'Bob',
+      body,
+    },
+  };
+}
+
+test('places a connected reply preview above the sender header', async () => {
+  setPreference('replyPreviewStyle', 'connected');
+  const onJumpToEvent = vi.fn();
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: replyItem(), collapsed: false, onJumpToEvent },
+    },
+  });
+  await tick();
+
+  const reply = document.querySelector<HTMLButtonElement>('.message-content > .reply-connected');
+  const message = document.querySelector('.message');
+  expect(reply).toBeInstanceOf(HTMLButtonElement);
+  expect(message?.classList.contains('has-connected-reply')).toBe(true);
+  expect(message?.querySelector(':scope > .message-avatar')).not.toBeNull();
+  expect(reply?.nextElementSibling?.tagName).toBe('HEADER');
+  expect(reply?.style.getPropertyValue('--reply-name-color')).toBe(senderColor('@bob:example.org'));
+  expect(reply?.querySelector('strong')?.textContent).toBe('Bob');
+  reply?.click();
+  expect(onJumpToEvent).toHaveBeenCalledWith('$original');
+
+  await unmount(instance);
+});
+
+test.each(['connected', 'compact', 'expanded'] as const)(
+  'marks a pinged reply target with an at sign in %s previews',
+  async (replyPreviewStyle) => {
+    setPreference('replyPreviewStyle', replyPreviewStyle);
+    const instance = mount(TimelineItemHarness, {
+      target: document.body,
+      props: {
+        core,
+        item: {
+          item: replyItem(undefined, 'none', true),
+          collapsed: false,
+          currentUserId: '@alice:example.org',
+        },
+      },
+    });
+    await tick();
+
+    expect(document.querySelector('.reply-preview strong')?.textContent).toBe('@Bob');
+
+    await unmount(instance);
+  }
+);
+
+test('leaves an unpinged reply target without an at sign', async () => {
+  setPreference('replyPreviewStyle', 'connected');
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: replyItem(undefined, 'silent', false),
+        collapsed: false,
+        currentUserId: '@alice:example.org',
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.reply-preview strong')?.textContent).toBe('Bob');
+
+  await unmount(instance);
+});
+
+test('switches between compact and expanded reply cards', async () => {
+  setPreference('replyPreviewStyle', 'compact');
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: replyItem(), collapsed: false } },
+  });
+  await tick();
+
+  expect(document.querySelector('.message-main > .reply-compact .reply-icon')).not.toBeNull();
+
+  setPreference('replyPreviewStyle', 'expanded');
+  await tick();
+  const expanded = document.querySelector('.message-main > .reply-expanded');
+  expect(expanded?.textContent).toContain('Bob');
+  expect(expanded?.textContent).toContain('A reply with enough text');
+
+  await unmount(instance);
+});
 
 test('renders placeholders through the standard message layout', async () => {
   const instance = mount(TimelineItemHarness, {

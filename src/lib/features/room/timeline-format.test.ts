@@ -172,6 +172,34 @@ test("keeps a persona message out of the account's collapsed run", () => {
   expect(isCollapsed(items, 1)).toBe(false);
 });
 
+test('only a connected reply preview starts a new message group', () => {
+  const first = {
+    ...message,
+    id: 'first',
+    sender: '@a:b',
+    timestamp: 0,
+    in_reply_to: null,
+  } as TimelineItemView;
+  const reply = {
+    ...message,
+    id: 'reply',
+    sender: '@a:b',
+    timestamp: 1000,
+    in_reply_to: {
+      event_id: '$original',
+      sender: '@b:b',
+      sender_mentioned: false,
+      sender_name: 'Bob',
+      body: 'Earlier message',
+    },
+  } as TimelineItemView;
+  const run = [first, reply];
+
+  expect(isCollapsed(run, 1, 'connected')).toBe(false);
+  expect(isCollapsed(run, 1, 'compact')).toBe(true);
+  expect(isCollapsed(run, 1, 'expanded')).toBe(true);
+});
+
 test('drops a divider whose whole run was filtered out', () => {
   expect(visibleTimelineItems([divider, renamed, divider, message], defaults)).toEqual([
     divider,

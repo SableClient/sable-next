@@ -614,6 +614,7 @@ export type RegistrationResultView = { state: "complete"; user_id: string } | { 
 export type ReplyView = {
 	event_id: string,
 	sender: string | null,
+	sender_mentioned: boolean,
 	sender_name: string | null,
 	body: string | null,
 };

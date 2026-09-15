@@ -1685,6 +1685,7 @@ test('an animated jump to a reply target settles on it instead of the end', asyn
         in_reply_to: {
           event_id: target,
           sender: '@bob:example.test',
+          sender_mentioned: false,
           sender_name: 'Bob',
           body: 'Mobile history 4',
         },

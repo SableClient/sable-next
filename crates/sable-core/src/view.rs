@@ -1487,10 +1487,22 @@ fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
         TimelineDetails::Ready(event) => Some(event),
         _ => None,
     };
+    let sender = embedded.map(|event| event.sender.clone());
+    let sender_mentioned = msg_like(content)
+        .and_then(|msg| match &msg.kind {
+            MsgLikeKind::Message(message) => message.mentions(),
+            _ => None,
+        })
+        .is_some_and(|mentions| {
+            sender
+                .as_ref()
+                .is_some_and(|sender| mentions.user_ids.contains(sender))
+        });
 
     Some(ReplyView {
         event_id: reply.event_id.clone(),
-        sender: embedded.map(|event| event.sender.clone()),
+        sender,
+        sender_mentioned,
         sender_name: embedded.and_then(|event| match &event.sender_profile {
             TimelineDetails::Ready(profile) => profile.display_name.clone(),
             _ => None,
