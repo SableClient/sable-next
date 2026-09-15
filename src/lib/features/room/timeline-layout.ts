@@ -6,7 +6,7 @@ export const TIMELINE_LAYOUT = {
   initialFillPollInterval: 25,
   historyRequestMinInterval: 300,
   historyLoadingLinger: 500,
-  historyLoadingFade: 180,
+  historyLoadingFade: 150,
   jumpToLatestRem: 5,
   jumpToLatestPages: 1,
   wheelGestureEndDelay: 150,

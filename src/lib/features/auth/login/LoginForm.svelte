@@ -1,8 +1,8 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
-  import { prefersReducedMotion } from 'svelte/motion';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import type { LoginFlowsView } from '#src/generated/protocol';
   import Button from '#lib/ui/primitives/Button.svelte';
   import AuthMethodToggle from '../shared/AuthMethodToggle.svelte';
@@ -102,7 +102,7 @@
 
 <form
   class="login-form auth-card-surface"
-  out:fade={{ duration: prefersReducedMotion.current ? 0 : 200 }}
+  out:fade={{ duration: motionMs(MOTION_MS.quick) }}
   aria-busy={isAuthenticating}
   novalidate
   onsubmit={(event) => {
@@ -150,7 +150,7 @@
       {/if}
 
       {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
-        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <LoginMethod>
           <div class="actions">
             <LoginProviderButton
               label={$i18n.t('auth.signInWithProvider', {
@@ -165,7 +165,7 @@
       {/if}
 
       {#if loginFlows?.sso && (showAllLoginMethods || preferredLoginMethod === 'sso')}
-        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <LoginMethod>
           {#if loginFlows.sso_identity_providers.length > 0}
             <div class="actions sso-actions">
               {#each loginFlows.sso_identity_providers as provider (provider.id)}
@@ -191,7 +191,7 @@
       {/if}
 
       {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
-        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <LoginMethod>
           <PasswordLoginForm
             invalidField={invalidField === 'homeserver' ? null : invalidField}
             {fieldError}
@@ -262,9 +262,14 @@
     padding: 0;
     text-decoration: underline;
     text-underline-offset: 0.15em;
-    transition:
-      color var(--motion-normal) var(--motion-easing-standard),
-      text-decoration-color var(--motion-normal) var(--motion-easing-standard);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .account-switch-button {
+      transition:
+        color var(--motion-normal) var(--motion-easing-standard),
+        text-decoration-color var(--motion-normal) var(--motion-easing-standard);
+    }
   }
 
   .account-switch-button:hover {

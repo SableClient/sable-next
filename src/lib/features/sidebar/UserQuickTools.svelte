@@ -93,18 +93,14 @@
   }
 
   let mobileSelectedIndex = $derived(mobileTools.findIndex((item) => isToolActive(item.href)));
-  let mobileSelectedPosition = $derived(
-    mobileSelectedIndex < 0
-      ? '50%'
-      : `${String(((mobileSelectedIndex + 0.5) / mobileSlotCount) * 100)}%`
-  );
 </script>
 
 {#if mobile}
   <nav
     class="mobile-tools"
     class:selection-active={mobileSelectedIndex >= 0}
-    style:--mobile-selected-position={mobileSelectedPosition}
+    style:--mobile-selected-index={String(Math.max(mobileSelectedIndex, 0))}
+    style:--mobile-slot-count={String(mobileSlotCount)}
     aria-label={$i18n.t('nav.quickTools')}
   >
     {#each mobileTools as item (item.href)}
@@ -240,6 +236,7 @@
     border-radius: var(--radius) var(--radius) 0 0;
     border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
+    container-type: inline-size;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     min-height: 4.25rem;
@@ -254,12 +251,14 @@
     box-shadow: inset 0 0 0 var(--border-width) var(--primary-main);
     content: '';
     height: var(--control-height-large);
-    left: var(--mobile-selected-position);
+    left: 0;
     opacity: 0;
     pointer-events: none;
     position: absolute;
     top: 50%;
-    transform: translate(-50%, -50%);
+    translate: calc(
+        (var(--mobile-selected-index) + 0.5) * 100cqi / var(--mobile-slot-count) - 50%
+      ) -50%;
     width: var(--control-height-large);
     z-index: 0;
   }
@@ -290,7 +289,7 @@
   @media (prefers-reduced-motion: no-preference) {
     .mobile-tools::before {
       transition:
-        left var(--motion-normal) var(--motion-easing-emphasized),
+        translate var(--duration-fast) var(--ease-smooth-out),
         opacity var(--motion-normal) var(--motion-easing-standard);
     }
   }

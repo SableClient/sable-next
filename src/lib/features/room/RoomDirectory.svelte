@@ -188,7 +188,7 @@
       </Button>
     {/if}
   {:else if directory.loading}
-    <div class="loading"><Spinner /></div>
+    <div class="loading"><Spinner label={$i18n.t('a11y.loading')} /></div>
   {:else if !directory.error}
     <EmptyState
       title={$i18n.t('room.directoryEmptyTitle')}

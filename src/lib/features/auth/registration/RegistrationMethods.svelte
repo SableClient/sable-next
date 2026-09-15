@@ -1,6 +1,5 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { prefersReducedMotion } from 'svelte/motion';
   import { i18n } from '#lib/i18n.js';
   import type { LoginFlowsView, RegistrationFlowsView } from '#src/generated/protocol';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -96,7 +95,7 @@
   {#if availableRegistrationMethodCount > 0}
     <div class="method-slot" id={methodSlotId}>
       {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
-        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <LoginMethod>
           <Button
             loading={isRegistering}
             disabled={isCheckingHomeserver}
@@ -111,7 +110,7 @@
       {/if}
 
       {#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
-        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <LoginMethod>
           <div class="actions">
             {#if loginFlows.sso_identity_providers.length > 0}
               {#each loginFlows.sso_identity_providers as provider (provider.id)}
@@ -143,7 +142,7 @@
       {/if}
 
       {#if loginFlows && registrationFlows?.uiaa && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
-        <LoginMethod reducedMotion={prefersReducedMotion.current}>
+        <LoginMethod>
           <LegacyRegistrationForm
             {serverLabel}
             {registrationToken}

@@ -1239,10 +1239,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .composer {
-      transition:
-        border-color var(--motion-fast) var(--motion-easing-standard),
-        box-shadow var(--motion-fast) var(--motion-easing-standard),
-        padding var(--motion-slow) var(--motion-easing-emphasized);
+      transition: border-color var(--motion-fast) var(--motion-easing-standard);
     }
   }
 </style>

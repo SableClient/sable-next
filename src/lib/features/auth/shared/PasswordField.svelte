@@ -115,24 +115,26 @@
   @media (prefers-reduced-motion: no-preference) {
     .password-toggle {
       transition:
-        color 120ms ease,
-        transform 100ms ease;
+        color var(--motion-normal) var(--ease-smooth-out),
+        transform var(--motion-normal) var(--ease-smooth-out);
     }
 
     .password-toggle-icon :global(svg) {
-      animation: password-icon-in 180ms ease-out;
+      animation: password-icon-in var(--duration-fast) ease-in-out;
     }
   }
 
   @keyframes password-icon-in {
     from {
+      filter: blur(var(--blur-small));
       opacity: 0;
-      transform: scale(0.8) rotate(-4deg);
+      transform: scale(var(--scale-enter));
     }
 
     to {
+      filter: blur(0);
       opacity: 1;
-      transform: scale(1) rotate(0);
+      transform: scale(1);
     }
   }
 </style>

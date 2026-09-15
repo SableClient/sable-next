@@ -1,15 +1,22 @@
 <script lang="ts">
   import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { fly } from 'svelte/transition';
 
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import { toasts } from './toasts.svelte.js';
   import IconButton from './primitives/IconButton.svelte';
 
   let { dismissLabel }: { dismissLabel: string } = $props();
 </script>
 
-<div class="toast-region" aria-live="assertive" aria-relevant="additions">
+<div class="toast-region">
   {#each toasts.items as toast (toast.id)}
-    <div class="toast" role="alert">
+    <div
+      class="toast"
+      role="alert"
+      in:fly={{ y: 8, duration: motionMs(MOTION_MS.slow) }}
+      out:fly={{ y: 8, duration: motionMs(MOTION_MS.medium) }}
+    >
       <span>{toast.message}</span>
       <IconButton
         size="small"

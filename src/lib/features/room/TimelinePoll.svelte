@@ -80,7 +80,10 @@
             pick(answer.id);
           }}
         >
-          <span class="fill" aria-pressed={answer.selected} style:width={`${String(percent)}%`}
+          <span
+            class="fill"
+            aria-pressed={answer.selected}
+            style:scale={`${String(percent / 100)} 1`}
           ></span>
           <span class="text">{answer.text}</span>
         </button>
@@ -213,6 +216,8 @@
     inset-block: 0;
     inset-inline-start: 0;
     position: absolute;
+    transform-origin: left center;
+    width: 100%;
   }
 
   .fill[aria-pressed='true'] {
@@ -221,7 +226,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .fill {
-      transition: width 150ms ease-out;
+      transition: scale var(--motion-normal) var(--ease-smooth-out);
     }
   }
 

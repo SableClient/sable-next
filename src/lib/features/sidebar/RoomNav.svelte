@@ -1039,6 +1039,12 @@
     width: var(--icon-size-large);
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .category-caret {
+      transition: transform var(--duration-fast) var(--ease-smooth-out);
+    }
+  }
+
   .rooms-heading :global(svg) {
     display: block;
     height: var(--icon-size-large);
