@@ -734,6 +734,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         direct: 'all',
         group: 'mentions',
       }),
+      web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
+      web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
       notification: () => ({ type: 'notification', notification: null }),
       image_packs: () => ({ type: 'image_packs', packs: [] }),
       all_image_packs: () => ({ type: 'all_image_packs', packs: [] }),

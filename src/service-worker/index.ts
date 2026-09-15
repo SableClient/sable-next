@@ -13,13 +13,32 @@ import {
   parsePushPayload,
   type PushPayload,
   unreadCount,
+  webPushValidation,
 } from '#lib/features/notifications/push-payload.js';
 import { roomName } from '#lib/features/notifications/room-names.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
 worker.addEventListener('push', (event) => {
-  event.waitUntil(present(parsePushPayload(event.data?.text()) ?? undefined));
+  const raw = event.data?.text();
+
+  const validation = webPushValidation(raw);
+  if (validation) {
+    event.waitUntil(
+      worker.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({
+            type: 'sable:webpush-ack',
+            appId: validation.appId,
+            ackToken: validation.ackToken,
+          });
+        }
+      })
+    );
+    return;
+  }
+
+  event.waitUntil(present(parsePushPayload(raw) ?? undefined));
 });
 
 worker.addEventListener('message', (event) => {

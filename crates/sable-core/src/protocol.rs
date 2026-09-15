@@ -729,6 +729,16 @@ pub enum Command {
         pushkey: String,
         app_id: String,
     },
+    /// The homeserver's web push support: a VAPID key means server delivery.
+    WebPusherSupport,
+    SetWebPusher {
+        pusher: WebPusherView,
+    },
+    WebPushers,
+    AckWebPusher {
+        app_id: String,
+        ack_token: String,
+    },
     /// Mirrors the reader's choice so a native shell can apply it too.
     SetNotificationContent {
         visible: bool,
@@ -983,6 +993,15 @@ pub enum CommandOk {
         direct: NotificationModeView,
         group: NotificationModeView,
     },
+    /// `Some` carries the VAPID key subscriptions must be minted under.
+    WebPusherSupport {
+        vapid: Option<String>,
+    },
+    SetWebPusher,
+    WebPushers {
+        pushers: Vec<RegisteredPusherView>,
+    },
+    AckWebPusher,
     /// `null` when the event notifies nobody, or is gone, or cannot be read.
     Notification {
         notification: Option<NotificationView>,
@@ -2627,6 +2646,32 @@ pub struct WebPushKeys {
     pub endpoint: String,
     pub p256dh: String,
     pub auth: String,
+}
+
+/// MSC4174 web push: the homeserver encrypts and delivers, so no gateway.
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct WebPusherView {
+    pub pushkey: String,
+    pub app_id: String,
+    pub device_display_name: String,
+    /// The browser subscription, where a gateway pusher carries a `url`.
+    pub endpoint: String,
+    pub auth: String,
+    pub event_id_only: bool,
+}
+
+/// Read raw: ruma's `Pusher` carries neither a custom kind nor `activated`.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RegisteredPusherView {
+    pub pushkey: String,
+    pub app_id: String,
+    /// `http`, `email`, the web push kind, or a server-defined kind.
+    pub kind: Option<String>,
+    pub device_display_name: Option<String>,
+    /// Some pusher kinds validate through a handshake; absent elsewhere.
+    pub activated: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

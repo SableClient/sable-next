@@ -19,7 +19,7 @@ export function pushOverride(): PushOverride {
   };
 }
 
-function trimmed(override: PushOverride): PushConfig {
+export function trimmed(override: PushOverride): PushConfig {
   return {
     gateway: override.pushGatewayUrl.trim(),
     appId: override.pushAppId.trim(),

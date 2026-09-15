@@ -19,6 +19,8 @@ import type {
   PresenceView,
   PublicRoomView,
   PusherView,
+  RegisteredPusherView,
+  WebPusherView,
   RoomTag,
   OpenIdTokenView,
   ScheduledMessageView,
@@ -1158,6 +1160,28 @@ export function createCommands(transport: () => Transport) {
         type: 'remove_pusher',
         pushkey,
         app_id: appId,
+      });
+    },
+
+    async webPusherSupport(): Promise<{ vapid: string | null }> {
+      const response = await transport().send({ type: 'web_pusher_support' });
+      return response;
+    },
+
+    async setWebPusher(pusher: WebPusherView): Promise<void> {
+      await transport().send({ type: 'set_web_pusher', pusher });
+    },
+
+    async webPushers(): Promise<RegisteredPusherView[]> {
+      const response = await transport().send({ type: 'web_pushers' });
+      return response.pushers;
+    },
+
+    async ackWebPusher(appId: string, ackToken: string): Promise<void> {
+      await transport().send({
+        type: 'ack_web_pusher',
+        app_id: appId,
+        ack_token: ackToken,
       });
     },
 

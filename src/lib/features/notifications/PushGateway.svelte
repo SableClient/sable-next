@@ -48,6 +48,19 @@
   let switching = $state(false);
   let distributorError = $state(false);
   let provider = $state<PushProvider>('auto');
+  let serverPush = $state(false);
+
+  async function refreshServerPush(): Promise<void> {
+    if (!deliversWebPush() || hasCompleteOverride(pushOverride())) {
+      serverPush = false;
+      return;
+    }
+    try {
+      serverPush = (await core.commands.webPusherSupport()).vapid !== null;
+    } catch {
+      serverPush = false;
+    }
+  }
 
   async function refreshDistributors(): Promise<void> {
     try {
@@ -65,6 +78,7 @@
 
   onMount(() => {
     void refreshDistributors();
+    void refreshServerPush();
   });
 
   async function changeDistributor(name: string): Promise<void> {
@@ -128,7 +142,10 @@
 
 <svelte:window
   onfocus={() => {
-    if (!switching) void refreshDistributors();
+    if (!switching) {
+      void refreshDistributors();
+      void refreshServerPush();
+    }
   }}
 />
 
@@ -179,6 +196,8 @@
     <Alert variant="info">
       <p>{$i18n.t('settings.pushGatewayUnsupported')}</p>
     </Alert>
+  {:else if !active && serverPush}
+    <p class="hint">{$i18n.t('settings.pushGatewayServer')}</p>
   {:else if !active}
     {#await config then { push }}
       {#if push}

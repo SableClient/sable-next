@@ -51,14 +51,17 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
     const [userId] = recipients;
     const content = isRecord(notification.content) ? notification.content : {};
     const counts = isRecord(notification.counts) ? notification.counts : {};
+    const counted = counts.unread ?? notification.unread;
     const unread =
-      typeof counts.unread === 'number' && Number.isSafeInteger(counts.unread) && counts.unread >= 0
-        ? counts.unread
+      typeof counted === 'number' && Number.isSafeInteger(counted) && counted >= 0
+        ? counted
         : undefined;
+    const roomId = text(notification.room_id);
+    if (roomId === undefined && unread === undefined) return null;
     return {
       notification: {
         user_id: userId,
-        room_id: text(notification.room_id),
+        room_id: roomId,
         event_id: text(notification.event_id),
         room_name: text(notification.room_name),
         sender_display_name: text(notification.sender_display_name),
@@ -70,6 +73,31 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
   } catch {
     return null;
   }
+}
+
+/** The MSC4174 validation handshake, exclusive of a real notification. */
+export function webPushValidation(
+  raw: string | undefined
+): { appId: string; ackToken: string } | null {
+  if (!raw) return null;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(payload)) return null;
+
+  const appId = text(payload.app_id);
+  const ackToken = text(payload.ack_token);
+  if (appId === undefined || ackToken === undefined) return null;
+  if (payload.notification !== undefined) return null;
+  return payload.room_id === undefined &&
+    payload.event_id === undefined &&
+    payload.type === undefined &&
+    typeof payload.unread !== 'number'
+    ? { appId, ackToken }
+    : null;
 }
 
 export type PushAlert = {
