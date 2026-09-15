@@ -111,8 +111,7 @@ impl Core {
         let mut login = client
             .matrix_auth()
             .login_username(&username, &password)
-            .initial_device_display_name("Sable")
-            .request_refresh_token();
+            .initial_device_display_name("Sable");
         if let Some(account) = &reauth {
             login = login.device_id(&account.session.credentials.device_id());
         }
@@ -511,8 +510,7 @@ impl Core {
             .matrix_auth()
             .login_with_sso_callback(callback_url.into())
             .map_err(|error| self.failed("complete_sso_login: callback_url", error))?
-            .initial_device_display_name("Sable")
-            .request_refresh_token();
+            .initial_device_display_name("Sable");
         if let Some(account) = &reauth {
             login = login.device_id(&account.session.credentials.device_id());
         }

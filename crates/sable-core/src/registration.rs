@@ -84,7 +84,6 @@ pub(super) fn registration_request(
     request.username = Some(username.to_owned());
     request.password = Some(password.to_owned());
     request.initial_device_display_name = Some("Sable".to_owned());
-    request.refresh_token = true;
     request.auth = auth;
     request
 }
@@ -962,8 +961,14 @@ mod tests {
             request.initial_device_display_name.as_deref(),
             Some("Sable")
         );
-        assert!(request.refresh_token);
         assert!(request.auth.is_none());
+    }
+
+    #[test]
+    fn registration_does_not_ask_for_a_refresh_token() {
+        let request = registration_request("alice", "correct horse", None);
+
+        assert!(!request.refresh_token);
     }
 
     #[test]
