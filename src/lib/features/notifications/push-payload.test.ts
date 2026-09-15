@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest';
 
-import { parsePushPayload, alert, type PushPayload, unreadCount } from './push-payload';
+import {
+  parsePushPayload,
+  alert,
+  type PushPayload,
+  unreadCount,
+  webPushValidation,
+} from './push-payload';
 
 function payload(notification: PushPayload['notification']): PushPayload {
   return { notification };
@@ -18,6 +24,19 @@ test('a counts-only push updates the badge and shows nothing', () => {
   expect(unreadCount(counts)).toBe(4);
   expect(alert(counts, null, true)).toBeNull();
   expect(unreadCount(payload({ room_id: '!room:example.org' }))).toBeNull();
+});
+
+test('a flattened notification (MSC4174) reads its top-level unread', () => {
+  const flattened = parsedPayload(
+    JSON.stringify({
+      room_id: '!room:example.org',
+      event_id: '$event',
+      user_id: '@me:example.org',
+      unread: 2,
+    })
+  );
+
+  expect(unreadCount(flattened)).toBe(2);
 });
 
 test('an event_id_only push names the room from what the app cached', () => {
@@ -120,4 +139,36 @@ test('malformed and conflicting gateway payloads are rejected', () => {
     }),
   ])
     expect(parsePushPayload(raw)).toBeNull();
+});
+
+const validation = JSON.stringify({ app_id: 'moe.sable.webpush', ack_token: 'tok' });
+
+test('the MSC4174 validation push is not a notification', () => {
+  expect(parsePushPayload(validation)).toBeNull();
+  expect(webPushValidation(validation)).toEqual({
+    appId: 'moe.sable.webpush',
+    ackToken: 'tok',
+  });
+});
+
+test('a notification carrying the same fields is still a notification', () => {
+  const notification = JSON.stringify({
+    app_id: 'moe.sable.webpush',
+    ack_token: 'tok',
+    room_id: '!room:example.org',
+    event_id: '$event',
+  });
+
+  expect(webPushValidation(notification)).toBeNull();
+  expect(parsedPayload(notification).notification?.room_id).toBe('!room:example.org');
+});
+
+test('an unparseable or incomplete handshake acknowledges nothing', () => {
+  expect(webPushValidation(undefined)).toBeNull();
+  expect(webPushValidation('not json')).toBeNull();
+  expect(webPushValidation(JSON.stringify({ app_id: 'moe.sable.webpush' }))).toBeNull();
+  expect(webPushValidation(JSON.stringify({ app_id: '', ack_token: 'tok' }))).toBeNull();
+  expect(
+    webPushValidation(JSON.stringify({ app_id: 'a', ack_token: 'tok', unread: 0 }))
+  ).toBeNull();
 });

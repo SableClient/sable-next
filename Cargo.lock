@@ -6479,6 +6479,7 @@ dependencies = [
  "getrandom 0.3.4",
  "getrandom 0.4.3",
  "html-escape",
+ "http",
  "linkify",
  "matrix-sdk",
  "matrix-sdk-base",

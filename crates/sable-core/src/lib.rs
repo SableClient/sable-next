@@ -28,6 +28,7 @@ pub mod tls;
 mod verification;
 pub mod view;
 mod watchers;
+mod webpush;
 
 pub use matrix_sdk::{reqwest, ruma};
 

@@ -1323,6 +1323,7 @@
     "pushGateway": "Push gateway",
     "pushGatewayHint": "Where your homeserver sends notifications when Sable is closed. Leave these blank to use the gateway this deployment ships with.",
     "pushGatewayDefault": "Using {{gateway}}",
+    "pushGatewayServer": "This homeserver delivers web push notifications itself.",
     "pushGatewayUrl": "Gateway URL",
     "pushVapidKey": "VAPID public key",
     "pushAppId": "Application ID",

@@ -67,7 +67,7 @@ use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::encryption_status;
 use crate::{Core, SubscriptionKind};
-use crate::{notifications, session, spaces, view};
+use crate::{notifications, session, spaces, view, webpush};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 
@@ -1658,6 +1658,34 @@ impl Core {
                     .map_err(|error| self.failed("remove_pusher", error))?;
 
                 Ok(CommandOk::RemovePusher)
+            }
+
+            Command::WebPusherSupport => Ok(CommandOk::WebPusherSupport {
+                vapid: webpush::support(&self.client().await?)
+                    .await
+                    .map_err(|error| self.failed("webpusher_support", error))?,
+            }),
+
+            Command::SetWebPusher { pusher } => {
+                webpush::set_pusher(&self.client().await?, pusher)
+                    .await
+                    .map_err(|error| self.failed("set_webpusher", error))?;
+
+                Ok(CommandOk::SetWebPusher)
+            }
+
+            Command::WebPushers => Ok(CommandOk::WebPushers {
+                pushers: webpush::pushers(&self.client().await?)
+                    .await
+                    .map_err(|error| self.failed("webpushers", error))?,
+            }),
+
+            Command::AckWebPusher { app_id, ack_token } => {
+                webpush::ack(&self.client().await?, app_id, ack_token)
+                    .await
+                    .map_err(|error| self.failed("ack_webpusher", error))?;
+
+                Ok(CommandOk::AckWebPusher)
             }
 
             Command::SetNotificationContent { visible, encrypted } => {

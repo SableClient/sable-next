@@ -312,10 +312,15 @@
 
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
-        | { type?: string; roomId?: string }
+        | { type?: string; roomId?: string; appId?: string; ackToken?: string }
         | undefined;
 
       if (message?.type === 'sable:push-resubscribe') resync();
+      if (message?.type === 'sable:webpush-ack') {
+        if (message.appId && message.ackToken) {
+          void core.commands.ackWebPusher(message.appId, message.ackToken).catch(() => undefined);
+        }
+      }
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
         void goto(roomSectionPath(roomList.rooms, message.roomId));
       }
