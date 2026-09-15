@@ -12,6 +12,7 @@ export type FontScale = 'small' | 'default' | 'large' | 'largest';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
+export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 
 export interface Preferences {
   language: string;
@@ -41,6 +42,7 @@ export interface Preferences {
   showTombstoneEvents: boolean;
   hideReadReceipts: boolean;
   readReceiptPlacement: ReadReceiptPlacement;
+  replyPreviewStyle: ReplyPreviewStyle;
   hideTypingIndicators: boolean;
   memberSort: MemberSort;
   filterPronounsByLanguage: boolean;
@@ -127,6 +129,7 @@ const ENUMS = {
   fontScale: ['small', 'default', 'large', 'largest'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   readReceiptPlacement: ['message', 'room'],
+  replyPreviewStyle: ['connected', 'compact', 'expanded'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
 } as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
 
@@ -168,6 +171,7 @@ const DEFAULTS: Preferences = {
   showTombstoneEvents: true,
   hideReadReceipts: false,
   readReceiptPlacement: 'message',
+  replyPreviewStyle: 'connected',
   hideTypingIndicators: false,
   memberSort: 'name-asc',
   filterPronounsByLanguage: true,

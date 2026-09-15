@@ -66,6 +66,7 @@
     canRedact,
     isMessageRow,
     jumboEmojiLevel,
+    senderColor,
   } from './timeline-format';
 
   interface Props {
@@ -170,14 +171,23 @@
       limit: pronounPillLimit(preferences.pronounPillLimit),
     })
   );
-  let replyName = $derived(
+  let replyNameBase = $derived(
     replyPersona?.display_name ??
       item.in_reply_to?.sender_name ??
       findMember(members, item.in_reply_to?.sender)?.display_name ??
       item.in_reply_to?.sender ??
       $i18n.t('timeline.unknownSender')
   );
+  let replyIsPinged = $derived(item.in_reply_to?.sender_mentioned ?? false);
+  let replyName = $derived(
+    replyIsPinged && !replyNameBase.startsWith('@') ? `@${replyNameBase}` : replyNameBase
+  );
   let replyBody = $derived(stripReplyFallback(item.in_reply_to?.body ?? '', replyPersona));
+  let replyNameColor = $derived(
+    currentUserId !== null && item.in_reply_to?.sender === currentUserId
+      ? 'var(--primary-on-container)'
+      : senderColor(item.in_reply_to?.sender ?? null)
+  );
 
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
@@ -554,6 +564,8 @@
         collapsed,
         pending,
         highlighted,
+        'has-connected-reply':
+          item.in_reply_to !== null && preferences.replyPreviewStyle === 'connected',
         persona: personaTint,
         own: item.is_own,
         'align-own': alignOwn,
@@ -737,6 +749,22 @@
       {/if}
     {/if}
     <div class="message-content">
+      {#if item.in_reply_to && preferences.replyPreviewStyle === 'connected'}
+        {@const tint = personaWithColor(replyPersona)}
+        {@const target = item.in_reply_to.event_id}
+        <button
+          class={['reply-preview', 'reply-connected', { persona: tint }]}
+          type="button"
+          style:--pmp-on-light={tint?.color_on_light ?? undefined}
+          style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+          style:--reply-name-color={replyNameColor}
+          onclick={() => {
+            onJumpToEvent?.(target);
+          }}
+        >
+          <span class="reply-copy"><strong>{replyName}</strong> <span>{replyBody}</span></span>
+        </button>
+      {/if}
       {#if !collapsed && layout !== 'compact'}
         <header>
           {#if !emote}
@@ -765,20 +793,21 @@
         </header>
       {/if}
       <div class="message-main">
-        {#if item.in_reply_to}
+        {#if item.in_reply_to && preferences.replyPreviewStyle !== 'connected'}
           {@const tint = personaWithColor(replyPersona)}
           {@const target = item.in_reply_to.event_id}
           <button
-            class={['reply-preview', { persona: tint }]}
+            class={['reply-preview', `reply-${preferences.replyPreviewStyle}`, { persona: tint }]}
             type="button"
             style:--pmp-on-light={tint?.color_on_light ?? undefined}
             style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+            style:--reply-name-color={replyNameColor}
             onclick={() => {
               onJumpToEvent?.(target);
             }}
           >
             <ReplyIcon class="reply-icon" />
-            <span class="reply-line"><strong>{replyName}</strong> {replyBody}</span>
+            <span class="reply-copy"><strong>{replyName}</strong> <span>{replyBody}</span></span>
           </button>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
@@ -1056,7 +1085,7 @@
     box-shadow: inset 0 0 0 var(--border-width) var(--primary-container-line);
   }
 
-  .message:has(:focus-visible):not([data-selected='true']) {
+  .message:has(:focus-visible):not([data-selected='true'], :has(.reply-preview:focus-visible)) {
     background: var(--bg-container-hover);
     border-radius: var(--radius);
   }
@@ -1381,7 +1410,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     cursor: pointer;
     display: grid;
     font: inherit;
@@ -1396,28 +1425,114 @@
     width: 100%;
   }
 
-  .reply-preview:hover {
-    background: var(--surface-var-container);
-  }
-
   .reply-preview :global(.reply-icon) {
     color: var(--primary-main);
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }
 
-  .reply-line {
+  .reply-copy {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .reply-compact .reply-copy > :is(strong, span),
+  .reply-connected .reply-copy > :is(strong, span) {
+    opacity: var(--opacity-p300);
+  }
+
+  .reply-connected {
+    --reply-connector-width: var(--border-width-500);
+
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: var(--space-100);
+    min-height: var(--space-500);
+    overflow: visible;
+    padding-block: 0;
+    position: relative;
+  }
+
+  .reply-connected::before {
+    border-left: var(--reply-connector-width) solid var(--surface-on-container);
+    border-radius: var(--radius) 0 0;
+    border-top: var(--reply-connector-width) solid var(--surface-on-container);
+    content: '';
+    height: calc(var(--space-250) + var(--border-width-300));
+    left: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    opacity: var(--opacity-placeholder);
+    pointer-events: none;
+    position: absolute;
+    top: calc(50% - var(--border-width-300));
+    width: calc(var(--timeline-row-gap) + var(--avatar-size-small) / 2 + var(--space-100));
+  }
+
+  .reply-connected:is(:hover, :focus-visible)::before {
+    opacity: var(--opacity-p300);
+  }
+
+  .message.has-connected-reply:not(.layout-compact) > :global(.avatar-button),
+  .message.has-connected-reply:not(.layout-compact) > :global(.avatar-root.message-avatar) {
+    margin-top: var(--space-600);
+  }
+
+  .reply-expanded {
+    --reply-accent-width: var(--border-width-600);
+
+    align-items: start;
+    background: var(--surface-var-container);
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: var(--space-200) var(--space-300) var(--space-200)
+      calc(var(--space-300) + var(--reply-accent-width));
+    position: relative;
+  }
+
+  .reply-expanded::before {
+    background: var(--primary-main);
+    bottom: 0;
+    content: '';
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: var(--reply-accent-width);
+  }
+
+  .reply-expanded .reply-copy {
+    display: grid;
+    gap: var(--space-050);
+    white-space: normal;
+  }
+
+  .reply-expanded .reply-copy > span {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    overflow: hidden;
+  }
+
   .reply-preview strong {
-    color: var(--sec-on-container);
+    color: var(--reply-name-color);
   }
 
   .reply-preview.persona strong {
     color: var(--pmp-ink);
+  }
+
+  .reply-preview:is(:hover, :focus-visible) .reply-copy > :is(strong, span) {
+    opacity: var(--opacity-p500);
+  }
+
+  .reply-expanded:is(:hover, :focus-visible) {
+    background: var(--surface-var-container-hover);
+  }
+
+  .reply-preview:focus-visible .reply-copy {
+    text-decoration: underline;
+    text-decoration-thickness: var(--border-width);
+    text-underline-offset: 0.15em;
   }
 
   /* bits-ui renders the trigger, so the row's scoped `.reaction` cannot reach it. */
@@ -1502,6 +1617,11 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .message.layout-compact .reply-connected::before {
+    left: calc(-1 * var(--space-400));
+    width: calc(var(--space-400) + var(--space-100));
+  }
+
   .message.layout-bubble .message-main {
     align-items: flex-start;
     display: flex;
@@ -1579,6 +1699,18 @@
   .message.layout-bubble.own.align-own .reply-preview :global(.reply-icon) {
     grid-column: 2;
     grid-row: 1;
+  }
+
+  .message.layout-bubble.own.align-own .reply-connected {
+    text-align: end;
+  }
+
+  .message.layout-bubble.own.align-own .reply-connected::before {
+    border-left: 0;
+    border-radius: 0 var(--radius) 0 0;
+    border-right: var(--reply-connector-width) solid var(--surface-on-container);
+    left: auto;
+    right: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
   }
 
   .message.layout-bubble.own.align-own header {

@@ -7,7 +7,7 @@ import type {
 } from '#src/generated/protocol';
 import { t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
-import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
+import type { ReplyPreviewStyle, TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
 function locale(): string {
   return i18next.resolvedLanguage ?? i18next.language;
@@ -185,11 +185,15 @@ function personaKey(item: TimelineItemView): string {
   return profile.id ?? profile.display_name ?? '';
 }
 
-// Collapsing on sender alone would hide a persona behind the account's header.
-export function isCollapsed(items: readonly TimelineItemView[], index: number): boolean {
+export function isCollapsed(
+  items: readonly TimelineItemView[],
+  index: number,
+  replyPreviewStyle: ReplyPreviewStyle = preferences.replyPreviewStyle
+): boolean {
   if (index === 0) return false;
   const current = items[index];
   const previous = items[index - 1];
+  if (replyPreviewStyle === 'connected' && current.in_reply_to) return false;
   return (
     current.content.kind === 'message' &&
     previous.content.kind === 'message' &&

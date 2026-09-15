@@ -2217,6 +2217,7 @@ pub struct ReplyView {
     pub event_id: OwnedEventId,
     #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
     pub sender: Option<OwnedUserId>,
+    pub sender_mentioned: bool,
     pub sender_name: Option<String>,
     pub body: Option<String>,
 }

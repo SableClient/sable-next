@@ -135,7 +135,7 @@
   let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
     identity.reconcile(visibleItems);
     return visibleItems.map((item, index) => {
-      const collapsed = isCollapsed(visibleItems, index);
+      const collapsed = isCollapsed(visibleItems, index, preferences.replyPreviewStyle);
       return {
         key: identity.key(visibleItems, index),
         value: {

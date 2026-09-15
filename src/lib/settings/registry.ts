@@ -35,6 +35,7 @@ import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+import QuotesIcon from 'phosphor-svelte/lib/QuotesIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
@@ -474,6 +475,18 @@ export const settingsCategories: SettingsCategory[] = [
         options: [
           { value: 'message', label: 'settings.readReceiptPlacementMessage' },
           { value: 'room', label: 'settings.readReceiptPlacementRoom' },
+        ],
+      },
+      {
+        key: 'replyPreviewStyle',
+        icon: QuotesIcon,
+        name: 'settings.replyPreviewStyle',
+        description: 'settings.replyPreviewStyleHint',
+        type: 'select',
+        options: [
+          { value: 'connected', label: 'settings.replyPreviewStyleConnected' },
+          { value: 'compact', label: 'settings.replyPreviewStyleCompact' },
+          { value: 'expanded', label: 'settings.replyPreviewStyleExpanded' },
         ],
       },
       {
