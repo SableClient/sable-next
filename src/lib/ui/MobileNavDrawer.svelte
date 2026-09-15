@@ -84,6 +84,13 @@
       shallow: true,
       state: { ...page.state, mobileDrawer: next ? 'open' : 'closed' },
     });
+    requestAnimationFrame(() => {
+      if (next) {
+        document.getElementById('drawer-toggle')?.focus();
+        return;
+      }
+      document.getElementById('main-content')?.focus();
+    });
   }
 
   function handleTouchStart(event: TouchEvent) {
@@ -160,6 +167,7 @@
   }}
 >
   <button
+    id="drawer-toggle"
     class="screen-reader-only"
     type="button"
     aria-label={open ? $i18n.t('nav.showConversation') : $i18n.t('nav.showRoomList')}
@@ -247,8 +255,8 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .drawer-track:not(.dragging, .route-changing) {
-      transition: transform 220ms cubic-bezier(0.33, 1, 0.68, 1);
+    :global(html:not([data-reduced-motion='on'])) .drawer-track:not(.dragging, .route-changing) {
+      transition: transform var(--duration-fast) var(--ease-smooth-out);
     }
   }
 

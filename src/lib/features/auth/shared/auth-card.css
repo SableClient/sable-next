@@ -18,7 +18,7 @@
 }
 
 .auth-page .auth-card-surface > * {
-  animation: auth-card-content-in var(--motion-normal) ease both;
+  animation: auth-card-content-in var(--motion-normal) ease-in-out both;
 }
 
 .auth-page .auth-card-heading {
@@ -46,7 +46,7 @@
 @keyframes auth-card-content-in {
   from {
     opacity: 0;
-    transform: translateY(0.375rem);
+    transform: translateY(var(--space-150));
   }
 }
 
@@ -54,6 +54,10 @@
   .auth-page .auth-card-surface > * {
     animation: none;
   }
+}
+
+html[data-reduced-motion='on'] .auth-page .auth-card-surface > * {
+  animation: none;
 }
 
 .auth-page .auth-link-button {

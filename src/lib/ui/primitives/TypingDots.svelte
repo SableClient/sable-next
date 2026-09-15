@@ -23,15 +23,15 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.typing-dots i) {
+    :global(html:not([data-reduced-motion='on']) .typing-dots i) {
       animation: typing-dot 1.2s infinite ease-in-out;
     }
 
-    :global(.typing-dots i:nth-child(2)) {
+    :global(html:not([data-reduced-motion='on']) .typing-dots i:nth-child(2)) {
       animation-delay: 0.15s;
     }
 
-    :global(.typing-dots i:nth-child(3)) {
+    :global(html:not([data-reduced-motion='on']) .typing-dots i:nth-child(3)) {
       animation-delay: 0.3s;
     }
   }

@@ -12,6 +12,7 @@
     ownsBack?: boolean;
     label?: string;
     contentStyle?: string;
+    contentClass?: string;
     onOpenChange?: (open: boolean) => void;
     onConfirm?: () => void;
     children: Snippet;
@@ -23,6 +24,7 @@
     ownsBack = false,
     label,
     contentStyle,
+    contentClass = '',
     onOpenChange,
     onConfirm,
     children,
@@ -46,7 +48,7 @@
   <Dialog.Portal>
     <Dialog.Overlay class={['dialog-backdrop', `dialog-backdrop-${variant}`]} />
     <Dialog.Content
-      class={['dialog-content', `dialog-content-${variant}`]}
+      class={['dialog-content', `dialog-content-${variant}`, contentClass]}
       style={contentStyle}
       aria-label={label}
     >
@@ -187,15 +189,36 @@
     }
   }
 
+  @keyframes dialog-backdrop-out {
+    to {
+      opacity: 0;
+    }
+  }
+
   @keyframes dialog-in {
     from {
       opacity: 0;
-      transform: translate(-50%, calc(-50% + var(--space-200))) scale(0.98);
+      transform: translate(-50%, calc(-50% + var(--space-200))) scale(var(--scale-enter));
+    }
+  }
+
+  @keyframes dialog-out {
+    to {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + var(--space-200))) scale(var(--scale-enter));
     }
   }
 
   @keyframes sheet-in {
     from {
+      filter: blur(var(--blur-small));
+      opacity: 0;
+      transform: translateY(var(--space-300));
+    }
+  }
+
+  @keyframes sheet-out {
+    to {
       opacity: 0;
       transform: translateY(var(--space-300));
     }
@@ -203,29 +226,62 @@
 
   @keyframes drawer-in {
     from {
+      filter: blur(var(--blur-small));
+      transform: translateX(var(--space-400));
+    }
+  }
+
+  @keyframes drawer-out {
+    to {
       transform: translateX(var(--space-400));
     }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    :global(.dialog-backdrop) {
-      animation: dialog-backdrop-in var(--motion-normal) var(--motion-easing-standard);
+    :global(html:not([data-reduced-motion='on']) .dialog-backdrop[data-state='open']) {
+      animation: dialog-backdrop-in var(--duration-fast) var(--ease-smooth-out);
     }
 
-    :global(.dialog-content-drawer) {
-      animation: drawer-in var(--motion-slow) var(--motion-easing-emphasized);
+    :global(html:not([data-reduced-motion='on']) .dialog-backdrop[data-state='closed']) {
+      animation: dialog-backdrop-out var(--motion-normal) var(--ease-smooth-out);
     }
 
-    :global(.dialog-content-settings),
-    :global(.dialog-content-verification),
-    :global(.dialog-content-sheet) {
-      animation: sheet-in var(--motion-slow) var(--motion-easing-emphasized);
+    :global(html:not([data-reduced-motion='on']) .dialog-content-drawer[data-state='open']) {
+      animation: drawer-in var(--duration-slow) var(--ease-smooth-out);
+    }
+
+    :global(html:not([data-reduced-motion='on']) .dialog-content-drawer[data-state='closed']) {
+      animation: drawer-out var(--duration-medium) var(--ease-smooth-out);
+    }
+
+    :global(html:not([data-reduced-motion='on']) .dialog-content-settings[data-state='open']),
+    :global(html:not([data-reduced-motion='on']) .dialog-content-verification[data-state='open']),
+    :global(html:not([data-reduced-motion='on']) .dialog-content-sheet[data-state='open']) {
+      animation: sheet-in var(--duration-slow) var(--ease-smooth-out);
+    }
+
+    :global(html:not([data-reduced-motion='on']) .dialog-content-settings[data-state='closed']),
+    :global(html:not([data-reduced-motion='on']) .dialog-content-verification[data-state='closed']),
+    :global(html:not([data-reduced-motion='on']) .dialog-content-sheet[data-state='closed']) {
+      animation: sheet-out var(--duration-medium) var(--ease-smooth-out);
+    }
+
+    :global(html:not([data-reduced-motion='on']) .dialog-content-sheet.sheet-settling) {
+      transition: transform var(--duration-slow) var(--ease-smooth-out);
+    }
+
+    :global(.dialog-content-sheet.sheet-dragging) {
+      transition: none;
     }
   }
 
   @media (prefers-reduced-motion: no-preference) and (width >= 48rem) {
-    :global(.dialog-content-settings) {
-      animation: dialog-in var(--motion-slow) var(--motion-easing-emphasized);
+    :global(html:not([data-reduced-motion='on']) .dialog-content-settings[data-state='open']) {
+      animation: dialog-in var(--duration-fast) var(--ease-smooth-out);
+    }
+
+    :global(html:not([data-reduced-motion='on']) .dialog-content-settings[data-state='closed']) {
+      animation: dialog-out var(--motion-normal) var(--ease-smooth-out);
     }
   }
 </style>

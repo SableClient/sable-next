@@ -67,24 +67,27 @@
   }
 
   :global(.switch-root[data-state='checked'] .switch-thumb) {
-    height: 1.125rem;
+    scale: 1.286;
     translate: 1.4375rem 0;
-    width: 1.125rem;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     :global(.switch-root) {
       transition:
         background-color var(--motion-normal) var(--motion-easing-standard),
-        box-shadow var(--motion-normal) var(--motion-easing-standard),
         opacity var(--motion-normal) var(--motion-easing-standard);
     }
 
     :global(.switch-thumb) {
       transition:
-        translate var(--motion-normal) var(--motion-easing-standard),
-        height var(--motion-normal) var(--motion-easing-standard),
-        width var(--motion-normal) var(--motion-easing-standard);
+        translate var(--duration-fast) var(--ease-smooth-out),
+        scale var(--duration-fast) var(--ease-bounce);
+    }
+
+    :global(.switch-root:not([data-state='checked']) .switch-thumb) {
+      transition:
+        translate var(--motion-normal) var(--ease-smooth-out),
+        scale var(--motion-normal) var(--ease-smooth-out);
     }
   }
 </style>

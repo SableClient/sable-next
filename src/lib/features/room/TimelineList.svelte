@@ -1,13 +1,13 @@
 <script lang="ts">
   import { tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
-  import { prefersReducedMotion } from 'svelte/motion';
   import { fade } from 'svelte/transition';
 
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
     TimelineWindow,
     type TimelineEntry,
@@ -509,7 +509,7 @@
     const entry = entries.find(({ value }) => value.item.event_id === target);
     if (!entry) return;
     handledFocus = target;
-    void positionFocus(engine, target, entry.key, !prefersReducedMotion.current);
+    void positionFocus(engine, target, entry.key, !shouldReduceMotion());
   });
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
@@ -542,7 +542,7 @@
       onJumpToLive?.();
       return;
     }
-    void controller?.jumpTo(null, 'start', !prefersReducedMotion.current);
+    void controller?.jumpTo(null, 'start', !shouldReduceMotion());
   }
 </script>
 
@@ -572,7 +572,7 @@
         class="history-loading"
         role="status"
         out:fade={{
-          duration: prefersReducedMotion.current ? 0 : TIMELINE_LAYOUT.historyLoadingFade,
+          duration: motionMs(TIMELINE_LAYOUT.historyLoadingFade),
         }}
       >
         <Spinner small />
@@ -584,7 +584,7 @@
         class="future-loading"
         role="status"
         out:fade={{
-          duration: prefersReducedMotion.current ? 0 : TIMELINE_LAYOUT.historyLoadingFade,
+          duration: motionMs(TIMELINE_LAYOUT.historyLoadingFade),
         }}
       >
         <Spinner small />

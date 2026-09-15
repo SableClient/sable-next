@@ -1,5 +1,7 @@
 import { tick } from 'svelte';
 
+import { scrollBehavior } from '#lib/ui/motion.js';
+
 const SETTINGS_SCROLL_SELECTOR = '.settings-scroll';
 
 export async function findSettingRow(id: string): Promise<HTMLElement | null> {
@@ -17,9 +19,10 @@ export async function findSettingRow(id: string): Promise<HTMLElement | null> {
 }
 
 export function scrollSettingRowIntoView(row: HTMLElement): void {
+  const behavior = scrollBehavior();
   const scroller = row.closest(SETTINGS_SCROLL_SELECTOR);
   if (!(scroller instanceof HTMLElement)) {
-    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.scrollIntoView({ block: 'center', behavior });
     return;
   }
 
@@ -30,5 +33,5 @@ export function scrollSettingRowIntoView(row: HTMLElement): void {
     (rowRect.top - scrollerRect.top) -
     (scroller.clientHeight - row.offsetHeight) / 2;
 
-  scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  scroller.scrollTo({ top: Math.max(0, top), behavior });
 }
