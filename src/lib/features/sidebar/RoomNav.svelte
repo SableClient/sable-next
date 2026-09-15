@@ -1136,6 +1136,12 @@
     min-width: 1.5rem;
   }
 
+  .room-status :global(.unread-badge-dot) {
+    background-clip: content-box;
+    padding-inline: var(--space-200);
+    width: var(--space-600);
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .room-options-slot {
       margin-right: var(--space-100);
@@ -1367,7 +1373,9 @@
   }
 
   .room-mode {
+    justify-content: center;
     opacity: var(--opacity-p300);
+    width: var(--space-600);
   }
 
   .room-mode :global(svg) {
