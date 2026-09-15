@@ -694,7 +694,13 @@
                   >
                 </button>
                 {#if !collapsed}
-                  <RoomOptionsMenu room={item.room} onSettings={openSettings} onLeave={openLeave} />
+                  <span class="room-options-slot">
+                    <RoomOptionsMenu
+                      room={item.room}
+                      onSettings={openSettings}
+                      onLeave={openLeave}
+                    />
+                  </span>
                 {/if}
               </div>
             {:else if isRoom(item)}
@@ -788,31 +794,35 @@
                         aria-label={$i18n.t('nav.voiceLive', { count: live })}>{live}</span
                       >
                     {/if}
-                    <UnreadBadge
-                      counts={{ unread, highlight: mentions, marked }}
-                      dm={room?.is_direct ?? false}
-                      role="img"
-                      aria-label={mentions > 0
-                        ? $i18n.t('nav.unreadMentions', { count: mentions })
-                        : unread > 0
-                          ? $i18n.t('nav.unreadMessages', { count: unread })
-                          : $i18n.t('nav.markedUnread')}
-                    />
-                    {#if notifyMode}
-                      {@const chip = notificationChip(notifyMode)}
-                      <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
-                        <chip.icon />
-                      </span>
-                    {/if}
+                    <span class="room-status">
+                      <UnreadBadge
+                        counts={{ unread, highlight: mentions, marked }}
+                        dm={room?.is_direct ?? false}
+                        role="img"
+                        aria-label={mentions > 0
+                          ? $i18n.t('nav.unreadMentions', { count: mentions })
+                          : unread > 0
+                            ? $i18n.t('nav.unreadMessages', { count: unread })
+                            : $i18n.t('nav.markedUnread')}
+                      />
+                      {#if notifyMode}
+                        {@const chip = notificationChip(notifyMode)}
+                        <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
+                          <chip.icon />
+                        </span>
+                      {/if}
+                    </span>
                   {/if}
                 </a>
                 {#if !collapsed && room}
-                  <RoomOptionsMenu
-                    {room}
-                    parentSpaceId={item.parentSpaceId ?? null}
-                    onSettings={openSettings}
-                    onLeave={openLeave}
-                  />
+                  <span class="room-options-slot">
+                    <RoomOptionsMenu
+                      {room}
+                      parentSpaceId={item.parentSpaceId ?? null}
+                      onSettings={openSettings}
+                      onLeave={openLeave}
+                    />
+                  </span>
                 {/if}
               </div>
             {/if}
@@ -1103,8 +1113,6 @@
   }
 
   .room-row-wrap {
-    --kebab-gutter: calc(var(--space-200) + 1.75rem);
-
     align-items: center;
     border-radius: var(--radius);
     display: flex;
@@ -1112,22 +1120,50 @@
     position: relative;
   }
 
-  .room-row-wrap :global(.room-options-trigger) {
-    position: absolute;
-    right: var(--space-100);
-    top: 50%;
-    translate: 0 -50%;
+  .room-options-slot {
+    align-items: center;
+    display: flex;
+    flex: none;
+    margin-right: var(--space-100);
+  }
+
+  .room-status {
+    align-items: center;
+    display: flex;
+    flex: none;
+    gap: var(--space-100);
+    justify-content: center;
+    min-width: 1.5rem;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .room-row-wrap :global(.room-options-trigger) {
-      opacity: 0;
+    .room-options-slot {
+      margin-right: var(--space-100);
+      pointer-events: none;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      translate: 0 -50%;
+      z-index: 1;
     }
 
-    .room-row-wrap:hover :global(.room-options-trigger),
-    .room-row-wrap:focus-within :global(.room-options-trigger),
-    .room-row-wrap :global(.room-options-trigger[data-state='open']) {
+    .room-options-slot :global(.room-options-trigger) {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .room-row-wrap:hover .room-options-slot :global(.room-options-trigger),
+    .room-row-wrap:focus-within .room-options-slot :global(.room-options-trigger),
+    .room-options-slot :global(.room-options-trigger[data-state='open']) {
       opacity: 1;
+      pointer-events: auto;
+    }
+
+    .room-row-wrap:hover .room-status,
+    .room-row-wrap:focus-within .room-status,
+    .room-row-wrap:has(:global(.room-options-trigger[data-state='open'])) .room-status {
+      opacity: 0;
+      pointer-events: none;
     }
   }
 
@@ -1163,13 +1199,13 @@
     gap: var(--space-200);
     min-height: var(--control-height-medium);
     min-width: 0;
-    padding: 0 var(--kebab-gutter, var(--space-300)) 0
-      calc(var(--space-200) + var(--room-depth, 0) * var(--space-400));
+    padding: 0 var(--space-300) 0 calc(var(--space-200) + var(--room-depth, 0) * var(--space-400));
     text-decoration: none;
   }
 
   .room-row {
     min-height: 2.25rem;
+    padding-right: var(--space-100);
   }
 
   .room-row[aria-current='page'] {
@@ -1266,11 +1302,10 @@
     font-weight: var(--font-weight-500);
     gap: var(--space-100);
     min-height: var(--control-height-medium);
+    min-width: 0;
     opacity: var(--opacity-p300);
-    padding: 0 var(--kebab-gutter, var(--space-300)) 0
-      calc(var(--space-200) + var(--room-depth, 0) * var(--space-400));
+    padding: 0 var(--space-100) 0 calc(var(--space-200) + var(--room-depth, 0) * var(--space-400));
     text-align: left;
-    width: 100%;
   }
 
   .category-caret.closed {
