@@ -772,7 +772,9 @@
             onJumpToEvent?.(target);
           }}
         >
-          <span class="reply-copy"><strong>{replyName}</strong> <span>{replyBody}</span></span>
+          <span class="reply-copy"
+            ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+          >
         </button>
       {/if}
       {#if !collapsed && layout !== 'compact'}
@@ -817,7 +819,9 @@
             }}
           >
             <ReplyIcon class="reply-icon" />
-            <span class="reply-copy"><strong>{replyName}</strong> <span>{replyBody}</span></span>
+            <span class="reply-copy"
+              ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+            >
           </button>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
@@ -1523,8 +1527,8 @@
     white-space: nowrap;
   }
 
-  .reply-compact .reply-copy > :is(strong, span),
-  .reply-connected .reply-copy > :is(strong, span) {
+  .reply-compact .reply-copy > span,
+  .reply-connected .reply-copy > span {
     opacity: var(--opacity-p300);
   }
 
@@ -1599,15 +1603,15 @@
     overflow: hidden;
   }
 
-  .reply-preview strong {
+  .reply-preview .reply-name {
     color: var(--reply-name-color);
   }
 
-  .reply-preview.persona strong {
+  .reply-preview.persona .reply-name {
     color: var(--pmp-ink);
   }
 
-  .reply-preview:is(:hover, :focus-visible) .reply-copy > :is(strong, span) {
+  .reply-preview:is(:hover, :focus-visible) .reply-copy > span {
     opacity: var(--opacity-p500);
   }
 

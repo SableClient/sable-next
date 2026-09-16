@@ -57,7 +57,7 @@
 <style>
   .profile-rooms-title {
     font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-500);
     margin: 0 0 var(--space-200);
   }
 
