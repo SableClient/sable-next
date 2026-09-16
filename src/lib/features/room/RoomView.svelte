@@ -137,7 +137,7 @@
       if (
         content.kind !== 'image' &&
         content.kind !== 'sticker' &&
-        !(content.kind === 'file' && isPdfAttachment(content.mime, content.body))
+        !(content.kind === 'file' && isPdfAttachment(content.mime, content.filename))
       ) {
         return [];
       }
@@ -616,10 +616,10 @@
     const eventId = `profile-avatar-${String(++profileAvatarSequence)}`;
     profileAvatarItem = {
       kind: 'image',
-      body: displayName,
+      filename: displayName,
+      caption: null,
       html: null,
       source,
-      filename: null,
       mime: null,
       width: null,
       height: null,

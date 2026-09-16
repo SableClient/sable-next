@@ -371,9 +371,9 @@ test('anything you sent is yours to redact, not only your text', () => {
   const image = {
     kind: 'image',
     html: null,
-    body: 'photo.png',
     source: 'mxc://example.org/p',
     filename: 'photo.png',
+    caption: null,
     mime: null,
     width: 8,
     height: 8,

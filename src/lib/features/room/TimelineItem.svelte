@@ -246,7 +246,11 @@
     const eventId = item.event_id ?? '';
     const editId = item.event_id ?? item.transaction_id ?? '';
     const body =
-      item.content.kind === 'message' || item.content.kind === 'image' ? item.content.body : null;
+      item.content.kind === 'message'
+        ? item.content.body
+        : item.content.kind === 'image'
+          ? (item.content.caption ?? '')
+          : null;
     const html = item.content.kind === 'message' ? item.content.html : null;
     return {
       onReact: onToggleReaction

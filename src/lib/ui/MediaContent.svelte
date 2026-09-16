@@ -25,7 +25,7 @@
   interface Props {
     source: string;
     mime: string | null;
-    body: string;
+    filename: string;
     kind: 'audio' | 'video' | 'file';
     width?: number | null;
     height?: number | null;
@@ -40,7 +40,7 @@
   let {
     source,
     mime,
-    body,
+    filename,
     kind,
     onOpen,
     width = null,
@@ -63,7 +63,7 @@
   /* An unsized video lays out at the UA's 150px, then jumps to its intrinsic
      size once metadata arrives, shoving the rows below it down. */
   let mediaLabel = $derived(
-    body ||
+    filename ||
       (kind === 'video'
         ? $i18n.t('timeline.videoAttachment')
         : kind === 'audio'
@@ -97,14 +97,14 @@
       return undefined;
     }
   });
-  let isPdf = $derived(kind === 'file' && isPdfAttachment(mime, body));
+  let isPdf = $derived(kind === 'file' && isPdfAttachment(mime, filename));
   let isText = $derived(
     kind === 'file' &&
       !isPdf &&
       (size === null || size <= MAX_TEXT_ATTACHMENT_BYTES) &&
-      isTextAttachment(mime, body)
+      isTextAttachment(mime, filename)
   );
-  let textLanguage = $derived(isText ? textAttachmentLanguage(mime, body) : null);
+  let textLanguage = $derived(isText ? textAttachmentLanguage(mime, filename) : null);
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
@@ -210,13 +210,13 @@
         style:aspect-ratio={aspectRatio}
         aria-label={mediaLabel}
       >
-        {body}
+        {filename}
       </video>
     {:else if kind === 'audio' && waveform !== null && waveform.length > 0}
-      <VoiceMessagePlayer {url} {body} {durationMs} {waveform} />
+      <VoiceMessagePlayer {url} body={filename} {durationMs} {waveform} />
     {:else if kind === 'audio'}
       <audio class="media-content" controls src={url} aria-label={mediaLabel}>
-        {body}
+        {filename}
       </audio>
     {:else}
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- an object URL for the media bytes, not a route -->

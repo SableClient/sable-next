@@ -40,7 +40,8 @@ export function timelineImage(id: string) {
     ...timelineItem(id, 'History image'),
     content: {
       kind: 'image',
-      body: 'History image',
+      filename: 'History image',
+      caption: null,
       source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
       mime: 'image/png',
       // Matches TIMELINE_LAYOUT.pictureRatio, so the placeholder the estimator
@@ -76,7 +77,8 @@ export function timelineWideImageWithoutDimensions(id: string) {
     ...timelineItem(id, 'History image'),
     content: {
       kind: 'image',
-      body: 'History image',
+      filename: 'History image',
+      caption: null,
       source: JSON.stringify({ Plain: 'mxc://example.test/wide-history-image' }),
       mime: 'image/png',
       width: null,

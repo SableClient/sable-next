@@ -903,13 +903,32 @@ body: string;
 /**  Sanitised display HTML, safe to inject as-is. */
 html: string;
 /**  `m.emote`, which reads as an action by the sender rather than speech. */
-emote: boolean; notice: boolean; edited: boolean } | { kind: "image"; body: string;
+emote: boolean; notice: boolean; edited: boolean } | { kind: "image";
+/**
+ *  The file name, per the spec's media captions: the `filename` field
+ *  when it is set, the body otherwise.
+ */
+filename: string;
+/**  The plain caption, absent when the body is the file name. */
+caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; filename: string | null; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video"; body: string;
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video";
+/**  The file name, per the spec's media captions. */
+filename: string;
+/**  The plain caption, absent when the body is the file name. */
+caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio"; body: string;
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio";
+/**  The file name, per the spec's media captions. */
+filename: string;
+/**  The plain caption, absent when the body is the file name. */
+caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file"; body: string;
+html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file";
+/**  The file name, per the spec's media captions. */
+filename: string;
+/**  The plain caption, absent when the body is the file name. */
+caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
 html: string | null; source: string; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } |
 /**

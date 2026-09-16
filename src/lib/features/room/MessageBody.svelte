@@ -14,7 +14,6 @@
   import { firstPreviewableLink } from './link-preview.js';
   import FormattedBody from './FormattedBody.svelte';
   import LinkPreviewCard from './LinkPreviewCard.svelte';
-  import { isCaption } from './members.js';
   import TimelineGallery from './TimelineGallery.svelte';
   import TimelineLocation from './TimelineLocation.svelte';
   import TimelineLiveLocation from './TimelineLiveLocation.svelte';
@@ -90,8 +89,8 @@
   <MediaImage
     class="image"
     source={item.content.source}
-    alt={item.content.body}
-    title={item.content.body}
+    alt={item.content.caption ?? item.content.filename}
+    title={item.content.caption ?? item.content.filename}
     width={800}
     height={600}
     intrinsicWidth={item.content.width}
@@ -104,8 +103,10 @@
   />
   {#if item.content.html}
     <FormattedBody html={item.content.html} {onMatrixLink} />
-  {:else if isCaption(item.content.body) || preferences.alwaysShowAltText}
-    <p class="body">{item.content.body}</p>
+  {:else if item.content.caption}
+    <p class="body">{item.content.caption}</p>
+  {:else if preferences.alwaysShowAltText}
+    <p class="body">{item.content.filename}</p>
   {/if}
 {:else if item.content.kind === 'gallery'}
   <TimelineGallery
@@ -137,7 +138,7 @@
     class="media"
     source={item.content.source}
     mime={item.content.mime}
-    body={item.content.body}
+    filename={item.content.filename}
     kind={item.content.kind}
     width={item.content.kind === 'video' ? item.content.width : null}
     height={item.content.kind === 'video' ? item.content.height : null}
@@ -149,6 +150,8 @@
   />
   {#if item.content.html}
     <FormattedBody html={item.content.html} {onMatrixLink} />
+  {:else if item.content.caption}
+    <p class="body">{item.content.caption}</p>
   {/if}
 {/if}
 {#if previewLink}

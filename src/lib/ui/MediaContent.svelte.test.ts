@@ -30,7 +30,7 @@ test.each([
         kind,
         source: `mxc://example.org/${kind}`,
         mime: `${kind}/*`,
-        body: 'report.pdf',
+        filename: 'report.pdf',
         width,
         height,
       },
@@ -58,7 +58,7 @@ test('renders the extension badge and human-readable size for a file attachment'
       kind: 'file',
       source: 'mxc://example.org/file',
       mime: 'application/zip',
-      body: 'archive.zip',
+      filename: 'archive.zip',
       size: 1_500_000,
     },
   });
@@ -82,7 +82,7 @@ test('offers a PDF as a file plus a preview that opens the viewer', async () => 
       kind: 'file',
       source: 'mxc://example.org/pdf',
       mime: 'application/pdf',
-      body: 'report.pdf',
+      filename: 'report.pdf',
       onOpen,
     },
   });
@@ -111,7 +111,7 @@ test('previews a readable text attachment and leaves an opaque one alone', async
       kind: 'file',
       source: 'mxc://example.org/json',
       mime: 'application/json',
-      body: 'payload.json',
+      filename: 'payload.json',
     },
   });
 
@@ -134,7 +134,7 @@ test('previews a readable text attachment and leaves an opaque one alone', async
       kind: 'file',
       source: 'mxc://example.org/zip',
       mime: 'application/zip',
-      body: 'archive.zip',
+      filename: 'archive.zip',
     },
   });
 
@@ -156,7 +156,7 @@ test('renders a voice message with a waveform when a waveform is present', async
       kind: 'audio',
       source: 'mxc://example.org/voice',
       mime: 'audio/ogg',
-      body: 'Voice message',
+      filename: 'Voice message',
       durationMs: 4200,
       waveform: [0, 0.5, 1, 0.5, 0],
     },
@@ -180,7 +180,7 @@ test('falls back to the plain audio player when there is no waveform', async () 
       kind: 'audio',
       source: 'mxc://example.org/audio-no-waveform',
       mime: 'audio/ogg',
-      body: 'clip.ogg',
+      filename: 'clip.ogg',
       waveform: null,
     },
   });
@@ -204,7 +204,7 @@ test('labels unavailable attachments', async () => {
       kind: 'file',
       source: 'mxc://example.org/unavailable-file',
       mime: 'application/pdf',
-      body: 'report.pdf',
+      filename: 'report.pdf',
     },
   });
 

@@ -1278,10 +1278,10 @@ fn message_content(
 
     match message.msgtype() {
         MessageType::Image(image) => TimelineItemContentView::Image {
-            body: image.body.clone(),
-            html: formatted_caption_html(image.body.as_str(), image.formatted_caption()),
+            filename: image.filename().to_owned(),
+            caption: image.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(image.caption(), image.formatted_caption()),
             source: media_source(&image.source),
-            filename: image.filename.clone(),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
@@ -1290,8 +1290,9 @@ fn message_content(
             spoiler: spoiler_reason(raw.content.as_ref()),
         },
         MessageType::Video(video) => TimelineItemContentView::Video {
-            body: video.body.clone(),
-            html: formatted_caption_html(video.body.as_str(), video.formatted_caption()),
+            filename: video.filename().to_owned(),
+            caption: video.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(video.caption(), video.formatted_caption()),
             source: media_source(&video.source),
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
@@ -1300,8 +1301,9 @@ fn message_content(
             spoiler: spoiler_reason(raw.content.as_ref()),
         },
         MessageType::Audio(audio) => TimelineItemContentView::Audio {
-            body: audio.body.clone(),
-            html: formatted_caption_html(audio.body.as_str(), audio.formatted_caption()),
+            filename: audio.filename().to_owned(),
+            caption: audio.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(audio.caption(), audio.formatted_caption()),
             source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
             duration_ms: audio
@@ -1325,8 +1327,9 @@ fn message_content(
             voice: audio.voice.is_some(),
         },
         MessageType::File(file) => TimelineItemContentView::File {
-            body: file.body.clone(),
-            html: formatted_caption_html(file.body.as_str(), file.formatted_caption()),
+            filename: file.filename().to_owned(),
+            caption: file.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(file.caption(), file.formatted_caption()),
             source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
             size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
@@ -1457,10 +1460,15 @@ fn content(
 }
 
 fn formatted_caption_html(
-    body: &str,
+    caption: Option<&str>,
     formatted: Option<&matrix_sdk::ruma::events::room::message::FormattedBody>,
 ) -> Option<String> {
-    formatted.map(|formatted| display_html(body, Some(formatted.body.as_str())))
+    let formatted = formatted?;
+
+    Some(display_html(
+        caption.unwrap_or_default(),
+        Some(formatted.body.as_str()),
+    ))
 }
 
 fn formatted_body(msgtype: &MessageType) -> Option<String> {
@@ -2033,7 +2041,7 @@ mod tests {
     #[test]
     fn formatted_attachment_captions_are_sanitised_for_display() {
         let html = formatted_caption_html(
-            "hi Ana party",
+            Some("hi Ana party"),
             Some(&FormattedBody::html(
                 "<a href=\"https://matrix.to/#/@ana:example.org\">Ana</a> <img src=\"mxc://example.org/party\" alt=\"party\" data-mx-emoticon><script>steal()</script>",
             )),
@@ -2044,7 +2052,7 @@ mod tests {
         assert!(html.contains("src=\"mxc://example.org/party\""));
         assert!(html.contains("data-mx-emoticon"));
         assert!(!html.contains("script"));
-        assert_eq!(formatted_caption_html("photo.png", None), None);
+        assert_eq!(formatted_caption_html(None, None), None);
     }
 
     #[test]

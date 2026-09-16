@@ -2292,11 +2292,11 @@ pub enum TimelineItemContentView {
         edited: bool,
     },
     Image {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
-        filename: Option<String>,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         width: Option<u64>,
@@ -2308,7 +2308,8 @@ pub enum TimelineItemContentView {
         spoiler: Option<String>,
     },
     Video {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
@@ -2321,7 +2322,8 @@ pub enum TimelineItemContentView {
         spoiler: Option<String>,
     },
     Audio {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
@@ -2333,7 +2335,8 @@ pub enum TimelineItemContentView {
         voice: bool,
     },
     File {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,

@@ -37,7 +37,7 @@
         class="tile"
         source={item.source}
         mime={item.mime}
-        body={item.body}
+        filename={item.body}
         kind={item.kind}
         width={item.kind === 'video' ? item.width : null}
         height={item.kind === 'video' ? item.height : null}

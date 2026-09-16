@@ -71,9 +71,9 @@ function imageItem(body = 'photo.png'): TimelineItemView {
     content: {
       kind: 'image',
       html: null,
-      body,
-      source: 'mxc://example.org/photo',
       filename: 'photo.png',
+      caption: body,
+      source: 'mxc://example.org/photo',
       mime: 'image/png',
       width: 800,
       height: 600,
@@ -319,7 +319,7 @@ test('edits an own image caption without dropping its media details', async () =
   const image = {
     ...imageItem(),
     is_own: true,
-    content: { ...imageItem().content, body: 'caption' },
+    content: { ...imageItem().content, caption: 'caption' },
   };
   const instance = mount(TimelineItemHarness, {
     target: document.body,
