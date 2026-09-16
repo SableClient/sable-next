@@ -726,7 +726,7 @@ pub fn timeline_item(
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
-                reactions: reactions(event.content()),
+                reactions: reactions(event.reactions()),
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,
@@ -1541,12 +1541,8 @@ fn body_of(content: &TimelineItemContent) -> Option<String> {
     }
 }
 
-fn reactions(content: &TimelineItemContent) -> Vec<ReactionGroup> {
-    let TimelineItemContent::MsgLike(msg) = content else {
-        return Vec::new();
-    };
-
-    msg.reactions
+fn reactions(reactions: &matrix_sdk_ui::timeline::ReactionsByKeyBySender) -> Vec<ReactionGroup> {
+    reactions
         .iter()
         .map(|(key, senders)| ReactionGroup {
             key: key.clone(),
@@ -1775,7 +1771,6 @@ mod tests {
         );
         let content = TimelineItemContent::MsgLike(MsgLikeContent {
             kind: MsgLikeKind::LiveLocation(LiveLocationState::new(beacon)),
-            reactions: matrix_sdk_ui::timeline::ReactionsByKeyBySender::default(),
             in_reply_to: None,
             thread_root: None,
             thread_summary: None,

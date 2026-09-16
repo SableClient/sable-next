@@ -849,3 +849,50 @@ test('offers to add a message inline emote to your own pack', async () => {
   expect(document.querySelector('.menu-surface')?.textContent).toContain('Add emote to my pack');
   await unmount(instance);
 });
+
+test('a membership row keeps its notice look and still carries the action layer', async () => {
+  const joined: TimelineItemView = {
+    ...item(false),
+    content: {
+      kind: 'membership',
+      user_id: '@alice:example.org',
+      change: 'joined',
+      display_name: 'Alice',
+      reason: null,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: joined, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  const row = document.querySelector('article.event-row');
+  if (!row) throw new Error('the membership event was not wrapped in an actionable row');
+  expect(row.querySelector('.state')).not.toBeNull();
+  expect(row.querySelector('header .sender')).toBeNull();
+
+  row.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await tick();
+  expect(document.querySelector('.message-actions')).not.toBeNull();
+
+  await unmount(instance);
+});
+
+test('a date divider stays a plain annotation with nothing to act on', async () => {
+  const divider: TimelineItemView = {
+    ...item(false),
+    event_id: null,
+    content: { kind: 'date_divider', timestamp: 0 },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: divider, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  expect(document.querySelector('article')).toBeNull();
+  expect(document.querySelector('.date-divider')).not.toBeNull();
+
+  await unmount(instance);
+});
