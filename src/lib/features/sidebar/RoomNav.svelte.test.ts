@@ -55,7 +55,7 @@ vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => presenceFixture.entry }),
 }));
 
-import RoomNav from './RoomNav.svelte';
+import RoomNavHarness from './RoomNavHarness.test.svelte';
 
 const realObserver = globalThis.IntersectionObserver;
 
@@ -100,7 +100,7 @@ function roomNames(): string[] {
 }
 
 async function mountNav(props: Record<string, unknown> = {}) {
-  const instance = mount(RoomNav, { target: document.body, props });
+  const instance = mount(RoomNavHarness, { target: document.body, props });
   await tick();
   return instance;
 }
@@ -500,5 +500,26 @@ test('a DM row falls back to the peer presence message, and a topic still wins',
   instance = await mountNav();
   await tick();
   expect(roomTopics()).toEqual(['Ship logs']);
+  await unmount(instance);
+});
+
+test('hovering a room row shows its full name in a tooltip', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!long:example.org', name: 'A very long room name that truncates' }),
+  ];
+  const instance = await mountNav();
+  await tick();
+
+  const row = document.querySelector<HTMLElement>('.room-row');
+  if (!row) throw new Error('room row was not rendered');
+  vi.useFakeTimers();
+  row.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await vi.advanceTimersByTimeAsync(400);
+  await tick();
+
+  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe(
+    'A very long room name that truncates'
+  );
+  vi.useRealTimers();
   await unmount(instance);
 });

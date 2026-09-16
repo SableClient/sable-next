@@ -4,12 +4,12 @@
   import type { Snippet } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
   import { type as osType } from '@tauri-apps/plugin-os';
-  import { Tooltip } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import '../styles.css';
   import { createCoreClient } from '#lib/core/client.svelte.js';
   import { provideCoreClient } from '#lib/core/context.js';
   import BannerDock from '#lib/ui/BannerDock.svelte';
+  import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import TitleBar from '#lib/ui/TitleBar.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
@@ -122,7 +122,7 @@
     <WebUpdateBanner />
   </BannerDock>
 
-  <Tooltip.Provider delayDuration={400} skipDelayDuration={80}>
+  <TooltipProvider>
     {@render children()}
-  </Tooltip.Provider>
+  </TooltipProvider>
 </IconContext>

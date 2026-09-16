@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack, type ComponentProps } from 'svelte';
 
+  import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+
   import { Bookmarks, provideBookmarks, type BookmarkCommands } from './bookmarks.svelte.js';
   import {
     PinnedEvents,
@@ -21,5 +23,7 @@
   provideBookmarks(new Bookmarks(untrack(() => core)));
 </script>
 
-<TimelineItem {...item} />
-<MessageContextMenu />
+<TooltipProvider>
+  <TimelineItem {...item} />
+  <MessageContextMenu />
+</TooltipProvider>

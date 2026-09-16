@@ -563,7 +563,7 @@ test('provides a formatted reaction attribution tooltip', async () => {
   await vi.advanceTimersByTimeAsync(400);
   await tick();
 
-  expect(document.querySelector('.reaction-tooltip')?.textContent).toBe('Alice reacted with 👍');
+  expect(document.querySelector('.tooltip')?.textContent).toBe('Alice reacted with 👍');
   vi.useRealTimers();
   await unmount(instance);
 });

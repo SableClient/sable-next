@@ -15,6 +15,8 @@
     side?: TooltipSide;
     align?: 'start' | 'center' | 'end';
     class?: ClassValue;
+    customAnchor?: HTMLElement | null;
+    open?: boolean;
     trigger?: TriggerSnippet;
     children?: Snippet;
   }
@@ -25,6 +27,8 @@
     side = 'top',
     align = 'center',
     class: className = '',
+    customAnchor,
+    open,
     trigger,
     children,
   }: Props = $props();
@@ -41,10 +45,12 @@
   </button>
 {/snippet}
 
-<BitsTooltip.Root>
-  <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
+<BitsTooltip.Root {open}>
+  {#if customAnchor === undefined}
+    <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
+  {/if}
   <BitsTooltip.Portal>
-    <BitsTooltip.Content class="tooltip" {side} {align} sideOffset={8}>
+    <BitsTooltip.Content class="tooltip" {side} {align} sideOffset={8} {customAnchor}>
       {label}
     </BitsTooltip.Content>
   </BitsTooltip.Portal>

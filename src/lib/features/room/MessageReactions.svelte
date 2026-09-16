@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Tooltip as BitsTooltip } from 'bits-ui';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import { onDestroy } from 'svelte';
 
@@ -7,6 +6,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { LongPress } from './long-press.svelte.js';
   import ReactionPicker from './ReactionPicker.svelte';
@@ -53,76 +53,71 @@
   });
 </script>
 
-<BitsTooltip.Provider delayDuration={400} skipDelayDuration={100}>
-  <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
-    {#each reactions as reaction, index (reaction.key)}
-      {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
-      {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
-        <button
-          {...props}
-          class="reaction choice"
-          type="button"
-          aria-pressed={mine}
-          aria-label={$i18n.t('timeline.toggleReaction', {
-            key: reaction.key,
-            count: reaction.senders.length,
-          })}
-          disabled={eventId === null}
-          onclick={() => {
-            if (press.fired) {
-              press.fired = false;
-              return;
-            }
-            if (eventId) onToggleReaction?.(eventId, reaction.key);
-          }}
-          oncontextmenu={(event) => {
-            openDetails(event, index);
-          }}
-          onpointerdown={(event) => {
-            pressIndex = index;
-            press.start(event);
-          }}
-          onpointermove={press.move}
-          onpointerup={press.end}
-          onpointercancel={press.end}
-        >
-          {#if reaction.key.startsWith('mxc://')}
-            <MediaImage
-              class="reaction-image"
-              source={reaction.key}
-              alt={reaction.key}
-              width={64}
-              height={64}
-              original
-            />
-          {:else}
-            <em>{reaction.key}</em>
-          {/if}
-          {reaction.senders.length}
-        </button>
-      {/snippet}
-      <BitsTooltip.Root>
-        <BitsTooltip.Trigger child={reactionTrigger} />
-        <BitsTooltip.Portal>
-          <BitsTooltip.Content class="reaction-tooltip" side="top" align="center" sideOffset={8}>
-            {reactionSummary(reaction.senders, reaction.key, members, $i18n.t)}
-          </BitsTooltip.Content>
-        </BitsTooltip.Portal>
-      </BitsTooltip.Root>
-    {/each}
-    {#if actionable && onReact}
-      {@const react = onReact}
-      <ReactionPicker
-        label={$i18n.t('timeline.addReaction')}
-        triggerClass="add-reaction"
-        {roomId}
-        onPick={react}
+<div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
+  {#each reactions as reaction, index (reaction.key)}
+    {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
+    {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
+      <button
+        {...props}
+        class="reaction choice"
+        type="button"
+        aria-pressed={mine}
+        aria-label={$i18n.t('timeline.toggleReaction', {
+          key: reaction.key,
+          count: reaction.senders.length,
+        })}
+        disabled={eventId === null}
+        onclick={() => {
+          if (press.fired) {
+            press.fired = false;
+            return;
+          }
+          if (eventId) onToggleReaction?.(eventId, reaction.key);
+        }}
+        oncontextmenu={(event) => {
+          openDetails(event, index);
+        }}
+        onpointerdown={(event) => {
+          pressIndex = index;
+          press.start(event);
+        }}
+        onpointermove={press.move}
+        onpointerup={press.end}
+        onpointercancel={press.end}
       >
-        <PlusIcon />
-      </ReactionPicker>
-    {/if}
-  </div>
-</BitsTooltip.Provider>
+        {#if reaction.key.startsWith('mxc://')}
+          <MediaImage
+            class="reaction-image"
+            source={reaction.key}
+            alt={reaction.key}
+            width={64}
+            height={64}
+            original
+          />
+        {:else}
+          <em>{reaction.key}</em>
+        {/if}
+        {reaction.senders.length}
+      </button>
+    {/snippet}
+    <Tooltip
+      label={reactionSummary(reaction.senders, reaction.key, members, $i18n.t)}
+      side="top"
+      trigger={reactionTrigger}
+    />
+  {/each}
+  {#if actionable && onReact}
+    {@const react = onReact}
+    <ReactionPicker
+      label={$i18n.t('timeline.addReaction')}
+      triggerClass="add-reaction"
+      {roomId}
+      onPick={react}
+    >
+      <PlusIcon />
+    </ReactionPicker>
+  {/if}
+</div>
 
 <style>
   .reactions {

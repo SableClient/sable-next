@@ -1621,32 +1621,6 @@
     text-underline-offset: 0.15em;
   }
 
-  /* bits-ui renders the trigger, so the row's scoped `.reaction` cannot reach it. */
-
-  :global(.reaction-tooltip) {
-    animation: tooltip-in var(--motion-normal) ease-out both;
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--bg-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
-    box-sizing: border-box;
-    color: var(--bg-on-container);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
-    max-width: min(15rem, calc(100vw - 2rem));
-    overflow-wrap: anywhere;
-    padding: var(--space-200) var(--space-250);
-    white-space: normal;
-    z-index: var(--layer-tooltip);
-  }
-
-  @keyframes tooltip-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--space-100)) scale(var(--scale-subtle));
-    }
-  }
-
   @media (prefers-reduced-motion: no-preference) {
     .via {
       transition: background-color var(--motion-fast) var(--motion-easing-standard);
@@ -1655,16 +1629,6 @@
     .via-hidden {
       transition: opacity var(--motion-fast) var(--motion-easing-standard);
     }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.reaction-tooltip) {
-      animation: none;
-    }
-  }
-
-  :global(html[data-reduced-motion='on'] .reaction-tooltip) {
-    animation: none;
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {

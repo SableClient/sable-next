@@ -41,6 +41,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
@@ -673,26 +674,29 @@
               {@const name = roomName(item.room)}
               {@const isClosed = closedCategories.has(item.key)}
               <div class="room-row-wrap">
-                <button
-                  type="button"
-                  class="room-category selection-layer"
-                  class:collapsed
-                  oncontextmenu={(event) => {
-                    openContextMenu(event, item.room, null);
-                  }}
-                  style:--room-depth={collapsed ? 0 : item.depth}
-                  aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
-                  aria-expanded={!isClosed}
-                  data-state={isClosed ? 'closed' : 'open'}
-                  onclick={() => {
-                    toggleCategory(item.key);
-                  }}
-                >
-                  {#if !collapsed}<span class="category-name">{name}</span>{/if}
-                  <span class:closed={isClosed} class="category-caret" aria-hidden="true"
-                    ><CaretDownIcon /></span
+                {#snippet categoryTrigger({ props }: { props: Record<string, unknown> })}
+                  <button
+                    {...props}
+                    type="button"
+                    class="room-category selection-layer"
+                    class:collapsed
+                    oncontextmenu={(event) => {
+                      openContextMenu(event, item.room, null);
+                    }}
+                    style:--room-depth={collapsed ? 0 : item.depth}
+                    aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
+                    aria-expanded={!isClosed}
+                    onclick={() => {
+                      toggleCategory(item.key);
+                    }}
                   >
-                </button>
+                    {#if !collapsed}<span class="category-name">{name}</span>{/if}
+                    <span class:closed={isClosed} class="category-caret" aria-hidden="true"
+                      ><CaretDownIcon /></span
+                    >
+                  </button>
+                {/snippet}
+                <Tooltip label={name} side="right" trigger={categoryTrigger} />
                 {#if !collapsed}
                   <span class="room-options-slot">
                     <RoomOptionsMenu
@@ -727,93 +731,97 @@
                 ? resolveUserStatus(peerProfiles.get(peerId), peerPresence)
                 : null}
               <div class="room-row-wrap">
-                <a
-                  oncontextmenu={(event) => {
-                    if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
-                  }}
-                  class="room-row selection-current selection-layer"
-                  class:unread={mentions > 0 || unread > 0 || marked}
-                  {href}
-                  style:--room-depth={collapsed ? 0 : item.depth}
-                  onclick={() => onNavigate?.(href)}
-                  aria-label={collapsed ? name : undefined}
-                  aria-current={active ? 'page' : undefined}
-                  {@attach peerId !== null && !collapsed
-                    ? whenVisible(() => {
-                        requestPeerProfile(peerId);
-                      })
-                    : undefined}
-                >
-                  {#if showIcons}
-                    <span class="room-avatar">
-                      <Avatar
-                        class={[
-                          'room-avatar-icon',
-                          { glyph: !room?.avatar_url, voice: room?.is_voice },
-                        ]}
-                        id={room?.avatar_url ? item.roomId : null}
-                        src={room?.avatar_url ?? null}
-                        size="small"
-                        uniform
-                      >
-                        <RoomIcon
-                          isSpace={room?.is_space ?? false}
-                          isVoice={room?.is_voice ?? false}
-                          joinRule={room?.join_rule ?? null}
-                          weight={active ? 'fill' : 'regular'}
-                        />
-                      </Avatar>
-                      {#if peerPresence && peerPresence.presence !== 'offline'}
-                        <PresenceDot
-                          presence={peerPresence.presence}
-                          label={$i18n.t(`presence.${peerPresence.presence}`)}
-                          class="room-presence"
-                        />
+                {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
+                  <a
+                    {...props}
+                    oncontextmenu={(event) => {
+                      if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
+                    }}
+                    class="room-row selection-current selection-layer"
+                    class:unread={mentions > 0 || unread > 0 || marked}
+                    {href}
+                    style:--room-depth={collapsed ? 0 : item.depth}
+                    onclick={() => onNavigate?.(href)}
+                    aria-label={collapsed ? name : undefined}
+                    aria-current={active ? 'page' : undefined}
+                    {@attach peerId !== null && !collapsed
+                      ? whenVisible(() => {
+                          requestPeerProfile(peerId);
+                        })
+                      : undefined}
+                  >
+                    {#if showIcons}
+                      <span class="room-avatar">
+                        <Avatar
+                          class={[
+                            'room-avatar-icon',
+                            { glyph: !room?.avatar_url, voice: room?.is_voice },
+                          ]}
+                          id={room?.avatar_url ? item.roomId : null}
+                          src={room?.avatar_url ?? null}
+                          size="small"
+                          uniform
+                        >
+                          <RoomIcon
+                            isSpace={room?.is_space ?? false}
+                            isVoice={room?.is_voice ?? false}
+                            joinRule={room?.join_rule ?? null}
+                            weight={active ? 'fill' : 'regular'}
+                          />
+                        </Avatar>
+                        {#if peerPresence && peerPresence.presence !== 'offline'}
+                          <PresenceDot
+                            presence={peerPresence.presence}
+                            label={$i18n.t(`presence.${peerPresence.presence}`)}
+                            class="room-presence"
+                          />
+                        {/if}
+                      </span>
+                    {/if}
+                    {#if !collapsed}
+                      <span class="room-text">
+                        <span class="room-name">{name}</span>
+                        {#if room?.is_direct && room.topic}
+                          <span class="room-topic">{room.topic}</span>
+                        {:else if peerStatus}
+                          <span class="room-topic"
+                            >{#if peerStatus.emoji}<span class="room-status-emoji"
+                                >{peerStatus.emoji}</span
+                              >{/if}{peerStatus.text}</span
+                          >
+                        {/if}
+                      </span>
+                      {#if typing}
+                        <span class="room-typing"><TypingDots /></span>
                       {/if}
-                    </span>
-                  {/if}
-                  {#if !collapsed}
-                    <span class="room-text">
-                      <span class="room-name">{name}</span>
-                      {#if room?.is_direct && room.topic}
-                        <span class="room-topic">{room.topic}</span>
-                      {:else if peerStatus}
-                        <span class="room-topic"
-                          >{#if peerStatus.emoji}<span class="room-status-emoji"
-                              >{peerStatus.emoji}</span
-                            >{/if}{peerStatus.text}</span
+                      {#if live > 0}
+                        <span
+                          class="voice-badge"
+                          aria-label={$i18n.t('nav.voiceLive', { count: live })}>{live}</span
                         >
                       {/if}
-                    </span>
-                    {#if typing}
-                      <span class="room-typing"><TypingDots /></span>
+                      <span class="room-status">
+                        <UnreadBadge
+                          counts={{ unread, highlight: mentions, marked }}
+                          dm={room?.is_direct ?? false}
+                          role="img"
+                          aria-label={mentions > 0
+                            ? $i18n.t('nav.unreadMentions', { count: mentions })
+                            : unread > 0
+                              ? $i18n.t('nav.unreadMessages', { count: unread })
+                              : $i18n.t('nav.markedUnread')}
+                        />
+                        {#if notifyMode}
+                          {@const chip = notificationChip(notifyMode)}
+                          <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
+                            <chip.icon />
+                          </span>
+                        {/if}
+                      </span>
                     {/if}
-                    {#if live > 0}
-                      <span
-                        class="voice-badge"
-                        aria-label={$i18n.t('nav.voiceLive', { count: live })}>{live}</span
-                      >
-                    {/if}
-                    <span class="room-status">
-                      <UnreadBadge
-                        counts={{ unread, highlight: mentions, marked }}
-                        dm={room?.is_direct ?? false}
-                        role="img"
-                        aria-label={mentions > 0
-                          ? $i18n.t('nav.unreadMentions', { count: mentions })
-                          : unread > 0
-                            ? $i18n.t('nav.unreadMessages', { count: unread })
-                            : $i18n.t('nav.markedUnread')}
-                      />
-                      {#if notifyMode}
-                        {@const chip = notificationChip(notifyMode)}
-                        <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
-                          <chip.icon />
-                        </span>
-                      {/if}
-                    </span>
-                  {/if}
-                </a>
+                  </a>
+                {/snippet}
+                <Tooltip label={name} side="right" trigger={roomTrigger} />
                 {#if !collapsed && room}
                   <span class="room-options-slot">
                     <RoomOptionsMenu
