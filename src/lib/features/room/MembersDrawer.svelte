@@ -14,11 +14,14 @@
 
   import MemberIdentityRow from './MemberIdentityRow.svelte';
   import {
+    INITIAL_MEMBER_ROWS,
     MEMBERSHIP_FILTERS,
     MEMBERSHIP_FILTER_LABELS,
+    MEMBER_ROWS_STEP,
     MEMBER_SORTS,
     MEMBER_SORT_LABELS,
     groupMembers,
+    limitGroups,
     matchesFilter,
     memberName,
     membershipFor,
@@ -56,6 +59,7 @@
   let filter = $state<MembershipFilter>('join');
   let fetched = $state.raw<MemberView[]>([]);
   let fetching = $state(false);
+  let limit = $state(INITIAL_MEMBER_ROWS);
   let generation = 0;
 
   let sort = $derived(preferences.memberSort);
@@ -67,7 +71,16 @@
     return matching.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
   });
   let groups = $derived(groupMembers(searched, sort));
+  let shown = $derived(limitGroups(groups, limit));
+  let hidden = $derived(Math.max(0, searched.length - limit));
   let busy = $derived(filter === 'join' ? loading : fetching);
+
+  $effect(() => {
+    void members;
+    void search;
+    void filter;
+    limit = INITIAL_MEMBER_ROWS;
+  });
 
   $effect(() => {
     const load = loadMembership;
@@ -183,7 +196,7 @@
   {:else}
     {#if groups.length > 0}
       <div class="member-groups">
-        {#each groups as group (group.level)}
+        {#each shown as group (group.level)}
           {@const tag = powerTag(group.level, $i18n.t, powerTags)}
           <h3 class="group-label" style:color={tag.color ?? undefined}>{tag.name}</h3>
           <ul>
@@ -200,6 +213,15 @@
             {/each}
           </ul>
         {/each}
+        {#if hidden > 0}
+          <button
+            type="button"
+            class="btn btn-ghost show-more"
+            onclick={() => (limit += MEMBER_ROWS_STEP)}
+          >
+            {$i18n.t('timeline.moreMembers', { count: hidden })}
+          </button>
+        {/if}
       </div>
     {:else if search.trim() !== ''}
       <p class="status">{$i18n.t('timeline.noMembersFound')}</p>
@@ -352,6 +374,15 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  .show-more {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    justify-content: flex-start;
+    min-height: 2.5rem;
+    padding: 0 var(--space-200);
+    width: 100%;
   }
 
   :global(.member-identity-row.member) {

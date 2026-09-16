@@ -1,7 +1,7 @@
 import type { MemberView } from '#src/generated/protocol';
 import { describe, expect, it } from 'vitest';
 
-import { groupMembers, matchesFilter, membershipFor } from './member-listing';
+import { groupMembers, limitGroups, matchesFilter, membershipFor } from './member-listing';
 
 function member(overrides: Partial<MemberView> & { user_id: string }): MemberView {
   return {
@@ -54,5 +54,21 @@ describe('matchesFilter', () => {
   it('asks the server for a leave when kicked members are wanted', () => {
     expect(membershipFor('kick')).toBe('leave');
     expect(membershipFor('ban')).toBe('ban');
+  });
+});
+
+describe('limitGroups', () => {
+  const groups = groupMembers([amy, bob, cid], 'name-asc');
+
+  it('cuts across groups once the limit is reached', () => {
+    expect(limitGroups(groups, 2)).toEqual([
+      { level: 100, members: [cid] },
+      { level: 0, members: [amy] },
+    ]);
+  });
+
+  it('drops a group it cannot reach and keeps everything under the limit', () => {
+    expect(limitGroups(groups, 1)).toEqual([{ level: 100, members: [cid] }]);
+    expect(limitGroups(groups, 10)).toEqual(groups);
   });
 });

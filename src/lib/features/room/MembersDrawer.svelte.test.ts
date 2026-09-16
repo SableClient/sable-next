@@ -116,3 +116,31 @@ test('honours the sort preference and fetches the membership a filter names', as
   expect(loadMembership).not.toHaveBeenCalled();
   await unmount(instance);
 });
+
+test('renders a first page of members and grows on demand', async () => {
+  const members = Array.from({ length: 40 }, (_, index) => ({
+    user_id: `@user${String(index).padStart(2, '0')}:example.org`,
+    display_name: `User ${index}`,
+    avatar_url: null,
+    power_level: 0,
+    membership: 'join' as const,
+    member_ts: null,
+    kicked: false,
+  }));
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: { loading: false, members, onClose: vi.fn(), onMemberProfile: vi.fn() },
+  });
+  await tick();
+
+  expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(30);
+
+  const more = document.querySelector<HTMLButtonElement>('.show-more');
+  expect(more).not.toBeNull();
+  more?.click();
+  await tick();
+
+  expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(40);
+  expect(document.querySelector('.show-more')).toBeNull();
+  await unmount(instance);
+});
