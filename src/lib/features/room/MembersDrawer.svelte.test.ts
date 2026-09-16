@@ -16,9 +16,12 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import MembersDrawer from './MembersDrawer.svelte';
 
+const observerBackup = globalThis.IntersectionObserver;
+
 afterEach(() => {
   document.body.replaceChildren();
   setPreference('memberSort', 'name-asc');
+  globalThis.IntersectionObserver = observerBackup;
 });
 
 test('sorts members by power then name and opens their profile', async () => {
@@ -117,7 +120,21 @@ test('honours the sort preference and fetches the membership a filter names', as
   await unmount(instance);
 });
 
-test('renders a first page of members and grows on demand', async () => {
+test('renders a first page of members and grows when the sentinel shows', async () => {
+  const observers: IntersectionObserverCallback[] = [];
+  globalThis.IntersectionObserver = class {
+    disconnect = vi.fn();
+    observe = vi.fn();
+    unobserve = vi.fn();
+    takeRecords = vi.fn(() => []);
+    root = null;
+    rootMargin = '';
+    thresholds = [];
+    constructor(callback: IntersectionObserverCallback) {
+      observers.push(callback);
+    }
+  } as unknown as typeof IntersectionObserver;
+
   const members = Array.from({ length: 40 }, (_, index) => ({
     user_id: `@user${String(index).padStart(2, '0')}:example.org`,
     display_name: `User ${index}`,
@@ -134,13 +151,12 @@ test('renders a first page of members and grows on demand', async () => {
   await tick();
 
   expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(30);
+  expect(document.querySelector('.load-sentinel')).not.toBeNull();
 
-  const more = document.querySelector<HTMLButtonElement>('.show-more');
-  expect(more).not.toBeNull();
-  more?.click();
+  observers[0]([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as never);
   await tick();
 
   expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(40);
-  expect(document.querySelector('.show-more')).toBeNull();
+  expect(document.querySelector('.load-sentinel')).toBeNull();
   await unmount(instance);
 });

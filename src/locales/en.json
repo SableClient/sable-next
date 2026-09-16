@@ -544,7 +544,6 @@
     "loadingMembers": "Loading members...",
     "searchMembers": "Search members",
     "noMembersFound": "No members found",
-    "moreMembers": "and {{count}} others...",
     "memberCount": "{{count}} members",
     "oneTyping": "{{name}} is typing...",
     "twoTyping": "{{name1}} and {{name2}} are typing...",

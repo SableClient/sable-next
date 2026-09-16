@@ -11,6 +11,7 @@
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { whenVisible } from '#lib/ui/when-visible.js';
 
   import MemberIdentityRow from './MemberIdentityRow.svelte';
   import {
@@ -214,13 +215,13 @@
           </ul>
         {/each}
         {#if hidden > 0}
-          <button
-            type="button"
-            class="btn btn-ghost show-more"
-            onclick={() => (limit += MEMBER_ROWS_STEP)}
-          >
-            {$i18n.t('timeline.moreMembers', { count: hidden })}
-          </button>
+          {#key limit}
+            <div
+              class="load-sentinel"
+              aria-hidden="true"
+              {@attach whenVisible(() => (limit += MEMBER_ROWS_STEP))}
+            ></div>
+          {/key}
         {/if}
       </div>
     {:else if search.trim() !== ''}
@@ -376,13 +377,8 @@
     padding: 0;
   }
 
-  .show-more {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    justify-content: flex-start;
-    min-height: 2.5rem;
-    padding: 0 var(--space-200);
-    width: 100%;
+  .load-sentinel {
+    height: 1px;
   }
 
   :global(.member-identity-row.member) {
