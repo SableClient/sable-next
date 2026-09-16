@@ -2,6 +2,7 @@
   import FormattedBody from './FormattedBody.svelte';
   import { provideRoomAbbreviations, RoomAbbreviations } from './room-abbreviations.svelte.js';
   import type { AbbreviationEntry } from './settings/abbreviations';
+  import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
   interface Props {
     html: string;
@@ -16,4 +17,6 @@
   void abbreviations.load('!room:example.org', []);
 </script>
 
-<FormattedBody {html} />
+<TooltipProvider>
+  <FormattedBody {html} />
+</TooltipProvider>
