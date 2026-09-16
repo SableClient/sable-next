@@ -76,7 +76,7 @@
   .app-page-eyebrow {
     color: var(--primary-main);
     font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-500);
     letter-spacing: 0.08em;
     margin: 0 0 var(--space-200);
     text-transform: uppercase;

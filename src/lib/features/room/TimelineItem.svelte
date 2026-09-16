@@ -772,7 +772,9 @@
             onJumpToEvent?.(target);
           }}
         >
-          <span class="reply-copy"><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span>
+          <span class="reply-copy"
+            ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+          >
         </button>
       {/if}
       {#if !collapsed && layout !== 'compact'}
@@ -817,7 +819,9 @@
             }}
           >
             <ReplyIcon class="reply-icon" />
-            <span class="reply-copy"><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span>
+            <span class="reply-copy"
+              ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+            >
           </button>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}

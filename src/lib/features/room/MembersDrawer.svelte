@@ -365,7 +365,7 @@
   .group-label {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-500);
     line-height: var(--line-height-small);
     margin: 0;
     padding: var(--space-200) var(--space-200) var(--space-100);
