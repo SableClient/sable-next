@@ -5,13 +5,13 @@ import process from 'node:process';
 
 const args = process.argv.slice(2);
 const foldNightlyIntoPatch = args.includes('--apple-short-version');
-const msiVersion = args.includes('--msi');
+const setMsiVersion = args.includes('--msi');
 const updaterEndpoint = args.find((arg) => arg.startsWith('--updater-endpoint='))?.slice(19) ?? '';
 const [version] = args.filter((arg) => !arg.startsWith('--'));
 
 if (!version || !/^\d+\.\d+\.\d+/.test(version)) {
   console.error(
-    `Usage: set-tauri-version.mjs <version> [--apple-short-version]  (got: ${version ?? '<none>'})`
+    `Usage: set-tauri-version.mjs <version> [--apple-short-version] [--msi]  (got: ${version ?? '<none>'})`
   );
   process.exit(1);
 }
@@ -20,6 +20,7 @@ if (!version || !/^\d+\.\d+\.\d+/.test(version)) {
 // stamp folds into patch as a Unix timestamp. The YYMMDDHHMMSS form itself
 // overflows the u32 Tauri parses each version part into.
 let stampedVersion = version;
+let wixVersion;
 if (foldNightlyIntoPatch) {
   const nightly = /^(\d+\.\d+)\.\d+-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(
     version
@@ -37,20 +38,26 @@ if (foldNightlyIntoPatch) {
   stampedVersion = `${base}.${patch}`;
 }
 
-if (msiVersion) {
+if (setMsiVersion) {
   const nightly = /^(\d+\.\d+\.\d+)-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(
     version
   );
   if (nightly) {
     const [, base, yy, mm, dd] = nightly;
     const day = Date.UTC(2000 + +yy, +mm - 1, +dd) / 86_400_000;
-    stampedVersion = `${base}-${day % 65_536}`;
+    wixVersion = `${base}.${day % 65_536}`;
   }
 }
 
 const file = 'src-tauri/tauri.conf.json';
 const config = JSON.parse(readFileSync(file, 'utf8'));
 config.version = stampedVersion;
+if (wixVersion) {
+  config.bundle ??= {};
+  config.bundle.windows ??= {};
+  config.bundle.windows.wix ??= {};
+  config.bundle.windows.wix.version = wixVersion;
+}
 if (updaterEndpoint) {
   config.plugins ??= {};
   config.plugins.updater ??= {};
@@ -58,3 +65,4 @@ if (updaterEndpoint) {
 }
 writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`Set ${file} version to ${stampedVersion}`);
+if (wixVersion) console.log(`Set ${file} MSI version to ${wixVersion}`);
