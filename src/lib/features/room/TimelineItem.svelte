@@ -1527,9 +1527,9 @@
     white-space: nowrap;
   }
 
-  .reply-compact .reply-copy > span,
-  .reply-connected .reply-copy > span {
-    opacity: var(--opacity-p300);
+  .reply-compact .reply-copy,
+  .reply-connected .reply-copy {
+    filter: brightness(var(--opacity-p300));
   }
 
   .reply-connected {
@@ -1611,8 +1611,8 @@
     color: var(--pmp-ink);
   }
 
-  .reply-preview:is(:hover, :focus-visible) .reply-copy > span {
-    opacity: var(--opacity-p500);
+  .reply-preview:is(:hover, :focus-visible) .reply-copy {
+    filter: brightness(var(--opacity-p500));
   }
 
   .reply-expanded:is(:hover, :focus-visible) {
