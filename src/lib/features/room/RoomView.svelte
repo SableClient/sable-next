@@ -801,6 +801,7 @@
           currentUserId={core.session?.user_id ?? null}
           scrollLocked={profileOpen || receiptsOpen}
           {typingLabel}
+          footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
           bind:nearLatest={timelineAtBottom}
           bind:followingLive={timelineFollowingLive}
         >

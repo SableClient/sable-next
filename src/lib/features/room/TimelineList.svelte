@@ -2,6 +2,7 @@
   import { tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { fade } from 'svelte/transition';
+  import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
 
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
@@ -15,8 +16,8 @@
     type TimelineWindowState,
   } from '#lib/timeline/timeline-window.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
-  import Button from '#lib/ui/primitives/Button.svelte';
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import MessageContextMenu from './MessageContextMenu.svelte';
@@ -84,6 +85,7 @@
     followingLive?: boolean;
     typingLabel?: string | null;
     footTrailing?: Snippet;
+    footTrailingVisible?: boolean;
   }
 
   let {
@@ -122,6 +124,7 @@
     followingLive = $bindable(false),
     typingLabel = null,
     footTrailing,
+    footTrailingVisible = false,
   }: Props = $props();
 
   interface RowValue {
@@ -573,26 +576,26 @@
   <div class="timeline-stage">
     {#if historyLoadingVisible}
       <div
-        class="history-loading"
+        class="timeline-loading history-loading"
         role="status"
         out:fade={{
           duration: motionMs(TIMELINE_LAYOUT.historyLoadingFade),
         }}
       >
-        <Spinner small />
-        <span>{$i18n.t('timeline.loadingHistory')}</span>
+        <Spinner />
+        <span class="screen-reader-only">{$i18n.t('timeline.loadingHistory')}</span>
       </div>
     {/if}
     {#if futureLoading}
       <div
-        class="future-loading"
+        class="timeline-loading future-loading"
         role="status"
         out:fade={{
           duration: motionMs(TIMELINE_LAYOUT.historyLoadingFade),
         }}
       >
-        <Spinner small />
-        <span>{$i18n.t('timeline.loadingNewer')}</span>
+        <Spinner />
+        <span class="screen-reader-only">{$i18n.t('timeline.loadingNewer')}</span>
       </div>
     {/if}
     <div class={['timeline-viewport', { initial: !revealed }]}>
@@ -672,21 +675,27 @@
   </div>
 
   {#if revealed && visibleItems.length > 0 && (live ? jumpToLatestVisible : onJumpToLive !== undefined)}
-    <Button
+    <IconButton
       type="button"
       class="jump-to-latest"
-      variant="primary"
-      size="small"
-      onclick={jumpToLatest}>{$i18n.t('timeline.jumpToLatest')}</Button
+      variant="secondary"
+      size="medium"
+      label={$i18n.t('timeline.jumpToLatest')}
+      title={$i18n.t('timeline.jumpToLatest')}
+      onclick={jumpToLatest}
     >
+      <ArrowDownIcon />
+    </IconButton>
   {/if}
 
-  <div class="timeline-foot">
-    <TypingIndicator label={typingLabel} />
-    {#if footTrailing}
-      <div class="foot-trailing">{@render footTrailing()}</div>
-    {/if}
-  </div>
+  {#if typingLabel || footTrailingVisible}
+    <div class="timeline-foot">
+      <TypingIndicator label={typingLabel} />
+      {#if footTrailing && footTrailingVisible}
+        <div class="foot-trailing">{@render footTrailing()}</div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -696,6 +705,8 @@
   }
 
   .timeline-content {
+    --timeline-foot-height: var(--space-600);
+    --timeline-indicator-size: var(--target-hit);
     --timeline-group-gap: var(--space-200);
     --timeline-row-gap: var(--space-250);
     --timeline-row-padding: var(--space-100);
@@ -736,42 +747,33 @@
     min-height: 0;
   }
 
-  .history-loading {
+  .timeline-loading {
     align-items: center;
     background: var(--surface-container);
     border: var(--border-width) solid var(--bg-container-line);
-    border-radius: var(--radii-pill);
+    border-radius: 50%;
     box-shadow: var(--shadow-e200);
-    color: var(--bg-on-container);
+    color: var(--surface-on-container);
     display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-200);
-    inset-block-start: var(--space-200);
-    inset-inline-start: 50%;
-    padding: var(--space-100) var(--space-300);
+    height: var(--timeline-indicator-size);
+    justify-content: center;
+    padding: var(--space-100);
     pointer-events: none;
     position: absolute;
-    transform: translateX(-50%);
+    width: var(--timeline-indicator-size);
     z-index: 1;
   }
 
+  .history-loading {
+    inset-block-start: var(--space-200);
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+  }
+
   .future-loading {
-    align-items: center;
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--bg-container-line);
-    border-radius: var(--radii-pill);
-    box-shadow: var(--shadow-e200);
-    color: var(--bg-on-container);
-    display: flex;
-    font-size: var(--font-size-small);
-    gap: var(--space-200);
     inset-block-end: var(--space-200);
     inset-inline-start: 50%;
-    padding: var(--space-100) var(--space-300);
-    pointer-events: none;
-    position: absolute;
     transform: translateX(-50%);
-    z-index: 1;
   }
 
   .timeline-viewport.initial {
@@ -829,6 +831,10 @@
     width: 100%;
   }
 
+  .window-rows {
+    padding-block-end: var(--space-400);
+  }
+
   @media (width >= 30rem) {
     .items {
       --timeline-media-fill: var(--timeline-media-max);
@@ -882,12 +888,16 @@
 
   .timeline-foot {
     align-items: center;
+    background: var(--surface-container);
     display: flex;
-    flex: none;
     gap: var(--space-200);
-    height: 1.5rem;
+    height: var(--timeline-foot-height);
+    inset-block-end: 0;
+    inset-inline: 0;
     justify-content: space-between;
     padding: 0 var(--page-gutter);
+    position: absolute;
+    z-index: 1;
   }
 
   .foot-trailing {
@@ -895,13 +905,14 @@
   }
 
   :global(button.jump-to-latest) {
-    background-color: var(--bg-container);
-    background-image: linear-gradient(var(--primary-container), var(--primary-container));
-    bottom: var(--space-400);
+    --button-height: var(--timeline-indicator-size);
+
+    background-image: none;
+    border-radius: 50%;
+    bottom: calc(var(--timeline-foot-height) + var(--space-200));
     box-shadow: var(--shadow-float);
-    left: 50%;
+    inset-inline-end: var(--page-gutter);
     position: absolute;
-    transform: translateX(-50%);
     z-index: 1;
   }
 </style>
