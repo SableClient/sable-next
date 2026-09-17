@@ -58,6 +58,9 @@ jobs:
             --prerelease true \
             --title 'Nightly (main)' \
             --notes "Rolling nightly build from main at $SHA"
+          # A manifest left by the previous run passes wait-assets early and
+          # makes the AltStore job point at an IPA finalize-nightly will delete.
+          node scripts/ci/forgejo-release.mjs delete-asset --tag nightly --name github-bundles.json || true
   build-web:
     name: Build web assets
     needs: setup-release
