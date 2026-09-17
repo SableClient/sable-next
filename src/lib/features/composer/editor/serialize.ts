@@ -25,6 +25,7 @@ export interface ComposerMessage {
 }
 
 type AutolinkState = MarkdownSerializerState & { inAutolink?: boolean };
+const SPOILER_FALLBACK = '\uE000';
 
 function isBareUrl(mark: Mark, parent: ProseMirrorNode, index: number): boolean {
   const child = parent.child(index);
@@ -180,12 +181,35 @@ export function composerMarkdown(doc: ProseMirrorNode): string {
   return markdown.serialize(withoutTrailingParagraph(flattenRoomPings(doc))).trim();
 }
 
+function spoilerFallback(node: ProseMirrorNode): ProseMirrorNode {
+  if (node.isText && composerSchema.marks.spoiler.isInSet(node.marks)) {
+    return composerSchema.text(
+      SPOILER_FALLBACK,
+      node.marks.filter((mark) => mark.type !== composerSchema.marks.spoiler)
+    );
+  }
+
+  if (node.isLeaf) return node;
+
+  const children: ProseMirrorNode[] = [];
+  let previousWasSpoiler = false;
+  node.forEach((child) => {
+    const isSpoiler = child.isText && Boolean(composerSchema.marks.spoiler.isInSet(child.marks));
+    if (!isSpoiler || !previousWasSpoiler) children.push(spoilerFallback(child));
+    previousWasSpoiler = isSpoiler;
+  });
+  return node.copy(Fragment.from(children));
+}
+
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const mentions = mentionsOf(doc);
   const flat = withoutTrailingParagraph(flattenRoomPings(doc));
   if (isPlain(flat)) return { body: plainTextOf(flat).trim(), formatted: null, mentions };
 
-  const body = markdown.serialize(flat).trim();
+  const body = markdown
+    .serialize(spoilerFallback(flat))
+    .replaceAll(SPOILER_FALLBACK, '[Spoiler]')
+    .trim();
   if (body === '') return { body, formatted: null, mentions };
 
   return { body, formatted: html(flat), mentions };

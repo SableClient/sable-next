@@ -103,7 +103,7 @@ test('underline and spoiler each serialise to their Matrix HTML', () => {
     )
   );
 
-  expect(message.body).toBe('u ||secret||');
+  expect(message.body).toBe('u [Spoiler]');
   expect(message.formatted).toBe('<u>u</u> <span data-mx-spoiler="">secret</span>');
 });
 

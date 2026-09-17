@@ -28,6 +28,7 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
     is_own: false,
     read_by: [],
     per_message_profile: null,
+    bundled_link_previews: [],
     mention: 'none',
     ...overrides,
   };

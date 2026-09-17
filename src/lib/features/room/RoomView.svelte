@@ -101,6 +101,7 @@
     personas,
     timeline,
     roomId: () => resolvedRoomId,
+    encrypted: () => resolvedRoom?.encrypted ?? null,
   });
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);

@@ -66,7 +66,9 @@ hidden_events: boolean } | { type: "unsubscribe"; subscription: SubscriptionId }
  *  Replying inside a thread needs no extra field: the SDK infers the
  *  thread from the replied-to event.
  */
-in_reply_to: string | null; mentions: string[]; mentions_room: boolean; silent_reply: boolean; persona: PerMessageProfileView | null } | { type: "send_raw_event"; room_id: string; event_type: string; content: unknown } | { type: "send_sticker"; room_id: string;
+in_reply_to: string | null; mentions: string[]; mentions_room: boolean; silent_reply: boolean; persona: PerMessageProfileView | null;
+/**  Cached Open Graph data carried with the event (MSC4095). */
+link_previews: UrlPreviewView[] } | { type: "send_raw_event"; room_id: string; event_type: string; content: unknown } | { type: "send_sticker"; room_id: string;
 /**  `mxc://` only; the core rejects anything else. */
 url: string; body: string; info: PackImageInfoView | null; in_reply_to: string | null; thread_root: string | null; persona: PerMessageProfileView | null } | { type: "send_gif"; room_id: string;
 /**  `mxc://` only; the core rejects anything else. */
@@ -995,6 +997,11 @@ export type TimelineItemView = {
 	 *  stays the account that actually sent it and must remain reachable.
 	 */
 	per_message_profile: PerMessageProfileView | null,
+	/**
+	 *  MSC4095 previews embedded by the sender. These are usable without a
+	 *  homeserver preview request, including in encrypted rooms.
+	 */
+	bundled_link_previews: UrlPreviewView[],
 	mention: MentionView,
 };
 

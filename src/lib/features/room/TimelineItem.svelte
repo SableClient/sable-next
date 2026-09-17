@@ -847,7 +847,11 @@
             {/if}
           </div>
           {@const previewUrl = firstPreviewableLink(item.content.html)}
-          {#if previewUrl}
+          {#if item.bundled_link_previews.length > 0}
+            {#each item.bundled_link_previews as preview (preview.url)}
+              <LinkPreviewCard url={preview.url} bundled={preview} {encrypted} />
+            {/each}
+          {:else if previewUrl}
             <LinkPreviewCard url={previewUrl} {encrypted} />
           {/if}
         {:else}

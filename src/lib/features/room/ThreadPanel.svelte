@@ -56,6 +56,7 @@
     personas,
     timeline,
     roomId: () => roomId,
+    encrypted: () => encrypted,
     threadRoot: untrack(() => rootEventId),
   });
 

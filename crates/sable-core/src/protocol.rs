@@ -149,6 +149,8 @@ pub enum Command {
         silent_reply: bool,
         #[serde(default)]
         persona: Option<PerMessageProfileView>,
+        #[serde(default)]
+        link_previews: Vec<UrlPreviewView>,
     },
     SendRawEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -160,7 +162,6 @@ pub enum Command {
     SendSticker {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
-        /// `mxc://` only; the core rejects anything else.
         url: String,
         body: String,
         #[serde(default)]
@@ -1997,6 +1998,7 @@ pub struct TimelineItemView {
     /// MSC4144. When set, this is the identity to show as the sender; `sender`
     /// stays the account that actually sent it and must remain reachable.
     pub per_message_profile: Option<PerMessageProfileView>,
+    pub bundled_link_previews: Vec<UrlPreviewView>,
     pub mention: MentionView,
 }
 
@@ -2022,7 +2024,7 @@ pub struct ThreadRootView {
     pub timestamp: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct UrlPreviewView {
     pub url: String,
@@ -2785,9 +2787,7 @@ pub struct ImagePackView {
 #[serde(rename_all = "snake_case")]
 pub enum ImagePackOriginView {
     Account,
-    /// The room being viewed.
     Room,
-    /// Another room, subscribed to account-wide.
     Global,
     Space,
 }
@@ -2796,7 +2796,6 @@ pub enum ImagePackOriginView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PackImageView {
     pub shortcode: String,
-    /// Always `mxc://`; anything else is dropped when the pack is read.
     pub url: String,
     pub body: Option<String>,
     pub usage: Vec<ImageUsageView>,

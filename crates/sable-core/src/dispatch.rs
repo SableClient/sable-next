@@ -385,6 +385,7 @@ impl Core {
                 mentions_room,
                 silent_reply,
                 persona,
+                link_previews,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let (body, formatted, persona) = match persona {
@@ -407,13 +408,26 @@ impl Core {
                     None => content,
                 };
 
-                match persona {
+                let previews = bundled_link_previews(&link_previews);
+                let extra = match persona {
                     Some(persona) => {
+                        let mut extra = crate::personas::profile_extra_content(&persona);
+                        if let Some(previews) = previews {
+                            extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
+                        }
+                        Some(extra)
+                    }
+                    None => previews.map(|previews| {
+                        let mut extra = serde_json::Map::new();
+                        extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
+                        extra
+                    }),
+                };
+
+                match extra {
+                    Some(extra) => {
                         timeline
-                            .send_with_extra_content(
-                                content.into(),
-                                Some(crate::personas::profile_extra_content(&persona)),
-                            )
+                            .send_with_extra_content(content.into(), Some(extra))
                             .await
                             .map_err(|error| self.failed("send_message", error))?;
                     }
@@ -2472,6 +2486,42 @@ fn message_content(
         Some(mentions) => content.add_mentions(mentions),
         None => content,
     }
+}
+
+const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
+
+fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Value> {
+    (!previews.is_empty()).then(|| {
+        serde_json::Value::Array(
+            previews
+                .iter()
+                .map(|preview| {
+                    let mut bundle = serde_json::Map::new();
+                    bundle.insert("matched_url".to_owned(), preview.url.clone().into());
+                    bundle.insert("og:url".to_owned(), preview.url.clone().into());
+                    if let Some(title) = &preview.title {
+                        bundle.insert("og:title".to_owned(), title.clone().into());
+                    }
+                    if let Some(description) = &preview.description {
+                        bundle.insert("og:description".to_owned(), description.clone().into());
+                    }
+                    if let Some(site_name) = &preview.site_name {
+                        bundle.insert("og:site_name".to_owned(), site_name.clone().into());
+                    }
+                    if let Some(image) = &preview.image {
+                        bundle.insert("og:image".to_owned(), image.clone().into());
+                    }
+                    if let Some(width) = preview.image_width {
+                        bundle.insert("og:image:width".to_owned(), width.into());
+                    }
+                    if let Some(height) = preview.image_height {
+                        bundle.insert("og:image:height".to_owned(), height.into());
+                    }
+                    serde_json::Value::Object(bundle)
+                })
+                .collect(),
+        )
+    })
 }
 
 fn edit_content(

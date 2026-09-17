@@ -50,6 +50,7 @@
     personas,
     timeline: forumThreads.roomTimeline,
     roomId: () => resolvedRoomId,
+    encrypted: () => resolvedRoom?.encrypted ?? null,
   });
 
   $effect(() => {

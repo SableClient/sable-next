@@ -3,6 +3,7 @@ import type {
   MessageKind,
   PerMessageProfileView,
   TimelineItemView,
+  UrlPreviewView,
 } from '#src/generated/protocol';
 
 import { goto } from '$app/navigation';
@@ -16,6 +17,8 @@ import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
+import { firstPreviewableLink } from '#lib/features/room/link-preview.js';
+import { loadUrlPreview } from '#lib/features/room/link-preview-cache.js';
 import {
   projectPersona,
   resolvePersona,
@@ -35,6 +38,7 @@ export type ConversationDeps = {
   personas: PersonaStore;
   timeline: RoomTimeline;
   roomId: () => string;
+  encrypted?: () => boolean | null;
   threadRoot?: string | null;
 };
 
@@ -45,20 +49,39 @@ export class Conversation {
   readonly #personas: PersonaStore;
   readonly #timeline: RoomTimeline;
   readonly #roomId: () => string;
+  readonly #encrypted: () => boolean | null;
   readonly #threadRoot: string | null;
   /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
   readonly #requestedDetails = new Set<string>();
 
-  constructor({ core, personas, timeline, roomId, threadRoot = null }: ConversationDeps) {
+  constructor({
+    core,
+    personas,
+    timeline,
+    roomId,
+    encrypted,
+    threadRoot = null,
+  }: ConversationDeps) {
     this.#core = core;
     this.#personas = personas;
     this.#timeline = timeline;
     this.#roomId = roomId;
+    this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
   }
 
   get threadRoot(): string | null {
     return this.#threadRoot;
+  }
+
+  async #bundledLinkPreviews(html: string | null): Promise<UrlPreviewView[]> {
+    const enabled =
+      this.#encrypted() === false ? preferences.urlPreviews : preferences.encryptedUrlPreviews;
+    if (!enabled) return [];
+    const url = html ? firstPreviewableLink(html) : null;
+    if (!url) return [];
+    const preview = await loadUrlPreview(this.#core.commands, url);
+    return preview ? [preview] : [];
   }
 
   readonly sendMessage = async (
@@ -122,6 +145,7 @@ export class Conversation {
       outcome.body,
       untouched ? (outcome.formatted ?? formatted) : (outcome.formatted ?? null)
     );
+    const linkPreviews = await this.#bundledLinkPreviews(outgoing.formatted);
     await this.#core.commands.sendMessage(targetRoomId, outgoing.body, {
       inReplyTo: pending?.eventId ?? null,
       threadRoot: this.#threadRoot,
@@ -130,6 +154,7 @@ export class Conversation {
       silentReply: pending?.silentReply ?? false,
       kind: outcome.msgtype,
       persona: outgoing.persona,
+      linkPreviews,
     });
     this.context = null;
   };

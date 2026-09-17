@@ -56,7 +56,8 @@ use crate::protocol::{
     ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
     RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
     SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
-    TimelineItemContentView, TimelineItemView, UploadProgressView, UtdCauseView, VectorDiff,
+    TimelineItemContentView, TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView,
+    VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -710,6 +711,7 @@ pub fn timeline_item(
                 });
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
+            let bundled_link_previews = bundled_link_previews(raw.content.as_ref());
 
             TimelineItemView {
                 id,
@@ -730,6 +732,7 @@ pub fn timeline_item(
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,
+                bundled_link_previews,
                 mention,
             }
         }
@@ -763,6 +766,7 @@ pub fn timeline_item(
                 is_own: false,
                 read_by: Vec::new(),
                 per_message_profile: None,
+                bundled_link_previews: Vec::new(),
                 mention: MentionView::None,
             }
         }
@@ -1245,6 +1249,39 @@ fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
     )
 }
 
+fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
+    const KEY: &str = "com.beeper.linkpreviews";
+
+    content
+        .and_then(|content| content.get(KEY))
+        .and_then(serde_json::Value::as_array)
+        .map_or_else(Vec::new, |bundles| {
+            bundles
+                .iter()
+                .filter_map(|bundle| {
+                    let text = |key| bundle.get(key).and_then(serde_json::Value::as_str);
+                    let url = text("matched_url").or_else(|| text("og:url"))?.to_owned();
+                    if !(url.starts_with("https://") || url.starts_with("http://")) {
+                        return None;
+                    }
+                    let dimension = |key| bundle.get(key).and_then(serde_json::Value::as_u64);
+                    let image = text("og:image")
+                        .filter(|image| image.starts_with("mxc://"))
+                        .map(ToOwned::to_owned);
+                    Some(UrlPreviewView {
+                        url,
+                        title: text("og:title").map(ToOwned::to_owned),
+                        description: text("og:description").map(ToOwned::to_owned),
+                        site_name: text("og:site_name").map(ToOwned::to_owned),
+                        image,
+                        image_width: dimension("og:image:width"),
+                        image_height: dimension("og:image:height"),
+                    })
+                })
+                .collect()
+        })
+}
+
 const fn utd_cause(message: &EncryptedMessage) -> UtdCauseView {
     let EncryptedMessage::MegolmV1AesSha2 { cause, .. } = message else {
         return UtdCauseView::Unknown;
@@ -1712,9 +1749,9 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, call_participants,
-        clamp_power_level, formatted_caption_html, geo_coordinates, in_call, per_message_profile,
-        relay_author, relay_profile, via_servers,
+        LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
+        call_participants, clamp_power_level, formatted_caption_html, geo_coordinates, in_call,
+        per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
     use matrix_sdk::ruma::serde::Raw;
@@ -1730,6 +1767,32 @@ mod tests {
         );
         let serialized = serde_json::to_value(view).unwrap();
         assert_eq!(serialized["kind"], "call_invite");
+    }
+
+    #[test]
+    fn reads_bundled_link_previews_without_trusting_external_images() {
+        let previews = bundled_link_previews(Some(&json!({
+            "com.beeper.linkpreviews": [{
+                "matched_url": "https://example.org/post",
+                "og:title": "Post",
+                "og:image": "https://example.org/image.png",
+            }, {
+                "og:url": "https://example.org/other",
+                "og:image": "mxc://example.org/image",
+                "og:image:width": 640,
+            }, {
+                "matched_url": "mxc://example.org/not-a-link",
+            }],
+        })));
+
+        assert_eq!(previews.len(), 2);
+        assert_eq!(previews[0].title.as_deref(), Some("Post"));
+        assert_eq!(previews[0].image, None);
+        assert_eq!(
+            previews[1].image.as_deref(),
+            Some("mxc://example.org/image")
+        );
+        assert_eq!(previews[1].image_width, Some(640));
     }
 
     #[test]
