@@ -359,6 +359,7 @@
     const link = parseMatrixLink(anchor.href);
     if (!link || !onMatrixLink) return;
     event.preventDefault();
+    event.stopPropagation();
     onMatrixLink(link, anchor);
   }
 
