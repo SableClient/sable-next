@@ -104,6 +104,7 @@ pub enum Command {
         room_ids: Vec<OwnedRoomId>,
     },
     DefaultNotificationModes,
+    MentionNotifications,
     Notification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -768,7 +769,12 @@ pub enum Command {
     },
     SetDefaultNotificationMode {
         direct: bool,
+        encrypted: bool,
         mode: NotificationModeView,
+    },
+    SetMentionNotifications {
+        rule: MentionRuleView,
+        mode: MentionNotificationModeView,
     },
 
     SetRoomName {
@@ -998,8 +1004,10 @@ pub enum CommandOk {
         modes: Vec<RoomNotificationModeView>,
     },
     DefaultNotificationModes {
-        direct: NotificationModeView,
-        group: NotificationModeView,
+        modes: DefaultNotificationModesView,
+    },
+    MentionNotifications {
+        modes: MentionNotificationsView,
     },
     /// `Some` carries the VAPID key subscriptions must be minted under.
     WebPusherSupport {
@@ -1261,6 +1269,7 @@ pub enum CommandOk {
     SetPresence,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
+    SetMentionNotifications,
 
     SetDirect,
     SetRoomName,
@@ -2693,6 +2702,43 @@ pub enum NotificationModeView {
     All,
     Mentions,
     Mute,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct DefaultNotificationModesView {
+    pub direct: NotificationModeView,
+    pub direct_encrypted: NotificationModeView,
+    pub group: NotificationModeView,
+    pub group_encrypted: NotificationModeView,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum MentionNotificationModeView {
+    Off,
+    Notify,
+    Loud,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum MentionRuleView {
+    Room,
+    User,
+    DisplayName,
+    Username,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct MentionNotificationsView {
+    pub room: MentionNotificationModeView,
+    pub user: MentionNotificationModeView,
+    pub display_name: MentionNotificationModeView,
+    pub username: MentionNotificationModeView,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

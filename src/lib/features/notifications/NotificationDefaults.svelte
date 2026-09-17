@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NotificationModeView } from '#src/generated/protocol';
+  import type { DefaultNotificationModesView, NotificationModeView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -18,48 +18,72 @@
     mute: 'room.notifyMute',
   };
 
-  let direct = $state<NotificationModeView | null>(null);
-  let group = $state<NotificationModeView | null>(null);
+  const rows: {
+    key: keyof DefaultNotificationModesView;
+    label: string;
+    direct: boolean;
+    encrypted: boolean;
+  }[] = [
+    { key: 'direct', label: 'settings.notificationDefaultDirect', direct: true, encrypted: false },
+    {
+      key: 'direct_encrypted',
+      label: 'settings.notificationDefaultDirectEncrypted',
+      direct: true,
+      encrypted: true,
+    },
+    { key: 'group', label: 'settings.notificationDefaultGroup', direct: false, encrypted: false },
+    {
+      key: 'group_encrypted',
+      label: 'settings.notificationDefaultGroupEncrypted',
+      direct: false,
+      encrypted: true,
+    },
+  ];
+
+  let current = $state<DefaultNotificationModesView | null>(null);
   let failed = $state(false);
   let granted = $state(true);
 
   $effect(() => {
-    let current = true;
+    let alive = true;
     void permissionGranted().then((allowed) => {
-      if (current) granted = allowed;
+      if (alive) granted = allowed;
     });
 
     return () => {
-      current = false;
+      alive = false;
     };
   });
 
   $effect(() => {
     void settingsChanges.version;
 
-    let current = true;
+    let alive = true;
     void core.commands
       .defaultNotificationModes()
       .then((modes) => {
-        if (!current) return;
-        direct = modes.direct;
-        group = modes.group;
+        if (!alive) return;
+        current = modes;
         failed = false;
       })
       .catch(() => {
-        if (current) failed = true;
+        if (alive) failed = true;
       });
 
     return () => {
-      current = false;
+      alive = false;
     };
   });
 
-  function save(isDirect: boolean, mode: NotificationModeView): void {
-    if (isDirect) direct = mode;
-    else group = mode;
+  function save(
+    key: keyof DefaultNotificationModesView,
+    isDirect: boolean,
+    encrypted: boolean,
+    mode: NotificationModeView
+  ): void {
+    if (current) current = { ...current, [key]: mode };
 
-    void core.commands.setDefaultNotificationMode(isDirect, mode).catch(() => {
+    void core.commands.setDefaultNotificationMode(isDirect, encrypted, mode).catch(() => {
       failed = true;
     });
   }
@@ -91,32 +115,21 @@
   {/if}
 
   <div class="rows">
-    <label>
-      <span>{$i18n.t('settings.notificationDefaultDirect')}</span>
-      {#if direct}
-        <Select
-          aria-label={$i18n.t('settings.notificationDefaultDirect')}
-          value={direct}
-          items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
-          onValueChange={(value) => {
-            save(true, value as NotificationModeView);
-          }}
-        />
-      {/if}
-    </label>
-    <label>
-      <span>{$i18n.t('settings.notificationDefaultGroup')}</span>
-      {#if group}
-        <Select
-          aria-label={$i18n.t('settings.notificationDefaultGroup')}
-          value={group}
-          items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
-          onValueChange={(value) => {
-            save(false, value as NotificationModeView);
-          }}
-        />
-      {/if}
-    </label>
+    {#each rows as { key, label, direct, encrypted } (key)}
+      <label>
+        <span>{$i18n.t(label)}</span>
+        {#if current}
+          <Select
+            aria-label={$i18n.t(label)}
+            value={current[key]}
+            items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
+            onValueChange={(value) => {
+              save(key, direct, encrypted, value as NotificationModeView);
+            }}
+          />
+        {/if}
+      </label>
+    {/each}
   </div>
 </section>
 

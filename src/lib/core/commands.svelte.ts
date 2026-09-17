@@ -6,6 +6,7 @@ import type {
   PerMessageProfileView,
   PersonaCatalogView,
   PersonaView,
+  DefaultNotificationModesView,
   DeviceView,
   EncryptionStatusView,
   SyncStatus,
@@ -15,6 +16,9 @@ import type {
   MemberView,
   MembershipView,
   MessageKind,
+  MentionNotificationModeView,
+  MentionNotificationsView,
+  MentionRuleView,
   NotificationModeView,
   NotificationSettingsView,
   RoomNotificationModeView,
@@ -1145,20 +1149,34 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async defaultNotificationModes(): Promise<{
-      direct: NotificationModeView;
-      group: NotificationModeView;
-    }> {
+    async defaultNotificationModes(): Promise<DefaultNotificationModesView> {
       const response = await transport().send({
         type: 'default_notification_modes',
       });
-      return { direct: response.direct, group: response.group };
+      return response.modes;
     },
 
-    async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
+    async mentionNotifications(): Promise<MentionNotificationsView> {
+      const response = await transport().send({ type: 'mention_notifications' });
+      return response.modes;
+    },
+
+    async setMentionNotifications(
+      rule: MentionRuleView,
+      mode: MentionNotificationModeView
+    ): Promise<void> {
+      await transport().send({ type: 'set_mention_notifications', rule, mode });
+    },
+
+    async setDefaultNotificationMode(
+      direct: boolean,
+      encrypted: boolean,
+      mode: NotificationModeView
+    ): Promise<void> {
       await transport().send({
         type: 'set_default_notification_mode',
         direct,
+        encrypted,
         mode,
       });
     },

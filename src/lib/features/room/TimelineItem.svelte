@@ -656,8 +656,8 @@
         persona: personaTint,
         own: item.is_own,
         'align-own': alignOwn,
-        'mention-silent': item.mention === 'silent',
-        'mention-loud': item.mention === 'loud',
+        'mention-silent': preferences.highlightMentions && item.mention === 'silent',
+        'mention-loud': preferences.highlightMentions && item.mention === 'loud',
       },
     ]}
     data-selected={selected ? 'true' : undefined}

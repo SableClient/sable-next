@@ -1,6 +1,7 @@
 import type { Component } from 'svelte';
 import ArrowCircleUpIcon from 'phosphor-svelte/lib/ArrowCircleUpIcon';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
+import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
 import BugIcon from 'phosphor-svelte/lib/BugIcon';
 import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
@@ -700,6 +701,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: PaperPlaneTiltIcon,
         name: 'settings.richPushPayloads',
         description: 'settings.richPushPayloadsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'highlightMentions',
+        icon: AtIcon,
+        name: 'settings.highlightMentions',
+        description: 'settings.highlightMentionsHint',
         type: 'boolean',
       },
       {

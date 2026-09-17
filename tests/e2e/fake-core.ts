@@ -4,6 +4,7 @@ import type {
   Command,
   CommandOk,
   CoreEvent,
+  MentionNotificationsView,
   ProfileView,
   RoomSummary,
   SessionInfo,
@@ -405,6 +406,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     let nextSubscription = 2;
     const subscriptions = new Map<number, { roomId: string; page: number }>();
     const notificationKeywords: string[] = [];
+    const mentionNotificationModes: MentionNotificationsView = {
+      room: 'notify',
+      user: 'loud',
+      display_name: 'loud',
+      username: 'loud',
+    };
     let activePort: FakePort | null = null;
 
     const servedBytes = new Map<string, Promise<Uint8Array>>();
@@ -732,8 +739,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       default_notification_modes: () => ({
         type: 'default_notification_modes',
-        direct: 'all',
-        group: 'mentions',
+        modes: {
+          direct: 'all',
+          direct_encrypted: 'all',
+          group: 'mentions',
+          group_encrypted: 'mentions',
+        },
+      }),
+      mention_notifications: () => ({
+        type: 'mention_notifications',
+        modes: mentionNotificationModes,
       }),
       web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
       web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
@@ -992,6 +1007,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         const index = notificationKeywords.indexOf(command.keyword);
         if (index !== -1) notificationKeywords.splice(index, 1);
         return { type: 'remove_notification_keyword' };
+      },
+      set_mention_notifications: (command) => {
+        mentionNotificationModes[command.rule] = command.mode;
+        return { type: 'set_mention_notifications' };
       },
       send_state_event: (command) => {
         if (command.event_type === 'im.vector.modular.widgets')
