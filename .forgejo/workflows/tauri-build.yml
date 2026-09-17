@@ -69,8 +69,10 @@ jobs:
     # action restores the bindings and only Vite runs.
     timeout-minutes: 60
     permissions:
-      contents: read
+      contents: write
     env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
       # Absent on forks, which builds an app with error reporting switched off.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
@@ -90,6 +92,12 @@ jobs:
         uses: ./.forgejo/actions/setup
         with:
           build: 'true'
+      # Matching the package naming keeps the nightly prune replacing old web
+      # bundles in step with the desktop and mobile ones.
+      - name: Attach web bundle to release
+        run: |
+          tar --create --gzip --file "sable-next-${VERSION}-web.tar.gz" --directory dist .
+          node scripts/ci/forgejo-release.mjs upload "sable-next-${VERSION}-web.tar.gz"
       - name: Upload web assets
         uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
         with:

@@ -47,6 +47,10 @@ Linux x86_64 and Android build here; macOS, Windows, iOS and Linux aarch64
 build on the GitHub mirror and attach their bundles, with attestations, to the
 same release. Tagged releases are not set up yet.
 
+The web build ships with every release as `sable-next-<version>-web.tar.gz`.
+Extract it into your web root to serve the app yourself; see
+[`Caddyfile`](Caddyfile) for an example configuration.
+
 ## Linux (Flatpak)
 
 Nightly builds have their own Flatpak remote, rebuilt from `main` on every push:
