@@ -1,6 +1,7 @@
 import type {
   PackImageInfoView,
   ImageSourcePackView,
+  ImageSourcePackReferenceView,
   MessageKind,
   PerMessageProfileView,
   TimelineItemView,
@@ -89,7 +90,8 @@ export class Conversation {
     targetRoomId: string,
     body: string,
     formatted: string | null = null,
-    mentions: OutgoingMentions = NO_MENTIONS
+    mentions: OutgoingMentions = NO_MENTIONS,
+    imageSourcePacks: ImageSourcePackReferenceView[] = []
   ): Promise<ConversationSendResult | undefined> => {
     const pending = this.context;
     if (body === '') return;
@@ -156,6 +158,7 @@ export class Conversation {
       kind: outcome.msgtype,
       persona: outgoing.persona,
       linkPreviews,
+      imageSourcePacks,
     });
     this.context = null;
   };

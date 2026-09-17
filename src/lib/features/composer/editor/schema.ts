@@ -202,7 +202,7 @@ export const composerSchema = new Schema({
       atom: true,
       group: 'inline',
       selectable: true,
-      attrs: { url: {}, shortcode: {} },
+      attrs: { url: {}, shortcode: {}, sourcePack: { default: null } },
       parseDOM: [
         {
           tag: 'img[data-mx-emoticon]',

@@ -151,6 +151,8 @@ pub enum Command {
         persona: Option<PerMessageProfileView>,
         #[serde(default)]
         link_previews: Vec<UrlPreviewView>,
+        #[serde(default)]
+        image_source_packs: Vec<ImageSourcePackReferenceView>,
     },
     SendRawEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -2814,6 +2816,13 @@ pub struct ImageSourcePackView {
     pub state_key: String,
     pub shortcode: String,
     pub via: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ImageSourcePackReferenceView {
+    pub url: String,
+    pub source: ImageSourcePackView,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

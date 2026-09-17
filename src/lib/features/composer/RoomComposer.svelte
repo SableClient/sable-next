@@ -77,7 +77,8 @@
       roomId: string,
       body: string,
       formatted: string | null,
-      mentions: OutgoingMentions
+      mentions: OutgoingMentions,
+      imageSourcePacks?: import('#src/generated/protocol').ImageSourcePackReferenceView[]
     ) => Promise<unknown>;
     onSendAttachment: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
     onSendSticker?: (
@@ -477,7 +478,12 @@
           ? rich
             ? serializeComposer(doc)
             : serializePlain(doc)
-          : { body: '', formatted: null, mentions: { userIds: [], room: false } };
+          : {
+              body: '',
+              formatted: null,
+              mentions: { userIds: [], room: false },
+              imageSourcePacks: [],
+            };
         const captioned = unsent.length === 1 && message.body !== '';
 
         while (unsent.length > 0) {
@@ -497,7 +503,15 @@
         }
 
         if (captioned || message.body === '') return;
-        const action = await onSend(roomId, message.body, message.formatted, message.mentions);
+        const action = message.imageSourcePacks
+          ? await onSend(
+              roomId,
+              message.body,
+              message.formatted,
+              message.mentions,
+              message.imageSourcePacks
+            )
+          : await onSend(roomId, message.body, message.formatted, message.mentions);
         if (isGifSearchAction(action)) {
           boardTab = 'gif';
           boardQuery = action.query;
@@ -600,7 +614,11 @@
     }
 
     editor.insert(
-      composerSchema.nodes.emoticon.create({ url: image.url, shortcode: image.shortcode })
+      composerSchema.nodes.emoticon.create({
+        url: image.url,
+        shortcode: image.shortcode,
+        sourcePack: image.source_pack,
+      })
     );
     updateTyping();
   }

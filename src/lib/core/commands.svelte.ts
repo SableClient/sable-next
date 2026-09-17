@@ -1,6 +1,7 @@
 import type {
   BookmarkView,
   ImageSourcePackView,
+  ImageSourcePackReferenceView,
   PackImageInfoView,
   PerMessageProfileView,
   PersonaCatalogView,
@@ -96,6 +97,7 @@ export type SendMessageOptions = {
   persona?: PerMessageProfileView | null;
   kind?: MessageKind;
   linkPreviews?: UrlPreviewView[];
+  imageSourcePacks?: ImageSourcePackReferenceView[];
 };
 
 export type SendAttachmentOptions = {
@@ -625,6 +627,7 @@ export function createCommands(transport: () => Transport) {
         silent_reply: options.silentReply ?? false,
         persona: $state.snapshot(options.persona ?? null),
         link_previews: $state.snapshot(options.linkPreviews ?? []),
+        image_source_packs: $state.snapshot(options.imageSourcePacks ?? []),
       });
     },
 

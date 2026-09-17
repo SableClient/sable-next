@@ -54,9 +54,9 @@ use matrix_sdk_ui::timeline::{RoomExt, TimelineEventItemId, TimelineFocus};
 
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
-    ImageSourcePackView, JoinRuleView, MembershipView, MessageKind, MutualRoomView,
-    PackImageInfoView, PaginationDirection, PresenceView, RoomOpenView, RoomStateEventView,
-    RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
+    ImageSourcePackReferenceView, ImageSourcePackView, JoinRuleView, MembershipView, MessageKind,
+    MutualRoomView, PackImageInfoView, PaginationDirection, PresenceView, RoomOpenView,
+    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -388,6 +388,7 @@ impl Core {
                 silent_reply,
                 persona,
                 link_previews,
+                image_source_packs,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let (body, formatted, persona) = match persona {
@@ -411,17 +412,26 @@ impl Core {
                 };
 
                 let previews = bundled_link_previews(&link_previews);
+                let image_source_packs = image_source_pack_references(&image_source_packs);
                 let extra = match persona {
                     Some(persona) => {
                         let mut extra = crate::personas::profile_extra_content(&persona);
                         if let Some(previews) = previews {
                             extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
                         }
+                        if let Some(image_source_packs) = image_source_packs {
+                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), image_source_packs);
+                        }
                         Some(extra)
                     }
-                    None => previews.map(|previews| {
+                    None => (previews.is_some() || image_source_packs.is_some()).then(|| {
                         let mut extra = serde_json::Map::new();
-                        extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
+                        if let Some(previews) = previews {
+                            extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
+                        }
+                        if let Some(image_source_packs) = image_source_packs {
+                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), image_source_packs);
+                        }
                         extra
                     }),
                 };
@@ -2579,6 +2589,19 @@ fn image_source_pack_extra(
     source: Option<ImageSourcePackView>,
 ) -> Option<serde_json::Value> {
     source.map(|source| serde_json::json!({ url: source }))
+}
+
+fn image_source_pack_references(
+    references: &[ImageSourcePackReferenceView],
+) -> Option<serde_json::Value> {
+    (!references.is_empty()).then(|| {
+        serde_json::Value::Object(
+            references
+                .iter()
+                .map(|reference| (reference.url.clone(), serde_json::json!(reference.source)))
+                .collect(),
+        )
+    })
 }
 
 fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Value> {

@@ -14,7 +14,12 @@ export function shortcodeNode(
   emotes: readonly PackImageView[]
 ): ProseMirrorNode | null {
   const image = emotes.find((candidate) => candidate.shortcode === shortcode);
-  if (image) return composerSchema.nodes.emoticon.create({ url: image.url, shortcode });
+  if (image)
+    return composerSchema.nodes.emoticon.create({
+      url: image.url,
+      shortcode,
+      sourcePack: image.source_pack,
+    });
 
   const emoji = emojiForShortcode(shortcode);
   return emoji ? composerSchema.text(emoji) : null;
