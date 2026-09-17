@@ -2,7 +2,6 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::{
-    ThreadingSupport,
     ruma::{
         event_id,
         events::{
@@ -1365,11 +1364,7 @@ async fn mark_read_body(
     let server = MatrixMockServer::new().await;
     let client = server
         .client_builder()
-        .on_builder(|builder| {
-            builder.with_threading_support(ThreadingSupport::Enabled {
-                with_subscriptions: false,
-            })
-        })
+        .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
         .build()
         .await;
     client.event_cache().subscribe().unwrap();
