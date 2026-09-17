@@ -4276,6 +4276,7 @@ dependencies = [
  "itertools 0.15.0",
  "js_option",
  "matrix-sdk-common",
+ "matrix-sdk-qrcode",
  "matrix-sdk-test",
  "pbkdf2",
  "rand 0.10.2",
@@ -4327,6 +4328,18 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "zeroize",
+]
+
+[[package]]
+name = "matrix-sdk-qrcode"
+version = "0.18.0"
+source = "git+https://github.com/eleboucher/matrix-rust-sdk?rev=0202eb52b6b9aa03bad41e100c90f10741816bdb#0202eb52b6b9aa03bad41e100c90f10741816bdb"
+dependencies = [
+ "byteorder",
+ "qrcode",
+ "ruma",
+ "thiserror 2.0.20",
+ "vodozemac",
 ]
 
 [[package]]
@@ -5690,6 +5703,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
 
 [[package]]
 name = "quick-xml"
