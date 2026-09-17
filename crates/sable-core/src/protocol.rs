@@ -167,6 +167,8 @@ pub enum Command {
         #[serde(default)]
         info: Option<PackImageInfoView>,
         #[serde(default)]
+        source_pack: Option<ImageSourcePackView>,
+        #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         in_reply_to: Option<OwnedEventId>,
         #[serde(default)]
@@ -419,6 +421,8 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         event_id: OwnedEventId,
         key: String,
+        #[serde(default)]
+        source_pack: Option<ImageSourcePackView>,
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
@@ -2800,6 +2804,16 @@ pub struct PackImageView {
     pub body: Option<String>,
     pub usage: Vec<ImageUsageView>,
     pub info: Option<PackImageInfoView>,
+    pub source_pack: Option<ImageSourcePackView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ImageSourcePackView {
+    pub room_id: String,
+    pub state_key: String,
+    pub shortcode: String,
+    pub via: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

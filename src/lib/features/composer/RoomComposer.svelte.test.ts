@@ -47,6 +47,7 @@ const packs: ImagePackView[] = [
         body: null,
         usage: ['emoticon'],
         info: null,
+        source_pack: null,
       },
     ],
   },

@@ -84,7 +84,11 @@
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
-    onToggleReaction?: (eventId: string, key: string) => void;
+    onToggleReaction?: (
+      eventId: string,
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
     onReply?: (eventId: string) => void;
     onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null, mediaCaption?: boolean) => void;
@@ -256,8 +260,11 @@
     const html = item.content.kind === 'message' ? item.content.html : null;
     return {
       onReact: onToggleReaction
-        ? (emoji: string) => {
-            onToggleReaction(eventId, emoji);
+        ? (
+            emoji: string,
+            sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+          ) => {
+            onToggleReaction(eventId, emoji, sourcePack);
           }
         : undefined,
       onAddReaction: onToggleReaction
@@ -565,8 +572,8 @@
         bind:open={emoteOpen}
         {roomId}
         anchor={emoteAnchor ?? messageRow}
-        onPick={(key: string) => {
-          onToggleReaction?.(item.event_id ?? '', key);
+        onPick={(key, sourcePack) => {
+          onToggleReaction?.(item.event_id ?? '', key, sourcePack);
         }}
       />
     {/if}

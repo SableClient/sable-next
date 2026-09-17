@@ -15,7 +15,7 @@
     open?: boolean;
     roomId: string;
     anchor?: HTMLElement | CursorAnchor | null;
-    onPick: (key: string) => void;
+    onPick: (key: string, sourcePack?: PackImageView['source_pack']) => void;
   }
 
   let { open = $bindable(false), roomId, anchor = null, onPick }: Props = $props();
@@ -23,10 +23,10 @@
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let sheet = $derived(!appLayout.matches);
 
-  function pick(key: string): void {
+  function pick(key: string, sourcePack: PackImageView['source_pack'] = null): void {
     rememberReaction(key);
     open = false;
-    onPick(key);
+    onPick(key, sourcePack);
   }
 </script>
 
@@ -43,7 +43,7 @@
       unicode
       stickers={false}
       onPick={(image: PackImageView) => {
-        pick(image.url);
+        pick(image.url, image.source_pack);
       }}
       onPickUnicode={pick}
     />

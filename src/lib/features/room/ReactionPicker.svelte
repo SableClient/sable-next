@@ -12,7 +12,7 @@
     roomId?: string;
     triggerClass?: string;
     anchor?: HTMLElement | CursorAnchor | null;
-    onPick: (key: string) => void;
+    onPick: (key: string, sourcePack?: PackImageView['source_pack']) => void;
     onOpenChange?: (open: boolean) => void;
     children?: Snippet;
   }
@@ -43,15 +43,14 @@
     onOpenChange?.(next);
   }
 
-  function pick(key: string): void {
+  function pick(key: string, sourcePack: PackImageView['source_pack'] = null): void {
     open = false;
     onOpenChange?.(false);
-    onPick(key);
+    onPick(key, sourcePack);
   }
 
   function pickImage(image: PackImageView): void {
-    // Custom-emote reactions travel as the mxc URI, which is what the room already sends.
-    pick(image.url);
+    pick(image.url, image.source_pack);
   }
 </script>
 

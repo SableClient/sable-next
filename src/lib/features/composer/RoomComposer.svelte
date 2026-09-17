@@ -3,6 +3,7 @@
     ImageUsageView,
     MemberView,
     PackImageInfoView,
+    ImageSourcePackView,
     PackImageView,
   } from '#src/generated/protocol';
   import { Portal } from 'bits-ui';
@@ -83,7 +84,8 @@
       roomId: string,
       url: string,
       body: string,
-      info: PackImageInfoView | null
+      info: PackImageInfoView | null,
+      sourcePack: ImageSourcePackView | null
     ) => Promise<void>;
     onSendGif?: (roomId: string, gif: GifResult) => Promise<void>;
     onCreatePoll?: (
@@ -582,7 +584,13 @@
     if (usage === 'sticker') {
       if (!onSendSticker) return;
       try {
-        await onSendSticker(roomId, image.url, image.body ?? image.shortcode, image.info);
+        await onSendSticker(
+          roomId,
+          image.url,
+          image.body ?? image.shortcode,
+          image.info,
+          image.source_pack
+        );
         error = null;
       } catch (cause) {
         console.debug('[sable composer] sticker failed', cause);

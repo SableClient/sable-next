@@ -1,5 +1,6 @@
 import type {
   PackImageInfoView,
+  ImageSourcePackView,
   MessageKind,
   PerMessageProfileView,
   TimelineItemView,
@@ -177,13 +178,15 @@ export class Conversation {
     targetRoomId: string,
     url: string,
     body: string,
-    info: PackImageInfoView | null = null
+    info: PackImageInfoView | null = null,
+    sourcePack: ImageSourcePackView | null = null
   ): Promise<void> => {
     await this.#core.commands.sendSticker(
       targetRoomId,
       url,
       body,
       info,
+      sourcePack,
       this.#consumeReply(),
       this.#threadRoot,
       this.#personaFor(targetRoomId, '', null).persona
@@ -279,8 +282,24 @@ export class Conversation {
     void this.#core.commands.cancelSend(this.#roomId(), transactionId, this.#threadRoot);
   };
 
-  readonly toggleReaction = (eventId: string, key: string): void => {
-    void this.#core.commands.toggleReaction(this.#roomId(), eventId, key, this.#threadRoot);
+  readonly toggleReaction = (
+    eventId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null = null
+  ): void => {
+    const mine = this.#timeline.items
+      .find((item) => item.event_id === eventId)
+      ?.reactions.some(
+        (reaction) =>
+          reaction.key === key && reaction.senders.includes(this.#core.session?.user_id ?? '')
+      );
+    void this.#core.commands.toggleReaction(
+      this.#roomId(),
+      eventId,
+      key,
+      this.#threadRoot,
+      mine ? null : sourcePack
+    );
   };
 
   readonly votePoll = (eventId: string, answers: string[]): void => {

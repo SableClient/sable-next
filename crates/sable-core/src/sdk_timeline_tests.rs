@@ -619,6 +619,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
             url: "mxc://example.org/blob".to_owned(),
             body: "blobwave".to_owned(),
             info: None,
+            source_pack: None,
             in_reply_to: None,
             thread_root: None,
             persona: None,

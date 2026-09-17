@@ -14,6 +14,7 @@ use matrix_sdk::ruma::api::client::authenticated_media::get_media_preview;
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
 use matrix_sdk::ruma::api::client::presence::set_presence;
+use matrix_sdk::ruma::api::client::profile::{PropagateTo, set_profile_field};
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
@@ -24,7 +25,8 @@ use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIden
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
-use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
+use matrix_sdk::ruma::events::reaction::ReactionEventContent;
+use matrix_sdk::ruma::events::relation::{Annotation, InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
@@ -52,9 +54,9 @@ use matrix_sdk_ui::timeline::{RoomExt, TimelineEventItemId, TimelineFocus};
 
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
-    JoinRuleView, MembershipView, MessageKind, MutualRoomView, PackImageInfoView,
-    PaginationDirection, PresenceView, RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView,
-    RoomVersionsView, ThreadRootView, UrlPreviewView,
+    ImageSourcePackView, JoinRuleView, MembershipView, MessageKind, MutualRoomView,
+    PackImageInfoView, PaginationDirection, PresenceView, RoomOpenView, RoomStateEventView,
+    RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -490,6 +492,7 @@ impl Core {
                 url,
                 body,
                 info,
+                source_pack,
                 in_reply_to,
                 thread_root,
                 persona,
@@ -498,6 +501,7 @@ impl Core {
                 if url.parts().is_err() {
                     return Err(CommandErr::InvalidMedia);
                 }
+                let source = image_source_pack_extra(url.as_str(), source_pack);
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let mut content = StickerEventContent::new(body, sticker_info(info), url);
@@ -513,17 +517,31 @@ impl Core {
                     (None, None) => None,
                 };
 
-                match persona {
-                    Some(persona) => timeline
+                match (persona, source) {
+                    (Some(persona), source) => {
+                        let mut extra = crate::personas::profile_extra_content(
+                            &crate::personas::without_fallback(&persona),
+                        );
+                        if let Some(source) = source {
+                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
+                        }
+                        timeline
+                            .send_with_extra_content(content.into(), Some(extra))
+                            .await
+                            .map_err(|error| self.failed("send_sticker", error))?
+                    }
+                    (None, Some(source)) => timeline
                         .send_with_extra_content(
                             content.into(),
-                            Some(crate::personas::profile_extra_content(
-                                &crate::personas::without_fallback(&persona),
-                            )),
+                            Some({
+                                let mut extra = serde_json::Map::new();
+                                extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
+                                extra
+                            }),
                         )
                         .await
                         .map_err(|error| self.failed("send_sticker", error))?,
-                    None => timeline
+                    (None, None) => timeline
                         .send(content.into())
                         .await
                         .map_err(|error| self.failed("send_sticker", error))?,
@@ -1224,13 +1242,28 @@ impl Core {
                 room_id,
                 event_id,
                 key,
+                source_pack,
                 thread_root,
             } => {
-                self.timeline_for(&room_id, thread_root.as_ref())
-                    .await?
-                    .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
-                    .await
-                    .map_err(|error| self.failed("react", error))?;
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                if let Some(source) = image_source_pack_extra(&key, source_pack) {
+                    timeline
+                        .send_with_extra_content(
+                            ReactionEventContent::new(Annotation::new(event_id, key)).into(),
+                            Some({
+                                let mut extra = serde_json::Map::new();
+                                extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
+                                extra
+                            }),
+                        )
+                        .await
+                        .map_err(|error| self.failed("react", error))?;
+                } else {
+                    timeline
+                        .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
+                        .await
+                        .map_err(|error| self.failed("react", error))?;
+                }
 
                 Ok(CommandOk::React)
             }
@@ -1526,12 +1559,36 @@ impl Core {
             }
 
             Command::SetDisplayName { name } => {
-                self.client()
-                    .await?
-                    .account()
-                    .set_display_name(name.as_deref())
+                let client = self.client().await?;
+                if client
+                    .unstable_features()
                     .await
+                    .map_err(|error| self.failed("set_display_name", error))?
+                    .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
+                        "computer.gingershaped.msc4466",
+                    ))
+                {
+                    let value = ProfileFieldValue::new(
+                        "displayname",
+                        serde_json::Value::String(name.unwrap_or_default()),
+                    )
                     .map_err(|error| self.failed("set_display_name", error))?;
+                    let mut request = set_profile_field::v3::Request::new(
+                        client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
+                        value,
+                    );
+                    request.propagate_to = PropagateTo::Unchanged;
+                    client
+                        .send(request)
+                        .await
+                        .map_err(|error| self.failed("set_display_name", error))?;
+                } else {
+                    client
+                        .account()
+                        .set_display_name(name.as_deref())
+                        .await
+                        .map_err(|error| self.failed("set_display_name", error))?;
+                }
 
                 Ok(CommandOk::SetDisplayName)
             }
@@ -1542,12 +1599,38 @@ impl Core {
                     None => None,
                 };
 
-                self.client()
-                    .await?
-                    .account()
-                    .set_avatar_url(url.as_deref())
+                let client = self.client().await?;
+                if client
+                    .unstable_features()
                     .await
+                    .map_err(|error| self.failed("set_avatar_url", error))?
+                    .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
+                        "computer.gingershaped.msc4466",
+                    ))
+                {
+                    let value = ProfileFieldValue::new(
+                        "avatar_url",
+                        serde_json::Value::String(
+                            url.map(|url| url.to_string()).unwrap_or_default(),
+                        ),
+                    )
                     .map_err(|error| self.failed("set_avatar_url", error))?;
+                    let mut request = set_profile_field::v3::Request::new(
+                        client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
+                        value,
+                    );
+                    request.propagate_to = PropagateTo::Unchanged;
+                    client
+                        .send(request)
+                        .await
+                        .map_err(|error| self.failed("set_avatar_url", error))?;
+                } else {
+                    client
+                        .account()
+                        .set_avatar_url(url.as_deref())
+                        .await
+                        .map_err(|error| self.failed("set_avatar_url", error))?;
+                }
 
                 Ok(CommandOk::SetAvatarUrl)
             }
@@ -2489,6 +2572,14 @@ fn message_content(
 }
 
 const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
+const IMAGE_SOURCE_PACKS: &str = "com.beeper.msc4459.image_source_packs";
+
+fn image_source_pack_extra(
+    url: &str,
+    source: Option<ImageSourcePackView>,
+) -> Option<serde_json::Value> {
+    source.map(|source| serde_json::json!({ url: source }))
+}
 
 fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Value> {
     (!previews.is_empty()).then(|| {

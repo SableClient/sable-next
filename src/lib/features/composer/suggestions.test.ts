@@ -23,6 +23,7 @@ function emote(shortcode: string): PackImageView {
     body: null,
     usage: ['emoticon'],
     info: null,
+    source_pack: null,
   };
 }
 

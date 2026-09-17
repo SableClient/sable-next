@@ -19,8 +19,15 @@
     members: readonly MemberView[];
     roomId: string;
     actionable: boolean;
-    onReact?: (key: string) => void;
-    onToggleReaction?: (eventId: string, key: string) => void;
+    onReact?: (
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
+    onToggleReaction?: (
+      eventId: string,
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
     onViewReactions?: (index: number) => void;
   }
 

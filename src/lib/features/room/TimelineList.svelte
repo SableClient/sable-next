@@ -59,7 +59,11 @@
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
-    onToggleReaction?: (eventId: string, key: string) => void;
+    onToggleReaction?: (
+      eventId: string,
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
     onReply?: (eventId: string) => void;
     onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null) => void;

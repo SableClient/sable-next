@@ -66,17 +66,13 @@ hidden_events: boolean } | { type: "unsubscribe"; subscription: SubscriptionId }
  *  Replying inside a thread needs no extra field: the SDK infers the
  *  thread from the replied-to event.
  */
-in_reply_to: string | null; mentions: string[]; mentions_room: boolean; silent_reply: boolean; persona: PerMessageProfileView | null;
-/**  Cached Open Graph data carried with the event (MSC4095). */
-link_previews: UrlPreviewView[] } | { type: "send_raw_event"; room_id: string; event_type: string; content: unknown } | { type: "send_sticker"; room_id: string;
-/**  `mxc://` only; the core rejects anything else. */
-url: string; body: string; info: PackImageInfoView | null; in_reply_to: string | null; thread_root: string | null; persona: PerMessageProfileView | null } | { type: "send_gif"; room_id: string;
+in_reply_to: string | null; mentions: string[]; mentions_room: boolean; silent_reply: boolean; persona: PerMessageProfileView | null; link_previews: UrlPreviewView[] } | { type: "send_raw_event"; room_id: string; event_type: string; content: unknown } | { type: "send_sticker"; room_id: string; url: string; body: string; info: PackImageInfoView | null; source_pack: ImageSourcePackView | null; in_reply_to: string | null; thread_root: string | null; persona: PerMessageProfileView | null } | { type: "send_gif"; room_id: string;
 /**  `mxc://` only; the core rejects anything else. */
 url: string; body: string; width: number | null; height: number | null; mimetype: string; size: number | null; in_reply_to: string | null; thread_root: string | null; persona: PerMessageProfileView | null } |
 /**  `edited` on the view flips once the server has the replacement. */
 { type: "edit_message"; room_id: string; event_id: string | null; transaction_id: string | null; body: string; formatted: string | null; kind: MessageKind; media_caption: boolean; thread_root: string | null; mentions: string[]; mentions_room: boolean; persona: PerMessageProfileView | null } |
 /**  The filled-in details arrive as a timeline diff, not as the response. */
-{ type: "fetch_event_details"; room_id: string; event_id: string; thread_root: string | null } | { type: "redact"; room_id: string; event_id: string; reason: string | null; thread_root: string | null } | { type: "bulk_redact"; room_id: string; senders: string[]; after_ts: number; event_types: string[]; reason: string | null } | { type: "pinned_events"; room_id: string } | { type: "set_pinned"; room_id: string; event_id: string; pinned: boolean } | { type: "room_power_levels"; room_id: string } | { type: "room_versions" } | { type: "room_aliases"; room_id: string } | { type: "create_room_alias"; room_id: string; alias: string } | { type: "delete_room_alias"; alias: string } | { type: "public_rooms"; server: string | null; search: string | null; since: string | null } | { type: "room_directory_visibility"; room_id: string } | { type: "set_room_directory_visibility"; room_id: string; public: boolean } | { type: "upgrade_room"; room_id: string; new_version: string; additional_creators: string[] } | { type: "room_state_event"; room_id: string; event_type: string; state_key: string } | { type: "room_state_events"; room_id: string; event_type: string } | { type: "room_has_space_parent"; room_id: string } | { type: "room_open"; room_id: string } | { type: "url_preview"; url: string } | { type: "list_threads"; room_id: string; from: string | null } | { type: "notification_keywords" } | { type: "add_notification_keyword"; keyword: string } | { type: "remove_notification_keyword"; keyword: string } | { type: "timestamp_to_event"; room_id: string; ts: number; direction: PaginationDirection } | { type: "room_account_data"; room_id: string; event_type: string } | { type: "account_data_types" } | { type: "access_token" } | { type: "account_data"; event_type: string } | { type: "set_account_data"; event_type: string; content: unknown } | { type: "set_room_account_data"; room_id: string; event_type: string; content: unknown } | { type: "report_message"; room_id: string; event_id: string; reason: string | null } | { type: "event_source"; room_id: string; event_id: string } | { type: "forward_message"; room_id: string; event_id: string; to_room_id: string } | { type: "personas" } | { type: "save_persona"; persona: PersonaView; previous_id: string | null } | { type: "remove_persona"; id: string } | { type: "reorder_personas"; ids: string[] } | { type: "set_persona_selection"; room_id: string | null; persona_id: string | null; valid_until: number | null } | { type: "bookmarks" } | { type: "set_bookmark"; room_id: string; event_id: string; bookmarked: boolean; now_ms: number } | { type: "react"; room_id: string; event_id: string; key: string; thread_root: string | null } | { type: "send_location"; room_id: string; body: string; geo_uri: string; in_reply_to: string | null; thread_root: string | null } | { type: "room_timeline_events"; room_id: string; event_type: string; msgtype: string | null; limit: number; since: string | null } | { type: "room_state_events_raw"; room_id: string; event_type: string; state_key: string | null } | { type: "search_user_directory"; term: string; limit: number | null } | { type: "open_id_token" } | { type: "schedule_message"; room_id: string; body: string; formatted: string | null; delay_ms: number } | { type: "scheduled_messages"; room_id: string | null } | { type: "cancel_scheduled_message"; delay_id: string } | { type: "send_scheduled_message"; delay_id: string } | { type: "delayed_events_supported" } |
+{ type: "fetch_event_details"; room_id: string; event_id: string; thread_root: string | null } | { type: "redact"; room_id: string; event_id: string; reason: string | null; thread_root: string | null } | { type: "bulk_redact"; room_id: string; senders: string[]; after_ts: number; event_types: string[]; reason: string | null } | { type: "pinned_events"; room_id: string } | { type: "set_pinned"; room_id: string; event_id: string; pinned: boolean } | { type: "room_power_levels"; room_id: string } | { type: "room_versions" } | { type: "room_aliases"; room_id: string } | { type: "create_room_alias"; room_id: string; alias: string } | { type: "delete_room_alias"; alias: string } | { type: "public_rooms"; server: string | null; search: string | null; since: string | null } | { type: "room_directory_visibility"; room_id: string } | { type: "set_room_directory_visibility"; room_id: string; public: boolean } | { type: "upgrade_room"; room_id: string; new_version: string; additional_creators: string[] } | { type: "room_state_event"; room_id: string; event_type: string; state_key: string } | { type: "room_state_events"; room_id: string; event_type: string } | { type: "room_has_space_parent"; room_id: string } | { type: "room_open"; room_id: string } | { type: "url_preview"; url: string } | { type: "list_threads"; room_id: string; from: string | null } | { type: "notification_keywords" } | { type: "add_notification_keyword"; keyword: string } | { type: "remove_notification_keyword"; keyword: string } | { type: "timestamp_to_event"; room_id: string; ts: number; direction: PaginationDirection } | { type: "room_account_data"; room_id: string; event_type: string } | { type: "account_data_types" } | { type: "access_token" } | { type: "account_data"; event_type: string } | { type: "set_account_data"; event_type: string; content: unknown } | { type: "set_room_account_data"; room_id: string; event_type: string; content: unknown } | { type: "report_message"; room_id: string; event_id: string; reason: string | null } | { type: "event_source"; room_id: string; event_id: string } | { type: "forward_message"; room_id: string; event_id: string; to_room_id: string } | { type: "personas" } | { type: "save_persona"; persona: PersonaView; previous_id: string | null } | { type: "remove_persona"; id: string } | { type: "reorder_personas"; ids: string[] } | { type: "set_persona_selection"; room_id: string | null; persona_id: string | null; valid_until: number | null } | { type: "bookmarks" } | { type: "set_bookmark"; room_id: string; event_id: string; bookmarked: boolean; now_ms: number } | { type: "react"; room_id: string; event_id: string; key: string; source_pack: ImageSourcePackView | null; thread_root: string | null } | { type: "send_location"; room_id: string; body: string; geo_uri: string; in_reply_to: string | null; thread_root: string | null } | { type: "room_timeline_events"; room_id: string; event_type: string; msgtype: string | null; limit: number; since: string | null } | { type: "room_state_events_raw"; room_id: string; event_type: string; state_key: string | null } | { type: "search_user_directory"; term: string; limit: number | null } | { type: "open_id_token" } | { type: "schedule_message"; room_id: string; body: string; formatted: string | null; delay_ms: number } | { type: "scheduled_messages"; room_id: string | null } | { type: "cancel_scheduled_message"; delay_id: string } | { type: "send_scheduled_message"; delay_id: string } | { type: "delayed_events_supported" } |
 /**  MSC3381. */
 { type: "create_poll"; room_id: string; question: string; answers: string[];
 /**  Withholds the tally until the poll closes. */
@@ -313,11 +309,7 @@ export type HomeserverSoftwareView = {
 	version: string | null,
 };
 
-export type ImagePackOriginView = "account" |
-/**  The room being viewed. */
-"room" |
-/**  Another room, subscribed to account-wide. */
-"global" | "space";
+export type ImagePackOriginView = "account" | "room" | "global" | "space";
 
 export type ImagePackView = {
 	/**
@@ -331,6 +323,13 @@ export type ImagePackView = {
 	avatar_url: string | null,
 	attribution: string | null,
 	images: PackImageView[],
+};
+
+export type ImageSourcePackView = {
+	room_id: string,
+	state_key: string,
+	shortcode: string,
+	via: string[],
 };
 
 export type ImageUsageView = "emoticon" | "sticker";
@@ -431,11 +430,11 @@ export type PackImageInfoView = {
 
 export type PackImageView = {
 	shortcode: string,
-	/**  Always `mxc://`; anything else is dropped when the pack is read. */
 	url: string,
 	body: string | null,
 	usage: ImageUsageView[],
 	info: PackImageInfoView | null,
+	source_pack: ImageSourcePackView | null,
 };
 
 export type PaginationDirection = "backward" | "forward";
@@ -997,10 +996,6 @@ export type TimelineItemView = {
 	 *  stays the account that actually sent it and must remain reachable.
 	 */
 	per_message_profile: PerMessageProfileView | null,
-	/**
-	 *  MSC4095 previews embedded by the sender. These are usable without a
-	 *  homeserver preview request, including in encrypted rooms.
-	 */
 	bundled_link_previews: UrlPreviewView[],
 	mention: MentionView,
 };

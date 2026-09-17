@@ -1,5 +1,6 @@
 import type {
   BookmarkView,
+  ImageSourcePackView,
   PackImageInfoView,
   PerMessageProfileView,
   PersonaCatalogView,
@@ -641,6 +642,7 @@ export function createCommands(transport: () => Transport) {
       url: string,
       body: string,
       info: PackImageInfoView | null = null,
+      sourcePack: ImageSourcePackView | null = null,
       inReplyTo: string | null = null,
       threadRoot: string | null = null,
       persona: PerMessageProfileView | null = null
@@ -651,6 +653,7 @@ export function createCommands(transport: () => Transport) {
         url,
         body,
         info,
+        source_pack: $state.snapshot(sourcePack),
         in_reply_to: inReplyTo,
         thread_root: threadRoot,
         persona: $state.snapshot(persona),
@@ -971,7 +974,8 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       eventId: string,
       key: string,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      sourcePack: ImageSourcePackView | null = null
     ): Promise<void> {
       await transport().send({
         type: 'react',
@@ -979,6 +983,7 @@ export function createCommands(transport: () => Transport) {
         event_id: eventId,
         thread_root: threadRoot,
         key,
+        source_pack: $state.snapshot(sourcePack),
       });
     },
 
