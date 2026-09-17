@@ -85,6 +85,7 @@
     followingLive?: boolean;
     typingLabel?: string | null;
     footTrailing?: Snippet;
+    footTrailingVisible?: boolean;
   }
 
   let {
@@ -123,6 +124,7 @@
     followingLive = $bindable(false),
     typingLabel = null,
     footTrailing,
+    footTrailingVisible = false,
   }: Props = $props();
 
   interface RowValue {
@@ -686,12 +688,14 @@
     </IconButton>
   {/if}
 
-  <div class="timeline-foot">
-    <TypingIndicator label={typingLabel} />
-    {#if footTrailing}
-      <div class="foot-trailing">{@render footTrailing()}</div>
-    {/if}
-  </div>
+  {#if typingLabel || footTrailingVisible}
+    <div class="timeline-foot">
+      <TypingIndicator label={typingLabel} />
+      {#if footTrailing && footTrailingVisible}
+        <div class="foot-trailing">{@render footTrailing()}</div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -828,7 +832,7 @@
   }
 
   .window-rows {
-    padding-block-end: var(--timeline-foot-height);
+    padding-block-end: var(--space-400);
   }
 
   @media (width >= 30rem) {
