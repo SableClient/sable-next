@@ -55,7 +55,7 @@
             class="menu-item choice"
           >
             {#snippet children({ selected })}
-              <span>{item.label}</span>
+              <span class="selection-label">{item.label}</span>
               {#if selected}<CheckIcon class="select-check" aria-hidden="true" />{/if}
             {/snippet}
           </BitsSelect.Item>
@@ -74,6 +74,10 @@
     justify-content: space-between;
     text-align: left;
     width: 100%;
+  }
+
+  :global(.selection-label) {
+    text-transform: capitalize;
   }
 
   :global(.select-caret),
