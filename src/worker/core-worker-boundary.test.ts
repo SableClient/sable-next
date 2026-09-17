@@ -54,6 +54,7 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
       mentions: ['@one:example.org'],
       mentionsRoom: true,
       persona: null,
+      spoiler: true,
     },
   });
 
@@ -69,7 +70,8 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
     formattedCaption,
     JSON.stringify(['@one:example.org']),
     true,
-    null
+    null,
+    true
   );
   expect(port.messages).toEqual([{ id: 1, uri: null }]);
 });

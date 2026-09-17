@@ -259,6 +259,7 @@ impl SableCore {
         mentions: Option<String>,
         mentions_room: bool,
         persona: Option<String>,
+        spoiler: bool,
     ) -> Result<(), String> {
         let info = info
             .as_deref()
@@ -285,6 +286,7 @@ impl SableCore {
                 mentions,
                 mentions_room,
                 persona,
+                spoiler,
             )
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))

@@ -15,6 +15,7 @@ use mime::Mime;
 use crate::messages::outgoing_mentions;
 use crate::personas::profile_extra_content;
 use crate::protocol::{AttachmentInfoView, CommandErr, PerMessageProfileView};
+use crate::view::SPOILER_PROPERTY;
 
 use crate::Core;
 
@@ -135,6 +136,7 @@ impl Core {
         mentions: Vec<String>,
         mentions_room: bool,
         persona: Option<PerMessageProfileView>,
+        spoiler: bool,
     ) -> Result<(), CommandErr> {
         if bytes.len() > MAX_ATTACHMENT_BYTES {
             return Err(CommandErr::InvalidMedia);
@@ -180,7 +182,7 @@ impl Core {
                 &info.unwrap_or_default(),
                 bytes.len(),
             )),
-            extra_content: persona.as_ref().map(attachment_profile),
+            extra_content: attachment_extra_content(persona.as_ref(), spoiler),
             ..AttachmentConfig::default()
         };
 
@@ -255,6 +257,17 @@ fn attachment_profile(
     profile: &PerMessageProfileView,
 ) -> serde_json::Map<String, serde_json::Value> {
     profile_extra_content(profile)
+}
+
+fn attachment_extra_content(
+    persona: Option<&PerMessageProfileView>,
+    spoiler: bool,
+) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let mut extra = persona.map(attachment_profile).unwrap_or_default();
+    if spoiler {
+        extra.insert(SPOILER_PROPERTY.to_owned(), serde_json::Value::Bool(true));
+    }
+    (!extra.is_empty()).then_some(extra)
 }
 
 #[cfg(all(test, not(target_family = "wasm")))]
@@ -392,8 +405,8 @@ pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
 mod tests {
     use super::{
         AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, OwnedUserId,
-        PerMessageProfileView, attachment_caption, attachment_info, attachment_profile,
-        outgoing_mentions,
+        PerMessageProfileView, SPOILER_PROPERTY, attachment_caption, attachment_extra_content,
+        attachment_info, attachment_profile, outgoing_mentions,
     };
 
     fn view(
@@ -527,6 +540,27 @@ mod tests {
         assert_eq!(content["body"], "A caption");
         assert!(content.get("formatted_body").is_none());
         assert!(attachment_caption(None, Some("<b>orphaned HTML</b>".to_owned())).is_none());
+    }
+
+    #[test]
+    fn a_spoiler_rides_the_extra_content_beside_the_persona() {
+        assert!(attachment_extra_content(None, false).is_none());
+
+        let spoiler = attachment_extra_content(None, true).expect("a spoiler property");
+        assert_eq!(spoiler[SPOILER_PROPERTY], true);
+
+        let profile = PerMessageProfileView {
+            id: Some("hatchy".to_owned()),
+            display_name: Some("Hatchy".to_owned()),
+            avatar_url: None,
+            pronouns: Vec::new(),
+            color_on_light: None,
+            color_on_dark: None,
+            has_fallback: true,
+        };
+        let both = attachment_extra_content(Some(&profile), true).expect("both properties");
+        assert_eq!(both["com.beeper.per_message_profile"]["id"], "hatchy");
+        assert_eq!(both[SPOILER_PROPERTY], true);
     }
 
     #[test]

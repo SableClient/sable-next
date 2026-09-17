@@ -76,6 +76,7 @@ export function createTauriTransport(): Transport {
       info,
       threadRoot,
       persona,
+      spoiler,
     }) {
       await carry('send_attachment', bytes, {
         'room-id': roomId,
@@ -89,6 +90,7 @@ export function createTauriTransport(): Transport {
         ...(info ? { info: JSON.stringify(info) } : {}),
         ...(threadRoot ? { 'thread-root': threadRoot } : {}),
         ...(persona ? { persona: JSON.stringify(persona) } : {}),
+        ...(spoiler ? { spoiler: 'true' } : {}),
       });
     },
 

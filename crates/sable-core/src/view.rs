@@ -1232,12 +1232,13 @@ pub(crate) const RTC_SLOT_TYPE: &str = "org.matrix.msc4143.rtc.slot";
 
 pub(crate) const CALL_SLOT_ID: &str = "m.call#ROOM";
 
+pub(crate) const SPOILER_PROPERTY: &str = "page.codeberg.everypizza.msc4193.spoiler";
+
 fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
-    const SPOILER: &str = "page.codeberg.everypizza.msc4193.spoiler";
     const REASON: &str = "page.codeberg.everypizza.msc4193.spoiler.reason";
 
     let content = content?;
-    if content.get(SPOILER)?.as_bool() != Some(true) {
+    if content.get(SPOILER_PROPERTY)?.as_bool() != Some(true) {
         return None;
     }
     Some(

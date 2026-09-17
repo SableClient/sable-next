@@ -53,6 +53,7 @@
     filesFrom,
     formatSize,
     stageFiles,
+    toggleSpoiler,
     unstageFile,
     type StagedFile,
   } from './composer-files';
@@ -496,8 +497,9 @@
                   caption: message.body,
                   formattedCaption: message.formatted,
                   mentions: message.mentions,
+                  spoiler: next.spoiler,
                 }
-              : {}
+              : { spoiler: next.spoiler }
           );
           unsent = rest;
         }
@@ -811,6 +813,9 @@
             disabled={sending}
             onRemove={(id: number) => {
               staged = unstageFile(staged, id);
+            }}
+            onToggleSpoiler={(id: number) => {
+              staged = toggleSpoiler(staged, id);
             }}
           />
         {/if}

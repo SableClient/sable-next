@@ -318,6 +318,7 @@ export function createWebTransport(): Transport {
       info,
       threadRoot,
       persona,
+      spoiler,
     }) {
       await request<null>(
         (id) => ({
@@ -335,6 +336,7 @@ export function createWebTransport(): Transport {
             info: info ?? null,
             threadRoot: threadRoot ?? null,
             persona: persona ?? null,
+            spoiler: spoiler ?? false,
           },
         }),
         [bytes.buffer]

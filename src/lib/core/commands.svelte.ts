@@ -107,6 +107,7 @@ export type SendAttachmentOptions = {
   inReplyTo?: string | null;
   threadRoot?: string | null;
   persona?: PerMessageProfileView | null;
+  spoiler?: boolean;
 };
 
 export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
@@ -1084,6 +1085,7 @@ export function createCommands(transport: () => Transport) {
         info,
         threadRoot: options.threadRoot ?? null,
         persona: options.persona ?? null,
+        spoiler: options.spoiler ?? false,
       });
     },
 
