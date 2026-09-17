@@ -85,19 +85,21 @@
         onpointerup={press.end}
         onpointercancel={press.end}
       >
-        {#if reaction.key.startsWith('mxc://')}
-          <MediaImage
-            class="reaction-image"
-            source={reaction.key}
-            alt={reaction.key}
-            width={64}
-            height={64}
-            original
-          />
-        {:else}
-          <em>{reaction.key}</em>
-        {/if}
-        {reaction.senders.length}
+        <span class="reaction-key">
+          {#if reaction.key.startsWith('mxc://')}
+            <MediaImage
+              class="reaction-image"
+              source={reaction.key}
+              alt={reaction.key}
+              width={64}
+              height={64}
+              original
+            />
+          {:else}
+            <em>{reaction.key}</em>
+          {/if}
+        </span>
+        <span class="reaction-count">{reaction.senders.length}</span>
       </button>
     {/snippet}
     <Tooltip
@@ -141,19 +143,21 @@
   }
 
   .reaction {
-    align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
     color: var(--surface-var-on-container);
     cursor: pointer;
-    display: inline-flex;
+    display: grid;
     font: inherit;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-medium);
     gap: var(--space-100);
+    grid-template-columns: minmax(0, 1fr) auto;
+    max-width: 100%;
     min-height: 1.5rem;
+    min-width: 0;
     padding: var(--space-050) var(--space-200) var(--space-050) var(--space-150);
     position: relative;
   }
@@ -172,10 +176,20 @@
     width: auto;
   }
 
-  .reaction em {
+  .reaction-key {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .reaction-key em {
     font-size: var(--font-size-body);
     font-style: normal;
     line-height: 1;
+  }
+
+  .reaction-count {
+    align-self: center;
+    white-space: nowrap;
   }
 
   .reaction:disabled {

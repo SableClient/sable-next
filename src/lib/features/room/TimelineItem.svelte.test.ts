@@ -568,6 +568,35 @@ test('provides a formatted reaction attribution tooltip', async () => {
   await unmount(instance);
 });
 
+test('keeps a long text reaction separate from its count', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: {
+          ...item(false),
+          reactions: [
+            {
+              key: 'this is an absurdly long reaction to test the reaction layout',
+              senders: ['@alice:example.org'],
+            },
+          ],
+        },
+        collapsed: false,
+      },
+    },
+  });
+  await tick();
+
+  const reaction = document.querySelector<HTMLButtonElement>('.reaction');
+  expect(reaction?.querySelector('.reaction-key')?.textContent).toBe(
+    'this is an absurdly long reaction to test the reaction layout'
+  );
+  expect(reaction?.querySelector('.reaction-count')?.textContent).toBe('1');
+  await unmount(instance);
+});
+
 test('mounts the action bar on hover and keeps it while its menu is open', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
