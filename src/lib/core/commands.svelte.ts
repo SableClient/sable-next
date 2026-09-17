@@ -1083,7 +1083,7 @@ export function createCommands(transport: () => Transport) {
 
     async markRead(
       roomId: string,
-      eventId: string,
+      eventId: string | null,
       privateReceipt = false,
       threadRoot: string | null = null,
       subscription: SubscriptionId | null = null

@@ -545,7 +545,7 @@ mod tests {
             let result = core
                 .dispatch(Command::MarkRead {
                     room_id: room_id.to_owned(),
-                    event_id: event_id!("$reply").to_owned(),
+                    event_id: Some(event_id!("$reply").to_owned()),
                     private_receipt: false,
                     thread_root,
                     subscription: Some(subscription),
@@ -558,7 +558,7 @@ mod tests {
         }
         core.dispatch(Command::MarkRead {
             room_id: room_id.to_owned(),
-            event_id: event_id!("$reply").to_owned(),
+            event_id: Some(event_id!("$reply").to_owned()),
             private_receipt: false,
             thread_root: Some(root.to_owned()),
             subscription: Some(subscription),

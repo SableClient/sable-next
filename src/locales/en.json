@@ -263,6 +263,7 @@
     "pinsUnreadable": "This message could not be loaded.",
     "menuMoreOptions": "More options",
     "menuMarkRead": "Mark as read",
+    "menuMarkUnread": "Mark as unread",
     "menuInvite": "Invite",
     "menuJumpToTime": "Jump to time",
     "inviteTitle": "Invite",

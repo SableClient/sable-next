@@ -86,7 +86,7 @@ event_id: string;
 /**  Answer ids, not their text. */
 answers: string[]; thread_root: string | null } |
 /**  Irreversible. */
-{ type: "end_poll"; room_id: string; event_id: string; thread_root: string | null } | { type: "mark_read"; room_id: string; event_id: string; private_receipt: boolean; thread_root: string | null; subscription: SubscriptionId | null } | { type: "mark_unread"; room_id: string; read_marker: string | null } | { type: "retry_send"; room_id: string; transaction_id: string; thread_root: string | null } |
+{ type: "end_poll"; room_id: string; event_id: string; thread_root: string | null } | { type: "mark_read"; room_id: string; event_id: string | null; private_receipt: boolean; thread_root: string | null; subscription: SubscriptionId | null } | { type: "mark_unread"; room_id: string; read_marker: string | null } | { type: "retry_send"; room_id: string; transaction_id: string; thread_root: string | null } |
 /**  A local echo is not on the server, so it cannot be redacted. */
 { type: "cancel_send"; room_id: string; transaction_id: string; thread_root: string | null } | { type: "create_room"; name: string | null; topic: string | null; kind: CreateRoomKind;
 /**  Published in the directory, joinable by link. */
@@ -903,32 +903,13 @@ body: string;
 /**  Sanitised display HTML, safe to inject as-is. */
 html: string;
 /**  `m.emote`, which reads as an action by the sender rather than speech. */
-emote: boolean; notice: boolean; edited: boolean } | { kind: "image";
-/**
- *  The file name, per the spec's media captions: the `filename` field
- *  when it is set, the body otherwise.
- */
-filename: string;
-/**  The plain caption, absent when the body is the file name. */
-caption: string | null;
+emote: boolean; notice: boolean; edited: boolean } | { kind: "image"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video";
-/**  The file name, per the spec's media captions. */
-filename: string;
-/**  The plain caption, absent when the body is the file name. */
-caption: string | null;
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio";
-/**  The file name, per the spec's media captions. */
-filename: string;
-/**  The plain caption, absent when the body is the file name. */
-caption: string | null;
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file";
-/**  The file name, per the spec's media captions. */
-filename: string;
-/**  The plain caption, absent when the body is the file name. */
-caption: string | null;
+html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
 html: string | null; source: string; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } |
 /**

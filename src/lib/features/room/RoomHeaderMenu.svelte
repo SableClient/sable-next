@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
+  import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
@@ -26,6 +27,7 @@
     canInvite: boolean;
     compact: boolean;
     onMarkRead: () => void;
+    onMarkUnread: () => void;
     onInvite: () => void;
     onMembers: () => void;
     onSettings: () => void;
@@ -38,6 +40,7 @@
     canInvite,
     compact,
     onMarkRead,
+    onMarkUnread,
     onInvite,
     onMembers,
     onSettings,
@@ -48,7 +51,9 @@
 
   let open = $state(false);
   let opened = $state(false);
-  let unread = $derived((room?.unread ?? 0) > 0);
+  let unread = $derived(
+    (room?.unread ?? 0) > 0 || (room?.highlight ?? 0) > 0 || (room?.marked_unread ?? false)
+  );
 
   async function copyLink(): Promise<void> {
     if (!room) return;
@@ -83,10 +88,17 @@
   {/snippet}
 
   <IconContext values={{ 'aria-hidden': 'true' }}>
-    <ActionMenuItem disabled={!unread} onSelect={onMarkRead}>
-      <ChecksIcon />
-      {$i18n.t('room.menuMarkRead')}
-    </ActionMenuItem>
+    {#if unread}
+      <ActionMenuItem onSelect={onMarkRead}>
+        <ChecksIcon />
+        {$i18n.t('room.menuMarkRead')}
+      </ActionMenuItem>
+    {:else}
+      <ActionMenuItem disabled={!room} onSelect={onMarkUnread}>
+        <CircleDashedIcon />
+        {$i18n.t('room.menuMarkUnread')}
+      </ActionMenuItem>
+    {/if}
     {#if room && !room.is_space}
       <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
     {/if}

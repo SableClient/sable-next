@@ -521,8 +521,9 @@ pub enum Command {
     MarkRead {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
-        #[cfg_attr(feature = "typegen", specta(type = String))]
-        event_id: OwnedEventId,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        event_id: Option<OwnedEventId>,
         #[serde(default)]
         private_receipt: bool,
         #[serde(default)]

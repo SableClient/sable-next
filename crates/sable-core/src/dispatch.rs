@@ -48,7 +48,7 @@ use matrix_sdk::ruma::{
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
 };
-use matrix_sdk_ui::timeline::TimelineEventItemId;
+use matrix_sdk_ui::timeline::{RoomExt, TimelineEventItemId, TimelineFocus};
 
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
@@ -2318,6 +2318,35 @@ impl Core {
                 thread_root,
                 subscription,
             } => {
+                let receipt_type = if private_receipt {
+                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::ReadPrivate
+                } else {
+                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::Read
+                };
+
+                let Some(event_id) = event_id else {
+                    let room = self.room(&room_id).await?;
+                    let timeline = room
+                        .timeline_builder()
+                        .with_focus(TimelineFocus::Live {
+                            hide_threaded_events: false,
+                        })
+                        .build()
+                        .await
+                        .map_err(|error| self.failed("build mark-read timeline", error))?;
+                    timeline
+                        .mark_as_read(receipt_type)
+                        .await
+                        .map_err(|error| self.failed("mark_read", error))?;
+                    timeline
+                        .mark_as_read(
+                            matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::FullyRead,
+                        )
+                        .await
+                        .map_err(|error| self.failed("mark_read", error))?;
+                    return Ok(CommandOk::MarkRead);
+                };
+
                 let timeline = if let Some(subscription) = subscription {
                     let timeline = self
                         .subscriptions
@@ -2333,11 +2362,6 @@ impl Core {
                     timeline
                 } else {
                     self.timeline_for(&room_id, thread_root.as_ref()).await?
-                };
-                let receipt_type = if private_receipt {
-                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::ReadPrivate
-                } else {
-                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::Read
                 };
                 timeline
                     .send_single_receipt(receipt_type, event_id.clone())
