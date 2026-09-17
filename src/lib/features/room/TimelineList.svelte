@@ -787,7 +787,7 @@
     min-height: 0;
     overflow: auto;
     overflow-anchor: none;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
     scrollbar-color: transparent transparent;
     scrollbar-width: thin;
   }
