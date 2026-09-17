@@ -30,6 +30,44 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+test('renders a zoned time in the viewer zone and names the sender offset', async () => {
+  const { formatMessageTimestamp } = await import('./timeline-format');
+  const instant = Date.parse('2026-09-17T15:00:00Z');
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: '<time datetime="2026-09-17T15:00:00Z">17 Sep 2026, 15:00 (UTC)</time>' },
+  });
+  await tick();
+
+  const time = document.querySelector('time');
+  expect(time?.textContent).toBe(formatMessageTimestamp(instant));
+  expect(time?.getAttribute('aria-label')).toContain(formatMessageTimestamp(instant));
+  expect(time?.getAttribute('aria-label')).toContain('UTC');
+  expect(time?.tabIndex).toBe(0);
+  expect(time?.getAttribute('role')).toBeNull();
+  await unmount(instance);
+});
+
+test('closes a pinned time tooltip when the rendered body changes', async () => {
+  const instance = mount(FormattedBodyHarness, {
+    target: document.body,
+    props: {
+      html: '<time datetime="2026-09-17T15:00:00Z">time</time>',
+      entries: [],
+    },
+  }) as { replaceHtml(value: string): void };
+  await tick();
+
+  document.querySelector<HTMLTimeElement>('time')?.click();
+  await tick();
+  expect(document.querySelector('.tooltip')).not.toBeNull();
+
+  instance.replaceHtml('<p>replacement</p>');
+  await tick();
+  expect(document.querySelector('.tooltip')).toBeNull();
+  await unmount(instance);
+});
+
 test('opens Matrix links through the room-level handler', async () => {
   const onMatrixLink = vi.fn();
   const onDocumentClick = vi.fn();
@@ -148,19 +186,28 @@ test('sends external links to a new tab instead of the handler', async () => {
   await unmount(instance);
 });
 
-// The colour is named rather than hex so check-theme-tokens does not read it as
-// an undeclared literal.
-test('applies Matrix colours and keeps spoilers hidden until asked', async () => {
+test('applies opaque Matrix colours, rejects alpha, and keeps spoilers hidden', async () => {
+  const opaqueTeal = ['#', '00', '80', '80'].join('');
+  const transparentBlack = ['#', '00', '00', '00', '00'].join('');
   const instance = mount(FormattedBody, {
     target: document.body,
     props: {
-      html: '<span data-mx-color="teal">teal</span><span data-mx-spoiler="">secret</span>',
+      html:
+        `<span id="opaque" data-mx-color="${opaqueTeal}">opaque</span>` +
+        `<span id="alpha" data-mx-color="${transparentBlack}">alpha</span>` +
+        '<span id="spoiler" data-mx-spoiler="">secret</span>',
     },
   });
   await tick();
 
-  const [colored, spoiler] = [...document.querySelectorAll<HTMLElement>('span')];
-  expect(colored.style.color).toBe('teal');
+  const colored = document.querySelector<HTMLElement>('#opaque');
+  const alpha = document.querySelector<HTMLElement>('#alpha');
+  const spoiler = document.querySelector<HTMLElement>('#spoiler');
+  expect(colored?.style.color).toBe(opaqueTeal);
+  expect(alpha?.style.color).toBe('');
+  expect(alpha?.dataset.mxColor).toBeUndefined();
+  expect(spoiler).not.toBeNull();
+  if (!spoiler) return;
   expect(spoiler.role).toBe('button');
   expect(spoiler.ariaPressed).toBe('true');
 

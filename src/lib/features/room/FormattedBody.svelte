@@ -4,10 +4,18 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
+  import {
+    formatRelativeTimestamp,
+    formatSenderWall,
+    isOpaqueMatrixColor,
+    parseZonedDatetime,
+  } from '../composer/time-markup';
   import { markAbbreviations } from './abbreviations';
+  import { formatMessageTimestamp } from './timeline-format';
   import { hasRoomAbbreviations, useRoomAbbreviations } from './room-abbreviations.svelte.js';
 
   import type { MatrixLink } from './matrix-link';
@@ -28,6 +36,9 @@
   let definitionAnchor = $state.raw<HTMLElement | null>(null);
   let definitionPinned = $state(false);
   let definition = $derived(definitionAnchor?.dataset.abbrDefinition ?? '');
+  let timeAnchor = $state.raw<HTMLTimeElement | null>(null);
+  let timePinned = $state(false);
+  let timeDetail = $derived(timeAnchor?.dataset.timeDetail ?? '');
   let renderedHtml = $derived(deferMxcImageSources(html));
 
   function deferMxcImageSources(value: string): string {
@@ -136,10 +147,30 @@
         }
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
-        element.style.color = element.dataset.mxColor ?? '';
+        const color = element.dataset.mxColor ?? '';
+        if (isOpaqueMatrixColor(color)) element.style.color = color;
+        else delete element.dataset.mxColor;
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-bg-color]')) {
-        element.style.backgroundColor = element.dataset.mxBgColor ?? '';
+        const color = element.dataset.mxBgColor ?? '';
+        if (isOpaqueMatrixColor(color)) element.style.backgroundColor = color;
+        else delete element.dataset.mxBgColor;
+      }
+      for (const element of node.querySelectorAll<HTMLTimeElement>('time[datetime]')) {
+        const zoned = parseZonedDatetime(
+          element.dateTime || element.getAttribute('datetime') || ''
+        );
+        if (!zoned) continue;
+        const local = formatMessageTimestamp(zoned.instant);
+        const sender = $i18n.t('timeline.timeMarkupSender', {
+          time: formatSenderWall(zoned, preferences.hour24Clock),
+        });
+        const relative = formatRelativeTimestamp(zoned.instant);
+        const detail = $i18n.t('timeline.timeMarkupDetail', { local, sender, relative });
+        element.textContent = local;
+        element.tabIndex = 0;
+        element.setAttribute('aria-label', detail);
+        element.dataset.timeDetail = detail;
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-spoiler]')) {
         element.tabIndex = 0;
@@ -173,6 +204,7 @@
         offFocusIn();
         offFocusOut();
         closeDefinition();
+        closeTime();
         for (const release of releases) release();
       };
     };
@@ -318,15 +350,32 @@
     definitionPinned = false;
   }
 
+  function timeOf(target: EventTarget | null): HTMLTimeElement | null {
+    if (!(target instanceof Element)) return null;
+    const time = target.closest<HTMLTimeElement>('time[datetime]');
+    return time?.dataset.timeDetail ? time : null;
+  }
+
+  function closeTime(): void {
+    timeAnchor = null;
+    timePinned = false;
+  }
+
   function handleDefinitionOver(event: PointerEvent | FocusEvent): void {
     const abbr = definitionOf(event.target);
     if (abbr) definitionAnchor = abbr;
+    const time = timeOf(event.target);
+    if (time) timeAnchor = time;
   }
 
   function handleDefinitionOut(event: PointerEvent | FocusEvent): void {
-    if (definitionPinned) return;
-    const abbr = definitionOf(event.target);
-    if (abbr && abbr === definitionAnchor) definitionAnchor = null;
+    if (!definitionPinned) {
+      const abbr = definitionOf(event.target);
+      if (abbr && abbr === definitionAnchor) definitionAnchor = null;
+    }
+    if (timePinned) return;
+    const time = timeOf(event.target);
+    if (time && time === timeAnchor) timeAnchor = null;
   }
 
   function handleClick(event: MouseEvent): void {
@@ -353,6 +402,17 @@
       event.preventDefault();
       return;
     }
+    const time = timeOf(target);
+    if (time) {
+      event.preventDefault();
+      if (timePinned && time === timeAnchor) closeTime();
+      else {
+        timeAnchor = time;
+        timePinned = true;
+      }
+      return;
+    }
+    if (timePinned) closeTime();
 
     const anchor = target.closest<HTMLAnchorElement>('a');
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -364,10 +424,23 @@
   }
 
   function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && timePinned) {
+      closeTime();
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const target = event.target;
-    if (!(target instanceof Element) || !target.matches('[data-mx-spoiler]')) return;
-    if (reveal(target)) event.preventDefault();
+    if (!(target instanceof Element)) return;
+    if (target.matches('[data-mx-spoiler]') && reveal(target)) {
+      event.preventDefault();
+      return;
+    }
+    const time = timeOf(target);
+    if (!time) return;
+    timeAnchor = time;
+    timePinned = true;
+    event.preventDefault();
   }
 </script>
 
@@ -376,6 +449,9 @@
 
 {#if definitionAnchor && definition}
   <Tooltip label={definition} open customAnchor={definitionAnchor} side="top" />
+{/if}
+{#if timeAnchor && timeDetail}
+  <Tooltip label={timeDetail} open customAnchor={timeAnchor} side="top" />
 {/if}
 
 <style>
@@ -388,6 +464,20 @@
   .formatted-body :global(p) {
     line-height: var(--line-height-body);
     margin: 0;
+  }
+
+  .formatted-body :global(time[datetime]) {
+    background: var(--sec-container);
+    border-radius: var(--radius);
+    color: var(--sec-on-container);
+    cursor: pointer;
+    padding: 0 var(--space-100);
+    white-space: nowrap;
+  }
+
+  .formatted-body :global(time[datetime]:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   .formatted-body :global(abbr[data-abbr-definition]) {

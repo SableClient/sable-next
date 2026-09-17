@@ -13,7 +13,7 @@ use matrix_sdk::ruma::html::{
 };
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
 
-const ALLOWED_TAGS: [&str; 37] = [
+const ALLOWED_TAGS: [&str; 38] = [
     "a",
     "b",
     "blockquote",
@@ -48,6 +48,7 @@ const ALLOWED_TAGS: [&str; 37] = [
     "td",
     "th",
     "thead",
+    "time",
     "tr",
     "u",
     "ul",
@@ -77,6 +78,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
             ]),
         ),
         ("div", HashSet::from(["data-mx-maths"])),
+        ("time", HashSet::from(["datetime"])),
         (
             "img",
             HashSet::from(["src", "alt", "title", "width", "height", "data-mx-emoticon"]),
@@ -140,6 +142,7 @@ fn sanitizer() -> Builder<'static> {
             (_, "data-mx-color" | "data-mx-bg-color") => {
                 is_matrix_hex_color(value).then(|| value.into())
             }
+            ("time", "datetime") => canonical_datetime(value).map(Into::into),
             _ => Some(value.into()),
         });
     builder
@@ -159,6 +162,7 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     SanitizerConfig::compat()
         .remove_reply_fallback()
         .remove_elements(["script", "style", "textarea", "option", "noscript"])
+        .allow_elements(["time"], ListBehavior::Add)
         .remove_attributes([PropertiesNames {
             parent: "a",
             properties: &["target"],
@@ -172,6 +176,10 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
                 PropertiesNames {
                     parent: "pre",
                     properties: &["class"],
+                },
+                PropertiesNames {
+                    parent: "time",
+                    properties: &["datetime"],
                 },
             ],
             ListBehavior::Add,
@@ -258,8 +266,11 @@ fn anchor(href: &str, text: &str) -> String {
     )
 }
 
-/// Escapes plain text and turns bare URLs, emails and Matrix URIs into links.
 fn linkify_plain_text(text: &str) -> String {
+    rewrite_mfm(text)
+}
+
+fn linkify_urls(text: &str) -> String {
     let mut spans: Vec<(usize, usize, bool)> = PLAIN_TEXT_LINKS
         .links(text)
         .map(|link| (link.start(), link.end(), link.kind() == &LinkKind::Email))
@@ -292,8 +303,371 @@ fn linkify_plain_text(text: &str) -> String {
     html
 }
 
-const LINKIFY_SKIP_ELEMENTS: [&str; 8] = [
-    "a", "code", "mx-reply", "noscript", "pre", "script", "style", "textarea",
+fn rewrite_mfm(text: &str) -> String {
+    rewrite_mfm_at_depth(text, 0)
+}
+
+const MAX_MFM_DEPTH: usize = 32;
+
+fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
+    let mut html = String::with_capacity(text.len());
+    let mut plain_start = 0;
+    let mut code_ticks = None;
+    let mut index = 0;
+    while index < text.len() {
+        let Some(rest) = text.get(index..) else {
+            break;
+        };
+        if code_ticks.is_none() && rest.starts_with('\\') {
+            index += 1 + rest
+                .get(1..)
+                .and_then(|tail| tail.chars().next())
+                .map_or(0, char::len_utf8);
+            continue;
+        }
+        if rest.starts_with('`') {
+            let ticks = rest.bytes().take_while(|byte| *byte == b'`').count();
+            match code_ticks {
+                Some(open) if open == ticks => code_ticks = None,
+                None => code_ticks = Some(ticks),
+                _ => {}
+            }
+            index += ticks;
+            continue;
+        }
+        if code_ticks.is_none()
+            && rest.starts_with("$[")
+            && let Some((consumed, element)) = mfm_element(rest, depth)
+        {
+            if let Some(before) = text.get(plain_start..index) {
+                html.push_str(&linkify_urls(before));
+            }
+            html.push_str(&element);
+            index += consumed;
+            plain_start = index;
+            continue;
+        }
+        index += rest.chars().next().map_or(1, char::len_utf8);
+    }
+    if let Some(tail) = text.get(plain_start..) {
+        html.push_str(&linkify_urls(tail));
+    }
+    html
+}
+
+fn mfm_element(src: &str, depth: usize) -> Option<(usize, String)> {
+    mfm_unixtime(src).or_else(|| mfm_color(src, depth))
+}
+
+fn mfm_unixtime(src: &str) -> Option<(usize, String)> {
+    let after_name = src.strip_prefix("$[unixtime")?;
+    if !after_name.starts_with([' ', '\t']) {
+        return None;
+    }
+    let after_space = after_name.trim_start_matches([' ', '\t']);
+    let digits_len = after_space.bytes().take_while(u8::is_ascii_digit).count();
+    if digits_len == 0 {
+        return None;
+    }
+    let digits = after_space.get(..digits_len)?;
+    let after_digits = after_space.get(digits_len..)?;
+    if !after_digits.starts_with(']') {
+        return None;
+    }
+    let datetime = unix_datetime(digits)?;
+    let label = utc_fallback_label(&datetime);
+    let html = format!(
+        "<time datetime=\"{}\">{label}</time>",
+        html_escape::encode_double_quoted_attribute(&datetime),
+        label = escape_html(&label)
+    );
+    Some((src.len() - after_digits.len() + 1, html))
+}
+
+struct ColorArgs {
+    fg: Option<String>,
+    bg: Option<String>,
+}
+
+fn mfm_close(src: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut escaped = false;
+    for (index, character) in src.char_indices().skip(1) {
+        if escaped {
+            escaped = false;
+        } else if character == '\\' {
+            escaped = true;
+        } else if character == '[' {
+            depth += 1;
+        } else if character == ']' {
+            depth = depth.checked_sub(1)?;
+            if depth == 0 {
+                return Some(index);
+            }
+        }
+    }
+    None
+}
+
+fn mfm_color(src: &str, depth: usize) -> Option<(usize, String)> {
+    if !src.starts_with("$[fg.color=") && !src.starts_with("$[bg.color=") {
+        return None;
+    }
+    let close = mfm_close(src)?;
+    let inner = src.get(2..close)?;
+    let (args, text_at) = parse_color_args(inner)?;
+    let text = inner.get(text_at..)?.trim();
+    if text.is_empty() {
+        return None;
+    }
+    let mut attrs = String::new();
+    if let Some(fg) = &args.fg {
+        attrs.push_str(" data-mx-color=\"");
+        attrs.push_str(&html_escape::encode_double_quoted_attribute(fg));
+        attrs.push('"');
+    }
+    if let Some(bg) = &args.bg {
+        attrs.push_str(" data-mx-bg-color=\"");
+        attrs.push_str(&html_escape::encode_double_quoted_attribute(bg));
+        attrs.push('"');
+    }
+    let content = if depth < MAX_MFM_DEPTH {
+        rewrite_mfm_at_depth(text, depth + 1)
+    } else {
+        linkify_urls(text)
+    };
+    Some((close + 1, format!("<span{attrs}>{content}</span>")))
+}
+
+fn parse_color_args(inner: &str) -> Option<(ColorArgs, usize)> {
+    let mut args = ColorArgs { fg: None, bg: None };
+    let mut rest = inner;
+    let mut consumed = 0;
+    let mut found = false;
+    loop {
+        if found {
+            let spaces = rest.len() - rest.trim_start_matches([' ', '\t']).len();
+            if spaces == 0 {
+                break;
+            }
+            rest = rest.get(spaces..)?;
+            consumed += spaces;
+        }
+        let token_len = rest.find([' ', '\t']).unwrap_or(rest.len());
+        let token = rest.get(..token_len)?;
+        let Some((kind, hex)) = color_token(token) else {
+            break;
+        };
+        let normalized = normalize_mfm_hex(hex)?;
+        if kind == "fg" {
+            args.fg = Some(normalized);
+        } else {
+            args.bg = Some(normalized);
+        }
+        found = true;
+        rest = rest.get(token_len..)?;
+        consumed += token_len;
+    }
+    (args.fg.is_some() || args.bg.is_some()).then_some((args, consumed))
+}
+
+fn color_token(token: &str) -> Option<(&str, &str)> {
+    let (kind, value) = token
+        .strip_prefix("fg.color=")
+        .map(|value| ("fg", value))
+        .or_else(|| token.strip_prefix("bg.color=").map(|value| ("bg", value)))?;
+    let hex = value.strip_prefix('#').unwrap_or(value);
+    (matches!(hex.len(), 3 | 6) && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .then_some((kind, value))
+}
+
+fn normalize_mfm_hex(value: &str) -> Option<String> {
+    let digits = value.strip_prefix('#').unwrap_or(value);
+    if !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let expanded = match digits.len() {
+        3 => {
+            let [red, green, blue] = *digits.as_bytes() else {
+                return None;
+            };
+            format!(
+                "{}{}{}{}{}{}",
+                red as char, red as char, green as char, green as char, blue as char, blue as char
+            )
+        }
+        6 => digits.to_owned(),
+        _ => return None,
+    };
+    Some(format!("#{}", expanded.to_ascii_lowercase()))
+}
+
+fn unix_datetime(digits: &str) -> Option<String> {
+    let seconds: i64 = digits.parse().ok()?;
+    if !(0..=253_402_300_799).contains(&seconds) {
+        return None;
+    }
+    let days = seconds.div_euclid(86_400);
+    let remainder = seconds.rem_euclid(86_400);
+    let hour = remainder / 3600;
+    let minute = (remainder % 3600) / 60;
+    let second = remainder % 60;
+    let (year, month, day) = civil_from_unix_days(days);
+    (1..=9999)
+        .contains(&year)
+        .then(|| format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z"))
+}
+
+const fn civil_from_unix_days(unix_days: i64) -> (i64, i64, i64) {
+    let z = unix_days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let month_part = (5 * doy + 2) / 153;
+    let day = doy - (153 * month_part + 2) / 5 + 1;
+    let month = if month_part < 10 {
+        month_part + 3
+    } else {
+        month_part - 9
+    };
+    let year = if month <= 2 { year + 1 } else { year };
+    (year, month, day)
+}
+
+fn utc_fallback_label(datetime: &str) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let Some((date, time)) = datetime.split_once('T') else {
+        return datetime.to_owned();
+    };
+    let mut date_parts = date.split('-');
+    let year = date_parts.next().unwrap_or_default();
+    let month: usize = date_parts.next().unwrap_or("1").parse().unwrap_or(1);
+    let day = date_parts.next().unwrap_or("1").trim_start_matches('0');
+    let day = if day.is_empty() { "0" } else { day };
+    let hour_minute = time.get(..5).unwrap_or("00:00");
+    format!(
+        "{day} {} {year}, {hour_minute} (UTC)",
+        MONTHS.get(month.wrapping_sub(1)).copied().unwrap_or("Jan")
+    )
+}
+
+fn canonical_datetime(value: &str) -> Option<String> {
+    let (date, rest) = value.split_once('T')?;
+    if date.len() != 10 {
+        return None;
+    }
+    let mut date_parts = date.split('-');
+    let (year, month, day) = (date_parts.next()?, date_parts.next()?, date_parts.next()?);
+    if date_parts.next().is_some() || year.len() != 4 || month.len() != 2 || day.len() != 2 {
+        return None;
+    }
+    let year: i32 = year.parse().ok()?;
+    let month: u32 = month.parse().ok()?;
+    let day: u32 = day.parse().ok()?;
+    if !(1..=9999).contains(&year) || !(1..=12).contains(&month) {
+        return None;
+    }
+    if day < 1 || day > days_in_month(year, month) {
+        return None;
+    }
+
+    let (clock, offset) = split_offset(rest)?;
+    let mut clock_parts = clock.split(':');
+    let (hour, minute) = (clock_parts.next()?, clock_parts.next()?);
+    if hour.len() != 2 || minute.len() != 2 {
+        return None;
+    }
+    let hour: u32 = hour.parse().ok()?;
+    let minute: u32 = minute.parse().ok()?;
+    let seconds = clock_parts.next().unwrap_or("00");
+    let (seconds, fraction) = seconds
+        .split_once('.')
+        .map_or((seconds, None), |(seconds, fraction)| {
+            (seconds, Some(fraction))
+        });
+    if seconds.len() != 2
+        || fraction.is_some_and(|value| {
+            value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit())
+        })
+    {
+        return None;
+    }
+    let second: u32 = seconds.parse().ok()?;
+    if clock_parts.next().is_some() || hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    let offset = canonical_offset(offset)?;
+    Some(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{offset}"
+    ))
+}
+
+const fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
+fn split_offset(rest: &str) -> Option<(&str, &str)> {
+    if let Some(clock) = rest.strip_suffix(['Z', 'z']) {
+        return Some((clock, "Z"));
+    }
+    if rest.len() >= 6 {
+        let tail = rest.get(rest.len() - 6..)?;
+        if parse_offset(tail).is_some() {
+            return Some((rest.get(..rest.len() - 6)?, tail));
+        }
+    }
+    if rest.len() >= 5 {
+        let tail = rest.get(rest.len() - 5..)?;
+        if parse_offset(tail).is_some() {
+            return Some((rest.get(..rest.len() - 5)?, tail));
+        }
+    }
+    None
+}
+
+fn canonical_offset(offset: &str) -> Option<String> {
+    if offset == "Z" {
+        return Some("Z".to_owned());
+    }
+    let (sign, hours, minutes) = parse_offset(offset)?;
+    if hours == 0 && minutes == 0 {
+        return Some("Z".to_owned());
+    }
+    Some(format!("{sign}{hours:02}:{minutes:02}"))
+}
+
+fn parse_offset(offset: &str) -> Option<(char, u32, u32)> {
+    let (sign, hour_tens, hour_ones, minute_tens, minute_ones) = match offset.as_bytes() {
+        [sign, hour_tens, hour_ones, minute_tens, minute_ones]
+        | [sign, hour_tens, hour_ones, b':', minute_tens, minute_ones] => {
+            (*sign, *hour_tens, *hour_ones, *minute_tens, *minute_ones)
+        }
+        _ => return None,
+    };
+    let sign = sign as char;
+    if sign != '+' && sign != '-' {
+        return None;
+    }
+    let digits = [hour_tens, hour_ones, minute_tens, minute_ones];
+    if !digits.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    let hours = u32::from((hour_tens - b'0') * 10 + hour_ones - b'0');
+    let minutes = u32::from((minute_tens - b'0') * 10 + minute_ones - b'0');
+    (hours <= 23 && minutes <= 59).then_some((sign, hours, minutes))
+}
+
+const LINKIFY_SKIP_ELEMENTS: [&str; 9] = [
+    "a", "code", "mx-reply", "noscript", "pre", "script", "style", "textarea", "time",
 ];
 
 fn markup_span_end(formatted: &str, start: usize) -> usize {
@@ -333,7 +707,11 @@ fn tag_name(tag: &str) -> Option<(String, bool)> {
 
 fn linkify_text_run(run: &str) -> String {
     let linkified = linkify_plain_text(&html_escape::decode_html_entities(run));
-    if linkified.contains("<a href=") {
+    if linkified.contains("<a href=")
+        || linkified.contains("<time ")
+        || linkified.contains("data-mx-color=")
+        || linkified.contains("data-mx-bg-color=")
+    {
         linkified
     } else {
         run.to_owned()
@@ -554,8 +932,8 @@ fn render_html(body: &str, formatted: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        display_html, linkify_markup, linkify_plain_text, strip_profile_fallback_body,
-        strip_profile_fallback_html,
+        canonical_datetime, display_html, linkify_markup, linkify_plain_text,
+        strip_profile_fallback_body, strip_profile_fallback_html,
     };
 
     #[test]
@@ -689,6 +1067,8 @@ mod tests {
                 "<span data-mx-spoiler=\"\">secret</span>\
                  <span data-mx-color=\"#ff0000\">red</span>\
                  <span data-mx-color=\"red\">named</span>\
+                 <span data-mx-color=\"#ff000080\">alpha</span>\
+                 <span data-mx-bg-color=\"#0000\">transparent background</span>\
                  <pre><code class=\"language-rust\">fn main() {}</code></pre>",
             ),
         );
@@ -696,6 +1076,10 @@ mod tests {
         assert!(html.contains("data-mx-spoiler"));
         assert!(html.contains("data-mx-color=\"#ff0000\""));
         assert!(!html.contains("\"red\""));
+        assert!(!html.contains("#ff000080"));
+        assert!(!html.contains("#0000"));
+        assert!(html.contains("alpha"));
+        assert!(html.contains("transparent background"));
         assert!(html.contains("class=\"language-rust\""));
     }
 
@@ -927,5 +1311,99 @@ mod tests {
         ] {
             let _ = linkify_markup(markup);
         }
+    }
+
+    #[test]
+    fn keeps_a_zoned_time_and_canonicalises_its_datetime() {
+        let html = display_html(
+            "",
+            Some(
+                "<time datetime=\"2026-09-17T09:00-0200\" class=\"x\" onclick=\"alert(1)\">9am</time>",
+            ),
+        );
+
+        assert!(html.contains("datetime=\"2026-09-17T09:00:00-02:00\""));
+        assert!(html.contains("9am"));
+        assert!(!html.contains("onclick"));
+        assert!(!html.contains("class="));
+    }
+
+    #[test]
+    fn rejects_malformed_zoned_datetimes() {
+        for value in [
+            "2026-09-17T09:00:00.fooZ",
+            "2026-09-17T09:00:00.Z",
+            "2026-09-17T09:00:00+02::00",
+            "2026-09-17T09:00:00+2:000",
+            "2026-9-017T09:00:00Z",
+            "2026-09-17T9:00:00Z",
+            "2026-09-17T09:0:00Z",
+            "2026-09-17T09:00:0Z",
+        ] {
+            assert_eq!(canonical_datetime(value), None, "accepted {value}");
+        }
+    }
+
+    #[test]
+    fn drops_a_datetime_that_has_no_timezone() {
+        let html = display_html("", Some("<time datetime=\"2026-09-17\">later</time>"));
+
+        assert!(!html.contains("datetime="));
+        assert!(html.contains("later"));
+    }
+
+    #[test]
+    fn strips_a_script_nested_in_a_time() {
+        let html = display_html(
+            "",
+            Some("<time datetime=\"2026-09-17T15:00:00Z\"><script>alert(1)</script>ok</time>"),
+        );
+
+        assert!(html.contains("datetime=\"2026-09-17T15:00:00Z\""));
+        assert!(html.contains("ok"));
+        assert!(!html.contains("script"));
+        assert!(!html.contains("alert"));
+    }
+
+    #[test]
+    fn rewrites_a_plain_unixtime() {
+        let html = display_html("$[unixtime 1789657200]", None);
+
+        assert!(html.contains("<time datetime=\"2026-09-17T15:00:00Z\">"));
+        assert!(html.contains("17 Sep 2026, 15:00 (UTC)"));
+    }
+
+    #[test]
+    fn leaves_unixtime_inside_code_and_rejects_junk() {
+        assert!(!display_html("", Some("<code>$[unixtime 1789657200]</code>")).contains("<time"));
+        assert!(!display_html("``$[unixtime 1789657200]``", None).contains("<time"));
+        assert!(display_html("\\`$[unixtime 1789657200]", None).contains("<time"));
+        assert!(!display_html("\\$[unixtime 1789657200]", None).contains("<time"));
+        assert!(!display_html("$[unixtime 1abc]", None).contains("<time"));
+        assert!(!display_html("$[unixtime.foo 1]", None).contains("<time"));
+        assert!(!display_html("$[unixtime 99999999999999]", None).contains("<time"));
+    }
+
+    #[test]
+    fn rewrites_mfm_colors_and_rejects_alpha() {
+        let red = display_html("$[fg.color=f00 red]", None);
+        assert!(red.contains("data-mx-color=\"#ff0000\""));
+        assert!(red.contains(">red<"));
+
+        let both = display_html("$[fg.color=ff0000 bg.color=00ff00 red on green]", None);
+        assert!(both.contains("data-mx-color=\"#ff0000\""));
+        assert!(both.contains("data-mx-bg-color=\"#00ff00\""));
+
+        let nested = display_html("$[fg.color=ff0000 $[bg.color=00ff00 nested]]", None);
+        assert!(nested.contains("data-mx-color=\"#ff0000\""));
+        assert!(nested.contains("data-mx-bg-color=\"#00ff00\""));
+
+        let background = display_html("$[bg.color=#0f0 highlighted]", None);
+        assert!(background.contains("data-mx-bg-color=\"#00ff00\""));
+
+        assert!(!display_html("$[fg.color=ff00 no color]", None).contains("data-mx-color"));
+        assert!(!display_html("$[fg.color=ff0000ff no color]", None).contains("data-mx-color"));
+        assert!(!display_html("$[fg.color=f00.red]", None).contains("data-mx-color"));
+        assert!(display_html("$[fg.color=f00 **bold**]", None).contains("**bold**"));
     }
 }

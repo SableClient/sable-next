@@ -180,7 +180,7 @@ const DEFAULTS: Preferences = {
   enterForNewline: false,
   mentionInReplies: true,
   formattingToolbar: false,
-  richTextComposer: true,
+  richTextComposer: false,
   composerGifButton: true,
   composerStickerButton: true,
   composerEmoteButton: true,

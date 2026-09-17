@@ -196,6 +196,17 @@
     outline: 0;
   }
 
+  .editor :global(.composer-time) {
+    background: var(--sec-container);
+    border-radius: var(--radius);
+    color: var(--sec-on-container);
+    padding: 0 var(--space-100);
+  }
+
+  .editor :global(.composer-time.selected) {
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+  }
+
   .editor :global(.composer-mention.selected) {
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }

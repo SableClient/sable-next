@@ -28,6 +28,14 @@ abstract class AtomNodeView implements NodeView {
   }
 }
 
+class TimeNodeView extends AtomNodeView {
+  constructor(node: ProseMirrorNode) {
+    super('time', 'composer-time');
+    this.dom.textContent = node.attrs.label as string;
+    this.dom.setAttribute('datetime', node.attrs.datetime as string);
+  }
+}
+
 class MentionNodeView extends AtomNodeView {
   constructor(node: ProseMirrorNode) {
     super('span', 'composer-mention');
@@ -127,6 +135,7 @@ class EmoticonNodeView extends AtomNodeView {
 
 export function composerNodeViews(media: EmoteMedia): Record<string, NodeViewConstructor> {
   return {
+    mfm_time: (node) => new TimeNodeView(node),
     mention: (node) => new MentionNodeView(node),
     emoticon: (node) => new EmoticonNodeView(node, media),
     image: (node) => new ImageNodeView(node, media),

@@ -4,7 +4,13 @@ import { Fragment, Slice, type Node as ProseMirrorNode } from 'prosemirror-model
 import { describe, expect, test } from 'vitest';
 
 import { composerSchema, parseMatrixHtml } from './schema';
-import { markdownFromSlice, serializeComposer, serializePlain, textDoc } from './serialize';
+import {
+  markdownFromSlice,
+  richFromPlain,
+  serializeComposer,
+  serializePlain,
+  textDoc,
+} from './serialize';
 
 const { doc, paragraph, heading, blockquote, bullet_list, list_item, mention, emoticon } =
   composerSchema.nodes;
@@ -511,6 +517,67 @@ test('copying plain words puts no markdown escapes on the clipboard', () => {
   const slice = new Slice(Fragment.from(composerSchema.text('5 * 3 [x]')), 0, 0);
 
   expect(markdownFromSlice(slice)).toBe('5 * 3 [x]');
+});
+
+test('a typed unixtime keeps its syntax in the body and sends a time element', () => {
+  const message = serializePlain(textDoc('$[unixtime 1789657200]'));
+
+  expect(message.body).toBe('$[unixtime 1789657200]');
+  expect(message.formatted).toContain('<time datetime="2026-09-17T15:00:00Z">');
+  expect(message.formatted).toContain('17 Sep 2026, 15:00 (UTC)');
+});
+
+test('a unixtime inside code is not turned into a time element', () => {
+  const message = serializePlain(textDoc('`$[unixtime 1789657200]`'));
+
+  expect(message.formatted).not.toContain('<time');
+  expect(message.formatted).toContain('$[unixtime 1789657200]');
+});
+
+test('MFM colors become Matrix color spans', () => {
+  const red = serializePlain(textDoc('$[fg.color=f00 red]'));
+  expect(red.body).toBe('$[fg.color=f00 red]');
+  expect(red.formatted).toBe('<span data-mx-color="#ff0000">red</span>');
+
+  const highlighted = serializePlain(textDoc('$[bg.color=#0f0 highlighted]'));
+  expect(highlighted.formatted).toBe('<span data-mx-bg-color="#00ff00">highlighted</span>');
+
+  const both = serializePlain(textDoc('$[fg.color=ff0000 bg.color=00ff00 red on green]'));
+  expect(both.formatted).toContain('data-mx-color="#ff0000"');
+  expect(both.formatted).toContain('data-mx-bg-color="#00ff00"');
+  expect(both.formatted?.match(/<span/g)).toHaveLength(1);
+
+  expect(serializePlain(textDoc('$[fg.color=ff00 no color]')).formatted).toBeNull();
+  expect(serializePlain(textDoc('$[fg.color=ff0000ff no color]')).formatted).toBeNull();
+});
+
+test('short Matrix colors keep their value in the MFM body', () => {
+  const foreground = serializeComposer(
+    parseMatrixHtml('<p><span data-mx-color="#fff">white</span></p>')
+  );
+  const background = serializeComposer(
+    parseMatrixHtml('<p><span data-mx-bg-color="#0f0">green</span></p>')
+  );
+
+  expect(foreground.body).toBe('$[fg.color=ffffff white]');
+  expect(background.body).toBe('$[bg.color=00ff00 green]');
+});
+
+test('combined colors survive a rich-mode body round trip', () => {
+  const parsed = richFromPlain(textDoc('$[fg.color=ff0000 bg.color=00ff00 both]'));
+  const first = serializeComposer(parsed);
+  const second = serializeComposer(richFromPlain(textDoc(first.body)));
+
+  expect(second.formatted).toBe(first.formatted);
+  expect(second.body).toBe(first.body);
+});
+
+test('nested markdown inside an MFM color function is still formatted', () => {
+  const message = serializePlain(textDoc('$[fg.color=f00 **bold**]'));
+
+  expect(message.formatted).toContain('data-mx-color="#ff0000"');
+  expect(message.formatted).toContain('<strong>');
+  expect(message.formatted).toContain('bold');
 });
 
 test('copying a selection out of the composer yields markdown', () => {
