@@ -18,8 +18,8 @@ includes = ["scripts"]
 [tools]
 "ubi:rustwasm/wasm-bindgen" = { version = "0.2.128", extract_all = true }
 "aqua:WebAssembly/binaryen" = "132"
-"aqua:watchexec/watchexec" = "2.5.1"
-"aqua:evilmartians/lefthook" = "2.1.10"
+"aqua:watchexec/watchexec" = "2.7.2"
+"aqua:evilmartians/lefthook" = "2.1.12"
 
 [tasks.setup]
 description = "Install mise tools, pnpm dependencies, and git hooks"
@@ -159,4 +159,4 @@ run = "tofu"
 dir = "infra/web"
 raw_args = true
 hide = true
-tools = { "opentofu" = "1.11.5" }
+tools = { "opentofu" = "1.12.6" }
