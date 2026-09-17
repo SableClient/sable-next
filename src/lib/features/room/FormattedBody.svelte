@@ -10,7 +10,7 @@
 
   import {
     formatRelativeTimestamp,
-    formatSenderWall,
+    formatUtcTimestamp,
     isOpaqueMatrixColor,
     parseZonedDatetime,
   } from '../composer/time-markup';
@@ -162,11 +162,9 @@
         );
         if (!zoned) continue;
         const local = formatMessageTimestamp(zoned.instant);
-        const sender = $i18n.t('timeline.timeMarkupSender', {
-          time: formatSenderWall(zoned, preferences.hour24Clock),
-        });
+        const utc = formatUtcTimestamp(zoned.instant, preferences.hour24Clock);
         const relative = formatRelativeTimestamp(zoned.instant);
-        const detail = $i18n.t('timeline.timeMarkupDetail', { local, sender, relative });
+        const detail = $i18n.t('timeline.timeMarkupDetail', { local, utc, relative });
         element.textContent = local;
         element.tabIndex = 0;
         element.setAttribute('aria-label', detail);
@@ -468,10 +466,14 @@
 
   .formatted-body :global(time[datetime]) {
     background: var(--sec-container);
+    border: var(--border-width) solid var(--sec-container-line);
     border-radius: var(--radius);
     color: var(--sec-on-container);
     cursor: pointer;
+    display: inline-block;
+    font-weight: var(--font-weight-medium);
     padding: 0 var(--space-100);
+    text-decoration: none;
     white-space: nowrap;
   }
 

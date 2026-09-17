@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import {
   canonicalDatetime,
   formatSenderWall,
+  formatUtcTimestamp,
   isOpaqueMatrixColor,
   matrixColorToMfmHex,
   parseMfmColor,
@@ -45,6 +46,10 @@ test('turns a unix timestamp into a UTC datetime', () => {
   expect(unixtimeDatetime('1789657200')).toBe('2026-09-17T15:00:00Z');
   expect(utcFallbackLabel('2026-09-17T15:00:00Z')).toBe('17 Sep 2026, 15:00 (UTC)');
   expect(unixtimeDatetime('99999999999999')).toBeNull();
+});
+
+test('formats the instant in UTC regardless of the viewer zone', () => {
+  expect(formatUtcTimestamp(Date.parse('2026-09-17T15:00:00Z'), true)).toContain('15:00');
 });
 
 test('parses Misskey color arguments the way Sable v1 does', () => {

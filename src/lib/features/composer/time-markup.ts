@@ -251,6 +251,18 @@ export function formatRelativeTimestamp(instant: number, now = Date.now()): stri
   return format.format(Math.round(delta / 1000), 'second');
 }
 
+export function formatUtcTimestamp(instant: number, hour24: boolean): string {
+  return new Intl.DateTimeFormat(locale(), {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(hour24 ? { hourCycle: 'h23' } : { hourCycle: 'h12' }),
+  }).format(new Date(instant));
+}
+
 export function formatSenderWall(zoned: ZonedInstant, hour24: boolean): string {
   const utc = new Date(0);
   utc.setUTCFullYear(zoned.year, zoned.month - 1, zoned.day);

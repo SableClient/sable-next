@@ -30,21 +30,29 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test('renders a zoned time in the viewer zone and names the sender offset', async () => {
+test('renders a local time and exposes the UTC instant on hover', async () => {
   const { formatMessageTimestamp } = await import('./timeline-format');
   const instant = Date.parse('2026-09-17T15:00:00Z');
-  const instance = mount(FormattedBody, {
+  const instance = mount(FormattedBodyHarness, {
     target: document.body,
-    props: { html: '<time datetime="2026-09-17T15:00:00Z">17 Sep 2026, 15:00 (UTC)</time>' },
+    props: {
+      html: '<time datetime="2026-09-17T15:00:00Z">17 Sep 2026, 15:00 (UTC)</time>',
+      entries: [],
+    },
   });
   await tick();
 
   const time = document.querySelector('time');
   expect(time?.textContent).toBe(formatMessageTimestamp(instant));
+  expect(time?.textContent).not.toContain('(UTC)');
   expect(time?.getAttribute('aria-label')).toContain(formatMessageTimestamp(instant));
-  expect(time?.getAttribute('aria-label')).toContain('UTC');
+  expect(time?.getAttribute('aria-label')).toContain('UTC:');
   expect(time?.tabIndex).toBe(0);
   expect(time?.getAttribute('role')).toBeNull();
+
+  time?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  await tick();
+  expect(document.querySelector('.tooltip')?.textContent).toContain('UTC:');
   await unmount(instance);
 });
 

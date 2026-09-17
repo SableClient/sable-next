@@ -555,8 +555,7 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "messageTimestamp": "{{date}} {{time}}",
-    "timeMarkupSender": "Sent as {{time}}",
-    "timeMarkupDetail": "{{local}}. {{sender}}. {{relative}}",
+    "timeMarkupDetail": "Local: {{local}} · UTC: {{utc}} · {{relative}}",
     "membership": {
       "joined": "{{user}} joined the room",
       "left": "{{user}} left the room",
