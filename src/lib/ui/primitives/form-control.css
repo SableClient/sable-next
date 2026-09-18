@@ -18,7 +18,6 @@
   min-height: var(--control-height-400);
   padding: var(--form-control-padding-block) var(--form-control-padding-inline-end)
     var(--form-control-padding-block) var(--form-control-padding-inline);
-  text-transform: capitalize;
 }
 
 .form-control:focus,
