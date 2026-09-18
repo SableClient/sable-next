@@ -19,6 +19,7 @@
   const uid = $props.id();
   let date = $state('');
   let time = $state('');
+  let timeInput: HTMLInputElement | null = null;
 
   let chosen = $derived(scheduleAt(date, time, Date.now()));
 
@@ -73,10 +74,25 @@
 
     <div class="pair">
       <FormField fieldId="{uid}-date" label={$i18n.t('composer.scheduleDate')}>
-        <TextInput id="{uid}-date" type="date" bind:value={date} />
+        <TextInput
+          id="{uid}-date"
+          type="date"
+          bind:value={date}
+          onchange={() => timeInput?.focus()}
+        />
       </FormField>
       <FormField fieldId="{uid}-time" label={$i18n.t('composer.scheduleTime')}>
-        <TextInput id="{uid}-time" type="time" bind:value={time} />
+        <TextInput
+          id="{uid}-time"
+          type="time"
+          bind:value={time}
+          {@attach (node: HTMLInputElement) => {
+            timeInput = node;
+            return () => {
+              timeInput = null;
+            };
+          }}
+        />
       </FormField>
     </div>
 
