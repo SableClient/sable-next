@@ -13,6 +13,7 @@ mod messages;
 pub mod notifications;
 mod personas;
 pub mod polls;
+mod presence;
 pub mod profiles;
 pub mod protocol;
 mod registration;
@@ -96,6 +97,7 @@ pub struct Core {
     server_search: Mutex<search::ServerSearch>,
     foreground_paginations: AtomicU32,
     call_sessions: Mutex<HashMap<protocol::CallSessionId, CallSession>>,
+    desired_presence: std::sync::Mutex<protocol::PresenceView>,
 }
 
 struct CallSession {
@@ -206,6 +208,7 @@ impl Core {
             search_crawl: Mutex::new(search::CrawlProgress::default()),
             server_search: Mutex::new(search::ServerSearch::default()),
             call_sessions: Mutex::new(HashMap::new()),
+            desired_presence: std::sync::Mutex::new(protocol::PresenceView::Online),
         });
         (core, rx)
     }

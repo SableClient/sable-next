@@ -1,3 +1,4 @@
+import type { PresenceView } from '#src/generated/protocol';
 import type { MemberSort } from '#lib/features/room/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
@@ -64,6 +65,8 @@ export interface Preferences {
   sendTypingNotifications: boolean;
   sendReadReceipts: boolean;
   sendPresence: boolean;
+  presence: PresenceView;
+  presenceStatusMessage: string;
 
   mediaAutoLoad: boolean;
   autoplayGifs: boolean;
@@ -138,11 +141,13 @@ const ENUMS = {
   replyPreviewStyle: ['connected', 'compact', 'expanded'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   personaLatching: ['off', 'room', 'account'],
+  presence: ['online', 'unavailable', 'offline'],
 } as const satisfies { [K in EnumPreference]?: readonly Preferences[K][] };
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
     `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
+  'presenceStatusMessage',
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
@@ -200,6 +205,8 @@ const DEFAULTS: Preferences = {
   sendTypingNotifications: true,
   sendReadReceipts: true,
   sendPresence: true,
+  presence: 'online',
+  presenceStatusMessage: '',
 
   mediaAutoLoad: true,
   autoplayGifs: true,

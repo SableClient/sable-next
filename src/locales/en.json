@@ -1992,7 +1992,12 @@
     "lastSeenHours_one": "Last seen {{count}} hour ago",
     "lastSeenHours_other": "Last seen {{count}} hours ago",
     "lastSeenDays_one": "Last seen {{count}} day ago",
-    "lastSeenDays_other": "Last seen {{count}} days ago"
+    "lastSeenDays_other": "Last seen {{count}} days ago",
+    "title": "Your presence",
+    "description": "How you appear to other people, and what they see under your name.",
+    "statusMessage": "Status message",
+    "statusMessagePlaceholder": "What are you up to?",
+    "statusMessageSave": "Save"
   },
   "widgets": {
     "label": "Widgets",

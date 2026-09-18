@@ -1256,6 +1256,13 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async fetchPresence(userIds: string[]): Promise<void> {
+      await transport().send({
+        type: 'fetch_presence',
+        user_ids: userIds,
+      });
+    },
+
     async encryptionStatus(): Promise<EncryptionStatusView> {
       const response = await transport().send({
         type: 'encryption_status',

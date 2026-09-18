@@ -761,6 +761,11 @@ pub enum Command {
         presence: PresenceView,
         status_message: Option<String>,
     },
+    /// Fills in users the presence poll has not pushed yet.
+    FetchPresence {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        user_ids: Vec<OwnedUserId>,
+    },
     SetRoomNotificationMode {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1267,6 +1272,7 @@ pub enum CommandOk {
     SetNotificationContent,
     SetReadRoom,
     SetPresence,
+    FetchPresence,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
     SetMentionNotifications,

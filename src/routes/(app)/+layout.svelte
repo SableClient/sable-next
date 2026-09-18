@@ -275,8 +275,12 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
+    const message = preferences.presenceStatusMessage.trim();
     void core.commands
-      .setPresence(preferences.sendPresence ? 'online' : 'offline', null)
+      .setPresence(
+        preferences.sendPresence ? preferences.presence : 'offline',
+        preferences.sendPresence && message ? message : null
+      )
       .catch(() => {});
   });
 

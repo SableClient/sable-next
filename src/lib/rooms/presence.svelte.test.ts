@@ -7,15 +7,18 @@ import { lastSeenBucket, lastSeenMs, PresenceStore } from './presence.svelte.js'
 
 function harness() {
   const listeners = new Set<(event: CoreEvent) => void>();
+  const fetchPresence = vi.fn(() => Promise.resolve());
   const client = {
     subscribeEvents: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    commands: { fetchPresence },
   } as unknown as CoreClient;
 
   return {
     client,
+    fetchPresence,
     emit: (event: CoreEvent) => {
       listeners.forEach((listener) => {
         listener(event);
@@ -99,4 +102,34 @@ test('lastSeenBucket buckets by minutes, hours and days', () => {
   expect(lastSeenBucket(5 * 60_000)).toEqual({ kind: 'minutes', count: 5 });
   expect(lastSeenBucket(3 * 60 * 60_000)).toEqual({ kind: 'hours', count: 3 });
   expect(lastSeenBucket(2 * 24 * 60 * 60_000)).toEqual({ kind: 'days', count: 2 });
+});
+
+test('users with no entry are fetched once, in one batch', async () => {
+  const { client, fetchPresence, emit } = harness();
+  const store = new PresenceStore();
+  store.start(client);
+
+  store.get('@bob:example.org');
+  store.get('@carol:example.org');
+  store.get('@bob:example.org');
+  await vi.advanceTimersByTimeAsync(100);
+
+  expect(fetchPresence).toHaveBeenCalledExactlyOnceWith(['@bob:example.org', '@carol:example.org']);
+
+  emit(presenceEvent());
+  store.get('@bob:example.org');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(fetchPresence).toHaveBeenCalledOnce();
+});
+
+test('a user the poll already reported is never fetched', async () => {
+  const { client, fetchPresence, emit } = harness();
+  const store = new PresenceStore();
+  store.start(client);
+
+  emit(presenceEvent());
+  store.get('@bob:example.org');
+  await vi.advanceTimersByTimeAsync(100);
+
+  expect(fetchPresence).not.toHaveBeenCalled();
 });

@@ -3,14 +3,12 @@ use std::sync::Arc;
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
-use matrix_sdk::ruma::events::presence::PresenceEvent;
 use matrix_sdk::ruma::events::room::member::MembershipState;
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
 use matrix_sdk::ruma::events::{AnyGlobalAccountDataEvent, AnyStrippedStateEvent};
-use matrix_sdk::ruma::presence::PresenceState;
 use matrix_sdk_ui::sync_service::State as SyncState;
 
-use crate::protocol::{CoreEvent, PresenceView, SyncStatus};
+use crate::protocol::{CoreEvent, SyncStatus};
 use matrix_sdk_base::deserialized_responses::RawAnySyncOrStrippedTimelineEvent;
 use matrix_sdk_base::sync::Notification;
 use matrix_sdk_ui::notification_client::{NotificationClient, NotificationProcessSetup};
@@ -389,32 +387,6 @@ impl Core {
                         CoreEvent::Typing {
                             room_id: room.room_id().to_owned(),
                             user_ids,
-                        },
-                    );
-                }
-            }
-        });
-        self.track_session_handler(client, handle);
-
-        let handle = client.add_event_handler({
-            let core = self.clone();
-            move |event: PresenceEvent| {
-                let core = core.clone();
-
-                async move {
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::Presence {
-                            user_id: event.sender,
-                            presence: match event.content.presence {
-                                PresenceState::Online => PresenceView::Online,
-                                PresenceState::Offline => PresenceView::Offline,
-                                // `PresenceState` is non-exhaustive. Anything added
-                                // later reads as away, not online.
-                                _ => PresenceView::Unavailable,
-                            },
-                            status_message: event.content.status_msg,
-                            last_active_ago: event.content.last_active_ago.map(Into::into),
                         },
                     );
                 }
