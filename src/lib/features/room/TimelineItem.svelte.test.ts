@@ -943,6 +943,29 @@ test('offers to add a message inline emote to your own pack', async () => {
   await unmount(instance);
 });
 
+test('a message of only inline emotes reads at jumbo size', async () => {
+  const html = '<img alt="rotate" height="32" src="mxc://example.org/rotate" title="rotate"> ';
+  const emoteItem = {
+    ...item(false),
+    content: {
+      kind: 'message' as const,
+      body: ':rotate:',
+      html,
+      emote: false,
+      notice: false,
+      edited: false,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: emoteItem, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  expect(document.querySelector('.jumbo-1')).not.toBeNull();
+  await unmount(instance);
+});
+
 test('a membership row keeps its notice look and still carries the action layer', async () => {
   const joined: TimelineItemView = {
     ...item(false),

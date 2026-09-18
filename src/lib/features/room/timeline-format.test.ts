@@ -19,6 +19,7 @@ import {
   isCollapsed,
   isMessageRow,
   jumboEmojiLevel,
+  jumboEmoticonLevel,
   personaLookup,
   readReceiptEventId,
   visibleTimelineItems,
@@ -260,6 +261,33 @@ test('leaves ordinary text alone', () => {
   // Digits are Emoji_Component, so a bare number must not count as emoji.
   expect(jumboEmojiLevel('123')).toBeNull();
   expect(jumboEmojiLevel('👍👍👍👍👍👍👍👍👍')).toBeNull();
+});
+
+const emote = (name: string) =>
+  `<img alt="${name}" height="32" src="mxc://example.org/${name}" title="${name}">`;
+
+test('sizes a message made only of inline emotes, by how many there are', () => {
+  expect(
+    jumboEmoticonLevel('<img alt="rotate" height="32" src="mxc://a/rotate" title="rotate"> ')
+  ).toBe(1);
+  expect(jumboEmoticonLevel(`<p>${emote('rotate')}</p>`)).toBe(1);
+  expect(jumboEmoticonLevel(`${emote('rotate')}<br>${emote('spin')}`)).toBe(2);
+  expect(jumboEmoticonLevel(`${emote('a')} ${emote('b')}`)).toBe(2);
+  expect(jumboEmoticonLevel(`${emote('a')} ${emote('b')} ${emote('c')} ${emote('d')}`)).toBe(3);
+  expect(jumboEmoticonLevel('<img src="mxc://a/rotate" alt="a > b">')).toBe(1);
+  expect(jumboEmoticonLevel('<img src="mxc://a/rotate" alt=":rotate:">&nbsp;')).toBe(1);
+});
+
+test('leaves messages with words or real images at normal size', () => {
+  expect(jumboEmoticonLevel(`nice ${emote('rotate')}`)).toBeNull();
+  expect(jumboEmoticonLevel('')).toBeNull();
+  expect(jumboEmoticonLevel('<img src="https://example.org/photo.png" width="640">')).toBeNull();
+  expect(
+    jumboEmoticonLevel(`${emote('rotate')}<img src="https://example.org/photo.png">`)
+  ).toBeNull();
+  expect(jumboEmoticonLevel('<a href="https://example.org">link</a>')).toBeNull();
+  expect(jumboEmoticonLevel(`${emote('rotate')} and words`)).toBeNull();
+  expect(jumboEmoticonLevel(Array.from({ length: 9 }, () => emote('rotate')).join(' '))).toBeNull();
 });
 
 function stateChange(change: StateChangeView): TimelineItemView {

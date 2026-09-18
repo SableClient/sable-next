@@ -62,7 +62,18 @@ export function canRedact(item: TimelineItemView, canRedactOthers: boolean): boo
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+const IMAGE_TAG = /<img\b(?:"[^"]*"|'[^']*'|[^>"'])*>/giu;
+const MXC_IMAGE_SOURCE = /\bsrc=(?:"mxc:|'mxc:)/i;
+const LINE_BREAK = /<br\b[^>]*>/giu;
+const NO_BREAK_SPACE = /&(?:nbsp|#160);/giu;
 const JUMBO_MAX = 8;
+
+function jumboLevel(count: number): 1 | 2 | 3 | 4 | null {
+  if (count === 0 || count > JUMBO_MAX) return null;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  return count <= 4 ? 3 : 4;
+}
 
 export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
   const trimmed = body.trim();
@@ -70,10 +81,23 @@ export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
 
   const segmenter = new Intl.Segmenter();
   const count = [...segmenter.segment(trimmed)].filter((unit) => unit.segment.trim()).length;
-  if (count > JUMBO_MAX) return null;
-  if (count === 1) return 1;
-  if (count === 2) return 2;
-  return count <= 4 ? 3 : 4;
+  return jumboLevel(count);
+}
+
+export function jumboEmoticonLevel(html: string): 1 | 2 | 3 | 4 | null {
+  const unwrapped = html
+    .trim()
+    .replace(/^<p[^>]*>/iu, '')
+    .replace(/<\/p>$/iu, '');
+  const images = unwrapped.match(IMAGE_TAG) ?? [];
+  if (images.length === 0 || !images.every((image) => MXC_IMAGE_SOURCE.test(image))) return null;
+  const residue = unwrapped
+    .replace(IMAGE_TAG, '')
+    .replace(LINE_BREAK, '')
+    .replace(NO_BREAK_SPACE, ' ')
+    .trim();
+  if (residue !== '') return null;
+  return jumboLevel(images.length);
 }
 
 export function isAnnotation(item: TimelineItemView): boolean {

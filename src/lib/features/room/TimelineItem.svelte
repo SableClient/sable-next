@@ -68,6 +68,7 @@
     isAnnotation,
     isMessageRow,
     jumboEmojiLevel,
+    jumboEmoticonLevel,
     senderColor,
   } from './timeline-format';
 
@@ -201,7 +202,7 @@
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
   let jumbo = $derived(
     item.content.kind === 'message' && !item.content.emote
-      ? jumboEmojiLevel(item.content.body)
+      ? (jumboEmojiLevel(item.content.body) ?? jumboEmoticonLevel(item.content.html))
       : null
   );
   let stalled = $derived(
@@ -1210,6 +1211,10 @@
     --jumbo-size-2: 1.9rem;
     --jumbo-size-3: 1.5rem;
     --jumbo-size-4: 1.25rem;
+  }
+
+  .jumbo :global(img) {
+    height: 1em;
   }
 
   .jumbo-1 {
