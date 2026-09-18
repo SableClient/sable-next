@@ -6,6 +6,7 @@ use matrix_sdk::{
         event_id,
         events::{
             key::verification::done::KeyVerificationDoneEventContent,
+            receipt::{ReceiptThread, ReceiptType},
             relation::Reference,
             room::avatar::RoomAvatarEventContent,
             room::message::{LocationMessageEventContent, MessageType, RoomMessageEventContent},
@@ -688,6 +689,111 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     assert_eq!(item.num_unread_messages(), 2);
     assert_eq!(summary.unread, 0);
     assert_eq!(summary.highlight, 0);
+}
+
+#[tokio::test]
+async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!truncated:example.org");
+    let me = client
+        .user_id()
+        .expect("the mock client is logged in")
+        .to_owned();
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_bulk([
+                    factory
+                        .text_msg("one")
+                        .event_id(event_id!("$one"))
+                        .into_raw(),
+                    factory
+                        .text_msg("two")
+                        .event_id(event_id!("$two"))
+                        .into_raw(),
+                ])
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$one"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                        )
+                        .into_event(),
+                )
+                .set_unread_notifications_count(json!({
+                    "notification_count": 9,
+                    "highlight_count": 2,
+                })),
+        )
+        .await;
+
+    let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
+
+    assert_eq!(item.num_unread_messages(), 1);
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two"))),
+        (9, 2)
+    );
+}
+
+#[tokio::test]
+async fn a_receipt_on_the_latest_event_clears_a_stale_server_count() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!caught-up:example.org");
+    let me = client
+        .user_id()
+        .expect("the mock client is logged in")
+        .to_owned();
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_bulk([
+                    factory
+                        .text_msg("one")
+                        .event_id(event_id!("$one"))
+                        .into_raw(),
+                    factory
+                        .text_msg("two")
+                        .event_id(event_id!("$two"))
+                        .into_raw(),
+                ])
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$two"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                        )
+                        .into_event(),
+                )
+                .set_unread_notifications_count(json!({
+                    "notification_count": 9,
+                    "highlight_count": 2,
+                })),
+        )
+        .await;
+
+    let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
+
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two"))),
+        (0, 0)
+    );
 }
 
 async fn timeline_views(

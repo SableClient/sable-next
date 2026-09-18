@@ -23,8 +23,10 @@ use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::room::{
     JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
 };
+use matrix_sdk::ruma::{
+    EventId, OwnedRoomId, OwnedTransactionId, OwnedUserId, TransactionId, UserId,
+};
 use matrix_sdk::ruma::{Int, UInt};
-use matrix_sdk::ruma::{OwnedRoomId, OwnedTransactionId, OwnedUserId, TransactionId, UserId};
 use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_base::crypto::types::events::UtdCause;
@@ -81,7 +83,13 @@ pub fn room_summary<S: BuildHasher>(
     room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
 ) -> RoomSummary {
     let info = room_cache.get(item.room_id());
-    let (unread, highlight) = unread_counts(item);
+    let latest_event = latest_event(item);
+    let (unread, highlight) = unread_counts(
+        item,
+        latest_event
+            .as_ref()
+            .and_then(|event| event.event_id.as_deref()),
+    );
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
@@ -129,7 +137,7 @@ pub fn room_summary<S: BuildHasher>(
         unread,
         highlight,
         marked_unread: item.is_marked_unread(),
-        latest_event: latest_event(item),
+        latest_event,
     }
 }
 
@@ -144,19 +152,28 @@ fn call_participants(joined: Vec<OwnedUserId>) -> Vec<OwnedUserId> {
     participants
 }
 
-fn unread_counts(item: &RoomListItem) -> (u32, u32) {
+pub(crate) fn unread_counts(item: &RoomListItem, latest_event_id: Option<&EventId>) -> (u32, u32) {
     let count = |value: u64| u32::try_from(value).unwrap_or(u32::MAX);
-    if item.read_receipts().latest_active.is_none() {
-        let server = item.unread_notification_counts();
-        return (
-            count(server.notification_count),
-            count(server.highlight_count),
-        );
-    }
-    (
+    let counts = item.unread_notification_counts();
+    let server = (
+        count(counts.notification_count),
+        count(counts.highlight_count),
+    );
+
+    let Some(receipt) = item.read_receipts().latest_active else {
+        return server;
+    };
+
+    let local = (
         count(item.num_unread_messages()),
         count(item.num_unread_mentions()),
-    )
+    );
+
+    if latest_event_id == Some(&*receipt.event_id) {
+        return local;
+    }
+
+    (local.0.max(server.0), local.1.max(server.1))
 }
 
 const fn join_rule_view(rule: Option<&JoinRule>) -> RoomJoinRuleView {
