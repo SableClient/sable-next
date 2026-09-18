@@ -9,6 +9,8 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -33,6 +35,7 @@
     resolveUserStatus(activeProfile, presenceStore.get(core.session?.user_id ?? ''))
   );
   let avatarUrl = $derived(activeProfile?.avatar_url ?? null);
+  let ownPresence = $derived(preferences.sendPresence ? preferences.presence : null);
 
   $effect(() => {
     const userId = core.session?.user_id;
@@ -78,14 +81,25 @@
   }
 </script>
 
+{#snippet ownAvatar()}
+  <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
+  {#if ownPresence}
+    <PresenceDot
+      presence={ownPresence}
+      label={$i18n.t(`presence.${ownPresence}`)}
+      class="account-presence"
+    />
+  {/if}
+{/snippet}
+
 {#if mode === 'mobile'}
   <button
-    class="quick-tool mobile-tool selection-layer"
+    class="quick-tool mobile-tool account-tool selection-layer"
     type="button"
     aria-label={$i18n.t('nav.account')}
     onclick={openAccounts}
   >
-    <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
+    {@render ownAvatar()}
   </button>
 {:else}
   {#snippet profileTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
@@ -107,7 +121,7 @@
             : 'desktop-tool nav-tab-bottom'}"
           aria-label={$i18n.t('nav.switchAccount')}
         >
-          <Avatar size="small" src={avatarUrl} name={displayName} alt={displayName} />
+          {@render ownAvatar()}
         </button>
       {/snippet}
       <ProfileCard
@@ -141,3 +155,15 @@
     trigger={profileTrigger}
   />
 {/if}
+
+<style>
+  .account-tool {
+    position: relative;
+  }
+
+  :global(.quick-tool > .account-presence) {
+    bottom: -0.125rem;
+    position: absolute;
+    right: -0.125rem;
+  }
+</style>
