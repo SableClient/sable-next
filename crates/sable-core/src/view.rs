@@ -650,10 +650,11 @@ impl LocalProfiles {
                 transaction_id,
                 new_content,
             } => self.remember(transaction_id, new_content),
-            RoomSendQueueUpdate::CancelledLocalEvent { transaction_id }
-            | RoomSendQueueUpdate::SentEvent { transaction_id, .. } => {
+            RoomSendQueueUpdate::CancelledLocalEvent { transaction_id } => {
                 self.0.remove(transaction_id);
             }
+            // A sent echo still needs its profile until the homeserver's echo
+            // replaces the item, so only a cancellation forgets it.
             _ => {}
         }
     }
@@ -678,6 +679,11 @@ impl LocalProfiles {
     fn get(&self, transaction_id: &TransactionId) -> Option<PerMessageProfileView> {
         self.0.get(transaction_id).cloned()
     }
+
+    /// A remote echo carries the profile in its raw content again, so the copy can go.
+    pub(crate) fn forget(&mut self, transaction_id: &TransactionId) {
+        self.0.remove(transaction_id);
+    }
 }
 
 #[must_use]
@@ -699,6 +705,9 @@ pub fn timeline_item(
             let raw = RawFields::read(event);
             let message_profile = per_message_profile(raw.content.as_ref())
                 .or_else(|| {
+                    // A remote event always carries its own profile in the raw
+                    // content; only a local echo (which has none) falls back.
+                    event.send_state()?;
                     event
                         .transaction_id()
                         .and_then(|transaction_id| local_profiles.get(transaction_id))
@@ -1684,12 +1693,15 @@ pub(crate) fn clamp_power_level(level: UserPowerLevel) -> i32 {
 }
 
 #[must_use]
-pub fn map_diff<T, U>(diff: eyeball_im::VectorDiff<T>, map: impl Fn(&T) -> U) -> VectorDiff<U> {
+pub fn map_diff<T, U>(
+    diff: eyeball_im::VectorDiff<T>,
+    mut map: impl FnMut(&T) -> U,
+) -> VectorDiff<U> {
     use eyeball_im::VectorDiff as In;
 
     match diff {
         In::Append { values } => VectorDiff::Append {
-            values: values.iter().map(&map).collect(),
+            values: values.iter().map(&mut map).collect(),
         },
         In::Clear => VectorDiff::Clear,
         In::PushFront { value } => VectorDiff::PushFront { value: map(&value) },
@@ -1707,7 +1719,7 @@ pub fn map_diff<T, U>(diff: eyeball_im::VectorDiff<T>, map: impl Fn(&T) -> U) ->
         In::Remove { index } => VectorDiff::Remove { index },
         In::Truncate { length } => VectorDiff::Truncate { length },
         In::Reset { values } => VectorDiff::Reset {
-            values: values.iter().map(&map).collect(),
+            values: values.iter().map(&mut map).collect(),
         },
     }
 }
@@ -2124,6 +2136,17 @@ mod tests {
             transaction_id: transaction_id.clone(),
             event_id: OwnedEventId::try_from("$sent:example.org").expect("an event id"),
         });
+        // A sent echo still shows the profile until the homeserver's echo arrives.
+        assert_eq!(
+            profiles
+                .get(&transaction_id)
+                .expect("the profile outlives the send acknowledgement")
+                .display_name
+                .as_deref(),
+            Some("Kris")
+        );
+
+        profiles.forget(&transaction_id);
         assert!(profiles.get(&transaction_id).is_none());
     }
 

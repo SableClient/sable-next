@@ -178,6 +178,13 @@ impl Core {
                         .into_iter()
                         .map(|diff| {
                             view::map_diff(diff, |item| {
+                                if let Some(event) = item.as_event()
+                                    && event.send_state().is_none()
+                                    && let Some(transaction_id) = event.transaction_id()
+                                {
+                                    // The remote echo supersedes its local echo's profile.
+                                    stream_profiles.forget(transaction_id);
+                                }
                                 view::timeline_item(
                                     item,
                                     stream_user_id.as_deref(),
