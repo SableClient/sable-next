@@ -38,7 +38,7 @@ test('collects an item with a thread summary as a root', () => {
   const root = item({
     id: 'root',
     timestamp: 100,
-    thread_summary: { num_replies: 2, latest_body: 'latest' },
+    thread_summary: { num_replies: 2, latest_event_id: null, latest_body: 'latest' },
   });
 
   const threads = collectForumThreads([root], null);
@@ -60,7 +60,7 @@ test('takes last activity from the newest visible reply, not the root', () => {
   const root = item({
     id: 'root',
     timestamp: 100,
-    thread_summary: { num_replies: 2, latest_body: 'root summary' },
+    thread_summary: { num_replies: 2, latest_event_id: null, latest_body: 'root summary' },
   });
   const reply = item({
     id: 'reply',
@@ -80,12 +80,12 @@ test('sorts threads by most recent activity first', () => {
   const older = item({
     id: 'older',
     timestamp: 10,
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
   });
   const newer = item({
     id: 'newer',
     timestamp: 20,
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
   });
 
   const threads = collectForumThreads([older, newer], null);
@@ -98,7 +98,7 @@ test('a thread is unread when the latest activity has no receipt from the curren
     id: 'root',
     timestamp: 10,
     sender: '@bob:example.org',
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
     read_by: [],
   });
 
@@ -110,7 +110,7 @@ test('a thread is read once the current user has a receipt on the latest activit
     id: 'root',
     timestamp: 10,
     sender: '@bob:example.org',
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
     read_by: ['@alice:example.org'],
   });
 
@@ -122,7 +122,7 @@ test('a thread you authored yourself is never unread', () => {
     id: 'root',
     timestamp: 10,
     sender: '@alice:example.org',
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
     read_by: [],
   });
 

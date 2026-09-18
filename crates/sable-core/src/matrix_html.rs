@@ -420,9 +420,9 @@ pub fn has_profile_fallback_html(formatted: &str) -> bool {
         .is_some_and(|(open_tag, _, _)| open_tag.contains("data-mx-profile-fallback"))
 }
 
-/// Not every sender marks the element; some emit a bare `<strong>Name: </strong>`.
-/// Matching the profile name, or `has_fallback` plus a trailing colon, catches
-/// those without eating the sender's own emphasis.
+/// Not every sender marks the element; some emit a bare `<strong>Name: </strong>`
+/// or no markup at all. Matching the profile name, or `has_fallback` plus a
+/// trailing colon, catches those without eating the sender's own emphasis.
 #[must_use]
 pub fn strip_profile_fallback_html(
     formatted: &str,
@@ -435,6 +435,19 @@ pub fn strip_profile_fallback_html(
             .strip_prefix(&format!("&lt;{name}&gt; "))
     {
         return body.trim_start().to_owned();
+    }
+
+    if let Some(name) = display_name.map(str::trim).filter(|name| !name.is_empty()) {
+        if let Some(body) = formatted.trim_start().strip_prefix(&format!("{name}: ")) {
+            return body.trim_start().to_owned();
+        }
+        // A name with markup characters arrives entity-encoded in the html.
+        let encoded = html_escape::encode_text(name);
+        if encoded != name
+            && let Some(body) = formatted.trim_start().strip_prefix(&format!("{encoded}: "))
+        {
+            return body.trim_start().to_owned();
+        }
     }
 
     let Some((open_tag, text, rest)) = leading_strong(formatted) else {
@@ -639,6 +652,26 @@ mod tests {
         assert_eq!(
             strip_profile_fallback_html("<strong>Alice: </strong>hello", None, true),
             "hello"
+        );
+    }
+
+    #[test]
+    fn strips_a_bare_prefix_that_names_the_profile() {
+        assert_eq!(
+            strip_profile_fallback_html("Alice: hello there", Some("Alice"), true),
+            "hello there"
+        );
+        assert_eq!(
+            strip_profile_fallback_html("Alice: hello there", Some("Alice"), false),
+            "hello there"
+        );
+        assert_eq!(
+            strip_profile_fallback_html("Alice &amp; Bob: hello", Some("Alice & Bob"), false),
+            "hello"
+        );
+        assert_eq!(
+            strip_profile_fallback_html("<em>Alice: </em>hello", Some("Alice"), false),
+            "<em>Alice: </em>hello"
         );
     }
 

@@ -158,12 +158,13 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
   return count;
 }
 
-export type PersonaLookup = (eventId: string) => PerMessageProfileView | null;
+export type PersonaLookup = (eventId: string | null | undefined) => PerMessageProfileView | null;
 
 export function personaLookup(items: readonly TimelineItemView[]): PersonaLookup {
   let personas: Map<string, PerMessageProfileView> | null = null;
 
   return (eventId) => {
+    if (eventId === null || eventId === undefined) return null;
     if (personas === null) {
       personas = new Map();
       for (const item of items) {

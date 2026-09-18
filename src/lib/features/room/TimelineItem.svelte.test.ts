@@ -282,6 +282,69 @@ test('keeps the sender header for an ordinary message', async () => {
   await unmount(instance);
 });
 
+test('strips a per-message-profile fallback from a thread summary', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: {
+          ...item(false),
+          thread_root: '$root',
+          thread_summary: {
+            num_replies: 2,
+            latest_event_id: '$reply',
+            latest_body: 'Josie: the latest reply',
+          },
+        },
+        collapsed: false,
+        onOpenThread: vi.fn(),
+        threadPersona: {
+          id: 'josie',
+          display_name: 'Josie',
+          avatar_url: null,
+          pronouns: [],
+          color_on_light: null,
+          color_on_dark: null,
+          has_fallback: true,
+        },
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.thread-latest')?.textContent).toBe('the latest reply');
+
+  await unmount(instance);
+});
+
+test('keeps a thread summary body without a fallback', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: {
+          ...item(false),
+          thread_root: '$root',
+          thread_summary: {
+            num_replies: 2,
+            latest_event_id: null,
+            latest_body: 'we shipped it: finally',
+          },
+        },
+        collapsed: false,
+        onOpenThread: vi.fn(),
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.thread-latest')?.textContent).toBe('we shipped it: finally');
+
+  await unmount(instance);
+});
+
 test('clicking the sender name mentions the account behind it', async () => {
   const onMentionUser = vi.fn();
   const instance = mount(TimelineItemHarness, {

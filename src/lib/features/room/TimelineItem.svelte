@@ -76,6 +76,7 @@
     collapsed: boolean;
     unreadCount?: number;
     replyPersona?: PerMessageProfileView | null;
+    threadPersona?: PerMessageProfileView | null;
     roomId?: string;
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -116,6 +117,7 @@
     collapsed,
     unreadCount = 0,
     replyPersona = null,
+    threadPersona = null,
     roomId = '',
     highlighted = false,
     onMatrixLink,
@@ -890,7 +892,9 @@
               >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
             >
             {#if threadSummary.latest_body}
-              <span class="thread-latest">{threadSummary.latest_body}</span>
+              <span class="thread-latest"
+                >{stripReplyFallback(threadSummary.latest_body, threadPersona)}</span
+              >
             {/if}
           </button>
         {:else if item.thread_root && onOpenThread}

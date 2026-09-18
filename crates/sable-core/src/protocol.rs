@@ -2264,6 +2264,10 @@ pub struct ReplyView {
 pub struct ThreadSummaryView {
     /// Excludes the root, so zero if every reply was redacted.
     pub num_replies: u32,
+    /// The latest reply's id, so the UI can strip its per-message-profile
+    /// fallback like a reply preview. Absent for a local echo or an unloaded
+    /// event.
+    pub latest_event_id: Option<String>,
     pub latest_body: Option<String>,
 }
 

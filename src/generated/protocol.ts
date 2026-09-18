@@ -916,6 +916,12 @@ export type ThreadRootView = {
 export type ThreadSummaryView = {
 	/**  Excludes the root, so zero if every reply was redacted. */
 	num_replies: number,
+	/**
+	 *  The latest reply's id, so the UI can resolve its per-message profile
+	 *  and strip the fallback the summary body carries. Absent for a local
+	 *  echo or an unloaded event.
+	 */
+	latest_event_id: string | null,
 	latest_body: string | null,
 };
 

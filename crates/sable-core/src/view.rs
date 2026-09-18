@@ -35,8 +35,8 @@ use matrix_sdk_ui::{
     timeline::{
         AnyOtherStateEventContentChange, EncryptedMessage, EventSendState, EventTimelineItem,
         LiveLocationState, MembershipChange, MsgLikeContent, MsgLikeKind, OtherState, PollState,
-        Profile, TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind,
-        VirtualTimelineItem,
+        Profile, TimelineDetails, TimelineEventItemId, TimelineItem, TimelineItemContent,
+        TimelineItemKind, VirtualTimelineItem,
     },
 };
 
@@ -1315,63 +1315,79 @@ fn message_content(
     let dimension = |value: Option<UInt>| value.map(u64::from);
 
     match message.msgtype() {
-        MessageType::Image(image) => TimelineItemContentView::Image {
-            filename: image.filename().to_owned(),
-            caption: image.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(image.caption(), image.formatted_caption()),
-            source: media_source(&image.source),
-            mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
-            width: dimension(image.info.as_ref().and_then(|info| info.width)),
-            height: dimension(image.info.as_ref().and_then(|info| info.height)),
-            size: dimension(image.info.as_ref().and_then(|info| info.size)),
-            blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
-            spoiler: spoiler_reason(raw.content.as_ref()),
-        },
-        MessageType::Video(video) => TimelineItemContentView::Video {
-            filename: video.filename().to_owned(),
-            caption: video.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(video.caption(), video.formatted_caption()),
-            source: media_source(&video.source),
-            mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
-            width: dimension(video.info.as_ref().and_then(|info| info.width)),
-            height: dimension(video.info.as_ref().and_then(|info| info.height)),
-            blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
-            spoiler: spoiler_reason(raw.content.as_ref()),
-        },
-        MessageType::Audio(audio) => TimelineItemContentView::Audio {
-            filename: audio.filename().to_owned(),
-            caption: audio.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(audio.caption(), audio.formatted_caption()),
-            source: media_source(&audio.source),
-            mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
-            duration_ms: audio
-                .audio
-                .as_ref()
-                .map(|details| details.duration)
-                .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
-                .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
-            waveform: audio.audio.as_ref().map(|details| {
-                details
-                    .waveform
-                    .iter()
-                    .map(|amplitude| {
-                        let value = u64::from(amplitude.get());
-                        #[allow(clippy::cast_precision_loss)]
-                        let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
-                        normalised
-                    })
-                    .collect()
-            }),
-            voice: audio.voice.is_some(),
-        },
-        MessageType::File(file) => TimelineItemContentView::File {
-            filename: file.filename().to_owned(),
-            caption: file.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(file.caption(), file.formatted_caption()),
-            source: media_source(&file.source),
-            mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
-            size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
-        },
+        MessageType::Image(image) => {
+            let (caption, caption_html) =
+                caption_view(image.caption(), image.formatted_caption(), profile);
+            TimelineItemContentView::Image {
+                filename: image.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&image.source),
+                mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
+                width: dimension(image.info.as_ref().and_then(|info| info.width)),
+                height: dimension(image.info.as_ref().and_then(|info| info.height)),
+                size: dimension(image.info.as_ref().and_then(|info| info.size)),
+                blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
+                spoiler: spoiler_reason(raw.content.as_ref()),
+            }
+        }
+        MessageType::Video(video) => {
+            let (caption, caption_html) =
+                caption_view(video.caption(), video.formatted_caption(), profile);
+            TimelineItemContentView::Video {
+                filename: video.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&video.source),
+                mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
+                width: dimension(video.info.as_ref().and_then(|info| info.width)),
+                height: dimension(video.info.as_ref().and_then(|info| info.height)),
+                blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
+                spoiler: spoiler_reason(raw.content.as_ref()),
+            }
+        }
+        MessageType::Audio(audio) => {
+            let (caption, caption_html) =
+                caption_view(audio.caption(), audio.formatted_caption(), profile);
+            TimelineItemContentView::Audio {
+                filename: audio.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&audio.source),
+                mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+                duration_ms: audio
+                    .audio
+                    .as_ref()
+                    .map(|details| details.duration)
+                    .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
+                    .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
+                waveform: audio.audio.as_ref().map(|details| {
+                    details
+                        .waveform
+                        .iter()
+                        .map(|amplitude| {
+                            let value = u64::from(amplitude.get());
+                            #[allow(clippy::cast_precision_loss)]
+                            let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
+                            normalised
+                        })
+                        .collect()
+                }),
+                voice: audio.voice.is_some(),
+            }
+        }
+        MessageType::File(file) => {
+            let (caption, caption_html) =
+                caption_view(file.caption(), file.formatted_caption(), profile);
+            TimelineItemContentView::File {
+                filename: file.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&file.source),
+                mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+                size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
+            }
+        }
         MessageType::Location(location) => {
             let coordinates = geo_coordinates(&location.geo_uri);
             TimelineItemContentView::Location {
@@ -1497,16 +1513,26 @@ fn content(
     }
 }
 
-fn formatted_caption_html(
+/// Media captions carry the same fallback as text messages: strip both
+/// halves, since the UI renders the plain caption when no formatted one
+/// arrived.
+fn caption_view(
     caption: Option<&str>,
     formatted: Option<&matrix_sdk::ruma::events::room::message::FormattedBody>,
-) -> Option<String> {
-    let formatted = formatted?;
+    profile: Option<&PerMessageProfileView>,
+) -> (Option<String>, Option<String>) {
+    let known = formatted
+        .map(|formatted| formatted.body.as_str())
+        .is_some_and(has_profile_fallback_html)
+        || profile.is_some_and(|profile| profile.has_fallback);
+    let name = profile.and_then(|profile| profile.display_name.as_deref());
 
-    Some(display_html(
-        caption.unwrap_or_default(),
-        Some(formatted.body.as_str()),
-    ))
+    let caption = caption.map(|caption| strip_profile_fallback_body(caption, name, known));
+    let html = formatted.map(|formatted| {
+        let html = strip_profile_fallback_html(&formatted.body, name, known);
+        display_html(caption.as_deref().unwrap_or_default(), Some(&html))
+    });
+    (caption, html)
 }
 
 fn formatted_body(msgtype: &MessageType) -> Option<String> {
@@ -1560,12 +1586,24 @@ fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
 fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     let summary = msg_like(content)?.thread_summary.as_ref()?;
 
+    // The SDK embeds no raw content for the latest reply, so the UI strips
+    // its per-message-profile fallback, looking the profile up by id like a
+    // reply preview.
+    let (latest_event_id, latest_body) = match &summary.latest_event {
+        TimelineDetails::Ready(event) => (
+            match &event.identifier {
+                TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
+                TimelineEventItemId::TransactionId(_) => None,
+            },
+            body_of(&event.content),
+        ),
+        _ => (None, None),
+    };
+
     Some(ThreadSummaryView {
         num_replies: summary.num_replies,
-        latest_body: match &summary.latest_event {
-            TimelineDetails::Ready(event) => body_of(&event.content),
-            _ => None,
-        },
+        latest_event_id,
+        latest_body,
     })
 }
 
@@ -1751,7 +1789,7 @@ mod tests {
 
     use super::{
         LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
-        call_participants, clamp_power_level, formatted_caption_html, geo_coordinates, in_call,
+        call_participants, caption_view, clamp_power_level, geo_coordinates, in_call,
         per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
@@ -2099,19 +2137,96 @@ mod tests {
 
     #[test]
     fn formatted_attachment_captions_are_sanitised_for_display() {
-        let html = formatted_caption_html(
+        let (_, html) = caption_view(
             Some("hi Ana party"),
             Some(&FormattedBody::html(
                 "<a href=\"https://matrix.to/#/@ana:example.org\">Ana</a> <img src=\"mxc://example.org/party\" alt=\"party\" data-mx-emoticon><script>steal()</script>",
             )),
-        )
-        .expect("a formatted caption maps to display HTML");
+            None,
+        );
+        let html = html.expect("a formatted caption maps to display HTML");
 
         assert!(html.contains("href=\"https://matrix.to/#/@ana:example.org\""));
         assert!(html.contains("src=\"mxc://example.org/party\""));
         assert!(html.contains("data-mx-emoticon"));
         assert!(!html.contains("script"));
-        assert_eq!(formatted_caption_html(None, None), None);
+        assert!(caption_view(None, None, None).1.is_none());
+    }
+
+    #[test]
+    fn strips_a_per_message_profile_fallback_from_media_captions() {
+        let profile = per_message_profile(Some(&json!({
+            "m.per_message_profile": {
+                "displayname": "Josie",
+                "has_fallback": true,
+            },
+        })))
+        .expect("a profile");
+        let (caption, html) = caption_view(
+            Some("Josie: you can still see the fallback on this message"),
+            Some(&FormattedBody::html(
+                "<strong data-mx-profile-fallback>Josie: </strong>you can still see the fallback on this message",
+            )),
+            Some(&profile),
+        );
+
+        assert_eq!(
+            caption.as_deref(),
+            Some("you can still see the fallback on this message")
+        );
+        let html = html.expect("a formatted caption maps to display HTML");
+        assert!(html.contains("this message"));
+        assert!(!html.contains("Josie"));
+    }
+
+    #[test]
+    fn a_caption_fallback_is_stripped_from_the_plain_body_alone() {
+        let profile = per_message_profile(Some(&json!({
+            "m.per_message_profile": {
+                "displayname": "Josie",
+                "has_fallback": true,
+            },
+        })))
+        .expect("a profile");
+        let (caption, html) = caption_view(
+            Some("Josie: you can still see the fallback on this message"),
+            None,
+            Some(&profile),
+        );
+
+        assert_eq!(
+            caption.as_deref(),
+            Some("you can still see the fallback on this message")
+        );
+        assert!(html.is_none());
+    }
+
+    // The event reported in the issue: an image whose `formatted_body` is
+    // plain text with a bare "josiejosie: " prefix and no strong wrapper.
+    #[test]
+    fn strips_a_bare_prefix_fallback_from_an_image_caption() {
+        let profile = per_message_profile(Some(&json!({
+            "m.per_message_profile": {
+                "displayname": "josiejosie",
+                "has_fallback": true,
+            },
+        })))
+        .expect("a profile");
+        let (caption, html) = caption_view(
+            Some("josiejosie: you can still see the fallback on this message"),
+            Some(&FormattedBody::html(
+                "josiejosie: you can still see the fallback on this message",
+            )),
+            Some(&profile),
+        );
+
+        assert_eq!(
+            caption.as_deref(),
+            Some("you can still see the fallback on this message")
+        );
+        let html = html.expect("a formatted caption maps to display HTML");
+        assert!(html.contains("you can still see the fallback on this message"));
+        assert!(!html.contains("josiejosie"));
     }
 
     #[test]

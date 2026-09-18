@@ -627,6 +627,9 @@
                   {collapsed}
                   unreadCount={row.value.unreadCount}
                   replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
+                  threadPersona={item.thread_summary
+                    ? personas(item.thread_summary.latest_event_id)
+                    : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
                   {onCopyLink}
