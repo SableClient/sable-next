@@ -146,8 +146,11 @@ jobs:
         run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
       # Not a GitHub-hosted image, so it carries neither browser nor driver, and
-      # Ubuntu packages no geckodriver. noble's `firefox` is a stub for the
-      # snap, which cannot run here; the pin is what stops apt preferring it.
+      # Ubuntu packages no geckodriver. noble's `firefox` and `chromium` are
+      # stubs for snaps, which cannot run here: the Mozilla pin is what stops
+      # apt preferring one, and Chrome comes from Google's own repository
+      # rather than the archive. Only Chrome for Testing publishes a
+      # chromedriver, so it is fetched for whatever milestone apt installed.
       - name: Install browsers and drivers
         id: drivers
         run: |
@@ -158,16 +161,27 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/mozilla.list >/dev/null
           printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
             | sudo tee /etc/apt/preferences.d/mozilla >/dev/null
+          curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+            | sudo tee /etc/apt/keyrings/google-chrome.asc >/dev/null
+          echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main' \
+            | sudo tee /etc/apt/sources.list.d/google-chrome.list >/dev/null
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y chromium chromium-driver firefox
+          sudo apt-get install --no-install-recommends -y google-chrome-stable firefox python3 unzip
+          milestone="$(google-chrome --version | grep -oE '[0-9]+' | head -n 1)"
+          url="$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json \
+            | python3 -c 'import json,sys;m=sys.argv[1];d=json.load(sys.stdin)["milestones"][m]["downloads"]["chromedriver"];print(next(e["url"] for e in d if e["platform"]=="linux64"))' "$milestone")"
+          curl -fsSL "$url" -o "$RUNNER_TEMP/chromedriver.zip"
+          unzip -q -j "$RUNNER_TEMP/chromedriver.zip" '*/chromedriver' -d "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/chromedriver"
+          echo "chromedriver=$RUNNER_TEMP/chromedriver" >>"$GITHUB_OUTPUT"
           mise use --global ubi:mozilla/geckodriver@0.37.1
           echo "geckodriver=$(mise which geckodriver)" >>"$GITHUB_OUTPUT"
 
-      # Chromium needs its sandbox off, having no user namespaces here; that is
+      # Chrome needs its sandbox off, having no user namespaces here; that is
       # what webdriver.json carries. Firefox's sandbox copes.
-      - name: Run tests on Chromium
+      - name: Run tests on Chrome
         env:
-          CHROMEDRIVER: /usr/bin/chromedriver
+          CHROMEDRIVER: ${{ steps.drivers.outputs.chromedriver }}
           WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/.forgejo/webdriver.json
         run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
