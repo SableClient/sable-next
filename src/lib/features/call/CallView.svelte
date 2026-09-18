@@ -87,6 +87,7 @@
     microphoneEnabled={session.transport.microphoneEnabled}
     cameraEnabled={session.transport.cameraEnabled}
     screenShareEnabled={session.transport.screenShareEnabled}
+    deafened={session.deafened}
     ready={session.mediaReady && session.lifecycle === 'active'}
     canScreenShare={session.canScreenShare}
     onToggleMicrophone={() =>
@@ -94,6 +95,7 @@
     onToggleCamera={() => void session.setCameraEnabled(!session.transport.cameraEnabled)}
     onToggleScreenShare={() =>
       void session.setScreenShareEnabled(!session.transport.screenShareEnabled)}
+    onToggleDeafen={() => session.setDeafened(!session.deafened)}
     onHangUp={() => void session.leave()}
   />
 </section>

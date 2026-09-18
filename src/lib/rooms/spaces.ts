@@ -64,3 +64,31 @@ export function childRouting(rooms: readonly RoomSummary[], roomId: string): Chi
   }
   return { via: [], parentId: null };
 }
+
+export function spacesContainingRoom(
+  spaces: readonly RoomSummary[],
+  rooms: readonly RoomSummary[],
+  roomId: string | null
+): Set<string> {
+  const found = new Set<string>();
+  if (roomId === null) return found;
+
+  const roomsById = new Map(rooms.map((room) => [room.room_id, room]));
+
+  function contains(spaceId: string, visited: Set<string>): boolean {
+    if (visited.has(spaceId)) return false;
+    visited.add(spaceId);
+
+    const space = roomsById.get(spaceId);
+    if (!space) return false;
+
+    return space.space_children.some(
+      (child) => child.room_id === roomId || contains(child.room_id, visited)
+    );
+  }
+
+  for (const space of spaces) {
+    if (contains(space.room_id, new Set())) found.add(space.room_id);
+  }
+  return found;
+}

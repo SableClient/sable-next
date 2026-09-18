@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { RoomEvent, Track, type RemoteTrack } from 'livekit-client';
   import type { Room as LivekitRoom } from 'livekit-client';
   import type { CallTelemetry } from './call-telemetry';
@@ -6,9 +7,10 @@
   interface Props {
     room: LivekitRoom | undefined;
     telemetry?: Pick<CallTelemetry, 'event' | 'failure'>;
+    deafened?: boolean;
   }
 
-  let { room, telemetry }: Props = $props();
+  let { room, telemetry, deafened = false }: Props = $props();
   let node = $state<HTMLDivElement>();
 
   $effect(() => {
@@ -31,6 +33,7 @@
       try {
         const element = track.attach();
         element.autoplay = true;
+        element.muted = untrack(() => deafened);
         currentNode.append(element);
         attached.set(track.sid, { track, element });
         currentTelemetry?.event('call.audio.track_attached', {
@@ -80,6 +83,16 @@
         .off(RoomEvent.AudioPlaybackStatusChanged, recordPlaybackStatus);
       for (const sid of [...attached.keys()]) release(sid);
     };
+  });
+
+  $effect(() => {
+    const currentNode = node;
+    const muted = deafened;
+    if (!currentNode) return;
+
+    for (const element of currentNode.children) {
+      if (element instanceof HTMLMediaElement) element.muted = muted;
+    }
   });
 </script>
 

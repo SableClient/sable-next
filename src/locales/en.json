@@ -1974,6 +1974,7 @@
     "microphone": "Microphone",
     "camera": "Camera",
     "screenShare": "Share screen",
+    "speaker": "Speaker",
     "returnTo": "Return to {{room}}",
     "lobbyEmpty": "Voice chat's empty - be the first to hop in!",
     "lobbyNoPermission": "You don't have permission to join.",
