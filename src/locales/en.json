@@ -1270,7 +1270,7 @@
     "sessionReplay": "Record sessions with errors",
     "sessionReplayHint": "Adds a replay of what you clicked before a crash. All text, media and inputs are masked before it leaves your device.",
     "telemetryBannerTitle": "Send anonymized bug reports",
-    "telemetryBannerHelp": "Help fix sable's bugs by sending reports when something breaks!",
+    "telemetryBannerHelp": "Help fix Sable's bugs by sending reports when something breaks!",
     "telemetryBannerBody": "They never include messages, room names, or who you talk to.",
     "telemetryBannerSent": "They are sent to the maintainers using a 3rd party service.",
     "telemetryBannerSablePolicy": "Sable's Privacy Policy",
