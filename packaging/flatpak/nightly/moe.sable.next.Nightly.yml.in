@@ -4,6 +4,10 @@ runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 
+# appstream-compose was removed from the freedesktop runtime and Ubuntu's
+# appstream 1.0.2 lacks the appstreamcli compose args flatpak-builder passes.
+appstream-compose: false
+
 base: org.electronjs.Electron2.BaseApp
 base-version: '25.08'
 
