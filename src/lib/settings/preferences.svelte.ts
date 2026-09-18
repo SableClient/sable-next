@@ -118,6 +118,12 @@ export type TimelinePreferences = Pick<
 const STORAGE_KEY = 'sable-preferences';
 const LEGACY_STORAGE_KEY = 'sable-timeline-preferences';
 
+/** The string-valued preferences with a fixed set of accepted values. */
+type EnumPreference = Exclude<
+  { [K in keyof Preferences]: Preferences[K] extends string ? K : never }[keyof Preferences],
+  FreeTextPreference
+>;
+
 const ENUMS = {
   language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
@@ -131,7 +137,8 @@ const ENUMS = {
   readReceiptPlacement: ['message', 'room'],
   replyPreviewStyle: ['connected', 'compact', 'expanded'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
-} as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
+  personaLatching: ['off', 'room', 'account'],
+} as const satisfies { [K in EnumPreference]?: readonly Preferences[K][] };
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
     `SelectPreference` would otherwise claim. */
