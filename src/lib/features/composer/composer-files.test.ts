@@ -21,7 +21,20 @@ test('sizes read in the largest unit that keeps a whole number', () => {
 
 test('a transfer without files yields nothing', () => {
   expect(filesFrom(null)).toEqual([]);
-  expect(filesFrom({ files: [] } as unknown as DataTransfer)).toEqual([]);
+  expect(filesFrom({ files: [], items: [] } as unknown as DataTransfer)).toEqual([]);
+});
+
+test('an item list stands in for an empty file list', () => {
+  const pasted = file('pasted.png');
+  const transfer = {
+    files: [],
+    items: [
+      { kind: 'string', getAsFile: () => null },
+      { kind: 'file', getAsFile: () => pasted },
+    ],
+  } as unknown as DataTransfer;
+
+  expect(filesFrom(transfer)).toEqual([pasted]);
 });
 
 test('staging appends and keeps every entry addressable', () => {
