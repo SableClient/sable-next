@@ -4,6 +4,7 @@
   import type { ProfileView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -37,6 +38,7 @@
   let userToBlock = $state('');
   let saving = $state<string | null>(null);
   let error = $state<string | null>(null);
+  let banner = $derived(profile.banner_url?.startsWith('mxc://') ? profile.banner_url : null);
 
   $effect(() => {
     void core.session?.user_id;
@@ -94,7 +96,7 @@
     saving = 'banner';
     error = null;
     try {
-      const url = await core.uploadAvatar(
+      const url = await core.commands.uploadMedia(
         bannerFile.type || 'image/*',
         new Uint8Array(await bannerFile.arrayBuffer())
       );
@@ -159,12 +161,12 @@
   {#if section === 'banner'}<div class="banner-setting">
       <span class="setting-label">Banner</span>
       <div class="setting-row">
-        {#if profile.banner_url}<img
+        {#if banner}<MediaImage
             class="banner"
-            src={profile.banner_url}
+            source={banner}
             alt="Current profile banner"
-            width="1000"
-            height="375"
+            width={1000}
+            height={375}
           />{/if}
         <label class="file-button btn btn-secondary btn-small">
           <input
@@ -398,7 +400,7 @@
     gap: var(--space-200);
   }
 
-  .banner {
+  .banner-setting :global(.banner) {
     border-radius: var(--radius);
     height: 6rem;
     object-fit: cover;
