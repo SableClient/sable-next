@@ -15,8 +15,29 @@ export interface ForumThread {
   unread: boolean;
 }
 
+const POST_KINDS = new Set<TimelineItemContentView['kind']>([
+  'message',
+  'image',
+  'video',
+  'audio',
+  'file',
+  'sticker',
+  'gallery',
+  'location',
+  'live_location',
+  'poll',
+  'unable_to_decrypt',
+]);
+
 function bodyOf(content: TimelineItemContentView): string {
   return 'body' in content ? content.body : '';
+}
+
+function isPost(item: TimelineItemView): boolean {
+  if (item.event_id === null) return false;
+  if (item.thread_root !== null && item.thread_root !== item.event_id) return false;
+  if (item.in_reply_to !== null) return false;
+  return POST_KINDS.has(item.content.kind);
 }
 
 function isUnread(latest: TimelineItemView, currentUserId: string | null): boolean {
@@ -31,7 +52,8 @@ export function collectForumThreads(
 ): ForumThread[] {
   const roots = new Map<string, TimelineItemView>();
   for (const item of items) {
-    if (item.event_id !== null && item.thread_summary !== null) roots.set(item.event_id, item);
+    if (item.event_id === null) continue;
+    if (item.thread_summary !== null || isPost(item)) roots.set(item.event_id, item);
   }
 
   const latestReplies = new Map<string, TimelineItemView>();

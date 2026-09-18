@@ -50,10 +50,40 @@ test('collects an item with a thread summary as a root', () => {
   expect(threads[0]?.lastActivityAt).toBe(100);
 });
 
-test('ignores an item with no thread summary', () => {
+test('collects a post nobody has replied to yet', () => {
   const plain = item({ id: 'plain', timestamp: 5 });
 
-  expect(collectForumThreads([plain], null)).toHaveLength(0);
+  const threads = collectForumThreads([plain], null);
+
+  expect(threads).toHaveLength(1);
+  expect(threads[0]?.replyCount).toBe(0);
+  expect(threads[0]?.lastBody).toBeNull();
+});
+
+test('ignores a thread reply, a plain reply and a state change', () => {
+  const reply = item({ id: 'reply', thread_root: '$root' });
+  const quoted = item({
+    id: 'quoted',
+    in_reply_to: {
+      event_id: '$root',
+      sender: null,
+      sender_mentioned: false,
+      sender_name: null,
+      body: null,
+    },
+  });
+  const joined = item({
+    id: 'joined',
+    content: {
+      kind: 'membership',
+      user_id: '@bob:example.org',
+      change: 'joined',
+      display_name: 'Bob',
+      reason: null,
+    },
+  });
+
+  expect(collectForumThreads([reply, quoted, joined], null)).toHaveLength(0);
 });
 
 test('takes last activity from the newest visible reply, not the root', () => {
