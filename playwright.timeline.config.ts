@@ -10,6 +10,7 @@ export default defineConfig({
     'timeline-media.spec.ts',
     'reaction-sheet.spec.ts',
     'room-settings-mobile.spec.ts',
+    'settings-backdrop.spec.ts',
   ],
   workers: 1,
   timeout: 60_000,
