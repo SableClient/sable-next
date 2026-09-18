@@ -75,7 +75,7 @@ impl Core {
                     let mut request = sync_events::v3::Request::new();
                     request.filter =
                         Some(sync_events::v3::Filter::FilterDefinition(presence_filter()));
-                    request.since = since.clone();
+                    request.since.clone_from(&since);
                     request.timeout = Some(POLL_TIMEOUT);
                     request.set_presence = state(core.desired_presence());
 
