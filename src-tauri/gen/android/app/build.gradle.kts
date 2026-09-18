@@ -101,3 +101,13 @@ dependencies {
 }
 
 apply(from = "tauri.build.gradle.kts")
+
+// Native FCM push (Sygnal): applies only once google-services.json is added to this
+// directory, so builds without Firebase configured still succeed. Debug builds are
+// excluded: the JSON has no client for the .debug application id.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    tasks.matching { it.name.matches(Regex("process.*DebugGoogleServices")) }.configureEach {
+        enabled = false
+    }
+}

@@ -9,6 +9,7 @@ buildscript {
         // notifications plugin pulls in ships Kotlin 2.1 metadata, and 2.1.21
         // still ICEs on MainActivity ("source must not be null").
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.0")
+        classpath("com.google.gms:google-services:4.5.0")
     }
 }
 
