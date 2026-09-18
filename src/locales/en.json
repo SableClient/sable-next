@@ -1686,11 +1686,7 @@
       },
       "color": {
         "description": "Set your name colour in this room",
-        "usage": "/color <#rrggbb|reset>"
-      },
-      "scolor": {
-        "description": "Set someone else's name colour in this room",
-        "usage": "/scolor <@user:server> <#rrggbb|reset>"
+        "usage": "/color [light|dark] <#rrggbb|reset>"
       },
       "font": {
         "description": "Set your font in this room",
