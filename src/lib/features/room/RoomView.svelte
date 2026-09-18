@@ -302,6 +302,7 @@
     memberLoader.reset();
     conversation.forgetRequestedDetails();
     receiptsOpen = false;
+    threadRootId = null;
     closeProfile();
   });
 
