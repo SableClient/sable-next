@@ -47,6 +47,7 @@ const packs: ImagePackView[] = [
         body: null,
         usage: ['emoticon'],
         info: null,
+        source_pack: null,
       },
     ],
   },
@@ -162,7 +163,7 @@ test('stages any selected attachment, not only images, and sends it on submit', 
   submit();
   await tick();
 
-  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, {});
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
   void unmount(instance);
 });
 
@@ -251,7 +252,7 @@ test('stages files dropped on the composer, and drops one on demand', async () =
   expect(drop.defaultPrevented).toBe(true);
   expect(stagedNames()).toEqual(['one.png', 'two.png']);
 
-  const remove = document.querySelector('.staged-item button');
+  const remove = document.querySelector('.staged-remove');
   if (!(remove instanceof HTMLButtonElement)) throw new Error('remove control not found');
   remove.click();
   await tick();
@@ -260,7 +261,7 @@ test('stages files dropped on the composer, and drops one on demand', async () =
   await tick();
 
   expect(attachment).toHaveBeenCalledTimes(1);
-  expect(attachment).toHaveBeenCalledWith('!room:example.org', second, {});
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', second, { spoiler: false });
   void unmount(instance);
 });
 
@@ -284,6 +285,7 @@ test('text rides a lone attachment as its caption', async () => {
     caption: 'look at this',
     formattedCaption: null,
     mentions: { userIds: [], room: false },
+    spoiler: false,
   });
   expect(message).not.toHaveBeenCalled();
   void unmount(instance);
@@ -321,6 +323,7 @@ test.each([true, false])(
       formattedCaption:
         'hey <a href="https://matrix.to/#/@one:example.org">Member One</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt=":wave:" title=":wave:" height="32">',
       mentions: { userIds: ['@one:example.org'], room: false },
+      spoiler: false,
     });
     await unmount(instance);
   }
@@ -347,8 +350,12 @@ test('text follows two attachments as its own message', async () => {
   });
 
   expect(attachment).toHaveBeenCalledTimes(2);
-  expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', expect.anything(), {});
-  expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', expect.anything(), {});
+  expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', expect.anything(), {
+    spoiler: false,
+  });
+  expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', expect.anything(), {
+    spoiler: false,
+  });
   expect(message).toHaveBeenCalledWith('!room:example.org', 'both of these', null, {
     userIds: [],
     room: false,
@@ -809,4 +816,34 @@ test('neither the toolbar nor its toggle appear without rich text', async () => 
   expect(document.querySelector('.composer-format')).toBeNull();
   expect(formattingBar()).toBeNull();
   void unmount(app);
+});
+
+test('a staged picture marked as a spoiler is sent as one', async () => {
+  const attachment = vi.fn(async () => {});
+  const instance = render({ roomId: '!room:example.org', onSendAttachment: attachment });
+  const file = new File(['one'], 'one.png', { type: 'image/png' });
+
+  await pick(file);
+
+  const toggle = document.querySelector('.staged-spoiler');
+  if (!(toggle instanceof HTMLButtonElement)) throw new Error('spoiler control not found');
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  toggle.click();
+  await tick();
+  expect(document.querySelector('.staged-spoiler')?.getAttribute('aria-pressed')).toBe('true');
+
+  submit();
+  await tick();
+
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: true });
+  void unmount(instance);
+});
+
+test('a document carries no spoiler control', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+
+  await pick(new File(['report'], 'report.pdf', { type: 'application/pdf' }));
+
+  expect(document.querySelector('.staged-spoiler')).toBeNull();
+  void unmount(instance);
 });

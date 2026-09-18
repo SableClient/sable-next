@@ -23,6 +23,7 @@ export type Attachment = {
   info?: AttachmentInfoView | null;
   threadRoot?: string | null;
   persona?: PerMessageProfileView | null;
+  spoiler?: boolean;
 };
 
 export class CoreError extends Error {

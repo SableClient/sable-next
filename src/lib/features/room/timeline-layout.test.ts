@@ -15,10 +15,10 @@ const CHROME_PX = TIMELINE_LAYOUT.mediaRowChromePx;
 function image(width: number | null, height: number | null) {
   return {
     kind: 'image',
-    body: 'Picture',
+    filename: 'Picture',
+    caption: null,
     html: null,
     source: 'mxc://example.org/picture',
-    filename: null,
     mime: 'image/png',
     width,
     height,

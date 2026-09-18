@@ -2,7 +2,6 @@ import { expect, test } from 'vitest';
 
 import {
   findMember,
-  isCaption,
   memberAvatar,
   memberName,
   personaWithColor,
@@ -52,13 +51,6 @@ test('a persona counts as tinted only when it carries a colour', () => {
   expect(personaWithColor(persona({}))).toBeNull();
   expect(personaWithColor(persona({ color_on_light: '#fff' }))).not.toBeNull();
   expect(personaWithColor(persona({ color_on_dark: '#000' }))).not.toBeNull();
-});
-
-test('a bare filename is not treated as a caption', () => {
-  expect(isCaption('photo.png')).toBe(false);
-  expect(isCaption('holiday.jpeg')).toBe(false);
-  expect(isCaption('look at this photo.png')).toBe(true);
-  expect(isCaption('a caption')).toBe(true);
 });
 
 test('a reply fallback is stripped by display name in either form', () => {

@@ -63,7 +63,9 @@
   import './sender-identity.css';
   import {
     formatMessageTimestamp,
+    canForward,
     canRedact,
+    isAnnotation,
     isMessageRow,
     jumboEmojiLevel,
     senderColor,
@@ -82,7 +84,11 @@
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
     currentUserId?: string | null;
-    onToggleReaction?: (eventId: string, key: string) => void;
+    onToggleReaction?: (
+      eventId: string,
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
     onReply?: (eventId: string) => void;
     onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null, mediaCaption?: boolean) => void;
@@ -246,12 +252,19 @@
     const eventId = item.event_id ?? '';
     const editId = item.event_id ?? item.transaction_id ?? '';
     const body =
-      item.content.kind === 'message' || item.content.kind === 'image' ? item.content.body : null;
+      item.content.kind === 'message'
+        ? item.content.body
+        : item.content.kind === 'image'
+          ? (item.content.caption ?? '')
+          : null;
     const html = item.content.kind === 'message' ? item.content.html : null;
     return {
       onReact: onToggleReaction
-        ? (emoji: string) => {
-            onToggleReaction(eventId, emoji);
+        ? (
+            emoji: string,
+            sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+          ) => {
+            onToggleReaction(eventId, emoji, sourcePack);
           }
         : undefined,
       onAddReaction: onToggleReaction
@@ -316,7 +329,7 @@
       onPin: roomId && eventId ? () => void togglePin(eventId) : undefined,
       onBookmark: roomId && eventId ? () => void toggleBookmark(eventId) : undefined,
       onForward:
-        roomId && eventId && item.content.kind === 'message'
+        roomId && eventId && canForward(item.content)
           ? () => {
               forwardOpen = true;
             }
@@ -524,6 +537,80 @@
   }
 </script>
 
+{#snippet actionLayer()}
+  {#if actionable && (engaged || actionsPinned)}
+    <MessageActions
+      {roomId}
+      onPickerOpenChange={pinActions}
+      onOverflowOpenChange={pinActions}
+      {...actions}
+    />
+  {/if}
+  {#if actionable}
+    {#if sourceOpen}
+      <MessageSourceDialog bind:open={sourceOpen} {source} />
+    {/if}
+    {#if reportOpen}
+      <MessageReportDialog bind:open={reportOpen} onReport={report} />
+    {/if}
+    {#if stealOpen}
+      <StealEmotesDialog bind:open={stealOpen} candidates={stealable} />
+    {/if}
+    {#if forwardOpen}
+      <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
+    {/if}
+    {#if reproxyOpen}
+      <MessageReproxyDialog
+        bind:open={reproxyOpen}
+        personas={personaStore.personas}
+        current={item.per_message_profile}
+        onChoose={(next) => void reproxy(next)}
+      />
+    {/if}
+    {#if emoteOpen}
+      <ReactionSheet
+        bind:open={emoteOpen}
+        {roomId}
+        anchor={emoteAnchor ?? messageRow}
+        onPick={(key, sourcePack) => {
+          onToggleReaction?.(item.event_id ?? '', key, sourcePack);
+        }}
+      />
+    {/if}
+    {#if sheetOpen}
+      <MessageActionSheet
+        bind:open={sheetOpen}
+        preview={item.content.kind === 'message' ? item.content.body : null}
+        {...actions}
+      />
+    {/if}
+    {#if deleteOpen}
+      <DeleteMessageDialog
+        bind:open={deleteOpen}
+        preview={item.content.kind === 'message' ? item.content.body : null}
+        onConfirm={confirmDelete}
+      />
+    {/if}
+    {#if reactionsOpen}
+      <ReactionsDialog
+        bind:open={reactionsOpen}
+        bind:active={reactionActive}
+        reactions={item.reactions}
+        {members}
+        onMemberProfile={onSenderProfile}
+      />
+    {/if}
+    {#if receiptsOpen}
+      <ReceiptsDialog
+        bind:open={receiptsOpen}
+        readers={receiptReaders}
+        {members}
+        onMemberProfile={onSenderProfile}
+      />
+    {/if}
+  {/if}
+{/snippet}
+
 {#if placeholder}
   <article
     class={['message', 'placeholder-message', `layout-${layout}`, { collapsed }]}
@@ -569,8 +656,8 @@
         persona: personaTint,
         own: item.is_own,
         'align-own': alignOwn,
-        'mention-silent': item.mention === 'silent',
-        'mention-loud': item.mention === 'loud',
+        'mention-silent': preferences.highlightMentions && item.mention === 'silent',
+        'mention-loud': preferences.highlightMentions && item.mention === 'loud',
       },
     ]}
     data-selected={selected ? 'true' : undefined}
@@ -606,79 +693,9 @@
         {/if}
       </div>
     {/if}
-    {#if actionable && (engaged || actionsPinned)}
-      <MessageActions
-        {roomId}
-        onPickerOpenChange={pinActions}
-        onOverflowOpenChange={pinActions}
-        {...actions}
-      />
-    {/if}
+    {@render actionLayer()}
     {#if !actionable && editable && item.transaction_id && engaged}
       <MessageActions {roomId} onEdit={actions.onEdit} />
-    {/if}
-    {#if actionable}
-      {#if sourceOpen}
-        <MessageSourceDialog bind:open={sourceOpen} {source} />
-      {/if}
-      {#if reportOpen}
-        <MessageReportDialog bind:open={reportOpen} onReport={report} />
-      {/if}
-      {#if stealOpen}
-        <StealEmotesDialog bind:open={stealOpen} candidates={stealable} />
-      {/if}
-      {#if forwardOpen}
-        <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
-      {/if}
-      {#if reproxyOpen}
-        <MessageReproxyDialog
-          bind:open={reproxyOpen}
-          personas={personaStore.personas}
-          current={item.per_message_profile}
-          onChoose={(next) => void reproxy(next)}
-        />
-      {/if}
-      {#if emoteOpen}
-        <ReactionSheet
-          bind:open={emoteOpen}
-          {roomId}
-          anchor={emoteAnchor ?? messageRow}
-          onPick={(key: string) => {
-            onToggleReaction?.(item.event_id ?? '', key);
-          }}
-        />
-      {/if}
-      {#if sheetOpen}
-        <MessageActionSheet
-          bind:open={sheetOpen}
-          preview={item.content.kind === 'message' ? item.content.body : null}
-          {...actions}
-        />
-      {/if}
-      {#if deleteOpen}
-        <DeleteMessageDialog
-          bind:open={deleteOpen}
-          preview={item.content.kind === 'message' ? item.content.body : null}
-          onConfirm={confirmDelete}
-        />
-      {/if}
-      {#if reactionsOpen}
-        <ReactionsDialog
-          bind:open={reactionsOpen}
-          bind:active={reactionActive}
-          reactions={item.reactions}
-          {members}
-          onMemberProfile={onSenderProfile}
-        />
-      {/if}
-      {#if receiptsOpen}
-        <ReceiptsDialog
-          bind:open={receiptsOpen}
-          readers={receiptReaders}
-          {members}
-          onMemberProfile={onSenderProfile}
-        />
-      {/if}
     {/if}
     {#if layout === 'compact'}
       <div class="compact-gutter">
@@ -762,7 +779,9 @@
             onJumpToEvent?.(target);
           }}
         >
-          <span class="reply-copy"><strong>{replyName}</strong> <span>{replyBody}</span></span>
+          <span class="reply-copy"
+            ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+          >
         </button>
       {/if}
       {#if !collapsed && layout !== 'compact'}
@@ -807,7 +826,9 @@
             }}
           >
             <ReplyIcon class="reply-icon" />
-            <span class="reply-copy"><strong>{replyName}</strong> <span>{replyBody}</span></span>
+            <span class="reply-copy"
+              ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+            >
           </button>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
@@ -833,7 +854,11 @@
             {/if}
           </div>
           {@const previewUrl = firstPreviewableLink(item.content.html)}
-          {#if previewUrl}
+          {#if item.bundled_link_previews.length > 0}
+            {#each item.bundled_link_previews as preview (preview.url)}
+              <LinkPreviewCard url={preview.url} bundled={preview} {encrypted} />
+            {/each}
+          {:else if previewUrl}
             <LinkPreviewCard url={previewUrl} {encrypted} />
           {/if}
         {:else}
@@ -942,8 +967,59 @@
       {/if}
     </div>
   </article>
-{:else}
+{:else if isAnnotation(item)}
   <TimelineNotice {item} {unreadCount} {onSenderProfile} />
+{:else}
+  <article
+    bind:this={messageRow}
+    class={['message', 'event-row', 'choice', { highlighted }]}
+    data-selected={selected ? 'true' : undefined}
+    style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
+    style:transition={swipe.dragging ? 'none' : undefined}
+    onpointerdown={rowPress.start}
+    onpointermove={rowPress.move}
+    onpointerup={rowPress.end}
+    onpointercancel={rowPress.end}
+    onpointerenter={engage}
+    onpointerleave={disengage}
+    onfocusin={engage}
+    onfocusout={disengage}
+    oncontextmenu={openContextMenu}
+    {@attach swipe.attach}
+  >
+    {#if swipe.offset > 0}
+      <div
+        class="swipe-action"
+        class:armed={swipe.action !== 'none'}
+        aria-hidden="true"
+        style:width={`${String(swipe.offset)}px`}
+        style:transform={`translateX(${String(swipe.offset)}px)`}
+      >
+        <ReplyIcon weight="bold" />
+      </div>
+    {/if}
+    {@render actionLayer()}
+    <TimelineNotice {item} {unreadCount} {onSenderProfile} />
+    {#if item.reactions.length > 0}
+      <div class="event-reactions">
+        <span class="event-rail" aria-hidden="true"></span>
+        <MessageReactions
+          reactions={item.reactions}
+          eventId={item.event_id}
+          {currentUserId}
+          {members}
+          {roomId}
+          {actionable}
+          onReact={actions.onReact}
+          {onToggleReaction}
+          onViewReactions={(index: number) => {
+            reactionActive = index;
+            reactionsOpen = true;
+          }}
+        />
+      </div>
+    {/if}
+  </article>
 {/if}
 
 <style>
@@ -1034,6 +1110,27 @@
     .message {
       transition: transform var(--duration-fast) var(--ease-smooth-out);
     }
+  }
+
+  .message.event-row {
+    display: block;
+    padding: 0;
+  }
+
+  .message.event-row :global(.message-actions) {
+    bottom: auto;
+    top: 50%;
+    translate: 0 -50%;
+  }
+
+  .event-reactions {
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .event-rail {
+    flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
+    margin-inline-start: var(--space-300);
   }
 
   .swipe-action {
@@ -1441,9 +1538,9 @@
     white-space: nowrap;
   }
 
-  .reply-compact .reply-copy > :is(strong, span),
-  .reply-connected .reply-copy > :is(strong, span) {
-    opacity: var(--opacity-p300);
+  .reply-compact .reply-copy,
+  .reply-connected .reply-copy {
+    filter: brightness(var(--opacity-p300));
   }
 
   .reply-connected {
@@ -1517,16 +1614,16 @@
     overflow: hidden;
   }
 
-  .reply-preview strong {
+  .reply-preview .reply-name {
     color: var(--reply-name-color);
   }
 
-  .reply-preview.persona strong {
+  .reply-preview.persona .reply-name {
     color: var(--pmp-ink);
   }
 
-  .reply-preview:is(:hover, :focus-visible) .reply-copy > :is(strong, span) {
-    opacity: var(--opacity-p500);
+  .reply-preview:is(:hover, :focus-visible) .reply-copy {
+    filter: brightness(var(--opacity-p500));
   }
 
   .reply-expanded:is(:hover, :focus-visible) {
@@ -1539,32 +1636,6 @@
     text-underline-offset: 0.15em;
   }
 
-  /* bits-ui renders the trigger, so the row's scoped `.reaction` cannot reach it. */
-
-  :global(.reaction-tooltip) {
-    animation: tooltip-in var(--motion-normal) ease-out both;
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--bg-container-line);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-float);
-    box-sizing: border-box;
-    color: var(--bg-on-container);
-    font-size: var(--font-size-small);
-    line-height: var(--line-height-body);
-    max-width: min(15rem, calc(100vw - 2rem));
-    overflow-wrap: anywhere;
-    padding: var(--space-200) var(--space-250);
-    white-space: normal;
-    z-index: var(--layer-tooltip);
-  }
-
-  @keyframes tooltip-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--space-100)) scale(var(--scale-subtle));
-    }
-  }
-
   @media (prefers-reduced-motion: no-preference) {
     .via {
       transition: background-color var(--motion-fast) var(--motion-easing-standard);
@@ -1573,16 +1644,6 @@
     .via-hidden {
       transition: opacity var(--motion-fast) var(--motion-easing-standard);
     }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.reaction-tooltip) {
-      animation: none;
-    }
-  }
-
-  :global(html[data-reduced-motion='on'] .reaction-tooltip) {
-    animation: none;
   }
 
   .message.mention-loud :global(a[data-matrix-link]) {

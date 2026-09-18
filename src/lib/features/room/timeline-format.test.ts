@@ -371,9 +371,9 @@ test('anything you sent is yours to redact, not only your text', () => {
   const image = {
     kind: 'image',
     html: null,
-    body: 'photo.png',
     source: 'mxc://example.org/p',
     filename: 'photo.png',
+    caption: null,
     mime: null,
     width: 8,
     height: 8,
@@ -386,9 +386,9 @@ test('anything you sent is yours to redact, not only your text', () => {
   expect(canRedact(own(image), false), 'an image you sent must be deletable').toBe(true);
   expect(canRedact(theirs(image), false)).toBe(false);
   expect(canRedact(theirs(image), true)).toBe(true);
-  // A divider or a state row is not an event anyone can redact.
+  expect(canRedact(own(joined.content), false)).toBe(true);
+  expect(canRedact(theirs(joined.content), true)).toBe(true);
   expect(canRedact(own(divider.content), true)).toBe(false);
-  expect(canRedact(own(joined.content), true)).toBe(false);
   expect(canRedact(own({ kind: 'redacted', reason: null }), true)).toBe(false);
 });
 

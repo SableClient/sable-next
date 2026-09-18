@@ -3,6 +3,7 @@ import type { Component } from 'svelte';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
+import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
 import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
@@ -30,6 +31,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
   appearance: [{ component: CustomThemes, class: 'custom-themes-card' }],
   notifications: [
     { component: NotificationDefaults },
+    { component: MentionNotifications },
     { component: NotificationKeywords },
     { component: PushGateway },
   ],

@@ -14,6 +14,7 @@ use matrix_sdk::ruma::api::client::authenticated_media::get_media_preview;
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
 use matrix_sdk::ruma::api::client::presence::set_presence;
+use matrix_sdk::ruma::api::client::profile::{PropagateTo, set_profile_field};
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::aliases;
 use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
@@ -24,7 +25,8 @@ use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIden
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
-use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
+use matrix_sdk::ruma::events::reaction::ReactionEventContent;
+use matrix_sdk::ruma::events::relation::{Annotation, InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
@@ -48,13 +50,13 @@ use matrix_sdk::ruma::{
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
 };
-use matrix_sdk_ui::timeline::TimelineEventItemId;
+use matrix_sdk_ui::timeline::{RoomExt, TimelineEventItemId, TimelineFocus};
 
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
-    JoinRuleView, MembershipView, MessageKind, MutualRoomView, PackImageInfoView,
-    PaginationDirection, PresenceView, RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView,
-    RoomVersionsView, ThreadRootView, UrlPreviewView,
+    ImageSourcePackReferenceView, ImageSourcePackView, JoinRuleView, MembershipView, MessageKind,
+    MutualRoomView, PackImageInfoView, PaginationDirection, PresenceView, RoomOpenView,
+    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -385,6 +387,8 @@ impl Core {
                 mentions_room,
                 silent_reply,
                 persona,
+                link_previews,
+                image_source_packs,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let (body, formatted, persona) = match persona {
@@ -407,13 +411,35 @@ impl Core {
                     None => content,
                 };
 
-                match persona {
+                let previews = bundled_link_previews(&link_previews);
+                let image_source_packs = image_source_pack_references(&image_source_packs);
+                let extra = match persona {
                     Some(persona) => {
+                        let mut extra = crate::personas::profile_extra_content(&persona);
+                        if let Some(previews) = previews {
+                            extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
+                        }
+                        if let Some(image_source_packs) = image_source_packs {
+                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), image_source_packs);
+                        }
+                        Some(extra)
+                    }
+                    None => (previews.is_some() || image_source_packs.is_some()).then(|| {
+                        let mut extra = serde_json::Map::new();
+                        if let Some(previews) = previews {
+                            extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
+                        }
+                        if let Some(image_source_packs) = image_source_packs {
+                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), image_source_packs);
+                        }
+                        extra
+                    }),
+                };
+
+                match extra {
+                    Some(extra) => {
                         timeline
-                            .send_with_extra_content(
-                                content.into(),
-                                Some(crate::personas::profile_extra_content(&persona)),
-                            )
+                            .send_with_extra_content(content.into(), Some(extra))
                             .await
                             .map_err(|error| self.failed("send_message", error))?;
                     }
@@ -476,6 +502,7 @@ impl Core {
                 url,
                 body,
                 info,
+                source_pack,
                 in_reply_to,
                 thread_root,
                 persona,
@@ -484,6 +511,7 @@ impl Core {
                 if url.parts().is_err() {
                     return Err(CommandErr::InvalidMedia);
                 }
+                let source = image_source_pack_extra(url.as_str(), source_pack);
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let mut content = StickerEventContent::new(body, sticker_info(info), url);
@@ -499,17 +527,31 @@ impl Core {
                     (None, None) => None,
                 };
 
-                match persona {
-                    Some(persona) => timeline
+                match (persona, source) {
+                    (Some(persona), source) => {
+                        let mut extra = crate::personas::profile_extra_content(
+                            &crate::personas::without_fallback(&persona),
+                        );
+                        if let Some(source) = source {
+                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
+                        }
+                        timeline
+                            .send_with_extra_content(content.into(), Some(extra))
+                            .await
+                            .map_err(|error| self.failed("send_sticker", error))?
+                    }
+                    (None, Some(source)) => timeline
                         .send_with_extra_content(
                             content.into(),
-                            Some(crate::personas::profile_extra_content(
-                                &crate::personas::without_fallback(&persona),
-                            )),
+                            Some({
+                                let mut extra = serde_json::Map::new();
+                                extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
+                                extra
+                            }),
                         )
                         .await
                         .map_err(|error| self.failed("send_sticker", error))?,
-                    None => timeline
+                    (None, None) => timeline
                         .send(content.into())
                         .await
                         .map_err(|error| self.failed("send_sticker", error))?,
@@ -1210,13 +1252,28 @@ impl Core {
                 room_id,
                 event_id,
                 key,
+                source_pack,
                 thread_root,
             } => {
-                self.timeline_for(&room_id, thread_root.as_ref())
-                    .await?
-                    .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
-                    .await
-                    .map_err(|error| self.failed("react", error))?;
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                if let Some(source) = image_source_pack_extra(&key, source_pack) {
+                    timeline
+                        .send_with_extra_content(
+                            ReactionEventContent::new(Annotation::new(event_id, key)).into(),
+                            Some({
+                                let mut extra = serde_json::Map::new();
+                                extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
+                                extra
+                            }),
+                        )
+                        .await
+                        .map_err(|error| self.failed("react", error))?;
+                } else {
+                    timeline
+                        .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
+                        .await
+                        .map_err(|error| self.failed("react", error))?;
+                }
 
                 Ok(CommandOk::React)
             }
@@ -1512,12 +1569,36 @@ impl Core {
             }
 
             Command::SetDisplayName { name } => {
-                self.client()
-                    .await?
-                    .account()
-                    .set_display_name(name.as_deref())
+                let client = self.client().await?;
+                if client
+                    .unstable_features()
                     .await
+                    .map_err(|error| self.failed("set_display_name", error))?
+                    .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
+                        "computer.gingershaped.msc4466",
+                    ))
+                {
+                    let value = ProfileFieldValue::new(
+                        "displayname",
+                        serde_json::Value::String(name.unwrap_or_default()),
+                    )
                     .map_err(|error| self.failed("set_display_name", error))?;
+                    let mut request = set_profile_field::v3::Request::new(
+                        client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
+                        value,
+                    );
+                    request.propagate_to = PropagateTo::Unchanged;
+                    client
+                        .send(request)
+                        .await
+                        .map_err(|error| self.failed("set_display_name", error))?;
+                } else {
+                    client
+                        .account()
+                        .set_display_name(name.as_deref())
+                        .await
+                        .map_err(|error| self.failed("set_display_name", error))?;
+                }
 
                 Ok(CommandOk::SetDisplayName)
             }
@@ -1528,12 +1609,38 @@ impl Core {
                     None => None,
                 };
 
-                self.client()
-                    .await?
-                    .account()
-                    .set_avatar_url(url.as_deref())
+                let client = self.client().await?;
+                if client
+                    .unstable_features()
                     .await
+                    .map_err(|error| self.failed("set_avatar_url", error))?
+                    .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
+                        "computer.gingershaped.msc4466",
+                    ))
+                {
+                    let value = ProfileFieldValue::new(
+                        "avatar_url",
+                        serde_json::Value::String(
+                            url.map(|url| url.to_string()).unwrap_or_default(),
+                        ),
+                    )
                     .map_err(|error| self.failed("set_avatar_url", error))?;
+                    let mut request = set_profile_field::v3::Request::new(
+                        client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
+                        value,
+                    );
+                    request.propagate_to = PropagateTo::Unchanged;
+                    client
+                        .send(request)
+                        .await
+                        .map_err(|error| self.failed("set_avatar_url", error))?;
+                } else {
+                    client
+                        .account()
+                        .set_avatar_url(url.as_deref())
+                        .await
+                        .map_err(|error| self.failed("set_avatar_url", error))?;
+                }
 
                 Ok(CommandOk::SetAvatarUrl)
             }
@@ -1638,10 +1745,16 @@ impl Core {
                 modes: notifications::room_modes(&self.client().await?, room_ids).await,
             }),
 
-            Command::DefaultNotificationModes => {
-                let (direct, group) = notifications::default_modes(&self.client().await?).await;
+            Command::DefaultNotificationModes => Ok(CommandOk::DefaultNotificationModes {
+                modes: notifications::default_modes(&self.client().await?).await,
+            }),
 
-                Ok(CommandOk::DefaultNotificationModes { direct, group })
+            Command::MentionNotifications => {
+                let modes = notifications::mention_notifications(&self.client().await?)
+                    .await
+                    .map_err(|error| self.failed("mention_notifications", error))?;
+
+                Ok(CommandOk::MentionNotifications { modes })
             }
 
             Command::SetPusher { pusher } => {
@@ -1734,12 +1847,24 @@ impl Core {
                 Ok(CommandOk::SetRoomNotificationMode)
             }
 
-            Command::SetDefaultNotificationMode { direct, mode } => {
-                notifications::set_default_mode(&self.client().await?, direct, mode)
+            Command::SetDefaultNotificationMode {
+                direct,
+                encrypted,
+                mode,
+            } => {
+                notifications::set_default_mode(&self.client().await?, direct, encrypted, mode)
                     .await
                     .map_err(|error| self.failed("set_default_notification_mode", error))?;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
+            }
+
+            Command::SetMentionNotifications { rule, mode } => {
+                notifications::set_mention_notifications(&self.client().await?, rule, mode)
+                    .await
+                    .map_err(|error| self.failed("set_mention_notifications", error))?;
+
+                Ok(CommandOk::SetMentionNotifications)
             }
 
             Command::Notification { room_id, event_id } => {
@@ -2318,6 +2443,35 @@ impl Core {
                 thread_root,
                 subscription,
             } => {
+                let receipt_type = if private_receipt {
+                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::ReadPrivate
+                } else {
+                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::Read
+                };
+
+                let Some(event_id) = event_id else {
+                    let room = self.room(&room_id).await?;
+                    let timeline = room
+                        .timeline_builder()
+                        .with_focus(TimelineFocus::Live {
+                            hide_threaded_events: false,
+                        })
+                        .build()
+                        .await
+                        .map_err(|error| self.failed("build mark-read timeline", error))?;
+                    timeline
+                        .mark_as_read(receipt_type)
+                        .await
+                        .map_err(|error| self.failed("mark_read", error))?;
+                    timeline
+                        .mark_as_read(
+                            matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::FullyRead,
+                        )
+                        .await
+                        .map_err(|error| self.failed("mark_read", error))?;
+                    return Ok(CommandOk::MarkRead);
+                };
+
                 let timeline = if let Some(subscription) = subscription {
                     let timeline = self
                         .subscriptions
@@ -2333,11 +2487,6 @@ impl Core {
                     timeline
                 } else {
                     self.timeline_for(&room_id, thread_root.as_ref()).await?
-                };
-                let receipt_type = if private_receipt {
-                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::ReadPrivate
-                } else {
-                    matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::Read
                 };
                 timeline
                     .send_single_receipt(receipt_type, event_id.clone())
@@ -2448,6 +2597,63 @@ fn message_content(
         Some(mentions) => content.add_mentions(mentions),
         None => content,
     }
+}
+
+const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
+const IMAGE_SOURCE_PACKS: &str = "com.beeper.msc4459.image_source_packs";
+
+fn image_source_pack_extra(
+    url: &str,
+    source: Option<ImageSourcePackView>,
+) -> Option<serde_json::Value> {
+    source.map(|source| serde_json::json!({ url: source }))
+}
+
+fn image_source_pack_references(
+    references: &[ImageSourcePackReferenceView],
+) -> Option<serde_json::Value> {
+    (!references.is_empty()).then(|| {
+        serde_json::Value::Object(
+            references
+                .iter()
+                .map(|reference| (reference.url.clone(), serde_json::json!(reference.source)))
+                .collect(),
+        )
+    })
+}
+
+fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Value> {
+    (!previews.is_empty()).then(|| {
+        serde_json::Value::Array(
+            previews
+                .iter()
+                .map(|preview| {
+                    let mut bundle = serde_json::Map::new();
+                    bundle.insert("matched_url".to_owned(), preview.url.clone().into());
+                    bundle.insert("og:url".to_owned(), preview.url.clone().into());
+                    if let Some(title) = &preview.title {
+                        bundle.insert("og:title".to_owned(), title.clone().into());
+                    }
+                    if let Some(description) = &preview.description {
+                        bundle.insert("og:description".to_owned(), description.clone().into());
+                    }
+                    if let Some(site_name) = &preview.site_name {
+                        bundle.insert("og:site_name".to_owned(), site_name.clone().into());
+                    }
+                    if let Some(image) = &preview.image {
+                        bundle.insert("og:image".to_owned(), image.clone().into());
+                    }
+                    if let Some(width) = preview.image_width {
+                        bundle.insert("og:image:width".to_owned(), width.into());
+                    }
+                    if let Some(height) = preview.image_height {
+                        bundle.insert("og:image:height".to_owned(), height.into());
+                    }
+                    serde_json::Value::Object(bundle)
+                })
+                .collect(),
+        )
+    })
 }
 
 fn edit_content(

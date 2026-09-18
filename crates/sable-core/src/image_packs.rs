@@ -6,7 +6,8 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 
 use crate::protocol::{
-    ImagePackOriginView, ImagePackView, ImageUsageView, PackImageInfoView, PackImageView,
+    ImagePackOriginView, ImagePackView, ImageSourcePackView, ImageUsageView, PackImageInfoView,
+    PackImageView,
 };
 
 pub const USER_EMOTES: &str = "im.ponies.user_emotes";
@@ -125,6 +126,15 @@ pub fn pack_view(
         .into_iter()
         .filter(|(_, image)| image.url.starts_with("mxc://"))
         .map(|(shortcode, image)| PackImageView {
+            source_pack: (origin == ImagePackOriginView::Room)
+                .then(|| room_id.clone())
+                .flatten()
+                .map(|room_id| ImageSourcePackView {
+                    room_id,
+                    state_key: id.clone(),
+                    shortcode: shortcode.clone(),
+                    via: Vec::new(),
+                }),
             usage: usages(image.usage.as_ref().or(pack_usage)),
             body: image.body,
             info: image.info.map(Into::into),
@@ -439,6 +449,9 @@ impl Core {
         }
 
         let mut packs = Vec::new();
+        let own_server = client
+            .user_id()
+            .map(|user_id| user_id.server_name().to_string());
         for (state_key, event) in parsed {
             if wanted.is_some_and(|keys| !keys.contains(&state_key)) {
                 continue;
@@ -449,6 +462,13 @@ impl Core {
                 origin,
                 Some(room.room_id().to_string()),
             );
+            if let Some(server) = &own_server {
+                for image in &mut view.images {
+                    if let Some(source) = &mut image.source_pack {
+                        source.via.push(server.clone());
+                    }
+                }
+            }
             if view.name.is_none() {
                 view.name = room.cached_display_name().map(|name| name.to_string());
             }
@@ -480,6 +500,26 @@ mod tests {
         assert_eq!(
             view.images[0].usage,
             vec![ImageUsageView::Emoticon, ImageUsageView::Sticker]
+        );
+    }
+
+    #[test]
+    fn a_room_image_carries_its_source_pack() {
+        let content = parse(r#"{"images":{"blob":{"url":"mxc://a/b"}}}"#);
+        let view = pack_view(
+            content,
+            "pack".to_owned(),
+            ImagePackOriginView::Room,
+            Some("!room:example.org".to_owned()),
+        );
+
+        assert_eq!(
+            view.images[0].source_pack.as_ref().map(|source| (
+                source.room_id.as_str(),
+                source.state_key.as_str(),
+                source.shortcode.as_str(),
+            )),
+            Some(("!room:example.org", "pack", "blob")),
         );
     }
 

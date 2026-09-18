@@ -31,7 +31,7 @@
       dismissedFor !== dismissKey
   );
 
-  const title = $derived(
+  const bannerTitle = $derived(
     selfUnverified
       ? $i18n.t('settings.unverifiedBannerTitle')
       : $i18n.t('settings.unverifiedOthersTitle', { count: otherUnverified })
@@ -60,7 +60,10 @@
 </script>
 
 {#if show}
-  <Banner icon={ShieldWarningIcon} {title} tone="warning">
+  <Banner icon={ShieldWarningIcon} tone="warning" onClose={dismiss}>
+    {#snippet title()}
+      {bannerTitle}
+    {/snippet}
     {#snippet body()}
       {selfUnverified
         ? $i18n.t('settings.unverifiedBannerBody')

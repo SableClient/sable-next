@@ -41,9 +41,22 @@ export function isMessageRow(content: TimelineItemContentView): content is Messa
   return (MESSAGE_ROW_KINDS as readonly string[]).includes(content.kind);
 }
 
-/** An image, a poll or a location you posted is yours to delete too. */
+const FORWARDABLE_KINDS = [
+  'message',
+  'image',
+  'video',
+  'audio',
+  'file',
+  'location',
+  'gallery',
+] as const satisfies readonly TimelineItemContentView['kind'][];
+
+export function canForward(content: TimelineItemContentView): boolean {
+  return (FORWARDABLE_KINDS as readonly string[]).includes(content.kind);
+}
+
 export function canRedact(item: TimelineItemView, canRedactOthers: boolean): boolean {
-  if (!isMessageRow(item.content) || item.content.kind === 'redacted') return false;
+  if (isAnnotation(item) || item.content.kind === 'redacted') return false;
   return item.is_own || canRedactOthers;
 }
 
@@ -63,7 +76,7 @@ export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
   return count <= 4 ? 3 : 4;
 }
 
-function isAnnotation(item: TimelineItemView): boolean {
+export function isAnnotation(item: TimelineItemView): boolean {
   const kind = item.content.kind;
   return kind === 'date_divider' || kind === 'read_marker' || kind === 'timeline_start';
 }

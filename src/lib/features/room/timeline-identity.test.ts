@@ -23,6 +23,7 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     read_by: [],
     ...options,
     per_message_profile: options.per_message_profile ?? null,
+    bundled_link_previews: options.bundled_link_previews ?? [],
     mention: options.mention ?? 'none',
   };
 }

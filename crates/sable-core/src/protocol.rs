@@ -104,6 +104,7 @@ pub enum Command {
         room_ids: Vec<OwnedRoomId>,
     },
     DefaultNotificationModes,
+    MentionNotifications,
     Notification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -149,6 +150,10 @@ pub enum Command {
         silent_reply: bool,
         #[serde(default)]
         persona: Option<PerMessageProfileView>,
+        #[serde(default)]
+        link_previews: Vec<UrlPreviewView>,
+        #[serde(default)]
+        image_source_packs: Vec<ImageSourcePackReferenceView>,
     },
     SendRawEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -160,11 +165,12 @@ pub enum Command {
     SendSticker {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
-        /// `mxc://` only; the core rejects anything else.
         url: String,
         body: String,
         #[serde(default)]
         info: Option<PackImageInfoView>,
+        #[serde(default)]
+        source_pack: Option<ImageSourcePackView>,
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         in_reply_to: Option<OwnedEventId>,
@@ -419,6 +425,8 @@ pub enum Command {
         event_id: OwnedEventId,
         key: String,
         #[serde(default)]
+        source_pack: Option<ImageSourcePackView>,
+        #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
     },
@@ -521,8 +529,9 @@ pub enum Command {
     MarkRead {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
-        #[cfg_attr(feature = "typegen", specta(type = String))]
-        event_id: OwnedEventId,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        event_id: Option<OwnedEventId>,
         #[serde(default)]
         private_receipt: bool,
         #[serde(default)]
@@ -760,7 +769,12 @@ pub enum Command {
     },
     SetDefaultNotificationMode {
         direct: bool,
+        encrypted: bool,
         mode: NotificationModeView,
+    },
+    SetMentionNotifications {
+        rule: MentionRuleView,
+        mode: MentionNotificationModeView,
     },
 
     SetRoomName {
@@ -990,8 +1004,10 @@ pub enum CommandOk {
         modes: Vec<RoomNotificationModeView>,
     },
     DefaultNotificationModes {
-        direct: NotificationModeView,
-        group: NotificationModeView,
+        modes: DefaultNotificationModesView,
+    },
+    MentionNotifications {
+        modes: MentionNotificationsView,
     },
     /// `Some` carries the VAPID key subscriptions must be minted under.
     WebPusherSupport {
@@ -1253,6 +1269,7 @@ pub enum CommandOk {
     SetPresence,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
+    SetMentionNotifications,
 
     SetDirect,
     SetRoomName,
@@ -1996,6 +2013,7 @@ pub struct TimelineItemView {
     /// MSC4144. When set, this is the identity to show as the sender; `sender`
     /// stays the account that actually sent it and must remain reachable.
     pub per_message_profile: Option<PerMessageProfileView>,
+    pub bundled_link_previews: Vec<UrlPreviewView>,
     pub mention: MentionView,
 }
 
@@ -2021,7 +2039,7 @@ pub struct ThreadRootView {
     pub timestamp: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct UrlPreviewView {
     pub url: String,
@@ -2292,11 +2310,11 @@ pub enum TimelineItemContentView {
         edited: bool,
     },
     Image {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
-        filename: Option<String>,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         width: Option<u64>,
@@ -2308,7 +2326,8 @@ pub enum TimelineItemContentView {
         spoiler: Option<String>,
     },
     Video {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
@@ -2321,7 +2340,8 @@ pub enum TimelineItemContentView {
         spoiler: Option<String>,
     },
     Audio {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
@@ -2333,7 +2353,8 @@ pub enum TimelineItemContentView {
         voice: bool,
     },
     File {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         /// Sanitised display HTML for a formatted caption, when present.
         html: Option<String>,
         source: String,
@@ -2685,6 +2706,43 @@ pub enum NotificationModeView {
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct DefaultNotificationModesView {
+    pub direct: NotificationModeView,
+    pub direct_encrypted: NotificationModeView,
+    pub group: NotificationModeView,
+    pub group_encrypted: NotificationModeView,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum MentionNotificationModeView {
+    Off,
+    Notify,
+    Loud,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum MentionRuleView {
+    Room,
+    User,
+    DisplayName,
+    Username,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct MentionNotificationsView {
+    pub room: MentionNotificationModeView,
+    pub user: MentionNotificationModeView,
+    pub display_name: MentionNotificationModeView,
+    pub username: MentionNotificationModeView,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
     pub room: Option<NotificationModeView>,
@@ -2781,9 +2839,7 @@ pub struct ImagePackView {
 #[serde(rename_all = "snake_case")]
 pub enum ImagePackOriginView {
     Account,
-    /// The room being viewed.
     Room,
-    /// Another room, subscribed to account-wide.
     Global,
     Space,
 }
@@ -2792,11 +2848,27 @@ pub enum ImagePackOriginView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct PackImageView {
     pub shortcode: String,
-    /// Always `mxc://`; anything else is dropped when the pack is read.
     pub url: String,
     pub body: Option<String>,
     pub usage: Vec<ImageUsageView>,
     pub info: Option<PackImageInfoView>,
+    pub source_pack: Option<ImageSourcePackView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ImageSourcePackView {
+    pub room_id: String,
+    pub state_key: String,
+    pub shortcode: String,
+    pub via: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ImageSourcePackReferenceView {
+    pub url: String,
+    pub source: ImageSourcePackView,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

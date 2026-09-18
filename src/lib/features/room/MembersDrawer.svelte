@@ -11,14 +11,18 @@
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { whenVisible } from '#lib/ui/when-visible.js';
 
   import MemberIdentityRow from './MemberIdentityRow.svelte';
   import {
+    INITIAL_MEMBER_ROWS,
     MEMBERSHIP_FILTERS,
     MEMBERSHIP_FILTER_LABELS,
+    MEMBER_ROWS_STEP,
     MEMBER_SORTS,
     MEMBER_SORT_LABELS,
     groupMembers,
+    limitGroups,
     matchesFilter,
     memberName,
     membershipFor,
@@ -56,6 +60,7 @@
   let filter = $state<MembershipFilter>('join');
   let fetched = $state.raw<MemberView[]>([]);
   let fetching = $state(false);
+  let limit = $state(INITIAL_MEMBER_ROWS);
   let generation = 0;
 
   let sort = $derived(preferences.memberSort);
@@ -67,7 +72,16 @@
     return matching.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
   });
   let groups = $derived(groupMembers(searched, sort));
+  let shown = $derived(limitGroups(groups, limit));
+  let hidden = $derived(Math.max(0, searched.length - limit));
   let busy = $derived(filter === 'join' ? loading : fetching);
+
+  $effect(() => {
+    void members;
+    void search;
+    void filter;
+    limit = INITIAL_MEMBER_ROWS;
+  });
 
   $effect(() => {
     const load = loadMembership;
@@ -183,7 +197,7 @@
   {:else}
     {#if groups.length > 0}
       <div class="member-groups">
-        {#each groups as group (group.level)}
+        {#each shown as group (group.level)}
           {@const tag = powerTag(group.level, $i18n.t, powerTags)}
           <h3 class="group-label" style:color={tag.color ?? undefined}>{tag.name}</h3>
           <ul>
@@ -200,6 +214,15 @@
             {/each}
           </ul>
         {/each}
+        {#if hidden > 0}
+          {#key limit}
+            <div
+              class="load-sentinel"
+              aria-hidden="true"
+              {@attach whenVisible(() => (limit += MEMBER_ROWS_STEP))}
+            ></div>
+          {/key}
+        {/if}
       </div>
     {:else if search.trim() !== ''}
       <p class="status">{$i18n.t('timeline.noMembersFound')}</p>
@@ -342,7 +365,7 @@
   .group-label {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-500);
     line-height: var(--line-height-small);
     margin: 0;
     padding: var(--space-200) var(--space-200) var(--space-100);
@@ -352,6 +375,10 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+
+  .load-sentinel {
+    height: 1px;
   }
 
   :global(.member-identity-row.member) {

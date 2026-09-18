@@ -58,6 +58,9 @@ jobs:
             --prerelease true \
             --title 'Nightly (main)' \
             --notes "Rolling nightly build from main at $SHA"
+          # A manifest left by the previous run passes wait-assets early and
+          # makes the AltStore job point at an IPA finalize-nightly will delete.
+          node scripts/ci/forgejo-release.mjs delete-asset --tag nightly --name github-bundles.json || true
   build-web:
     name: Build web assets
     needs: setup-release
@@ -352,9 +355,10 @@ jobs:
         if: ${{ env.ANDROID_KEY_BASE64 != '' }}
         run: |
           apk="src-tauri/gen/android/app/build/outputs/apk/universal/release/sable-next-${VERSION}-android-universal.apk"
-          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort | tail -n 1)"
+          sdk="$(mise exec -- printenv ANDROID_HOME)"
+          apksigner="$(find "$sdk/build-tools" -name apksigner -type f | sort | tail -n 1)"
           [ -n "$apksigner" ] || { echo 'apksigner not found' >&2; exit 1; }
-          "$apksigner" verify --print-certs "$apk"
+          mise exec -- "$apksigner" verify --print-certs "$apk"
       - name: Attach Android bundles to release
         run: |
           mapfile -d '' bundles < <(find src-tauri/gen/android/app/build/outputs -type f \

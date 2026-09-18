@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Tooltip } from 'bits-ui';
   import { on } from 'svelte/events';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { markAbbreviations } from './abbreviations';
   import { hasRoomAbbreviations, useRoomAbbreviations } from './room-abbreviations.svelte.js';
@@ -15,8 +15,6 @@
   import { splitVia } from './join-address';
   import { settingsLinkLabel } from './settings-link-label';
   import { parseSettingsLink } from './settings-link';
-
-  import '#lib/ui/primitives/tooltip.css';
 
   interface Props {
     html: string;
@@ -361,6 +359,7 @@
     const link = parseMatrixLink(anchor.href);
     if (!link || !onMatrixLink) return;
     event.preventDefault();
+    event.stopPropagation();
     onMatrixLink(link, anchor);
   }
 
@@ -376,15 +375,7 @@
 <div class="formatted-body" {@attach decorate(renderedHtml)}>{@html renderedHtml}</div>
 
 {#if definitionAnchor && definition}
-  <Tooltip.Provider>
-    <Tooltip.Root open>
-      <Tooltip.Portal>
-        <Tooltip.Content class="tooltip" customAnchor={definitionAnchor} side="top" sideOffset={8}>
-          {definition}
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
-  </Tooltip.Provider>
+  <Tooltip label={definition} open customAnchor={definitionAnchor} side="top" />
 {/if}
 
 <style>

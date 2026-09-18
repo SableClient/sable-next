@@ -1,6 +1,13 @@
 import { expect, test } from 'vitest';
 
-import { filesFrom, formatSize, stageFiles, unstageFile } from './composer-files';
+import {
+  canSpoiler,
+  filesFrom,
+  formatSize,
+  stageFiles,
+  toggleSpoiler,
+  unstageFile,
+} from './composer-files';
 
 function file(name: string): File {
   return new File(['x'], name, { type: 'image/png' });
@@ -34,4 +41,22 @@ test('unstaging removes only the addressed entry', () => {
 
   expect(unstageFile(staged, 0).map((item) => item.file.name)).toEqual(['two.png']);
   expect(unstageFile(staged, 9)).toHaveLength(2);
+});
+
+test('a staged file starts unmarked and only the addressed one toggles', () => {
+  let id = 0;
+  const staged = stageFiles([], [file('one.png'), file('two.png')], () => id++);
+
+  expect(staged.map((item) => item.spoiler)).toEqual([false, false]);
+  expect(toggleSpoiler(staged, 1).map((item) => item.spoiler)).toEqual([false, true]);
+  expect(toggleSpoiler(toggleSpoiler(staged, 1), 1).map((item) => item.spoiler)).toEqual([
+    false,
+    false,
+  ]);
+});
+
+test('only media can be hidden behind a spoiler', () => {
+  expect(canSpoiler(file('one.png'))).toBe(true);
+  expect(canSpoiler(new File(['x'], 'clip.webm', { type: 'video/webm' }))).toBe(true);
+  expect(canSpoiler(new File(['x'], 'report.pdf', { type: 'application/pdf' }))).toBe(false);
 });

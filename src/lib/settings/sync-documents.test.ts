@@ -100,7 +100,7 @@ describe('the drafts document', () => {
   it('carries the editor document and not the staged files', () => {
     writeDraft('!room:example.org', {
       doc: { type: 'doc' },
-      staged: [{ id: 1, file: new File([], 'cat.png') }],
+      staged: [{ id: 1, file: new File([], 'cat.png'), spoiler: false }],
       nextStagedId: 2,
     });
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Tooltip as BitsTooltip } from 'bits-ui';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import { onDestroy } from 'svelte';
 
@@ -7,6 +6,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { LongPress } from './long-press.svelte.js';
   import ReactionPicker from './ReactionPicker.svelte';
@@ -19,8 +19,15 @@
     members: readonly MemberView[];
     roomId: string;
     actionable: boolean;
-    onReact?: (key: string) => void;
-    onToggleReaction?: (eventId: string, key: string) => void;
+    onReact?: (
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
+    onToggleReaction?: (
+      eventId: string,
+      key: string,
+      sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
+    ) => void;
     onViewReactions?: (index: number) => void;
   }
 
@@ -53,39 +60,39 @@
   });
 </script>
 
-<BitsTooltip.Provider delayDuration={400} skipDelayDuration={100}>
-  <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
-    {#each reactions as reaction, index (reaction.key)}
-      {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
-      {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
-        <button
-          {...props}
-          class="reaction choice"
-          type="button"
-          aria-pressed={mine}
-          aria-label={$i18n.t('timeline.toggleReaction', {
-            key: reaction.key,
-            count: reaction.senders.length,
-          })}
-          disabled={eventId === null}
-          onclick={() => {
-            if (press.fired) {
-              press.fired = false;
-              return;
-            }
-            if (eventId) onToggleReaction?.(eventId, reaction.key);
-          }}
-          oncontextmenu={(event) => {
-            openDetails(event, index);
-          }}
-          onpointerdown={(event) => {
-            pressIndex = index;
-            press.start(event);
-          }}
-          onpointermove={press.move}
-          onpointerup={press.end}
-          onpointercancel={press.end}
-        >
+<div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
+  {#each reactions as reaction, index (reaction.key)}
+    {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
+    {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
+      <button
+        {...props}
+        class="reaction choice"
+        type="button"
+        aria-pressed={mine}
+        aria-label={$i18n.t('timeline.toggleReaction', {
+          key: reaction.key,
+          count: reaction.senders.length,
+        })}
+        disabled={eventId === null}
+        onclick={() => {
+          if (press.fired) {
+            press.fired = false;
+            return;
+          }
+          if (eventId) onToggleReaction?.(eventId, reaction.key);
+        }}
+        oncontextmenu={(event) => {
+          openDetails(event, index);
+        }}
+        onpointerdown={(event) => {
+          pressIndex = index;
+          press.start(event);
+        }}
+        onpointermove={press.move}
+        onpointerup={press.end}
+        onpointercancel={press.end}
+      >
+        <span class="reaction-key">
           {#if reaction.key.startsWith('mxc://')}
             <MediaImage
               class="reaction-image"
@@ -98,31 +105,28 @@
           {:else}
             <em>{reaction.key}</em>
           {/if}
-          {reaction.senders.length}
-        </button>
-      {/snippet}
-      <BitsTooltip.Root>
-        <BitsTooltip.Trigger child={reactionTrigger} />
-        <BitsTooltip.Portal>
-          <BitsTooltip.Content class="reaction-tooltip" side="top" align="center" sideOffset={8}>
-            {reactionSummary(reaction.senders, reaction.key, members, $i18n.t)}
-          </BitsTooltip.Content>
-        </BitsTooltip.Portal>
-      </BitsTooltip.Root>
-    {/each}
-    {#if actionable && onReact}
-      {@const react = onReact}
-      <ReactionPicker
-        label={$i18n.t('timeline.addReaction')}
-        triggerClass="add-reaction"
-        {roomId}
-        onPick={react}
-      >
-        <PlusIcon />
-      </ReactionPicker>
-    {/if}
-  </div>
-</BitsTooltip.Provider>
+        </span>
+        <span class="reaction-count">{reaction.senders.length}</span>
+      </button>
+    {/snippet}
+    <Tooltip
+      label={reactionSummary(reaction.senders, reaction.key, members, $i18n.t)}
+      side="top"
+      trigger={reactionTrigger}
+    />
+  {/each}
+  {#if actionable && onReact}
+    {@const react = onReact}
+    <ReactionPicker
+      label={$i18n.t('timeline.addReaction')}
+      triggerClass="add-reaction"
+      {roomId}
+      onPick={react}
+    >
+      <PlusIcon />
+    </ReactionPicker>
+  {/if}
+</div>
 
 <style>
   .reactions {
@@ -146,19 +150,21 @@
   }
 
   .reaction {
-    align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
     color: var(--surface-var-on-container);
     cursor: pointer;
-    display: inline-flex;
+    display: grid;
     font: inherit;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-medium);
     gap: var(--space-100);
+    grid-template-columns: minmax(0, 1fr) auto;
+    max-width: 100%;
     min-height: 1.5rem;
+    min-width: 0;
     padding: var(--space-050) var(--space-200) var(--space-050) var(--space-150);
     position: relative;
   }
@@ -177,10 +183,20 @@
     width: auto;
   }
 
-  .reaction em {
+  .reaction-key {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .reaction-key em {
     font-size: var(--font-size-body);
     font-style: normal;
     line-height: 1;
+  }
+
+  .reaction-count {
+    align-self: center;
+    white-space: nowrap;
   }
 
   .reaction:disabled {

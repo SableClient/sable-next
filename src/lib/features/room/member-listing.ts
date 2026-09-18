@@ -12,6 +12,9 @@ export const MEMBERSHIP_FILTERS: readonly MembershipFilter[] = [
   'ban',
 ];
 
+export const INITIAL_MEMBER_ROWS = 30;
+export const MEMBER_ROWS_STEP = 50;
+
 export const MEMBER_SORT_LABELS: Record<MemberSort, string> = {
   'name-asc': 'timeline.memberSortNameAsc',
   'name-desc': 'timeline.memberSortNameDesc',
@@ -76,4 +79,16 @@ export function groupMembers(members: readonly MemberView[], sort: MemberSort): 
     else groups.push({ level: member.power_level, members: [member] });
   }
   return groups;
+}
+
+export function limitGroups(groups: readonly MemberGroup[], limit: number): MemberGroup[] {
+  const limited: MemberGroup[] = [];
+  let taken = 0;
+  for (const group of groups) {
+    if (taken >= limit) break;
+    const members = group.members.slice(0, limit - taken);
+    taken += members.length;
+    limited.push({ level: group.level, members });
+  }
+  return limited;
 }

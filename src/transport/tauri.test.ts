@@ -39,6 +39,7 @@ test('percent-encodes a caption and a filename a header value cannot carry', asy
     inReplyTo: null,
     info: null,
     threadRoot: null,
+    spoiler: true,
   });
 
   const headers = headersOf(invoke.mock.calls.at(-1) ?? []);
@@ -49,6 +50,7 @@ test('percent-encodes a caption and a filename a header value cannot carry', asy
   );
   expect(headers.mentions).toBe(encodeURIComponent(JSON.stringify(['@one:example.org'])));
   expect(headers['mentions-room']).toBe('true');
+  expect(headers.spoiler).toBe('true');
   for (const value of Object.values(headers)) {
     expect(value).toMatch(/^[ -~]*$/);
   }

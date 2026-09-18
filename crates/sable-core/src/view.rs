@@ -56,7 +56,8 @@ use crate::protocol::{
     ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
     RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
     SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
-    TimelineItemContentView, TimelineItemView, UploadProgressView, UtdCauseView, VectorDiff,
+    TimelineItemContentView, TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView,
+    VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -710,6 +711,7 @@ pub fn timeline_item(
                 });
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
+            let bundled_link_previews = bundled_link_previews(raw.content.as_ref());
 
             TimelineItemView {
                 id,
@@ -726,10 +728,11 @@ pub fn timeline_item(
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
-                reactions: reactions(event.content()),
+                reactions: reactions(event.reactions()),
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,
+                bundled_link_previews,
                 mention,
             }
         }
@@ -763,6 +766,7 @@ pub fn timeline_item(
                 is_own: false,
                 read_by: Vec::new(),
                 per_message_profile: None,
+                bundled_link_previews: Vec::new(),
                 mention: MentionView::None,
             }
         }
@@ -1228,12 +1232,13 @@ pub(crate) const RTC_SLOT_TYPE: &str = "org.matrix.msc4143.rtc.slot";
 
 pub(crate) const CALL_SLOT_ID: &str = "m.call#ROOM";
 
+pub(crate) const SPOILER_PROPERTY: &str = "page.codeberg.everypizza.msc4193.spoiler";
+
 fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
-    const SPOILER: &str = "page.codeberg.everypizza.msc4193.spoiler";
     const REASON: &str = "page.codeberg.everypizza.msc4193.spoiler.reason";
 
     let content = content?;
-    if content.get(SPOILER)?.as_bool() != Some(true) {
+    if content.get(SPOILER_PROPERTY)?.as_bool() != Some(true) {
         return None;
     }
     Some(
@@ -1243,6 +1248,39 @@ fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
             .unwrap_or_default()
             .to_owned(),
     )
+}
+
+fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
+    const KEY: &str = "com.beeper.linkpreviews";
+
+    content
+        .and_then(|content| content.get(KEY))
+        .and_then(serde_json::Value::as_array)
+        .map_or_else(Vec::new, |bundles| {
+            bundles
+                .iter()
+                .filter_map(|bundle| {
+                    let text = |key| bundle.get(key).and_then(serde_json::Value::as_str);
+                    let url = text("matched_url").or_else(|| text("og:url"))?.to_owned();
+                    if !(url.starts_with("https://") || url.starts_with("http://")) {
+                        return None;
+                    }
+                    let dimension = |key| bundle.get(key).and_then(serde_json::Value::as_u64);
+                    let image = text("og:image")
+                        .filter(|image| image.starts_with("mxc://"))
+                        .map(ToOwned::to_owned);
+                    Some(UrlPreviewView {
+                        url,
+                        title: text("og:title").map(ToOwned::to_owned),
+                        description: text("og:description").map(ToOwned::to_owned),
+                        site_name: text("og:site_name").map(ToOwned::to_owned),
+                        image,
+                        image_width: dimension("og:image:width"),
+                        image_height: dimension("og:image:height"),
+                    })
+                })
+                .collect()
+        })
 }
 
 const fn utd_cause(message: &EncryptedMessage) -> UtdCauseView {
@@ -1278,10 +1316,10 @@ fn message_content(
 
     match message.msgtype() {
         MessageType::Image(image) => TimelineItemContentView::Image {
-            body: image.body.clone(),
-            html: formatted_caption_html(image.body.as_str(), image.formatted_caption()),
+            filename: image.filename().to_owned(),
+            caption: image.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(image.caption(), image.formatted_caption()),
             source: media_source(&image.source),
-            filename: image.filename.clone(),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
@@ -1290,8 +1328,9 @@ fn message_content(
             spoiler: spoiler_reason(raw.content.as_ref()),
         },
         MessageType::Video(video) => TimelineItemContentView::Video {
-            body: video.body.clone(),
-            html: formatted_caption_html(video.body.as_str(), video.formatted_caption()),
+            filename: video.filename().to_owned(),
+            caption: video.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(video.caption(), video.formatted_caption()),
             source: media_source(&video.source),
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
@@ -1300,8 +1339,9 @@ fn message_content(
             spoiler: spoiler_reason(raw.content.as_ref()),
         },
         MessageType::Audio(audio) => TimelineItemContentView::Audio {
-            body: audio.body.clone(),
-            html: formatted_caption_html(audio.body.as_str(), audio.formatted_caption()),
+            filename: audio.filename().to_owned(),
+            caption: audio.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(audio.caption(), audio.formatted_caption()),
             source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
             duration_ms: audio
@@ -1325,8 +1365,9 @@ fn message_content(
             voice: audio.voice.is_some(),
         },
         MessageType::File(file) => TimelineItemContentView::File {
-            body: file.body.clone(),
-            html: formatted_caption_html(file.body.as_str(), file.formatted_caption()),
+            filename: file.filename().to_owned(),
+            caption: file.caption().map(ToOwned::to_owned),
+            html: formatted_caption_html(file.caption(), file.formatted_caption()),
             source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
             size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
@@ -1457,10 +1498,15 @@ fn content(
 }
 
 fn formatted_caption_html(
-    body: &str,
+    caption: Option<&str>,
     formatted: Option<&matrix_sdk::ruma::events::room::message::FormattedBody>,
 ) -> Option<String> {
-    formatted.map(|formatted| display_html(body, Some(formatted.body.as_str())))
+    let formatted = formatted?;
+
+    Some(display_html(
+        caption.unwrap_or_default(),
+        Some(formatted.body.as_str()),
+    ))
 }
 
 fn formatted_body(msgtype: &MessageType) -> Option<String> {
@@ -1533,12 +1579,8 @@ fn body_of(content: &TimelineItemContent) -> Option<String> {
     }
 }
 
-fn reactions(content: &TimelineItemContent) -> Vec<ReactionGroup> {
-    let TimelineItemContent::MsgLike(msg) = content else {
-        return Vec::new();
-    };
-
-    msg.reactions
+fn reactions(reactions: &matrix_sdk_ui::timeline::ReactionsByKeyBySender) -> Vec<ReactionGroup> {
+    reactions
         .iter()
         .map(|(key, senders)| ReactionGroup {
             key: key.clone(),
@@ -1708,9 +1750,9 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, call_participants,
-        clamp_power_level, formatted_caption_html, geo_coordinates, in_call, per_message_profile,
-        relay_author, relay_profile, via_servers,
+        LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
+        call_participants, clamp_power_level, formatted_caption_html, geo_coordinates, in_call,
+        per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
     use matrix_sdk::ruma::serde::Raw;
@@ -1726,6 +1768,32 @@ mod tests {
         );
         let serialized = serde_json::to_value(view).unwrap();
         assert_eq!(serialized["kind"], "call_invite");
+    }
+
+    #[test]
+    fn reads_bundled_link_previews_without_trusting_external_images() {
+        let previews = bundled_link_previews(Some(&json!({
+            "com.beeper.linkpreviews": [{
+                "matched_url": "https://example.org/post",
+                "og:title": "Post",
+                "og:image": "https://example.org/image.png",
+            }, {
+                "og:url": "https://example.org/other",
+                "og:image": "mxc://example.org/image",
+                "og:image:width": 640,
+            }, {
+                "matched_url": "mxc://example.org/not-a-link",
+            }],
+        })));
+
+        assert_eq!(previews.len(), 2);
+        assert_eq!(previews[0].title.as_deref(), Some("Post"));
+        assert_eq!(previews[0].image, None);
+        assert_eq!(
+            previews[1].image.as_deref(),
+            Some("mxc://example.org/image")
+        );
+        assert_eq!(previews[1].image_width, Some(640));
     }
 
     #[test]
@@ -1767,7 +1835,6 @@ mod tests {
         );
         let content = TimelineItemContent::MsgLike(MsgLikeContent {
             kind: MsgLikeKind::LiveLocation(LiveLocationState::new(beacon)),
-            reactions: matrix_sdk_ui::timeline::ReactionsByKeyBySender::default(),
             in_reply_to: None,
             thread_root: None,
             thread_summary: None,
@@ -2033,7 +2100,7 @@ mod tests {
     #[test]
     fn formatted_attachment_captions_are_sanitised_for_display() {
         let html = formatted_caption_html(
-            "hi Ana party",
+            Some("hi Ana party"),
             Some(&FormattedBody::html(
                 "<a href=\"https://matrix.to/#/@ana:example.org\">Ana</a> <img src=\"mxc://example.org/party\" alt=\"party\" data-mx-emoticon><script>steal()</script>",
             )),
@@ -2044,7 +2111,7 @@ mod tests {
         assert!(html.contains("src=\"mxc://example.org/party\""));
         assert!(html.contains("data-mx-emoticon"));
         assert!(!html.contains("script"));
-        assert_eq!(formatted_caption_html("photo.png", None), None);
+        assert_eq!(formatted_caption_html(None, None), None);
     }
 
     #[test]

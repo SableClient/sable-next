@@ -17,10 +17,10 @@ function picture(width: number, height: number) {
     ...timelineItem('media-probe', 'probe'),
     content: {
       kind: 'image',
-      body: 'shot.png',
+      filename: 'shot.png',
+      caption: null,
       html: null,
       source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
-      filename: null,
       mime: 'image/png',
       width,
       height,
@@ -181,7 +181,8 @@ test('a video in a bubble fills its bubble on mobile', async ({
     ...picture(1920, 1080),
     content: {
       kind: 'video',
-      body: 'clip.mp4',
+      filename: 'clip.mp4',
+      caption: null,
       html: null,
       source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
       mime: 'video/mp4',
@@ -227,7 +228,8 @@ function portraitVideo() {
     ...timelineItem('media-probe', 'probe'),
     content: {
       kind: 'video',
-      body: 'clip.mp4',
+      filename: 'clip.mp4',
+      caption: null,
       html: null,
       source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
       mime: 'video/mp4',

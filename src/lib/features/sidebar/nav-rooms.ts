@@ -19,14 +19,20 @@ export function markRoomsRead(
   privateReceipt = false
 ): void {
   for (const room of rooms) {
-    const eventId = room?.latest_event?.event_id;
-    if (!room || !eventId) continue;
+    if (!room) continue;
     if (room.unread === 0 && room.highlight === 0 && !room.marked_unread) continue;
+    if (!room.latest_event) continue;
 
-    void commands.markRead(room.room_id, eventId, privateReceipt).catch((error: unknown) => {
+    void commands.markRead(room.room_id, null, privateReceipt).catch((error: unknown) => {
       console.warn('[sable nav] mark as read failed', error);
     });
   }
+}
+
+export function markRoomUnread(roomId: string, commands: Pick<CoreCommands, 'markUnread'>): void {
+  void commands.markUnread(roomId, null).catch((error: unknown) => {
+    console.warn('[sable nav] mark as unread failed', error);
+  });
 }
 
 export function spaceDescendantRooms(

@@ -1,9 +1,12 @@
 import type {
   BookmarkView,
+  ImageSourcePackView,
+  ImageSourcePackReferenceView,
   PackImageInfoView,
   PerMessageProfileView,
   PersonaCatalogView,
   PersonaView,
+  DefaultNotificationModesView,
   DeviceView,
   EncryptionStatusView,
   SyncStatus,
@@ -13,6 +16,9 @@ import type {
   MemberView,
   MembershipView,
   MessageKind,
+  MentionNotificationModeView,
+  MentionNotificationsView,
+  MentionRuleView,
   NotificationModeView,
   NotificationSettingsView,
   RoomNotificationModeView,
@@ -94,6 +100,8 @@ export type SendMessageOptions = {
   mentions?: OutgoingMentions;
   persona?: PerMessageProfileView | null;
   kind?: MessageKind;
+  linkPreviews?: UrlPreviewView[];
+  imageSourcePacks?: ImageSourcePackReferenceView[];
 };
 
 export type SendAttachmentOptions = {
@@ -103,6 +111,7 @@ export type SendAttachmentOptions = {
   inReplyTo?: string | null;
   threadRoot?: string | null;
   persona?: PerMessageProfileView | null;
+  spoiler?: boolean;
 };
 
 export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
@@ -622,6 +631,8 @@ export function createCommands(transport: () => Transport) {
         mentions_room: mentions.room,
         silent_reply: options.silentReply ?? false,
         persona: $state.snapshot(options.persona ?? null),
+        link_previews: $state.snapshot(options.linkPreviews ?? []),
+        image_source_packs: $state.snapshot(options.imageSourcePacks ?? []),
       });
     },
 
@@ -639,6 +650,7 @@ export function createCommands(transport: () => Transport) {
       url: string,
       body: string,
       info: PackImageInfoView | null = null,
+      sourcePack: ImageSourcePackView | null = null,
       inReplyTo: string | null = null,
       threadRoot: string | null = null,
       persona: PerMessageProfileView | null = null
@@ -649,6 +661,7 @@ export function createCommands(transport: () => Transport) {
         url,
         body,
         info,
+        source_pack: $state.snapshot(sourcePack),
         in_reply_to: inReplyTo,
         thread_root: threadRoot,
         persona: $state.snapshot(persona),
@@ -969,7 +982,8 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       eventId: string,
       key: string,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      sourcePack: ImageSourcePackView | null = null
     ): Promise<void> {
       await transport().send({
         type: 'react',
@@ -977,6 +991,7 @@ export function createCommands(transport: () => Transport) {
         event_id: eventId,
         thread_root: threadRoot,
         key,
+        source_pack: $state.snapshot(sourcePack),
       });
     },
 
@@ -1074,6 +1089,7 @@ export function createCommands(transport: () => Transport) {
         info,
         threadRoot: options.threadRoot ?? null,
         persona: options.persona ?? null,
+        spoiler: options.spoiler ?? false,
       });
     },
 
@@ -1083,7 +1099,7 @@ export function createCommands(transport: () => Transport) {
 
     async markRead(
       roomId: string,
-      eventId: string,
+      eventId: string | null,
       privateReceipt = false,
       threadRoot: string | null = null,
       subscription: SubscriptionId | null = null
@@ -1133,20 +1149,34 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async defaultNotificationModes(): Promise<{
-      direct: NotificationModeView;
-      group: NotificationModeView;
-    }> {
+    async defaultNotificationModes(): Promise<DefaultNotificationModesView> {
       const response = await transport().send({
         type: 'default_notification_modes',
       });
-      return { direct: response.direct, group: response.group };
+      return response.modes;
     },
 
-    async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
+    async mentionNotifications(): Promise<MentionNotificationsView> {
+      const response = await transport().send({ type: 'mention_notifications' });
+      return response.modes;
+    },
+
+    async setMentionNotifications(
+      rule: MentionRuleView,
+      mode: MentionNotificationModeView
+    ): Promise<void> {
+      await transport().send({ type: 'set_mention_notifications', rule, mode });
+    },
+
+    async setDefaultNotificationMode(
+      direct: boolean,
+      encrypted: boolean,
+      mode: NotificationModeView
+    ): Promise<void> {
       await transport().send({
         type: 'set_default_notification_mode',
         direct,
+        encrypted,
         mode,
       });
     },

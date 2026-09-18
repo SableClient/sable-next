@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use matrix_sdk::{
-    Client, ClientBuilder,
+    Client, ClientBuilder, ThreadingSupport,
     authentication::{
         matrix::MatrixSession,
         oauth::{
@@ -20,6 +20,10 @@ use url::Url;
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(15);
 
 const SESSION_TIMEOUT: Duration = Duration::from_mins(2);
+
+pub(crate) const THREADING_SUPPORT: ThreadingSupport = ThreadingSupport::Enabled {
+    with_subscriptions: false,
+};
 
 pub struct Session {
     pub account_id: String,
@@ -259,6 +263,7 @@ fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
     let builder = builder
         .request_config(RequestConfig::new().timeout(SESSION_TIMEOUT))
         .handle_refresh_tokens()
+        .with_threading_support(THREADING_SUPPORT)
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
             auto_enable_cross_signing: true,

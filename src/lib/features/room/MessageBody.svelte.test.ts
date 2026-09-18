@@ -40,6 +40,7 @@ function item(content: TimelineItemContentView): TimelineItemView {
     is_own: false,
     read_by: [],
     per_message_profile: null,
+    bundled_link_previews: [],
     mention: 'none',
   };
 }
@@ -47,7 +48,13 @@ function item(content: TimelineItemContentView): TimelineItemView {
 function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemContentView {
   const html =
     '<a href="https://matrix.to/#/@ana:example.org">Ana</a> <img src="mxc://example.org/party" alt="party" data-mx-emoticon>';
-  const base = { body: 'caption', html, source: 'mxc://example.org/media', mime: null };
+  const base = {
+    filename: 'media.bin',
+    caption: 'caption',
+    html,
+    source: 'mxc://example.org/media',
+    mime: null,
+  };
 
   switch (kind) {
     case 'image':
@@ -94,10 +101,10 @@ test('keeps an image filename hidden without the alt-text preference', async () 
     props: {
       item: item({
         kind: 'image',
-        body: 'photo.png',
+        filename: 'photo.png',
+        caption: null,
         html: null,
         source: 'mxc://example.org/photo',
-        filename: null,
         mime: 'image/png',
         width: null,
         height: null,
@@ -113,6 +120,38 @@ test('keeps an image filename hidden without the alt-text preference', async () 
   expect(document.querySelector('.body')).toBeNull();
   await unmount(instance);
 });
+
+test.each(['image', 'video', 'audio', 'file'] as const)(
+  'renders a plain caption under a %s attachment',
+  async (kind) => {
+    const content = { ...attachment(kind), html: null } as TimelineItemContentView;
+    const instance = mount(MessageBody, {
+      target: document.body,
+      props: { item: item(content), canRedactOthers: false },
+    });
+    await tick();
+
+    expect(document.querySelector('.body')?.textContent).toBe('caption');
+
+    await unmount(instance);
+  }
+);
+
+test.each(['image', 'video', 'audio', 'file'] as const)(
+  'never reads a %s filename as a caption',
+  async (kind) => {
+    const content = { ...attachment(kind), html: null, caption: null } as TimelineItemContentView;
+    const instance = mount(MessageBody, {
+      target: document.body,
+      props: { item: item(content), canRedactOthers: false },
+    });
+    await tick();
+
+    expect(document.querySelector('.body')).toBeNull();
+
+    await unmount(instance);
+  }
+);
 
 test.each(['javascript:alert(document.domain)', 'data:text/html,unsafe', 'geo:invalid'])(
   'does not turn an invalid location into a navigable link: %s',

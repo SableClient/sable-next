@@ -71,6 +71,12 @@
   let spoilerHidden = $derived(spoiler !== null && !revealedSpoilers.has(spoilerKey));
   let source = $derived(spoilerHidden ? null : (item?.source ?? null));
   let mime = $derived(item?.mime ?? null);
+  let fileName = $derived(
+    item === undefined ? '' : item.kind === 'sticker' ? item.body : item.filename
+  );
+  let mediaLabel = $derived(
+    item === undefined ? '' : item.kind === 'sticker' ? item.body : (item.caption ?? item.filename)
+  );
   let url = $state<string | null>(null);
   let failed = $state(false);
   let zoom = $state(1);
@@ -463,7 +469,7 @@
 
   async function shareMedia(anchor: HTMLElement): Promise<void> {
     if (!url || !item) return;
-    const name = item.body || 'image';
+    const name = fileName || 'image';
     if (nativeShare) {
       await shareFile(url, name, item.mime ?? undefined, anchor.getBoundingClientRect());
       return;
@@ -496,7 +502,7 @@
 
   async function download(): Promise<void> {
     if (!url || !item) return;
-    const filename = item.body || 'image';
+    const filename = fileName || 'image';
     if (savesNatively()) {
       await saveFile(url, filename);
       return;
@@ -509,7 +515,7 @@
 
   async function saveToPhotos(): Promise<void> {
     if (!url || !item) return;
-    await saveImageToPhotos(url, item.body || 'image', item.mime ?? undefined);
+    await saveImageToPhotos(url, fileName || 'image', item.mime ?? undefined);
   }
 </script>
 
@@ -624,23 +630,23 @@
                 class="media-player"
                 controls
                 src={url}
-                aria-label={item.body || $i18n.t('timeline.videoAttachment')}
+                aria-label={mediaLabel || $i18n.t('timeline.videoAttachment')}
               >
-                {item.body}
+                {fileName}
               </video>
             {:else if item.kind === 'audio'}
               <audio
                 class="media-player"
                 controls
                 src={url}
-                aria-label={item.body || $i18n.t('timeline.audioAttachment')}
+                aria-label={mediaLabel || $i18n.t('timeline.audioAttachment')}
               >
-                {item.body}
+                {fileName}
               </audio>
             {:else if item.kind === 'file'}
               <PdfViewer
                 src={url}
-                name={item.body}
+                name={fileName}
                 page={pdfPage}
                 {zoom}
                 onPages={(pages) => {
@@ -654,7 +660,7 @@
                 class:dragging
                 class:instant
                 src={url}
-                alt={item.body || $i18n.t('viewer.imageAlt')}
+                alt={mediaLabel || $i18n.t('viewer.imageAlt')}
                 draggable="false"
                 style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
@@ -744,7 +750,7 @@
             </div>
           {/if}
           <p>
-            {spoilerHidden ? $i18n.t('composer.spoiler') : item.body || $i18n.t('viewer.untitled')}
+            {spoilerHidden ? $i18n.t('composer.spoiler') : mediaLabel || $i18n.t('viewer.untitled')}
           </p>
           {#if isImage || isPdf}
             <button

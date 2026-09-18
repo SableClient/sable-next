@@ -619,6 +619,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
             url: "mxc://example.org/blob".to_owned(),
             body: "blobwave".to_owned(),
             info: None,
+            source_pack: None,
             in_reply_to: None,
             thread_root: None,
             persona: None,
@@ -1327,44 +1328,13 @@ async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
 }
 
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-async fn mark_read_body(private_receipt: bool) -> (serde_json::Value, serde_json::Value) {
-    let server = MatrixMockServer::new().await;
-    let client = server.client_builder().build().await;
-    client.event_cache().subscribe().unwrap();
-    let room_id = room_id!("!receipts:example.org");
-    let factory = EventFactory::new().room(room_id).sender(*ALICE);
-
-    server.mock_room_state_encryption().plain().mount().await;
-    server
-        .sync_room(
-            &client,
-            JoinedRoomBuilder::new(room_id)
-                .add_timeline_event(factory.text_msg("read me").event_id(event_id!("$read"))),
-        )
-        .await;
-    Mock::given(method("POST"))
-        .and(path(format!(
-            "/_matrix/client/v3/rooms/{room_id}/read_markers"
-        )))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .expect(1)
-        .mount(server.server())
-        .await;
-
-    let receipt_type = if private_receipt {
-        "m.read.private"
-    } else {
-        "m.read"
-    };
-    Mock::given(method("POST"))
-        .and(path(format!(
-            "/_matrix/client/v3/rooms/{room_id}/receipt/{receipt_type}/$read"
-        )))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .expect(1)
-        .mount(server.server())
-        .await;
-
+async fn dispatch_mark_read(
+    server: &MatrixMockServer,
+    client: matrix_sdk::Client,
+    room_id: matrix_sdk::ruma::OwnedRoomId,
+    event_id: Option<matrix_sdk::ruma::OwnedEventId>,
+    private_receipt: bool,
+) {
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
     *core.session.write().await = Some(Session {
@@ -1376,33 +1346,117 @@ async fn mark_read_body(private_receipt: bool) -> (serde_json::Value, serde_json
     });
 
     core.dispatch(Command::MarkRead {
-        room_id: room_id.to_owned(),
-        event_id: event_id!("$read").to_owned(),
+        room_id,
+        event_id,
         private_receipt,
         thread_root: None,
         subscription: None,
     })
     .await
     .unwrap();
+}
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+async fn mark_read_body(
+    private_receipt: bool,
+    event_id: Option<matrix_sdk::ruma::OwnedEventId>,
+    include_threaded_reply: bool,
+) -> (serde_json::Value, serde_json::Value, String, String) {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .on_builder(|builder| builder.with_threading_support(crate::session::THREADING_SUPPORT))
+        .build()
+        .await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!receipts:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = JoinedRoomBuilder::new(room_id)
+        .add_timeline_event(factory.text_msg("read me").event_id(event_id!("$read")));
+    let room = if include_threaded_reply {
+        room.add_timeline_event(
+            factory
+                .text_msg("threaded reply")
+                .in_thread(event_id!("$read"), event_id!("$read"))
+                .event_id(event_id!("$threaded")),
+        )
+    } else {
+        room
+    };
+    server.sync_room(&client, room).await;
+    if event_id.is_some() {
+        Mock::given(method("POST"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{room_id}/read_markers"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+    } else {
+        Mock::given(method("POST"))
+            .and(path_regex(format!(
+                r"^/_matrix/client/v3/rooms/{room_id}/receipt/m\.fully_read/.*$"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+    }
+
+    let receipt_type = if private_receipt {
+        "m.read.private"
+    } else {
+        "m.read"
+    };
+    Mock::given(method("POST"))
+        .and(path_regex(format!(
+            r"^/_matrix/client/v3/rooms/{room_id}/receipt/{receipt_type}/.*$"
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    dispatch_mark_read(
+        &server,
+        client,
+        room_id.to_owned(),
+        event_id,
+        private_receipt,
+    )
+    .await;
 
     let requests = server
         .server()
         .received_requests()
         .await
         .expect("wiremock records requests");
-    let marker = requests
-        .iter()
-        .rev()
-        .find(|request| request.url.path().ends_with("/read_markers"))
-        .expect("a read marker request");
+    let marker = requests.iter().rev().find(|request| {
+        request.url.path().ends_with("/read_markers")
+            || request.url.path().contains("/receipt/m.fully_read/")
+    });
 
     let receipt = requests
         .iter()
-        .find(|request| request.url.path().contains("/receipt/"))
+        .find(|request| {
+            request.url.path().contains("/receipt/")
+                && !request.url.path().contains("/receipt/m.fully_read/")
+        })
         .expect("a scoped receipt request");
+    let marker_path = marker
+        .map(|request| request.url.path().to_owned())
+        .unwrap_or_default();
+    let receipt_path = receipt.url.path().to_owned();
     (
-        serde_json::from_slice(&marker.body).expect("a JSON body"),
+        marker
+            .map(|request| serde_json::from_slice(&request.body).expect("a JSON body"))
+            .unwrap_or_default(),
         serde_json::from_slice(&receipt.body).expect("a receipt body"),
+        marker_path,
+        receipt_path,
     )
 }
 
@@ -1534,7 +1588,8 @@ async fn marking_unread_from_a_message_walks_the_read_marker_back() {
 
 #[tokio::test]
 async fn marking_read_publishes_a_receipt_and_moves_the_marker() {
-    let (body, receipt) = mark_read_body(false).await;
+    let (body, receipt, _, _) =
+        mark_read_body(false, Some(event_id!("$read").to_owned()), false).await;
 
     assert_eq!(receipt["thread_id"], json!("main"));
     assert!(body.get("m.read").is_none());
@@ -1544,7 +1599,8 @@ async fn marking_read_publishes_a_receipt_and_moves_the_marker() {
 
 #[tokio::test]
 async fn a_private_reader_still_moves_the_marker_without_telling_the_room() {
-    let (body, receipt) = mark_read_body(true).await;
+    let (body, receipt, _, _) =
+        mark_read_body(true, Some(event_id!("$read").to_owned()), false).await;
 
     assert_eq!(receipt["thread_id"], json!("main"));
     assert!(body.get("m.read.private").is_none());
@@ -1554,6 +1610,15 @@ async fn a_private_reader_still_moves_the_marker_without_telling_the_room() {
         "the unread badge tracks the marker, so it has to move either way"
     );
     assert!(body.get("m.read").is_none(), "{body}");
+}
+
+#[tokio::test]
+async fn marking_a_room_read_uses_the_latest_threaded_event() {
+    let (body, _, fully_read_path, read_path) = mark_read_body(false, None, true).await;
+
+    assert_eq!(body, json!({}));
+    assert!(read_path.ends_with("/m.read/$threaded"));
+    assert!(fully_read_path.ends_with("/m.fully_read/$threaded"));
 }
 
 async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<Option<String>> {

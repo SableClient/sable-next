@@ -47,7 +47,6 @@ export interface Preferences {
   memberSort: MemberSort;
   filterPronounsByLanguage: boolean;
   pronounPillLimit: PronounPillLimit;
-  hidePronounPill: boolean;
 
   enterForNewline: boolean;
   mentionInReplies: boolean;
@@ -78,6 +77,7 @@ export interface Preferences {
   notificationEncryptedContent: boolean;
   richPushPayloads: boolean;
   clearNotificationsOnRead: boolean;
+  highlightMentions: boolean;
   ringForGroupCalls: boolean;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
@@ -176,7 +176,6 @@ const DEFAULTS: Preferences = {
   memberSort: 'name-asc',
   filterPronounsByLanguage: true,
   pronounPillLimit: '3',
-  hidePronounPill: false,
 
   enterForNewline: false,
   mentionInReplies: true,
@@ -207,6 +206,7 @@ const DEFAULTS: Preferences = {
   notificationEncryptedContent: false,
   richPushPayloads: true,
   clearNotificationsOnRead: true,
+  highlightMentions: true,
   ringForGroupCalls: false,
 
   pushGatewayUrl: '',

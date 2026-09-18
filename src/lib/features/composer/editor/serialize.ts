@@ -15,6 +15,7 @@ import {
 } from 'prosemirror-model';
 
 import type { OutgoingMentions } from '#lib/core/client.svelte.js';
+import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 
 import { composerSchema, ROOM_PING } from './schema';
 
@@ -22,9 +23,11 @@ export interface ComposerMessage {
   body: string;
   formatted: string | null;
   mentions: OutgoingMentions;
+  imageSourcePacks?: ImageSourcePackReferenceView[];
 }
 
 type AutolinkState = MarkdownSerializerState & { inAutolink?: boolean };
+const SPOILER_FALLBACK = '\uE000';
 
 function isBareUrl(mark: Mark, parent: ProseMirrorNode, index: number): boolean {
   const child = parent.child(index);
@@ -180,15 +183,90 @@ export function composerMarkdown(doc: ProseMirrorNode): string {
   return markdown.serialize(withoutTrailingParagraph(flattenRoomPings(doc))).trim();
 }
 
+function spoilerFallback(node: ProseMirrorNode): ProseMirrorNode {
+  if (node.isText && composerSchema.marks.spoiler.isInSet(node.marks)) {
+    return composerSchema.text(
+      SPOILER_FALLBACK,
+      node.marks.filter((mark) => mark.type !== composerSchema.marks.spoiler)
+    );
+  }
+
+  if (node.isLeaf) return node;
+
+  const children: ProseMirrorNode[] = [];
+  let previousWasSpoiler = false;
+  node.forEach((child) => {
+    const isSpoiler = child.isText && Boolean(composerSchema.marks.spoiler.isInSet(child.marks));
+    if (!isSpoiler || !previousWasSpoiler) children.push(spoilerFallback(child));
+    previousWasSpoiler = isSpoiler;
+  });
+  return node.copy(Fragment.from(children));
+}
+
+function imageSourcePacksOf(doc: ProseMirrorNode): ImageSourcePackReferenceView[] {
+  const references: ImageSourcePackReferenceView[] = [];
+  doc.descendants((node) => {
+    if (node.type !== composerSchema.nodes.emoticon) return;
+    const source = node.attrs.sourcePack as unknown;
+    if (
+      typeof node.attrs.url !== 'string' ||
+      source === null ||
+      typeof source !== 'object' ||
+      !('room_id' in source) ||
+      !('state_key' in source) ||
+      !('shortcode' in source) ||
+      !('via' in source) ||
+      typeof source.room_id !== 'string' ||
+      typeof source.state_key !== 'string' ||
+      typeof source.shortcode !== 'string' ||
+      !Array.isArray(source.via) ||
+      !source.via.every((server) => typeof server === 'string')
+    )
+      return;
+    references.push({
+      url: node.attrs.url,
+      source: {
+        room_id: source.room_id,
+        state_key: source.state_key,
+        shortcode: source.shortcode,
+        via: source.via,
+      },
+    });
+  });
+  return references;
+}
+
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const mentions = mentionsOf(doc);
   const flat = withoutTrailingParagraph(flattenRoomPings(doc));
-  if (isPlain(flat)) return { body: plainTextOf(flat).trim(), formatted: null, mentions };
+  const imageSourcePacks = imageSourcePacksOf(flat);
+  if (isPlain(flat)) {
+    return {
+      body: plainTextOf(flat).trim(),
+      formatted: null,
+      mentions,
+      ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
+    };
+  }
 
-  const body = markdown.serialize(flat).trim();
-  if (body === '') return { body, formatted: null, mentions };
+  const body = markdown
+    .serialize(spoilerFallback(flat))
+    .replaceAll(SPOILER_FALLBACK, '[Spoiler]')
+    .trim();
+  if (body === '')
+    return {
+      body,
+      formatted: null,
+      mentions,
+      ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
+    };
 
-  return { body, formatted: html(flat), mentions };
+  return {
+    body,
+    formatted: html(flat),
+    mentions,
+    ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
+  };
 }
 
 function mentionsRoom(doc: ProseMirrorNode): boolean {
@@ -344,13 +422,25 @@ function spliceAtoms(node: ProseMirrorNode, atoms: ProseMirrorNode[]): ProseMirr
 export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   const body = plainTextOf(doc).trim();
   const mentions = mentionsOf(doc);
-  if (body === '') return { body, formatted: null, mentions };
+  const imageSourcePacks = imageSourcePacksOf(doc);
+  if (body === '')
+    return {
+      body,
+      formatted: null,
+      mentions,
+      ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
+    };
 
   const { source, atoms } = markdownSourceOf(doc);
   const parsed = withoutTrailingParagraph(
     flattenRoomPings(spliceAtoms(markdownParser.parse(source.trim()), atoms))
   );
-  return { body, formatted: isPlain(parsed) ? null : html(parsed), mentions };
+  return {
+    body,
+    formatted: isPlain(parsed) ? null : html(parsed),
+    mentions,
+    ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
+  };
 }
 
 export function richFromPlain(doc: ProseMirrorNode): ProseMirrorNode {

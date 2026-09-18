@@ -44,7 +44,10 @@
 </script>
 
 {#if show}
-  <Banner icon={KeyIcon} title={$i18n.t('settings.recoveryIncompleteTitle')} tone="warning">
+  <Banner icon={KeyIcon} tone="warning" onClose={dismiss}>
+    {#snippet title()}
+      {$i18n.t('settings.recoveryIncompleteTitle')}
+    {/snippet}
     {#snippet body()}
       {$i18n.t('settings.recoveryIncompleteBody')}
     {/snippet}

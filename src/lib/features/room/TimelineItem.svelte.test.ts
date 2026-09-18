@@ -61,6 +61,7 @@ function item(emote: boolean): TimelineItemView {
     is_own: false,
     read_by: [],
     per_message_profile: null,
+    bundled_link_previews: [],
     mention: 'none',
   };
 }
@@ -71,9 +72,9 @@ function imageItem(body = 'photo.png'): TimelineItemView {
     content: {
       kind: 'image',
       html: null,
-      body,
-      source: 'mxc://example.org/photo',
       filename: 'photo.png',
+      caption: body,
+      source: 'mxc://example.org/photo',
       mime: 'image/png',
       width: 800,
       height: 600,
@@ -121,7 +122,7 @@ test('places a connected reply preview above the sender header', async () => {
   expect(message?.querySelector(':scope > .message-avatar')).not.toBeNull();
   expect(reply?.nextElementSibling?.tagName).toBe('HEADER');
   expect(reply?.style.getPropertyValue('--reply-name-color')).toBe(senderColor('@bob:example.org'));
-  expect(reply?.querySelector('strong')?.textContent).toBe('Bob');
+  expect(reply?.querySelector('.reply-name')?.textContent).toBe('Bob');
   reply?.click();
   expect(onJumpToEvent).toHaveBeenCalledWith('$original');
 
@@ -145,7 +146,7 @@ test.each(['connected', 'compact', 'expanded'] as const)(
     });
     await tick();
 
-    expect(document.querySelector('.reply-preview strong')?.textContent).toBe('@Bob');
+    expect(document.querySelector('.reply-preview .reply-name')?.textContent).toBe('@Bob');
 
     await unmount(instance);
   }
@@ -166,7 +167,7 @@ test('leaves an unpinged reply target without an at sign', async () => {
   });
   await tick();
 
-  expect(document.querySelector('.reply-preview strong')?.textContent).toBe('Bob');
+  expect(document.querySelector('.reply-preview .reply-name')?.textContent).toBe('Bob');
 
   await unmount(instance);
 });
@@ -319,7 +320,7 @@ test('edits an own image caption without dropping its media details', async () =
   const image = {
     ...imageItem(),
     is_own: true,
-    content: { ...imageItem().content, body: 'caption' },
+    content: { ...imageItem().content, caption: 'caption' },
   };
   const instance = mount(TimelineItemHarness, {
     target: document.body,
@@ -563,8 +564,37 @@ test('provides a formatted reaction attribution tooltip', async () => {
   await vi.advanceTimersByTimeAsync(400);
   await tick();
 
-  expect(document.querySelector('.reaction-tooltip')?.textContent).toBe('Alice reacted with 👍');
+  expect(document.querySelector('.tooltip')?.textContent).toBe('Alice reacted with 👍');
   vi.useRealTimers();
+  await unmount(instance);
+});
+
+test('keeps a long text reaction separate from its count', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: {
+          ...item(false),
+          reactions: [
+            {
+              key: 'this is an absurdly long reaction to test the reaction layout',
+              senders: ['@alice:example.org'],
+            },
+          ],
+        },
+        collapsed: false,
+      },
+    },
+  });
+  await tick();
+
+  const reaction = document.querySelector<HTMLButtonElement>('.reaction');
+  expect(reaction?.querySelector('.reaction-key')?.textContent).toBe(
+    'this is an absurdly long reaction to test the reaction layout'
+  );
+  expect(reaction?.querySelector('.reaction-count')?.textContent).toBe('1');
   await unmount(instance);
 });
 
@@ -847,5 +877,52 @@ test('offers to add a message inline emote to your own pack', async () => {
   await tick();
 
   expect(document.querySelector('.menu-surface')?.textContent).toContain('Add emote to my pack');
+  await unmount(instance);
+});
+
+test('a membership row keeps its notice look and still carries the action layer', async () => {
+  const joined: TimelineItemView = {
+    ...item(false),
+    content: {
+      kind: 'membership',
+      user_id: '@alice:example.org',
+      change: 'joined',
+      display_name: 'Alice',
+      reason: null,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: joined, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  const row = document.querySelector('article.event-row');
+  if (!row) throw new Error('the membership event was not wrapped in an actionable row');
+  expect(row.querySelector('.state')).not.toBeNull();
+  expect(row.querySelector('header .sender')).toBeNull();
+
+  row.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await tick();
+  expect(document.querySelector('.message-actions')).not.toBeNull();
+
+  await unmount(instance);
+});
+
+test('a date divider stays a plain annotation with nothing to act on', async () => {
+  const divider: TimelineItemView = {
+    ...item(false),
+    event_id: null,
+    content: { kind: 'date_divider', timestamp: 0 },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: divider, collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  expect(document.querySelector('article')).toBeNull();
+  expect(document.querySelector('.date-divider')).not.toBeNull();
+
   await unmount(instance);
 });

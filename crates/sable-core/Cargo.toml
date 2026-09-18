@@ -46,7 +46,11 @@ sha2 = "0.11"
 getrandom = "0.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-matrix-sdk = { workspace = true, features = ["bundled-sqlite"] }
+matrix-sdk = { workspace = true, features = [
+  "bundled-sqlite",
+  "automatic-room-key-forwarding",
+  "qrcode",
+] }
 tokio = { workspace = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -63,8 +67,8 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 
 [dev-dependencies]
 matrix-sdk = { workspace = true, features = ["testing"] }
-matrix-sdk-test = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "d3ee5492bb7ba66664b830d1059a5c250894fa66" }
-matrix-sdk-test-utils = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "d3ee5492bb7ba66664b830d1059a5c250894fa66" }
+matrix-sdk-test = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "0202eb52b6b9aa03bad41e100c90f10741816bdb" }
+matrix-sdk-test-utils = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "0202eb52b6b9aa03bad41e100c90f10741816bdb" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"

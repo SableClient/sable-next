@@ -69,7 +69,7 @@
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
-  import { eventBefore, latestEventId } from './timeline-format';
+  import { eventBefore } from './timeline-format';
 
   interface Props {
     roomId: string;
@@ -101,6 +101,7 @@
     personas,
     timeline,
     roomId: () => resolvedRoomId,
+    encrypted: () => resolvedRoom?.encrypted ?? null,
   });
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
@@ -137,7 +138,7 @@
       if (
         content.kind !== 'image' &&
         content.kind !== 'sticker' &&
-        !(content.kind === 'file' && isPdfAttachment(content.mime, content.body))
+        !(content.kind === 'file' && isPdfAttachment(content.mime, content.filename))
       ) {
         return [];
       }
@@ -597,13 +598,17 @@
   }
 
   function markRoomRead(): void {
-    const newest = latestEventId(timeline.items);
-    if (!newest) return;
     void core.commands
-      .markRead(resolvedRoomId, newest, readReceiptIsPrivate())
+      .markRead(resolvedRoomId, null, readReceiptIsPrivate())
       .catch((error: unknown) => {
         console.warn('[sable room] mark as read failed', error);
       });
+  }
+
+  function markRoomUnread(): void {
+    void core.commands.markUnread(resolvedRoomId).catch((error: unknown) => {
+      console.warn('[sable room] mark as unread failed', error);
+    });
   }
 
   function openMedia(eventId: string): void {
@@ -616,10 +621,10 @@
     const eventId = `profile-avatar-${String(++profileAvatarSequence)}`;
     profileAvatarItem = {
       kind: 'image',
-      body: displayName,
+      filename: displayName,
+      caption: null,
       html: null,
       source,
-      filename: null,
       mime: null,
       width: null,
       height: null,
@@ -736,6 +741,7 @@
           canInvite={permissions?.can_invite ?? false}
           compact={!desktop}
           onMarkRead={markRoomRead}
+          onMarkUnread={markRoomUnread}
           onInvite={() => (inviteOpen = true)}
           onMembers={toggleMembers}
           onSettings={() => (settingsOpen = true)}
@@ -795,6 +801,7 @@
           currentUserId={core.session?.user_id ?? null}
           scrollLocked={profileOpen || receiptsOpen}
           {typingLabel}
+          footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
           bind:nearLatest={timelineAtBottom}
           bind:followingLive={timelineFollowingLive}
         >

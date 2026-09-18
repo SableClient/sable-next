@@ -2,11 +2,12 @@ import type { TimelineItemContentView } from '#src/generated/protocol';
 
 export function replyPreviewBody(content: TimelineItemContentView): string {
   switch (content.kind) {
-    case 'message':
     case 'image':
     case 'video':
     case 'audio':
     case 'file':
+      return content.caption ?? content.filename;
+    case 'message':
     case 'sticker':
     case 'location':
     case 'gallery':

@@ -146,6 +146,7 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
       color_on_dark: null,
       has_fallback: false,
     },
+    spoiler: false,
   });
 });
 

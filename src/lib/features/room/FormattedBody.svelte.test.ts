@@ -32,10 +32,12 @@ afterEach(() => {
 
 test('opens Matrix links through the room-level handler', async () => {
   const onMatrixLink = vi.fn();
+  const onDocumentClick = vi.fn();
+  document.addEventListener('click', onDocumentClick);
   const instance = mount(FormattedBody, {
     target: document.body,
     props: {
-      html: '<a href="matrix:roomid/room:example.org/e/event">Message</a>',
+      html: '<a href="https://matrix.to/#/!room:example.org/$event">Message</a>',
       onMatrixLink,
     },
   });
@@ -47,6 +49,8 @@ test('opens Matrix links through the room-level handler', async () => {
     { kind: 'event', roomId: '!room:example.org', eventId: '$event' },
     expect.any(HTMLAnchorElement)
   );
+  expect(onDocumentClick).not.toHaveBeenCalled();
+  document.removeEventListener('click', onDocumentClick);
   await unmount(instance);
 });
 

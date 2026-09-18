@@ -10,9 +10,10 @@
   interface Props {
     url: string;
     encrypted: boolean | null;
+    bundled?: UrlPreviewView | null;
   }
 
-  let { url, encrypted }: Props = $props();
+  let { url, encrypted, bundled = null }: Props = $props();
   const core = useCoreClient();
   let preview = $state<UrlPreviewView | null>(null);
   let allowed = $derived(
@@ -20,6 +21,10 @@
   );
 
   $effect(() => {
+    if (bundled !== null) {
+      preview = bundled;
+      return;
+    }
     if (!allowed) {
       preview = null;
       return;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { RoomSummary, RoomTag } from '#src/generated/protocol';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
+  import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
@@ -30,7 +31,7 @@
 
   import AddToSpaceDialog from './AddToSpaceDialog.svelte';
   import { wouldCreateCycle } from './add-to-space.js';
-  import { markRoomsRead, spaceDescendantRooms } from './nav-rooms.js';
+  import { markRoomUnread, markRoomsRead, spaceDescendantRooms } from './nav-rooms.js';
 
   interface Props {
     room: RoomSummary;
@@ -166,6 +167,10 @@
     markRoomsRead(readable, core.commands, readReceiptIsPrivate());
   }
 
+  function markUnread(): void {
+    markRoomUnread(room.room_id, core.commands);
+  }
+
   async function copyLink(): Promise<void> {
     try {
       const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
@@ -205,10 +210,17 @@
   }}
 >
   <IconContext values={{ 'aria-hidden': 'true' }}>
-    <ActionMenuItem disabled={!unread} onSelect={markRead}>
-      <ChecksIcon />
-      {$i18n.t('room.menuMarkRead')}
-    </ActionMenuItem>
+    {#if room.is_space || unread}
+      <ActionMenuItem disabled={!unread} onSelect={markRead}>
+        <ChecksIcon />
+        {$i18n.t('room.menuMarkRead')}
+      </ActionMenuItem>
+    {:else}
+      <ActionMenuItem onSelect={markUnread}>
+        <CircleDashedIcon />
+        {$i18n.t('room.menuMarkUnread')}
+      </ActionMenuItem>
+    {/if}
     <ActionMenuSeparator />
     <ActionMenuItem
       onSelect={() => {

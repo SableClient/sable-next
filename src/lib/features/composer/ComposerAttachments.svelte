@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import VideoIcon from 'phosphor-svelte/lib/VideoIcon';
@@ -7,15 +8,16 @@
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
-  import { formatSize, type StagedFile } from './composer-files';
+  import { canSpoiler, formatSize, type StagedFile } from './composer-files';
 
   interface Props {
     files: readonly StagedFile[];
     disabled?: boolean;
     onRemove: (id: number) => void;
+    onToggleSpoiler: (id: number) => void;
   }
 
-  let { files, disabled = false, onRemove }: Props = $props();
+  let { files, disabled = false, onRemove, onToggleSpoiler }: Props = $props();
 </script>
 
 <ul class="staged" aria-label={$i18n.t('composer.stagedFiles')}>
@@ -34,6 +36,21 @@
         <span class="staged-name">{item.file.name}</span>
         <span class="staged-size">{formatSize(item.file.size)}</span>
       </span>
+      {#if canSpoiler(item.file)}
+        <IconButton
+          variant="ghost"
+          size="small"
+          class={['staged-spoiler', item.spoiler && 'staged-spoiler-on']}
+          {disabled}
+          aria-pressed={item.spoiler}
+          label={$i18n.t('composer.spoilerAttachment', { name: item.file.name })}
+          onclick={() => {
+            onToggleSpoiler(item.id);
+          }}
+        >
+          <EyeSlashIcon />
+        </IconButton>
+      {/if}
       <IconButton
         variant="ghost"
         size="small"
@@ -108,12 +125,18 @@
     font-size: var(--font-size-small);
   }
 
-  .staged-item :global(.staged-remove) {
+  .staged-item :global(.staged-remove),
+  .staged-item :global(.staged-spoiler) {
     border-radius: var(--radius-inner);
     flex: 0 0 auto;
   }
 
-  :global(.staged-remove svg) {
+  .staged-item :global(.staged-spoiler-on) {
+    color: var(--warn-main);
+  }
+
+  :global(.staged-remove svg),
+  :global(.staged-spoiler svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
   }

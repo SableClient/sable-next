@@ -1,8 +1,11 @@
 import type {
   PackImageInfoView,
+  ImageSourcePackView,
+  ImageSourcePackReferenceView,
   MessageKind,
   PerMessageProfileView,
   TimelineItemView,
+  UrlPreviewView,
 } from '#src/generated/protocol';
 
 import { goto } from '$app/navigation';
@@ -16,6 +19,8 @@ import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
+import { firstPreviewableLink } from '#lib/features/room/link-preview.js';
+import { loadUrlPreview } from '#lib/features/room/link-preview-cache.js';
 import {
   projectPersona,
   resolvePersona,
@@ -35,6 +40,7 @@ export type ConversationDeps = {
   personas: PersonaStore;
   timeline: RoomTimeline;
   roomId: () => string;
+  encrypted?: () => boolean | null;
   threadRoot?: string | null;
 };
 
@@ -45,15 +51,24 @@ export class Conversation {
   readonly #personas: PersonaStore;
   readonly #timeline: RoomTimeline;
   readonly #roomId: () => string;
+  readonly #encrypted: () => boolean | null;
   readonly #threadRoot: string | null;
   /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
   readonly #requestedDetails = new Set<string>();
 
-  constructor({ core, personas, timeline, roomId, threadRoot = null }: ConversationDeps) {
+  constructor({
+    core,
+    personas,
+    timeline,
+    roomId,
+    encrypted,
+    threadRoot = null,
+  }: ConversationDeps) {
     this.#core = core;
     this.#personas = personas;
     this.#timeline = timeline;
     this.#roomId = roomId;
+    this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
   }
 
@@ -61,11 +76,22 @@ export class Conversation {
     return this.#threadRoot;
   }
 
+  async #bundledLinkPreviews(html: string | null): Promise<UrlPreviewView[]> {
+    const enabled =
+      this.#encrypted() === false ? preferences.urlPreviews : preferences.encryptedUrlPreviews;
+    if (!enabled) return [];
+    const url = html ? firstPreviewableLink(html) : null;
+    if (!url) return [];
+    const preview = await loadUrlPreview(this.#core.commands, url);
+    return preview ? [preview] : [];
+  }
+
   readonly sendMessage = async (
     targetRoomId: string,
     body: string,
     formatted: string | null = null,
-    mentions: OutgoingMentions = NO_MENTIONS
+    mentions: OutgoingMentions = NO_MENTIONS,
+    imageSourcePacks: ImageSourcePackReferenceView[] = []
   ): Promise<ConversationSendResult | undefined> => {
     const pending = this.context;
     if (body === '') return;
@@ -122,6 +148,7 @@ export class Conversation {
       outcome.body,
       untouched ? (outcome.formatted ?? formatted) : (outcome.formatted ?? null)
     );
+    const linkPreviews = await this.#bundledLinkPreviews(outgoing.formatted);
     await this.#core.commands.sendMessage(targetRoomId, outgoing.body, {
       inReplyTo: pending?.eventId ?? null,
       threadRoot: this.#threadRoot,
@@ -130,6 +157,8 @@ export class Conversation {
       silentReply: pending?.silentReply ?? false,
       kind: outcome.msgtype,
       persona: outgoing.persona,
+      linkPreviews,
+      imageSourcePacks,
     });
     this.context = null;
   };
@@ -152,13 +181,15 @@ export class Conversation {
     targetRoomId: string,
     url: string,
     body: string,
-    info: PackImageInfoView | null = null
+    info: PackImageInfoView | null = null,
+    sourcePack: ImageSourcePackView | null = null
   ): Promise<void> => {
     await this.#core.commands.sendSticker(
       targetRoomId,
       url,
       body,
       info,
+      sourcePack,
       this.#consumeReply(),
       this.#threadRoot,
       this.#personaFor(targetRoomId, '', null).persona
@@ -254,8 +285,24 @@ export class Conversation {
     void this.#core.commands.cancelSend(this.#roomId(), transactionId, this.#threadRoot);
   };
 
-  readonly toggleReaction = (eventId: string, key: string): void => {
-    void this.#core.commands.toggleReaction(this.#roomId(), eventId, key, this.#threadRoot);
+  readonly toggleReaction = (
+    eventId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null = null
+  ): void => {
+    const mine = this.#timeline.items
+      .find((item) => item.event_id === eventId)
+      ?.reactions.some(
+        (reaction) =>
+          reaction.key === key && reaction.senders.includes(this.#core.session?.user_id ?? '')
+      );
+    void this.#core.commands.toggleReaction(
+      this.#roomId(),
+      eventId,
+      key,
+      this.#threadRoot,
+      mine ? null : sourcePack
+    );
   };
 
   readonly votePoll = (eventId: string, answers: string[]): void => {

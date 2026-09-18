@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { claimedRoomIds, isActiveSpace, markRoomsRead } from './nav-rooms.js';
+import { claimedRoomIds, isActiveSpace, markRoomUnread, markRoomsRead } from './nav-rooms.js';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -65,8 +65,8 @@ test('marks only rooms that are actually unread', () => {
   );
 
   expect(markRead.mock.calls).toEqual([
-    ['!unread', '$a', false],
-    ['!highlighted', '$b', false],
+    ['!unread', null, false],
+    ['!highlighted', null, false],
   ]);
 });
 
@@ -79,7 +79,15 @@ test('a private reader still marks rooms read, just without telling them', () =>
     true
   );
 
-  expect(markRead.mock.calls).toEqual([['!unread', '$a', true]]);
+  expect(markRead.mock.calls).toEqual([['!unread', null, true]]);
+});
+
+test('marks a room unread without moving its read marker', () => {
+  const markUnread = vi.fn(() => Promise.resolve());
+
+  markRoomUnread('!room:example.org', { markUnread });
+
+  expect(markUnread).toHaveBeenCalledWith('!room:example.org', null);
 });
 
 test('a failed mark does not stop the rest', () => {

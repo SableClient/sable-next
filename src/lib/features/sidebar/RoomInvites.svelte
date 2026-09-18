@@ -64,7 +64,7 @@
 
   h3 {
     font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-500);
     margin: 0;
     padding: 0 var(--space-200);
     text-transform: uppercase;

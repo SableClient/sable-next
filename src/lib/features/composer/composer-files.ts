@@ -1,6 +1,11 @@
 export interface StagedFile {
   id: number;
   file: File;
+  spoiler: boolean;
+}
+
+export function canSpoiler(file: File): boolean {
+  return file.type.startsWith('image/') || file.type.startsWith('video/');
 }
 
 export function filesFrom(transfer: DataTransfer | null): File[] {
@@ -19,9 +24,13 @@ export function stageFiles(
   files: readonly File[],
   nextId: () => number
 ): StagedFile[] {
-  return [...staged, ...files.map((file) => ({ id: nextId(), file }))];
+  return [...staged, ...files.map((file) => ({ id: nextId(), file, spoiler: false }))];
 }
 
 export function unstageFile(staged: readonly StagedFile[], id: number): StagedFile[] {
   return staged.filter((item) => item.id !== id);
+}
+
+export function toggleSpoiler(staged: readonly StagedFile[], id: number): StagedFile[] {
+  return staged.map((item) => (item.id === id ? { ...item, spoiler: !item.spoiler } : item));
 }

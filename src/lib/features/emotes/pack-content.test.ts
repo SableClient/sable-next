@@ -27,6 +27,7 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
         body: 'blob wave',
         usage: ['emoticon', 'sticker'],
         info: { width: 32, height: 32, mimetype: 'image/png', size: 128 },
+        source_pack: null,
       },
     ],
     ...overrides,
@@ -42,7 +43,18 @@ test('the written content carries the dimensions on the wire keys', () => {
 
 test('an image with no declared info leaves the key off', () => {
   const draft = packDraft(
-    pack({ images: [{ shortcode: 'wave', url: 'mxc://a/b', body: null, usage: [], info: null }] })
+    pack({
+      images: [
+        {
+          shortcode: 'wave',
+          url: 'mxc://a/b',
+          body: null,
+          usage: [],
+          info: null,
+          source_pack: null,
+        },
+      ],
+    })
   );
   const images = (packEventContent(draft).images as Record<string, Record<string, unknown>>).wave;
 

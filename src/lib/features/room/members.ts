@@ -49,10 +49,6 @@ export function personaWithColor(
   return profile && (profile.color_on_light ?? profile.color_on_dark) !== null ? profile : null;
 }
 
-export function isCaption(body: string): boolean {
-  return !/^\S+\.[a-z0-9]{2,4}$/i.test(body);
-}
-
 export function stripReplyFallback(body: string, profile: PerMessageProfileView | null): string {
   if (!profile) return body;
 

@@ -48,6 +48,7 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
         body: 'a waving blob',
         usage: ['emoticon'],
         info: { width: 128, height: 128, mimetype: 'image/png', size: PNG.length },
+        source_pack: null,
       },
       {
         shortcode: 'blob_party',
@@ -55,6 +56,7 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
         body: null,
         usage: ['emoticon', 'sticker'],
         info: null,
+        source_pack: null,
       },
     ],
     ...overrides,

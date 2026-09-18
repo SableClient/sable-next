@@ -6,7 +6,8 @@ import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
 const video: TimelineItemContentView = {
   kind: 'video',
   html: null,
-  body: 'clip.mp4',
+  filename: 'clip.mp4',
+  caption: null,
   source: '{}',
   mime: 'video/mp4',
   width: null,
@@ -21,7 +22,8 @@ test('every renderable message kind yields a preview', () => {
     replyPreviewBody({
       kind: 'audio',
       html: null,
-      body: 'voice.ogg',
+      filename: 'voice.ogg',
+      caption: null,
       source: '{}',
       mime: null,
       duration_ms: null,
@@ -32,7 +34,8 @@ test('every renderable message kind yields a preview', () => {
   expect(
     replyPreviewBody({
       kind: 'file',
-      body: 'deck.pdf',
+      filename: 'deck.pdf',
+      caption: null,
       html: null,
       source: '{}',
       mime: null,

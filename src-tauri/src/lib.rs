@@ -168,6 +168,7 @@ async fn send_attachment(
                 .unwrap_or_default(),
             header("mentions-room").is_some_and(|value| value == "true"),
             header("persona").and_then(|json| serde_json::from_str(&json).ok()),
+            header("spoiler").is_some_and(|value| value == "true"),
         )
         .await
 }
@@ -216,6 +217,9 @@ async fn send_attachment_base64(
             request
                 .header("persona")
                 .and_then(|json| serde_json::from_str(&json).ok()),
+            request
+                .header("spoiler")
+                .is_some_and(|value| value == "true"),
         )
         .await
 }

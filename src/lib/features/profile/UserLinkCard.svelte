@@ -32,10 +32,10 @@
     profile?.avatar_url
       ? {
           kind: 'image',
-          body: name,
+          filename: name,
+          caption: null,
           html: null,
           source: profile.avatar_url,
-          filename: null,
           mime: null,
           width: null,
           height: null,

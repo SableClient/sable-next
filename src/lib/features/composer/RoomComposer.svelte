@@ -3,6 +3,7 @@
     ImageUsageView,
     MemberView,
     PackImageInfoView,
+    ImageSourcePackView,
     PackImageView,
   } from '#src/generated/protocol';
   import { Portal } from 'bits-ui';
@@ -52,6 +53,7 @@
     filesFrom,
     formatSize,
     stageFiles,
+    toggleSpoiler,
     unstageFile,
     type StagedFile,
   } from './composer-files';
@@ -76,14 +78,16 @@
       roomId: string,
       body: string,
       formatted: string | null,
-      mentions: OutgoingMentions
+      mentions: OutgoingMentions,
+      imageSourcePacks?: import('#src/generated/protocol').ImageSourcePackReferenceView[]
     ) => Promise<unknown>;
     onSendAttachment: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
     onSendSticker?: (
       roomId: string,
       url: string,
       body: string,
-      info: PackImageInfoView | null
+      info: PackImageInfoView | null,
+      sourcePack: ImageSourcePackView | null
     ) => Promise<void>;
     onSendGif?: (roomId: string, gif: GifResult) => Promise<void>;
     onCreatePoll?: (
@@ -475,7 +479,12 @@
           ? rich
             ? serializeComposer(doc)
             : serializePlain(doc)
-          : { body: '', formatted: null, mentions: { userIds: [], room: false } };
+          : {
+              body: '',
+              formatted: null,
+              mentions: { userIds: [], room: false },
+              imageSourcePacks: [],
+            };
         const captioned = unsent.length === 1 && message.body !== '';
 
         while (unsent.length > 0) {
@@ -488,14 +497,23 @@
                   caption: message.body,
                   formattedCaption: message.formatted,
                   mentions: message.mentions,
+                  spoiler: next.spoiler,
                 }
-              : {}
+              : { spoiler: next.spoiler }
           );
           unsent = rest;
         }
 
         if (captioned || message.body === '') return;
-        const action = await onSend(roomId, message.body, message.formatted, message.mentions);
+        const action = message.imageSourcePacks
+          ? await onSend(
+              roomId,
+              message.body,
+              message.formatted,
+              message.mentions,
+              message.imageSourcePacks
+            )
+          : await onSend(roomId, message.body, message.formatted, message.mentions);
         if (isGifSearchAction(action)) {
           boardTab = 'gif';
           boardQuery = action.query;
@@ -582,7 +600,13 @@
     if (usage === 'sticker') {
       if (!onSendSticker) return;
       try {
-        await onSendSticker(roomId, image.url, image.body ?? image.shortcode, image.info);
+        await onSendSticker(
+          roomId,
+          image.url,
+          image.body ?? image.shortcode,
+          image.info,
+          image.source_pack
+        );
         error = null;
       } catch (cause) {
         console.debug('[sable composer] sticker failed', cause);
@@ -592,7 +616,11 @@
     }
 
     editor.insert(
-      composerSchema.nodes.emoticon.create({ url: image.url, shortcode: image.shortcode })
+      composerSchema.nodes.emoticon.create({
+        url: image.url,
+        shortcode: image.shortcode,
+        sourcePack: image.source_pack,
+      })
     );
     updateTyping();
   }
@@ -785,6 +813,9 @@
             disabled={sending}
             onRemove={(id: number) => {
               staged = unstageFile(staged, id);
+            }}
+            onToggleSpoiler={(id: number) => {
+              staged = toggleSpoiler(staged, id);
             }}
           />
         {/if}

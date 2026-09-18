@@ -19,9 +19,29 @@
 </script>
 
 {#if configured && !answered}
-  <Banner icon={ShieldCheckIcon} title={$i18n.t('settings.telemetryBannerTitle')}>
+  <Banner
+    icon={ShieldCheckIcon}
+    onClose={() => {
+      answer(false);
+    }}
+  >
+    {#snippet title()}
+      {$i18n.t('settings.telemetryBannerTitle')}
+    {/snippet}
     {#snippet body()}
-      {$i18n.t('settings.telemetryBannerBody')}
+      <div>
+        {$i18n.t('settings.telemetryBannerHelp')}
+        <br />
+        {$i18n.t('settings.telemetryBannerBody')}
+        <br />
+        {$i18n.t('settings.telemetryBannerSent')}
+        <div class="policies">
+          <a href="https://github.com/SableClient/Sable/blob/dev/docs/PRIVACY.md"
+            >{$i18n.t('settings.telemetryBannerSablePolicy')}</a
+          >
+          <a href="https://sentry.io/privacy/">{$i18n.t('settings.telemetryBannerSentryPolicy')}</a>
+        </div>
+      </div>
     {/snippet}
     {#snippet actions()}
       <Button
@@ -34,7 +54,7 @@
         {$i18n.t('settings.telemetryBannerDecline')}
       </Button>
       <Button
-        variant="primary"
+        variant="ghost"
         size="small"
         onclick={() => {
           answer(true);
@@ -45,3 +65,14 @@
     {/snippet}
   </Banner>
 {/if}
+
+<style>
+  .policies {
+    display: flex;
+    justify-content: space-evenly;
+  }
+
+  .policies > a {
+    margin: var(--space-200);
+  }
+</style>
