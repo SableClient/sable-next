@@ -216,15 +216,16 @@ async fn pending_key_with_a_custom_membership_id_is_emitted() {
     ));
     assert!(state.pending_keys.is_empty());
 
-    state
-        .pending_keys
-        .push(pending(4, Some("other-membership")));
+    state.pending_keys.push(pending(4, Some("a-random-uuid")));
     super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
-    assert_eq!(
-        events.try_recv().unwrap_err(),
-        tokio::sync::mpsc::error::TryRecvError::Empty
+    assert!(
+        matches!(
+            events.try_recv(),
+            Ok(crate::protocol::CoreEvent::CallEncryptionKey { key_index: 4, .. })
+        ),
+        "element call sends a random member id with a legacy membership id"
     );
-    assert_eq!(state.pending_keys.len(), 1);
+    assert!(state.pending_keys.is_empty());
 
     state.pending_keys.push(pending(5, None));
     super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
