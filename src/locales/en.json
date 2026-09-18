@@ -1253,6 +1253,8 @@
     "composerStickerButtonHint": "Shows a sticker button beside the composer. It opens the picker on the sticker tab.",
     "composerEmoteButton": "Emote button",
     "composerEmoteButtonHint": "Shows an emote button beside the composer. Turning every button off keeps this one.",
+    "scheduleInEncryptedRooms": "Schedule in encrypted rooms",
+    "scheduleInEncryptedRoomsHint": "Your homeserver cannot hold an encrypted message, so a scheduled one is kept in your account data as plain text until a device of yours sends it. Off refuses to schedule in encrypted rooms.",
     "formattingToolbar": "Formatting toolbar",
     "formattingToolbarHint": "Keeps the bold, italic and list controls always open.",
     "privacyTitle": "Privacy",
@@ -1807,10 +1809,11 @@
         "usage": "/delete <@user:server|@*:server> [-past 1d|2h|5m|30s] [-t event.type] [-r reason]"
       }
     },
-    "schedule": "Schedule send",
     "scheduleTitle": "Schedule this message",
     "scheduleExplain": "Unencrypted rooms hand the message to the homeserver, which sends it whether or not Sable is running. In an encrypted room it is held on your devices and goes out from whichever one is open at the time.",
     "scheduleEmpty": "Write the message first, then pick a time.",
+    "scheduleEncryptedNote": "This room is encrypted, so the message waits in your account data as plain text and goes out from whichever device of yours is open at the time.",
+    "scheduleEncryptedBlocked": "Scheduling in encrypted rooms is off. Turn it on in Settings, Composer.",
     "scheduleIn30Minutes": "In 30 minutes",
     "scheduleIn1Hour": "In an hour",
     "scheduleTomorrow9am": "Tomorrow, 9am",

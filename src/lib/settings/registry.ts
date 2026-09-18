@@ -575,6 +575,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.composerEmoteButtonHint',
         type: 'boolean',
       },
+      {
+        key: 'scheduleInEncryptedRooms',
+        icon: LockIcon,
+        name: 'settings.scheduleInEncryptedRooms',
+        description: 'settings.scheduleInEncryptedRoomsHint',
+        type: 'boolean',
+      },
     ],
   },
   {

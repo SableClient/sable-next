@@ -56,6 +56,7 @@ export interface Preferences {
   composerGifButton: boolean;
   composerStickerButton: boolean;
   composerEmoteButton: boolean;
+  scheduleInEncryptedRooms: boolean;
 
   personaPicker: boolean;
   personaProxying: boolean;
@@ -194,6 +195,7 @@ const DEFAULTS: Preferences = {
   composerGifButton: true,
   composerStickerButton: true,
   composerEmoteButton: true,
+  scheduleInEncryptedRooms: true,
 
   personaPicker: true,
   personaProxying: false,

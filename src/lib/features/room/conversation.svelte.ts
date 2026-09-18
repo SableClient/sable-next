@@ -15,7 +15,10 @@ import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
 import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
-import { isServerScheduleUnsupported } from '#lib/features/composer/send-failure.js';
+import {
+  isEncryptedScheduleUnsupported,
+  isServerScheduleUnsupported,
+} from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
@@ -260,6 +263,9 @@ export class Conversation {
       return;
     } catch (error) {
       if (!isServerScheduleUnsupported(error)) throw error;
+      if (isEncryptedScheduleUnsupported(error) && !preferences.scheduleInEncryptedRooms) {
+        throw error;
+      }
     }
 
     enqueue({

@@ -73,6 +73,12 @@ interface ComposerProps {
     mentions: { userIds: string[]; room: boolean }
   ) => Promise<void>;
   onSendAttachment?: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
+  onSchedule?: (
+    roomId: string,
+    body: string,
+    formatted: string | null,
+    dueTs: number
+  ) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
@@ -845,5 +851,60 @@ test('a document carries no spoiler control', async () => {
   await pick(new File(['report'], 'report.pdf', { type: 'application/pdf' }));
 
   expect(document.querySelector('.staged-spoiler')).toBeNull();
+  void unmount(instance);
+});
+
+test('holding the send button opens the schedule dialog instead of sending', async () => {
+  vi.useFakeTimers();
+  const send = vi.fn(async () => {});
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const instance = render({
+    roomId: '!room:example.org',
+    onSend: send,
+    onSchedule: async () => {},
+  });
+  await tick();
+
+  const button = document.querySelector('.composer-send');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
+  button.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
+  );
+  await vi.advanceTimersByTimeAsync(450);
+  await tick();
+
+  expect(document.body.textContent).toContain('Schedule this message');
+  expect(send).not.toHaveBeenCalled();
+
+  void unmount(instance);
+  vi.useRealTimers();
+});
+
+test('right-clicking the send button opens the schedule dialog', async () => {
+  const send = vi.fn(async () => {});
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const instance = render({
+    roomId: '!room:example.org',
+    onSend: send,
+    onSchedule: async () => {},
+  });
+  await tick();
+
+  const button = document.querySelector('.composer-send');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
+  const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  button.dispatchEvent(menu);
+  await tick();
+
+  expect(menu.defaultPrevented).toBe(true);
+  expect(document.body.textContent).toContain('Schedule this message');
+  expect(send).not.toHaveBeenCalled();
+
   void unmount(instance);
 });
