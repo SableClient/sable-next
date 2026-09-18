@@ -2038,6 +2038,8 @@
     "paletteLabel": "Jump to room",
     "palettePlaceholder": "Search rooms",
     "paletteEmpty": "No rooms match your search.",
+    "paletteRecents": "Recent",
+    "paletteHint": "# rooms · * spaces · @ direct messages",
     "helpTitle": "Keyboard shortcuts",
     "categoryGeneral": "General",
     "categoryNavigation": "Navigation",

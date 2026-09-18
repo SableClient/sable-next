@@ -2,7 +2,13 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { filterRoomsByQuery, roomDisplayName, unreadRoomsByPriority } from './room-jump';
+import {
+  filterRoomsByQuery,
+  parentSpaceNames,
+  parseJumpQuery,
+  roomDisplayName,
+  unreadRoomsByPriority,
+} from './room-jump';
 
 function room(overrides: Partial<RoomSummary> & { room_id: string }): RoomSummary {
   return {
@@ -31,6 +37,10 @@ function room(overrides: Partial<RoomSummary> & { room_id: string }): RoomSummar
     latest_event: null,
     ...overrides,
   };
+}
+
+function latest(timestamp: number): RoomSummary['latest_event'] {
+  return { sender: null, body: '', timestamp, sending: false, event_id: null };
 }
 
 test('roomDisplayName prefers the name, then the alias, then the id', () => {
@@ -105,4 +115,64 @@ test('unreadRoomsByPriority breaks a highlight tie on unread count', () => {
     '!b:example.org',
     '!a:example.org',
   ]);
+});
+
+test('parseJumpQuery reads the type prefix off the query', () => {
+  expect(parseJumpQuery('#eng')).toEqual({ kind: 'room', text: 'eng' });
+  expect(parseJumpQuery('*design')).toEqual({ kind: 'space', text: 'design' });
+  expect(parseJumpQuery(' @bob')).toEqual({ kind: 'direct', text: 'bob' });
+  expect(parseJumpQuery('eng')).toEqual({ kind: null, text: 'eng' });
+  expect(parseJumpQuery('#')).toEqual({ kind: 'room', text: '' });
+});
+
+test('filterRoomsByQuery keeps only the prefixed kind', () => {
+  const rooms = [
+    room({ room_id: '!a:example.org', name: 'Design', is_space: true }),
+    room({ room_id: '!b:example.org', name: 'Design chat' }),
+    room({ room_id: '!c:example.org', name: 'Designer', is_direct: true }),
+  ];
+
+  expect(filterRoomsByQuery(rooms, '*desi').map((r) => r.room_id)).toEqual(['!a:example.org']);
+  expect(filterRoomsByQuery(rooms, '#desi').map((r) => r.room_id)).toEqual(['!b:example.org']);
+  expect(filterRoomsByQuery(rooms, '@desi').map((r) => r.room_id)).toEqual(['!c:example.org']);
+});
+
+test('an empty query lists recent rooms, newest first, without spaces', () => {
+  const rooms = [
+    room({ room_id: '!a:example.org', latest_event: latest(10) }),
+    room({ room_id: '!b:example.org', latest_event: latest(30) }),
+    room({ room_id: '!c:example.org', is_space: true, latest_event: latest(40) }),
+    room({ room_id: '!d:example.org', latest_event: latest(20) }),
+  ];
+
+  expect(filterRoomsByQuery(rooms, '').map((r) => r.room_id)).toEqual([
+    '!b:example.org',
+    '!d:example.org',
+    '!a:example.org',
+  ]);
+});
+
+test('an empty spaces query still lists spaces', () => {
+  const rooms = [
+    room({ room_id: '!a:example.org' }),
+    room({ room_id: '!b:example.org', is_space: true }),
+  ];
+
+  expect(filterRoomsByQuery(rooms, '*').map((r) => r.room_id)).toEqual(['!b:example.org']);
+});
+
+test('parentSpaceNames names a room after the first space that lists it', () => {
+  const rooms = [
+    room({
+      room_id: '!space:example.org',
+      name: 'Engineering',
+      is_space: true,
+      space_children: [
+        { room_id: '!a:example.org', via: [], order: null, suggested: false, origin_server_ts: 0 },
+      ],
+    }),
+    room({ room_id: '!a:example.org', name: 'Backend' }),
+  ];
+
+  expect(parentSpaceNames(rooms).get('!a:example.org')).toBe('Engineering');
 });

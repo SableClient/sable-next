@@ -39,3 +39,21 @@ export function fuzzyFilter<T>(
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((entry) => entry.item);
 }
+
+export function fuzzyMatchIndices(text: string, query: string): number[] {
+  const trimmed = query.trim();
+  if (trimmed === '') return [];
+
+  const haystack = text.toLocaleLowerCase();
+  const needle = trimmed.toLocaleLowerCase();
+
+  const indices: number[] = [];
+  let needleIndex = 0;
+  for (let index = 0; index < haystack.length && needleIndex < needle.length; index += 1) {
+    if (haystack[index] !== needle[needleIndex]) continue;
+    indices.push(index);
+    needleIndex += 1;
+  }
+
+  return needleIndex === needle.length ? indices : [];
+}

@@ -51,6 +51,7 @@
     showsRoomIcon,
   } from '#lib/features/room/settings/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
+  import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
 
   import RoomInvites from './RoomInvites.svelte';
@@ -531,6 +532,14 @@
               <LockSimpleIcon />
             </span>
           {/if}
+          <button
+            type="button"
+            class="room-nav-menu"
+            aria-label={$i18n.t('shortcuts.openRoomSearch')}
+            onclick={() => (paletteState.open = true)}
+          >
+            <MagnifyingGlassIcon />
+          </button>
           <ActionMenu label={$i18n.t('nav.listOptions')}>
             {#snippet trigger({ props })}
               <button
