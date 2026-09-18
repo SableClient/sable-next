@@ -75,27 +75,26 @@ class MainActivity : TauriActivity() {
 
   private fun stageFile(uri: Uri, index: Int, batchDir: File, items: JSONArray) {
     val resolver = contentResolver
-    var displayName = "shared-$index"
-    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-      if (c.moveToFirst()) {
-        val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (i >= 0) displayName = c.getString(i)
-      }
-    }
-    val sanitized = displayName
-      .replace("/", "_").replace("\\", "_").replace("\u0000", "")
-      .take(120)
-      .let { if (it.isEmpty() || it == "." || it == "..") "shared" else it }
-
-    val fileName = "$index-$sanitized"
-    val dest = File(batchDir, fileName)
-    val input = resolver.openInputStream(uri)
-    if (input == null) {
-      android.util.Log.w("ShareTarget", "provider returned no stream for $uri")
-      return
-    }
     try {
-      input.use { FileOutputStream(dest).use { output -> it.copyTo(output) } }
+      var displayName = "shared-$index"
+      resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) {
+          val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+          if (i >= 0) c.getString(i)?.let { displayName = it }
+        }
+      }
+      val sanitized = displayName
+        .replace("/", "_").replace("\\", "_").replace("\u0000", "")
+        .take(120)
+        .let { if (it.isEmpty() || it == "." || it == "..") "shared" else it }
+
+      val fileName = "$index-$sanitized"
+      val input = resolver.openInputStream(uri)
+      if (input == null) {
+        android.util.Log.w("ShareTarget", "provider returned no stream for $uri")
+        return
+      }
+      input.use { FileOutputStream(File(batchDir, fileName)).use { output -> it.copyTo(output) } }
       items.put(JSONObject().apply {
         put("kind", "file")
         put("fileName", fileName)
@@ -103,7 +102,6 @@ class MainActivity : TauriActivity() {
       })
     } catch (e: Exception) {
       android.util.Log.w("ShareTarget", "stage failed: ${e.message}")
-      dest.delete()
     }
   }
 
