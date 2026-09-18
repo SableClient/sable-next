@@ -23,7 +23,10 @@
 
 <Story name="Banner" asChild>
   <div class="stack">
-    <Banner icon={ShieldWarningIcon} title="Unverified device">
+    <Banner icon={ShieldWarningIcon}>
+      {#snippet title()}
+        <p>"Unverified Device"</p>
+      {/snippet}
       {#snippet body()}
         <p>Verify this device to read older messages.</p>
       {/snippet}
@@ -32,7 +35,10 @@
         <Button variant="ghost" size="small">Later</Button>
       {/snippet}
     </Banner>
-    <Banner icon={ShieldWarningIcon} title="Update available" tone="warning">
+    <Banner icon={ShieldWarningIcon} tone="warning" onClose={() => {}}>
+      {#snippet title()}
+        <p>"Update available"</p>
+      {/snippet}
       {#snippet body()}
         <p>Restart to finish installing the update.</p>
       {/snippet}

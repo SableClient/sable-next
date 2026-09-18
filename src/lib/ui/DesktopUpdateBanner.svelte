@@ -27,7 +27,7 @@
   let dismissed = $state(false);
 
   const version = $derived(update?.version ?? '');
-  const title = $derived(
+  const bannerTitle = $derived(
     stage.name === 'staged'
       ? $i18n.t('settings.updateBannerStagedTitle')
       : stage.name === 'failed'
@@ -74,7 +74,15 @@
 </script>
 
 {#if update && !dismissed}
-  <Banner icon={ArrowCircleUpIcon} {title}>
+  <Banner
+    icon={ArrowCircleUpIcon}
+    onClose={() => {
+      dismissed = true;
+    }}
+  >
+    {#snippet title()}
+      {bannerTitle}
+    {/snippet}
     {#snippet body()}
       {#if stage.name === 'staged'}
         {$i18n.t('settings.updateBannerStagedBody', { version })}

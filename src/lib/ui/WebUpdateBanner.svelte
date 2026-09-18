@@ -99,7 +99,10 @@
 </script>
 
 {#if registration && !dismissed}
-  <Banner icon={ArrowClockwiseIcon} title={$i18n.t('settings.webUpdateBannerTitle')}>
+  <Banner icon={ArrowClockwiseIcon} onClose={() => (dismissed = true)}>
+    {#snippet title()}
+      {$i18n.t('settings.webUpdateBannerTitle')}
+    {/snippet}
     {#snippet body()}
       {$i18n.t('settings.webUpdateBannerBody')}
     {/snippet}
