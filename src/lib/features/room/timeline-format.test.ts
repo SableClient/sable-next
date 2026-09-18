@@ -20,6 +20,7 @@ import {
   isMessageRow,
   jumboEmojiLevel,
   jumboEmoticonLevel,
+  mergeAggregations,
   personaLookup,
   readReceiptEventId,
   visibleTimelineItems,
@@ -72,7 +73,6 @@ const defaults: TimelinePreferences = {
   hideMemberInReadOnly: true,
   showTombstoneEvents: false,
   showHiddenEvents: false,
-  showNonStandardEvents: false,
 };
 
 function item(content: TimelineItemView['content'], id: string = content.kind): TimelineItemView {
@@ -121,7 +121,6 @@ test('honours each toggle independently', () => {
     hideMembershipEvents: true,
     hideProfileChanges: false,
     showHiddenEvents: true,
-    showNonStandardEvents: true,
   });
   expect(shown.map((entry) => entry.content.kind)).toEqual(['profile_change', 'state_event']);
 });
@@ -148,12 +147,9 @@ test('drops member events in a read-only room', () => {
   ).toEqual([joined, message]);
 });
 
-test('gates raw state events behind both developer switches', () => {
-  const master = { ...defaults, showHiddenEvents: true };
-  expect(visibleTimelineItems([topic], master)).toEqual([]);
-  expect(visibleTimelineItems([topic], { ...master, showNonStandardEvents: true })).toEqual([
-    topic,
-  ]);
+test('gates raw state events behind the developer switch', () => {
+  expect(visibleTimelineItems([topic], defaults)).toEqual([]);
+  expect(visibleTimelineItems([topic], { ...defaults, showHiddenEvents: true })).toEqual([topic]);
 });
 
 test("keeps a persona message out of the account's collapsed run", () => {
@@ -246,6 +242,31 @@ test('keeps an unclassified membership change out of the timeline', () => {
     reason: null,
   });
   expect(visibleTimelineItems([other, message], defaults)).toEqual([message]);
+  expect(visibleTimelineItems([other, message], { ...defaults, showHiddenEvents: true })).toEqual([
+    other,
+    message,
+  ]);
+  expect(
+    visibleTimelineItems([other, message], {
+      ...defaults,
+      showHiddenEvents: true,
+      hideMembershipEvents: true,
+    })
+  ).toEqual([message]);
+});
+
+test('slots aggregation rows into the timeline by timestamp', () => {
+  const at = (id: string, timestamp: number): TimelineItemView => ({
+    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null }, id),
+    timestamp,
+  });
+  const sent = { ...message, timestamp: 10 };
+  const before = at('$before', 9);
+  const after = at('$after', 11);
+
+  expect(mergeAggregations([sent], [after, before])).toEqual([before, sent, after]);
+  expect(mergeAggregations([sent], [])).toEqual([sent]);
+  expect(mergeAggregations([sent, before], [before])).toEqual([sent, before]);
 });
 
 test('sizes emoji-only bodies by how many there are', () => {

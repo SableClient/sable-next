@@ -103,7 +103,6 @@ export interface Preferences {
 
   developerTools: boolean;
   showHiddenEvents: boolean;
-  showNonStandardEvents: boolean;
 }
 
 /** The subset the timeline reads when deciding which events to render. */
@@ -115,7 +114,6 @@ export type TimelinePreferences = Pick<
   | 'hideMemberInReadOnly'
   | 'showTombstoneEvents'
   | 'showHiddenEvents'
-  | 'showNonStandardEvents'
 >;
 
 const STORAGE_KEY = 'sable-preferences';
@@ -241,7 +239,6 @@ const DEFAULTS: Preferences = {
 
   developerTools: false,
   showHiddenEvents: false,
-  showNonStandardEvents: false,
 };
 
 function prefersReducedMotion(): boolean {

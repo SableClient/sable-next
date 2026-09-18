@@ -814,14 +814,6 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
         gatedBy: 'developerTools',
       },
-      {
-        key: 'showNonStandardEvents',
-        icon: CodeIcon,
-        name: 'settings.showNonStandardEvents',
-        description: 'settings.showNonStandardEventsHint',
-        type: 'boolean',
-        gatedBy: 'showHiddenEvents',
-      },
     ],
   },
 ];

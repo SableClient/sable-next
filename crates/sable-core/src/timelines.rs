@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use matrix_sdk::executor::spawn;
 use matrix_sdk::ruma::{
-    OwnedEventId, OwnedRoomId,
+    OwnedEventId, OwnedRoomId, UserId,
     events::room::message::Relation,
     events::{
         AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncTimelineEvent,
@@ -14,7 +14,10 @@ use matrix_sdk_ui::timeline::{
     RoomExt, Timeline, TimelineEventFocusThreadMode, TimelineFocus, default_event_filter,
 };
 
-use crate::protocol::{CommandErr, TimelineFocusView};
+use matrix_sdk_base::event_cache::Event;
+
+use crate::protocol::{CommandErr, TimelineFocusView, TimelineItemView};
+use crate::view::aggregation_item;
 
 use crate::{CachedTimeline, Core, SubscriptionKind, ThreadKey};
 
@@ -224,8 +227,25 @@ fn is_aggregation(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> boo
 }
 
 pub(crate) fn hidden_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
-    !is_signaling_event(event)
-        && (default_event_filter(event, rules) || !is_aggregation(event, rules))
+    default_event_filter(event, rules) || !is_aggregation(event, rules)
+}
+
+pub(crate) fn aggregation_items(
+    events: impl IntoIterator<Item = Event>,
+    rules: &RoomVersionRules,
+    own_user_id: Option<&UserId>,
+) -> Vec<TimelineItemView> {
+    events
+        .into_iter()
+        .filter_map(|event| {
+            let parsed = event.raw().deserialize().ok()?;
+            if !is_aggregation(&parsed, rules) {
+                return None;
+            }
+            let content = event.raw().get_field::<serde_json::Value>("content").ok()?;
+            Some(aggregation_item(&parsed, content, own_user_id))
+        })
+        .collect()
 }
 
 fn timeline_event_filter(event: &AnySyncTimelineEvent, rules: &RoomVersionRules) -> bool {
@@ -312,21 +332,23 @@ mod tests {
     }
 
     #[test]
-    fn signaling_events_are_filtered_from_the_timeline() {
+    fn signaling_events_are_filtered_unless_hidden_events_are_on() {
         let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
         let event_json = [
-            ("m.rtc.member", "{}"),
-            ("io.element.call.encryption_keys", "{}"),
+            ("m.rtc.member", "{}", true),
+            ("io.element.call.encryption_keys", "{}", true),
             (
                 "org.matrix.msc4075.rtc.notification",
                 r#"{"m.mentions":{"room":true,"user_ids":[]},"notification_type":"ring","m.relates_to":{"rel_type":"m.reference","event_id":"$root"},"sender_ts":1,"lifetime":30000,"m.text":[]}"#,
+                true,
             ),
             (
                 "org.matrix.msc4310.rtc.decline",
                 r#"{"m.relates_to":{"rel_type":"m.reference","event_id":"$root"}}"#,
+                false,
             ),
         ];
-        for (event_type, content) in event_json {
+        for (event_type, content, hidden) in event_json {
             let event = Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
                 format!(
                     r#"{{"type":"{event_type}","event_id":"$signal","sender":"@alice:example.org","origin_server_ts":1,"content":{content},"unsigned":{{}}}}"#
@@ -337,7 +359,7 @@ mod tests {
             .unwrap();
 
             assert!(!super::timeline_event_filter(&event, &rules));
-            assert!(!super::hidden_event_filter(&event, &rules));
+            assert_eq!(super::hidden_event_filter(&event, &rules), hidden);
         }
 
         let ordinary = Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
@@ -347,5 +369,37 @@ mod tests {
         .deserialize()
         .unwrap();
         assert!(super::hidden_event_filter(&ordinary, &rules));
+    }
+
+    #[test]
+    fn aggregations_become_hidden_rows() {
+        use matrix_sdk_base::deserialized_responses::TimelineEvent;
+
+        let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
+        let event = |json: &str| {
+            TimelineEvent::from_plaintext(
+                Raw::<matrix_sdk::ruma::events::AnySyncTimelineEvent>::from_json_string(
+                    json.to_owned(),
+                )
+                .unwrap()
+                .cast_unchecked(),
+            )
+        };
+        let reaction = event(
+            r#"{"type":"m.reaction","event_id":"$reaction","sender":"@alice:example.org","origin_server_ts":7,"content":{"m.relates_to":{"rel_type":"m.annotation","event_id":"$target","key":"👍"}},"unsigned":{}}"#,
+        );
+        let message = event(
+            r#"{"type":"m.room.message","event_id":"$message","sender":"@alice:example.org","origin_server_ts":8,"content":{"msgtype":"m.text","body":"hi"},"unsigned":{}}"#,
+        );
+
+        let items = super::aggregation_items([reaction, message], &rules, None);
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].timestamp, 7);
+        assert!(matches!(
+            &items[0].content,
+            crate::protocol::TimelineItemContentView::HiddenEvent { event_type, .. }
+                if event_type == "m.reaction"
+        ));
     }
 }

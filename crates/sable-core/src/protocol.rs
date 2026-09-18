@@ -977,6 +977,7 @@ pub enum CommandOk {
     SubscribeTimeline {
         subscription: SubscriptionId,
         items: Vec<TimelineItemView>,
+        aggregations: Vec<TimelineItemView>,
     },
     Unsubscribe,
 
@@ -1441,6 +1442,10 @@ pub enum CoreEvent {
         subscription: SubscriptionId,
         loading: bool,
         reached_start: bool,
+    },
+    TimelineAggregations {
+        subscription: SubscriptionId,
+        items: Vec<TimelineItemView>,
     },
 
     /// Our own user excluded. Absolute, so an empty list replaces the previous

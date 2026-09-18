@@ -178,7 +178,11 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       focus: TimelineFocusView = { kind: 'live' },
       hiddenEvents = false
-    ): Promise<{ subscription: SubscriptionId; items: TimelineItemView[] }> {
+    ): Promise<{
+      subscription: SubscriptionId;
+      items: TimelineItemView[];
+      aggregations: TimelineItemView[];
+    }> {
       const response = await transport().send({
         type: 'subscribe_timeline',
         room_id: roomId,

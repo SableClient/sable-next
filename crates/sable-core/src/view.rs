@@ -687,6 +687,39 @@ impl LocalProfiles {
 }
 
 #[must_use]
+pub fn aggregation_item(
+    event: &AnySyncTimelineEvent,
+    content: Option<serde_json::Value>,
+    own_user_id: Option<&UserId>,
+) -> TimelineItemView {
+    let event_id = event.event_id().to_owned();
+    let sender = event.sender().to_owned();
+    TimelineItemView {
+        id: event_id.to_string(),
+        event_id: Some(event_id),
+        transaction_id: None,
+        send_state: None,
+        is_own: own_user_id == Some(sender.as_ref()),
+        sender_name: None,
+        sender_avatar: None,
+        timestamp: event.origin_server_ts().0.into(),
+        content: TimelineItemContentView::HiddenEvent {
+            event_type: event.event_type().to_string(),
+            content,
+        },
+        sender: Some(sender),
+        in_reply_to: None,
+        thread_root: None,
+        thread_summary: None,
+        reactions: Vec::new(),
+        read_by: Vec::new(),
+        per_message_profile: None,
+        bundled_link_previews: Vec::new(),
+        mention: MentionView::None,
+    }
+}
+
+#[must_use]
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
     own_user_id: Option<&UserId>,

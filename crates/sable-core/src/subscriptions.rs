@@ -1,19 +1,23 @@
 use std::{collections::HashMap, sync::Arc};
 
 use futures_util::{StreamExt, pin_mut};
-use matrix_sdk::event_cache::PaginationStatus;
+use matrix_sdk::event_cache::{PaginationStatus, RoomEventCacheUpdate};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::OwnedRoomId;
+use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId};
+use matrix_sdk_base::event_cache::Event;
+use matrix_sdk_ui::eyeball_im::VectorDiff;
 use matrix_sdk_ui::room_list_service::RoomListLoadingState;
 use matrix_sdk_ui::room_list_service::filters::{
     new_filter_all, new_filter_deduplicate_versions, new_filter_non_left,
 };
 
-use crate::protocol::{CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView};
+use crate::protocol::{
+    CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView, TimelineItemView,
+};
 
-use crate::timelines::{build_room_timeline, fill_sender_profiles};
+use crate::timelines::{aggregation_items, build_room_timeline, fill_sender_profiles};
 use crate::view;
-use crate::{Core, Subscription, SubscriptionKind};
+use crate::{Core, Subscription, SubscriptionKind, Task};
 
 const ROOM_LIST_PAGE_SIZE: usize = 200;
 
@@ -214,11 +218,22 @@ impl Core {
                 ),
             )
         });
+        let (aggregations, aggregation_task) = if hidden_events {
+            self.watch_aggregations(subscription, &room, own_user_id.clone())
+                .await
+        } else {
+            (Vec::new(), None)
+        };
+
         let mut subscriptions = self.subscriptions.lock().await;
         let Some(entry) = subscriptions.get_mut(&subscription) else {
             return Err(CommandErr::Unavailable);
         };
-        entry.tasks = status_task.into_iter().chain([task]).collect();
+        entry.tasks = status_task
+            .into_iter()
+            .chain(aggregation_task)
+            .chain([task])
+            .collect();
         if let Some(status) = initial_status {
             self.emit(timeline_pagination_event(subscription, status));
         }
@@ -228,6 +243,7 @@ impl Core {
 
         Ok(CommandOk::SubscribeTimeline {
             subscription,
+            aggregations,
             items: items
                 .iter()
                 .map(|item| {
@@ -241,6 +257,49 @@ impl Core {
                 })
                 .collect(),
         })
+    }
+
+    async fn watch_aggregations(
+        self: &Arc<Self>,
+        subscription: SubscriptionId,
+        room: &matrix_sdk::Room,
+        own_user_id: Option<OwnedUserId>,
+    ) -> (Vec<TimelineItemView>, Option<Task>) {
+        let Ok((cache, _handles)) = room.event_cache().await else {
+            return (Vec::new(), None);
+        };
+        let Ok((cached, mut updates)) = cache.subscribe().await else {
+            return (Vec::new(), None);
+        };
+        let rules = room.clone_info().room_version_rules_or_default();
+        let items = aggregation_items(cached, &rules, own_user_id.as_deref());
+
+        let core = self.clone();
+        let task = spawn(async move {
+            use tokio::sync::broadcast::error::RecvError;
+
+            loop {
+                let update = match updates.recv().await {
+                    Ok(update) => update,
+                    Err(RecvError::Lagged(_)) => continue,
+                    Err(RecvError::Closed) => break,
+                };
+                let RoomEventCacheUpdate::UpdateTimelineEvents(update) = update else {
+                    continue;
+                };
+                let events = update.diffs.into_iter().flat_map(diff_events);
+                let items = aggregation_items(events, &rules, own_user_id.as_deref());
+                if !items.is_empty() {
+                    core.emit(CoreEvent::TimelineAggregations {
+                        subscription,
+                        items,
+                    });
+                }
+            }
+        })
+        .abort_on_drop();
+
+        (items, Some(task))
     }
 
     pub(crate) async fn sync_timeline_rooms_locked(&self) -> Result<(), CommandErr> {
@@ -261,6 +320,23 @@ impl Core {
             .set_room_subscriptions(&room_refs)
             .await;
         Ok(())
+    }
+}
+
+fn diff_events(diff: VectorDiff<Event>) -> Vec<Event> {
+    match diff {
+        VectorDiff::Append { values } | VectorDiff::Reset { values } => {
+            values.into_iter().collect()
+        }
+        VectorDiff::PushFront { value }
+        | VectorDiff::PushBack { value }
+        | VectorDiff::Insert { value, .. }
+        | VectorDiff::Set { value, .. } => vec![value],
+        VectorDiff::Clear
+        | VectorDiff::PopFront
+        | VectorDiff::PopBack
+        | VectorDiff::Remove { .. }
+        | VectorDiff::Truncate { .. } => Vec::new(),
     }
 }
 

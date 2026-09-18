@@ -30,6 +30,7 @@
   import {
     isCollapsed,
     latestEventId,
+    mergeAggregations,
     personaLookup,
     unreadCountAfter,
     visibleTimelineItems,
@@ -135,7 +136,12 @@
   }
   const identity = new TimelineIdentityTracker();
   let followingRead = $state(false);
-  let allItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
+  let allItems = $derived(
+    mergeAggregations(
+      visibleTimelineItems(timeline.items, preferences, { readOnly }),
+      preferences.showHiddenEvents ? timeline.aggregations : []
+    )
+  );
   let visibleItems = $derived(
     followingRead ? allItems.filter((item) => item.content.kind !== 'read_marker') : allItems
   );

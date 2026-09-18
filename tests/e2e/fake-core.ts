@@ -643,6 +643,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           type: 'subscribe_timeline',
           subscription,
           items: timelineSnapshot(subscriptionRoom(subscription).name ?? ''),
+          aggregations: [],
         };
       },
       paginate: (command, port) => {

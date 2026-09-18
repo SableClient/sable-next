@@ -117,21 +117,44 @@ function isVisibleEvent(
   const memberEventsHidden = Boolean(context.readOnly) && preferences.hideMemberInReadOnly;
   switch (item.content.kind) {
     case 'membership':
-      return (
-        !preferences.hideMembershipEvents && !memberEventsHidden && item.content.change !== 'other'
-      );
+      if (preferences.hideMembershipEvents || memberEventsHidden) return false;
+      return item.content.change !== 'other' || preferences.showHiddenEvents;
     case 'profile_change':
       return !preferences.hideProfileChanges && !memberEventsHidden;
     case 'redacted':
       return preferences.showTombstoneEvents;
     case 'state_event':
       if (item.content.change) return true;
-      return preferences.showHiddenEvents && preferences.showNonStandardEvents;
+      return preferences.showHiddenEvents;
     case 'hidden_event':
-      return preferences.showHiddenEvents && preferences.showNonStandardEvents;
+      return preferences.showHiddenEvents;
     default:
       return true;
   }
+}
+
+export function mergeAggregations(
+  items: readonly TimelineItemView[],
+  aggregations: readonly TimelineItemView[]
+): readonly TimelineItemView[] {
+  if (aggregations.length === 0) return items;
+
+  const known = new Set(items.map((item) => item.id));
+  const pending = aggregations
+    .filter((item) => !known.has(item.id))
+    .toSorted((left, right) => left.timestamp - right.timestamp);
+  if (pending.length === 0) return items;
+
+  const merged: TimelineItemView[] = [];
+  let next = 0;
+  for (const item of items) {
+    while (next < pending.length && pending[next].timestamp <= item.timestamp) {
+      merged.push(pending[next]);
+      next += 1;
+    }
+    merged.push(item);
+  }
+  return merged.concat(pending.slice(next));
 }
 
 export function visibleTimelineItems(
