@@ -7,7 +7,8 @@ const CLIENT_SERVER_PORT = 8008;
 // The server mints its OAuth 2.0 metadata URLs at boot and the browser follows
 // them through a redirect login, so the host port has to be known beforehand.
 const HOST_PORT = 18008;
-const PUBLIC_URL = `http://127.0.0.1:${String(HOST_PORT)}`;
+const CLIENT_HOST = process.env.TESTCONTAINERS_HOST_OVERRIDE ?? '127.0.0.1';
+const PUBLIC_URL = `http://${CLIENT_HOST}:${String(HOST_PORT)}`;
 const SERVER_NAME = 'test.local';
 const execFileAsync = promisify(execFile);
 

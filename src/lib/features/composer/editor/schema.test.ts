@@ -117,6 +117,7 @@ test('both atoms survive a clipboard round trip', () => {
   expect(doc.firstChild?.child(3).attrs).toEqual({
     url: 'mxc://example.org/wave',
     shortcode: 'wave',
+    sourcePack: null,
   });
 });
 
