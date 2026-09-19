@@ -6,6 +6,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -56,6 +57,14 @@
     onClose,
     onMemberProfile,
   }: Props = $props();
+  const presenceStore = usePresenceStore();
+
+  function connected(userId: string): boolean {
+    if (!preferences.groupMembersByPresence) return true;
+    const entry = presenceStore.peek(userId);
+    return entry !== null && entry.presence !== 'offline';
+  }
+
   let search = $state('');
   let filter = $state<MembershipFilter>('join');
   let fetched = $state.raw<MemberView[]>([]);
@@ -64,14 +73,15 @@
   let generation = 0;
 
   let sort = $derived(preferences.memberSort);
-  let listed = $derived(filter === 'join' ? members : fetched);
+  let joined = $derived(members.filter((member) => !member.service));
+  let listed = $derived(filter === 'join' ? joined : fetched.filter((member) => !member.service));
   let matching = $derived(listed.filter((member) => matchesFilter(member, filter)));
   let searched = $derived.by(() => {
     const query = search.trim().toLocaleLowerCase();
     if (!query) return matching;
     return matching.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
   });
-  let groups = $derived(groupMembers(searched, sort));
+  let groups = $derived(groupMembers(searched, sort, connected));
   let shown = $derived(limitGroups(groups, limit));
   let hidden = $derived(Math.max(0, searched.length - limit));
   let busy = $derived(filter === 'join' ? loading : fetching);
@@ -112,7 +122,7 @@
       {:else}
         <h2 class="title">{title}</h2>
       {/if}
-      <p>{$i18n.t('timeline.memberCount', { count: members.length })}</p>
+      <p>{$i18n.t('timeline.memberCount', { count: joined.length })}</p>
     </div>
     {#if modal}
       <Dialog.Close
@@ -197,8 +207,11 @@
   {:else}
     {#if groups.length > 0}
       <div class="member-groups">
-        {#each shown as group (group.level)}
-          {@const tag = powerTag(group.level, $i18n.t, powerTags)}
+        {#each shown as group (group.key)}
+          {@const tag =
+            group.level === null
+              ? { name: $i18n.t('timeline.memberGroupOffline'), color: null }
+              : powerTag(group.level, $i18n.t, powerTags)}
           <h3 class="group-label" style:color={tag.color ?? undefined}>{tag.name}</h3>
           <ul>
             {#each group.members as member (member.user_id)}

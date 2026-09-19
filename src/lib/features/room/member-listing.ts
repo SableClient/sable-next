@@ -63,21 +63,34 @@ function byName(left: MemberView, right: MemberView): number {
 }
 
 export interface MemberGroup {
-  level: number;
+  key: string;
+  level: number | null;
   members: MemberView[];
 }
 
-export function groupMembers(members: readonly MemberView[], sort: MemberSort): MemberGroup[] {
-  const ordered = [...members]
-    .sort(compare(sort))
+export function groupMembers(
+  members: readonly MemberView[],
+  sort: MemberSort,
+  isOnline: (userId: string) => boolean
+): MemberGroup[] {
+  const ordered = [...members].sort(compare(sort));
+  const offline = ordered.filter((member) => !isOnline(member.user_id));
+  const online = ordered
+    .filter((member) => isOnline(member.user_id))
     .sort((left, right) => right.power_level - left.power_level);
 
   const groups: MemberGroup[] = [];
-  for (const member of ordered) {
+  for (const member of online) {
     const current = groups.at(-1);
     if (current && current.level === member.power_level) current.members.push(member);
-    else groups.push({ level: member.power_level, members: [member] });
+    else
+      groups.push({
+        key: String(member.power_level),
+        level: member.power_level,
+        members: [member],
+      });
   }
+  if (offline.length > 0) groups.push({ key: 'offline', level: null, members: offline });
   return groups;
 }
 
@@ -88,7 +101,7 @@ export function limitGroups(groups: readonly MemberGroup[], limit: number): Memb
     if (taken >= limit) break;
     const members = group.members.slice(0, limit - taken);
     taken += members.length;
-    limited.push({ level: group.level, members });
+    limited.push({ ...group, members });
   }
   return limited;
 }

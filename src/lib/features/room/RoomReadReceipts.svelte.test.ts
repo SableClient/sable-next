@@ -23,6 +23,7 @@ const members = [
     membership: 'join' as const,
     member_ts: null,
     kicked: false,
+    service: false,
   },
   {
     user_id: '@carol:example.org',
@@ -32,6 +33,7 @@ const members = [
     membership: 'join' as const,
     member_ts: null,
     kicked: false,
+    service: false,
   },
 ];
 
@@ -79,6 +81,7 @@ test('caps the stack at three faces and keeps the row reserved when empty', asyn
         membership: 'join' as const,
         member_ts: null,
         kicked: false,
+        service: false,
       })),
       onMemberProfile: () => {},
     },

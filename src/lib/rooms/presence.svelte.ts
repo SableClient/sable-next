@@ -84,6 +84,10 @@ export class PresenceStore {
     return null;
   }
 
+  peek(userId: string): PresenceEntry | null {
+    return this.#entries.get(userId) ?? null;
+  }
+
   #request(userId: string): void {
     if (this.#core === null || this.#requested.has(userId)) return;
 

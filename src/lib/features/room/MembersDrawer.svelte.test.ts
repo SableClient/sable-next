@@ -5,11 +5,22 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
+const offline = new Set<string>();
+
 vi.mock('#lib/rooms/presence.svelte.js', async () => {
   const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(
     '#lib/rooms/presence.svelte.js'
   );
-  return { ...actual, usePresenceStore: () => ({ get: () => null }) };
+  return {
+    ...actual,
+    usePresenceStore: () => ({
+      get: () => null,
+      peek: (userId: string) =>
+        offline.has(userId)
+          ? null
+          : { presence: 'online', statusMessage: null, lastActiveAgo: null, receivedAt: 0 },
+    }),
+  };
 });
 
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -19,8 +30,10 @@ import MembersDrawer from './MembersDrawer.svelte';
 const observerBackup = globalThis.IntersectionObserver;
 
 afterEach(() => {
+  offline.clear();
   document.body.replaceChildren();
   setPreference('memberSort', 'name-asc');
+  setPreference('groupMembersByPresence', true);
   globalThis.IntersectionObserver = observerBackup;
 });
 
@@ -39,6 +52,7 @@ test('sorts members by power then name and opens their profile', async () => {
           membership: 'join' as const,
           member_ts: null,
           kicked: false,
+          service: false,
         },
         {
           user_id: '@bob:example.org',
@@ -48,6 +62,7 @@ test('sorts members by power then name and opens their profile', async () => {
           membership: 'join' as const,
           member_ts: null,
           kicked: false,
+          service: false,
         },
         {
           user_id: '@amy:example.org',
@@ -57,6 +72,7 @@ test('sorts members by power then name and opens their profile', async () => {
           membership: 'join' as const,
           member_ts: null,
           kicked: false,
+          service: false,
         },
       ],
       onClose: vi.fn(),
@@ -94,6 +110,7 @@ test('honours the sort preference and fetches the membership a filter names', as
           membership: 'join' as const,
           member_ts: null,
           kicked: false,
+          service: false,
         },
         {
           user_id: '@amy:example.org',
@@ -103,6 +120,7 @@ test('honours the sort preference and fetches the membership a filter names', as
           membership: 'join' as const,
           member_ts: null,
           kicked: false,
+          service: false,
         },
       ],
       loadMembership,
@@ -143,6 +161,7 @@ test('renders a first page of members and grows when the sentinel shows', async 
     membership: 'join' as const,
     member_ts: null,
     kicked: false,
+    service: false,
   }));
   const instance = mount(MembersDrawer, {
     target: document.body,
@@ -158,5 +177,103 @@ test('renders a first page of members and grows when the sentinel shows', async 
 
   expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(40);
   expect(document.querySelector('.load-sentinel')).toBeNull();
+  await unmount(instance);
+});
+
+test('sinks members without presence under offline and drops service members', async () => {
+  offline.add('@zoe:example.org');
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: {
+      loading: false,
+      members: [
+        {
+          user_id: '@zoe:example.org',
+          display_name: 'Zoe',
+          avatar_url: null,
+          power_level: 100,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        },
+        {
+          user_id: '@amy:example.org',
+          display_name: 'Amy',
+          avatar_url: null,
+          power_level: 0,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        },
+        {
+          user_id: '@bot:example.org',
+          display_name: 'Bot',
+          avatar_url: null,
+          power_level: 100,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: true,
+        },
+      ],
+      onClose: vi.fn(),
+      onMemberProfile: vi.fn(),
+    },
+  });
+  await tick();
+
+  const names = [...document.querySelectorAll('.member .member-name')].map(
+    (node) => node.textContent
+  );
+  expect(names).toEqual(['Amy', 'Zoe']);
+  expect([...document.querySelectorAll('.group-label')].map((node) => node.textContent)).toEqual([
+    'Member',
+    'Offline',
+  ]);
+  expect(document.querySelector('header p')?.textContent).toBe('2 members');
+  await unmount(instance);
+});
+
+test('keeps power-level groups when presence grouping is off', async () => {
+  setPreference('groupMembersByPresence', false);
+  offline.add('@zoe:example.org');
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: {
+      loading: false,
+      members: [
+        {
+          user_id: '@zoe:example.org',
+          display_name: 'Zoe',
+          avatar_url: null,
+          power_level: 100,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        },
+        {
+          user_id: '@amy:example.org',
+          display_name: 'Amy',
+          avatar_url: null,
+          power_level: 0,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        },
+      ],
+      onClose: vi.fn(),
+      onMemberProfile: vi.fn(),
+    },
+  });
+  await tick();
+
+  expect([...document.querySelectorAll('.group-label')].map((node) => node.textContent)).toEqual([
+    'Admin',
+    'Member',
+  ]);
   await unmount(instance);
 });

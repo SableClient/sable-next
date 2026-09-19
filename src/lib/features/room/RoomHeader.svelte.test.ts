@@ -14,6 +14,7 @@ const members = [
     membership: 'join' as const,
     member_ts: null,
     kicked: false,
+    service: false,
   },
   {
     user_id: '@carol:example.org',
@@ -23,6 +24,7 @@ const members = [
     membership: 'join' as const,
     member_ts: null,
     kicked: false,
+    service: false,
   },
 ];
 

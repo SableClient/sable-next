@@ -2826,6 +2826,7 @@ pub struct MemberView {
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub member_ts: Option<u64>,
     pub kicked: bool,
+    pub service: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

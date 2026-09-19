@@ -506,6 +506,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'groupMembersByPresence',
+        icon: UsersIcon,
+        name: 'settings.groupMembersByPresence',
+        description: 'settings.groupMembersByPresenceHint',
+        type: 'boolean',
+      },
+      {
         key: 'filterPronounsByLanguage',
         icon: TranslateIcon,
         name: 'settings.filterPronounsByLanguage',

@@ -1697,6 +1697,7 @@ pub fn member_view(member: &RoomMember) -> MemberView {
         member_ts: member.event().timestamp().map(u64::from),
         kicked: matches!(member.membership(), MembershipState::Leave)
             && member.event().sender() != member.user_id(),
+        service: member.is_service_member(),
     }
 }
 

@@ -383,6 +383,7 @@ export type MemberView = {
 	membership: MembershipView,
 	member_ts: number | null,
 	kicked: boolean,
+	service: boolean,
 };
 
 /**

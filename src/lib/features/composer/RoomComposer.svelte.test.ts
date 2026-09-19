@@ -29,6 +29,7 @@ const members: MemberView[] = [
     membership: 'join' as const,
     member_ts: null,
     kicked: false,
+    service: false,
   },
 ];
 

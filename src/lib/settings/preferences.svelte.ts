@@ -47,6 +47,7 @@ export interface Preferences {
   replyPreviewStyle: ReplyPreviewStyle;
   hideTypingIndicators: boolean;
   memberSort: MemberSort;
+  groupMembersByPresence: boolean;
   filterPronounsByLanguage: boolean;
   pronounPillLimit: PronounPillLimit;
 
@@ -187,6 +188,7 @@ const DEFAULTS: Preferences = {
   replyPreviewStyle: 'connected',
   hideTypingIndicators: false,
   memberSort: 'name-asc',
+  groupMembersByPresence: true,
   filterPronounsByLanguage: true,
   pronounPillLimit: '3',
 

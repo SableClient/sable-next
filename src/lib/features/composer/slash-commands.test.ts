@@ -648,6 +648,7 @@ function member(userId: string, membership: MemberView['membership'] = 'join'): 
     membership,
     member_ts: null,
     kicked: false,
+    service: false,
   };
 }
 

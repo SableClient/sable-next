@@ -31,6 +31,7 @@ const alice: MemberView = {
   membership: 'join',
   member_ts: null,
   kicked: false,
+  service: false,
 };
 
 const room: RoomSummary = { room_id: '!room:example.org' } as RoomSummary;

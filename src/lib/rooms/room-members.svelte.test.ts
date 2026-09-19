@@ -13,6 +13,7 @@ function member(userId: string, displayName: string | null = null): MemberView {
     membership: 'join',
     member_ts: null,
     kicked: false,
+    service: false,
   };
 }
 
