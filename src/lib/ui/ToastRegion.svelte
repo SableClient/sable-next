@@ -32,13 +32,13 @@
 
 <style>
   .toast-region {
-    bottom: var(--space-400);
+    bottom: calc(var(--space-400) + var(--safe-bottom));
     display: grid;
     gap: var(--space-200);
     max-width: min(28rem, calc(100vw - var(--space-800)));
     pointer-events: none;
     position: fixed;
-    right: var(--space-400);
+    right: calc(var(--space-400) + var(--safe-right));
     z-index: var(--layer-notify);
   }
 

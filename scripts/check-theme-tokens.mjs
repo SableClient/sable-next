@@ -26,6 +26,10 @@ const localLayerCeiling = 10;
 // second reference doubles the gap -- which is only visible on a device.
 const safeAreaOwners = new Set([
   'src/styles.css',
+  'src/routes/(app)/+layout.svelte',
+  'src/lib/ui/BannerDock.svelte',
+  'src/lib/ui/CoreHealthBanner.svelte',
+  'src/lib/ui/ToastRegion.svelte',
   'src/lib/ui/MobileNavDrawer.svelte',
   'src/lib/ui/primitives/BottomSheet.svelte',
   'src/lib/ui/primitives/DialogFrame.svelte',

@@ -570,10 +570,10 @@
     border: var(--border-width) solid var(--primary-main);
     border-radius: var(--radius);
     color: var(--bg-on-container);
-    left: var(--space-300);
+    left: calc(var(--space-300) + var(--safe-left));
     padding: var(--space-300) var(--space-400);
     position: fixed;
-    top: var(--space-300);
+    top: calc(var(--space-300) + var(--safe-top));
     transform: translateY(-150%);
     z-index: var(--layer-tooltip);
   }

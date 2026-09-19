@@ -85,7 +85,7 @@
 
   :global(.dialog-content-drawer) {
     border: 0;
-    inset: 0 0 0 auto;
+    inset: var(--safe-top) var(--safe-right) var(--safe-bottom) auto;
     max-width: min(22rem, 85%);
     padding: 0;
     width: 100%;

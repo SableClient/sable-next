@@ -657,6 +657,7 @@
     padding: var(--space-700) var(--space-600);
     padding-block: calc(var(--space-700) + var(--safe-top))
       calc(var(--space-700) + var(--safe-bottom));
+    padding-inline: max(var(--space-600), var(--safe-left)) max(var(--space-600), var(--safe-right));
   }
 
   .auth-content {
