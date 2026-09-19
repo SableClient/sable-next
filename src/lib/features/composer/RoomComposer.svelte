@@ -434,6 +434,15 @@
     if (activeElement instanceof HTMLElement) activeElement.blur();
   }
 
+  function focusFromRow(event: MouseEvent): void {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('button, input, label, a, [contenteditable]')) return;
+
+    event.preventDefault();
+    editor.focus();
+  }
+
   function confirmDeleteEdit(reason: string | null): void {
     const target = deleteEditTarget;
     if (!target) return;
@@ -846,10 +855,12 @@
             }}
           />
         {/if}
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="composer-row"
           class:multiline={multiline && !recording}
           bind:this={rowEl}
+          onmousedown={focusFromRow}
           onsubmit={(event) => {
             event.preventDefault();
             void send();
