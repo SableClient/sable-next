@@ -141,7 +141,7 @@ test('the editor mounts as a labelled combobox surface', async () => {
   await tick();
 
   const editable = document.querySelector('[role="combobox"]');
-  expect(editable?.getAttribute('aria-label')).toBe('Send a message...');
+  expect(editable?.getAttribute('aria-label')).toBe('Send a message…');
   expect(editable?.getAttribute('contenteditable')).toBe('true');
 
   void unmount(instance);
