@@ -797,8 +797,18 @@
     overflow: auto;
     overflow-anchor: none;
     overscroll-behavior-y: contain;
-    scrollbar-color: transparent transparent;
-    scrollbar-width: thin;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    .viewport {
+      scrollbar-color: transparent transparent;
+      scrollbar-width: thin;
+    }
+
+    .viewport:hover,
+    .viewport:focus-within {
+      scrollbar-color: var(--surface-container-line) transparent;
+    }
   }
 
   .viewport:focus-visible {
@@ -818,11 +828,6 @@
 
   .viewport::-webkit-scrollbar-track {
     background: transparent;
-  }
-
-  .viewport:hover,
-  .viewport:focus-within {
-    scrollbar-color: var(--surface-container-line) transparent;
   }
 
   .viewport:hover::-webkit-scrollbar-thumb,

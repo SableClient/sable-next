@@ -784,6 +784,11 @@
     flex: 1;
     min-height: 0;
     overflow: hidden auto;
+    scrollbar-width: none;
+  }
+
+  .rail-scroll::-webkit-scrollbar {
+    display: none;
   }
 
   .rail-separator {

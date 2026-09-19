@@ -439,9 +439,16 @@ body {
   box-sizing: border-box;
 }
 
-* {
-  scrollbar-color: transparent transparent;
-  scrollbar-width: thin;
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-color: transparent transparent;
+    scrollbar-width: thin;
+  }
+
+  *:hover,
+  *:focus-within {
+    scrollbar-color: var(--surface-container-line) transparent;
+  }
 }
 
 *::-webkit-scrollbar {
@@ -458,11 +465,6 @@ body {
   background-clip: padding-box;
   border: calc(var(--border-width) * 2) solid transparent;
   border-radius: var(--radius-pill);
-}
-
-*:hover,
-*:focus-within {
-  scrollbar-color: var(--surface-container-line) transparent;
 }
 
 *:hover::-webkit-scrollbar-thumb,
