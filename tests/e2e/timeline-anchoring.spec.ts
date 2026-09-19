@@ -2,6 +2,7 @@
 // mid-scroll, delay a snapshot on cue, or confirm a local echo at a chosen
 // moment.
 
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import {
   historyItems,
@@ -30,7 +31,7 @@ test('keeps the latest message visible when the typing indicator appears', async
 
   await core.emitTyping(ROOM_ID, ['@alice:example.test']);
 
-  await expect(page.getByText('Alice is typing...')).toBeVisible();
+  await expect(page.getByText(en.timeline.oneTyping.replace('{{name}}', 'Alice'))).toBeVisible();
   await timeline.expectAtLatest(LATEST);
 });
 

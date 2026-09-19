@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import en from '../../../src/locales/en.json' with { type: 'json' };
+
 const COLD_BOOT_TIMEOUT = 45_000;
 
 export class AppShell {
@@ -28,7 +30,7 @@ export class AppShell {
     this.startupHeading = page.getByRole('heading', { name: 'Starting Sable' });
     this.backToRooms = page.getByRole('button', { name: 'Back to rooms' });
     this.resizeRooms = page.getByRole('slider', { name: 'Resize rooms' });
-    this.composer = page.getByRole('combobox', { name: 'Send a message...' });
+    this.composer = page.getByRole('combobox', { name: en.timeline.messagePlaceholder });
     this.sendMessage = page.getByRole('button', { name: 'Send message' });
     this.createRoomName = page.getByLabel('Name');
     this.createRoomSubmit = page

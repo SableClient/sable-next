@@ -1,3 +1,4 @@
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test } from './fixtures/test';
 
 test('a tombstoned room replaces the composer with a banner offering the successor', async ({
@@ -22,7 +23,7 @@ test('a tombstoned room replaces the composer with a banner offering the success
   await expect(page.getByRole('region', { name: 'This room has been replaced' })).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByRole('combobox', { name: 'Send a message...' })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: en.timeline.messagePlaceholder })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Join new room' }).click();
   await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(successorId)), {
