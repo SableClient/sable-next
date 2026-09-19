@@ -147,7 +147,7 @@
     "directoryEmptyBody": "Verwende einen anderen Suchterm oder erkunde einen anderen Server.",
     "directoryJoinByAddress": "Per Adresse beitreten",
     "joinTitle": "Per Adresse beitreten",
-    "joinDescription": "Gib eine öffentliche Adresse eines Raumes oder Spaces ein.",
+    "joinDescription": "Gib eine öffentliche Adresse eines Raums oder Spaces ein.",
     "joinExamplesLabel": "Adressen haben folgendes Format:",
     "joinAddressLabel": "Adressen",
     "joinAddressPlaceholder": "#raum:server",
@@ -157,6 +157,21 @@
     "settingsTitle": "Raumeinstellungen",
     "settingsOpen": "Raumeinstellungen",
     "settingsClose": "Raumeinstellungen schließen",
-    "settingsGeneral": "Allgemein"
+    "settingsGeneral": "Allgemein",
+    "directoryTotal_one": "{{count}} Raum",
+    "directoryTotal_other": "{{count}} Räume",
+    "settingsAccess": "Zutritt",
+    "settingsAccessDescription": "Wer kann beitreten.",
+    "settingsAdvanced": "Erweitert",
+    "settingsNameLabel": "Name",
+    "settingsTopicLabel": "Thema",
+    "settingsAvatarLabel": "Raumavatar",
+    "settingsAvatarChange": "Avatar ändern",
+    "settingsBannerLabel": "Banner",
+    "settingsBannerChange": "Banner ändern",
+    "settingsBannerRemove": "Banner entfernen",
+    "settingsAvatarRemove": "Avatar entfernen",
+    "settingsAvatarHint": "PNG, JPEG, GIF oder WebP.",
+    "settingsJoinRulePublic": "Öffentlich"
   }
 }
