@@ -259,7 +259,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     min-height: 4.25rem;
-    padding: var(--space-100);
+    padding: var(--space-100) 0;
     position: relative;
     width: 100%;
   }
