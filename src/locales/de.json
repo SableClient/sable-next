@@ -1,6 +1,7 @@
 {
   "nav": {
     "primary": "Primärnavigation",
+    "home": "Startseite",
     "messages": "Nachrichten",
     "direct": "Direktnachrichten",
     "inbox": "Posteingang",
@@ -8,6 +9,7 @@
     "navigate": "Navigieren",
     "settings": "Einstellungen",
     "space": "Space",
+    "lobby": "Lobby",
     "createRoom": "Raum erstellen",
     "newChat": "Neuer Chat",
     "joinWithAddress": "Mit Adresse beitreten",
@@ -36,6 +38,7 @@
     "unreadMessages": "{{count}} ungelesene Nachrichten",
     "unreadMentions": "{{count}} Erwähnungen",
     "markedUnread": "Als ungelesen markieren",
+    "voiceLive": "{{count}} im Anruf",
     "moreOptions": "Weitere Optionen",
     "resizeRooms": "Raumlistengröße anpassen",
     "showRoomList": "Raumliste anzeigen",
@@ -56,10 +59,7 @@
     "folderExpand": "Ordner {{name}}",
     "markSectionRead": "Als gelesen markieren",
     "listOptions": "Listenoptionen",
-    "displayOptions": "Seitenleistenanzeigeoptionen",
-    "home": "Startseite",
-    "lobby": "Lobby",
-    "voiceLive": "{{count}} im Anruf"
+    "displayOptions": "Seitenleistenanzeigeoptionen"
   },
   "inbox": {
     "notifications": "Benachrichtigungen",
@@ -137,6 +137,26 @@
     "createSubmit": "Raum erstellen",
     "createSubmitSpace": "Space erstellen",
     "createFailed": "Der Raum konnte nicht erstellt werden.",
-    "directoryTitle": "Räume entdecken"
+    "directoryTitle": "Räume entdecken",
+    "directorySearch": "Suchen",
+    "directorySearchLabel": "Im Verzeichnis suchen",
+    "directorySearchPlaceholder": "Nach Räumen suchen",
+    "directoryMore": "Weitere laden",
+    "directoryFailed": "Das Verzeichnis konnte nicht gelesen werden.",
+    "directoryEmptyTitle": "Keine Räume gefunden",
+    "directoryEmptyBody": "Verwende einen anderen Suchterm oder erkunde einen anderen Server.",
+    "directoryJoinByAddress": "Per Adresse beitreten",
+    "joinTitle": "Per Adresse beitreten",
+    "joinDescription": "Gib eine öffentliche Adresse eines Raumes oder Spaces ein.",
+    "joinExamplesLabel": "Adressen haben folgendes Format:",
+    "joinAddressLabel": "Adressen",
+    "joinAddressPlaceholder": "#raum:server",
+    "joinSubmit": "Beitreten",
+    "joinInvalid": "Das sieht nicht wie die Adresse eines Raums oder ein matrix.to Link aus.",
+    "joinFailed": "Dem Raum konnte nicht beigetreten werden.",
+    "settingsTitle": "Raumeinstellungen",
+    "settingsOpen": "Raumeinstellungen",
+    "settingsClose": "Raumeinstellungen schließen",
+    "settingsGeneral": "Allgemein"
   }
 }

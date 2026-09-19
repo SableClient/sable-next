@@ -2,6 +2,7 @@
   "nav": {
     "primary": "Hlavní navigace",
     "quickTools": "Rychlé nástroje",
+    "home": "Domovský rozcestník",
     "messages": "Zprávy",
     "direct": "Přímé zprávy",
     "inbox": "Přehled",
@@ -15,7 +16,6 @@
     "joinWithAddress": "Připojit se pomocí adresy",
     "exploreSpaces": "Procházet prostory",
     "messageSearch": "Hledat zprávy",
-    "home": "Domovský rozcestník",
     "profile": "Profil",
     "editProfile": "Upravit profil",
     "account": "Účet",
@@ -159,7 +159,6 @@
     "directoryEmptyTitle": "Žádné místnosti nenalezeny",
     "directoryEmptyBody": "Zkuste hledat jiný výraz, či na jiném serveru.",
     "directoryTotal_one": "{{count}} místnost",
-    "directoryTotal_few": "{{count}} místnosti",
     "directoryTotal_other": "{{count}} místností",
     "directoryJoinByAddress": "Připojit se pomocí adresy",
     "joinTitle": "Připojit se pomocí adresy",
