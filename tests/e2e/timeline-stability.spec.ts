@@ -1172,13 +1172,27 @@ test.describe('mobile', () => {
       await timeline.viewport.evaluate((node) => node.clientHeight + 1)
     );
     await expect(timeline.jumpToLatest).toBeVisible();
-    const gap = await timeline.jumpToLatest.evaluate((button) => {
-      (button as HTMLElement).click();
-      const node = document.querySelector<HTMLElement>('.timeline-viewport .viewport');
-      if (!node) throw new Error('missing timeline viewport');
-      return node.scrollHeight - node.clientHeight - node.scrollTop;
+    const before = await timeline.scrollTop();
+    const end = await timeline.scrollableHeight();
+    const sampling = timeline.viewport.evaluate(async (node) => {
+      const offsets: number[] = [];
+      const deadline = performance.now() + 5_000;
+      do {
+        await new Promise(requestAnimationFrame);
+        offsets.push(node.scrollTop);
+      } while (
+        node.scrollHeight - node.clientHeight - node.scrollTop > 1 &&
+        performance.now() < deadline
+      );
+      return offsets;
     });
-    expect(gap).toBeLessThanOrEqual(1);
+    await timeline.jumpToLatest.tap();
+    const offsets = await sampling;
+    expect(
+      offsets.some((offset) => offset > before + 1 && offset < end - 1),
+      'a reduced-motion jump should land without rendering intermediate positions'
+    ).toBe(false);
+    await expect.poll(() => timeline.distanceFromBottom()).toBeLessThanOrEqual(1);
     await expect(timeline.jumpToLatest).toBeHidden();
   });
 
@@ -1271,10 +1285,14 @@ test.describe('mobile', () => {
     const end = await timeline.scrollableHeight();
     const sampling = timeline.viewport.evaluate(async (node) => {
       const offsets: number[] = [];
-      for (let frame = 0; frame < 30; frame += 1) {
+      const deadline = performance.now() + 5_000;
+      do {
         await new Promise(requestAnimationFrame);
         offsets.push(node.scrollTop);
-      }
+      } while (
+        node.scrollHeight - node.clientHeight - node.scrollTop > 1 &&
+        performance.now() < deadline
+      );
       return offsets;
     });
     await timeline.jumpToLatest.tap();
