@@ -67,6 +67,7 @@
         presence={presence.presence}
         label={$i18n.t(`presence.${presence.presence}`)}
         class="member-identity-presence"
+        size="large"
       />
     {/if}
   </span>

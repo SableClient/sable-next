@@ -6,7 +6,7 @@
   interface Props {
     presence: PresenceView;
     label: string;
-    size?: 'small' | 'medium';
+    size?: 'small' | 'medium' | 'large';
     class?: ClassValue;
   }
 
@@ -14,7 +14,12 @@
 </script>
 
 <span
-  class={['presence-dot', size === 'medium' && 'presence-dot-medium', className]}
+  class={[
+    'presence-dot',
+    size === 'medium' && 'presence-dot-medium',
+    size === 'large' && 'presence-dot-large',
+    className,
+  ]}
   data-presence={presence}
   role="img"
   aria-label={label}
@@ -34,6 +39,11 @@
   .presence-dot-medium {
     height: var(--space-200);
     width: var(--space-200);
+  }
+
+  .presence-dot-large {
+    height: var(--space-300);
+    width: var(--space-300);
   }
 
   .presence-dot[data-presence='online'] {

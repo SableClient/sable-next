@@ -783,6 +783,7 @@
                             presence={peerPresence.presence}
                             label={$i18n.t(`presence.${peerPresence.presence}`)}
                             class="room-presence"
+                            size="large"
                           />
                         {/if}
                       </span>
