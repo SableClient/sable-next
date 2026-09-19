@@ -356,7 +356,7 @@
 
   .pin-item {
     align-items: center;
-    border-radius: var(--radii-400);
+    border-radius: var(--radius-inner);
     display: flex;
     gap: var(--space-200);
     padding-right: var(--space-200);
@@ -371,7 +371,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    border-radius: var(--radii-400);
+    border-radius: var(--radius-inner);
     color: inherit;
     cursor: pointer;
     display: flex;
