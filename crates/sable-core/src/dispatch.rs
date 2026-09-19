@@ -732,6 +732,13 @@ impl Core {
                 memberships,
             } => {
                 let room = self.room(&room_id).await?;
+                if let Err(error) = room.power_levels().await {
+                    tracing::error!(
+                        room_id = %room_id,
+                        %error,
+                        "room power levels are unavailable, every member reads as the spec default"
+                    );
+                }
                 let members = room
                     .members(membership_filter(&memberships))
                     .await
