@@ -60,6 +60,31 @@ test('a room reachable from a joined space lands under that space', () => {
   );
 });
 
+test('a room in a subspace lands under the root space the sidebar shows', () => {
+  const rooms = [
+    room('!root:example.org', { is_space: true, space_children: [child('!sub:example.org')] }),
+    room('!sub:example.org', { is_space: true, space_children: [child('!inner:example.org')] }),
+    room('!inner:example.org'),
+  ];
+  expect(roomSectionPath(rooms, '!inner:example.org')).toBe(
+    '/space/!root%3Aexample.org/!inner%3Aexample.org'
+  );
+});
+
+test('a cycle between spaces still resolves to one of them', () => {
+  const rooms = [
+    room('!left:example.org', { is_space: true, space_children: [child('!right:example.org')] }),
+    room('!right:example.org', {
+      is_space: true,
+      space_children: [child('!left:example.org'), child('!inner:example.org')],
+    }),
+    room('!inner:example.org'),
+  ];
+  expect(roomSectionPath(rooms, '!inner:example.org')).toBe(
+    '/space/!right%3Aexample.org/!inner%3Aexample.org'
+  );
+});
+
 test('a space the user has not joined does not claim its children', () => {
   const rooms = [
     room('!space:example.org', {

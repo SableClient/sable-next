@@ -16,6 +16,20 @@ function parentSpaceOf(rooms: readonly RoomSummary[], roomId: string): RoomSumma
   );
 }
 
+function rootSpaceOf(rooms: readonly RoomSummary[], roomId: string): RoomSummary | undefined {
+  const seen = new Set<string>([roomId]);
+  let space = parentSpaceOf(rooms, roomId);
+
+  while (space !== undefined && !seen.has(space.room_id)) {
+    seen.add(space.room_id);
+    const parent = parentSpaceOf(rooms, space.room_id);
+    if (parent === undefined) return space;
+    space = parent;
+  }
+
+  return space;
+}
+
 /** Mirrors RoomNav's sectioning, so a permalink lands where the sidebar links. */
 function sectionPath(
   rooms: readonly RoomSummary[],
@@ -25,7 +39,7 @@ function sectionPath(
   if (room?.is_space) return resolve('/(app)/space/[spaceId]', { spaceId: roomParam });
   if (room?.is_direct) return resolve('/(app)/direct/[roomId]', { roomId: roomParam });
 
-  const parentSpace = room ? parentSpaceOf(rooms, room.room_id) : undefined;
+  const parentSpace = room ? rootSpaceOf(rooms, room.room_id) : undefined;
   if (parentSpace) {
     return resolve('/(app)/space/[spaceId]/[roomId]', {
       spaceId: roomPathParam(parentSpace),
