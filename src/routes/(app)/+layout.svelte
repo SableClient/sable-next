@@ -574,7 +574,7 @@
     padding: var(--space-300) var(--space-400);
     position: fixed;
     top: calc(var(--space-300) + var(--safe-top));
-    transform: translateY(-150%);
+    transform: translateY(calc(-100% - var(--space-300) - var(--safe-top)));
     z-index: var(--layer-tooltip);
   }
 
