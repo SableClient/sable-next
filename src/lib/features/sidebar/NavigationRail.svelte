@@ -31,6 +31,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
   import '#lib/ui/primitives/nav-tab.css';
@@ -425,7 +426,7 @@
       {/snippet}
     </ContextMenu.Trigger>
     <ContextMenu.Portal>
-      <ContextMenu.Content class="menu-surface">
+      <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
         <ContextMenu.Item
           class="menu-item"
           disabled={resolveUnreadBadge(item.unread, preferences, item.dm ?? false) === null}
@@ -480,7 +481,7 @@
           {/snippet}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="menu-surface">
+          <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
             <ContextMenu.Item
               class="menu-item"
               onSelect={() => {
@@ -578,7 +579,7 @@
       {/snippet}
     </ContextMenu.Trigger>
     <ContextMenu.Portal>
-      <ContextMenu.Content class="menu-surface">
+      <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
         {@render folderMenuItems(folder)}
       </ContextMenu.Content>
     </ContextMenu.Portal>
@@ -612,7 +613,7 @@
           {/snippet}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content class="menu-surface">
+          <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
             {@render folderMenuItems(folder)}
           </ContextMenu.Content>
         </ContextMenu.Portal>

@@ -6,6 +6,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import BottomSheet from './BottomSheet.svelte';
   import { setActionMenuSurface } from './action-menu.js';
@@ -81,6 +82,7 @@
     <DropdownMenu.Portal>
       <DropdownMenu.Content
         class={['menu-surface', surfaceClass]}
+        {...overlayLayer()}
         customAnchor={anchor}
         aria-label={label}
         {side}

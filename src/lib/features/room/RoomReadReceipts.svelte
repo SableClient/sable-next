@@ -6,6 +6,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import MemberUserList from './MemberUserList.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
@@ -53,7 +54,13 @@
 {#if desktop && anchor}
   <Popover.Root bind:open>
     <Popover.Portal>
-      <Popover.Content class="read-receipts-popover" customAnchor={anchor} side="top" align="end">
+      <Popover.Content
+        class="read-receipts-popover"
+        {...overlayLayer()}
+        customAnchor={anchor}
+        side="top"
+        align="end"
+      >
         <MemberUserList
           title={$i18n.t('timeline.seenBy')}
           userIds={readers}
@@ -103,7 +110,6 @@
     overflow: hidden;
     padding: 0;
     width: min(22rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
   }
 
   :global(.read-receipts-popover .member-user-list) {

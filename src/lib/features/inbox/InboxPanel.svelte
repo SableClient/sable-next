@@ -6,6 +6,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import InboxView from './InboxView.svelte';
 
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
@@ -36,6 +37,7 @@
     <Popover.Portal>
       <Popover.Content
         class="inbox-popover"
+        {...overlayLayer()}
         customAnchor={anchor}
         side="top"
         align="end"
@@ -71,6 +73,5 @@
     max-height: min(42rem, calc(100dvh - 2rem));
     overflow: auto;
     width: min(24rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
   }
 </style>

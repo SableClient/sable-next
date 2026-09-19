@@ -3,6 +3,7 @@
   import type { Snippet } from 'svelte';
 
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   type DialogVariant = 'drawer' | 'settings' | 'verification' | 'sheet' | 'fullscreen';
 
@@ -46,9 +47,10 @@
 
 <Dialog.Root bind:open {onOpenChange}>
   <Dialog.Portal>
-    <Dialog.Overlay class={['dialog-backdrop', `dialog-backdrop-${variant}`]} />
+    <Dialog.Overlay class={['dialog-backdrop', `dialog-backdrop-${variant}`]} {...overlayLayer()} />
     <Dialog.Content
       class={['dialog-content', `dialog-content-${variant}`, contentClass]}
+      {...overlayLayer()}
       style={contentStyle}
       aria-label={label}
     >
@@ -79,7 +81,6 @@
 
   :global(.dialog-backdrop-drawer) {
     border: 0;
-    z-index: var(--layer-dialog);
   }
 
   :global(.dialog-content-drawer) {
@@ -88,20 +89,6 @@
     max-width: min(22rem, 85%);
     padding: 0;
     width: 100%;
-    z-index: var(--layer-dialog);
-  }
-
-  :global(.dialog-backdrop-verification),
-  :global(.dialog-backdrop-sheet) {
-    z-index: var(--layer-sheet);
-  }
-
-  :global(.dialog-backdrop-settings) {
-    z-index: var(--layer-dialog);
-  }
-
-  :global(.dialog-backdrop-fullscreen) {
-    z-index: var(--layer-sheet);
   }
 
   :global(.dialog-content-fullscreen) {
@@ -111,7 +98,6 @@
     inset: 0;
     overflow: hidden;
     padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
-    z-index: var(--layer-sheet);
   }
 
   :global(.dialog-content-settings) {
@@ -127,7 +113,6 @@
     top: 50%;
     transform: translate(-50%, -50%);
     width: 100%;
-    z-index: var(--layer-dialog);
   }
 
   :global(.dialog-content-verification),
@@ -144,7 +129,6 @@
     /* Bottom-anchored, so the home indicator would otherwise sit on the content. */
     padding-bottom: calc(var(--space-400) + var(--safe-bottom));
     width: 100%;
-    z-index: var(--layer-sheet);
   }
 
   /* Several dialog bodies cap themselves against the viewport. Keep those

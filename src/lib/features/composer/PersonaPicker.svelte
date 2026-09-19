@@ -11,6 +11,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import PersonaMenu from './PersonaMenu.svelte';
 
@@ -90,6 +91,7 @@
     <Popover.Portal>
       <Popover.Content
         class="persona-picker-popover"
+        {...overlayLayer()}
         side="top"
         align="start"
         collisionPadding={12}
@@ -144,7 +146,6 @@
     box-shadow: var(--shadow-dialog);
     padding: var(--space-200);
     width: min(18rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
   }
 
   :global(.persona-button-format) {

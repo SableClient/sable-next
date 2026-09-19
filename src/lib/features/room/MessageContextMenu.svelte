@@ -4,6 +4,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import '#lib/ui/primitives/menu.css';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import { messageMenuRows } from './message-menu-items';
   import { openMessageMenu } from './message-menu-open.svelte.js';
@@ -29,6 +30,7 @@
     <ContextMenu.Portal>
       <ContextMenu.Content
         class="menu-surface message-menu"
+        {...overlayLayer()}
         loop
         collisionPadding={8}
         customAnchor={anchor}

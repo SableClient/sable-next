@@ -1126,7 +1126,7 @@
     padding: var(--space-400);
     pointer-events: none;
     position: fixed;
-    z-index: var(--layer-dialog);
+    z-index: var(--layer-overlay);
   }
 
   .drop-card {
