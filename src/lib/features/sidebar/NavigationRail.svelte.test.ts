@@ -573,3 +573,41 @@ test('right-clicking a top-level space opens its options menu', async () => {
 
   await unmount(instance);
 });
+
+test('restores the direct tab to its last desktop chat', () => {
+  expect(spaceNavigationHref('/direct', '/direct/!dm%3Aexample.org', false, '/direct')).toBe(
+    '/direct/!dm%3Aexample.org'
+  );
+  expect(spaceNavigationHref('/direct', '/home/!room%3Aexample.org', false, '/direct')).toBe(
+    '/direct'
+  );
+});
+
+test('opens the direct root on mobile even when it has a saved chat', async () => {
+  localStorage.setItem(
+    'sable-space-paths',
+    JSON.stringify({ direct: '/direct/!dm%3Aexample.org' })
+  );
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [], mobile: true },
+  });
+  await tick();
+
+  expect(document.querySelector('a[href="/direct"]')).not.toBeNull();
+  expect(document.querySelector('a[href="/direct/!dm%3Aexample.org"]')).toBeNull();
+
+  await unmount(instance);
+});
+
+test('records the active desktop direct chat', async () => {
+  const instance = mount(NavigationRail, { target: document.body, props: { spaces: [] } });
+  await tick();
+
+  pageState.url = { pathname: '/direct/!dm%3Aexample.org', search: '?event=%24event', hash: '' };
+  navigation.afterNavigate?.();
+
+  expect(savedSpacePaths()).toEqual({ direct: '/direct/!dm%3Aexample.org' });
+
+  await unmount(instance);
+});

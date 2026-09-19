@@ -21,7 +21,12 @@
     type SidebarFolder,
     type SidebarItem,
   } from '#lib/spaces/sidebar-layout.js';
-  import { saveSpacePath, savedSpacePaths, spaceNavigationHref } from './space-paths.js';
+  import {
+    DIRECT_PATHS_KEY,
+    saveSpacePath,
+    savedSpacePaths,
+    spaceNavigationHref,
+  } from './space-paths.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
@@ -109,6 +114,7 @@
     onReorder,
     onMarkSectionRead,
   }: Props = $props();
+  const directRoot = resolve('direct');
   let spacePaths = $state(savedSpacePaths());
   let dragged = $state<LayoutRef | null>(null);
   let dropState = $state<DropState<LayoutRef> | null>(null);
@@ -145,8 +151,14 @@
         ]
       : []),
     {
-      href: resolve('direct'),
+      href: directRoot,
       activePrefix: '/direct',
+      navigateHref: spaceNavigationHref(
+        directRoot,
+        spacePaths[DIRECT_PATHS_KEY],
+        mobile,
+        directRoot
+      ),
       icon: ChatsIcon,
       label: 'nav.direct',
       unread: directUnread,
@@ -186,6 +198,10 @@
     icon: PlusIcon,
     label: 'nav.createRoom',
   };
+
+  function under(path: string, root: string): boolean {
+    return path === root || path.startsWith(`${root}/`);
+  }
 
   function spaceName(name: string | null, roomId: string): string {
     return name ?? roomId;
@@ -349,10 +365,11 @@
       const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(candidate) });
       return path === href || path.startsWith(`${href}/`);
     });
-    if (!space || spacePaths[space.room_id] === path) return;
+    const key = under(path, directRoot) ? DIRECT_PATHS_KEY : space?.room_id;
+    if (key === undefined || spacePaths[key] === path) return;
 
-    spacePaths = { ...spacePaths, [space.room_id]: path };
-    saveSpacePath(space.room_id, path);
+    spacePaths = { ...spacePaths, [key]: path };
+    saveSpacePath(key, path);
   });
 </script>
 

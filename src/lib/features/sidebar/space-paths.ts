@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'sable-space-paths';
 
+export const DIRECT_PATHS_KEY = 'direct';
+
 type SpacePaths = Record<string, string>;
 
 function load(): SpacePaths {
