@@ -97,7 +97,7 @@
     <p class="empty">{$i18n.t('settings.developerLogsEmpty')}</p>
   {:else}
     <div class="entries" aria-live="polite">
-      {#each filtered.slice(-200).toReversed() as entry (entry.id)}
+      {#each filtered.slice(-200).reverse() as entry (entry.id)}
         <details class={`entry level-${entry.level}`}>
           <summary>
             <span>{entry.level.toUpperCase()}</span>

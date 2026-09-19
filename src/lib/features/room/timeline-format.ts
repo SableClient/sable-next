@@ -142,7 +142,7 @@ export function mergeAggregations(
   const known = new Set(items.map((item) => item.id));
   const pending = aggregations
     .filter((item) => !known.has(item.id))
-    .toSorted((left, right) => left.timestamp - right.timestamp);
+    .sort((left, right) => left.timestamp - right.timestamp);
   if (pending.length === 0) return items;
 
   const merged: TimelineItemView[] = [];

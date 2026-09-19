@@ -31,6 +31,24 @@ export default defineConfig([
     },
   },
   {
+    // Vite transpiles syntax and never polyfills a built-in.
+    files: ['src/**/*.{ts,svelte}'],
+    ignores: ['src/**/*.test.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { property: 'toSorted', message: 'Needs Chrome 110; use .slice().sort().' },
+        { property: 'toReversed', message: 'Needs Chrome 110; use .slice().reverse().' },
+        { property: 'toSpliced', message: 'Needs Chrome 110.' },
+        { object: 'Object', property: 'groupBy', message: 'Needs Chrome 117.' },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'structuredClone', message: 'Needs Chrome 98; use a JSON round trip.' },
+      ],
+    },
+  },
+  {
     files: ['**/*.svelte'],
     languageOptions: {
       parserOptions: {

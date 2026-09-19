@@ -30,9 +30,9 @@ export function parseJumpQuery(query: string): { kind: JumpKind | null; text: st
 }
 
 function byActivity(rooms: readonly RoomSummary[]): RoomSummary[] {
-  return rooms.toSorted(
-    (a, b) => (b.latest_event?.timestamp ?? 0) - (a.latest_event?.timestamp ?? 0)
-  );
+  return rooms
+    .slice()
+    .sort((a, b) => (b.latest_event?.timestamp ?? 0) - (a.latest_event?.timestamp ?? 0));
 }
 
 export function filterRoomsByQuery(
@@ -72,5 +72,5 @@ export function unreadRoomsByPriority(
 ): RoomSummary[] {
   return rooms
     .filter((room) => room.unread > 0 && room.room_id !== excludeRoomId)
-    .toSorted((a, b) => b.highlight - a.highlight || b.unread - a.unread);
+    .sort((a, b) => b.highlight - a.highlight || b.unread - a.unread);
 }

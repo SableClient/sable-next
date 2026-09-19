@@ -32,7 +32,7 @@ export function powerTag(level: number, t: Translate, tags: PowerLevelTagMap = {
 
   const levels = [
     ...new Set([...Object.keys(tags).map(Number), ...DEFAULT_TAGS.map((tag) => tag.level)]),
-  ].toSorted((left, right) => right - left);
+  ].sort((left, right) => right - left);
 
   const below = levels.find((candidate) => candidate < level);
   const tag = below === undefined ? null : named(below, t, tags);

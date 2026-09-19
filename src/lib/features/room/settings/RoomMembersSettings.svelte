@@ -52,7 +52,7 @@
   let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
   let canSetPower = $derived(permissions?.can_change_power_levels ?? false);
   let sorted = $derived(
-    [...members].toSorted(
+    [...members].sort(
       (left, right) =>
         right.power_level - left.power_level ||
         memberName(left).localeCompare(memberName(right), undefined, { sensitivity: 'base' })

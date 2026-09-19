@@ -95,7 +95,7 @@
   let directRooms = $derived(
     allDirectRooms
       .filter((room) => room.highlight > 0 || room.unread > 0)
-      .toSorted(
+      .sort(
         (left, right) => (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0)
       )
       .slice(0, 3)

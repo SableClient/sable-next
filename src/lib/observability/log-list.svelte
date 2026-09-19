@@ -4,6 +4,6 @@
   let { warn }: { warn: () => void } = $props();
 </script>
 
-{#each debugLog.entries.slice(-200).toReversed() as entry (entry.id)}
+{#each debugLog.entries.slice(-200).reverse() as entry (entry.id)}
   <details>{warn()}{entry.message}</details>
 {/each}

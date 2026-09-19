@@ -73,7 +73,7 @@
         const roomId = pack.room_id ?? '';
         return { ...grouped, [roomId]: [...(grouped[roomId] ?? []), pack] };
       }, {})
-    ).toSorted(([left], [right]) => roomName(left).localeCompare(roomName(right)))
+    ).sort(([left], [right]) => roomName(left).localeCompare(roomName(right)))
   );
 
   $effect(() => {

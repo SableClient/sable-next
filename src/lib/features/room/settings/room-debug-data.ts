@@ -26,7 +26,9 @@ export async function collectRoomDebugData(
   permissions: RoomPermissionsView | null,
   levels: RoomPowerLevelsView | null
 ): Promise<string> {
-  const snapshot = structuredClone({ room, permissions, power_levels: levels });
+  const snapshot = JSON.parse(
+    JSON.stringify({ room, permissions, power_levels: levels })
+  ) as Record<string, unknown>;
   const capturedAt = new Date().toISOString();
   const state = await Promise.all(
     STATE_TYPES.map(async (type) => {

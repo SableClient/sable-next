@@ -19,7 +19,7 @@ export function abbreviationPattern(map: ReadonlyMap<string, string>): RegExp | 
   if (map.size === 0) return null;
 
   const terms = [...map.keys()]
-    .toSorted((left, right) => right.length - left.length)
+    .sort((left, right) => right.length - left.length)
     .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   return new RegExp(`\\b(?:${terms.join('|')})\\b`, 'gi');
 }
@@ -42,7 +42,7 @@ export function ancestorSpaceIds(rooms: readonly RoomSummary[], roomId: string):
     if (frontier.length > 0) levels.push(frontier);
   }
 
-  return levels.toReversed().flat();
+  return levels.slice().reverse().flat();
 }
 
 export function markAbbreviations(

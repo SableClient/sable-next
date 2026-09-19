@@ -241,7 +241,7 @@
       return roomList.rooms
         .filter((room) => room.state === 'joined' && room.is_direct)
         .map(roomRow)
-        .toSorted(byRecency);
+        .sort(byRecency);
     }
 
     if (page.url.pathname.startsWith('/space')) {
@@ -261,7 +261,7 @@
           !claimedByJoinedSpace.has(room.room_id)
       )
       .map(roomRow)
-      .toSorted(byRecency);
+      .sort(byRecency);
   });
   let invites = $derived.by<RoomSummary[]>(() => {
     const pending = roomList.rooms.filter((room) => room.state === 'invited');

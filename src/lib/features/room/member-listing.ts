@@ -69,7 +69,7 @@ export interface MemberGroup {
 
 export function groupMembers(members: readonly MemberView[], sort: MemberSort): MemberGroup[] {
   const ordered = [...members]
-    .toSorted(compare(sort))
+    .sort(compare(sort))
     .sort((left, right) => right.power_level - left.power_level);
 
   const groups: MemberGroup[] = [];
