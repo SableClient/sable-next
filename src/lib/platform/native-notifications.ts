@@ -41,6 +41,32 @@ export async function sendNativeTestNotification(sequence: number): Promise<void
   await invoke('test_notification', { sequence });
 }
 
+export interface NativePushDiagnostics {
+  counts: Record<string, number>;
+  lastOutcome: string | null;
+  lastAt: number;
+}
+
+/** The cold path posts from a process the app never sees, so its outcome is
+    only readable here. */
+export async function takeNativePushDiagnostics(): Promise<NativePushDiagnostics | null> {
+  if (!isTauri()) return null;
+  try {
+    const taken = await invoke<{
+      counts?: Record<string, number>;
+      lastOutcome?: string;
+      lastAt?: number;
+    }>('plugin:notifications|take_push_diagnostics');
+    return {
+      counts: taken.counts ?? {},
+      lastOutcome: taken.lastOutcome ?? null,
+      lastAt: taken.lastAt ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function watchNativeNotificationActions(
   handler: (action: NativeNotificationAction) => void
 ): Promise<() => void> {
