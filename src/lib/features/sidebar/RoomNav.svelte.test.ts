@@ -503,11 +503,11 @@ test('a DM row falls back to the peer presence message, and a topic still wins',
   await unmount(instance);
 });
 
-test('hovering a room row shows its full name in a tooltip', async () => {
+test('hovering a collapsed room row shows its full name in a tooltip', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!long:example.org', name: 'A very long room name that truncates' }),
   ];
-  const instance = await mountNav();
+  const instance = await mountNav({ collapsed: true });
   await tick();
 
   const row = document.querySelector<HTMLElement>('.room-row');

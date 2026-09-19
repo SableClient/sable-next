@@ -705,8 +705,10 @@
                     >
                   </button>
                 {/snippet}
-                <Tooltip label={name} side="right" trigger={categoryTrigger} />
-                {#if !collapsed}
+                {#if collapsed}
+                  <Tooltip label={name} side="right" trigger={categoryTrigger} />
+                {:else}
+                  {@render categoryTrigger({ props: {} })}
                   <span class="room-options-slot">
                     <RoomOptionsMenu
                       room={item.room}
@@ -831,16 +833,20 @@
                     {/if}
                   </a>
                 {/snippet}
-                <Tooltip label={name} side="right" trigger={roomTrigger} />
-                {#if !collapsed && room}
-                  <span class="room-options-slot">
-                    <RoomOptionsMenu
-                      {room}
-                      parentSpaceId={item.parentSpaceId ?? null}
-                      onSettings={openSettings}
-                      onLeave={openLeave}
-                    />
-                  </span>
+                {#if collapsed}
+                  <Tooltip label={name} side="right" trigger={roomTrigger} />
+                {:else}
+                  {@render roomTrigger({ props: {} })}
+                  {#if room}
+                    <span class="room-options-slot">
+                      <RoomOptionsMenu
+                        {room}
+                        parentSpaceId={item.parentSpaceId ?? null}
+                        onSettings={openSettings}
+                        onLeave={openLeave}
+                      />
+                    </span>
+                  {/if}
                 {/if}
               </div>
             {/if}
