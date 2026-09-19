@@ -1527,8 +1527,8 @@
     "customThemesDarkTheme": "Întunecată",
     "customThemesErrorSize": "Temele nu put fi mai mari decât 1 MiB",
     "customThemesErrorHeader": "Acest fișier nu este o temă sau modificare pentru Sable. Ele ar trebui să includă @sable-theme sau @sable-tweak în metadata.",
-    "customThemesErrorLoad" :"Catalogul nu s-a putut încărca, încearcă mai târziu.",
-    "customThemesErrorInstall" :"{{file}} nu s-a putut instala.",
+    "customThemesErrorLoad": "Catalogul nu s-a putut încărca, încearcă mai târziu.",
+    "customThemesErrorInstall": "{{file}} nu s-a putut instala.",
     "customThemesErrorChoose": "Alege un fișier .sable.css"
   },
   "errors": {

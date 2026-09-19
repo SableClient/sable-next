@@ -165,10 +165,9 @@
         {#if banner}<MediaImage
             class="banner"
             source={banner}
-            src={profile.banner_url}
             alt={$i18n.t('settings.currentProfileBanner')}
-            width="1000"
-            height="375"
+            width={1000}
+            height={375}
           />{/if}
         <label class="file-button btn btn-secondary btn-small">
           <input

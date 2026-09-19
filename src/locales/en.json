@@ -1432,7 +1432,7 @@
     "profileColorsBrightnessDark": "Dark",
     "pronounsAndTimezone": "Pronouns and timezone",
     "pronouns": "Pronouns",
-    "pronounsPlaceholder":"they/them, she/her (en)",
+    "pronounsPlaceholder": "they/them, she/her (en)",
     "timezone": "Timezone",
     "timezonePlaceholder": "America/Halifax",
     "biography": "Biography",
@@ -1461,8 +1461,8 @@
     "customThemesDarkTheme": "Dark theme",
     "customThemesErrorSize": "Themes must be smaller than 1 MiB",
     "customThemesErrorHeader": "This file is not a Sable theme or tweak. It must include @sable-theme or @sable-tweak metadata.",
-    "customThemesErrorLoad" :"Could not load the official theme catalog.",
-    "customThemesErrorInstall" :"Could not install {{file}}.",
+    "customThemesErrorLoad": "Could not load the official theme catalog.",
+    "customThemesErrorInstall": "Could not install {{file}}.",
     "customThemesErrorChoose": "Choose a .sable.css theme file."
   },
   "errors": {
