@@ -381,3 +381,29 @@ async fn a_pack_with_no_images_is_still_listed() {
     assert_eq!(packs[0].id, "fresh");
     assert!(packs[0].images.is_empty());
 }
+
+#[tokio::test]
+async fn messaging_a_user_reuses_the_dm_that_already_exists() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!existing-dm:example.org");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder
+                .add_joined_room(JoinedRoomBuilder::new(room_id))
+                .add_custom_global_account_data(json!({
+                    "type": "m.direct",
+                    "content": { "@bob:example.org": [room_id] }
+                }));
+        })
+        .await;
+    let core = core(&server, client).await;
+    let command =
+        serde_json::from_value(json!({"type": "create_dm", "user_id": "@bob:example.org"}))
+            .unwrap();
+    let CommandOk::CreateDm { room_id: found } = core.dispatch(command).await.unwrap() else {
+        panic!("wrong response")
+    };
+    assert_eq!(found, room_id);
+}

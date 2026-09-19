@@ -2319,12 +2319,17 @@ impl Core {
             }
 
             Command::CreateDm { user_id } => {
-                let room = self
-                    .client()
-                    .await?
-                    .create_dm(&user_id)
-                    .await
-                    .map_err(|error| self.failed("create_dm", error))?;
+                let client = self.client().await?;
+                let existing = client
+                    .get_dm_rooms(&user_id)
+                    .find(|room| !room.is_tombstoned());
+                let room = match existing {
+                    Some(room) => room,
+                    None => client
+                        .create_dm(&user_id)
+                        .await
+                        .map_err(|error| self.failed("create_dm", error))?,
+                };
 
                 Ok(CommandOk::CreateDm {
                     room_id: room.room_id().to_owned(),
