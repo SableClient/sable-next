@@ -288,9 +288,7 @@ impl Core {
         );
 
         let mut seen = BTreeSet::new();
-        packs.retain(|pack| {
-            !pack.images.is_empty() && seen.insert((pack.room_id.clone(), pack.id.clone()))
-        });
+        packs.retain(|pack| seen.insert((pack.room_id.clone(), pack.id.clone())));
         Ok(CommandOk::ImagePacks { packs })
     }
 
@@ -382,7 +380,6 @@ impl Core {
             }
         }
 
-        packs.retain(|pack| pack.origin == ImagePackOriginView::Account || !pack.images.is_empty());
         Ok(CommandOk::AllImagePacks { packs })
     }
 

@@ -351,3 +351,33 @@ async fn cached_image_packs_return_without_waiting_for_room_state() {
             .any(|request| request.url.path().ends_with("/state"))
     );
 }
+
+#[tokio::test]
+async fn a_pack_with_no_images_is_still_listed() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!empty-pack:example.org");
+    let pack = json!({
+        "type": "m.room.image_pack", "state_key": "fresh", "sender": "@alice:example.org",
+        "event_id": "$empty-pack", "origin_server_ts": 1,
+        "content": {"pack": {"display_name": "Fresh"}, "images": {}}
+    });
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(Raw::new(&pack).unwrap().cast_unchecked()),
+        )
+        .await;
+    let core = core(&server, client).await;
+    let command = serde_json::from_value(
+        json!({"type": "image_packs", "room_id": room_id, "cached_only": true}),
+    )
+    .unwrap();
+    let CommandOk::ImagePacks { packs } = core.dispatch(command).await.unwrap() else {
+        panic!("wrong response")
+    };
+    assert_eq!(packs.len(), 1);
+    assert_eq!(packs[0].id, "fresh");
+    assert!(packs[0].images.is_empty());
+}
