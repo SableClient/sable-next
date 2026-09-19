@@ -225,9 +225,9 @@
     border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     display: flex;
-    flex: 0 0 4.625rem;
+    flex: 0 0 var(--sidebar-footer-height);
     justify-content: space-between;
-    min-height: 4.625rem;
+    min-height: var(--sidebar-footer-height);
     padding: 0 var(--space-300);
   }
 

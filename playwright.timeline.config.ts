@@ -8,6 +8,7 @@ export default defineConfig({
     'timeline-keyboard.spec.ts',
     'timeline-lifecycle.spec.ts',
     'timeline-media.spec.ts',
+    'composer-alignment.spec.ts',
     'reaction-sheet.spec.ts',
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',

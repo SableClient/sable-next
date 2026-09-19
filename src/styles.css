@@ -367,6 +367,7 @@ html {
   --layer-chrome: 7000;
   --page-gutter: var(--space-300);
   --navigation-rail-width: 4.125rem;
+  --sidebar-footer-height: 4.625rem;
   --timeline-row-gap: var(--space-250);
   --timeline-row-padding: var(--space-100);
   --link-decoration: underline;

@@ -1069,4 +1069,15 @@
     flex: 0 0 auto;
     padding-bottom: var(--space-200);
   }
+
+  @media (width >= 48rem) {
+    .composer-dock {
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: var(--sidebar-footer-height);
+      padding-block: var(--space-300);
+    }
+  }
 </style>
