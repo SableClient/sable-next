@@ -100,7 +100,7 @@
     "createTopicHint": "Optional. Shown in the room header and the directory.",
     "createKindLabel": "Kind",
     "createKindRoom": "Room",
-    "createKindRoomHint": "A conversation people can talk in.",
+    "createKindRoomHint": "A conversation people can text in.",
     "createKindVoice": "Voice room",
     "createKindVoiceHint": "A room people join to talk out loud.",
     "createKindSpace": "Space",
@@ -533,24 +533,24 @@
   "timeline": {
     "label": "Timeline",
     "back": "Back to rooms",
-    "loading": "Loading messages...",
-    "loadingHistory": "Loading older messages...",
-    "loadingNewer": "Loading newer messages...",
+    "loading": "Loading messages…",
+    "loadingHistory": "Loading older messages…",
+    "loadingNewer": "Loading newer messages…",
     "loadFailed": "Unable to load messages. Please try again.",
-    "messagePlaceholder": "Send a message...",
+    "messagePlaceholder": "Send a message…",
     "sendMessage": "Send message",
     "sendAttachment": "Send attachment",
     "members": "Members",
     "closeMembers": "Close members",
-    "loadingMembers": "Loading members...",
+    "loadingMembers": "Loading members…",
     "searchMembers": "Search members",
     "noMembersFound": "No members found",
     "memberCount": "{{count}} members",
-    "oneTyping": "{{name}} is typing...",
-    "twoTyping": "{{name1}} and {{name2}} are typing...",
-    "threeTyping": "{{name1}}, {{name2}} and {{name3}} are typing...",
-    "manyTyping": "{{name1}}, {{name2}} and {{count}} others are typing...",
-    "unknownTyping": "Someone is typing...",
+    "oneTyping": "{{name}} is typing…",
+    "twoTyping": "{{name1}} and {{name2}} are typing…",
+    "threeTyping": "{{name1}}, {{name2}} and {{name3}} are typing…",
+    "manyTyping": "{{name1}}, {{name2}} and {{count}} others are typing…",
+    "unknownTyping": "Someone is typing…",
     "unknownSender": "Unknown sender",
     "today": "Today",
     "yesterday": "Yesterday",
@@ -617,7 +617,7 @@
     "readMarker": "Messages read up to here",
     "edited": "(edited)",
     "morePronouns": "+{{count}}",
-    "sending": "Sending...",
+    "sending": "Sending…",
     "uploading": "Uploading attachment",
     "sendFailed": "Failed to send",
     "retrySend": "Retry",
@@ -741,7 +741,6 @@
     "locationFallback": "Shared a location",
     "pinnedAdded_one": "{{user}} pinned a message",
     "pinnedAdded_other": "{{user}} pinned {{count}} messages",
-    "pinnedChanged": "{{user}} changed the pinned messages",
     "pinnedRemoved_one": "{{user}} unpinned a message",
     "pinnedRemoved_other": "{{user}} unpinned {{count}} messages",
     "pollClosed": "Final results",
@@ -815,7 +814,8 @@
     "utdWithheldUnverified": "The sender withheld the key because this device is unverified or insecure.",
     "utdWithheldBySender": "The sender chose not to send this device the key.",
     "utdRecoverAction": "Set up recovery",
-    "utdWaiting": "Waiting for this message’s key…"
+    "utdWaiting": "Waiting for this message’s key…",
+    "pinnedChanged": "{{user}} changed the pinned messages"
   },
   "viewer": {
     "title": "Media viewer",
@@ -842,7 +842,7 @@
   "auth": {
     "welcome": "Welcome to Sable",
     "welcomeBack": "Welcome back",
-    "starting": "Starting Sable...",
+    "starting": "Starting Sable…",
     "accountProvider": "Account provider",
     "checkingProvider": "Checking provider…",
     "opening": "Opening…",
@@ -859,7 +859,7 @@
     "stageCreateAccountLabel": "Create your Matrix account",
     "stageRecoveryLabel": "Set up account recovery",
     "stageProfileLabel": "Choose your profile details",
-    "signingIn": "Signing in...",
+    "signingIn": "Signing in…",
     "moreWaysToSignIn": "More ways to sign in",
     "hideOtherWaysToSignIn": "Hide other ways to sign in",
     "moreWaysToCreateAccount": "More ways to create an account",
@@ -872,7 +872,7 @@
     "unableToStart": "Unable to start Sable.",
     "chooseSignInMethod": "Choose one of the sign-in methods offered by this homeserver.",
     "allowPopups": "Allow pop-ups to sign in with this homeserver.",
-    "redirectingTo": "Redirecting to {{name}}...",
+    "redirectingTo": "Redirecting to {{name}}…",
     "enterHomeserver": "Enter a homeserver.",
     "enterUsername": "Enter your username.",
     "enterPassword": "Enter your password.",
@@ -1511,14 +1511,14 @@
     "description": "Describe the bug",
     "descriptionPlaceholder": "What went wrong?",
     "reproduction": "Steps to reproduce (optional)",
-    "reproductionPlaceholder": "1. Go to...\n2. Click on...\n3. See error",
+    "reproductionPlaceholder": "1. Go to…\n2. Click on…\n3. See error",
     "expectedBehavior": "Expected behavior (optional)",
     "platformInfo": "Platform information included automatically",
     "problem": "Describe the problem",
     "solution": "Describe the solution",
     "alternatives": "Alternatives considered (optional)",
     "context": "Additional context (optional)",
-    "searching": "Searching for similar issues...",
+    "searching": "Searching for similar issues…",
     "similarIssues": "Similar open issues. Please check before submitting:",
     "errorTracking": "Error tracking",
     "sendToSentry": "Send an anonymous report to Sentry",
@@ -1725,11 +1725,11 @@
       },
       "kick": {
         "description": "Remove someone from this room",
-        "usage": "/kick <@user:server|@*:server> [@user:server|@*:server...] [reason]"
+        "usage": "/kick <@user:server|@*:server> [@user:server|@*:server…] [reason]"
       },
       "ban": {
         "description": "Ban someone from this room",
-        "usage": "/ban <@user:server|@*:server> [@user:server|@*:server...] [reason]"
+        "usage": "/ban <@user:server|@*:server> [@user:server|@*:server…] [reason]"
       },
       "unban": {
         "description": "Lift a ban on someone",
@@ -1769,19 +1769,19 @@
       },
       "disinvite": {
         "description": "Withdraw an invitation",
-        "usage": "/disinvite <@user:server> [@user:server...]"
+        "usage": "/disinvite <@user:server> [@user:server…]"
       },
       "ignore": {
         "description": "Hide everything from someone, on every device",
-        "usage": "/ignore <@user:server> [@user:server...]"
+        "usage": "/ignore <@user:server> [@user:server…]"
       },
       "unignore": {
         "description": "Stop hiding someone",
-        "usage": "/unignore <@user:server> [@user:server...]"
+        "usage": "/unignore <@user:server> [@user:server…]"
       },
       "startdm": {
         "description": "Open a direct message with someone",
-        "usage": "/startdm <@user:server> [@user:server...]"
+        "usage": "/startdm <@user:server> [@user:server…]"
       },
       "converttodm": {
         "description": "Mark this room as a direct message",
@@ -1940,8 +1940,8 @@
     "edit": "Edit {{name}}",
     "remove": "Delete {{name}}",
     "removeConfirm": "Delete this profile? Messages already sent keep the name and picture they were sent with.",
-    "moveUp": "Move {name} up",
-    "moveDown": "Move {name} down",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
     "name": "Name",
     "nameHint": "Shown as the sender of every message sent as this profile.",
     "avatar": "Picture",
