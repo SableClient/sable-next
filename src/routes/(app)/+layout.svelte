@@ -566,20 +566,30 @@
 
 <style>
   .skip-link {
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--primary-main);
-    border-radius: var(--radius);
-    color: var(--bg-on-container);
-    left: calc(var(--space-300) + var(--safe-left));
-    padding: var(--space-300) var(--space-400);
-    position: fixed;
-    top: calc(var(--space-300) + var(--safe-top));
-    transform: translateY(calc(-100% - var(--space-300) - var(--safe-top)));
-    z-index: var(--layer-tooltip);
+    border: 0;
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
   }
 
   .skip-link:focus-visible {
-    transform: translateY(0);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--primary-main);
+    border-radius: var(--radius);
+    clip-path: none;
+    color: var(--bg-on-container);
+    height: auto;
+    left: calc(var(--space-300) + var(--safe-left));
+    overflow: visible;
+    padding: var(--space-300) var(--space-400);
+    position: fixed;
+    top: calc(var(--space-300) + var(--safe-top));
+    width: auto;
+    z-index: var(--layer-tooltip);
   }
 
   .app-status {
