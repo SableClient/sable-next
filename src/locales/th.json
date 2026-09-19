@@ -1,0 +1,48 @@
+{
+  "auth": {
+    "welcomeBack": "ยินดีต้อนรับกลับ",
+    "accountProvider": "ผู้ให้บริการบัญชี",
+    "signInWithProvider": "ลงชื่อเข้าใช้ด้วย {{name}}",
+    "signInWithSso": "ลงชื่อเข้าใช้ด้วย SSO",
+    "signInWithPassword": "ลงชื่อเข้าใช้ด้วยรหัสผ่าน",
+    "username": "ชื่อผู้ใช้",
+    "welcome": "ยินดีต้อนรับสู่ Sable",
+    "starting": "กำลังเริ่ม Sable…",
+    "checkingProvider": "กำลังตรวจสอบผู้ให้บริการ…",
+    "opening": "กำลังเปิด…",
+    "password": "รหัสผ่าน",
+    "showPassword": "แสดงรหัสผ่าน",
+    "hidePassword": "ซ่อนรหัสผ่าน",
+    "signInTitle": "ลงชื่อเข้าใช้",
+    "newToMatrixQuestion": "เพิ่งเริ่มใช้ Matrix ใช่ไหม?",
+    "createAccount": "สร้างบัญชี",
+    "registeringWith": "กำลังลงทะเบียนกับ",
+    "accountProviderHint": "ผู้ให้บริการบัญชีของคุณเป็นผู้โฮสต์บัญชีและข้อมูลของคุณ คุณยังคงสามารถแชทกับทุกคนบน Matrix ได้ตามปกติ",
+    "createAccountOnServer": "สร้างบัญชีบน {{server}}"
+  },
+  "footer": {
+    "sourceCode": "ซอร์สโค้ด"
+  },
+  "errors": {
+    "registrationUnavailable": "ผู้ให้บริการรายนี้ยังไม่เปิดรับบัญชีใหม่ในขณะนี้"
+  },
+  "home": {
+    "getSupport": "รับความช่วยเหลือ",
+    "viewSource": "ดูซอร์สโค้ด",
+    "supportDevelopment": "บริจาค",
+    "nextStepsTitle": "คุณอยากจะทำอะไร?",
+    "findCommunityTitle": "ค้นหาชุมชน",
+    "findCommunityDescription": "เลือกดูห้องและพื้นที่สาธารณะเพื่อค้นหากลุ่มที่มีความสนใจตรงกัน",
+    "startRoomTitle": "สร้างห้อง",
+    "startRoomDescription": "สร้างห้องหรือพื้นที่สำหรับกลุ่มเพื่อนหรือชุมชนของคุณเอง",
+    "joinConversationTitle": "เข้าร่วมห้องหรือส่งข้อความส่วนตัว",
+    "joinConversationDescription": "ระบุที่อยู่ของห้องหรือ ID ผู้ใช้ Matrix เพื่อเริ่มแชท"
+  },
+  "nav": {
+    "unspaced": "ห้องภายนอกพื้นที่",
+    "createRoom": "สร้างห้อง",
+    "exploreSpaces": "สำรวจพื้นที่ต่าง ๆ",
+    "messageSearch": "ค้นหาข้อความ",
+    "rooms": "ห้อง"
+  }
+}

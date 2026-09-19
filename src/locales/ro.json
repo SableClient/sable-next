@@ -10,7 +10,7 @@
     "navigate": "Navighează",
     "settings": "Setări",
     "space": "Spațiu",
-    "lobby": "Lobby",
+    "lobby": "Anticameră",
     "createRoom": "Crează cameră",
     "newChat": "Conversație nouă",
     "joinWithAddress": "Alătură-te prin adresă",
@@ -25,8 +25,8 @@
     "manageAccountsDescription": "Schimbă contul sau șterge conturi de pe acest dispozitiv.",
     "activeAccount": "Cont activ",
     "removeAccount": "Deconectează contul",
-    "removeAccountConfirm": "Sigur vrei sa deconectezi contul?",
-    "removeAccountDescription": "Această acțiune va șterge contul și datele locale ale contului de pe acest dispozitiv.",
+    "removeAccountConfirm": "Sigur vrei să scoți contul?",
+    "removeAccountDescription": "Asta va elimina contul și datele sale locale de pe acest dispozitiv.",
     "removeAccountFailed": "Ștergerea contului a eșuat.",
     "accountSignedOut": "Deconectat",
     "accountSignInAgain": "Reconectează-te",
@@ -101,7 +101,7 @@
     "createTopicHint": "Opțională. Prezentată în antetul camerei și în registru.",
     "createKindLabel": "Tipul camerei",
     "createKindRoom": "Cameră",
-    "createKindRoomHint": "O conversație în care se poate vorbi.",
+    "createKindRoomHint": "O conversație în care se poate scrie.",
     "createKindVoice": "Cameră vocală",
     "createKindVoiceHint": "O cameră pentru conversații vocale prin apeluri.",
     "createKindSpace": "Spațiu",
@@ -206,7 +206,7 @@
     "settingsSaved": "Salvat.",
     "settingsFailed": "Această schimbare nu a putut fi salvată.",
     "menuLabel": "Opțiuni cameră",
-    "menuFavourite": "Preferată",
+    "menuFavourite": "Marchează ca preferată",
     "menuLowPriority": "Prioritate scăzută",
     "menuNotifications": "Notificări",
     "notifyDefault": "({{mode}}) implicit",
@@ -669,7 +669,6 @@
     "playGif": "Redă GIF",
     "stopGif": "Oprește GIF",
     "retryMedia": "Reîncearcă",
-    "retryMediaIn_zero": "Reîncearcă acum",
     "retryMediaIn_one": "Reîncearcă într-o {{count, number}} secundă",
     "retryMediaIn_few": "Reîncearcă în {{count, number}} secunde",
     "retryMediaIn_many": "Reîncearcă în {{count, number}} de secunde",
@@ -1119,7 +1118,6 @@
     "unverifiedOthersTitle_other": "{{count, number}} dintre dispozitivele tale nu sunt verificate",
     "unverifiedOthersBody_one": "Pănă când îl verifici, persoanele cu care vorbești vor vedea o avertizare lăngă mesajele trimise de pe el.",
     "unverifiedOthersBody_few": "Pănă când le verifici, persoanele cu care vorbești vor vedea o avertizare lăngă mesajele trimise de pe ele.",
-    "unverifiedOthersBody_many": "Pănă când le verifici, persoanele cu care vorbești vor vedea o avertizare lăngă mesajele trimise de pe ele.",
     "unverifiedOthersBody_other": "Pănă când le verifici, persoanele cu care vorbești vor vedea o avertizare lăngă mesajele trimise de pe ele.",
     "unverifiedBannerVerify": "Verifică",
     "recoveryIncompleteTitle": "Acest dispozitiv nu poate deschide cheile de rezervă",
@@ -1217,8 +1215,6 @@
     "developerSentryDescription": "Raportarea de erori rămăne controlată din Diagnostice & Intimitate. Aceste comutatoare controlează care categorii sunt păstrate în breadcrumb-uri de depanare.",
     "showHiddenEvents": "Arată evenimentele ascunse",
     "showHiddenEventsHint": "Redeschide camera deschisă astfel încăt evenimentele ignorate de Sable vor fi vizibile. Activează comutoarele de mai jos.",
-    "showNonStandardEvents": "Tipuri de eveniment non-standard",
-    "showNonStandardEventsHint": "Afișează evenimentele de stare și ne-cunoscute. Folositor pentru depanare.",
     "stateEventTitle": "Trimite un eveniment de stare",
     "stateEventDescription": "Scrie un eveniment de stare al camerei. Serverul este singurul care îl validează. Dacă poți, e foarte NERECOMANDAT să folosești metoda asta, folosește setările camerei.",
     "stateEventRoom": "ID-ul camerei",
@@ -1294,8 +1290,6 @@
     "hideTypingIndicatorsHint": "Indicatorul de scriere nu este arătat deasupra compozitorului.",
     "filterPronounsByLanguage": "Potrivește pronumele utilizatorilor cu limba ta",
     "filterPronounsByLanguageHint": "Arată doar pronumele setate în limba setată pentru interfața ta, arătandu-le pe celelalte dacă nu se potrivește niciunul.",
-    "hidePronounPill": "Ascunde pilulele de pronume",
-    "hidePronounPillHint": "Ascunde pilulele de pronume în cronologie. Ele vor continua să fie vizibile în profiluri.",
     "pronounPillLimit": "Limita de pilule de pronume per mesaj",
     "pronounPillLimitHint": "Celelalte pronume sunt puse într-o singură pilulă care le va lista când ți mouse-ul peste ea.",
     "pronounPillLimitOne": "Unul",
@@ -1309,7 +1303,7 @@
     "mentionInReplies": "Notifică persoanele la care răspunzi",
     "mentionInRepliesHint": "Dezactivează pentru a răspunde automat. Vei păstra butonul de clopoțel per-răspuns.",
     "richTextComposer": "Editor de text bogat",
-    "richTextComposerHint": "Formatează cât timp scrii. Dezactivează pentru a scrie în Markdown; textul va continua să fie formatat când e trimis",
+    "richTextComposerHint": "Formatează cât timp scrii. Dezactivează pentru a scrie în Markdown; textul va continua să fie formatat când e trimis.",
     "composerGifButton": "Buton de GIF",
     "composerGifButtonHint": "Afișează un buton de GIFuri în compozitor. Acesta va deschide un meniu cu o listă de GIFuri.",
     "composerStickerButton": "Buton de Abțibilduri",
@@ -1533,7 +1527,11 @@
     "customThemesErrorHeader": "Acest fișier nu este o temă sau modificare pentru Sable. Ele ar trebui să includă @sable-theme sau @sable-tweak în metadata.",
     "customThemesErrorLoad": "Catalogul nu s-a putut încărca, încearcă mai târziu.",
     "customThemesErrorInstall": "{{file}} nu s-a putut instala.",
-    "customThemesErrorChoose": "Alege un fișier .sable.css"
+    "customThemesErrorChoose": "Alege un fișier .sable.css",
+    "developerPushOutcomesTitle": "Rezultate „cold push”",
+    "developerPushOutcomesDescription": "Cum a reacționat furnizorul tău de notificări în timp ce telefonul tău a fost închis. Citirea rezultatelor curăță lista.",
+    "developerPushOutcomesRead": "Vezi rezultatele",
+    "developerPushOutcomesEmpty": "Încă nu ai nici un „cold push”."
   },
   "errors": {
     "pageTitle": "Ceva a eșuat",
@@ -1557,7 +1555,6 @@
     "tooManyAttemptsSeconds": "Prea multe încercări de conectare. Încearcă din nou în {{seconds}} de secunde.",
     "tooManyAttemptsSeconds_one": "Prea multe încercări de conectare. Încearcă din nou în {{seconds}} secundă.",
     "tooManyAttemptsSeconds_few": "Prea multe încercări de conectare. Încearcă din nou în {{seconds}} secunde.",
-    "tooManyAttemptsSeconds_many": "Prea multe încercări de conectare. Încearcă din nou în {{seconds}} de secunde.",
     "tooManyAttemptsSeconds_other": "Prea multe încercări de conectare. Încearcă din nou în {{seconds}} de secunde.",
     "connectionError": "Conectarea a eșuat din cauza unei erori de conectare.",
     "authProviderUnreachable": "Furnizorul de conectare a acestui server nu a putut fi accesat. Metoda sa OAuth poate fi configurată greșit.",
@@ -1720,7 +1717,7 @@
     "voiceCancelled": "Înregistrarea a fost anulată",
     "voicePermissionDenied": "Sable nu are acces la microfonul tău. Verifică permisiunile și încearcă din nou.",
     "voiceUnavailable": "Mesajele vocale nu sunt suportate în browserul acesta.",
-    "slashUnknown": "Comanda /{{name}} nu există. Începe un mesaj cu // pentru a trimite un „/”",
+    "slashUnknown": "Comanda /{{name}} nu există. Începe un mesaj cu // pentru a trimite un „/”.",
     "slashDeveloperOnly": "Această comandă este accesibilă doar când opțiunile de dezvoltator sunt activate.",
     "slashWildcardEmpty": "niciun membru din {{server}} nu se potrivește acestei camere.",
     "slashFix": {
@@ -1812,10 +1809,6 @@
       "color": {
         "description": "Setează-ți culoarea numelui în camera asta",
         "usage": "/color <#rrggbb|reset>"
-      },
-      "scolor": {
-        "description": "Setează culoarea numelui altei persoane din cameră",
-        "usage": "/scolor <@cineva:server> <#rrggbb|reset>"
       },
       "font": {
         "description": "Setează un font în camera asta",
@@ -1938,7 +1931,6 @@
         "usage": "/delete <@cineva:server|@*:server> [-past 1d|2h|5m|30s] [-t tip.event] [-r motiv]"
       }
     },
-    "schedule": "Programează trimiterea",
     "scheduleTitle": "Trimite mesajul mai târziu",
     "scheduleExplain": "Mesajele ne-criptate sunt trimise la server care le va trimite la momentul stabilit. Mesajele criptate sunt ținute pe dispozitive și sunt trimise de pe orice dispozitiv e activ la acel moment.",
     "scheduleEmpty": "Scrie mai întăi mesajul, apoi programează momentul.",
@@ -2186,7 +2178,7 @@
     "paletteTitle": "Du-te la cameră",
     "paletteLabel": "Du-te la cameră",
     "palettePlaceholder": "Caută camere",
-    "paletteEmpty": "Nicio cameră nu corespunde căutării",
+    "paletteEmpty": "Nicio cameră nu corespunde căutării.",
     "paletteRecents": "Recente",
     "paletteHint": "# camere · * spații · @ mesaje directe",
     "helpTitle": "Scurtături",
@@ -2280,17 +2272,13 @@
     "pageDescription": "Emoji-urile tale, și pachetele pe care le folosești din camere.",
     "exportAll": "Exportează toate",
     "stealOne": "Fură emoji-ul",
-    "stealFew": "Fură emoji-urile",
     "stealMany": "Fură emoji-urile",
-    "stealOther": "Fură emoji-urile",
     "stealTitle": "Adaugă la pachetul tău",
     "stealExplain": "Această imagine a fost copiată în contul tău.",
     "stealConfirm": "Adaugă",
     "stealFailed": "Emoji-ul nu a putut fi adăugat.",
     "downloadOne": "Descarcă emoji-ul",
-    "downloadFew": "Descarcă emoji-urile",
-    "downloadMany": "Descarcă emoji-urile",
-    "downloadOther": "Descarcă emoji-urile"
+    "downloadMany": "Descarcă emoji-urile"
   },
   "a11y": {
     "loading": "Se încarcă"
