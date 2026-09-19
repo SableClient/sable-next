@@ -44,6 +44,7 @@ test('a held touch keeps a shrunken bounded latest window at the composer', asyn
   await expect
     .poll(() => timeline.items.first().evaluate((item) => item.getBoundingClientRect().height))
     .toBeLessThanOrEqual(25);
+  const reserve = await timeline.footReserve();
   await expect
     .poll(() =>
       timeline.viewport.evaluate((viewport) => {
@@ -54,22 +55,21 @@ test('a held touch keeps a shrunken bounded latest window at the composer', asyn
         );
       })
     )
-    .toBeLessThanOrEqual(1);
+    .toBeLessThanOrEqual(reserve + 1);
   const layoutGap = await timeline.viewport.evaluate((viewport) => {
     const last = viewport.querySelector<HTMLElement>('.item:last-child');
     const footer = viewport.closest('.timeline-content')?.querySelector('.timeline-foot');
     const dock = document.querySelector<HTMLElement>('.composer-dock');
-    if (!last || !footer || !dock) throw new Error('timeline layout boundary missing');
+    if (!last || !dock) throw new Error('timeline layout boundary missing');
     const lastBottom = last.getBoundingClientRect().bottom;
-    const footerRect = footer.getBoundingClientRect();
+    const footerRect = footer?.getBoundingClientRect();
     const dockTop = dock.getBoundingClientRect().top;
     return {
-      footerHeight: footerRect.height,
       gap: dockTop - lastBottom,
-      footerToDock: dockTop - footerRect.bottom,
+      footerToDock: footerRect ? dockTop - footerRect.bottom : 0,
     };
   });
-  expect(Math.abs(layoutGap.gap - layoutGap.footerHeight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(layoutGap.gap - reserve)).toBeLessThanOrEqual(1);
   expect(layoutGap.footerToDock).toBeLessThanOrEqual(1);
   await timeline.viewport.dispatchEvent('touchend', { touches: [] });
   await core.emitTimelineDiff(subscription, [

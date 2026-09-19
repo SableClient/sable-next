@@ -60,8 +60,9 @@ test('keyboard viewport shrink keeps the latest row at the bottom during an acti
   });
 
   expect(frames.some((frame) => frame.height < heightBefore)).toBe(true);
+  const reserve = await timeline.footReserve();
   expect(
-    Math.max(...frames.map((frame) => Math.abs(frame.gap))),
+    Math.max(...frames.map((frame) => Math.abs(frame.gap - reserve))),
     `keyboard frames: ${JSON.stringify(frames)}`
   ).toBeLessThanOrEqual(1);
   await expect(timeline.itemById('keyboard-999')).toBeInViewport();
@@ -84,5 +85,5 @@ test('keyboard viewport shrink keeps the latest row at the bottom during an acti
         );
       })
     )
-    .toBeLessThanOrEqual(1);
+    .toBeLessThanOrEqual(reserve + 1);
 });

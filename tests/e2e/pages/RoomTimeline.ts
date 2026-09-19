@@ -112,6 +112,14 @@ export class RoomTimeline {
     return this.viewport.evaluate((element) => element.scrollHeight - element.clientHeight);
   }
 
+  footReserve(): Promise<number> {
+    return this.viewport.evaluate((element) => {
+      const rows = element.querySelector('.window-rows');
+      if (!rows) throw new Error('missing timeline window rows');
+      return Number.parseFloat(getComputedStyle(rows).paddingBlockEnd);
+    });
+  }
+
   /** Mirrors `isNearOldest` in `TimelineHistoryController`. */
   prefetchBand(): Promise<number> {
     return this.viewport.evaluate((element) => element.clientHeight * 2);

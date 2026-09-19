@@ -564,7 +564,7 @@ test('a room that fits opens on its unread marker with no gap under the last mes
     if (!last) throw new Error('no rendered rows');
     return node.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
   });
-  expect(gap).toBeLessThanOrEqual(1);
+  expect(Math.abs(gap - (await timeline.footReserve()))).toBeLessThanOrEqual(1);
 });
 
 test('follows an appended event while a pointer rests on the timeline', async ({

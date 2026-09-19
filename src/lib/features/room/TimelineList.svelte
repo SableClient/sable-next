@@ -846,7 +846,7 @@
   }
 
   .window-rows {
-    padding-block-end: var(--space-400);
+    padding-block-end: var(--timeline-foot-height);
   }
 
   @media (width >= 30rem) {
