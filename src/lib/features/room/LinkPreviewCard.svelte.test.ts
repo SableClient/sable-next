@@ -21,6 +21,7 @@ function preview(overrides: Partial<UrlPreviewView> = {}): UrlPreviewView {
     description: null,
     site_name: null,
     image: null,
+    image_mime: null,
     image_width: null,
     image_height: null,
     ...overrides,
@@ -146,4 +147,52 @@ test('an encrypted room needs its own consent, and an unknown one is treated as 
 
   expect(core.urlPreview).toHaveBeenCalledWith('https://example.org/f');
   await unmount(consented);
+});
+
+test('an image-only preview renders inline instead of as a card', async () => {
+  preferences.urlPreviews = true;
+  core.urlPreview.mockResolvedValue(
+    preview({
+      url: 'https://media.example/anim.gif',
+      title: null,
+      description: 'anim.gif',
+      image: 'mxc://example.org/anim',
+      image_mime: 'image/gif',
+      image_width: 320,
+      image_height: 240,
+    })
+  );
+  const instance = mount(LinkPreviewCard, {
+    target: document.body,
+    props: { url: 'https://media.example/anim.gif', encrypted: false },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.body.querySelector('a.link-preview')).toBeNull();
+  const link = document.body.querySelector('a.link-preview-link');
+  expect(link?.getAttribute('href')).toBe('https://media.example/anim.gif');
+  expect(link?.querySelector('.link-preview-inline')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('a preview carrying a title stays a card even with an image', async () => {
+  preferences.urlPreviews = true;
+  core.urlPreview.mockResolvedValue(
+    preview({ url: 'https://example.org/post', image: 'mxc://example.org/hero' })
+  );
+  const instance = mount(LinkPreviewCard, {
+    target: document.body,
+    props: { url: 'https://example.org/post', encrypted: false },
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.body.querySelector('a.link-preview')).not.toBeNull();
+  expect(document.body.querySelector('a.link-preview-link')).toBeNull();
+  await unmount(instance);
 });

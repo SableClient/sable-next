@@ -110,6 +110,7 @@ fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPreviewView> 
         description: text("og:description"),
         site_name: text("og:site_name"),
         image: text("og:image").filter(|image| image.starts_with("mxc://")),
+        image_mime: text("og:image:type"),
         image_width: number("og:image:width"),
         image_height: number("og:image:height"),
     };

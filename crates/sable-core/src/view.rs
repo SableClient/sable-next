@@ -1334,6 +1334,7 @@ fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewV
                         description: text("og:description").map(ToOwned::to_owned),
                         site_name: text("og:site_name").map(ToOwned::to_owned),
                         image,
+                        image_mime: text("og:image:type").map(ToOwned::to_owned),
                         image_width: dimension("og:image:width"),
                         image_height: dimension("og:image:height"),
                     })

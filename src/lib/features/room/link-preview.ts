@@ -33,6 +33,24 @@ function hidesItsLinks(name: string, attributes: string): boolean {
   );
 }
 
+const IMAGE_MIMES: Record<string, string> = {
+  apng: 'image/apng',
+  avif: 'image/avif',
+  gif: 'image/gif',
+  webp: 'image/webp',
+};
+
+export function imageMimeFromUrl(href: string): string | null {
+  let path: string;
+  try {
+    path = new URL(href).pathname;
+  } catch {
+    return null;
+  }
+  const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+  return IMAGE_MIMES[extension] ?? null;
+}
+
 export function firstPreviewableLink(html: string): string | null {
   let skipped: { name: string; depth: number } | null = null;
 

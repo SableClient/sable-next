@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstPreviewableLink } from './link-preview';
+import { firstPreviewableLink, imageMimeFromUrl } from './link-preview';
 
 describe('firstPreviewableLink', () => {
   it('finds the only link', () => {
@@ -78,5 +78,16 @@ describe('firstPreviewableLink', () => {
     expect(
       firstPreviewableLink('<code>x<code><a href="https://example.org/a">a</a></code>y</code>')
     ).toBeNull();
+  });
+});
+
+describe('imageMimeFromUrl', () => {
+  it('reads the extension of the path, not of the query', () => {
+    expect(imageMimeFromUrl('https://media.example/a/anim.gif?name=x.png')).toBe('image/gif');
+  });
+
+  it('ignores an extension it does not know, and a malformed url', () => {
+    expect(imageMimeFromUrl('https://example.org/a.png')).toBeNull();
+    expect(imageMimeFromUrl('not a url')).toBeNull();
   });
 });

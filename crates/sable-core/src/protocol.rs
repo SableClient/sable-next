@@ -2062,6 +2062,7 @@ pub struct UrlPreviewView {
     pub description: Option<String>,
     pub site_name: Option<String>,
     pub image: Option<String>,
+    pub image_mime: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub image_width: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]

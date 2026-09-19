@@ -1043,6 +1043,7 @@ export type UrlPreviewView = {
 	description: string | null,
 	site_name: string | null,
 	image: string | null,
+	image_mime: string | null,
 	image_width: number | null,
 	image_height: number | null,
 };

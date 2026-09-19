@@ -5,6 +5,7 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
+  import { imageMimeFromUrl } from './link-preview.js';
   import { loadUrlPreview } from './link-preview-cache';
 
   interface Props {
@@ -43,7 +44,20 @@
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
 </script>
 
-{#if preview}
+{#if preview?.image && preview.title === null && preview.site_name === null}
+  <a class="link-preview-link" href={url} target="_blank" rel="noopener noreferrer">
+    <MediaImage
+      class="link-preview-inline"
+      source={preview.image}
+      alt={preview.description ?? ''}
+      width={400}
+      height={300}
+      intrinsicWidth={preview.image_width}
+      intrinsicHeight={preview.image_height}
+      mime={preview.image_mime ?? imageMimeFromUrl(url)}
+    />
+  </a>
+{:else if preview}
   <a class="link-preview" href={url} target="_blank" rel="noopener noreferrer" aria-label={title}>
     {#if preview.image}
       <MediaImage
@@ -67,6 +81,16 @@
 {/if}
 
 <style>
+  .link-preview-link {
+    display: block;
+    margin-top: var(--space-100);
+    max-width: var(--timeline-media-max);
+  }
+
+  :global(.link-preview-inline) {
+    border-radius: var(--radius);
+  }
+
   .link-preview {
     background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);

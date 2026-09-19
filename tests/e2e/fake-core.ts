@@ -858,6 +858,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                 description: 'A short description of the article.',
                 site_name: 'Example',
                 image: null,
+                image_mime: null,
                 image_width: null,
                 image_height: null,
               }
