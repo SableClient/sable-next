@@ -8,11 +8,13 @@
   } from '#lib/features/settings/settings-navigation.js';
   import { countInvites, countNotifications, hasMarkedUnread } from '#lib/features/inbox/inbox.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import ListMagnifyingGlassIcon from 'phosphor-svelte/lib/ListMagnifyingGlassIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import AccountSwitcher from './AccountSwitcher.svelte';
   import '#lib/ui/primitives/nav-tab.css';
@@ -95,6 +97,21 @@
   let mobileSelectedIndex = $derived(mobileTools.findIndex((item) => isToolActive(item.href)));
 </script>
 
+{#snippet roomSwitcher(toolClass: string, side: 'top' | 'right')}
+  {#snippet switcherTrigger({ props }: { props: Record<string, unknown> })}
+    <button
+      {...props}
+      type="button"
+      class="quick-tool {toolClass} nav-tab nav-tab-outlined selection-layer"
+      aria-label={$i18n.t('shortcuts.openRoomSearch')}
+      onclick={() => (paletteState.open = true)}
+    >
+      <span class="tool-icon" aria-hidden="true"><ListMagnifyingGlassIcon /></span>
+    </button>
+  {/snippet}
+  <Tooltip label={$i18n.t('shortcuts.openRoomSearch')} {side} trigger={switcherTrigger} />
+{/snippet}
+
 {#if mobile}
   <nav
     class="mobile-tools"
@@ -130,6 +147,7 @@
   </nav>
 {:else if compact}
   <nav class="compact-tools" aria-label={$i18n.t('nav.quickTools')}>
+    {@render roomSwitcher('compact-tool nav-tab-side', 'right')}
     {#each compactTools as item (item.href)}
       {@const toolActive = isToolActive(item.href)}
       {#snippet trigger({ props }: { props: Record<string, unknown> })}
@@ -160,6 +178,7 @@
   <nav class="desktop-tools" aria-label={$i18n.t('nav.quickTools')}>
     <AccountSwitcher mode="desktop" />
     <div class="desktop-tool-actions">
+      {@render roomSwitcher('desktop-tool nav-tab-bottom', 'top')}
       {#each desktopTools as item (item.href)}
         {@const toolActive = isToolActive(item.href)}
         {#snippet trigger({ props }: { props: Record<string, unknown> })}
