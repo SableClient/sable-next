@@ -501,14 +501,16 @@ jobs:
             echo 'enabled=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # A skipped arch uploads nothing, and download-artifact fails on a
-          # pattern that matches none.
-          if ! gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-                 --paginate --jq '.artifacts[].name' | grep -q '^flatpak-nightly-repo-'; then
-            echo '::notice::No Flatpak repo was built; skipping the publish.'
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # The repo is rebuilt from scratch, so publishing one arch delists the other.
+          built="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                     --paginate --jq '.artifacts[].name')"
+          for arch in x86_64 aarch64; do
+            if ! printf '%s\n' "$built" | grep -qx "flatpak-nightly-repo-$arch"; then
+              echo "::notice::No $arch Flatpak repo; skipping the publish."
+              echo 'enabled=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
           echo 'enabled=true' >> "$GITHUB_OUTPUT"
       - name: Install flatpak
         if: ${{ steps.gate.outputs.enabled == 'true' }}
