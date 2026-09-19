@@ -11,7 +11,11 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
-  import { readBoardSize, trackBoardSize } from '#lib/ui/primitives/board-size.svelte.js';
+  import {
+    writeBoardSize,
+    readBoardSize,
+    trackBoardSize,
+  } from '#lib/ui/primitives/board-size.svelte.js';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import { SvelteSet } from 'svelte/reactivity';
@@ -61,6 +65,8 @@
   let recentReactions = $derived(uniqueReactions());
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
   let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
+  let dragging = $state(false);
+  let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
 
   $effect(() => {
     let cancelled = false;
@@ -239,6 +245,40 @@
     rememberEmote(image.shortcode);
     onPick(image, tab as ImageUsageView);
   }
+
+  function handleResizeStart(event: PointerEvent) {
+    if (event.button !== 0) return;
+
+    const handle = event.currentTarget;
+    if (!(handle instanceof HTMLElement)) return;
+
+    const boardSize = readBoardSize();
+    const width: number = boardSize != null ? boardSize.width : 550;
+
+    drag = { pointerId: event.pointerId, startX: event.clientX, startWidth: width };
+    dragging = true;
+    handle.setPointerCapture(event.pointerId);
+  }
+
+  function handleResizeMove(event: PointerEvent) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
+    const boardSize = readBoardSize();
+    const targetWidth = drag.startWidth - event.clientX + drag.startX;
+    if (targetWidth < 250) return;
+
+    const targetHeight: number = boardSize != null ? boardSize.height : 457;
+
+    if (Number.isFinite(targetWidth) && Number.isFinite(targetHeight))
+      writeBoardSize({ width: targetWidth, height: targetHeight });
+  }
+
+  function finishResize(event: PointerEvent) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
+    drag = undefined;
+    dragging = false;
+  }
 </script>
 
 <div
@@ -246,6 +286,19 @@
   style={boardStyle}
   {@attach attachSize}
 >
+  <button
+    type="button"
+    class={resizable ? 'resize-handle' : 'resize-handle-hidden'}
+    class:dragging
+    role="slider"
+    aria-orientation="horizontal"
+    aria-valuenow={readBoardSize()?.width}
+    aria-label={$i18n.t('nav.resizeRooms')}
+    onpointerdown={handleResizeStart}
+    onpointermove={handleResizeMove}
+    onpointerup={finishResize}
+    onpointercancel={finishResize}
+  ></button>
   <div class="board-head">
     {#if stickers || gifs}
       <div class="tabs" role="group" aria-label={$i18n.t('composer.emotesAndStickers')}>
@@ -553,15 +606,6 @@
     width: min(27rem, calc(100vw - 2rem));
   }
 
-  .board.resizable {
-    max-height: 85dvh;
-    max-width: calc(100vw - 2rem);
-    min-height: 14rem;
-    min-width: 18rem;
-    overflow: hidden;
-    resize: both;
-  }
-
   .board.sheet {
     height: min(24rem, 60dvh);
     width: 100%;
@@ -828,5 +872,35 @@
     justify-content: center;
     padding: var(--space-400);
     text-align: center;
+  }
+
+  .resize-handle {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    cursor: col-resize;
+    height: 100%;
+    padding: 0;
+    position: absolute;
+    top: 0;
+    touch-action: none;
+    user-select: none;
+    width: 0.5rem;
+  }
+
+  .resize-handle:hover,
+  .resize-handle.dragging,
+  .resize-handle:focus-visible {
+    background: var(--primary-main);
+  }
+
+  .resize-handle:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: -3px;
+  }
+
+  .resize-handle-hidden {
+    display: none;
   }
 </style>
