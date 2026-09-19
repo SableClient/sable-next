@@ -23,8 +23,10 @@ use matrix_sdk::ruma::push::Action;
 use matrix_sdk::ruma::room::{
     JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
 };
+use matrix_sdk::ruma::{
+    EventId, OwnedRoomId, OwnedTransactionId, OwnedUserId, TransactionId, UserId,
+};
 use matrix_sdk::ruma::{Int, UInt};
-use matrix_sdk::ruma::{OwnedRoomId, OwnedTransactionId, OwnedUserId, TransactionId, UserId};
 use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
 use matrix_sdk::{EncryptionState, RoomState};
 use matrix_sdk_base::crypto::types::events::UtdCause;
@@ -35,8 +37,8 @@ use matrix_sdk_ui::{
     timeline::{
         AnyOtherStateEventContentChange, EncryptedMessage, EventSendState, EventTimelineItem,
         LiveLocationState, MembershipChange, MsgLikeContent, MsgLikeKind, OtherState, PollState,
-        Profile, TimelineDetails, TimelineItem, TimelineItemContent, TimelineItemKind,
-        VirtualTimelineItem,
+        Profile, TimelineDetails, TimelineEventItemId, TimelineItem, TimelineItemContent,
+        TimelineItemKind, VirtualTimelineItem,
     },
 };
 
@@ -81,7 +83,13 @@ pub fn room_summary<S: BuildHasher>(
     room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
 ) -> RoomSummary {
     let info = room_cache.get(item.room_id());
-    let (unread, highlight) = unread_counts(item);
+    let latest_event = latest_event(item);
+    let (unread, highlight) = unread_counts(
+        item,
+        latest_event
+            .as_ref()
+            .and_then(|event| event.event_id.as_deref()),
+    );
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
@@ -129,7 +137,7 @@ pub fn room_summary<S: BuildHasher>(
         unread,
         highlight,
         marked_unread: item.is_marked_unread(),
-        latest_event: latest_event(item),
+        latest_event,
     }
 }
 
@@ -144,19 +152,28 @@ fn call_participants(joined: Vec<OwnedUserId>) -> Vec<OwnedUserId> {
     participants
 }
 
-fn unread_counts(item: &RoomListItem) -> (u32, u32) {
+pub(crate) fn unread_counts(item: &RoomListItem, latest_event_id: Option<&EventId>) -> (u32, u32) {
     let count = |value: u64| u32::try_from(value).unwrap_or(u32::MAX);
-    if item.read_receipts().latest_active.is_none() {
-        let server = item.unread_notification_counts();
-        return (
-            count(server.notification_count),
-            count(server.highlight_count),
-        );
-    }
-    (
+    let counts = item.unread_notification_counts();
+    let server = (
+        count(counts.notification_count),
+        count(counts.highlight_count),
+    );
+
+    let Some(receipt) = item.read_receipts().latest_active else {
+        return server;
+    };
+
+    let local = (
         count(item.num_unread_messages()),
         count(item.num_unread_mentions()),
-    )
+    );
+
+    if latest_event_id == Some(&*receipt.event_id) {
+        return local;
+    }
+
+    (local.0.max(server.0), local.1.max(server.1))
 }
 
 const fn join_rule_view(rule: Option<&JoinRule>) -> RoomJoinRuleView {
@@ -650,10 +667,11 @@ impl LocalProfiles {
                 transaction_id,
                 new_content,
             } => self.remember(transaction_id, new_content),
-            RoomSendQueueUpdate::CancelledLocalEvent { transaction_id }
-            | RoomSendQueueUpdate::SentEvent { transaction_id, .. } => {
+            RoomSendQueueUpdate::CancelledLocalEvent { transaction_id } => {
                 self.0.remove(transaction_id);
             }
+            // A sent echo still needs its profile until the homeserver's echo
+            // replaces the item, so only a cancellation forgets it.
             _ => {}
         }
     }
@@ -678,6 +696,44 @@ impl LocalProfiles {
     fn get(&self, transaction_id: &TransactionId) -> Option<PerMessageProfileView> {
         self.0.get(transaction_id).cloned()
     }
+
+    /// A remote echo carries the profile in its raw content again, so the copy can go.
+    pub(crate) fn forget(&mut self, transaction_id: &TransactionId) {
+        self.0.remove(transaction_id);
+    }
+}
+
+#[must_use]
+pub fn aggregation_item(
+    event: &AnySyncTimelineEvent,
+    content: Option<serde_json::Value>,
+    own_user_id: Option<&UserId>,
+) -> TimelineItemView {
+    let event_id = event.event_id().to_owned();
+    let sender = event.sender().to_owned();
+    TimelineItemView {
+        id: event_id.to_string(),
+        event_id: Some(event_id),
+        transaction_id: None,
+        send_state: None,
+        is_own: own_user_id == Some(sender.as_ref()),
+        sender_name: None,
+        sender_avatar: None,
+        timestamp: event.origin_server_ts().0.into(),
+        content: TimelineItemContentView::HiddenEvent {
+            event_type: event.event_type().to_string(),
+            content,
+        },
+        sender: Some(sender),
+        in_reply_to: None,
+        thread_root: None,
+        thread_summary: None,
+        reactions: Vec::new(),
+        read_by: Vec::new(),
+        per_message_profile: None,
+        bundled_link_previews: Vec::new(),
+        mention: MentionView::None,
+    }
 }
 
 #[must_use]
@@ -699,6 +755,9 @@ pub fn timeline_item(
             let raw = RawFields::read(event);
             let message_profile = per_message_profile(raw.content.as_ref())
                 .or_else(|| {
+                    // A remote event always carries its own profile in the raw
+                    // content; only a local echo (which has none) falls back.
+                    event.send_state()?;
                     event
                         .transaction_id()
                         .and_then(|transaction_id| local_profiles.get(transaction_id))
@@ -1315,63 +1374,79 @@ fn message_content(
     let dimension = |value: Option<UInt>| value.map(u64::from);
 
     match message.msgtype() {
-        MessageType::Image(image) => TimelineItemContentView::Image {
-            filename: image.filename().to_owned(),
-            caption: image.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(image.caption(), image.formatted_caption()),
-            source: media_source(&image.source),
-            mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
-            width: dimension(image.info.as_ref().and_then(|info| info.width)),
-            height: dimension(image.info.as_ref().and_then(|info| info.height)),
-            size: dimension(image.info.as_ref().and_then(|info| info.size)),
-            blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
-            spoiler: spoiler_reason(raw.content.as_ref()),
-        },
-        MessageType::Video(video) => TimelineItemContentView::Video {
-            filename: video.filename().to_owned(),
-            caption: video.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(video.caption(), video.formatted_caption()),
-            source: media_source(&video.source),
-            mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
-            width: dimension(video.info.as_ref().and_then(|info| info.width)),
-            height: dimension(video.info.as_ref().and_then(|info| info.height)),
-            blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
-            spoiler: spoiler_reason(raw.content.as_ref()),
-        },
-        MessageType::Audio(audio) => TimelineItemContentView::Audio {
-            filename: audio.filename().to_owned(),
-            caption: audio.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(audio.caption(), audio.formatted_caption()),
-            source: media_source(&audio.source),
-            mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
-            duration_ms: audio
-                .audio
-                .as_ref()
-                .map(|details| details.duration)
-                .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
-                .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
-            waveform: audio.audio.as_ref().map(|details| {
-                details
-                    .waveform
-                    .iter()
-                    .map(|amplitude| {
-                        let value = u64::from(amplitude.get());
-                        #[allow(clippy::cast_precision_loss)]
-                        let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
-                        normalised
-                    })
-                    .collect()
-            }),
-            voice: audio.voice.is_some(),
-        },
-        MessageType::File(file) => TimelineItemContentView::File {
-            filename: file.filename().to_owned(),
-            caption: file.caption().map(ToOwned::to_owned),
-            html: formatted_caption_html(file.caption(), file.formatted_caption()),
-            source: media_source(&file.source),
-            mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
-            size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
-        },
+        MessageType::Image(image) => {
+            let (caption, caption_html) =
+                caption_view(image.caption(), image.formatted_caption(), profile);
+            TimelineItemContentView::Image {
+                filename: image.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&image.source),
+                mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
+                width: dimension(image.info.as_ref().and_then(|info| info.width)),
+                height: dimension(image.info.as_ref().and_then(|info| info.height)),
+                size: dimension(image.info.as_ref().and_then(|info| info.size)),
+                blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
+                spoiler: spoiler_reason(raw.content.as_ref()),
+            }
+        }
+        MessageType::Video(video) => {
+            let (caption, caption_html) =
+                caption_view(video.caption(), video.formatted_caption(), profile);
+            TimelineItemContentView::Video {
+                filename: video.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&video.source),
+                mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
+                width: dimension(video.info.as_ref().and_then(|info| info.width)),
+                height: dimension(video.info.as_ref().and_then(|info| info.height)),
+                blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
+                spoiler: spoiler_reason(raw.content.as_ref()),
+            }
+        }
+        MessageType::Audio(audio) => {
+            let (caption, caption_html) =
+                caption_view(audio.caption(), audio.formatted_caption(), profile);
+            TimelineItemContentView::Audio {
+                filename: audio.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&audio.source),
+                mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+                duration_ms: audio
+                    .audio
+                    .as_ref()
+                    .map(|details| details.duration)
+                    .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
+                    .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
+                waveform: audio.audio.as_ref().map(|details| {
+                    details
+                        .waveform
+                        .iter()
+                        .map(|amplitude| {
+                            let value = u64::from(amplitude.get());
+                            #[allow(clippy::cast_precision_loss)]
+                            let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
+                            normalised
+                        })
+                        .collect()
+                }),
+                voice: audio.voice.is_some(),
+            }
+        }
+        MessageType::File(file) => {
+            let (caption, caption_html) =
+                caption_view(file.caption(), file.formatted_caption(), profile);
+            TimelineItemContentView::File {
+                filename: file.filename().to_owned(),
+                caption,
+                html: caption_html,
+                source: media_source(&file.source),
+                mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+                size: file.info.as_ref().and_then(|info| info.size).map(u64::from),
+            }
+        }
         MessageType::Location(location) => {
             let coordinates = geo_coordinates(&location.geo_uri);
             TimelineItemContentView::Location {
@@ -1497,16 +1572,26 @@ fn content(
     }
 }
 
-fn formatted_caption_html(
+/// Media captions carry the same fallback as text messages: strip both
+/// halves, since the UI renders the plain caption when no formatted one
+/// arrived.
+fn caption_view(
     caption: Option<&str>,
     formatted: Option<&matrix_sdk::ruma::events::room::message::FormattedBody>,
-) -> Option<String> {
-    let formatted = formatted?;
+    profile: Option<&PerMessageProfileView>,
+) -> (Option<String>, Option<String>) {
+    let known = formatted
+        .map(|formatted| formatted.body.as_str())
+        .is_some_and(has_profile_fallback_html)
+        || profile.is_some_and(|profile| profile.has_fallback);
+    let name = profile.and_then(|profile| profile.display_name.as_deref());
 
-    Some(display_html(
-        caption.unwrap_or_default(),
-        Some(formatted.body.as_str()),
-    ))
+    let caption = caption.map(|caption| strip_profile_fallback_body(caption, name, known));
+    let html = formatted.map(|formatted| {
+        let html = strip_profile_fallback_html(&formatted.body, name, known);
+        display_html(caption.as_deref().unwrap_or_default(), Some(&html))
+    });
+    (caption, html)
 }
 
 fn formatted_body(msgtype: &MessageType) -> Option<String> {
@@ -1560,12 +1645,24 @@ fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
 fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     let summary = msg_like(content)?.thread_summary.as_ref()?;
 
+    // The SDK embeds no raw content for the latest reply, so the UI strips
+    // its per-message-profile fallback, looking the profile up by id like a
+    // reply preview.
+    let (latest_event_id, latest_body) = match &summary.latest_event {
+        TimelineDetails::Ready(event) => (
+            match &event.identifier {
+                TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
+                TimelineEventItemId::TransactionId(_) => None,
+            },
+            body_of(&event.content),
+        ),
+        _ => (None, None),
+    };
+
     Some(ThreadSummaryView {
         num_replies: summary.num_replies,
-        latest_body: match &summary.latest_event {
-            TimelineDetails::Ready(event) => body_of(&event.content),
-            _ => None,
-        },
+        latest_event_id,
+        latest_body,
     })
 }
 
@@ -1646,12 +1743,15 @@ pub(crate) fn clamp_power_level(level: UserPowerLevel) -> i32 {
 }
 
 #[must_use]
-pub fn map_diff<T, U>(diff: eyeball_im::VectorDiff<T>, map: impl Fn(&T) -> U) -> VectorDiff<U> {
+pub fn map_diff<T, U>(
+    diff: eyeball_im::VectorDiff<T>,
+    mut map: impl FnMut(&T) -> U,
+) -> VectorDiff<U> {
     use eyeball_im::VectorDiff as In;
 
     match diff {
         In::Append { values } => VectorDiff::Append {
-            values: values.iter().map(&map).collect(),
+            values: values.iter().map(&mut map).collect(),
         },
         In::Clear => VectorDiff::Clear,
         In::PushFront { value } => VectorDiff::PushFront { value: map(&value) },
@@ -1669,7 +1769,7 @@ pub fn map_diff<T, U>(diff: eyeball_im::VectorDiff<T>, map: impl Fn(&T) -> U) ->
         In::Remove { index } => VectorDiff::Remove { index },
         In::Truncate { length } => VectorDiff::Truncate { length },
         In::Reset { values } => VectorDiff::Reset {
-            values: values.iter().map(&map).collect(),
+            values: values.iter().map(&mut map).collect(),
         },
     }
 }
@@ -1751,7 +1851,7 @@ mod tests {
 
     use super::{
         LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
-        call_participants, clamp_power_level, formatted_caption_html, geo_coordinates, in_call,
+        call_participants, caption_view, clamp_power_level, geo_coordinates, in_call,
         per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
@@ -2086,6 +2186,17 @@ mod tests {
             transaction_id: transaction_id.clone(),
             event_id: OwnedEventId::try_from("$sent:example.org").expect("an event id"),
         });
+        // A sent echo still shows the profile until the homeserver's echo arrives.
+        assert_eq!(
+            profiles
+                .get(&transaction_id)
+                .expect("the profile outlives the send acknowledgement")
+                .display_name
+                .as_deref(),
+            Some("Kris")
+        );
+
+        profiles.forget(&transaction_id);
         assert!(profiles.get(&transaction_id).is_none());
     }
 
@@ -2099,19 +2210,96 @@ mod tests {
 
     #[test]
     fn formatted_attachment_captions_are_sanitised_for_display() {
-        let html = formatted_caption_html(
+        let (_, html) = caption_view(
             Some("hi Ana party"),
             Some(&FormattedBody::html(
                 "<a href=\"https://matrix.to/#/@ana:example.org\">Ana</a> <img src=\"mxc://example.org/party\" alt=\"party\" data-mx-emoticon><script>steal()</script>",
             )),
-        )
-        .expect("a formatted caption maps to display HTML");
+            None,
+        );
+        let html = html.expect("a formatted caption maps to display HTML");
 
         assert!(html.contains("href=\"https://matrix.to/#/@ana:example.org\""));
         assert!(html.contains("src=\"mxc://example.org/party\""));
         assert!(html.contains("data-mx-emoticon"));
         assert!(!html.contains("script"));
-        assert_eq!(formatted_caption_html(None, None), None);
+        assert!(caption_view(None, None, None).1.is_none());
+    }
+
+    #[test]
+    fn strips_a_per_message_profile_fallback_from_media_captions() {
+        let profile = per_message_profile(Some(&json!({
+            "m.per_message_profile": {
+                "displayname": "Josie",
+                "has_fallback": true,
+            },
+        })))
+        .expect("a profile");
+        let (caption, html) = caption_view(
+            Some("Josie: you can still see the fallback on this message"),
+            Some(&FormattedBody::html(
+                "<strong data-mx-profile-fallback>Josie: </strong>you can still see the fallback on this message",
+            )),
+            Some(&profile),
+        );
+
+        assert_eq!(
+            caption.as_deref(),
+            Some("you can still see the fallback on this message")
+        );
+        let html = html.expect("a formatted caption maps to display HTML");
+        assert!(html.contains("this message"));
+        assert!(!html.contains("Josie"));
+    }
+
+    #[test]
+    fn a_caption_fallback_is_stripped_from_the_plain_body_alone() {
+        let profile = per_message_profile(Some(&json!({
+            "m.per_message_profile": {
+                "displayname": "Josie",
+                "has_fallback": true,
+            },
+        })))
+        .expect("a profile");
+        let (caption, html) = caption_view(
+            Some("Josie: you can still see the fallback on this message"),
+            None,
+            Some(&profile),
+        );
+
+        assert_eq!(
+            caption.as_deref(),
+            Some("you can still see the fallback on this message")
+        );
+        assert!(html.is_none());
+    }
+
+    // The event reported in the issue: an image whose `formatted_body` is
+    // plain text with a bare "josiejosie: " prefix and no strong wrapper.
+    #[test]
+    fn strips_a_bare_prefix_fallback_from_an_image_caption() {
+        let profile = per_message_profile(Some(&json!({
+            "m.per_message_profile": {
+                "displayname": "josiejosie",
+                "has_fallback": true,
+            },
+        })))
+        .expect("a profile");
+        let (caption, html) = caption_view(
+            Some("josiejosie: you can still see the fallback on this message"),
+            Some(&FormattedBody::html(
+                "josiejosie: you can still see the fallback on this message",
+            )),
+            Some(&profile),
+        );
+
+        assert_eq!(
+            caption.as_deref(),
+            Some("you can still see the fallback on this message")
+        );
+        let html = html.expect("a formatted caption maps to display HTML");
+        assert!(html.contains("you can still see the fallback on this message"));
+        assert!(!html.contains("josiejosie"));
     }
 
     #[test]

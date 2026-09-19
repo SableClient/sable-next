@@ -27,6 +27,7 @@ import type { PackImageView } from '#src/generated/protocol';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { AutocompleteQuery } from '../autocomplete';
+import { filesFrom } from '../composer-files';
 import { compositionInputRules } from './composition-rules';
 import {
   activeMarks,
@@ -41,6 +42,7 @@ import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
 import { hasAndroidCompositionQuirk } from '#lib/platform/input.js';
 
+import { filesFromSources, pastedImageSources } from './pasted-images';
 import { queryKey, queryPlugin } from './query-plugin';
 import { composerSchema, parseMatrixHtml } from './schema';
 import {
@@ -298,11 +300,6 @@ export interface ComposerEditorOptions {
   onSourceToggle: (source: boolean) => void;
 }
 
-function filesFrom(transfer: DataTransfer | null): File[] {
-  if (!transfer) return [];
-  return Array.from(transfer.files).filter((file): file is File => file instanceof File);
-}
-
 function isDocEmpty(doc: ProseMirrorNode): boolean {
   if (doc.textContent.trim() !== '') return false;
 
@@ -452,6 +449,7 @@ export class ComposerEditor {
           attributes: () => this.domAttributes(),
           handlePaste: (pasteView, event, slice) =>
             this.handleFiles(filesFrom(event.clipboardData)) ||
+            this.handlePastedImages(slice) ||
             this.linkSelection(pasteView, slice),
           clipboardTextParser: (text, _context, plain) =>
             plain || !preferences.richTextComposer ? textSlice(text) : markdownSlice(text),
@@ -595,6 +593,13 @@ export class ComposerEditor {
   leaveSource(): boolean {
     this.source = false;
     return false;
+  }
+
+  private handlePastedImages(slice: Slice): boolean {
+    const sources = pastedImageSources(slice);
+    if (sources.length === 0) return false;
+    void filesFromSources(sources).then((files) => this.handleFiles(files));
+    return true;
   }
 
   private linkSelection(view: EditorView, slice: Slice): boolean {

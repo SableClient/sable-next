@@ -14,6 +14,8 @@ pub mod deep_link_ipc;
 #[allow(unsafe_code)]
 mod ios;
 mod map_tiles;
+#[cfg(all(feature = "cef", target_os = "linux"))]
+pub use map_tiles::TILE_URI_SCHEME;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;

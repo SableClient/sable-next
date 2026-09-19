@@ -13,7 +13,6 @@ use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
 use matrix_sdk::ruma::api::client::authenticated_media::get_media_preview;
 use matrix_sdk::ruma::api::client::directory::{get_room_visibility, set_room_visibility};
 use matrix_sdk::ruma::api::client::discovery::get_capabilities;
-use matrix_sdk::ruma::api::client::presence::set_presence;
 use matrix_sdk::ruma::api::client::profile::{PropagateTo, set_profile_field};
 use matrix_sdk::ruma::api::client::room::Visibility;
 use matrix_sdk::ruma::api::client::room::aliases;
@@ -38,7 +37,6 @@ use matrix_sdk::ruma::events::room::message::{
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
-use matrix_sdk::ruma::presence::PresenceState;
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
@@ -55,8 +53,8 @@ use matrix_sdk_ui::timeline::{RoomExt, TimelineEventItemId, TimelineFocus};
 use crate::protocol::{
     Command, CommandErr, CommandOk, CreateJoinRuleView, CreateRoomKind, HomeserverSoftwareView,
     ImageSourcePackReferenceView, ImageSourcePackView, JoinRuleView, MembershipView, MessageKind,
-    MutualRoomView, PackImageInfoView, PaginationDirection, PresenceView, RoomOpenView,
-    RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
+    MutualRoomView, PackImageInfoView, PaginationDirection, RoomOpenView, RoomStateEventView,
+    RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -65,6 +63,7 @@ const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
 
 use crate::media::mxc_uri;
 use crate::messages::outgoing_mentions;
+use crate::presence;
 use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::encryption_status;
@@ -1819,23 +1818,21 @@ impl Core {
                 presence,
                 status_message,
             } => {
-                let client = self.client().await?;
-                let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
-                let mut request = set_presence::v3::Request::new(
-                    user_id,
-                    match presence {
-                        PresenceView::Online => PresenceState::Online,
-                        PresenceView::Offline => PresenceState::Offline,
-                        PresenceView::Unavailable => PresenceState::Unavailable,
-                    },
-                );
-                request.status_msg = status_message;
-                client
-                    .send(request)
+                self.set_desired_presence(presence);
+
+                self.client()
+                    .await?
+                    .set_presence(presence::state(presence), status_message, true)
                     .await
                     .map_err(|error| self.failed("set_presence", error))?;
 
                 Ok(CommandOk::SetPresence)
+            }
+
+            Command::FetchPresence { user_ids } => {
+                self.fetch_presence(user_ids).await;
+
+                Ok(CommandOk::FetchPresence)
             }
 
             Command::SetRoomNotificationMode { room_id, mode } => {

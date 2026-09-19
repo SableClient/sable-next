@@ -652,12 +652,6 @@ function member(userId: string, membership: MemberView['membership'] = 'join'): 
 }
 
 test.each([
-  [
-    'color',
-    'moe.sable.room.cosmetics.color',
-    '#ff00ff',
-    { on_dark: '#ff00ff', on_light: '#ff00ff' },
-  ],
   ['font', 'moe.sable.room.cosmetics.font', 'Courier New', { font: 'Courier New' }],
   [
     'pronoun',
@@ -689,8 +683,102 @@ test.each([
   }
 );
 
-test('/color rejects anything that is not a hex colour', async () => {
+test('/colour writes the room colour into your own m.room.member', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/color #ff00ff', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
+    1,
+    '!room:example.org',
+    'm.room.member',
+    '@me:example.org',
+    {
+      membership: 'join',
+      'eu.she-a.color': { on_dark: '#ff00ff', on_light: '#ff00ff' },
+    }
+  );
+  expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
+    '!room:example.org',
+    'moe.sable.room.cosmetics.color',
+    '@me:example.org',
+    {}
+  );
+});
+
+test('/colour sets a single theme and preserves the rest of your member event', async () => {
+  const commands = fakeCommands();
+  commands.roomStateEvent.mockResolvedValueOnce({
+    membership: 'join',
+    displayname: 'Me',
+    'eu.she-a.color': { on_dark: '#001100' },
+  });
+
+  await runSlash('/color light #ff00ff', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
+    1,
+    '!room:example.org',
+    'm.room.member',
+    '@me:example.org',
+    {
+      membership: 'join',
+      displayname: 'Me',
+      'eu.she-a.color': { on_dark: '#001100', on_light: '#ff00ff' },
+    }
+  );
+});
+
+test('/colour reset clears the member colour and the legacy event', async () => {
+  const commands = fakeCommands();
+  commands.roomStateEvent.mockResolvedValueOnce({
+    membership: 'join',
+    'eu.she-a.color': { on_dark: '#001100', on_light: '#002200' },
+  });
+
+  await runSlash('/color reset', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
+    1,
+    '!room:example.org',
+    'm.room.member',
+    '@me:example.org',
+    { membership: 'join' }
+  );
+  expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
+    '!room:example.org',
+    'moe.sable.room.cosmetics.color',
+    '@me:example.org',
+    {}
+  );
+});
+
+test('/colour light reset drops only the light colour', async () => {
+  const commands = fakeCommands();
+  commands.roomStateEvent.mockResolvedValueOnce({
+    membership: 'join',
+    'eu.she-a.color': { on_dark: '#001100', on_light: '#002200' },
+  });
+
+  await runSlash('/color light reset', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenNthCalledWith(
+    1,
+    '!room:example.org',
+    'm.room.member',
+    '@me:example.org',
+    {
+      membership: 'join',
+      'eu.she-a.color': { on_dark: '#001100' },
+    }
+  );
+});
+
+test('/colour rejects anything that is not a hex colour', async () => {
   await expect(runSlash('/color blue', context(fakeCommands()))).rejects.toMatchObject({
+    key: 'composer.slash.color.usage',
+  });
+  await expect(runSlash('/color light blue', context(fakeCommands()))).rejects.toMatchObject({
     key: 'composer.slash.color.usage',
   });
 });
@@ -714,12 +802,6 @@ test('/pronoun understands a language-tagged list', async () => {
 });
 
 test.each([
-  [
-    'scolor',
-    'moe.sable.room.cosmetics.color',
-    '#00ff00',
-    { on_dark: '#00ff00', on_light: '#00ff00' },
-  ],
   ['sfont', 'moe.sable.room.cosmetics.font', 'Comic Sans', { font: 'Comic Sans' }],
   [
     'spronoun',

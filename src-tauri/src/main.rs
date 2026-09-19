@@ -48,7 +48,7 @@ fn install_permission_policy() {
             || !request
                 .origin
                 .as_ref()
-                .is_some_and(|origin| origin.is_app_local())
+                .is_some_and(tauri_runtime_cef::NormalizedOrigin::is_app_local)
         {
             return responder.deny(DenyReason::NoPolicy);
         }
@@ -125,6 +125,7 @@ fn cef_command_line_args() -> Vec<(String, Option<String>)> {
             "autoplay-policy".into(),
             Some("no-user-gesture-required".into()),
         ),
+        ("enable-features".into(), Some("SharedArrayBuffer".into())),
         (
             "disable-features".into(),
             Some(
@@ -161,6 +162,11 @@ fn cef_command_line_args() -> Vec<(String, Option<String>)> {
 #[cfg(all(feature = "cef", target_os = "linux"))]
 fn is_cef_subprocess() -> bool {
     std::env::args().any(|arg| arg.starts_with("--type="))
+}
+
+#[cfg(all(feature = "cef", target_os = "linux"))]
+fn is_cef_views() -> bool {
+    std::env::var_os("SABLE_CEF_VIEWS").is_some()
 }
 
 #[cfg(target_os = "linux")]
@@ -237,10 +243,12 @@ fn main() {
     // The CEF runtime's Wayland path is unstable; the crate is verified on X11.
     // https://github.com/tauri-apps/tauri/issues/14251
     #[cfg(all(feature = "cef", target_os = "linux"))]
-    // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
-    #[allow(unsafe_code)]
-    unsafe {
-        std::env::set_var("GDK_BACKEND", "x11");
+    if !is_cef_views() {
+        // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
+        #[allow(unsafe_code)]
+        unsafe {
+            std::env::set_var("GDK_BACKEND", "x11");
+        }
     }
 
     #[cfg(target_os = "linux")]
@@ -251,9 +259,19 @@ fn main() {
     {
         tauri_runtime_cef::configure(tauri_runtime_cef::CefConfig {
             identifier: "moe.sable.next".into(),
-            custom_schemes: vec!["tauri".into(), "ipc".into(), "asset".into()],
+            custom_schemes: vec![
+                "tauri".into(),
+                "ipc".into(),
+                "asset".into(),
+                app_lib::TILE_URI_SCHEME.into(),
+            ],
             deep_link_schemes: vec!["moe.sable.next".into(), "sable".into()],
             command_line_args: cef_command_line_args(),
+            linux_windowing: if is_cef_views() {
+                tauri_runtime_cef::LinuxWindowing::Wayland
+            } else {
+                tauri_runtime_cef::LinuxWindowing::X11
+            },
             ..Default::default()
         });
 

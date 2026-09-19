@@ -575,6 +575,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.composerEmoteButtonHint',
         type: 'boolean',
       },
+      {
+        key: 'scheduleInEncryptedRooms',
+        icon: LockIcon,
+        name: 'settings.scheduleInEncryptedRooms',
+        description: 'settings.scheduleInEncryptedRoomsHint',
+        type: 'boolean',
+      },
     ],
   },
   {
@@ -813,14 +820,6 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.showHiddenEventsHint',
         type: 'boolean',
         gatedBy: 'developerTools',
-      },
-      {
-        key: 'showNonStandardEvents',
-        icon: CodeIcon,
-        name: 'settings.showNonStandardEvents',
-        description: 'settings.showNonStandardEventsHint',
-        type: 'boolean',
-        gatedBy: 'showHiddenEvents',
       },
     ],
   },

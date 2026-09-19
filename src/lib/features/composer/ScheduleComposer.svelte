@@ -5,22 +5,27 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { presetOffsets, scheduleAt } from './schedule-time.js';
 
   interface Props {
     open?: boolean;
     empty: boolean;
+    encrypted?: boolean | null;
     onSchedule: (dueTs: number) => void;
   }
 
-  let { open = $bindable(false), empty, onSchedule }: Props = $props();
+  let { open = $bindable(false), empty, encrypted = null, onSchedule }: Props = $props();
 
   const uid = $props.id();
   let date = $state('');
   let time = $state('');
+  let timeInput: HTMLInputElement | null = null;
 
   let chosen = $derived(scheduleAt(date, time, Date.now()));
+  let blocked = $derived(encrypted === true && !preferences.scheduleInEncryptedRooms);
+  let unavailable = $derived(empty || blocked);
 
   function reset(): void {
     date = '';
@@ -39,7 +44,7 @@
   }
 
   function submit(): void {
-    if (!empty && chosen !== null) confirm(chosen);
+    if (!unavailable && chosen !== null) confirm(chosen);
   }
 </script>
 
@@ -57,11 +62,17 @@
       <Alert variant="warning">{$i18n.t('composer.scheduleEmpty')}</Alert>
     {/if}
 
+    {#if blocked}
+      <Alert variant="warning">{$i18n.t('composer.scheduleEncryptedBlocked')}</Alert>
+    {:else if encrypted === true}
+      <Alert>{$i18n.t('composer.scheduleEncryptedNote')}</Alert>
+    {/if}
+
     <div class="presets">
       {#each presetOffsets as preset (preset.key)}
         <Button
           variant="ghost"
-          disabled={empty}
+          disabled={unavailable}
           onclick={() => {
             confirm(preset.at(Date.now()));
           }}
@@ -73,10 +84,25 @@
 
     <div class="pair">
       <FormField fieldId="{uid}-date" label={$i18n.t('composer.scheduleDate')}>
-        <TextInput id="{uid}-date" type="date" bind:value={date} />
+        <TextInput
+          id="{uid}-date"
+          type="date"
+          bind:value={date}
+          onchange={() => timeInput?.focus()}
+        />
       </FormField>
       <FormField fieldId="{uid}-time" label={$i18n.t('composer.scheduleTime')}>
-        <TextInput id="{uid}-time" type="time" bind:value={time} />
+        <TextInput
+          id="{uid}-time"
+          type="time"
+          bind:value={time}
+          {@attach (node: HTMLInputElement) => {
+            timeInput = node;
+            return () => {
+              timeInput = null;
+            };
+          }}
+        />
       </FormField>
     </div>
 
@@ -88,7 +114,7 @@
       <Button type="button" variant="ghost" onclick={cancel}>
         {$i18n.t('composer.scheduleCancel')}
       </Button>
-      <Button type="submit" disabled={empty || chosen === null}>
+      <Button type="submit" disabled={unavailable || chosen === null}>
         {$i18n.t('composer.scheduleConfirm')}
       </Button>
     </div>

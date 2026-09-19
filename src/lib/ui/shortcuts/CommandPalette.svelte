@@ -29,9 +29,8 @@
   }
 </script>
 
-<DialogFrame bind:open variant="sheet" label={$i18n.t('shortcuts.paletteTitle')}>
+<DialogFrame bind:open variant="verification" label={$i18n.t('shortcuts.paletteTitle')}>
   <div class="palette">
-    <h2>{$i18n.t('shortcuts.paletteTitle')}</h2>
     <RoomJumpList onSelect={select} onClose={() => (open = false)} />
     <footer>
       <Button variant="ghost" size="small" onclick={openShortcutsHelp}>
@@ -45,21 +44,13 @@
   .palette {
     display: grid;
     gap: var(--space-300);
-    max-width: 34rem;
-    width: 100%;
-  }
-
-  h2 {
-    font-size: var(--font-size-heading);
-    line-height: var(--line-height-heading);
-    margin: 0;
-    padding: var(--space-400) var(--space-400) 0;
+    width: min(34rem, calc(100vw - 2rem));
   }
 
   footer {
     border-top: var(--border-width) solid var(--bg-container-line);
     display: flex;
     justify-content: flex-end;
-    padding: var(--space-300) var(--space-400);
+    padding-top: var(--space-200);
   }
 </style>

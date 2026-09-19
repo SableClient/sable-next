@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { ProfileView } from '#src/generated/protocol';
+  import type { PresenceView, ProfileView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
@@ -12,7 +12,12 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
+  import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
+  import type { OptionCard } from '#lib/ui/primitives/option-card.js';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import SettingsSheet from '#lib/features/settings/SettingsSheet.svelte';
 
   const core = useCoreClient();
@@ -28,6 +33,12 @@
   let displayName = $derived(profile?.display_name ?? activeUserId);
   let userStatus = $derived(resolveUserStatus(profile, presenceStore.get(activeUserId)));
   let profileColor = $derived(profile?.hero_color ?? 'var(--primary-container)');
+  let statusDraft = $state(preferences.presenceStatusMessage);
+  let presenceOptions = $derived<OptionCard<PresenceView>[]>([
+    { value: 'online', label: $i18n.t('presence.online') },
+    { value: 'unavailable', label: $i18n.t('presence.unavailable') },
+    { value: 'offline', label: $i18n.t('presence.offline') },
+  ]);
   let accountToRemove = $derived(
     core.accounts.find((account) => account.account_id === removeAccountId) ?? null
   );
@@ -46,6 +57,10 @@
       cancelled = true;
     };
   });
+
+  function saveStatusMessage(): void {
+    setPreference('presenceStatusMessage', statusDraft.trim());
+  }
 
   function reauthenticate(homeserver: string, accountId: string): Promise<void> {
     return goto(
@@ -115,6 +130,39 @@
     nameColorDark={profile?.name_color_dark}
     actions={profileActions}
   />
+
+  {#if preferences.sendPresence}
+    <section class="presence-section" aria-labelledby="presence-title">
+      <div class="section-heading">
+        <h1 id="presence-title">{$i18n.t('presence.title')}</h1>
+        <p>{$i18n.t('presence.description')}</p>
+      </div>
+      <OptionCards
+        label={$i18n.t('presence.title')}
+        options={presenceOptions}
+        value={preferences.presence}
+        onSelect={(value) => setPreference('presence', value)}
+      />
+      <FormField fieldId="presence-status-message" label={$i18n.t('presence.statusMessage')}>
+        <div class="status-message">
+          <TextInput
+            id="presence-status-message"
+            bind:value={statusDraft}
+            maxlength={120}
+            placeholder={$i18n.t('presence.statusMessagePlaceholder')}
+            onkeydown={(event) => {
+              if (event.key === 'Enter') saveStatusMessage();
+            }}
+          />
+          <Button
+            variant="secondary"
+            disabled={statusDraft === preferences.presenceStatusMessage}
+            onclick={saveStatusMessage}>{$i18n.t('presence.statusMessageSave')}</Button
+          >
+        </div>
+      </FormField>
+    </section>
+  {/if}
 
   <section class="account-list" aria-labelledby="account-list-title">
     <div class="section-heading">
@@ -223,6 +271,7 @@
     align-content: start;
     display: grid;
     gap: var(--space-500);
+    grid-auto-rows: max-content;
     margin: 0 auto;
     max-width: 42rem;
     overflow: auto;
@@ -230,9 +279,16 @@
     width: 100%;
   }
 
-  .account-list {
+  .account-list,
+  .presence-section {
     display: grid;
     gap: var(--space-300);
+  }
+
+  .status-message {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
   }
 
   .section-heading {

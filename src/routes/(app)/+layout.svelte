@@ -56,7 +56,6 @@
   import IncomingCallDialog from '#lib/features/call/IncomingCallDialog.svelte';
   import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
-  import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
   import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
@@ -93,13 +92,6 @@
   const shareInbox = new ShareInbox();
 
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
-  let callRoom = $derived(
-    callSession.roomId === null
-      ? undefined
-      : roomList.rooms.find((room) => room.room_id === callSession.roomId)
-  );
-  let showCallBar = $derived(callSession.active && callSession.roomId !== openRoomId);
-
   let incoming = $derived(incomingCalls.calls.at(0) ?? null);
   let incomingProfile = $state.raw<{ name: string; avatar: string | null } | null>(null);
 
@@ -275,8 +267,12 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
+    const message = preferences.presenceStatusMessage.trim();
     void core.commands
-      .setPresence(preferences.sendPresence ? 'online' : 'offline', null)
+      .setPresence(
+        preferences.sendPresence ? preferences.presence : 'offline',
+        preferences.sendPresence && message ? message : null
+      )
       .catch(() => {});
   });
 
@@ -515,22 +511,14 @@
     <AppShell>
       {@render children()}
     </AppShell>
-    {#if showCallBar}
-      <div class="call-dock">
-        <ActiveCallBar
-          session={callSession}
-          roomName={callRoom?.name ?? $i18n.t('call.title')}
-          onReturn={() => {
-            if (callSession.roomId === null) return;
-            void goto(roomSectionPath(roomList.rooms, callSession.roomId));
-          }}
-        />
-      </div>
-    {/if}
     {#if callSession.rooms.length > 0}
       {#await import('#lib/features/call/CallAudio.svelte') then { default: CallAudio }}
         {#each callSession.rooms as entry (entry.backendId)}
-          <CallAudio room={entry.room} telemetry={callSession.telemetry} />
+          <CallAudio
+            room={entry.room}
+            telemetry={callSession.telemetry}
+            deafened={callSession.deafened}
+          />
         {/each}
       {/await}
     {/if}
@@ -634,19 +622,5 @@
 
   .app-status-card :global(.btn) {
     min-width: 8rem;
-  }
-
-  .call-dock {
-    display: flex;
-    inset-block-end: var(--space-400);
-    inset-inline: 0;
-    justify-content: center;
-    pointer-events: none;
-    position: fixed;
-    z-index: 5;
-  }
-
-  .call-dock > :global(*) {
-    pointer-events: auto;
   }
 </style>

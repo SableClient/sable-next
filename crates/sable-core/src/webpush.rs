@@ -10,8 +10,7 @@ use http::{self, header::CONTENT_TYPE};
 use matrix_sdk::SupportedPathBuilder;
 use matrix_sdk::{Client, HttpResult};
 use ruma::api::{
-    BytesBody, EmptyBody, FeatureFlag, IncomingResponse, MatrixVersion, Metadata, OutgoingRequest,
-    auth_scheme,
+    BytesBody, EmptyBody, IncomingResponse, MatrixVersion, Metadata, OutgoingRequest, auth_scheme,
     client::discovery::get_capabilities,
     error::{DeserializationError, IntoHttpError},
     path_builder::{PathBuilder, StablePathSelector, VersionHistory},
@@ -20,10 +19,7 @@ use ruma::http_headers::APPLICATION_JSON;
 
 use crate::protocol::{RegisteredPusherView, WebPusherView};
 
-/// The unstable feature `/versions` must advertise.
-const FEATURE: &str = "org.matrix.msc4174";
-
-/// The stable capability name once upstreamed, and the unstable one meanwhile.
+/// The capability name once upstreamed, and the unstable one meanwhile.
 const CAPABILITIES: [&str; 2] = ["m.webpush", "org.matrix.msc4174.webpush"];
 
 /// The kind the pusher goes on the wire as.
@@ -43,20 +39,12 @@ fn vapid(capability: &JsonValue) -> Option<String> {
     (capability.enabled && !vapid.trim().is_empty()).then_some(vapid)
 }
 
-/// `None` unless the server both advertises MSC4174 and serves a VAPID key.
+/// `None` unless the homeserver serves a web push capability with a VAPID key.
 ///
 /// # Errors
 ///
-/// When the homeserver queries fail.
+/// When the homeserver query fails.
 pub async fn support(client: &Client) -> Result<Option<String>, String> {
-    let features = client
-        .unstable_features()
-        .await
-        .map_err(|error| error.to_string())?;
-    if !features.contains(&FeatureFlag::from(FEATURE)) {
-        return Ok(None);
-    }
-
     let capabilities = client
         .send(get_capabilities::v3::Request::new())
         .await
@@ -379,6 +367,7 @@ mod tests {
     use matrix_sdk::ruma::api::OutgoingRequestExt;
     use matrix_sdk::ruma::api::SupportedVersions;
     use matrix_sdk::ruma::api::auth_scheme::SendAccessToken;
+    use serde_json::json;
 
     use super::*;
 
@@ -520,6 +509,71 @@ mod tests {
             serde_json::from_slice::<JsonValue>(http_request.body().as_slice()).unwrap(),
             serde_json::json!({"app_id": "moe.sable.webpush", "ack_token": "token"})
         );
+    }
+
+    /// Mounts a homeserver's `/versions` and `/capabilities`, whose contents
+    /// are the caller's choice, and returns a logged-in client against them.
+    async fn homeserver(
+        unstable_features: JsonValue,
+        capabilities: JsonValue,
+    ) -> matrix_sdk::Client {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+
+        let server = MatrixMockServer::new().await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/versions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"versions": ["v1.11"], "unstable_features": unstable_features}),
+            ))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/capabilities"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "capabilities": capabilities })),
+            )
+            .mount(server.server())
+            .await;
+
+        matrix_sdk::test_utils::client::MockClientBuilder::new(Some(&server.uri()))
+            .logged_in_with_token(
+                "token".to_owned(),
+                matrix_sdk::ruma::owned_user_id!("@sable:example.org"),
+                matrix_sdk::ruma::owned_device_id!("DEVICE"),
+            )
+            .build()
+            .await
+    }
+
+    #[tokio::test]
+    async fn a_capability_alone_announces_the_homeserver_delivery() {
+        let client = homeserver(
+            json!({}),
+            json!({"org.matrix.msc4174.webpush": {"enabled": true, "vapid": "BRaw"}}),
+        )
+        .await;
+
+        assert_eq!(support(&client).await, Ok(Some("BRaw".to_owned())));
+    }
+
+    #[tokio::test]
+    async fn the_stable_capability_is_read_without_the_unstable_feature() {
+        let client = homeserver(
+            json!({}),
+            json!({"m.webpush": {"enabled": true, "vapid": "BStable"}}),
+        )
+        .await;
+
+        assert_eq!(support(&client).await, Ok(Some("BStable".to_owned())));
+    }
+
+    #[tokio::test]
+    async fn a_feature_without_a_capability_makes_no_homeserver_delivery() {
+        let client = homeserver(json!({"org.matrix.msc4174": true}), json!({})).await;
+
+        assert_eq!(support(&client).await, Ok(None));
     }
 
     #[test]

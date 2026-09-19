@@ -32,6 +32,8 @@ pre-commit:
 
     - name: type-aware
       glob: '*.{ts,tsx,mts,cts,svelte}'
+      exclude:
+        - 'src/generated/*'
       run: pnpm exec oxlint --type-aware {staged_files}
 
     - name: css

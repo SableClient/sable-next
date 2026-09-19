@@ -1,3 +1,4 @@
+import type { PresenceView } from '#src/generated/protocol';
 import type { MemberSort } from '#lib/features/room/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
@@ -55,6 +56,7 @@ export interface Preferences {
   composerGifButton: boolean;
   composerStickerButton: boolean;
   composerEmoteButton: boolean;
+  scheduleInEncryptedRooms: boolean;
 
   personaPicker: boolean;
   personaProxying: boolean;
@@ -64,6 +66,8 @@ export interface Preferences {
   sendTypingNotifications: boolean;
   sendReadReceipts: boolean;
   sendPresence: boolean;
+  presence: PresenceView;
+  presenceStatusMessage: string;
 
   mediaAutoLoad: boolean;
   autoplayGifs: boolean;
@@ -100,7 +104,6 @@ export interface Preferences {
 
   developerTools: boolean;
   showHiddenEvents: boolean;
-  showNonStandardEvents: boolean;
 }
 
 /** The subset the timeline reads when deciding which events to render. */
@@ -112,11 +115,16 @@ export type TimelinePreferences = Pick<
   | 'hideMemberInReadOnly'
   | 'showTombstoneEvents'
   | 'showHiddenEvents'
-  | 'showNonStandardEvents'
 >;
 
 const STORAGE_KEY = 'sable-preferences';
 const LEGACY_STORAGE_KEY = 'sable-timeline-preferences';
+
+/** The string-valued preferences with a fixed set of accepted values. */
+type EnumPreference = Exclude<
+  { [K in keyof Preferences]: Preferences[K] extends string ? K : never }[keyof Preferences],
+  FreeTextPreference
+>;
 
 const ENUMS = {
   language: languageValues,
@@ -131,11 +139,14 @@ const ENUMS = {
   readReceiptPlacement: ['message', 'room'],
   replyPreviewStyle: ['connected', 'compact', 'expanded'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
-} as const satisfies Partial<Record<keyof Preferences, readonly string[]>>;
+  personaLatching: ['off', 'room', 'account'],
+  presence: ['online', 'unavailable', 'offline'],
+} as const satisfies { [K in EnumPreference]?: readonly Preferences[K][] };
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
     `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
+  'presenceStatusMessage',
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
@@ -184,6 +195,7 @@ const DEFAULTS: Preferences = {
   composerGifButton: true,
   composerStickerButton: true,
   composerEmoteButton: true,
+  scheduleInEncryptedRooms: true,
 
   personaPicker: true,
   personaProxying: false,
@@ -193,6 +205,8 @@ const DEFAULTS: Preferences = {
   sendTypingNotifications: true,
   sendReadReceipts: true,
   sendPresence: true,
+  presence: 'online',
+  presenceStatusMessage: '',
 
   mediaAutoLoad: true,
   autoplayGifs: true,
@@ -227,7 +241,6 @@ const DEFAULTS: Preferences = {
 
   developerTools: false,
   showHiddenEvents: false,
-  showNonStandardEvents: false,
 };
 
 function prefersReducedMotion(): boolean {

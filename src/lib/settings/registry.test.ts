@@ -39,3 +39,38 @@ describe('developer settings', () => {
     expect(await developerItemKeys()).toContain('developerTools');
   });
 });
+
+describe('select settings', () => {
+  it('survive sanitization for every option value the registry declares', async () => {
+    const [{ settingsCategories }, { preferences, sanitize }] = await Promise.all([
+      import('./registry'),
+      import('./preferences.svelte'),
+    ]);
+    const base = { ...preferences };
+
+    for (const category of settingsCategories) {
+      for (const item of category.items) {
+        if (item.type !== 'select') continue;
+        for (const option of item.options) {
+          const stored: Record<string, unknown> = { [item.key]: option.value };
+          expect(sanitize(stored, base)[item.key], `${item.key} = ${option.value}`).toBe(
+            option.value
+          );
+        }
+      }
+    }
+  });
+
+  it('survive sanitization for the member sort set outside the registry', async () => {
+    const [{ MEMBER_SORTS }, { preferences, sanitize }] = await Promise.all([
+      import('#lib/features/room/member-listing.js'),
+      import('./preferences.svelte'),
+    ]);
+    const base = { ...preferences };
+
+    for (const option of MEMBER_SORTS) {
+      const stored: Record<string, unknown> = { memberSort: option };
+      expect(sanitize(stored, base).memberSort, `memberSort = ${option}`).toBe(option);
+    }
+  });
+});

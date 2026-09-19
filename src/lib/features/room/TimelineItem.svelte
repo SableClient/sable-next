@@ -68,6 +68,7 @@
     isAnnotation,
     isMessageRow,
     jumboEmojiLevel,
+    jumboEmoticonLevel,
     senderColor,
   } from './timeline-format';
 
@@ -76,6 +77,7 @@
     collapsed: boolean;
     unreadCount?: number;
     replyPersona?: PerMessageProfileView | null;
+    threadPersona?: PerMessageProfileView | null;
     roomId?: string;
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -116,6 +118,7 @@
     collapsed,
     unreadCount = 0,
     replyPersona = null,
+    threadPersona = null,
     roomId = '',
     highlighted = false,
     onMatrixLink,
@@ -199,7 +202,7 @@
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
   let jumbo = $derived(
     item.content.kind === 'message' && !item.content.emote
-      ? jumboEmojiLevel(item.content.body)
+      ? (jumboEmojiLevel(item.content.body) ?? jumboEmoticonLevel(item.content.html))
       : null
   );
   let stalled = $derived(
@@ -890,7 +893,9 @@
               >{$i18n.t('timeline.threadReplies', { count: threadSummary.num_replies })}</span
             >
             {#if threadSummary.latest_body}
-              <span class="thread-latest">{threadSummary.latest_body}</span>
+              <span class="thread-latest"
+                >{stripReplyFallback(threadSummary.latest_body, threadPersona)}</span
+              >
             {/if}
           </button>
         {:else if item.thread_root && onOpenThread}
@@ -1206,6 +1211,10 @@
     --jumbo-size-2: 1.9rem;
     --jumbo-size-3: 1.5rem;
     --jumbo-size-4: 1.25rem;
+  }
+
+  .jumbo :global(img) {
+    height: 1em;
   }
 
   .jumbo-1 {

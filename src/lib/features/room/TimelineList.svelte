@@ -30,6 +30,7 @@
   import {
     isCollapsed,
     latestEventId,
+    mergeAggregations,
     personaLookup,
     unreadCountAfter,
     visibleTimelineItems,
@@ -135,7 +136,12 @@
   }
   const identity = new TimelineIdentityTracker();
   let followingRead = $state(false);
-  let allItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
+  let allItems = $derived(
+    mergeAggregations(
+      visibleTimelineItems(timeline.items, preferences, { readOnly }),
+      preferences.showHiddenEvents ? timeline.aggregations : []
+    )
+  );
   let visibleItems = $derived(
     followingRead ? allItems.filter((item) => item.content.kind !== 'read_marker') : allItems
   );
@@ -627,6 +633,9 @@
                   {collapsed}
                   unreadCount={row.value.unreadCount}
                   replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
+                  threadPersona={item.thread_summary
+                    ? personas(item.thread_summary.latest_event_id)
+                    : null}
                   highlighted={focusEventId !== null && item.event_id === focusEventId}
                   {onMatrixLink}
                   {onCopyLink}
@@ -787,7 +796,7 @@
     min-height: 0;
     overflow: auto;
     overflow-anchor: none;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
     scrollbar-color: transparent transparent;
     scrollbar-width: thin;
   }

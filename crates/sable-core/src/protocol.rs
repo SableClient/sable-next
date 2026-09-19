@@ -761,6 +761,11 @@ pub enum Command {
         presence: PresenceView,
         status_message: Option<String>,
     },
+    /// Fills in users the presence poll has not pushed yet.
+    FetchPresence {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        user_ids: Vec<OwnedUserId>,
+    },
     SetRoomNotificationMode {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -972,6 +977,7 @@ pub enum CommandOk {
     SubscribeTimeline {
         subscription: SubscriptionId,
         items: Vec<TimelineItemView>,
+        aggregations: Vec<TimelineItemView>,
     },
     Unsubscribe,
 
@@ -1267,6 +1273,7 @@ pub enum CommandOk {
     SetNotificationContent,
     SetReadRoom,
     SetPresence,
+    FetchPresence,
     SetRoomNotificationMode,
     SetDefaultNotificationMode,
     SetMentionNotifications,
@@ -1435,6 +1442,10 @@ pub enum CoreEvent {
         subscription: SubscriptionId,
         loading: bool,
         reached_start: bool,
+    },
+    TimelineAggregations {
+        subscription: SubscriptionId,
+        items: Vec<TimelineItemView>,
     },
 
     /// Our own user excluded. Absolute, so an empty list replaces the previous
@@ -2264,6 +2275,10 @@ pub struct ReplyView {
 pub struct ThreadSummaryView {
     /// Excludes the root, so zero if every reply was redacted.
     pub num_replies: u32,
+    /// The latest reply's id, so the UI can strip its per-message-profile
+    /// fallback like a reply preview. Absent for a local echo or an unloaded
+    /// event.
+    pub latest_event_id: Option<String>,
     pub latest_body: Option<String>,
 }
 

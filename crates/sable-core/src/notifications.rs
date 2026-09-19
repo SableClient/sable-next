@@ -1,22 +1,18 @@
 use matrix_sdk::Client;
 use matrix_sdk::notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode};
 use matrix_sdk::ruma::api::client::push::{
-    PusherIds, PusherInit, PusherKind, delete_pushrule, set_pushrule,
+    PusherIds, PusherInit, PusherKind, delete_pushrule, set_pushrule, set_pushrule_actions,
+    set_pushrule_enabled,
 };
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
-use matrix_sdk::ruma::power_levels::NotificationPowerLevelsKey;
 use matrix_sdk::ruma::push::{
-    Action, EventMatchConditionData, EventPropertyContainsConditionData,
-    EventPropertyIsConditionData, HighlightTweakValue, HttpPusherData, NewConditionalPushRule,
-    NewPatternedPushRule, NewPushRule, PredefinedContentRuleId, PredefinedOverrideRuleId,
-    PushCondition, PushFormat, RuleKind, Ruleset, SenderNotificationPermissionConditionData,
+    Action, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule,
+    PredefinedContentRuleId, PredefinedOverrideRuleId, PushFormat, RuleKind, Ruleset,
     SoundTweakValue, Tweak,
 };
-use matrix_sdk::ruma::{
-    EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId, UserId,
-};
+use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
     NotificationStatus,
@@ -164,101 +160,74 @@ fn mention_actions(mode: MentionNotificationModeView) -> Vec<Action> {
     }
 }
 
-enum MentionRule {
-    Conditional {
-        id: String,
-        conditions: Vec<PushCondition>,
-        fallback: MentionNotificationModeView,
-    },
-    Patterned {
-        id: String,
-        pattern: String,
-        fallback: MentionNotificationModeView,
-    },
+struct MentionRule {
+    kind: RuleKind,
+    id: String,
+    fallback: MentionNotificationModeView,
 }
 
-fn room_mention_rule(rules: &Ruleset) -> MentionRule {
-    let modern = rules
+fn room_mention_rule_id(rules: &Ruleset) -> String {
+    if rules
         .override_
         .iter()
-        .any(|rule| rule.rule_id == PredefinedOverrideRuleId::IsRoomMention.as_str());
-
-    let (id, matcher) = if modern {
-        (
-            PredefinedOverrideRuleId::IsRoomMention.to_string(),
-            PushCondition::EventPropertyIs(EventPropertyIsConditionData::new(
-                r"content.m\.mentions.room".to_owned(),
-                true.into(),
-            )),
-        )
-    } else {
-        #[allow(deprecated)]
-        let legacy = PredefinedOverrideRuleId::RoomNotif.to_string();
-        (
-            legacy,
-            PushCondition::EventMatch(EventMatchConditionData::new(
-                "content.body".to_owned(),
-                "@room".to_owned(),
-            )),
-        )
-    };
-
-    MentionRule::Conditional {
-        id,
-        conditions: vec![
-            matcher,
-            PushCondition::SenderNotificationPermission(
-                SenderNotificationPermissionConditionData::new(NotificationPowerLevelsKey::Room),
-            ),
-        ],
-        fallback: MentionNotificationModeView::Notify,
+        .any(|rule| rule.rule_id == PredefinedOverrideRuleId::IsRoomMention.as_str())
+    {
+        return PredefinedOverrideRuleId::IsRoomMention.to_string();
     }
+
+    #[allow(deprecated)]
+    PredefinedOverrideRuleId::RoomNotif.to_string()
 }
 
-fn mention_rule(rules: &Ruleset, rule: MentionRuleView, user_id: &UserId) -> MentionRule {
+fn mention_rule(rules: &Ruleset, rule: MentionRuleView) -> MentionRule {
     match rule {
-        MentionRuleView::Room => room_mention_rule(rules),
-        MentionRuleView::User => MentionRule::Conditional {
+        MentionRuleView::Room => MentionRule {
+            kind: RuleKind::Override,
+            id: room_mention_rule_id(rules),
+            fallback: MentionNotificationModeView::Notify,
+        },
+        MentionRuleView::User => MentionRule {
+            kind: RuleKind::Override,
             id: PredefinedOverrideRuleId::IsUserMention.to_string(),
-            conditions: vec![PushCondition::EventPropertyContains(
-                EventPropertyContainsConditionData::new(
-                    r"content.m\.mentions.user_ids".to_owned(),
-                    user_id.as_str().into(),
-                ),
-            )],
             fallback: MentionNotificationModeView::Loud,
         },
-        #[allow(deprecated)]
-        MentionRuleView::DisplayName => MentionRule::Conditional {
-            id: PredefinedOverrideRuleId::ContainsDisplayName.to_string(),
-            conditions: vec![PushCondition::ContainsDisplayName],
-            fallback: MentionNotificationModeView::Loud,
-        },
-        MentionRuleView::Username => {
+        MentionRuleView::DisplayName => MentionRule {
+            kind: RuleKind::Override,
             #[allow(deprecated)]
-            let id = PredefinedContentRuleId::ContainsUserName.to_string();
-            MentionRule::Patterned {
-                id,
-                pattern: user_id.localpart().to_owned(),
-                fallback: MentionNotificationModeView::Loud,
-            }
-        }
+            id: PredefinedOverrideRuleId::ContainsDisplayName.to_string(),
+            fallback: MentionNotificationModeView::Loud,
+        },
+        MentionRuleView::Username => MentionRule {
+            kind: RuleKind::Content,
+            #[allow(deprecated)]
+            id: PredefinedContentRuleId::ContainsUserName.to_string(),
+            fallback: MentionNotificationModeView::Loud,
+        },
     }
 }
 
 fn read_mention_mode(rules: &Ruleset, rule: &MentionRule) -> MentionNotificationModeView {
-    match rule {
-        MentionRule::Conditional { id, fallback, .. } => rules
-            .override_
-            .iter()
-            .find(|rule| &rule.rule_id == id)
-            .map_or(*fallback, |rule| mention_mode(&rule.actions)),
-        MentionRule::Patterned { id, fallback, .. } => rules
+    let found = if rule.kind == RuleKind::Content {
+        rules
             .content
             .iter()
-            .find(|rule| &rule.rule_id == id)
-            .map_or(*fallback, |rule| mention_mode(&rule.actions)),
-    }
+            .find(|entry| entry.rule_id == rule.id)
+            .map(|entry| (entry.enabled, entry.actions.as_slice()))
+    } else {
+        rules
+            .override_
+            .iter()
+            .find(|entry| entry.rule_id == rule.id)
+            .map(|entry| (entry.enabled, entry.actions.as_slice()))
+    };
+
+    found.map_or(rule.fallback, |(enabled, actions)| {
+        if enabled {
+            mention_mode(actions)
+        } else {
+            MentionNotificationModeView::Off
+        }
+    })
 }
 
 /// # Errors
@@ -270,8 +239,7 @@ pub async fn mention_notifications(client: &Client) -> Result<MentionNotificatio
         .push_rules()
         .await
         .map_err(|error| error.to_string())?;
-    let user_id = client.user_id().ok_or("no session")?;
-    let read = |view| read_mention_mode(&rules, &mention_rule(&rules, view, user_id));
+    let read = |view| read_mention_mode(&rules, &mention_rule(&rules, view));
 
     Ok(MentionNotificationsView {
         room: read(MentionRuleView::Room),
@@ -294,20 +262,24 @@ pub async fn set_mention_notifications(
         .push_rules()
         .await
         .map_err(|error| error.to_string())?;
-    let user_id = client.user_id().ok_or("no session")?;
-    let actions = mention_actions(mode);
+    let rule = mention_rule(&rules, rule);
+    let on = mode != MentionNotificationModeView::Off;
 
-    let new = match mention_rule(&rules, rule, user_id) {
-        MentionRule::Conditional { id, conditions, .. } => {
-            NewPushRule::Override(NewConditionalPushRule::new(id, conditions, actions))
-        }
-        MentionRule::Patterned { id, pattern, .. } => {
-            NewPushRule::Content(NewPatternedPushRule::new(id, pattern, actions))
-        }
-    };
+    if on {
+        client
+            .send(set_pushrule_actions::v3::Request::new(
+                rule.kind.clone(),
+                rule.id.clone(),
+                mention_actions(mode),
+            ))
+            .await
+            .map_err(|error| error.to_string())?;
+    }
 
     client
-        .send(set_pushrule::v3::Request::new(new))
+        .send(set_pushrule_enabled::v3::Request::new(
+            rule.kind, rule.id, on,
+        ))
         .await
         .map(|_| ())
         .map_err(|error| error.to_string())
@@ -653,14 +625,13 @@ fn room_message_body(content: &RoomMessageEventContent) -> String {
 #[cfg(test)]
 mod tests {
     use matrix_sdk::ruma::events::AnySyncTimelineEvent;
-    use matrix_sdk::ruma::push::Ruleset;
+    use matrix_sdk::ruma::push::{PredefinedOverrideRuleId, RuleKind, Ruleset};
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, UInt, user_id};
     use serde_json::json;
 
     use super::{
-        MentionRule, gateway, is_backfill, mention_actions, mention_rule, read_mention_mode,
-        timeline_body,
+        gateway, is_backfill, mention_actions, mention_rule, read_mention_mode, timeline_body,
     };
     use crate::protocol::{MentionNotificationModeView, MentionRuleView};
 
@@ -807,31 +778,21 @@ mod tests {
         );
     }
 
-    fn conditional(rule: MentionRule) -> (String, serde_json::Value) {
-        match rule {
-            MentionRule::Conditional { id, conditions, .. } => {
-                let conditions = serde_json::to_value(conditions).unwrap();
-                (id, conditions)
-            }
-            MentionRule::Patterned { .. } => panic!("expected a conditional rule"),
-        }
-    }
-
     #[test]
-    fn room_mention_falls_back_to_legacy_text_and_permission() {
+    fn room_mentions_fall_back_to_the_legacy_rule_id() {
         let user = user_id!("@me:example.org");
         let mut rules = Ruleset::server_default(user);
+
+        assert_eq!(
+            mention_rule(&rules, MentionRuleView::Room).id,
+            ".m.rule.is_room_mention"
+        );
+
         rules.override_.clear();
 
-        let (id, conditions) = conditional(mention_rule(&rules, MentionRuleView::Room, user));
-
-        assert_eq!(id, ".m.rule.roomnotif");
         assert_eq!(
-            conditions,
-            json!([
-                {"kind": "event_match", "key": "content.body", "pattern": "@room"},
-                {"kind": "sender_notification_permission", "key": "room"}
-            ])
+            mention_rule(&rules, MentionRuleView::Room).id,
+            ".m.rule.roomnotif"
         );
     }
 
@@ -840,29 +801,38 @@ mod tests {
         let user = user_id!("@me:example.org");
         let rules = Ruleset::server_default(user);
 
-        let (id, conditions) = conditional(mention_rule(&rules, MentionRuleView::User, user));
-        assert_eq!(id, ".m.rule.is_user_mention");
-        assert_eq!(
-            conditions,
-            json!([{
-                "kind": "event_property_contains",
-                "key": r"content.m\.mentions.user_ids",
-                "value": "@me:example.org"
-            }])
-        );
+        let user_rule = mention_rule(&rules, MentionRuleView::User);
+        assert_eq!(user_rule.id, ".m.rule.is_user_mention");
+        assert_eq!(user_rule.kind, RuleKind::Override);
 
-        let (id, conditions) =
-            conditional(mention_rule(&rules, MentionRuleView::DisplayName, user));
-        assert_eq!(id, ".m.rule.contains_display_name");
-        assert_eq!(conditions, json!([{"kind": "contains_display_name"}]));
+        let display_name = mention_rule(&rules, MentionRuleView::DisplayName);
+        assert_eq!(display_name.id, ".m.rule.contains_display_name");
+        assert_eq!(display_name.kind, RuleKind::Override);
 
-        match mention_rule(&rules, MentionRuleView::Username, user) {
-            MentionRule::Patterned { id, pattern, .. } => {
-                assert_eq!(id, ".m.rule.contains_user_name");
-                assert_eq!(pattern, "me");
-            }
-            MentionRule::Conditional { .. } => panic!("the username rule is content-specific"),
-        }
+        let username = mention_rule(&rules, MentionRuleView::Username);
+        assert_eq!(username.id, ".m.rule.contains_user_name");
+        assert_eq!(username.kind, RuleKind::Content);
+    }
+
+    #[test]
+    fn a_disabled_mention_rule_reads_as_off() {
+        let user = user_id!("@me:example.org");
+        let mut rules = Ruleset::server_default(user);
+        let read =
+            |rules: &Ruleset| read_mention_mode(rules, &mention_rule(rules, MentionRuleView::Room));
+
+        assert_ne!(read(&rules), MentionNotificationModeView::Off);
+
+        let mut room = rules
+            .override_
+            .iter()
+            .find(|rule| rule.rule_id == PredefinedOverrideRuleId::IsRoomMention.as_str())
+            .expect("the server default carries the room mention rule")
+            .clone();
+        room.enabled = false;
+        rules.override_.replace(room);
+
+        assert_eq!(read(&rules), MentionNotificationModeView::Off);
     }
 
     #[test]
@@ -872,7 +842,7 @@ mod tests {
         rules.override_.clear();
         rules.content.clear();
 
-        let read = |view| read_mention_mode(&rules, &mention_rule(&rules, view, user));
+        let read = |view| read_mention_mode(&rules, &mention_rule(&rules, view));
 
         assert_eq!(
             read(MentionRuleView::Room),
@@ -894,10 +864,7 @@ mod tests {
         let rules = Ruleset::server_default(user);
 
         assert_eq!(
-            read_mention_mode(
-                &rules,
-                &mention_rule(&rules, MentionRuleView::Username, user)
-            ),
+            read_mention_mode(&rules, &mention_rule(&rules, MentionRuleView::Username)),
             MentionNotificationModeView::Loud
         );
     }

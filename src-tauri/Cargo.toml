@@ -93,7 +93,7 @@ tauri-plugin-sharekit = "=0.4.0-rc.7"
 [target."cfg(target_os = \"linux\")".dependencies]
 gtk = "0.18"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
-tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "69a6b8cac865f48bfaf324c21369a2bd101c1e94", optional = true }
+tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "eace83edf055acc17e811b2bc75d4b6eadf39670", optional = true }
 cef = { version = "=150.2.1", optional = true }
 libloading = "0.9"
 zbus = "5"

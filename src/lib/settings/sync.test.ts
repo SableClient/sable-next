@@ -116,6 +116,27 @@ describe('applySettings', () => {
     expect(applied?.preferences.pronounPillLimit).toBe(base.pronounPillLimit);
   });
 
+  it('carries the latching scope across devices', () => {
+    const { content } = prepareSettings({ ...base, personaLatching: 'room' }, noThemes);
+
+    expect(content.settings.personaLatching).toBe('room');
+
+    const applied = applySettings(content, base, noThemes, []);
+
+    expect(applied?.preferences.personaLatching).toBe('room');
+  });
+
+  it('ignores a latching scope outside the accepted set', () => {
+    const applied = applySettings(
+      { v: 1, settings: { personaLatching: 'everywhere' }, themes: noThemes },
+      base,
+      noThemes,
+      []
+    );
+
+    expect(applied?.preferences.personaLatching).toBe(base.personaLatching);
+  });
+
   it('refuses content from another schema version', () => {
     expect(applySettings({ v: 2, settings: {} }, base, noThemes, [])).toBeNull();
     expect(applySettings(null, base, noThemes, [])).toBeNull();

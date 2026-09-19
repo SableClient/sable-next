@@ -10,7 +10,12 @@ export function canSpoiler(file: File): boolean {
 
 export function filesFrom(transfer: DataTransfer | null): File[] {
   if (!transfer) return [];
-  return Array.from(transfer.files).filter((file): file is File => file instanceof File);
+  const files = Array.from(transfer.files).filter((file): file is File => file instanceof File);
+  if (files.length > 0) return files;
+  return Array.from(transfer.items)
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null);
 }
 
 export function formatSize(bytes: number): string {

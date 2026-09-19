@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { childRouting, spaceUnreadCounts } from './spaces';
+import { childRouting, spaceUnreadCounts, spacesContainingRoom } from './spaces';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -134,4 +134,33 @@ test('a joined space lends its edge to a room opened from a link', () => {
     parentId: '!space:example.org',
   });
   expect(childRouting([space], '!absent')).toEqual({ via: [], parentId: null });
+});
+
+test('finds the space holding a call room through a nested space, with cycles', () => {
+  const child = (roomId: string) => ({
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 1,
+    suggested: false,
+  });
+  const root = room({
+    room_id: '!root:example.org',
+    is_space: true,
+    space_children: [child('!sub:example.org')],
+  });
+  const sub = room({
+    room_id: '!sub:example.org',
+    is_space: true,
+    space_children: [child('!root:example.org'), child('!voice:example.org')],
+  });
+  const other = room({ room_id: '!other:example.org', is_space: true, space_children: [] });
+  const voice = room({ room_id: '!voice:example.org' });
+  const rooms = [root, sub, other, voice];
+
+  expect(spacesContainingRoom([root, other], rooms, '!voice:example.org')).toEqual(
+    new Set(['!root:example.org'])
+  );
+  expect(spacesContainingRoom([root, other], rooms, null)).toEqual(new Set());
+  expect(spacesContainingRoom([root, other], rooms, '!elsewhere:example.org')).toEqual(new Set());
 });

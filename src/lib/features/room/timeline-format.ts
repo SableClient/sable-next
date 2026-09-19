@@ -62,7 +62,18 @@ export function canRedact(item: TimelineItemView, canRedactOthers: boolean): boo
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+const IMAGE_TAG = /<img\b(?:"[^"]*"|'[^']*'|[^>"'])*>/giu;
+const MXC_IMAGE_SOURCE = /\bsrc=(?:"mxc:|'mxc:)/i;
+const LINE_BREAK = /<br\b[^>]*>/giu;
+const NO_BREAK_SPACE = /&(?:nbsp|#160);/giu;
 const JUMBO_MAX = 8;
+
+function jumboLevel(count: number): 1 | 2 | 3 | 4 | null {
+  if (count === 0 || count > JUMBO_MAX) return null;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  return count <= 4 ? 3 : 4;
+}
 
 export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
   const trimmed = body.trim();
@@ -70,10 +81,23 @@ export function jumboEmojiLevel(body: string): 1 | 2 | 3 | 4 | null {
 
   const segmenter = new Intl.Segmenter();
   const count = [...segmenter.segment(trimmed)].filter((unit) => unit.segment.trim()).length;
-  if (count > JUMBO_MAX) return null;
-  if (count === 1) return 1;
-  if (count === 2) return 2;
-  return count <= 4 ? 3 : 4;
+  return jumboLevel(count);
+}
+
+export function jumboEmoticonLevel(html: string): 1 | 2 | 3 | 4 | null {
+  const unwrapped = html
+    .trim()
+    .replace(/^<p[^>]*>/iu, '')
+    .replace(/<\/p>$/iu, '');
+  const images = unwrapped.match(IMAGE_TAG) ?? [];
+  if (images.length === 0 || !images.every((image) => MXC_IMAGE_SOURCE.test(image))) return null;
+  const residue = unwrapped
+    .replace(IMAGE_TAG, '')
+    .replace(LINE_BREAK, '')
+    .replace(NO_BREAK_SPACE, ' ')
+    .trim();
+  if (residue !== '') return null;
+  return jumboLevel(images.length);
 }
 
 export function isAnnotation(item: TimelineItemView): boolean {
@@ -93,21 +117,44 @@ function isVisibleEvent(
   const memberEventsHidden = Boolean(context.readOnly) && preferences.hideMemberInReadOnly;
   switch (item.content.kind) {
     case 'membership':
-      return (
-        !preferences.hideMembershipEvents && !memberEventsHidden && item.content.change !== 'other'
-      );
+      if (preferences.hideMembershipEvents || memberEventsHidden) return false;
+      return item.content.change !== 'other' || preferences.showHiddenEvents;
     case 'profile_change':
       return !preferences.hideProfileChanges && !memberEventsHidden;
     case 'redacted':
       return preferences.showTombstoneEvents;
     case 'state_event':
       if (item.content.change) return true;
-      return preferences.showHiddenEvents && preferences.showNonStandardEvents;
+      return preferences.showHiddenEvents;
     case 'hidden_event':
-      return preferences.showHiddenEvents && preferences.showNonStandardEvents;
+      return preferences.showHiddenEvents;
     default:
       return true;
   }
+}
+
+export function mergeAggregations(
+  items: readonly TimelineItemView[],
+  aggregations: readonly TimelineItemView[]
+): readonly TimelineItemView[] {
+  if (aggregations.length === 0) return items;
+
+  const known = new Set(items.map((item) => item.id));
+  const pending = aggregations
+    .filter((item) => !known.has(item.id))
+    .toSorted((left, right) => left.timestamp - right.timestamp);
+  if (pending.length === 0) return items;
+
+  const merged: TimelineItemView[] = [];
+  let next = 0;
+  for (const item of items) {
+    while (next < pending.length && pending[next].timestamp <= item.timestamp) {
+      merged.push(pending[next]);
+      next += 1;
+    }
+    merged.push(item);
+  }
+  return merged.concat(pending.slice(next));
 }
 
 export function visibleTimelineItems(
@@ -158,12 +205,13 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
   return count;
 }
 
-export type PersonaLookup = (eventId: string) => PerMessageProfileView | null;
+export type PersonaLookup = (eventId: string | null | undefined) => PerMessageProfileView | null;
 
 export function personaLookup(items: readonly TimelineItemView[]): PersonaLookup {
   let personas: Map<string, PerMessageProfileView> | null = null;
 
   return (eventId) => {
+    if (eventId === null || eventId === undefined) return null;
     if (personas === null) {
       personas = new Map();
       for (const item of items) {

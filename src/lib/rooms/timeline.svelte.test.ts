@@ -46,7 +46,7 @@ class FakeCore {
       subscription: 1,
       diffs: [{ op: 'push_back', value: item('buffered') }],
     });
-    return Promise.resolve({ subscription: 1, items: [item('initial')] });
+    return Promise.resolve({ subscription: 1, items: [item('initial')], aggregations: [] });
   }
 
   paginate(
@@ -245,7 +245,7 @@ class DelayedDiffCore extends FakeCore {
       loading: false,
       reached_start: false,
     });
-    return Promise.resolve({ subscription: 1, items: [item('latest')] });
+    return Promise.resolve({ subscription: 1, items: [item('latest')], aggregations: [] });
   }
 
   override paginate(subscription: number, direction: 'backward' | 'forward') {
@@ -423,7 +423,9 @@ class SwitchingCore {
   private readonly listeners = new Set<(event: CoreEvent) => void>();
   readonly responses = new Map<
     string,
-    ReturnType<typeof deferred<{ subscription: number; items: TimelineItemView[] }>>
+    ReturnType<
+      typeof deferred<{ subscription: number; items: TimelineItemView[]; aggregations: [] }>
+    >
   >();
   readonly unsubscribed: number[] = [];
   readonly paginateSubscriptions: number[] = [];
@@ -434,7 +436,11 @@ class SwitchingCore {
   }
 
   subscribeTimeline(roomId: string) {
-    const response = deferred<{ subscription: number; items: TimelineItemView[] }>();
+    const response = deferred<{
+      subscription: number;
+      items: TimelineItemView[];
+      aggregations: [];
+    }>();
     this.responses.set(roomId, response);
     return response.promise;
   }
@@ -468,11 +474,11 @@ test('a late room subscription cannot replace the current room', async () => {
 
   const secondResponse = core.responses.get('!second:example.org');
   if (!secondResponse) throw new Error('second subscription was not created');
-  secondResponse.resolve({ subscription: 2, items: [item('second')] });
+  secondResponse.resolve({ subscription: 2, items: [item('second')], aggregations: [] });
   await secondStart;
   const firstResponse = core.responses.get('!first:example.org');
   if (!firstResponse) throw new Error('first subscription was not created');
-  firstResponse.resolve({ subscription: 1, items: [item('first')] });
+  firstResponse.resolve({ subscription: 1, items: [item('first')], aggregations: [] });
   await firstStart;
 
   expect(timeline.items.map((entry) => entry.id)).toEqual(['second']);
@@ -488,7 +494,7 @@ test('a stale failed start cannot stop the active room subscription', async () =
   const secondStart = timeline.start('!second:example.org');
   const secondResponse = core.responses.get('!second:example.org');
   if (!secondResponse) throw new Error('second subscription was not created');
-  secondResponse.resolve({ subscription: 2, items: [item('second')] });
+  secondResponse.resolve({ subscription: 2, items: [item('second')], aggregations: [] });
   await secondStart;
 
   const firstResponse = core.responses.get('!first:example.org');
@@ -537,12 +543,12 @@ test('a delayed stale start cannot paginate the active timeline', async () => {
 
   const secondResponse = core.responses.get('!second:example.org');
   if (!secondResponse) throw new Error('second subscription was not created');
-  secondResponse.resolve({ subscription: 2, items: [item('second')] });
+  secondResponse.resolve({ subscription: 2, items: [item('second')], aggregations: [] });
   await secondStart;
 
   const firstResponse = core.responses.get('!first:example.org');
   if (!firstResponse) throw new Error('first subscription was not created');
-  firstResponse.resolve({ subscription: 1, items: [item('first')] });
+  firstResponse.resolve({ subscription: 1, items: [item('first')], aggregations: [] });
   await firstStart;
 
   expect(core.paginateSubscriptions).toEqual([]);
@@ -558,7 +564,7 @@ test('ignores events that precede the subscription snapshot', async () => {
 
   const response = core.responses.get('!room:example.org');
   if (!response) throw new Error('subscription was not created');
-  response.resolve({ subscription: 1, items: [item('initial')] });
+  response.resolve({ subscription: 1, items: [item('initial')], aggregations: [] });
   await start;
 
   expect(timeline.backwardPagination).toBe('idle');

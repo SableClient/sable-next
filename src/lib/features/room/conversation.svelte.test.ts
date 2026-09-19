@@ -1,10 +1,13 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+
+import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import { Conversation } from './conversation.svelte';
 
@@ -127,4 +130,46 @@ test('a pending edit follows its stable timeline ID after sync drops the transac
     'corrected',
     expect.objectContaining({ transactionId: null })
   );
+});
+
+function encryptedScheduleFailure(): Error {
+  const error = new Error('encrypted');
+  Object.assign(error, { detail: { code: 'encrypted_schedule_unsupported' } });
+  return error;
+}
+
+function scheduling() {
+  const scheduleMessage = vi.fn(() => Promise.reject(encryptedScheduleFailure()));
+  const core = {
+    session: { user_id: '@kris:example.org', device_id: 'DEV' },
+    commands: { scheduleMessage },
+  } as unknown as CoreClient;
+
+  return new Conversation({
+    core,
+    personas: { personas: [] } as unknown as PersonaStore,
+    timeline: { items: [] } as unknown as RoomTimeline,
+    roomId: () => ROOM,
+    encrypted: () => true,
+  });
+}
+
+afterEach(() => {
+  adoptQueue([]);
+  setPreference('scheduleInEncryptedRooms', true);
+});
+
+test('an encrypted room falls back to the local queue while the preference allows it', async () => {
+  await scheduling().schedule(ROOM, 'later', null, Date.now() + 60_000);
+
+  expect(scheduledQueue()).toHaveLength(1);
+});
+
+test('with the preference off an encrypted room refuses the schedule instead of queueing it', async () => {
+  setPreference('scheduleInEncryptedRooms', false);
+
+  await expect(scheduling().schedule(ROOM, 'later', null, Date.now() + 60_000)).rejects.toThrow(
+    'encrypted'
+  );
+  expect(scheduledQueue()).toHaveLength(0);
 });

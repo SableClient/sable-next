@@ -12,6 +12,7 @@
 
 .account-popover {
   --menu-min-width: min(20rem, calc(100vw - 2rem));
+  --menu-max-height: calc(100dvh - 2rem);
 
   gap: var(--space-100);
   padding: var(--space-150);

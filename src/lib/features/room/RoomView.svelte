@@ -302,6 +302,7 @@
     memberLoader.reset();
     conversation.forgetRequestedDetails();
     receiptsOpen = false;
+    threadRootId = null;
     closeProfile();
   });
 
@@ -847,6 +848,7 @@
               onTyping={conversation.setTyping}
               {roomName}
               readOnly={permissions ? !permissions.can_post : false}
+              encrypted={resolvedRoom?.encrypted ?? null}
               context={conversation.context}
               onCancelContext={conversation.clearContext}
               onToggleSilentReply={conversation.toggleSilentReply}

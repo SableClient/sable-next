@@ -42,6 +42,7 @@
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UserQuickTools from './UserQuickTools.svelte';
@@ -63,11 +64,13 @@
     dm?: boolean;
     section?: RailSection;
     badge?: boolean;
+    inCall?: boolean;
   };
 
   interface Props {
     spaces: readonly RoomSummary[];
     spaceUnread?: ReadonlyMap<string, UnreadCount>;
+    callSpaces?: ReadonlySet<string>;
     homeUnread?: UnreadCount;
     unspacedUnread?: UnreadCount;
     directRooms?: readonly RoomSummary[];
@@ -88,6 +91,7 @@
   let {
     spaces,
     spaceUnread = new Map(),
+    callSpaces = new Set(),
     homeUnread = NO_UNREAD,
     unspacedUnread = NO_UNREAD,
     directRooms = [],
@@ -246,6 +250,7 @@
       avatar: space.avatar_url,
       label: name,
       unread: spaceUnread.get(space.room_id),
+      inCall: callSpaces.has(space.room_id),
     };
   }
 
@@ -371,6 +376,9 @@
   {/if}
   {#if item.badge !== false}
     {@render unreadMark(item.unread, item.dm ?? false)}
+  {/if}
+  {#if item.inCall}
+    <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>
   {/if}
 {/snippet}
 
@@ -735,6 +743,26 @@
 {/if}
 
 <style>
+  .call-mark {
+    align-items: center;
+    background: var(--success-main);
+    border: var(--border-width) solid var(--bg-container);
+    border-radius: var(--radii-pill);
+    color: var(--success-on-main);
+    display: flex;
+    justify-content: center;
+    padding: var(--space-050);
+    position: absolute;
+    right: -0.25rem;
+    top: -0.25rem;
+    z-index: 1;
+  }
+
+  .call-mark :global(svg) {
+    height: 0.625rem;
+    width: 0.625rem;
+  }
+
   .rail {
     background: var(--bg-container);
     border-right: var(--border-width) solid var(--bg-container-line);

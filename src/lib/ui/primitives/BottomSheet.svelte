@@ -98,36 +98,32 @@
   {onOpenChange}
 >
   <div class:content-inset={contentInset}>{@render children()}</div>
-  <button
-    class="bottom-sheet-handle"
-    type="button"
-    aria-label={closeLabel}
-    onclick={handleClick}
+  <div
+    class="bottom-sheet-grip"
+    class:bottom-sheet-grip-wide={contentInset}
+    role="presentation"
     onpointerdown={startDrag}
     onpointermove={drag}
     onpointerup={endDrag}
     onpointercancel={endDrag}
   >
-    <span
-      class="bottom-sheet-pill"
-      aria-hidden="true"
-      style:background={handleColor}
-      style:opacity={handleOpacity}
-    ></span>
-  </button>
+    <button class="bottom-sheet-handle" type="button" aria-label={closeLabel} onclick={handleClick}>
+      <span
+        class="bottom-sheet-pill"
+        aria-hidden="true"
+        style:background={handleColor}
+        style:opacity={handleOpacity}
+      ></span>
+    </button>
+  </div>
 </DialogFrame>
 
 <style>
   /* Above sticky headers (z-index 1) in sheet content. */
-  :global(.bottom-sheet-handle) {
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-pill);
-    cursor: grab;
+  :global(.bottom-sheet-grip) {
     display: grid;
     height: var(--control-height-medium);
     left: 50%;
-    padding: 0;
     place-items: center;
     position: absolute;
     top: 0;
@@ -135,6 +131,24 @@
     transform: translateX(-50%);
     width: 4rem;
     z-index: 3;
+  }
+
+  :global(.bottom-sheet-grip-wide) {
+    left: 0;
+    transform: none;
+    width: 100%;
+  }
+
+  :global(.bottom-sheet-handle) {
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-pill);
+    cursor: grab;
+    display: grid;
+    height: 100%;
+    padding: 0;
+    place-items: center;
+    width: 4rem;
   }
 
   :global(.bottom-sheet-handle):active {

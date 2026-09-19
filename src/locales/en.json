@@ -1156,9 +1156,7 @@
     "developerSentryWarnings": "warnings",
     "developerSentryDescription": "Error-reporting consent remains controlled from Diagnostics & Privacy. These switches control which categories are retained as debug breadcrumbs.",
     "showHiddenEvents": "Show hidden events",
-    "showHiddenEventsHint": "Reloads the open room so events the client normally drops come through. Unlocks the controls below.",
-    "showNonStandardEvents": "Non-standard event types",
-    "showNonStandardEventsHint": "Renders state and custom events as a debug stream.",
+    "showHiddenEventsHint": "Reloads the open room so the events the client normally folds away — edits, reactions, redactions, state and custom events — appear as their own rows.",
     "stateEventTitle": "Send a state event",
     "stateEventDescription": "Writes raw room state. The server is the only thing validating it, so prefer the typed controls in room settings.",
     "stateEventRoom": "Room id",
@@ -1254,6 +1252,8 @@
     "composerStickerButtonHint": "Shows a sticker button beside the composer. It opens the picker on the sticker tab.",
     "composerEmoteButton": "Emote button",
     "composerEmoteButtonHint": "Shows an emote button beside the composer. Turning every button off keeps this one.",
+    "scheduleInEncryptedRooms": "Schedule in encrypted rooms",
+    "scheduleInEncryptedRoomsHint": "Your homeserver cannot hold an encrypted message, so a scheduled one is kept in your account data as plain text until a device of yours sends it. Off refuses to schedule in encrypted rooms.",
     "formattingToolbar": "Formatting toolbar",
     "formattingToolbarHint": "Keeps the bold, italic and list controls always open.",
     "privacyTitle": "Privacy",
@@ -1737,11 +1737,7 @@
       },
       "color": {
         "description": "Set your name colour in this room",
-        "usage": "/color <#rrggbb|reset>"
-      },
-      "scolor": {
-        "description": "Set someone else's name colour in this room",
-        "usage": "/scolor <@user:server> <#rrggbb|reset>"
+        "usage": "/color [light|dark] <#rrggbb|reset>"
       },
       "font": {
         "description": "Set your font in this room",
@@ -1864,10 +1860,11 @@
         "usage": "/delete <@user:server|@*:server> [-past 1d|2h|5m|30s] [-t event.type] [-r reason]"
       }
     },
-    "schedule": "Schedule send",
     "scheduleTitle": "Schedule this message",
     "scheduleExplain": "Unencrypted rooms hand the message to the homeserver, which sends it whether or not Sable is running. In an encrypted room it is held on your devices and goes out from whichever one is open at the time.",
     "scheduleEmpty": "Write the message first, then pick a time.",
+    "scheduleEncryptedNote": "This room is encrypted, so the message waits in your account data as plain text and goes out from whichever device of yours is open at the time.",
+    "scheduleEncryptedBlocked": "Scheduling in encrypted rooms is off. Turn it on in Settings, Composer.",
     "scheduleIn30Minutes": "In 30 minutes",
     "scheduleIn1Hour": "In an hour",
     "scheduleTomorrow9am": "Tomorrow, 9am",
@@ -2031,6 +2028,7 @@
     "microphone": "Microphone",
     "camera": "Camera",
     "screenShare": "Share screen",
+    "speaker": "Speaker",
     "returnTo": "Return to {{room}}",
     "lobbyEmpty": "Voice chat's empty - be the first to hop in!",
     "lobbyNoPermission": "You don't have permission to join.",
@@ -2047,7 +2045,12 @@
     "lastSeenHours_one": "Last seen {{count}} hour ago",
     "lastSeenHours_other": "Last seen {{count}} hours ago",
     "lastSeenDays_one": "Last seen {{count}} day ago",
-    "lastSeenDays_other": "Last seen {{count}} days ago"
+    "lastSeenDays_other": "Last seen {{count}} days ago",
+    "title": "Your presence",
+    "description": "How you appear to other people, and what they see under your name.",
+    "statusMessage": "Status message",
+    "statusMessagePlaceholder": "What are you up to?",
+    "statusMessageSave": "Save"
   },
   "widgets": {
     "label": "Widgets",
@@ -2088,6 +2091,8 @@
     "paletteLabel": "Jump to room",
     "palettePlaceholder": "Search rooms",
     "paletteEmpty": "No rooms match your search.",
+    "paletteRecents": "Recent",
+    "paletteHint": "# rooms · * spaces · @ direct messages",
     "helpTitle": "Keyboard shortcuts",
     "categoryGeneral": "General",
     "categoryNavigation": "Navigation",

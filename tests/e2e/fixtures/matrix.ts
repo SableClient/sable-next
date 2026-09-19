@@ -6,6 +6,8 @@ export type RoomOptions = {
   invite?: string[];
   powerLevels?: Record<string, unknown>;
   isSpace?: boolean;
+  roomType?: string;
+  version?: string;
 };
 
 export class MatrixAdmin {
@@ -41,6 +43,8 @@ export class MatrixAdmin {
       invite,
       powerLevels,
       isSpace = false,
+      roomType,
+      version,
     } = options;
     const { room_id: roomId } = await this.request<{ room_id: string }>(
       'POST',
@@ -52,7 +56,8 @@ export class MatrixAdmin {
         visibility,
         invite,
         power_level_content_override: powerLevels,
-        creation_content: isSpace ? { type: 'm.space' } : undefined,
+        room_version: version,
+        creation_content: roomType ? { type: roomType } : isSpace ? { type: 'm.space' } : undefined,
       }
     );
     return roomId;

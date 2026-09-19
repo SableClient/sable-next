@@ -11,6 +11,8 @@ export interface PresenceEntry {
   receivedAt: number;
 }
 
+const FETCH_DELAY_MS = 50;
+
 export type LastSeenBucket =
   | { kind: 'now' }
   | { kind: 'minutes'; count: number }
@@ -38,10 +40,19 @@ export function lastSeenBucket(msAgo: number): LastSeenBucket {
 
 export class PresenceStore {
   readonly #entries = new SvelteMap<string, PresenceEntry>();
+  /* Nothing renders from these, and a reactive set would re-run every mounted
+     presence reader on any other user's first look. */
+  /* eslint-disable svelte/prefer-svelte-reactivity */
+  readonly #requested = new Set<string>();
+  readonly #pending = new Set<string>();
+  /* eslint-enable svelte/prefer-svelte-reactivity */
+  #core: CoreClient | null = null;
+  #flush: ReturnType<typeof setTimeout> | null = null;
   #stopEvents: (() => void) | null = null;
 
   start(core: CoreClient): void {
     this.#stopEvents?.();
+    this.#core = core;
     this.#stopEvents = core.subscribeEvents((event) => {
       if (event.type !== 'presence') return;
 
@@ -57,10 +68,33 @@ export class PresenceStore {
   stop(): void {
     this.#stopEvents?.();
     this.#stopEvents = null;
+    this.#core = null;
+    if (this.#flush !== null) clearTimeout(this.#flush);
+    this.#flush = null;
+    this.#pending.clear();
+    this.#requested.clear();
+    this.#entries.clear();
   }
 
   get(userId: string): PresenceEntry | null {
-    return this.#entries.get(userId) ?? null;
+    const entry = this.#entries.get(userId);
+    if (entry) return entry;
+
+    this.#request(userId);
+    return null;
+  }
+
+  #request(userId: string): void {
+    if (this.#core === null || this.#requested.has(userId)) return;
+
+    this.#requested.add(userId);
+    this.#pending.add(userId);
+    this.#flush ??= setTimeout(() => {
+      this.#flush = null;
+      const userIds = [...this.#pending];
+      this.#pending.clear();
+      void this.#core?.commands.fetchPresence(userIds).catch(() => {});
+    }, FETCH_DELAY_MS);
   }
 }
 

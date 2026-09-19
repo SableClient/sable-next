@@ -48,6 +48,7 @@ export class CallSession {
   transport = $state.raw<CallTransportState>(idleTransportState());
   mediaReady = $state(false);
   encryptsMedia = $state(false);
+  deafened = $state(false);
 
   readonly #client: CoreClient;
   readonly #deps: CallSessionDeps;
@@ -295,6 +296,10 @@ export class CallSession {
 
   async setMicrophoneEnabled(enabled: boolean): Promise<void> {
     await this.#media?.setMicrophoneEnabled(enabled);
+  }
+
+  setDeafened(deafened: boolean): void {
+    this.deafened = deafened;
   }
 
   async setCameraEnabled(enabled: boolean): Promise<void> {

@@ -259,9 +259,9 @@
   }
 
   .voice-faces :global(.avatar-root.voice-face) {
+    --avatar-size: 1.25rem;
+
     border: var(--border-width) solid var(--bg-container);
-    height: 1.25rem;
-    width: 1.25rem;
   }
 
   .voice-faces :global(.avatar-root.voice-face:not(:first-child)) {

@@ -2,9 +2,18 @@
   import { i18n } from '#lib/i18n.js';
   import type { RoomSummary } from '#src/generated/protocol';
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { useCoreClient } from '#lib/core/context.js';
+  import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
+  import { useCallSession } from '#lib/features/call/call-session.svelte.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { addUnread, spaceUnreadCounts, type UnreadCount } from '#lib/rooms/spaces.js';
+  import {
+    addUnread,
+    spacesContainingRoom,
+    spaceUnreadCounts,
+    type UnreadCount,
+  } from '#lib/rooms/spaces.js';
   import {
     applyDrop,
     folderName,
@@ -39,6 +48,7 @@
   let { mobile = false, onNavigate, roomNavWidth = $bindable(224) }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
+  const call = useCallSession();
   const spaceSidebar = useSpaceSidebar();
   let renamingFolder = $state<SidebarFolder | null>(null);
   let dragging = $state(false);
@@ -53,7 +63,13 @@
     return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
   let claimed = $derived(claimedRoomIds(roomList.rooms));
+  let callRoom = $derived(
+    call.roomId === null ? undefined : roomList.rooms.find((room) => room.room_id === call.roomId)
+  );
   let spaceUnread = $derived(spaceUnreadCounts(spaces, roomList.rooms, roomList.mutedRoomIds));
+  let callSpaces = $derived(
+    call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
+  );
   let entries = $derived(
     mergeSpaces(
       spaceSidebar.items,
@@ -198,6 +214,19 @@
   };
 </script>
 
+{#snippet callBar()}
+  {#if call.active}
+    <ActiveCallBar
+      session={call}
+      roomName={callRoom?.name ?? $i18n.t('call.title')}
+      onReturn={() => {
+        if (call.roomId === null) return;
+        void goto(roomSectionPath(roomList.rooms, call.roomId));
+      }}
+    />
+  {/if}
+{/snippet}
+
 <aside class="sidebar">
   {#if mobile}
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
@@ -205,6 +234,7 @@
         <NavigationRail
           {spaces}
           {spaceUnread}
+          {callSpaces}
           {homeUnread}
           {unspacedUnread}
           {directRooms}
@@ -215,6 +245,7 @@
         />
         <RoomNav {onNavigate} />
       </div>
+      {@render callBar()}
       <UserQuickTools mobile {onNavigate} />
     </nav>
   {:else}
@@ -223,6 +254,7 @@
         <NavigationRail
           {spaces}
           {spaceUnread}
+          {callSpaces}
           {homeUnread}
           {unspacedUnread}
           {directRooms}
@@ -248,6 +280,7 @@
           onkeydown={handleResizeKeydown}
         ></button>
       </div>
+      {@render callBar()}
       {#if !collapsed}
         <UserQuickTools />
       {/if}

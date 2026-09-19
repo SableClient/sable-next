@@ -676,22 +676,9 @@ fn emit_pending(
         let member = state.members.iter().find(|member| {
             member.user_id == pending.sender
                 && member.device_id == pending.device
-                && match &member.member_id {
-                    Some(id) => pending
-                        .content
-                        .member
-                        .id
-                        .as_ref()
-                        .map_or(member.mode != CallMode::Matrix2, |pending_id| {
-                            pending_id == id
-                        }),
-                    None => pending
-                        .content
-                        .member
-                        .id
-                        .as_deref()
-                        .is_none_or(|id| id == member.identity),
-                }
+                && (member.mode != CallMode::Matrix2
+                    || (member.member_id.is_some()
+                        && member.member_id == pending.content.member.id))
         });
         if let Some(member) = member
             && let Some(service) = member_service(member, &state.members)

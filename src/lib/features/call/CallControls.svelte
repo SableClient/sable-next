@@ -5,6 +5,8 @@
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
   import VideoCameraSlashIcon from 'phosphor-svelte/lib/VideoCameraSlashIcon';
   import MonitorArrowUpIcon from 'phosphor-svelte/lib/MonitorArrowUpIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
+  import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
 
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -13,11 +15,14 @@
     microphoneEnabled: boolean;
     cameraEnabled: boolean;
     screenShareEnabled: boolean;
+    deafened: boolean;
     ready: boolean;
     canScreenShare: boolean;
+    compact?: boolean;
     onToggleMicrophone: () => void;
     onToggleCamera: () => void;
     onToggleScreenShare: () => void;
+    onToggleDeafen: () => void;
     onHangUp: () => void;
   }
 
@@ -25,19 +30,23 @@
     microphoneEnabled,
     cameraEnabled,
     screenShareEnabled,
+    deafened,
     ready,
     canScreenShare,
+    compact = false,
     onToggleMicrophone,
     onToggleCamera,
     onToggleScreenShare,
+    onToggleDeafen,
     onHangUp,
   }: Props = $props();
 </script>
 
-<div class="controls">
+<div class="controls" class:compact>
   <IconButton
     variant="ghost"
     class="choice"
+    size={compact ? 'small' : 'medium'}
     label={$i18n.t('call.microphone')}
     aria-pressed={microphoneEnabled}
     disabled={!ready}
@@ -53,6 +62,7 @@
   <IconButton
     variant="ghost"
     class="choice"
+    size={compact ? 'small' : 'medium'}
     label={$i18n.t('call.camera')}
     aria-pressed={cameraEnabled}
     disabled={!ready}
@@ -69,6 +79,7 @@
     <IconButton
       variant="ghost"
       class="choice"
+      size={compact ? 'small' : 'medium'}
       label={$i18n.t('call.screenShare')}
       aria-pressed={screenShareEnabled}
       disabled={!ready}
@@ -78,7 +89,28 @@
     </IconButton>
   {/if}
 
-  <IconButton class="hang-up" variant="danger" label={$i18n.t('call.hangUp')} onclick={onHangUp}>
+  <IconButton
+    variant="ghost"
+    class="choice"
+    size={compact ? 'small' : 'medium'}
+    label={$i18n.t('call.speaker')}
+    aria-pressed={!deafened}
+    onclick={onToggleDeafen}
+  >
+    {#if deafened}
+      <SpeakerSlashIcon />
+    {:else}
+      <SpeakerHighIcon />
+    {/if}
+  </IconButton>
+
+  <IconButton
+    class="hang-up"
+    variant="danger"
+    size={compact ? 'small' : 'medium'}
+    label={$i18n.t('call.hangUp')}
+    onclick={onHangUp}
+  >
     <PhoneDisconnectIcon />
   </IconButton>
 </div>
@@ -94,5 +126,15 @@
 
   .controls :global(.hang-up) {
     margin-inline-start: var(--space-200);
+  }
+
+  .controls.compact {
+    gap: var(--space-050);
+    justify-content: space-between;
+    padding: 0;
+  }
+
+  .controls.compact :global(.hang-up) {
+    margin-inline-start: var(--space-100);
   }
 </style>

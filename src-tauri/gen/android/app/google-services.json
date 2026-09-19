@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "136631010081",
+    "project_id": "sable-d1811",
+    "storage_bucket": "sable-d1811.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:136631010081:android:fed0de8a33c934580b7460",
+        "android_client_info": {
+          "package_name": "moe.sable.client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-0JTo2XFXGqKda6iaUyUGoCI-NIqhMFA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:136631010081:android:a8576984128691680b7460",
+        "android_client_info": {
+          "package_name": "moe.sable.next"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-0JTo2XFXGqKda6iaUyUGoCI-NIqhMFA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:136631010081:android:cf2ab4b2676bc6930b7460",
+        "android_client_info": {
+          "package_name": "moe.sable.next.nightly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-0JTo2XFXGqKda6iaUyUGoCI-NIqhMFA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

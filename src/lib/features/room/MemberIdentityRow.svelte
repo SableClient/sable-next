@@ -8,6 +8,7 @@
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
 
   import { memberAvatar, memberName, senderDisplayColors } from './members.js';
   import SenderName from './SenderName.svelte';
@@ -36,9 +37,8 @@
   let avatarUrl = $derived(memberAvatar(members, userId));
   let colors = $derived(senderDisplayColors(userId, profile));
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
-  let userStatus = $derived(
-    showStatus ? resolveUserStatus(profile, presenceStore.get(userId)) : null
-  );
+  let presence = $derived(presenceStore.get(userId));
+  let userStatus = $derived(showStatus ? resolveUserStatus(profile, presence) : null);
 
   $effect(() => {
     profile = null;
@@ -60,7 +60,16 @@
 </script>
 
 {#snippet identity()}
-  <Avatar src={avatarUrl} name={displayName} id={userId} size="small" />
+  <span class="member-identity-avatar">
+    <Avatar src={avatarUrl} name={displayName} id={userId} size="small" />
+    {#if presence && presence.presence !== 'offline'}
+      <PresenceDot
+        presence={presence.presence}
+        label={$i18n.t(`presence.${presence.presence}`)}
+        class="member-identity-presence"
+      />
+    {/if}
+  </span>
   <div class="member-identity-main">
     <span class="member-identity-text">
       <SenderName {displayName} {colors} nameClass="member-name" compact />
@@ -119,6 +128,18 @@
   .member-identity-button:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  .member-identity-avatar {
+    display: inline-flex;
+    flex: none;
+    position: relative;
+  }
+
+  .member-identity-avatar :global(.member-identity-presence) {
+    bottom: -0.125rem;
+    position: absolute;
+    right: -0.125rem;
   }
 
   .member-identity-main {

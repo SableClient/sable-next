@@ -227,6 +227,22 @@ jobs:
       - name: Install Playwright system libraries
         run: pnpm exec playwright install-deps chromium webkit
 
+      - name: Point testcontainers at the docker host
+        run: |
+          if [ -f /.dockerenv ]; then
+            gateway=$(node -e '
+              const lines = require("node:fs").readFileSync("/proc/net/route", "utf8").split("\n").slice(1);
+              for (const line of lines) {
+                const f = line.trim().split(/\s+/);
+                if (f[1] === "00000000") {
+                  const hex = f[2];
+                  process.stdout.write([6, 4, 2, 0].map((i) => parseInt(hex.slice(i, i + 2), 16)).join("."));
+                }
+              }
+            ')
+            echo "TESTCONTAINERS_HOST_OVERRIDE=$gateway" >>"$GITHUB_ENV"
+          fi
+
       - name: Run Playwright tests
         if: ${{ github.event_name == 'pull_request' }}
         run: pnpm test:e2e

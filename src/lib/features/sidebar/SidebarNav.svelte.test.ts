@@ -48,6 +48,9 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
 vi.mock('#lib/spaces/sidebar-layout.svelte.js', () => ({
   useSpaceSidebar: () => ({ items: [], openFolders: new Set() }),
 }));
+vi.mock('#lib/features/call/call-session.svelte.js', () => ({
+  useCallSession: () => ({ active: false, roomId: null }),
+}));
 vi.mock('./RoomNav.svelte', () => ({ default: () => null }));
 vi.mock('./UserQuickTools.svelte', () => ({ default: () => null }));
 vi.mock('./FolderRenameDialog.svelte', () => ({ default: () => null }));

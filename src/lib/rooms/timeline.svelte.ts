@@ -75,6 +75,7 @@ export function activeRoomTimeline(core: CoreClient): ActiveRoomTimeline {
 
 export class RoomTimeline {
   items = $state.raw<TimelineItemView[]>([]);
+  aggregations = $state.raw<TimelineItemView[]>([]);
   loading = $state(false);
   hasSnapshot = $state(false);
   backwardPagination = $state<BackwardPaginationState>('idle');
@@ -232,6 +233,7 @@ export class RoomTimeline {
     this.state = 'stopped';
     this.startPromise = null;
     this.items = [];
+    this.aggregations = [];
     this.hasSnapshot = false;
     this.loading = false;
     this.backwardPaginationPending = false;
@@ -269,7 +271,12 @@ export class RoomTimeline {
     const session = this.session;
     this.state = 'pending';
     const stopEvents = this.core.subscribeEvents((event) => {
-      if (event.type !== 'timeline_diff' && event.type !== 'timeline_pagination') return;
+      if (
+        event.type !== 'timeline_diff' &&
+        event.type !== 'timeline_pagination' &&
+        event.type !== 'timeline_aggregations'
+      )
+        return;
       if (
         session !== this.session ||
         this.state !== 'active' ||
@@ -292,6 +299,11 @@ export class RoomTimeline {
         this.backwardPaginationBoundaryChanged ||=
           firstEventId !== this.backwardPaginationStartFirstEventId;
         this.settleBackwardPagination();
+      }
+      if (event.type === 'timeline_aggregations') {
+        const known = this.aggregations.map((item) => item.id);
+        const added = event.items.filter((item) => !known.includes(item.id));
+        if (added.length > 0) this.aggregations = [...this.aggregations, ...added];
       }
       if (event.type === 'timeline_pagination' && this.mode.kind === 'live') {
         if (event.loading || !this.backwardPaginationPending) {
@@ -321,6 +333,7 @@ export class RoomTimeline {
 
     this.subscription = response.subscription;
     this.items = response.items;
+    this.aggregations = response.aggregations;
     this.hasSnapshot = true;
     this.state = 'active';
     this.unsubscribeEvents = stopEvents;

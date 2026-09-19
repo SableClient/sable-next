@@ -20,6 +20,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
+  import { LongPress } from '#lib/features/room/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';
   import { pickFiles } from '#lib/platform/files.js';
@@ -107,6 +108,7 @@
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
     roomName?: string | null;
     readOnly?: boolean;
+    encrypted?: boolean | null;
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     onCancelContext?: () => void;
@@ -128,6 +130,7 @@
     onTyping,
     roomName = null,
     readOnly = false,
+    encrypted = null,
     context = null,
     onCancelContext,
     onToggleSilentReply,
@@ -214,6 +217,17 @@
     !hasContent && !canDeleteEdited && voiceSupported && !micDenied ? 'record' : 'send'
   );
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
+
+  let canSchedule = $derived(
+    onSchedule !== undefined && primaryAction === 'send' && hasContent && !readOnly
+  );
+
+  const sendPress = new LongPress({
+    enabled: () => canSchedule,
+    onPress: () => {
+      scheduleOpen = true;
+    },
+  });
 
   $effect(() => {
     if (preferences.personaPicker || preferences.personaProxying) void personas.load();
@@ -330,6 +344,7 @@
   });
 
   onDestroy(() => {
+    sendPress.cancel();
     if (layoutFrame !== undefined) cancelAnimationFrame(layoutFrame);
     if (typingTimeout) clearTimeout(typingTimeout);
     stopTyping();
@@ -867,11 +882,6 @@
                       locationOpen = true;
                     }
                   : undefined}
-                onSchedule={onSchedule
-                  ? () => {
-                      scheduleOpen = true;
-                    }
-                  : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
             </div>
@@ -935,6 +945,15 @@
                   : undefined}
                 onpointerdown={(event: PointerEvent) => {
                   if (hasContent) event.preventDefault();
+                  sendPress.start(event);
+                }}
+                onpointermove={sendPress.move}
+                onpointerup={sendPress.end}
+                onpointercancel={sendPress.end}
+                oncontextmenu={(event: MouseEvent) => {
+                  if (!canSchedule) return;
+                  event.preventDefault();
+                  scheduleOpen = true;
                 }}
                 onmousedown={(event: MouseEvent) => {
                   if (hasContent) event.preventDefault();
@@ -1000,6 +1019,7 @@
   <ScheduleComposer
     bind:open={scheduleOpen}
     empty={!hasContent || readOnly}
+    {encrypted}
     onSchedule={(dueTs: number) => {
       void scheduleDraft(dueTs);
     }}

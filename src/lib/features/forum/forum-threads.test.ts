@@ -38,7 +38,7 @@ test('collects an item with a thread summary as a root', () => {
   const root = item({
     id: 'root',
     timestamp: 100,
-    thread_summary: { num_replies: 2, latest_body: 'latest' },
+    thread_summary: { num_replies: 2, latest_event_id: null, latest_body: 'latest' },
   });
 
   const threads = collectForumThreads([root], null);
@@ -50,17 +50,47 @@ test('collects an item with a thread summary as a root', () => {
   expect(threads[0]?.lastActivityAt).toBe(100);
 });
 
-test('ignores an item with no thread summary', () => {
+test('collects a post nobody has replied to yet', () => {
   const plain = item({ id: 'plain', timestamp: 5 });
 
-  expect(collectForumThreads([plain], null)).toHaveLength(0);
+  const threads = collectForumThreads([plain], null);
+
+  expect(threads).toHaveLength(1);
+  expect(threads[0]?.replyCount).toBe(0);
+  expect(threads[0]?.lastBody).toBeNull();
+});
+
+test('ignores a thread reply, a plain reply and a state change', () => {
+  const reply = item({ id: 'reply', thread_root: '$root' });
+  const quoted = item({
+    id: 'quoted',
+    in_reply_to: {
+      event_id: '$root',
+      sender: null,
+      sender_mentioned: false,
+      sender_name: null,
+      body: null,
+    },
+  });
+  const joined = item({
+    id: 'joined',
+    content: {
+      kind: 'membership',
+      user_id: '@bob:example.org',
+      change: 'joined',
+      display_name: 'Bob',
+      reason: null,
+    },
+  });
+
+  expect(collectForumThreads([reply, quoted, joined], null)).toHaveLength(0);
 });
 
 test('takes last activity from the newest visible reply, not the root', () => {
   const root = item({
     id: 'root',
     timestamp: 100,
-    thread_summary: { num_replies: 2, latest_body: 'root summary' },
+    thread_summary: { num_replies: 2, latest_event_id: null, latest_body: 'root summary' },
   });
   const reply = item({
     id: 'reply',
@@ -80,12 +110,12 @@ test('sorts threads by most recent activity first', () => {
   const older = item({
     id: 'older',
     timestamp: 10,
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
   });
   const newer = item({
     id: 'newer',
     timestamp: 20,
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
   });
 
   const threads = collectForumThreads([older, newer], null);
@@ -98,7 +128,7 @@ test('a thread is unread when the latest activity has no receipt from the curren
     id: 'root',
     timestamp: 10,
     sender: '@bob:example.org',
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
     read_by: [],
   });
 
@@ -110,7 +140,7 @@ test('a thread is read once the current user has a receipt on the latest activit
     id: 'root',
     timestamp: 10,
     sender: '@bob:example.org',
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
     read_by: ['@alice:example.org'],
   });
 
@@ -122,7 +152,7 @@ test('a thread you authored yourself is never unread', () => {
     id: 'root',
     timestamp: 10,
     sender: '@alice:example.org',
-    thread_summary: { num_replies: 0, latest_body: null },
+    thread_summary: { num_replies: 0, latest_event_id: null, latest_body: null },
     read_by: [],
   });
 

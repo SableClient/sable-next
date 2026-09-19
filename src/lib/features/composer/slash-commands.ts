@@ -296,9 +296,31 @@ function isReset(text: string): boolean {
   return text === '' || text.toLowerCase() === 'reset' || text.toLowerCase() === 'clear';
 }
 
-function colorContent(text: string): Record<string, unknown> | null {
-  if (isReset(text)) return {};
-  return HEX_COLOR.test(text) ? { on_dark: text, on_light: text } : null;
+// Unstable prefix for the `m.color_preference` field from MSC4522.
+const MEMBER_COLOR_FIELD = 'eu.she-a.color';
+
+type ColorUpdate = { kind: 'clear' } | { kind: 'set'; colors: Record<string, string | undefined> };
+
+function colorUpdate(text: string): ColorUpdate | null {
+  const parts = words(text);
+  if (parts.length === 0 || parts.length > 2) return null;
+
+  const theme = parts.length === 2 ? parts[0].toLowerCase() : 'both';
+  if (theme !== 'both' && theme !== 'light' && theme !== 'dark') return null;
+
+  const value = (parts.length === 2 ? parts[1] : parts[0]).toLowerCase();
+  if (isReset(value)) {
+    if (theme === 'both') return { kind: 'clear' };
+    return theme === 'light'
+      ? { kind: 'set', colors: { on_light: undefined } }
+      : { kind: 'set', colors: { on_dark: undefined } };
+  }
+  if (!HEX_COLOR.test(value)) return null;
+
+  if (theme === 'both') return { kind: 'set', colors: { on_dark: value, on_light: value } };
+  return theme === 'light'
+    ? { kind: 'set', colors: { on_light: value } }
+    : { kind: 'set', colors: { on_dark: value } };
 }
 
 function fontContent(text: string): Record<string, unknown> | null {
@@ -356,6 +378,35 @@ function otherCosmetic(
       if (content === null) return usageError(name);
 
       await commands.sendStateEvent(roomId, eventType, first, content);
+      return { kind: 'done' };
+    },
+  };
+}
+
+// The legacy vendor event write clears deprecated colours for other clients.
+function ownColor(name: string): SlashCommand {
+  return {
+    name,
+    run: async (args, { roomId, userId, commands }) => {
+      if (userId === null) return usageError(name);
+
+      const update = colorUpdate(args.trim());
+      if (update === null) return usageError(name);
+
+      const existing = objectValue(await commands.roomStateEvent(roomId, 'm.room.member', userId));
+      // Omitting the colour field replaces it; spreading it back would keep the old value.
+      const source: Record<string, unknown> = { ...existing, membership: 'join' };
+      const { [MEMBER_COLOR_FIELD]: legacyColors, ...content } = source;
+
+      if (update.kind === 'set') {
+        const colors = { ...objectValue(legacyColors), ...update.colors };
+        if (Object.values(colors).some((color) => typeof color === 'string' && color !== '')) {
+          content[MEMBER_COLOR_FIELD] = colors;
+        }
+      }
+
+      await commands.sendStateEvent(roomId, 'm.room.member', userId, content);
+      await commands.sendStateEvent(roomId, COSMETIC_EVENT_TYPES.color, userId, {});
       return { kind: 'done' };
     },
   };
@@ -564,8 +615,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   moderationTargets('ban', 'banUser', false),
   moderation('unban', 'unbanUser'),
   setter('nick', (text, { commands }) => commands.setDisplayName(text)),
-  ownCosmetic('color', colorContent),
-  otherCosmetic('scolor', COSMETIC_EVENT_TYPES.color, colorContent),
+  ownColor('color'),
   ownCosmetic('font', fontContent),
   otherCosmetic('sfont', COSMETIC_EVENT_TYPES.font, fontContent),
   ownCosmetic('pronoun', pronounContent),
