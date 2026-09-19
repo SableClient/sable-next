@@ -1897,7 +1897,7 @@
     "unsupported": "Not supported yet: {{operators}}",
     "unresolved": "No match for {{targets}}",
     "suggestions": "Search suggestions",
-    "count": "{{count}} result",
+    "count_one": "{{count}} result",
     "count_other": "{{count}} results",
     "recoveryFilter": "Remove a filter ({{filters}})",
     "recoveryPhrase": "Drop the quotes to match words separately",
