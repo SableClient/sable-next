@@ -66,6 +66,7 @@
     "displayOptions": "Sidebar display options"
   },
   "inbox": {
+    "close": "Close inbox",
     "notifications": "Notifications",
     "invites": "Pending invites",
     "navLabel": "Inbox, {{count, number}} waiting",
@@ -499,6 +500,9 @@
   "permalink": {
     "opening": "Opening link…",
     "unresolved": "Sable cannot tell what that link points to."
+  },
+  "banner": {
+    "close": "Close"
   },
   "app": {
     "starting": "Starting Sable…",

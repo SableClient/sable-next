@@ -30,7 +30,7 @@
     </div>
     {#if onClose}
       <div class="close">
-        <IconButton variant="ghost" size="small" label={$i18n.t('widgets.close')} onclick={onClose}>
+        <IconButton variant="ghost" size="small" label={$i18n.t('banner.close')} onclick={onClose}>
           <XIcon />
         </IconButton>
       </div>

@@ -52,7 +52,7 @@
     ownsBack
     open={page.state.inbox === true}
     label={$i18n.t('nav.inbox')}
-    closeLabel={$i18n.t('settings.close')}
+    closeLabel={$i18n.t('inbox.close')}
     background="var(--surface-container)"
     handleColor="var(--surface-on-container)"
     contentInset

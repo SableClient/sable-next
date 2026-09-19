@@ -96,7 +96,7 @@ test('closing the inbox sheet returns to the previous page', async ({ page, app 
   await expect(inbox).toBeVisible();
   await expect(page).toHaveURL(/\/rooms$/);
 
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Close inbox' }).click();
 
   await expect(inbox).toBeHidden();
   await expect(page).toHaveURL(/\/rooms$/);
