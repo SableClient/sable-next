@@ -12,6 +12,11 @@ declare global {
     }
   }
 
+  interface Window {
+    /** Injected by the desktop shell; false where a package manager owns updates. */
+    __SABLE_AUTO_UPDATE__?: boolean;
+  }
+
   interface ImportMetaEnv {
     /** Absent in self-hosted builds, which disables Sentry entirely. */
     readonly VITE_SENTRY_DSN?: string;

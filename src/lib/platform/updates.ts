@@ -11,7 +11,8 @@ export interface AvailableUpdate {
 export function supportsAutoUpdate(): boolean {
   if (!isTauri()) return false;
   const os = osType();
-  return os !== 'android' && os !== 'ios';
+  if (os === 'android' || os === 'ios') return false;
+  return window.__SABLE_AUTO_UPDATE__ !== false;
 }
 let handle: { close: () => Promise<void> } | null = null;
 

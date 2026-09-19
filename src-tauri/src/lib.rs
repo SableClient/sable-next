@@ -436,6 +436,11 @@ fn spawn_event_pump<R: tauri::Runtime>(
     });
 }
 
+#[cfg(desktop)]
+fn auto_update_supported() -> bool {
+    !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Two SDK sites log once per room per sync response, which on a phone costs
@@ -472,7 +477,15 @@ pub fn run() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri::plugin::Builder::<BrowserEngine, ()>::new("sable-updates")
+                .js_init_script(format!(
+                    "window.__SABLE_AUTO_UPDATE__ = {};",
+                    auto_update_supported()
+                ))
+                .build(),
+        );
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let builder = builder
