@@ -8,6 +8,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
 import { clearDrafts, writeDraft } from './composer-drafts.svelte';
 import { ComposerEditor } from './editor/composer-editor';
 import { composerSchema } from './editor/schema';
@@ -222,7 +223,27 @@ test('a read-only room shows no overlay and stages nothing', async () => {
 
   const drop = new Event('drop', { bubbles: true, cancelable: true });
   const file = new File(['one'], 'one.png', { type: 'image/png' });
-  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file] } });
+  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } });
+  window.dispatchEvent(drop);
+  await tick();
+
+  expect(drop.defaultPrevented).toBe(false);
+  expect(stagedNames()).toEqual([]);
+  void unmount(instance);
+});
+
+test('a sidebar reorder drag opens no drop overlay and stages nothing', async () => {
+  const instance = render({ roomId: '!room:example.org', roomName: 'Design' });
+
+  window.dispatchEvent(dragEvent('dragover', ['Files', REORDER_DRAG_TYPE]));
+  await tick();
+  expect(document.querySelector('.drop-overlay')).toBeNull();
+
+  const file = new File(['one'], 'one.png', { type: 'image/png' });
+  const drop = new Event('drop', { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, 'dataTransfer', {
+    value: { files: [file], types: ['Files', REORDER_DRAG_TYPE] },
+  });
   window.dispatchEvent(drop);
   await tick();
 
@@ -235,7 +256,7 @@ test('a file dropped outside the composer is staged', async () => {
   const instance = render({ roomId: '!room:example.org' });
   const file = new File(['one'], 'one.png', { type: 'image/png' });
   const drop = new Event('drop', { bubbles: true, cancelable: true });
-  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file] } });
+  Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } });
 
   window.dispatchEvent(drop);
   await tick();
@@ -251,7 +272,9 @@ test('stages files dropped on the composer, and drops one on demand', async () =
   const first = new File(['one'], 'one.png', { type: 'image/png' });
   const second = new File(['two'], 'two.png', { type: 'image/png' });
   const drop = new Event('drop', { bubbles: true, cancelable: true });
-  Object.defineProperty(drop, 'dataTransfer', { value: { files: [first, second] } });
+  Object.defineProperty(drop, 'dataTransfer', {
+    value: { files: [first, second], types: ['Files'] },
+  });
 
   document.querySelector('.composer')?.dispatchEvent(drop);
   await tick();

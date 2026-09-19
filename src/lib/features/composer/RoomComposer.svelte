@@ -28,6 +28,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -694,9 +695,13 @@
     input.value = '';
   }
 
+  function reorderDrag(event: DragEvent): boolean {
+    return event.dataTransfer?.types.includes(REORDER_DRAG_TYPE) ?? false;
+  }
+
   function handleDrop(event: DragEvent): void {
     dragging = false;
-    if (event.defaultPrevented || readOnly) return;
+    if (event.defaultPrevented || readOnly || reorderDrag(event)) return;
 
     const files = filesFrom(event.dataTransfer);
     if (files.length === 0) return;
@@ -705,7 +710,7 @@
   }
 
   function handleDragover(event: DragEvent): void {
-    if (readOnly || !event.dataTransfer?.types.includes('Files')) return;
+    if (readOnly || reorderDrag(event) || !event.dataTransfer?.types.includes('Files')) return;
     event.preventDefault();
     dragging = true;
   }

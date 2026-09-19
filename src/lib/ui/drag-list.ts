@@ -1,6 +1,8 @@
 import type { Attachment } from 'svelte/attachments';
 import { on } from 'svelte/events';
 
+export const REORDER_DRAG_TYPE = 'application/x-sable-reorder';
+
 export type DropEdge = 'above' | 'below';
 export type DropInstruction = DropEdge | 'into';
 
@@ -55,6 +57,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           dragged = item;
           onDragging(item);
           event.dataTransfer?.setData('text/plain', '');
+          event.dataTransfer?.setData(REORDER_DRAG_TYPE, '');
           if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move';
         };
         const end = (): void => {
