@@ -1200,7 +1200,7 @@
     "stateEventInvalidJson": "Le contenu doit être un objet JSON.",
     "stateEventFailed": "L’événement d’état a été refusé.",
     "notAvailableYet": "Pas encore disponible",
-    "language": "Langue et région",
+    "language": "Langue",
     "languageHint": "Suivez le système ou choisissez une langue pour l’application.",
     "languageSystem": "Système",
     "theme": "Thème",
