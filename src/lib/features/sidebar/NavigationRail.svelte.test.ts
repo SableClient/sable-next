@@ -59,6 +59,7 @@ afterEach(() => {
   document.body.replaceChildren();
   localStorage.clear();
   setPreference('showHome', false);
+  setPreference('showSearch', true);
 });
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
@@ -142,6 +143,23 @@ test('home is absent until the preference asks for it', async () => {
   await tick();
 
   expect(document.querySelector('a[href="/home"]')).not.toBeNull();
+
+  await unmount(instance);
+});
+
+test('search leaves the rail when the preference is off', async () => {
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [], mobile: true },
+  });
+  await tick();
+
+  expect(document.querySelector('a[href="/search"]')).not.toBeNull();
+
+  setPreference('showSearch', false);
+  await tick();
+
+  expect(document.querySelector('a[href="/search"]')).toBeNull();
 
   await unmount(instance);
 });

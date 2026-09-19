@@ -1203,6 +1203,8 @@
     "showRoomBannersHint": "Show a room or space banner image above its room list.",
     "showHome": "Show All rooms item in sidebar",
     "showHomeHint": "Keep the Home entry at the top of the sidebar, listing every room, and a hash icon for all the rooms that is outside of a space.",
+    "showSearch": "Show search in sidebar",
+    "showSearchHint": "Keep the search messages entry in the sidebar.",
     "showUnreadCounts": "Room unread counts",
     "showUnreadCountsHint": "Badge rooms with a number instead of a dot.",
     "badgeCountDMsOnly": "Direct message counts",

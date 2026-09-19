@@ -27,6 +27,7 @@ import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
+import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
@@ -317,6 +318,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: HouseIcon,
         name: 'settings.showHome',
         description: 'settings.showHomeHint',
+        type: 'boolean',
+      },
+      {
+        key: 'showSearch',
+        icon: MagnifyingGlassIcon,
+        name: 'settings.showSearch',
+        description: 'settings.showSearchHint',
         type: 'boolean',
       },
       {

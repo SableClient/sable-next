@@ -134,12 +134,16 @@
       label: 'nav.unspaced',
       unread: unspacedUnread,
     },
-    {
-      href: resolve('/(app)/search'),
-      activePrefix: '/search',
-      icon: MagnifyingGlassIcon,
-      label: 'search.title',
-    },
+    ...(preferences.showSearch
+      ? [
+          {
+            href: resolve('/(app)/search'),
+            activePrefix: '/search',
+            icon: MagnifyingGlassIcon,
+            label: 'search.title',
+          } satisfies RailItem,
+        ]
+      : []),
     {
       href: resolve('direct'),
       activePrefix: '/direct',
