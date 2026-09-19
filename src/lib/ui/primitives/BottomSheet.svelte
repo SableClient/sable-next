@@ -57,15 +57,18 @@
     startY = event.clientY;
     dragProgress = 0;
     suppressClick = false;
-    const target = event.currentTarget;
-    if (target instanceof HTMLElement) target.setPointerCapture(event.pointerId);
   }
 
   function drag(event: PointerEvent): void {
     if (pointerId !== event.pointerId) return;
     const viewportHeight = Math.max(window.innerHeight, 1);
     dragProgress = Math.min(Math.max(0, event.clientY - startY) / viewportHeight, 0.5);
-    if (dragProgress > 0) suppressClick = true;
+    if (dragProgress <= 0) return;
+    suppressClick = true;
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement && !target.hasPointerCapture(event.pointerId)) {
+      target.setPointerCapture(event.pointerId);
+    }
   }
 
   function endDrag(event: PointerEvent): void {
