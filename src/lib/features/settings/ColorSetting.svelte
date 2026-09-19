@@ -3,6 +3,7 @@
 
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { i18n } from '#lib/i18n.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   interface Props {
@@ -151,8 +152,12 @@
       </Popover.Portal>
     </Popover.Root>
     <TextInput bind:value aria-label={`${label} hex value`} placeholder="Hex value" maxlength={7} />
-    <Button size="small" disabled={!valid} loading={saving} onclick={onSave}>Save</Button>
-    <Button variant="danger" size="small" disabled={!value} onclick={onReset}>Reset</Button>
+    <Button size="small" disabled={!valid} loading={saving} onclick={onSave}
+      >{$i18n.t('settings.saveButton')}</Button
+    >
+    <Button variant="danger" size="small" disabled={!value} onclick={onReset}
+      >{$i18n.t('settings.resetButton')}</Button
+    >
   </div>
 </div>
 

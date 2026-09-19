@@ -42,7 +42,7 @@
 
 <BitsSelect.Root type="single" {items} bind:value {name} {required} {disabled} {onValueChange}>
   <BitsSelect.Trigger {id} aria-label={ariaLabel} class={['form-control', 'select', className]}>
-    <BitsSelect.Value {placeholder} />
+    <BitsSelect.Value class="select-text" {placeholder} />
     <CaretDownIcon class="select-caret" aria-hidden="true" />
   </BitsSelect.Trigger>
   <BitsSelect.Portal>
@@ -56,7 +56,7 @@
             class="menu-item choice"
           >
             {#snippet children({ selected })}
-              <span>{item.label}</span>
+              <span class="selection-label">{item.label}</span>
               {#if selected}<CheckIcon class="select-check" aria-hidden="true" />{/if}
             {/snippet}
           </BitsSelect.Item>
@@ -75,6 +75,11 @@
     justify-content: space-between;
     text-align: left;
     width: 100%;
+  }
+
+  :global(.select-text),
+  :global(.selection-label) {
+    text-transform: capitalize;
   }
 
   :global(.select-caret),

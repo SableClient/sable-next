@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
 
   import type { ProfileView } from '#src/generated/protocol';
+  import { i18n } from '#lib/i18n.js';
 
   import { useCoreClient } from '#lib/core/context.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -159,12 +160,12 @@
   {#if error}<Alert variant="critical" aria-live="polite">{error}</Alert>{/if}
 
   {#if section === 'banner'}<div class="banner-setting">
-      <span class="setting-label">Banner</span>
+      <span class="setting-label">{$i18n.t('settings.banner')}</span>
       <div class="setting-row">
         {#if banner}<MediaImage
             class="banner"
             source={banner}
-            alt="Current profile banner"
+            alt={$i18n.t('settings.currentProfileBanner')}
             width={1000}
             height={375}
           />{/if}
@@ -176,24 +177,27 @@
               bannerFile = event.currentTarget.files?.[0] ?? null;
             }}
           />
-          {profile.banner_url ? 'Change banner' : 'Upload banner'}
+          {profile.banner_url ? $i18n.t('settings.changeBanner') : $i18n.t('settings.saveBanner')}
         </label>
         {#if bannerFile}<Button
             size="small"
             loading={saving === 'banner'}
-            onclick={() => void saveBanner()}>Save</Button
+            onclick={() => void saveBanner()}>{$i18n.t('settings.saveButton')}</Button
           >{/if}
         {#if profile.banner_url}<Button
             variant="danger"
             size="small"
             loading={saving === 'banner'}
             onclick={() => void save('banner', [['chat.commet.profile_banner', null]])}
-            >Remove</Button
+            >{$i18n.t('settings.removeButton')}</Button
           >{/if}
       </div>
     </div>{/if}
 
-  {#if section === 'profile'}<SettingsSection title="Status" headingId="profile-status">
+  {#if section === 'profile'}<SettingsSection
+      title={$i18n.t('settings.status')}
+      headingId="profile-status"
+    >
       <form
         class="form-row"
         onsubmit={(event) => {
@@ -201,12 +205,17 @@
           void save('status', [['m.status', status ? { text: status } : null]]);
         }}
       >
-        <TextInput bind:value={status} placeholder="What are you up to?" maxlength={256} />
-        <Button type="submit" loading={saving === 'status'}>Save</Button>
+        <TextInput
+          bind:value={status}
+          placeholder={$i18n.t('settings.statusPlaceholder')}
+          maxlength={256}
+        />
+        <Button type="submit" loading={saving === 'status'}>{$i18n.t('settings.saveButton')}</Button
+        >
       </form>
     </SettingsSection>
 
-    <SettingsSection title="Profile colors" headingId="profile-colors">
+    <SettingsSection title={$i18n.t('settings.profileColors')} headingId="profile-colors">
       <form
         class="form-stack"
         onsubmit={(event) => {
@@ -218,7 +227,7 @@
         }}
       >
         <ColorSetting
-          label="Dark theme name color"
+          label={$i18n.t('settings.profileColorsOnDark')}
           bind:value={darkColor}
           saving={saving === 'colors'}
           onSave={() =>
@@ -229,7 +238,7 @@
             ])}
         />
         <ColorSetting
-          label="Light theme name color"
+          label={$i18n.t('settings.profileColorsOnLight')}
           bind:value={lightColor}
           saving={saving === 'colors'}
           onSave={() =>
@@ -240,7 +249,7 @@
             ])}
         />
         <ColorSetting
-          label="Profile card background"
+          label={$i18n.t('settings.profileColorsBackground')}
           bind:value={heroColor}
           saving={saving === 'colors'}
           onSave={() =>
@@ -250,19 +259,20 @@
           onReset={() => void save('colors', [['chat.commet.profile_color_scheme', null]])}
         />
         <label
-          >Background brightness <Select
+          >{$i18n.t('settings.profileColorsBrightness')}<Select
             bind:value={brightness}
             items={[
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
+              { value: 'light', label: $i18n.t('settings.profileColorsBrightnessLight') },
+              { value: 'dark', label: $i18n.t('settings.profileColorsBrightnessDark') },
             ]}
           /></label
         >
-        <Button type="submit" loading={saving === 'colors'}>Save</Button>
+        <Button type="submit" loading={saving === 'colors'}>{$i18n.t('settings.saveButton')}</Button
+        >
       </form>
     </SettingsSection>
 
-    <SettingsSection title="Pronouns and timezone" headingId="profile-identity">
+    <SettingsSection title={$i18n.t('settings.pronounsAndTimezone')} headingId="profile-identity">
       <form
         class="form-stack"
         onsubmit={(event) => {
@@ -275,14 +285,25 @@
         }}
       >
         <label
-          >Pronouns <TextInput bind:value={pronouns} placeholder="they/them, she/her (en)" /></label
+          >{$i18n.t('settings.pronouns')}
+          <TextInput
+            bind:value={pronouns}
+            placeholder={$i18n.t('settings.pronounsPlaceholder')}
+          /></label
         >
-        <label>Timezone <TextInput bind:value={timezone} placeholder="Europe/Paris" /></label>
-        <Button type="submit" loading={saving === 'identity'}>Save</Button>
+        <label
+          >{$i18n.t('settings.timezone')}<TextInput
+            bind:value={timezone}
+            placeholder={$i18n.t('settings.timezonePlaceholder')}
+          /></label
+        >
+        <Button type="submit" loading={saving === 'identity'}
+          >{$i18n.t('settings.saveButton')}</Button
+        >
       </form>
     </SettingsSection>
 
-    <SettingsSection title="Biography" headingId="profile-bio">
+    <SettingsSection title={$i18n.t('settings.biography')} headingId="profile-bio">
       <form
         class="form-stack"
         onsubmit={(event) => {
@@ -291,12 +312,12 @@
         }}
       >
         <TextArea bind:value={bio} rows={5} maxlength={5000} />
-        <Button type="submit" loading={saving === 'bio'}>Save</Button>
+        <Button type="submit" loading={saving === 'bio'}>{$i18n.t('settings.saveButton')}</Button>
       </form>
     </SettingsSection>
 
     {#if profile.extra.length}
-      <SettingsSection title="Other profile fields" headingId="profile-extra">
+      <SettingsSection title={$i18n.t('settings.otherProfileFields')} headingId="profile-extra">
         <dl class="extra-fields">
           {#each profile.extra as field (field.key)}<div>
               <dt>{field.key}</dt>
@@ -305,7 +326,7 @@
         </dl>
       </SettingsSection>
     {/if}
-    <SettingsSection title="Animal cosmetics" headingId="profile-animal">
+    <SettingsSection title={$i18n.t('settings.animalIdentity')} headingId="profile-animal">
       <form
         class="form-stack"
         onsubmit={(event) => {
@@ -317,25 +338,41 @@
           ]);
         }}
       >
-        <label>Animal identity <TextInput bind:value={isAnimal} /></label>
-        <label>Animals with you <TextInput bind:value={hasAnimal} /></label>
-        <label>Animal need <TextInput bind:value={animalNeed} /></label>
-        <Button type="submit" loading={saving === 'animal'}>Save</Button>
+        <label
+          >{$i18n.t('settings.animalIdentityWhatIs')}<TextInput
+            bind:value={isAnimal}
+            placeholder={$i18n.t('settings.animalIdentityWhatIsPlaceholder')}
+          /></label
+        >
+        <label
+          >{$i18n.t('settings.animalIdentityWhatHas')}<TextInput
+            bind:value={hasAnimal}
+            placeholder={$i18n.t('settings.animalIdentityWhatHasPlaceholder')}
+          /></label
+        >
+        <label
+          >{$i18n.t('settings.animalIdentityWhatNeeds')}<TextInput
+            bind:value={animalNeed}
+            placeholder={$i18n.t('settings.animalIdentityWhatNeedsPlaceholder')}
+          /></label
+        >
+        <Button type="submit" loading={saving === 'animal'}>{$i18n.t('settings.saveButton')}</Button
+        >
       </form>
     </SettingsSection>{/if}
 
   {#if section === 'account'}<SettingsSection
-      title="Contact information"
+      title={$i18n.t('settings.contactInformation')}
       headingId="account-contact"
     >
       <div class="setting-row">
         {#if emails.length}{#each emails as email (email)}<code>{email}</code>{/each}{:else}<span
-            >No email addresses attached to this account.</span
+            >{$i18n.t('settings.contactInformationNoEmail')}</span
           >{/if}
       </div>
     </SettingsSection>
 
-    <SettingsSection title="Blocked users" headingId="account-blocked">
+    <SettingsSection title={$i18n.t('settings.blockedUsers')} headingId="account-blocked">
       <form
         class="form-row"
         onsubmit={(event) => {
@@ -343,8 +380,12 @@
           void block();
         }}
       >
-        <TextInput bind:value={userToBlock} placeholder="@user:example.org" />
-        <Button type="submit" loading={saving === 'block'}>Block</Button>
+        <TextInput
+          bind:value={userToBlock}
+          placeholder={$i18n.t('settings.blockedUsersPlaceholder')}
+        />
+        <Button type="submit" loading={saving === 'block'}>{$i18n.t('settings.blockButton')}</Button
+        >
       </form>
       {#if ignored.length}<ul class="ignored-users">
           {#each ignored as userId (userId)}<li>
@@ -352,7 +393,7 @@
                 variant="danger"
                 size="small"
                 loading={saving === userId}
-                onclick={() => void unblock(userId)}>Unblock</Button
+                onclick={() => void unblock(userId)}>{$i18n.t('settings.unblockButton')}</Button
               >
             </li>{/each}
         </ul>{/if}
