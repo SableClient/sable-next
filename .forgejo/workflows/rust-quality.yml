@@ -49,7 +49,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Rust
-        uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        uses: https://github.com/dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
           toolchain: 1.98.1
           components: rustfmt
@@ -204,14 +204,14 @@ jobs:
       # cargo-deny resolves the graph through `cargo metadata`, so cargo has to
       # be on PATH, but it compiles nothing and wants no artifact cache.
       - name: Set up Rust
-        uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        uses: https://github.com/dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
           toolchain: 1.98.1
 
       - name: Set up mise
         uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          version: '2026.9.4'
+          version: '2026.9.5'
           github_token: ''
           cache: true
           env: false
