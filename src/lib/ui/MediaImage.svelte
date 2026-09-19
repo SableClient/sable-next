@@ -460,6 +460,7 @@
     class={[className, 'media-image', 'interactive', { gif: manualGif }]}
     {style}
     style:--media-ratio={aspectRatio}
+    style:contain-intrinsic-inline-size="{width}px"
     type="button"
     aria-label={mediaLabel}
     onclick={activate}
@@ -471,7 +472,12 @@
     {@render content()}
   </button>
 {:else}
-  <span class={[className, 'media-image']} {style} style:--media-ratio={aspectRatio}>
+  <span
+    class={[className, 'media-image']}
+    {style}
+    style:--media-ratio={aspectRatio}
+    style:contain-intrinsic-inline-size="{width}px"
+  >
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render content()}
   </span>
