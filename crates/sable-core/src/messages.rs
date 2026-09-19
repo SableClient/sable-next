@@ -249,16 +249,6 @@ impl Core {
         object.remove(PER_MESSAGE_PROFILE);
 
         let private = !matches!(source.join_rule(), Some(JoinRule::Public));
-        if private {
-            let body = object
-                .get("body")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
-            object.clear();
-            object.insert("msgtype".to_owned(), "m.text".into());
-            object.insert("body".to_owned(), body.into());
-        }
 
         object.insert(
             FORWARD_META.to_owned(),
@@ -410,6 +400,56 @@ mod tests {
         .await
         .unwrap();
     }
+
+    #[tokio::test]
+    async fn forwarding_media_from_a_private_room_keeps_the_attachment() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let source = room_id!("!private:example.org");
+        let target = room_id!("!target:example.org");
+        server.sync_joined_room(&client, source).await;
+        server.sync_joined_room(&client, target).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{source}/event/$video"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "type": "m.room.message", "event_id": "$video", "sender": "@alice:example.org",
+                "origin_server_ts": 1, "room_id": source,
+                "content": {"msgtype": "m.video", "body": "seal.mp4", "url": "mxc://example.org/seal"}
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/rooms/{source}/relations/$video/m.replace"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+            .mount(server.server())
+            .await;
+        Mock::given(method("PUT"))
+            .and(wiremock::matchers::path_regex(format!(
+                "/_matrix/client/v3/rooms/{target}/send/m.room.message/.*"
+            )))
+            .and(wiremock::matchers::body_partial_json(json!({
+                "msgtype": "m.video", "body": "seal.mp4", "url": "mxc://example.org/seal"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$forward"})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let core = core(&server, client).await;
+        core.forward_message(
+            &source.to_owned(),
+            &event_id!("$video").to_owned(),
+            &target.to_owned(),
+        )
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn editing_a_pending_reply_updates_the_queue_and_keeps_the_relation() {
         use crate::protocol::{Command, MessageKind};
