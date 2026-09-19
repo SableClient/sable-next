@@ -11,6 +11,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
+  import { i18n } from '#lib/i18n.js';
 
   type CatalogEntry = { basename: string; fullUrl: string };
 
@@ -32,7 +33,7 @@
 
   function install(css: string, fallback: string): void {
     if (css.length > 1024 * 1024) {
-      error = 'Themes must be smaller than 1 MiB.';
+      error = $i18n.t('settings.customThemesErrorSize');
       return;
     }
     if (css.includes('@sable-tweak')) {
@@ -40,8 +41,7 @@
       return;
     }
     if (!css.includes('@sable-theme')) {
-      error =
-        'This file is not a Sable theme or tweak. It must include @sable-theme or @sable-tweak metadata.';
+      error = $i18n.t('settings.customThemesErrorHeader');
       return;
     }
     const theme = metadata(css, fallback);
@@ -65,8 +65,7 @@
       catalog = catalogEntries((data as { themes: unknown[] }).themes);
       tweakCatalog = catalogEntries((data as { tweaks?: unknown }).tweaks);
     } catch {
-      error = 'Could not load the official theme catalog.';
-    } finally {
+      error = $i18n.t('settings.customThemesErrorLoad');
       loading = false;
     }
   }
@@ -89,7 +88,7 @@
       if (!response.ok) throw new Error('unavailable');
       install(await response.text(), entry.basename);
     } catch {
-      error = `Could not install ${entry.basename}.`;
+      error = $i18n.t('settings.customThemesErrorInstall', { file: entry.basename });
     }
   }
 
@@ -106,7 +105,7 @@
   async function importFiles(files: FileList | File[]): Promise<void> {
     for (const file of files) {
       if (!file.name.endsWith('.sable.css')) {
-        error = 'Choose a .sable.css theme file.';
+        error = $i18n.t('settings.customThemesErrorChoose');
         continue;
       }
       install(await file.text(), file.name.replace(/\.sable\.css$/i, ''));
@@ -125,15 +124,16 @@
 
 <section class="custom-themes" aria-labelledby="custom-themes-title">
   <div>
-    <h3 id="custom-themes-title">Custom themes</h3>
-    <p>
-      Install a theme or a tweak from Sable's official catalog, or import a local
-      <code>.sable.css</code> file. A tweak layers on top of the active theme. Only import CSS you trust.
-    </p>
+    <h3 id="custom-themes-title">{$i18n.t('settings.customThemes')}</h3>
+    <p>{$i18n.t('settings.customThemesHint')}</p>
   </div>
   <div class="actions">
-    <Button size="small" {loading} onclick={() => void loadCatalog()}>Browse catalog</Button>
-    <Button size="small" variant="secondary" onclick={() => void importTheme()}>Import file</Button>
+    <Button size="small" {loading} onclick={() => void loadCatalog()}
+      >{$i18n.t('settings.customThemesBrowse')}</Button
+    >
+    <Button size="small" variant="secondary" onclick={() => void importTheme()}
+      >{$i18n.t('settings.customThemesImport')}</Button
+    >
     <input
       bind:this={picker}
       class="screen-reader-only"
@@ -145,10 +145,10 @@
   {#if catalog.length > 0}
     <Select
       bind:value={catalogSelection}
-      aria-label="Install an official theme"
-      placeholder="Choose an official theme"
+      aria-label={$i18n.t('settings.customThemesInstallTheme')}
+      placeholder={$i18n.t('settings.customThemesChooseTheme')}
       items={[
-        { value: '', label: 'Choose an official theme' },
+        { value: '', label: $i18n.t('settings.customThemesChooseTheme') },
         ...catalog.map((theme) => ({ value: theme.fullUrl, label: theme.basename })),
       ]}
       onValueChange={() => void installCatalogTheme()}
@@ -157,10 +157,10 @@
   {#if tweakCatalog.length > 0}
     <Select
       bind:value={tweakSelection}
-      aria-label="Install an official tweak"
-      placeholder="Choose an official tweak"
+      aria-label={$i18n.t('settings.customThemesInstallTweak')}
+      placeholder={$i18n.t('settings.customThemesChooseTweak')}
       items={[
-        { value: '', label: 'Choose an official tweak' },
+        { value: '', label: $i18n.t('settings.customThemesChooseTheme') },
         ...tweakCatalog.map((tweak) => ({ value: tweak.fullUrl, label: tweak.basename })),
       ]}
       onValueChange={() => void installCatalogTweak()}
@@ -171,12 +171,14 @@
     <div class="theme-slots">
       {#each themeKinds as kind (kind)}
         <label>
-          {kind === 'light' ? 'Light theme' : 'Dark theme'}
+          {kind === 'light'
+            ? $i18n.t('settings.customThemesLightTheme')
+            : $i18n.t('settings.customThemesDarkTheme')}
           <Select
             value={selectedCustomThemeId(kind) ?? ''}
             placeholder="Built-in"
             items={[
-              { value: '', label: 'Built-in' },
+              { value: '', label: $i18n.t('settings.customThemesBuiltIn') },
               ...customThemes.themes
                 .filter((theme) => theme.kind === kind)
                 .map((theme) => ({ value: theme.id, label: theme.name })),
