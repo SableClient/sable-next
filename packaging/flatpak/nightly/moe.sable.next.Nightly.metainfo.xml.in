@@ -10,7 +10,7 @@
   </developer>
 
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>AGPL-3.0-only</project_license>
+  <project_license>AGPL-3.0-or-later</project_license>
 
   <url type="homepage">https://sable.moe</url>
   <url type="bugtracker">https://git.sable.moe/SableClient/sable-next/issues</url>

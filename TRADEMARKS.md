@@ -2,7 +2,7 @@
 
 The Sable name and the Sable logo belong to the FOSS community.
 
-While our source code is governed by the GNU Affero General Public License (AGPLv3), we believe the Free and Open Source ethos shouldn't stop there. We actually like it when people use, share, and build upon our work.
+While our source code is governed by the GNU Affero General Public License (AGPLv3 or later), we believe the Free and Open Source ethos shouldn't stop there. We actually like it when people use, share, and build upon our work.
 
 ## Logo
 
@@ -40,7 +40,7 @@ If you modify or build upon the Sable source code:
 
 You must:
 
-- Comply with the AGPLv3 license terms (keep open source open!).
+- Comply with the AGPL-3.0-or-later license terms (keep open source open!).
 
 You may:
 

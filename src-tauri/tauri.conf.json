@@ -33,7 +33,7 @@
     "copyright": "Copyright © SableClient contributors",
     "shortDescription": "A Matrix client",
     "longDescription": "Sable Next, a Matrix client.",
-    "license": "AGPL-3.0-only",
+    "license": "AGPL-3.0-or-later",
     "licenseFile": "../LICENSE",
     "category": "SocialNetworking",
     "homepage": "https://sable.moe",
