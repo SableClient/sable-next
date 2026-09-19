@@ -7,7 +7,8 @@ type CachedMediaUrl = { url: string; bytes: number };
 
 const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
-const unavailable = new Set<string>();
+/* A deadline, not a verdict: `Unavailable` covers a blip as well as a 404. */
+const unavailable = new Map<string, number>();
 const aspectRatios = new Map<string, number>();
 const holds = new Map<string, number>();
 /* An object URL pins its blob until revoked. Held entries are exempt. */
@@ -15,6 +16,7 @@ const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
 const MAX_MEDIA_REQUESTS = 6;
+const MEDIA_FAILURE_TTL_MS = 30_000;
 let objectUrlBytes = 0;
 let inflight = 0;
 const waiting: (() => void)[] = [];
@@ -154,7 +156,11 @@ export function loadMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const key = cacheKey(core.session?.account_id, source, width, height);
-  if (unavailable.has(key)) return Promise.reject(new Error('Media unavailable'));
+  const failedUntil = unavailable.get(key);
+  if (failedUntil !== undefined) {
+    if (Date.now() < failedUntil) return Promise.reject(new Error('Media unavailable'));
+    unavailable.delete(key);
+  }
   const request =
     pending.get(key) ??
     fetchThroughGate(core, source, width, height)
@@ -182,9 +188,9 @@ export function loadMediaUrl(
       });
   pending.set(key, request);
   void request.catch(() => {
-    unavailable.add(key);
+    unavailable.set(key, Date.now() + MEDIA_FAILURE_TTL_MS);
     if (unavailable.size > MAX_MEDIA_METADATA) {
-      const oldest = unavailable.values().next().value;
+      const oldest = unavailable.keys().next().value;
       if (oldest !== undefined) unavailable.delete(oldest);
     }
   });
@@ -199,7 +205,7 @@ export function retryMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const prefix = `${core.session?.account_id ?? ''}:${source}:`;
-  for (const key of unavailable) {
+  for (const key of unavailable.keys()) {
     if (key.startsWith(prefix)) unavailable.delete(key);
   }
   return loadMediaUrl(core, source, width, height, mime);

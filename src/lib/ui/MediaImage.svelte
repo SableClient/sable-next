@@ -23,6 +23,7 @@
   const ORIENTATION_TOLERANCE = 0.05;
   const ANIMATED_MIMES = ['image/gif', 'image/apng', 'image/avif', 'image/webp'];
   const ANIMATED_EXTENSIONS = ['.gif', '.apng', '.avif', '.webp'];
+  const AUTO_RETRIES = 4;
 
   interface Props {
     source: string;
@@ -74,6 +75,7 @@
   let loadGeneration = $state(0);
   let retryNextLoad = false;
   let backoffSource: string | null = null;
+  let autoRetries = $state(0);
   let gifPreview = $state<HTMLCanvasElement>();
   let gifImage = $state<HTMLImageElement>();
   let gifPreviewReady = $state(false);
@@ -146,6 +148,20 @@
   });
 
   $effect(() => {
+    if (!failed || autoRetries === 0 || autoRetries > AUTO_RETRIES) return;
+    const timeout = setTimeout(
+      () => {
+        retryNextLoad = true;
+        loadGeneration += 1;
+      },
+      2 ** autoRetries * 1000
+    );
+    return () => {
+      clearTimeout(timeout);
+    };
+  });
+
+  $effect(() => {
     if (!failed || retryWait === 0) return;
     const timeout = setTimeout(
       () => {
@@ -166,6 +182,7 @@
       backoffSource = source;
       retryCount = 0;
       retryAt = 0;
+      autoRetries = 0;
     }
     const asIs = original || mime === 'image/svg+xml' || animated || servedSideways;
     const requestWidth = asIs ? 0 : width;
@@ -200,6 +217,7 @@
         url = nextUrl;
         retryCount = 0;
         retryAt = 0;
+        autoRetries = 0;
       })
       .catch(() => {
         if (!active) return;
@@ -208,6 +226,7 @@
           retryAt = Date.now() + Math.min(2 ** retryCount * 1000, 30_000);
           clock = Date.now();
         }
+        autoRetries += 1;
         onfailed?.();
       });
 

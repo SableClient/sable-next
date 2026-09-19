@@ -217,7 +217,8 @@ test('renders maths in place of the sender fallback', async () => {
   await unmount(instance);
 });
 
-test('falls back to the shortcode when an emoticon cannot be resolved', async () => {
+test('falls back to the shortcode once an emoticon has run out of retries', async () => {
+  vi.useFakeTimers();
   core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
   const instance = mount(FormattedBody, {
     target: document.body,
@@ -225,13 +226,21 @@ test('falls back to the shortcode when an emoticon cannot be resolved', async ()
       html: '<img src="mxc://example.org/gone" alt="party" data-mx-emoticon="">',
     },
   });
-  await tick();
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).toBeNull();
-  });
+  await vi.advanceTimersByTimeAsync(0);
 
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('img')).not.toBeNull();
+
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+
+  await vi.advanceTimersByTimeAsync(4000);
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(3);
+  expect(document.querySelector('img')).toBeNull();
   expect(document.body.textContent).toContain(':party:');
   await unmount(instance);
+  vi.useRealTimers();
 });
 
 test('leaves a remote image for the browser and drops a source with no scheme behind it', async () => {

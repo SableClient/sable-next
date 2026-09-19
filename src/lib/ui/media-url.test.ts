@@ -136,3 +136,25 @@ test('never revokes the URL it is about to return', async () => {
 
   expect(revoke).not.toHaveBeenCalledWith(original);
 });
+
+test('lets a failed source be fetched again once its backoff has elapsed', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:recovered');
+  const core = {
+    session: session('account-recovered', '@a:example.org', 'device-a'),
+    commands: {
+      fetchMedia: vi
+        .fn<() => Promise<Uint8Array<ArrayBuffer>>>()
+        .mockRejectedValueOnce(new Error('Media unavailable'))
+        .mockResolvedValue(new Uint8Array([1])),
+    },
+  };
+  const source = 'mxc://remote.example/cold-avatar';
+
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow();
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow();
+  expect(core.commands.fetchMedia).toHaveBeenCalledOnce();
+
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000);
+
+  await expect(loadMediaUrl(core, source, 96, 96)).resolves.toBe('blob:recovered');
+});

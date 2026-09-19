@@ -4,7 +4,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { markAbbreviations } from './abbreviations';
@@ -20,6 +20,8 @@
     html: string;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
+
+  const INLINE_RETRIES = 2;
 
   let { html, onMatrixLink }: Props = $props();
   const core = useCoreClient();
@@ -68,14 +70,27 @@
         paint(image, cached);
         continue;
       }
-      void loadMediaUrl(core, source, width, height)
-        .then((url) => {
-          if (image.isConnected) paint(image, url);
-        })
-        .catch((error: unknown) => {
-          console.warn('[sable media] inline image unavailable', source, error);
-          if (image.isConnected) image.replaceWith(fallbackLabel(image, emoticon));
-        });
+      const attempt = (retries: number): void => {
+        void (retries === 0 ? loadMediaUrl : retryMediaUrl)(core, source, width, height)
+          .then((url) => {
+            if (image.isConnected) paint(image, url);
+          })
+          .catch((error: unknown) => {
+            if (!image.isConnected) return;
+            if (retries < INLINE_RETRIES) {
+              setTimeout(
+                () => {
+                  attempt(retries + 1);
+                },
+                2 ** (retries + 1) * 1000
+              );
+              return;
+            }
+            console.warn('[sable media] inline image unavailable', source, error);
+            image.replaceWith(fallbackLabel(image, emoticon));
+          });
+      };
+      attempt(0);
     }
     return releases;
   }

@@ -844,3 +844,28 @@ test('does not flash the loading overlay over a GIF it has already fetched', asy
   expect(document.querySelector('.media-image-size')).toBeNull();
   await unmount(second);
 });
+
+test('retries a failed load on its own, without a retry button', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia
+    .mockRejectedValueOnce(new Error('media unavailable'))
+    .mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://remote.example/cold-avatar',
+      alt: '',
+      width: 96,
+      height: 96,
+    },
+  });
+
+  await vi.advanceTimersByTimeAsync(0);
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+
+  await vi.advanceTimersByTimeAsync(2000);
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  await unmount(instance);
+  vi.useRealTimers();
+});
