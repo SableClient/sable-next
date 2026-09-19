@@ -65,6 +65,10 @@ const fn shows_content(encrypted_room: bool, content: bool, encrypted_content: b
     content && (!encrypted_room || encrypted_content)
 }
 
+const fn alerts_silently(noisy: Option<bool>, sounds: bool) -> bool {
+    matches!(noisy, Some(false)) || !sounds
+}
+
 fn line(view: &NotificationView, content: bool) -> Line {
     Line {
         sender_name: view
@@ -187,7 +191,7 @@ pub async fn show<R: Runtime>(
         builder = builder.icon("notification_icon");
     }
     builder = builder.only_alert_once(false);
-    if pusher_registered() {
+    if alerts_silently(view.noisy, core.notification_sounds()) {
         builder = builder.silent();
     }
     if lines.len() > 1 {
@@ -472,13 +476,6 @@ pub async fn register_push<R: Runtime>(
     Ok(())
 }
 
-fn pusher_registered() -> bool {
-    REGISTERED_PUSHER
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .is_some()
-}
-
 #[cfg(mobile)]
 fn remember_pusher(pushkey: String, app_id: String) {
     *REGISTERED_PUSHER
@@ -526,8 +523,8 @@ mod tests {
     use sable_core::protocol::NotificationView;
 
     use super::{
-        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, Registration, body, collapsed, forget,
-        java_hash, pusher, remember, room_notification_id, shows_content,
+        Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, Registration, alerts_silently, body,
+        collapsed, forget, java_hash, pusher, remember, room_notification_id, shows_content,
     };
 
     fn view(is_direct: bool) -> NotificationView {
@@ -554,6 +551,14 @@ mod tests {
         assert_eq!(body(&view(true), true), "shipped the patch");
         assert_eq!(body(&view(false), false), "New message from Ada");
         assert_eq!(body(&view(true), false), "New message");
+    }
+
+    #[test]
+    fn only_a_soundless_rule_or_muted_sounds_silences_an_alert() {
+        assert!(!alerts_silently(Some(true), true));
+        assert!(!alerts_silently(None, true));
+        assert!(alerts_silently(Some(false), true));
+        assert!(alerts_silently(Some(true), false));
     }
 
     #[test]
