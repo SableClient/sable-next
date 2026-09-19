@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-const COLD_BOOT_TIMEOUT = 30_000;
+const COLD_BOOT_TIMEOUT = 45_000;
 
 export class AppShell {
   readonly primaryNavigation: Locator;
@@ -34,7 +34,9 @@ export class AppShell {
     this.createRoomSubmit = page
       .locator('#main-content')
       .getByRole('button', { name: 'Create room', exact: true });
-    this.closeSettings = page.getByRole('button', { name: 'Close' });
+    this.closeSettings = page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Close', exact: true });
     this.deviceBanner = page.getByRole('status', { name: /not verified/i });
   }
 

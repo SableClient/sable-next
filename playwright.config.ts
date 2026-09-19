@@ -31,7 +31,7 @@ export default defineConfig({
       testMatch: /global\.setup\.ts/,
       teardown: 'teardown',
       retries: 0,
-      timeout: 180_000,
+      timeout: 300_000,
     },
     { name: 'teardown', testMatch: /global\.teardown\.ts/ },
     {

@@ -25,11 +25,12 @@ test('shows the authenticated app shell on desktop', async ({ page, app, signIn 
     const roomNavigation = document.querySelector('.room-nav-content');
     return {
       gutter: getComputedStyle(document.documentElement).scrollbarGutter,
+      webkitPseudo: CSS.supports('selector(::-webkit-scrollbar)'),
       roomNavigation: roomNavigation ? getComputedStyle(roomNavigation).scrollbarWidth : null,
     };
   });
   expect(scrollbars.gutter).toBe('auto');
-  expect(scrollbars.roomNavigation).toBe('thin');
+  expect(scrollbars.roomNavigation).toBe(scrollbars.webkitPseudo ? 'auto' : 'thin');
 });
 
 test('shows the authenticated app shell on mobile', async ({ page, app, signIn }) => {

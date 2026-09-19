@@ -14,15 +14,15 @@ export class AccountSettings {
   readonly saveDisplayName: Locator;
 
   constructor(private readonly page: Page) {
-    this.profile = page.getByRole('heading', { name: 'Profile', exact: true });
-    this.status = page.getByRole('heading', { name: 'Status' });
-    this.colors = page.getByRole('heading', { name: 'Profile colors' });
-    this.identity = page.getByRole('heading', { name: 'Pronouns and timezone' });
-    this.biography = page.getByRole('heading', { name: 'Biography' });
-    this.animal = page.getByRole('heading', { name: 'Animal cosmetics' });
-    this.matrixId = page.getByRole('heading', { name: 'Matrix ID' });
-    this.contacts = page.getByRole('heading', { name: 'Contact information' });
-    this.blockedUsers = page.getByRole('heading', { name: 'Blocked users' });
+    this.profile = page.locator('h2#account-profile');
+    this.status = page.locator('h2#profile-status');
+    this.colors = page.locator('h2#profile-colors');
+    this.identity = page.locator('h2#profile-identity');
+    this.biography = page.locator('h2#profile-bio');
+    this.animal = page.locator('h2#profile-animal');
+    this.matrixId = page.locator('h2#account-matrix-id');
+    this.contacts = page.locator('h2#account-contact');
+    this.blockedUsers = page.locator('h2#account-blocked');
     this.displayName = page.getByLabel('Display name');
     this.saveDisplayName = page
       .locator('.name-form')

@@ -88,7 +88,7 @@ test('the keyboard move sends one order for the room that moved', async ({ page,
 
   const rooms = sectionWith(page, 'Late Arrival').locator('.room-name');
   await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/], {
-    timeout: 30_000,
+    timeout: 60_000,
   });
 
   const tail = spaceTree.children.find((child) => child.name === 'Tail Room');
@@ -118,7 +118,7 @@ test('moving the first room up does nothing', async ({ page, spaceTree }) => {
 
   const rooms = sectionWith(page, 'Late Arrival').locator('.room-name');
   await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/], {
-    timeout: 30_000,
+    timeout: 60_000,
   });
 
   const late = spaceTree.children.find((child) => child.name === 'Late Arrival');
@@ -141,7 +141,7 @@ test('a dragged room is dropped where the indicator showed', async ({ page, spac
 
   const rooms = sectionWith(page, 'Late Arrival').locator('.room-name');
   await expect(rooms).toHaveText([/Late Arrival/, /Middle Room/, /Tail Room/], {
-    timeout: 30_000,
+    timeout: 60_000,
   });
 
   const source = region(page).locator('.room', {

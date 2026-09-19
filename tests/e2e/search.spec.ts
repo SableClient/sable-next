@@ -1,12 +1,13 @@
 import type { Page } from '@playwright/test';
 
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test as base } from './fixtures/test';
 
 const test = base.extend({
   storageState: ({ workerSearchCorpus }, use) => use(workerSearchCorpus.statePath),
 });
 
-const SEARCH_FIELD = 'Search messages — try from:ada in:#general has:image';
+const SEARCH_FIELD = en.search.placeholder;
 const INDEXED = { timeout: 20_000 };
 
 function group(page: Page, name: string) {

@@ -45,22 +45,22 @@ test('loads a real room at latest and preserves the viewport while paginating', 
   const initialOldestMessage = await oldestRenderedMessage();
   await timeline.wheelUp(200);
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
-  await expect
-    .poll(
-      async () => {
-        await timeline.dispatchWheel(1);
-        await timeline.scrollToAndNotify(0);
-        return oldestRenderedMessage();
-      },
-      { timeout: 15_000 }
-    )
-    .toBeLessThan(initialOldestMessage);
+  const wheelUpUntilOlder = async (than: number): Promise<void> => {
+    await expect
+      .poll(
+        async () => {
+          await timeline.wheelUp(400);
+          await timeline.waitForScrollSettled();
+          return oldestRenderedMessage();
+        },
+        { timeout: 15_000 }
+      )
+      .toBeLessThan(than);
+  };
+  await wheelUpUntilOlder(initialOldestMessage);
 
   const beforeOldestMessage = await oldestRenderedMessage();
-
-  await timeline.dispatchWheel(-200);
-  await timeline.scrollToAndNotify(0);
-  await expect.poll(oldestRenderedMessage, { timeout: 15_000 }).toBeLessThan(beforeOldestMessage);
+  await wheelUpUntilOlder(beforeOldestMessage);
 
   await timeline.waitForScrollSettled();
   await expect.poll(() => timeline.visibleItems().count()).toBeGreaterThan(0);

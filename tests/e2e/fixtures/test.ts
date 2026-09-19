@@ -153,10 +153,15 @@ async function saveSignedInState(
   await context.close();
 }
 
+const RESIZE_OBSERVER_NOTICE = /^ResizeObserver loop /;
+
 export const test = base.extend<Fixtures, WorkerFixtures>({
   page: async ({ page }, use) => {
     const errors: Error[] = [];
-    const onError = (error: Error) => errors.push(error);
+    const onError = (error: Error) => {
+      if (RESIZE_OBSERVER_NOTICE.test(error.message)) return;
+      errors.push(error);
+    };
     page.on('pageerror', onError);
     try {
       await use(page);

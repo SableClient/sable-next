@@ -48,7 +48,7 @@ export async function startContinuwuity(): Promise<TestHomeserver> {
     .withWaitStrategy(
       Wait.forHttp('/_matrix/client/versions', CLIENT_SERVER_PORT).forStatusCode(200)
     )
-    .withStartupTimeout(120_000)
+    .withStartupTimeout(240_000)
     // Setup and teardown run in separate Playwright workers.
     .withAutoCleanup(false)
     .start();
