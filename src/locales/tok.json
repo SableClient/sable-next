@@ -1,23 +1,23 @@
 {
-    "nav": {
-        "home": "tomo sina",
-        "messages": "toki",
-        "direct": "toki ante",
-        "inbox": "poki toki",
-        "explore": "alasa",
-        "settings": "ante nasin",
-        "space": "kulupu tomo",
-        "lobby": "ma pi kulupu",
-        "createRoom": "o pali e tomo",
-        "newChat": "o toki tawa ona",
-        "joinWithAddress": "o kama kepeken nimi tomo",
-        "exploreSpaces": "alasa kulupu",
-        "messageSearch": "alasa toki",
-        "profile": "sitelen sina",
-        "editProfile": "o ante e sitelen sina",
-        "account": "sina",
-        "switchAccount": "o ante e sina",
-        "addAccount": "o kama e sina kin",
-        "manageAccounts": "o ante e kulupu sina"
-    }
+  "nav": {
+    "home": "tomo sina",
+    "messages": "toki",
+    "direct": "toki ante",
+    "inbox": "poki toki",
+    "explore": "alasa",
+    "settings": "ante nasin",
+    "space": "kulupu tomo",
+    "lobby": "ma pi kulupu",
+    "createRoom": "o pali e tomo",
+    "newChat": "o toki tawa ona",
+    "joinWithAddress": "o kama kepeken nimi tomo",
+    "exploreSpaces": "alasa kulupu",
+    "messageSearch": "alasa toki",
+    "profile": "sitelen sina",
+    "editProfile": "o ante e sitelen sina",
+    "account": "sina",
+    "switchAccount": "o ante e sina",
+    "addAccount": "o kama e sina kin",
+    "manageAccounts": "o ante e kulupu sina"
+  }
 }
