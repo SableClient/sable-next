@@ -211,7 +211,7 @@ export class Conversation {
       gif.width || null,
       gif.height || null,
       proxied.mimetype,
-      gif.size > 0 && proxied.mimetype === gif.mimetype ? gif.size : null,
+      gif.size > 0 ? gif.size : null,
       this.#consumeReply(),
       this.#threadRoot,
       this.#personaFor(targetRoomId, '', null).persona

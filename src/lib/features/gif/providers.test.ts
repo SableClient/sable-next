@@ -113,14 +113,26 @@ test('the proxy mxc names the provider and its media, base64url encoded', () => 
   });
 });
 
-test('giphy is proxied by its result id, and the proxy serves webp', () => {
+test('giphy is proxied by its result id, carrying the format the proxy must serve', () => {
   const proxied = proxiedGif(
     gif({ id: 'giphy-id', mediaUrl: 'https://i.giphy.com/media/xyz/cat.gif' }),
     'gifs.example'
   );
 
-  expect(proxied?.mimetype).toBe('image/webp');
-  expect(proxied?.mxcUrl.startsWith('mxc://gifs.example/giphy_')).toBe(true);
+  expect(proxied?.mimetype).toBe('image/gif');
+  expect(proxied?.mxcUrl).toBe('mxc://gifs.example/giphy_Z2lwaHktaWQuZ2lm');
+});
+
+test('a result is labelled with the format its media url actually carries', () => {
+  const webp = gifProviders.tenor.parse({
+    results: [{ id: 'a', media_formats: { gif: { url: 'https://media.tenor.com/a/cat.webp' } } }],
+  })[0];
+  const unknown = gifProviders.tenor.parse({
+    results: [{ id: 'b', media_formats: { gif: { url: 'https://media.tenor.com/b/cat' } } }],
+  })[0];
+
+  expect(webp.mimetype).toBe('image/webp');
+  expect(unknown.mimetype).toBe('image/gif');
 });
 
 test('a result off any provider CDN, or no proxy at all, cannot be proxied', () => {

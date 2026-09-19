@@ -29,10 +29,11 @@ export type GifProvider = {
   parse: (payload: unknown) => GifResult[];
   isMediaUrlAllowed: (url: URL) => boolean;
   proxyPayload: (url: URL, gif: GifResult) => string | undefined;
-  proxyMimetype: string;
 };
 
 const resultLimit = 50;
+
+const mimetypeByExtension: Record<string, string> = { gif: 'image/gif', webp: 'image/webp' };
 
 const sizeLimit = 3 * 1024 * 1024;
 
@@ -45,6 +46,19 @@ function positiveInt(value: unknown): number | undefined {
   return typeof parsed === 'number' && Number.isSafeInteger(parsed) && parsed > 0
     ? parsed
     : undefined;
+}
+
+function urlExtension(url: URL): string {
+  const dot = url.pathname.lastIndexOf('.');
+  return dot === -1 ? '' : url.pathname.slice(dot + 1).toLowerCase();
+}
+
+function mimetypeOf(mediaUrl: string): string {
+  try {
+    return mimetypeByExtension[urlExtension(new URL(mediaUrl))] ?? 'image/gif';
+  } catch {
+    return 'image/gif';
+  }
 }
 
 function idBeforeFilename(url: URL): string | undefined {
@@ -79,15 +93,17 @@ function toResult(
   fullRes: GifFile | undefined,
   preview: GifFile | undefined
 ): GifResult {
+  const mediaUrl = fullRes?.url ?? '';
+
   return {
     id,
     title: title || 'GIF',
-    mediaUrl: fullRes?.url ?? '',
+    mediaUrl,
     previewUrl: preview?.url ?? fullRes?.url ?? '',
     width: fullRes?.width ?? preview?.width ?? 0,
     height: fullRes?.height ?? preview?.height ?? 0,
     size: fullRes?.size ?? preview?.size ?? 0,
-    mimetype: 'image/gif',
+    mimetype: mimetypeOf(mediaUrl),
   };
 }
 
@@ -180,7 +196,6 @@ export const gifProviders: Record<GifProviderId, GifProvider> = {
     isMediaUrlAllowed: (url) =>
       isPlainHttpsUrl(url) && url.hostname === 'static.klipy.com' && /^\/ii\/.+/.test(url.pathname),
     proxyPayload: (url) => url.pathname.slice('/ii/'.length) || undefined,
-    proxyMimetype: 'image/gif',
   },
   tenor: {
     id: 'tenor',
@@ -200,7 +215,6 @@ export const gifProviders: Record<GifProviderId, GifProvider> = {
     isMediaUrlAllowed: (url) =>
       isPlainHttpsUrl(url) && /^(?:c|media\d*)\.tenor\.com$/.test(url.hostname),
     proxyPayload: (url) => idBeforeFilename(url),
-    proxyMimetype: 'image/gif',
   },
   giphy: {
     id: 'giphy',
@@ -216,8 +230,10 @@ export const gifProviders: Record<GifProviderId, GifProvider> = {
     parse: parseGiphy,
     isMediaUrlAllowed: (url) =>
       isPlainHttpsUrl(url) && /^(?:i|media\d*)\.giphy\.com$/.test(url.hostname),
-    proxyPayload: (url, gif) => gif.id || idBeforeFilename(url),
-    proxyMimetype: 'image/webp',
+    proxyPayload: (url, gif) => {
+      const id = gif.id || idBeforeFilename(url);
+      return id ? `${id}.${urlExtension(url) || 'gif'}` : undefined;
+    },
   },
 };
 
@@ -277,11 +293,13 @@ export function proxiedGif(gif: GifResult, proxyUrl: string | null): ProxiedGif 
 
   return {
     mxcUrl: `mxc://${server}/${provider.id}_${toBase64Url(payload)}`,
-    mimetype: provider.proxyMimetype,
+    mimetype: gif.mimetype,
   };
 }
 
-const extensions: Record<string, string> = { 'image/gif': 'gif', 'image/webp': 'webp' };
+const extensions = Object.fromEntries(
+  Object.entries(mimetypeByExtension).map(([extension, mimetype]) => [mimetype, extension])
+);
 
 export function gifFilename(title: string, mimetype: string): string {
   const ext = extensions[mimetype] ?? 'gif';
