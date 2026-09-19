@@ -28,7 +28,7 @@ export function readBoardSize(): BoardSize | null {
   return state.size;
 }
 
-function writeBoardSize(size: BoardSize): void {
+export function writeBoardSize(size: BoardSize): void {
   state.size = size;
   if (typeof localStorage === 'undefined') return;
 
