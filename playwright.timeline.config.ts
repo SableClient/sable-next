@@ -9,6 +9,7 @@ export default defineConfig({
     'timeline-lifecycle.spec.ts',
     'timeline-media.spec.ts',
     'reaction-sheet.spec.ts',
+    'profile-mobile.spec.ts',
     'room-settings-mobile.spec.ts',
     'settings-backdrop.spec.ts',
   ],

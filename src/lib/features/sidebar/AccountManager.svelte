@@ -271,6 +271,7 @@
     align-content: start;
     display: grid;
     gap: var(--space-500);
+    grid-auto-rows: max-content;
     margin: 0 auto;
     max-width: 42rem;
     overflow: auto;
