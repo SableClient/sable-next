@@ -15,7 +15,6 @@
   overflow: auto;
   padding: var(--radius-padding);
   transform-origin: var(--bits-floating-transform-origin, top);
-  z-index: var(--layer-menu);
 }
 
 @keyframes menu-in {

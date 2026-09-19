@@ -359,14 +359,12 @@ html {
   --scale-subtle: 0.98;
   --blur-small: 2px;
 
-  /* Overlay layers, ascending. Same layer stacks by DOM order. */
-  --layer-dialog: 100;
-  --layer-sheet: 200;
-  --layer-popover: 300;
-  --layer-menu: 400;
-  --layer-tooltip: 500;
-  --layer-notify: 600;
-  --layer-chrome: 700;
+  /* Every transient surface shares this: they are portalled in open order, so
+     the one opened last paints last. */
+  --layer-overlay: 1000;
+  --layer-tooltip: 5000;
+  --layer-notify: 6000;
+  --layer-chrome: 7000;
   --page-gutter: var(--space-300);
   --navigation-rail-width: 4.125rem;
   --timeline-row-gap: var(--space-250);

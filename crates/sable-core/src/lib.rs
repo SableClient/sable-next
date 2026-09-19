@@ -91,6 +91,7 @@ pub struct Core {
     thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
     notification_content: AtomicBool,
     notification_encrypted_content: AtomicBool,
+    notification_sounds: AtomicBool,
     read_room: std::sync::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
     search_crawl: Mutex<search::CrawlProgress>,
@@ -175,6 +176,7 @@ impl Core {
             events,
             notification_content: AtomicBool::new(false),
             notification_encrypted_content: AtomicBool::new(false),
+            notification_sounds: AtomicBool::new(true),
             read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
             foreground_paginations: AtomicU32::new(0),
@@ -221,6 +223,11 @@ impl Core {
     #[must_use]
     pub fn notification_encrypted_content(&self) -> bool {
         self.notification_encrypted_content.load(Ordering::Relaxed)
+    }
+
+    #[must_use]
+    pub fn notification_sounds(&self) -> bool {
+        self.notification_sounds.load(Ordering::Relaxed)
     }
 
     pub(crate) fn set_read_room(&self, room_id: Option<OwnedRoomId>) {

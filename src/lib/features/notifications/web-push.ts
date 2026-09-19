@@ -115,17 +115,18 @@ async function serverPusherActivated(
 }
 
 /** A gateway pusher left beside the server delivery doubles every alert. */
-async function removeStaleGatewayPusher(
+async function removeStaleGatewayPushers(
   core: CoreClient,
   appId: string,
-  pushkey: string
+  pushkey: string,
+  rekeyed: string | null
 ): Promise<void> {
   const pushers = await core.commands.webPushers().catch(() => []);
-  const stale = pushers.some(
-    (pusher) =>
-      pusher.app_id === appId && pusher.pushkey === pushkey && pusher.kind === GATEWAY_PUSHER_KIND
-  );
-  if (stale) await core.commands.removePusher(pushkey, appId).catch(() => undefined);
+  for (const pusher of pushers) {
+    if (pusher.app_id !== appId || pusher.kind !== GATEWAY_PUSHER_KIND) continue;
+    if (pusher.pushkey !== pushkey && pusher.pushkey !== rekeyed) continue;
+    await core.commands.removePusher(pusher.pushkey, appId).catch(() => undefined);
+  }
 }
 
 export async function syncPushSubscription(
@@ -141,7 +142,9 @@ export async function syncPushSubscription(
   const registration = await activeServiceWorker();
   if (!registration) return;
   let subscription = await registration.pushManager.getSubscription();
+  let rekeyed: string | null = null;
   if (subscription && !applicationServerKeyMatches(subscription, target.vapid)) {
+    rekeyed = subscription.toJSON().keys?.p256dh ?? null;
     await subscription.unsubscribe();
     subscription = null;
   }
@@ -186,7 +189,7 @@ export async function syncPushSubscription(
     if (activated !== false) return;
   }
 
-  await removeStaleGatewayPusher(core, target.appId, keys.p256dh);
+  await removeStaleGatewayPushers(core, target.appId, keys.p256dh, rekeyed);
   await core.commands.setWebPusher({
     pushkey: keys.p256dh,
     app_id: target.appId,

@@ -17,6 +17,7 @@
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   interface Props {
     roomId: string;
@@ -126,6 +127,7 @@
     <Popover.Portal>
       <Popover.Content
         class="composer-board"
+        {...overlayLayer()}
         side="top"
         align="end"
         sideOffset={10}
@@ -229,6 +231,5 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     overflow: hidden;
-    z-index: var(--layer-popover);
   }
 </style>

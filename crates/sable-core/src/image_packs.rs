@@ -168,7 +168,10 @@ use std::collections::BTreeSet;
 use futures_util::{StreamExt, stream};
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::ruma::api::client::state::get_state_events;
-use matrix_sdk::ruma::events::{GlobalAccountDataEventType, StateEventType};
+use matrix_sdk::ruma::events::{
+    AnyGlobalAccountDataEventContent, GlobalAccountDataEventType, StateEventType,
+};
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 
 use crate::Core;
@@ -188,6 +191,23 @@ fn push_canonical(parents: &mut Vec<OwnedRoomId>, event: &SpaceParentEvent) {
     }
 }
 
+async fn account_data(
+    client: &matrix_sdk::Client,
+    event_type: &str,
+    network: bool,
+) -> Result<Option<Raw<AnyGlobalAccountDataEventContent>>, matrix_sdk::Error> {
+    let wanted = GlobalAccountDataEventType::from(event_type);
+    if network {
+        match client.account().fetch_account_data(wanted.clone()).await {
+            Ok(found) => return Ok(found),
+            Err(error) => {
+                tracing::warn!(event_type, %error, "using stored account data after a fetch failed");
+            }
+        }
+    }
+    client.account().account_data_raw(wanted).await
+}
+
 impl Core {
     pub(crate) async fn image_packs(
         &self,
@@ -197,9 +217,7 @@ impl Core {
         let client = self.client().await?;
         let mut packs = Vec::new();
 
-        let own = client
-            .account()
-            .account_data_raw(GlobalAccountDataEventType::from(USER_EMOTES))
+        let own = account_data(&client, USER_EMOTES, !cached_only)
             .await
             .map_err(|error| self.failed("image_packs_account", error))?;
         if let Some(content) =
@@ -225,15 +243,11 @@ impl Core {
         .map_err(|error| self.failed("image_packs_room", error))?;
         packs.extend(own_room.packs);
 
-        let mut subscribed = client
-            .account()
-            .account_data_raw(GlobalAccountDataEventType::from(IMAGE_PACK_ROOMS))
+        let mut subscribed = account_data(&client, IMAGE_PACK_ROOMS, !cached_only)
             .await
             .map_err(|error| self.failed("image_packs_global", error))?;
         if subscribed.is_none() {
-            subscribed = client
-                .account()
-                .account_data_raw(GlobalAccountDataEventType::from(EMOTE_ROOMS))
+            subscribed = account_data(&client, EMOTE_ROOMS, !cached_only)
                 .await
                 .map_err(|error| self.failed("image_packs_global", error))?;
         }
@@ -251,18 +265,20 @@ impl Core {
                     continue;
                 };
                 let wanted: Vec<String> = state_keys.into_keys().collect();
-                packs.extend(
-                    Self::room_packs(
-                        &client,
-                        &subscribed_room,
-                        ImagePackOriginView::Global,
-                        Some(&wanted),
-                        !cached_only,
-                    )
-                    .await
-                    .map_err(|error| self.failed("image_packs_global_room", error))?
-                    .packs,
-                );
+                match Self::room_packs(
+                    &client,
+                    &subscribed_room,
+                    ImagePackOriginView::Global,
+                    Some(&wanted),
+                    !cached_only,
+                )
+                .await
+                {
+                    Ok(found) => packs.extend(found.packs),
+                    Err(error) => {
+                        tracing::warn!(room = %parsed, %error, "subscribed image packs unreadable");
+                    }
+                }
             }
         }
 
@@ -331,9 +347,7 @@ impl Core {
         let client = self.client().await?;
         let mut packs = Vec::new();
 
-        let own = client
-            .account()
-            .account_data_raw(GlobalAccountDataEventType::from(USER_EMOTES))
+        let own = account_data(&client, USER_EMOTES, true)
             .await
             .map_err(|error| self.failed("all_image_packs_account", error))?;
         if let Some(content) =
@@ -662,5 +676,79 @@ mod tests {
 
         assert_eq!(rooms.rooms.len(), 2);
         assert_eq!(rooms.rooms["!a:example.org"].len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod server_tests {
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use serde_json::json;
+    use wiremock::matchers::{method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    use super::{PackContent, USER_EMOTES, account_data};
+
+    const ACCOUNT_DATA_PATH: &str =
+        r"^/_matrix/client/v3/user/.*/account_data/im\.ponies\.user_emotes$";
+
+    #[tokio::test]
+    async fn a_pack_sync_never_delivered_is_read_from_the_server() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let _get = Mock::given(method("GET"))
+            .and(path_regex(ACCOUNT_DATA_PATH))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "images": { "wave": { "url": "mxc://example.org/wave" } }
+            })))
+            .expect(1)
+            .mount_as_scoped(server.server())
+            .await;
+
+        assert!(
+            account_data(&client, USER_EMOTES, false)
+                .await
+                .expect("store")
+                .is_none()
+        );
+
+        let found = account_data(&client, USER_EMOTES, true)
+            .await
+            .expect("fetch")
+            .expect("pack");
+        let content = found
+            .deserialize_as_unchecked::<PackContent>()
+            .expect("content");
+
+        assert!(content.images.contains_key("wave"));
+    }
+
+    #[tokio::test]
+    async fn a_refused_fetch_falls_back_to_the_stored_pack() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_custom_global_account_data(json!({
+                    "type": "im.ponies.user_emotes",
+                    "content": { "images": { "wave": { "url": "mxc://example.org/wave" } } }
+                }));
+            })
+            .await;
+        let _get = Mock::given(method("GET"))
+            .and(path_regex(ACCOUNT_DATA_PATH))
+            .respond_with(ResponseTemplate::new(500))
+            .mount_as_scoped(server.server())
+            .await;
+
+        let found = account_data(&client, USER_EMOTES, true)
+            .await
+            .expect("fetch")
+            .expect("pack");
+        let content = found
+            .deserialize_as_unchecked::<PackContent>()
+            .expect("content");
+
+        assert!(content.images.contains_key("wave"));
     }
 }

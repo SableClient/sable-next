@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Combobox as BitsCombobox } from 'bits-ui';
   import { i18n } from '#lib/i18n.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import TextInput from './TextInput.svelte';
   import './menu.css';
@@ -110,7 +111,7 @@
     <BitsCombobox.Content sideOffset={4}>
       {#snippet child({ wrapperProps, props, open })}
         {#if open && filteredItems.length > 0}
-          <div {...wrapperProps} class="combobox-positioner">
+          <div {...wrapperProps} {...overlayLayer()} class="combobox-positioner">
             <div {...props} class="menu-surface combobox-menu">
               {#each filteredItems as item (item.value)}
                 <BitsCombobox.Item value={item.value} label={item.label} disabled={item.disabled}>
@@ -190,7 +191,6 @@
 
   .combobox-positioner {
     position: relative;
-    z-index: var(--layer-menu);
   }
 
   @media (prefers-reduced-motion: no-preference) {

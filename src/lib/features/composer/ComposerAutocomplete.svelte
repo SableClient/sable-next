@@ -81,7 +81,7 @@
     overflow: hidden;
     position: absolute;
     right: 0;
-    z-index: var(--layer-popover);
+    z-index: var(--layer-overlay);
   }
 
   .heading {

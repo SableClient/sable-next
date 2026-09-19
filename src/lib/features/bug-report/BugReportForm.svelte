@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { SvelteURLSearchParams } from 'svelte/reactivity';
   import * as Sentry from '@sentry/sveltekit';
   import { i18n } from '#lib/i18n.js';
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
+  import { describePlatform } from '#lib/platform/diagnostics.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -26,10 +27,10 @@
   const GITHUB_REPO = 'SableClient/Sable';
   const sentryEnabled = Sentry.isInitialized();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
-  const platform = typeof navigator === 'undefined' ? 'unknown' : navigator.platform || 'unknown';
   const userAgent = typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent;
 
   let { onDone }: Props = $props();
+  let platform = $state('unknown');
   let type = $state<ReportType>('bug');
   let title = $state('');
   let description = $state('');
@@ -89,6 +90,10 @@
       }
     }, 600);
   }
+
+  onMount(() => {
+    void describePlatform().then((value) => (platform = value));
+  });
 
   onDestroy(() => {
     searchController?.abort();

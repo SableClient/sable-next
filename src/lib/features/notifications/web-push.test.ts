@@ -206,6 +206,32 @@ test('a complete override beats even a serving homeserver', async () => {
   expect(commandsOf.setWebPusher).not.toHaveBeenCalled();
 });
 
+test('re-keying to the homeserver retires the gateway pusher under the old key', async () => {
+  mocks.activeServiceWorker.mockResolvedValue({
+    pushManager: {
+      getSubscription: vi.fn().mockResolvedValue({
+        options: { applicationServerKey: vapidBytes(shipped.vapid) },
+        toJSON: () => ({ endpoint: ENDPOINT, keys: { p256dh: 'old-p256dh', auth: 'old-auth' } }),
+        unsubscribe: vi.fn().mockResolvedValue(undefined),
+      }),
+      subscribe: vi.fn().mockResolvedValue({
+        options: { applicationServerKey: vapidBytes(SERVER_KEY) },
+        toJSON: () => ({ endpoint: ENDPOINT, keys: KEYS }),
+      }),
+    },
+  });
+  client = core(SERVER_KEY, [
+    { pushkey: 'old-p256dh', app_id: shipped.appId, kind: 'http', activated: true },
+  ]);
+
+  await syncPushSubscription(client, NONE);
+
+  expect(commandsOf.removePusher).toHaveBeenCalledWith('old-p256dh', shipped.appId);
+  expect(commandsOf.setWebPusher).toHaveBeenCalledWith(
+    expect.objectContaining({ pushkey: 'keys-p256dh', app_id: shipped.appId })
+  );
+});
+
 test('taking over the delivery retires the gateway pusher left behind', async () => {
   mocks.activeServiceWorker.mockResolvedValue(registration(SERVER_KEY));
   client = core(SERVER_KEY, [

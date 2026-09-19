@@ -4,6 +4,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { i18n } from '#lib/i18n.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   interface Props {
     label: string;
@@ -108,7 +109,13 @@
         <span aria-hidden="true"></span>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content class="color-popover" side="bottom" align="start" sideOffset={8}>
+        <Popover.Content
+          class="color-popover"
+          {...overlayLayer()}
+          side="bottom"
+          align="start"
+          sideOffset={8}
+        >
           <button
             type="button"
             class="saturation-picker"
@@ -190,7 +197,6 @@
     box-shadow: var(--shadow-float);
     padding: var(--space-400);
     width: 14rem;
-    z-index: var(--layer-popover);
   }
 
   .saturation-picker {

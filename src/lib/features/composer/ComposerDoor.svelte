@@ -10,6 +10,7 @@
   import { i18n } from '#lib/i18n.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   interface Props {
     desktop: boolean;
@@ -39,6 +40,7 @@
     <DropdownMenu.Portal>
       <DropdownMenu.Content
         class="menu-surface composer-menu"
+        {...overlayLayer()}
         side="top"
         align="start"
         sideOffset={8}
@@ -227,7 +229,6 @@
     gap: var(--space-100);
     padding: var(--radius-padding);
     width: min(15rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
   }
 
   :global(.composer-menu .menu-item > svg) {

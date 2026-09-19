@@ -4,6 +4,7 @@
   import type { PackImageView } from '#src/generated/protocol';
 
   import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
 
   interface Props {
@@ -63,6 +64,7 @@
   <Popover.Portal>
     <Popover.Content
       class="reaction-picker"
+      {...overlayLayer()}
       side="top"
       align="end"
       collisionPadding={12}
@@ -84,6 +86,5 @@
     box-shadow: var(--shadow-float);
     color: var(--surface-on-container);
     overflow: hidden;
-    z-index: var(--layer-popover);
   }
 </style>

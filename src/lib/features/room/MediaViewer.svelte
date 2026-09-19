@@ -32,6 +32,7 @@
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PdfViewer from '#lib/ui/PdfViewer.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
@@ -531,6 +532,7 @@
     <Dialog.Portal>
       <Dialog.Content
         class="viewer"
+        {...overlayLayer()}
         style={`height: 100dvh; inset: 0; opacity: ${String(1 - Math.min(0.75, Math.abs(swipeY) / 400))}; position: fixed; width: 100vw;`}
         aria-label={$i18n.t('viewer.title')}
       >
@@ -782,7 +784,6 @@
     overscroll-behavior: contain;
     position: fixed;
     width: 100vw;
-    z-index: var(--layer-dialog);
   }
 
   .toolbar,

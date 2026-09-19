@@ -908,3 +908,23 @@ test('right-clicking the send button opens the schedule dialog', async () => {
 
   void unmount(instance);
 });
+
+test('a press beside the text focuses the editor, and one on a button does not', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+
+  const row = document.querySelector('form');
+  const editable = document.querySelector('[role="combobox"]');
+  row?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+  expect(document.activeElement).toBe(editable);
+
+  (document.activeElement as HTMLElement | null)?.blur();
+  document
+    .querySelector('form button')
+    ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+  expect(document.activeElement).not.toBe(editable);
+
+  void unmount(instance);
+});

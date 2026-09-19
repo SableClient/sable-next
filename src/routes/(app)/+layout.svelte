@@ -258,6 +258,8 @@
       )
       .catch(() => {});
 
+    void core.commands.setNotificationSounds(preferences.notificationSounds).catch(() => {});
+
     void setNativeEncryptedContentAllowed(
       preferences.notificationContent && preferences.notificationEncryptedContent
     ).catch(() => {});

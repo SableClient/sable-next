@@ -6,6 +6,7 @@
   import { i18n } from '#lib/i18n.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import MentionProfileCard from './MentionProfileCard.svelte';
 
@@ -65,6 +66,7 @@
     <Popover.Portal>
       <Popover.Content
         class="mention-profile-popover"
+        {...overlayLayer()}
         customAnchor={anchor}
         side="top"
         align="start"
@@ -116,6 +118,5 @@
     box-shadow: var(--shadow-dialog);
     padding: 0;
     width: min(22rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
   }
 </style>

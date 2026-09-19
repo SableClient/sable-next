@@ -7,6 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import PersonaCard from './PersonaCard.svelte';
   import './avatar-button.css';
@@ -81,6 +82,7 @@
     <Popover.Portal>
       <Popover.Content
         class="persona-profile-popover"
+        {...overlayLayer()}
         side="top"
         align="start"
         collisionPadding={12}
@@ -132,6 +134,5 @@
     box-shadow: var(--shadow-dialog);
     padding: 0;
     width: min(22rem, calc(100vw - 2rem));
-    z-index: var(--layer-popover);
   }
 </style>

@@ -3,6 +3,7 @@
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import type { ClassValue } from 'svelte/elements';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import './form-control.css';
   import './menu.css';
 
@@ -45,7 +46,7 @@
     <CaretDownIcon class="select-caret" aria-hidden="true" />
   </BitsSelect.Trigger>
   <BitsSelect.Portal>
-    <BitsSelect.Content sideOffset={4} class="menu-surface select-content">
+    <BitsSelect.Content sideOffset={4} class="menu-surface select-content" {...overlayLayer()}>
       <BitsSelect.Viewport>
         {#each items as item (item.value)}
           <BitsSelect.Item

@@ -4,6 +4,7 @@
   import type { Snippet } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
+  import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import BottomSheet from './BottomSheet.svelte';
   import { setActionMenuSurface, useActionMenuSurface } from './action-menu.js';
@@ -57,7 +58,11 @@
       <CaretRightIcon class="menu-submenu-chevron" aria-hidden="true" />
     </DropdownMenu.SubTrigger>
     <DropdownMenu.Portal>
-      <DropdownMenu.SubContent class={['menu-surface', surfaceClass]} sideOffset={4}>
+      <DropdownMenu.SubContent
+        class={['menu-surface', surfaceClass]}
+        {...overlayLayer()}
+        sideOffset={4}
+      >
         {@render children()}
       </DropdownMenu.SubContent>
     </DropdownMenu.Portal>
