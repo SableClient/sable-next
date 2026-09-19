@@ -114,21 +114,17 @@ async function serverPusherActivated(
   return mine?.activated ?? null;
 }
 
-/** A gateway pusher left beside the server delivery doubles every alert, and
-    re-keying to the homeserver's VAPID mints a new pushkey, so the one to drop
-    is usually the subscription we just replaced rather than the current one. */
+/** A gateway pusher left beside the server delivery doubles every alert. */
 async function removeStaleGatewayPushers(
   core: CoreClient,
   appId: string,
-  pushkeys: readonly (string | null)[]
+  pushkey: string,
+  rekeyed: string | null
 ): Promise<void> {
-  const wanted = new Set(pushkeys.filter((pushkey) => pushkey !== null));
-  if (wanted.size === 0) return;
-
   const pushers = await core.commands.webPushers().catch(() => []);
   for (const pusher of pushers) {
     if (pusher.app_id !== appId || pusher.kind !== GATEWAY_PUSHER_KIND) continue;
-    if (!wanted.has(pusher.pushkey)) continue;
+    if (pusher.pushkey !== pushkey && pusher.pushkey !== rekeyed) continue;
     await core.commands.removePusher(pusher.pushkey, appId).catch(() => undefined);
   }
 }
@@ -193,7 +189,7 @@ export async function syncPushSubscription(
     if (activated !== false) return;
   }
 
-  await removeStaleGatewayPushers(core, target.appId, [keys.p256dh, rekeyed]);
+  await removeStaleGatewayPushers(core, target.appId, keys.p256dh, rekeyed);
   await core.commands.setWebPusher({
     pushkey: keys.p256dh,
     app_id: target.appId,
