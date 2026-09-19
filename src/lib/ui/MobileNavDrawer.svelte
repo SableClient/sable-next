@@ -33,11 +33,15 @@
       hide the page that was asked for behind an inert panel. Keyed on the path
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/rooms', '/direct']);
+  const BLANK_INDEX_PATHS = new Set(['/home', '/rooms']);
   let pathname = $derived(page.url.pathname);
   let showMobileQuickTools = $derived(page.params.roomId === undefined);
-  let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || /^\/space\/[^/]+$/.test(pathname));
+  let spaceIndex = $derived(/^\/space\/[^/]+$/.test(pathname));
+  let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
+  let pinnedOpen = $derived(BLANK_INDEX_PATHS.has(pathname) || spaceIndex);
   let open = $derived(
-    page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open'
+    pinnedOpen ||
+      (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
   );
 
   // Navigating out from under a drag would otherwise leave the track pinned at
@@ -79,7 +83,7 @@
   }
 
   function setOpen(next: boolean): void {
-    if (next === open) return;
+    if (next === open || (!next && pinnedOpen)) return;
     void goto('', {
       shallow: true,
       state: { ...page.state, mobileDrawer: next ? 'open' : 'closed' },
