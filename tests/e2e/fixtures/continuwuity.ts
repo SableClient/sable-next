@@ -11,6 +11,7 @@ const CLIENT_HOST = process.env.TESTCONTAINERS_HOST_OVERRIDE ?? '127.0.0.1';
 const PUBLIC_URL = `http://${CLIENT_HOST}:${String(HOST_PORT)}`;
 const SERVER_NAME = 'test.local';
 const API_REACHABLE_TIMEOUT = 60_000;
+const API_ATTEMPT_TIMEOUT = 5_000;
 const execFileAsync = promisify(execFile);
 
 export type TestHomeserver = {
@@ -47,7 +48,7 @@ export async function startContinuwuity(): Promise<TestHomeserver> {
     })
     .withTmpFs({ '/database': 'rw' })
     .withWaitStrategy(Wait.forLogMessage(/Listening on/))
-    .withStartupTimeout(240_000)
+    .withStartupTimeout(180_000)
     // Setup and teardown run in separate Playwright workers.
     .withAutoCleanup(false)
     .start();
@@ -60,15 +61,14 @@ export async function startContinuwuity(): Promise<TestHomeserver> {
   };
 }
 
-// The first traffic to cross from the runner to the published port, so its
-// failure has to name the address it tried, or a topology problem reads as a
-// boot timeout.
 async function waitForClientApi(containerId: string): Promise<void> {
   const deadline = Date.now() + API_REACHABLE_TIMEOUT;
   let failure = 'no attempt made';
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${PUBLIC_URL}/_matrix/client/versions`);
+      const response = await fetch(`${PUBLIC_URL}/_matrix/client/versions`, {
+        signal: AbortSignal.timeout(API_ATTEMPT_TIMEOUT),
+      });
       if (response.ok) return;
       failure = `HTTP ${String(response.status)}`;
     } catch (error) {

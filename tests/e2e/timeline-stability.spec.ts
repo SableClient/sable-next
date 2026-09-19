@@ -322,6 +322,21 @@ test('an arrival the reader is watching does not bounce the timeline', async ({
   await expect(timeline.itemById('watched-2')).toBeInViewport();
 });
 
+function sampleUntilAtBottom(timeline: RoomTimeline): Promise<number[]> {
+  return timeline.viewport.evaluate(async (node) => {
+    const offsets: number[] = [];
+    const deadline = performance.now() + 5_000;
+    do {
+      await new Promise(requestAnimationFrame);
+      offsets.push(node.scrollTop);
+    } while (
+      node.scrollHeight - node.clientHeight - node.scrollTop > 1 &&
+      performance.now() < deadline
+    );
+    return offsets;
+  });
+}
+
 async function loadScrollableHistory(core: FakeCoreDriver, timeline: RoomTimeline): Promise<void> {
   await core.emitTimelineDiff(await core.subscription(), [
     {
@@ -1174,18 +1189,7 @@ test.describe('mobile', () => {
     await expect(timeline.jumpToLatest).toBeVisible();
     const before = await timeline.scrollTop();
     const end = await timeline.scrollableHeight();
-    const sampling = timeline.viewport.evaluate(async (node) => {
-      const offsets: number[] = [];
-      const deadline = performance.now() + 5_000;
-      do {
-        await new Promise(requestAnimationFrame);
-        offsets.push(node.scrollTop);
-      } while (
-        node.scrollHeight - node.clientHeight - node.scrollTop > 1 &&
-        performance.now() < deadline
-      );
-      return offsets;
-    });
+    const sampling = sampleUntilAtBottom(timeline);
     await timeline.jumpToLatest.tap();
     const offsets = await sampling;
     expect(
@@ -1283,18 +1287,7 @@ test.describe('mobile', () => {
     await expect(timeline.jumpToLatest).toBeVisible();
     const before = await timeline.scrollTop();
     const end = await timeline.scrollableHeight();
-    const sampling = timeline.viewport.evaluate(async (node) => {
-      const offsets: number[] = [];
-      const deadline = performance.now() + 5_000;
-      do {
-        await new Promise(requestAnimationFrame);
-        offsets.push(node.scrollTop);
-      } while (
-        node.scrollHeight - node.clientHeight - node.scrollTop > 1 &&
-        performance.now() < deadline
-      );
-      return offsets;
-    });
+    const sampling = sampleUntilAtBottom(timeline);
     await timeline.jumpToLatest.tap();
     const offsets = await sampling;
     expect(

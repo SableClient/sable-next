@@ -227,8 +227,6 @@ jobs:
       - name: Install Playwright system libraries
         run: pnpm exec playwright install-deps chromium webkit
 
-      # A TCP daemon is already addressable by its own hostname, and overriding
-      # it with this container's gateway sends the readiness probe nowhere.
       - name: Point testcontainers at the docker host
         run: |
           echo "DOCKER_HOST=${DOCKER_HOST:-<unset>} in-container=$([ -f /.dockerenv ] && echo yes || echo no)"
