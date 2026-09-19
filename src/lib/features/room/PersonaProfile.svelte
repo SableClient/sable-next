@@ -17,7 +17,7 @@
     accountId: string;
     accountName: string;
     label: string;
-    onOpenAccount: () => void;
+    onOpenAccount: (anchor: HTMLElement | null) => void;
     onAvatarClick?: (source: string, displayName: string) => void;
     onOpenChange?: (open: boolean) => void;
     children: Snippet;
@@ -64,7 +64,7 @@
   function openAccount(): void {
     open = false;
     onOpenChange?.(false);
-    onOpenAccount();
+    onOpenAccount(trigger);
   }
 
   function openAvatar(source: string, displayName: string): void {
@@ -99,6 +99,7 @@
   </Popover.Root>
 {:else}
   <button
+    bind:this={trigger}
     class="avatar-button selection-open"
     type="button"
     aria-label={label}

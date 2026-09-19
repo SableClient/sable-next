@@ -535,8 +535,9 @@
     if (item.sender) onMentionUser?.(item.sender, accountName);
   }
 
-  function openAccountFromPersona(): void {
-    if (item.sender && messageRow) onSenderProfile?.(item.sender, messageRow);
+  function openAccountFromPersona(anchor: HTMLElement | null): void {
+    const target = anchor ?? messageRow;
+    if (item.sender && target) onSenderProfile?.(item.sender, target);
   }
 </script>
 
