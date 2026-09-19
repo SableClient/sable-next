@@ -10,6 +10,7 @@ const HOST_PORT = 18008;
 const CLIENT_HOST = process.env.TESTCONTAINERS_HOST_OVERRIDE ?? '127.0.0.1';
 const PUBLIC_URL = `http://${CLIENT_HOST}:${String(HOST_PORT)}`;
 const SERVER_NAME = 'test.local';
+const API_REACHABLE_TIMEOUT = 60_000;
 const execFileAsync = promisify(execFile);
 
 export type TestHomeserver = {
@@ -45,18 +46,51 @@ export async function startContinuwuity(): Promise<TestHomeserver> {
       CONTINUWUITY_ALLOW_CHECK_FOR_UPDATES: 'false',
     })
     .withTmpFs({ '/database': 'rw' })
-    .withWaitStrategy(
-      Wait.forHttp('/_matrix/client/versions', CLIENT_SERVER_PORT).forStatusCode(200)
-    )
+    .withWaitStrategy(Wait.forLogMessage(/Listening on/))
     .withStartupTimeout(240_000)
     // Setup and teardown run in separate Playwright workers.
     .withAutoCleanup(false)
     .start();
 
+  await waitForClientApi(container.getId());
+
   return {
     baseUrl: PUBLIC_URL,
     containerId: container.getId(),
   };
+}
+
+// The first traffic to cross from the runner to the published port, so its
+// failure has to name the address it tried, or a topology problem reads as a
+// boot timeout.
+async function waitForClientApi(containerId: string): Promise<void> {
+  const deadline = Date.now() + API_REACHABLE_TIMEOUT;
+  let failure = 'no attempt made';
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${PUBLIC_URL}/_matrix/client/versions`);
+      if (response.ok) return;
+      failure = `HTTP ${String(response.status)}`;
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  const { stdout, stderr } = await execFileAsync('docker', [
+    'logs',
+    '--tail',
+    '20',
+    containerId,
+  ]).catch((error: unknown) => ({ stdout: '', stderr: String(error) }));
+  throw new Error(
+    [
+      `the homeserver is up but ${PUBLIC_URL} is not reachable from the runner: ${failure}`,
+      `DOCKER_HOST=${process.env.DOCKER_HOST ?? '<unset>'}`,
+      `TESTCONTAINERS_HOST_OVERRIDE=${process.env.TESTCONTAINERS_HOST_OVERRIDE ?? '<unset>'}`,
+      stdout || stderr,
+    ].join('\n')
+  );
 }
 
 // An interrupted run leaves a container holding the port, with its accounts.
