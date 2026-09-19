@@ -16,6 +16,11 @@ async function ensureBundle(code: string): Promise<void> {
   if (bundle) i18next.addResourceBundle(code, 'translation', bundle, true, true);
 }
 
+function applyDocumentLanguage(code: string): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.lang = code;
+}
+
 const initialLanguage = chosenLanguage();
 
 i18next
@@ -39,6 +44,9 @@ i18next
   .catch((error: unknown) => {
     console.error('[sable i18n] init failed; the UI will render raw translation keys', error);
   });
+
+i18next.on('languageChanged', applyDocumentLanguage);
+applyDocumentLanguage(i18next.resolvedLanguage ?? i18next.language);
 
 export async function setLanguage(value: string): Promise<void> {
   if (value === SYSTEM_LANGUAGE) {
