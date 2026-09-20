@@ -89,3 +89,50 @@ test('an emote destroyed before its bytes arrive does not paint', async () => {
   expect(view.dom.querySelector('img')).toBeNull();
   expect(view.dom.textContent).toBe(':wave:');
 });
+
+const { image } = composerSchema.nodes;
+
+test('an inline image shows its alt text until the bytes arrive, then paints', async () => {
+  const release = vi.fn();
+  const view = views({ hold: () => release })['image'](
+    image.create({ src: 'mxc://example.org/pic', alt: 'a cat' }),
+    null as never,
+    () => 0,
+    [],
+    null as never
+  );
+
+  expect(view.dom.textContent).toBe('a cat');
+  await vi.waitFor(() => {
+    expect(view.dom.querySelector('img')?.getAttribute('src')).toBe('blob:emote');
+  });
+  expect(view.dom.querySelector('img')?.alt).toBe('a cat');
+
+  view.destroy?.();
+  expect(release).toHaveBeenCalledOnce();
+});
+
+test('an inline image without alt text names itself by its address, and paints at once when cached', () => {
+  const cachedImage = views({ cached: () => 'blob:ready' })['image'](
+    image.create({ src: 'mxc://example.org/pic' }),
+    null as never,
+    () => 0,
+    [],
+    null as never
+  );
+  expect(cachedImage.dom.querySelector('img')?.alt).toBe('mxc://example.org/pic');
+  expect(cachedImage.dom.querySelector('img')?.getAttribute('src')).toBe('blob:ready');
+});
+
+test('an image whose bytes never arrive keeps its label and does not throw', async () => {
+  const view = views({ load: () => Promise.reject(new Error('gone')) })['image'](
+    image.create({ src: 'mxc://example.org/pic', alt: 'lost' }),
+    null as never,
+    () => 0,
+    [],
+    null as never
+  );
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(view.dom.textContent).toBe('lost');
+});

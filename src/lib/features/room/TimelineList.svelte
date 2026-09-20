@@ -33,6 +33,7 @@
     mergeAggregations,
     personaLookup,
     unreadCountAfter,
+    visibleAggregations,
     visibleTimelineItems,
   } from './timeline-format';
   import { TimelineHistoryController } from './timeline-history';
@@ -139,7 +140,7 @@
   let allItems = $derived(
     mergeAggregations(
       visibleTimelineItems(timeline.items, preferences, { readOnly }),
-      preferences.showHiddenEvents ? timeline.aggregations : []
+      visibleAggregations(timeline.aggregations, preferences)
     )
   );
   let visibleItems = $derived(

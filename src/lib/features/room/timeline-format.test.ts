@@ -23,6 +23,7 @@ import {
   mergeAggregations,
   personaLookup,
   readReceiptEventId,
+  visibleAggregations,
   visibleTimelineItems,
 } from './timeline-format';
 
@@ -73,7 +74,43 @@ const defaults: TimelinePreferences = {
   hideMemberInReadOnly: true,
   showTombstoneEvents: false,
   showHiddenEvents: false,
+  hiddenEventEdits: true,
+  hiddenEventReactions: true,
+  hiddenEventRedactions: true,
+  hiddenEventOther: true,
 };
+
+function aggregation(eventType: string, id: string): TimelineItemView {
+  return {
+    id,
+    content: { kind: 'hidden_event', event_type: eventType, content: null },
+  } as unknown as TimelineItemView;
+}
+
+test('an aggregation is filtered by its own event type', () => {
+  const on: TimelinePreferences = { ...defaults, showHiddenEvents: true };
+  const aggregations = [
+    aggregation('m.reaction', '$reaction'),
+    aggregation('m.room.redaction', '$redaction'),
+    aggregation('m.room.message', '$edit'),
+    aggregation('m.beacon', '$beacon'),
+  ];
+
+  expect(visibleAggregations(aggregations, defaults)).toEqual([]);
+  expect(visibleAggregations(aggregations, on).map((entry) => entry.id)).toEqual([
+    '$reaction',
+    '$redaction',
+    '$edit',
+    '$beacon',
+  ]);
+  expect(
+    visibleAggregations(aggregations, {
+      ...on,
+      hiddenEventReactions: false,
+      hiddenEventOther: false,
+    }).map((entry) => entry.id)
+  ).toEqual(['$redaction', '$edit']);
+});
 
 function item(content: TimelineItemView['content'], id: string = content.kind): TimelineItemView {
   return { id, content } as TimelineItemView;

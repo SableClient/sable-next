@@ -20,6 +20,9 @@ importers:
       '@sableclient/tauri-plugin-livekit-mobile':
         specifier: ^0.3.0
         version: 0.3.0
+      '@sableclient/twemoji-font':
+        specifier: ^1.0.4
+        version: 1.0.4
       '@tauri-apps/api':
         specifier: 2.11.1
         version: 2.11.1
@@ -110,6 +113,9 @@ importers:
       prosemirror-state:
         specifier: ^1.4.4
         version: 1.4.4
+      prosemirror-transform:
+        specifier: ^1.12.1
+        version: 1.12.1
       prosemirror-view:
         specifier: ^1.42.3
         version: 1.42.3
@@ -2097,6 +2103,9 @@ packages:
 
   '@sableclient/tauri-plugin-livekit-mobile@0.3.0':
     resolution: {integrity: sha512-tKca6+NJ1S9EtQuCBTraa5r4lsj4jgsOStYIWvQNi3HvG0pHPGCcVN3paKa1Q7qOd+36KilDH4Yq6dQAYDh7/A==}
+
+  '@sableclient/twemoji-font@1.0.4':
+    resolution: {integrity: sha512-LzvQB/VZtv5KEq1VYq2azr7v7cYT8oklOVRGkAN2RNwa3sF0XcnqM3lBHSYRFXQleGLSUgs3gA0slbwkD2+sJw==}
 
   '@sentry/browser-utils@10.74.0':
     resolution: {integrity: sha512-/Rh3WH4i2nStdOqHpaWocbpSMFPjKhlxKQgp9vkJBSolqjJzXlIpLYXOrldZHHZLG1iDoX3PFBQkNDYcPXCg0A==}
@@ -6210,6 +6219,8 @@ snapshots:
   '@sableclient/tauri-plugin-livekit-mobile@0.3.0':
     dependencies:
       '@tauri-apps/api': 2.11.1
+
+  '@sableclient/twemoji-font@1.0.4': {}
 
   '@sentry/browser-utils@10.74.0':
     dependencies:

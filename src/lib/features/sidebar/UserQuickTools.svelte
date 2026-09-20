@@ -29,11 +29,14 @@
   let { mobile = false, compact = false, onNavigate }: Props = $props();
   const roomList = useRoomList();
 
-  let inboxCount = $derived(countNotifications(roomList.rooms) + countInvites(roomList.rooms));
+  const notificationMode = (roomId: string) => roomList.notificationMode(roomId);
+  let inboxCount = $derived(
+    countNotifications(roomList.rooms, notificationMode) + countInvites(roomList.rooms)
+  );
   let inboxCounts = $derived({
     unread: 0,
     highlight: inboxCount,
-    marked: hasMarkedUnread(roomList.rooms),
+    marked: hasMarkedUnread(roomList.rooms, notificationMode),
   });
 
   const mobileTools = [

@@ -34,7 +34,8 @@
     direct: 'inbox.filterDirect',
   };
 
-  let rooms = $derived(notifications(roomList.rooms, filter));
+  const notificationMode = (roomId: string) => roomList.notificationMode(roomId);
+  let rooms = $derived(notifications(roomList.rooms, filter, notificationMode));
   let visibleRooms = $derived(limit === undefined ? rooms : rooms.slice(0, limit));
 
   function roomHref(room: RoomSummary): string {
@@ -92,7 +93,7 @@
     <ul class="feed">
       {#each visibleRooms as room (room.room_id)}
         {@const name = roomName(room)}
-        {@const count = notificationCount(room)}
+        {@const count = notificationCount(room, notificationMode(room.room_id))}
         {@const line = preview(room)}
         {@const readable = room.latest_event?.event_id ?? null}
         <li>

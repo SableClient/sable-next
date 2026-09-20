@@ -23,6 +23,8 @@ mod sentry;
 mod share_inbox;
 #[cfg(desktop)]
 mod tray;
+#[cfg(all(feature = "cef", target_os = "linux"))]
+mod video_transcode;
 #[cfg(all(not(feature = "cef"), target_os = "linux"))]
 mod webkit;
 
@@ -98,6 +100,43 @@ async fn fetch_media(
 ) -> Result<Response, CommandErr> {
     let bytes = state.core.media_thumbnail(source, width, height).await?;
     Ok(Response::new(bytes))
+}
+
+/// The MIME type [`stream_video`] delivers.
+#[cfg(all(feature = "cef", target_os = "linux"))]
+#[tauri::command]
+#[allow(clippy::unnecessary_wraps)] // The frontend transport expects a Result.
+async fn video_stream_mime() -> Result<&'static str, CommandErr> {
+    Ok(video_transcode::STREAM_MIME)
+}
+
+/// Sends a re-encode over `chunks`, ending with the empty end-of-stream chunk.
+#[cfg(all(feature = "cef", target_os = "linux"))]
+#[tauri::command]
+async fn stream_video(
+    app: AppHandle<BrowserEngine>,
+    state: State<'_, AppState>,
+    source: String,
+    id: u64,
+    chunks: tauri::ipc::Channel<Response>,
+) -> Result<(), CommandErr> {
+    tracing::info!(%source, id, "video stream requested");
+    let input = state
+        .core
+        .media_thumbnail(source.clone(), 0, 0)
+        .await
+        .inspect_err(
+            |error| tracing::warn!(%source, ?error, "video stream could not fetch the attachment"),
+        )?;
+    tracing::info!(id, bytes = input.len(), "video stream fetched, encoding");
+    tauri::async_runtime::spawn_blocking(move || {
+        video_transcode::stream_to(&app, &source, &input, &chunks, id)
+    })
+    .await
+    .map_err(|error| {
+        tracing::error!(%error, "video encode task did not finish");
+        CommandErr::Unavailable
+    })?
 }
 
 pub(crate) fn decode_header(request: &Request<'_>, name: &str) -> Option<String> {
@@ -330,6 +369,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     webkit::configure(app.handle());
 
     map_tiles::cleanup_cache(app.handle());
+    #[cfg(all(feature = "cef", target_os = "linux"))]
+    video_transcode::cleanup_cache(app.handle());
 
     Ok(())
 }
@@ -441,11 +482,10 @@ fn auto_update_supported() -> bool {
     !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some()
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    // Two SDK sites log once per room per sync response, which on a phone costs
-    // more than they are worth: heroes it cannot name, and the latest-event
-    // builder choking on the bare `{}` a space child removal carries.
+/// Two SDK sites log once per room per sync response, which on a phone costs
+/// more than they are worth: heroes it cannot name, and the latest-event
+/// builder choking on the bare `{}` a space child removal carries.
+fn install_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
         tracing_subscriber::EnvFilter::new(
             "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off,matrix_sdk::http_client=off",
@@ -454,6 +494,11 @@ pub fn run() {
     if let Err(error) = tracing_subscriber::fmt().with_env_filter(filter).try_init() {
         eprintln!("could not install the log subscriber: {error}");
     }
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    install_logging();
 
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let _sentry_guard = sentry::init();
@@ -517,6 +562,10 @@ pub fn run() {
             submit_command,
             subscribe_events,
             fetch_media,
+            #[cfg(all(feature = "cef", target_os = "linux"))]
+            stream_video,
+            #[cfg(all(feature = "cef", target_os = "linux"))]
+            video_stream_mime,
             import_persona_avatar,
             send_attachment,
             send_attachment_base64,

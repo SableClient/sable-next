@@ -77,7 +77,7 @@
     display: flex;
     flex-direction: column;
     left: 0;
-    max-height: min(30dvh, calc((100dvh - var(--keyboard-height, 0px)) / 3));
+    max-height: min(30dvh, calc((100dvh - var(--keyboard-overlap)) / 3));
     overflow: hidden;
     position: absolute;
     right: 0;

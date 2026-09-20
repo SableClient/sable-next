@@ -50,15 +50,34 @@ test('an unknown filter falls back to showing everything', () => {
   expect(parseFilter('mentions')).toBe('mentions');
 });
 
-test('a room notifies on mentions only, a chat on any message', () => {
+test('all-message mode counts ordinary messages in channels and chats', () => {
   const rooms = [
     room({ room_id: '!chat', is_direct: true, unread: 3 }),
     room({ room_id: '!quiet-room', unread: 7 }),
     room({ room_id: '!loud-room', unread: 7, highlight: 2 }),
   ];
 
-  expect(notifications(rooms, 'all').map((each) => each.room_id)).toEqual(['!chat', '!loud-room']);
-  expect(countNotifications(rooms)).toBe(5);
+  const mode = () => 'all' as const;
+  expect(notifications(rooms, 'all', mode).map((each) => each.room_id)).toEqual([
+    '!chat',
+    '!quiet-room',
+    '!loud-room',
+  ]);
+  expect(countNotifications(rooms, mode)).toBe(17);
+});
+
+test('mentions-only and muted rooms do not contribute ordinary unread messages', () => {
+  const rooms = [
+    room({ room_id: '!mentions', unread: 7, highlight: 2 }),
+    room({ room_id: '!dm', is_direct: true, unread: 3 }),
+    room({ room_id: '!muted', unread: 4, highlight: 1 }),
+  ];
+  const mode = (roomId: string) =>
+    roomId === '!muted' ? ('mute' as const) : ('mentions' as const);
+  expect(notifications(rooms, 'all', mode).map((each) => each.room_id)).toEqual(['!mentions']);
+  expect(notifications(rooms, 'direct', mode)).toEqual([]);
+  expect(notifications(rooms, 'mentions', mode).map((each) => each.room_id)).toEqual(['!mentions']);
+  expect(countNotifications(rooms, mode)).toBe(2);
 });
 
 test('filters narrow to mentions or to chats', () => {

@@ -79,3 +79,41 @@ test('a throwing listener neither escapes the channel nor stops the batch', () =
   expect(seen).toEqual(['sync_state', 'sync_state']);
   expect(captureException).toHaveBeenCalledTimes(2);
 });
+
+test('a video stream is not whole until the end-of-stream marker arrives', async () => {
+  let channel: { onmessage: ((chunk: unknown) => void) | null } | undefined;
+  invoke.mockImplementation((command: string, args: unknown) => {
+    if (command === 'stream_video') {
+      channel = (args as { chunks: typeof channel }).chunks;
+    }
+    return Promise.resolve(undefined);
+  });
+  const transport = createTauriTransport();
+  const settle = async () => {
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+  };
+
+  const chunks: Uint8Array[] = [];
+  let settled = false;
+  const streaming = transport
+    .streamVideo('mxc://example.org/clip', 1, (chunk) => chunks.push(chunk))
+    .then(() => {
+      settled = true;
+    });
+
+  // The command resolves long before the channel has drained, so resolving on
+  // it handed the renderer a random prefix of the video.
+  await settle();
+  expect(settled).toBe(false);
+
+  channel?.onmessage?.(new Uint8Array([1, 2, 3]).buffer);
+  channel?.onmessage?.(new Uint8Array([4]).buffer);
+  await settle();
+  expect(settled).toBe(false);
+
+  channel?.onmessage?.(new ArrayBuffer(0));
+  await streaming;
+
+  expect(settled).toBe(true);
+  expect(chunks.flatMap((chunk) => [...chunk])).toEqual([1, 2, 3, 4]);
+});

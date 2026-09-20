@@ -20,6 +20,7 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
     name: 'Blobs',
     avatar_url: 'mxc://a/av',
     attribution: 'CC BY 4.0',
+    usage: ['emoticon', 'sticker'],
     images: [
       {
         shortcode: 'wave',
@@ -66,6 +67,24 @@ test('a pack usable for both leaves the usage key off, so the default applies', 
   const content = packEventContent(packDraft(pack()));
 
   expect((content.pack as Record<string, unknown>).usage).toBeUndefined();
+});
+
+test('a sticker-only pack keeps its usage through the editor', () => {
+  const content = packEventContent(packDraft(pack({ usage: ['sticker'] })));
+
+  expect((content.pack as Record<string, unknown>).usage).toEqual(['sticker']);
+});
+
+test('an image usage matching the pack is left to the pack', () => {
+  const draft = packDraft(pack());
+  const images = (
+    packEventContent({ ...draft, usage: ['sticker'] }).images as Record<
+      string,
+      Record<string, unknown>
+    >
+  ).wave;
+
+  expect(images.usage).toEqual(['emoticon', 'sticker']);
 });
 
 test('the meta round-trips', () => {

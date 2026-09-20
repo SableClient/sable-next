@@ -1,17 +1,11 @@
-import i18next from 'i18next';
-
 import type {
   PerMessageProfileView,
   TimelineItemContentView,
   TimelineItemView,
 } from '#src/generated/protocol';
-import { t } from '#lib/i18n.js';
+import { currentLocale, t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { ReplyPreviewStyle, TimelinePreferences } from '#lib/settings/preferences.svelte.js';
-
-function locale(): string {
-  return i18next.resolvedLanguage ?? i18next.language;
-}
 
 function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.toDateString() === b.toDateString();
@@ -127,10 +121,31 @@ function isVisibleEvent(
       if (item.content.change) return true;
       return preferences.showHiddenEvents;
     case 'hidden_event':
-      return preferences.showHiddenEvents;
+      return preferences.showHiddenEvents && preferences.hiddenEventOther;
     default:
       return true;
   }
+}
+
+export function visibleAggregations(
+  aggregations: readonly TimelineItemView[],
+  preferences: TimelinePreferences
+): readonly TimelineItemView[] {
+  if (!preferences.showHiddenEvents) return [];
+
+  return aggregations.filter((item) => {
+    if (item.content.kind !== 'hidden_event') return true;
+    switch (item.content.event_type) {
+      case 'm.reaction':
+        return preferences.hiddenEventReactions;
+      case 'm.room.redaction':
+        return preferences.hiddenEventRedactions;
+      case 'm.room.message':
+        return preferences.hiddenEventEdits;
+      default:
+        return preferences.hiddenEventOther;
+    }
+  });
 }
 
 export function mergeAggregations(
@@ -307,7 +322,7 @@ export function readReceiptEventId(
 }
 
 export function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString(locale(), {
+  return new Date(timestamp).toLocaleTimeString(currentLocale(), {
     hour: '2-digit',
     minute: '2-digit',
     ...(preferences.hour24Clock ? { hour12: false } : {}),
@@ -319,7 +334,7 @@ function pad(value: number): string {
 }
 
 function formatMessageDatePart(date: Date, includeYear: boolean): string {
-  return date.toLocaleDateString(locale(), {
+  return date.toLocaleDateString(currentLocale(), {
     day: 'numeric',
     month: 'long',
     ...(includeYear ? { year: 'numeric' } : {}),
@@ -361,7 +376,7 @@ export function formatDate(timestamp: number): string {
     case 'ymd':
       return `${year}-${month}-${day}`;
     default:
-      return date.toLocaleDateString(locale(), {
+      return date.toLocaleDateString(currentLocale(), {
         day: 'numeric',
         month: 'long',
         year: 'numeric',

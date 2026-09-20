@@ -13,6 +13,7 @@ export default defineConfig({
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',
     'room-settings-mobile.spec.ts',
+    'thread-panel.spec.ts',
     'settings-backdrop.spec.ts',
   ],
   workers: 1,

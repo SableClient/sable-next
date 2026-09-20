@@ -756,6 +756,9 @@ pub enum Command {
     SetNotificationSounds {
         enabled: bool,
     },
+    SetNotificationsEnabled {
+        enabled: bool,
+    },
     SetReadRoom {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         room_id: Option<OwnedRoomId>,
@@ -1275,6 +1278,7 @@ pub enum CommandOk {
     RemovePusher,
     SetNotificationContent,
     SetNotificationSounds,
+    SetNotificationsEnabled,
     SetReadRoom,
     SetPresence,
     FetchPresence,
@@ -2852,6 +2856,7 @@ pub struct ImagePackView {
     pub name: Option<String>,
     pub avatar_url: Option<String>,
     pub attribution: Option<String>,
+    pub usage: Vec<ImageUsageView>,
     pub images: Vec<PackImageView>,
 }
 

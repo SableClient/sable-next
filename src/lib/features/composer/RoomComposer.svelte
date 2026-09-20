@@ -12,7 +12,7 @@
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
@@ -152,8 +152,8 @@
   const draftKey = (): string => (threadRoot === null ? roomId : `${roomId}/${threadRoot}`);
 
   let prefilledFor: string | null = null;
+  let activeDraftKey = $state<string | null>(null);
   let nextStagedId = 0;
-  let restored = false;
   let preEdit: ProseMirrorNode | undefined;
   let loadedMembersFor = $state<string | null>(null);
   let loadedEmotesFor = $state<string | null>(null);
@@ -215,7 +215,13 @@
   let hasContent = $derived(!empty || staged.length > 0);
   let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
   let primaryAction = $derived(
-    !hasContent && !canDeleteEdited && voiceSupported && !micDenied ? 'record' : 'send'
+    !hasContent &&
+      !canDeleteEdited &&
+      preferences.composerVoiceButton &&
+      voiceSupported &&
+      !micDenied
+      ? 'record'
+      : 'send'
   );
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
@@ -333,15 +339,32 @@
 
   const queue = new SendQueue();
 
-  $effect(() => {
-    if (restored) return;
-    restored = true;
+  function persistDraft(key: string): void {
+    const doc = preEdit ?? (editor.isEmpty() ? undefined : editor.doc());
+    if (!doc && staged.length === 0) clearDraft(key);
+    else writeDraft(key, { doc: doc?.toJSON() ?? null, staged, nextStagedId });
+  }
 
-    const draft = readDraft(draftKey());
-    if (!draft) return;
-    staged = draft.staged;
-    nextStagedId = draft.nextStagedId;
-    if (draft.doc) editor.setDoc(composerSchema.nodeFromJSON(draft.doc));
+  $effect(() => {
+    const key = draftKey();
+    if (activeDraftKey === key) return;
+    const previous = activeDraftKey;
+    if (previous !== null) untrack(() => persistDraft(previous));
+    activeDraftKey = key;
+
+    untrack(() => {
+      const draft = readDraft(key);
+      if (draft) {
+        staged = draft.staged;
+        nextStagedId = draft.nextStagedId;
+        editor.clear();
+        if (draft.doc) editor.setDoc(composerSchema.nodeFromJSON(draft.doc));
+      } else if (previous !== null) {
+        staged = [];
+        nextStagedId = 0;
+        editor.clear();
+      }
+    });
   });
 
   onDestroy(() => {
@@ -350,10 +373,7 @@
     if (typingTimeout) clearTimeout(typingTimeout);
     stopTyping();
     queue.dispose();
-
-    const doc = preEdit ?? (editor.isEmpty() ? undefined : editor.doc());
-    if (!doc && staged.length === 0) clearDraft(draftKey());
-    else writeDraft(draftKey(), { doc: doc?.toJSON() ?? null, staged, nextStagedId });
+    if (activeDraftKey !== null) persistDraft(activeDraftKey);
   });
 
   $effect(() => {

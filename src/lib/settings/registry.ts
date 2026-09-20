@@ -29,6 +29,7 @@ import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
+import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
@@ -51,6 +52,7 @@ import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
+import { alertsNatively } from '#lib/platform/native-notifications.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
@@ -355,6 +357,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.uniformIconsHint',
         type: 'boolean',
       },
+      {
+        key: 'twitterEmoji',
+        icon: SmileyIcon,
+        name: 'settings.twitterEmoji',
+        description: 'settings.twitterEmojiHint',
+        type: 'boolean',
+      },
     ],
   },
   {
@@ -370,10 +379,12 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.fontScaleHint',
         type: 'select',
         options: [
-          { value: 'small', label: 'settings.fontScaleSmall' },
-          { value: 'default', label: 'settings.fontScaleDefault' },
-          { value: 'large', label: 'settings.fontScaleLarge' },
-          { value: 'largest', label: 'settings.fontScaleLargest' },
+          { value: 'smallest', label: '75%', literal: true },
+          { value: 'small', label: '94%', literal: true },
+          { value: 'default', label: '100%', literal: true },
+          { value: 'large', label: '113%', literal: true },
+          { value: 'largest', label: '125%', literal: true },
+          { value: 'huge', label: '150%', literal: true },
         ],
       },
       {
@@ -513,11 +524,19 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'showPronouns',
+        icon: UserCircleIcon,
+        name: 'settings.showPronouns',
+        description: 'settings.showPronounsHint',
+        type: 'boolean',
+      },
+      {
         key: 'filterPronounsByLanguage',
         icon: TranslateIcon,
         name: 'settings.filterPronounsByLanguage',
         description: 'settings.filterPronounsByLanguageHint',
         type: 'boolean',
+        gatedBy: 'showPronouns',
       },
       {
         key: 'pronounPillLimit',
@@ -530,6 +549,21 @@ export const settingsCategories: SettingsCategory[] = [
           { value: '2', label: 'settings.pronounPillLimitTwo' },
           { value: '3', label: 'settings.pronounPillLimitThree' },
           { value: 'all', label: 'settings.pronounPillLimitAll' },
+        ],
+        gatedBy: 'showPronouns',
+      },
+      {
+        key: 'pronounPillLength',
+        icon: TextAaIcon,
+        name: 'settings.pronounPillLength',
+        description: 'settings.pronounPillLengthHint',
+        type: 'select',
+        gatedBy: 'showPronouns',
+        options: [
+          { value: '12', label: '12' },
+          { value: '16', label: '16' },
+          { value: '24', label: '24' },
+          { value: 'all', label: 'settings.pronounPillLengthAll' },
         ],
       },
     ],
@@ -591,6 +625,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'composerVoiceButton',
+        icon: MicrophoneIcon,
+        name: 'settings.composerVoiceButton',
+        description: 'settings.composerVoiceButtonHint',
+        type: 'boolean',
+      },
+      {
         key: 'scheduleInEncryptedRooms',
         icon: LockIcon,
         name: 'settings.scheduleInEncryptedRooms',
@@ -626,6 +667,27 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.sendPresenceHint',
         type: 'boolean',
       },
+      {
+        key: 'blurMedia',
+        icon: ImageIcon,
+        name: 'settings.blurMedia',
+        description: 'settings.blurMediaHint',
+        type: 'boolean',
+      },
+      {
+        key: 'blurAvatars',
+        icon: UserCircleIcon,
+        name: 'settings.blurAvatars',
+        description: 'settings.blurAvatarsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'blurEmotes',
+        icon: SmileyIcon,
+        name: 'settings.blurEmotes',
+        description: 'settings.blurEmotesHint',
+        type: 'boolean',
+      },
       ...telemetrySettings,
     ],
   },
@@ -648,6 +710,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: FilmStripIcon,
         name: 'settings.autoplayGifs',
         description: 'settings.autoplayGifsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'autoplayStickers',
+        icon: StickerIcon,
+        name: 'settings.autoplayStickers',
+        description: 'settings.autoplayStickersHint',
         type: 'boolean',
       },
       {
@@ -694,10 +763,44 @@ export const settingsCategories: SettingsCategory[] = [
         supported: presentsInApp,
       },
       {
+        key: 'systemNotifications',
+        icon: BellIcon,
+        name: 'settings.desktopNotifications',
+        description: 'settings.systemNotificationsHint',
+        type: 'boolean',
+        supported: alertsNatively,
+      },
+      {
         key: 'notificationSounds',
         icon: SpeakerHighIcon,
         name: 'settings.notificationSounds',
         description: 'settings.notificationSoundsHint',
+        type: 'boolean',
+        gatedBy: 'desktopNotifications',
+        supported: presentsInApp,
+      },
+      {
+        key: 'notificationSounds',
+        icon: SpeakerHighIcon,
+        name: 'settings.notificationSounds',
+        description: 'settings.notificationSoundsHint',
+        type: 'boolean',
+        gatedBy: 'systemNotifications',
+        supported: alertsNatively,
+      },
+      {
+        key: 'backgroundNotificationSounds',
+        icon: SpeakerHighIcon,
+        name: 'settings.backgroundNotificationSounds',
+        description: 'settings.backgroundNotificationSoundsHint',
+        type: 'boolean',
+        gatedBy: 'notificationSounds',
+      },
+      {
+        key: 'notificationContent',
+        icon: ChatTextIcon,
+        name: 'settings.notificationContent',
+        description: 'settings.notificationContentHint',
         type: 'boolean',
         gatedBy: 'desktopNotifications',
         supported: presentsInApp,
@@ -708,7 +811,8 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.notificationContent',
         description: 'settings.notificationContentHint',
         type: 'boolean',
-        gatedBy: 'desktopNotifications',
+        gatedBy: 'systemNotifications',
+        supported: alertsNatively,
       },
       {
         key: 'notificationEncryptedContent',
@@ -733,11 +837,45 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'faviconForMentionsOnly',
+        icon: AtIcon,
+        name: 'settings.faviconForMentionsOnly',
+        description: 'settings.faviconForMentionsOnlyHint',
+        type: 'boolean',
+      },
+      {
         key: 'clearNotificationsOnRead',
         icon: CheckCircleIcon,
         name: 'settings.clearNotificationsOnRead',
         description: 'settings.clearNotificationsOnReadHint',
         type: 'boolean',
+      },
+      {
+        key: 'incomingCallSound',
+        icon: PhoneIcon,
+        name: 'settings.incomingCallSound',
+        description: 'settings.incomingCallSoundHint',
+        type: 'boolean',
+      },
+      {
+        key: 'outgoingRingback',
+        icon: PhoneIcon,
+        name: 'settings.outgoingRingback',
+        description: 'settings.outgoingRingbackHint',
+        type: 'boolean',
+      },
+      {
+        key: 'callRingtoneVolume',
+        icon: SpeakerHighIcon,
+        name: 'settings.callRingtoneVolume',
+        description: 'settings.callRingtoneVolumeHint',
+        type: 'select',
+        gatedBy: 'incomingCallSound',
+        options: [
+          { value: 'quiet', label: 'settings.callRingtoneVolumeQuiet' },
+          { value: 'normal', label: 'settings.callRingtoneVolumeNormal' },
+          { value: 'loud', label: 'settings.callRingtoneVolumeLoud' },
+        ],
       },
       {
         key: 'ringForGroupCalls',
@@ -835,6 +973,38 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.showHiddenEventsHint',
         type: 'boolean',
         gatedBy: 'developerTools',
+      },
+      {
+        key: 'hiddenEventEdits',
+        icon: PencilSimpleIcon,
+        name: 'settings.hiddenEventEdits',
+        description: 'settings.hiddenEventEditsHint',
+        type: 'boolean',
+        gatedBy: 'showHiddenEvents',
+      },
+      {
+        key: 'hiddenEventReactions',
+        icon: SmileyIcon,
+        name: 'settings.hiddenEventReactions',
+        description: 'settings.hiddenEventReactionsHint',
+        type: 'boolean',
+        gatedBy: 'showHiddenEvents',
+      },
+      {
+        key: 'hiddenEventRedactions',
+        icon: TrashIcon,
+        name: 'settings.hiddenEventRedactions',
+        description: 'settings.hiddenEventRedactionsHint',
+        type: 'boolean',
+        gatedBy: 'showHiddenEvents',
+      },
+      {
+        key: 'hiddenEventOther',
+        icon: DotsThreeIcon,
+        name: 'settings.hiddenEventOther',
+        description: 'settings.hiddenEventOtherHint',
+        type: 'boolean',
+        gatedBy: 'showHiddenEvents',
       },
     ],
   },

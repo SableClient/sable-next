@@ -9,7 +9,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { ComposerContext } from './composer-context';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
-import { clearDrafts, writeDraft } from './composer-drafts.svelte';
+import { clearDraft, clearDrafts, writeDraft } from './composer-drafts.svelte';
 import { ComposerEditor } from './editor/composer-editor';
 import { composerSchema } from './editor/schema';
 import Harness from './RoomComposerHarness.test.svelte';
@@ -42,6 +42,7 @@ const packs: ImagePackView[] = [
     name: 'Room pack',
     avatar_url: null,
     attribution: null,
+    usage: ['emoticon', 'sticker'],
     images: [
       {
         shortcode: 'wave',
@@ -89,11 +90,13 @@ interface ComposerProps {
   roomName?: string;
   registerReply?: (reply: () => void) => void;
   registerContext?: (set: (next: ComposerContext | null) => void) => void;
+  registerRoom?: (set: (roomId: string) => void) => void;
 }
 
 function render({
   registerReply,
   registerContext,
+  registerRoom,
   ...composer
 }: ComposerProps): ReturnType<typeof mount> {
   return mount(Harness, {
@@ -102,6 +105,7 @@ function render({
       core: core(),
       registerReply,
       registerContext,
+      registerRoom,
       composer: {
         onSend: async () => {},
         onSendAttachment: async () => {},
@@ -646,6 +650,33 @@ test('another room does not inherit the draft', async () => {
 
   expect(stagedNames()).toEqual([]);
   void unmount(second);
+});
+
+test('switching rooms saves the active draft under its original room', async () => {
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('half a thought')]),
+  ]);
+  writeDraft('!first:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  let switchRoom: ((roomId: string) => void) | undefined;
+  const first = render({
+    roomId: '!first:example.org',
+    registerRoom: (set) => {
+      switchRoom = set;
+    },
+  });
+  await tick();
+  clearDraft('!first:example.org');
+
+  switchRoom?.('!second:example.org');
+  await tick();
+  await unmount(first);
+  document.body.replaceChildren();
+
+  const reopened = render({ roomId: '!first:example.org' });
+  await tick();
+
+  expect(editorText()).toBe('half a thought');
+  void unmount(reopened);
 });
 
 test('a thread keeps its draft out of the room it hangs off', async () => {

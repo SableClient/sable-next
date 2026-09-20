@@ -3,7 +3,7 @@
   import type { PerMessageProfileView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import { preferredPronouns } from '#lib/personas/pronouns.js';
+  import { clampPronoun, preferredPronouns, pronounPillLength } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
@@ -30,12 +30,16 @@
   let displayName = $derived(profile.display_name ?? accountName);
   let accountLabel = $derived(displayName === accountName ? accountId : accountName);
   let pronouns = $derived(
-    (preferences.filterPronounsByLanguage
-      ? preferredPronouns(profile.pronouns, $i18n.resolvedLanguage ?? $i18n.language)
-      : profile.pronouns
-    )
-      .map((pronoun) => pronoun.summary)
-      .join(' · ')
+    !preferences.showPronouns
+      ? ''
+      : (preferences.filterPronounsByLanguage
+          ? preferredPronouns(profile.pronouns, $i18n.resolvedLanguage ?? $i18n.language)
+          : profile.pronouns
+        )
+          .map((pronoun) =>
+            clampPronoun(pronoun.summary, pronounPillLength(preferences.pronounPillLength))
+          )
+          .join(' · ')
   );
 </script>
 

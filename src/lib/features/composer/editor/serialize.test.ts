@@ -4,7 +4,14 @@ import { Fragment, Slice, type Node as ProseMirrorNode } from 'prosemirror-model
 import { describe, expect, test } from 'vitest';
 
 import { composerSchema, parseMatrixHtml } from './schema';
-import { markdownFromSlice, serializeComposer, serializePlain, textDoc } from './serialize';
+import {
+  markdownFromSlice,
+  markdownSlice,
+  serializeComposer,
+  serializePlain,
+  textDoc,
+  textSlice,
+} from './serialize';
 
 const { doc, paragraph, heading, blockquote, bullet_list, list_item, mention, emoticon } =
   composerSchema.nodes;
@@ -521,4 +528,105 @@ test('copying a selection out of the composer yields markdown', () => {
   );
 
   expect(markdownFromSlice(slice)).toBe('a **bold**');
+});
+
+describe('markdown fallbacks for nodes the toolbar cannot make', () => {
+  test('inline and block maths are written as dollar fences', () => {
+    const doc = parseMatrixHtml(
+      '<p>see <span data-mx-maths="x^2">x</span></p><div data-mx-maths="y"></div>'
+    );
+    expect(serializeComposer(doc).body).toBe('see $x^2$\n\n$$\ny\n$$');
+  });
+
+  test('an inline image falls back to its alt text, or its address without one', () => {
+    const named = parseMatrixHtml('<p>a <img src="mxc://x/y" alt="cat"> b</p>');
+    expect(serializePlain(named).body).toBe('a cat b');
+    const bare = parseMatrixHtml('<p><img src="mxc://x/y"></p>');
+    expect(serializePlain(bare).body).toBe('mxc://x/y');
+  });
+
+  test('a room ping node is written as @room in the source view', () => {
+    const doc = docOf(para([composerSchema.nodes.room_ping.create(), composerSchema.text(' hi')]));
+    expect(markdownFromSlice(new Slice(doc.content, 0, 0))).toBe('@room hi');
+  });
+
+  test('a link whose text is its address stays bare even when linked text follows', () => {
+    const doc = docOf(
+      para([
+        composerSchema.text('https://a.b', [link.create({ href: 'https://a.b' })]),
+        composerSchema.text(' and '),
+        composerSchema.text('docs', [link.create({ href: 'https://a.b/docs' })]),
+      ])
+    );
+    expect(serializeComposer(doc).body).toBe('https://a.b and [docs](https://a.b/docs)');
+  });
+
+  test('an address whose linked text runs on is written with markdown syntax', () => {
+    const mark = link.create({ href: 'https://a.b' });
+    const doc = docOf(
+      para([
+        composerSchema.text('https://a.b', [mark]),
+        composerSchema.text(' more', [mark, strong.create()]),
+      ])
+    );
+    expect(serializeComposer(doc).body).toBe('[https://a.b **more**](https://a.b)');
+  });
+});
+
+describe('image pack references', () => {
+  test('an emote with a malformed source pack sends no reference', () => {
+    const doc = docOf(
+      para([
+        emoticon.create({
+          url: 'mxc://x/y',
+          shortcode: 'z',
+          sourcePack: { room_id: '!r:x', state_key: 'p' },
+        }),
+      ])
+    );
+    expect(serializeComposer(doc).imageSourcePacks).toBeUndefined();
+  });
+
+  test('a well-formed source pack is referenced once per emote', () => {
+    const sourcePack = { room_id: '!r:x', state_key: 'p', shortcode: 'z', via: ['x'] };
+    const doc = docOf(para([emoticon.create({ url: 'mxc://x/y', shortcode: 'z', sourcePack })]));
+    expect(serializeComposer(doc).imageSourcePacks).toEqual([
+      { url: 'mxc://x/y', source: sourcePack },
+    ]);
+  });
+});
+
+describe('clipboard slices', () => {
+  test('several pasted paragraphs become blocks, one becomes inline content', () => {
+    const multi = markdownSlice('# Title\n\n- a\n- b');
+    expect(multi.content.childCount).toBe(2);
+    expect(multi.content.firstChild?.type.name).toBe('heading');
+    expect(multi.content.child(1).type.name).toBe('bullet_list');
+
+    const single = markdownSlice('just *this*');
+    expect(single.content.firstChild?.isInline).toBe(true);
+  });
+
+  test('a fenced paste keeps its language and a numbered paste its start', () => {
+    const slice = markdownSlice('```rust\nfn main() {}\n```\n\n3. three');
+    expect(slice.content.firstChild?.attrs.language).toBe('rust');
+    expect(slice.content.child(1).attrs.order).toBe(3);
+  });
+
+  test('a plain paste with blank lines becomes paragraphs, with single breaks kept', () => {
+    const slice = textSlice('one\ntwo\r\n\r\nthree');
+    expect(slice.content.childCount).toBe(2);
+    expect(slice.content.firstChild?.child(1).type.name).toBe('hard_break');
+    expect(slice.content.child(1).textContent).toBe('three');
+
+    expect(textSlice('single').content.firstChild?.isInline).toBe(true);
+  });
+
+  test('an empty rich document has an empty body and no formatted body', () => {
+    expect(serializeComposer(parseMatrixHtml('<p><strong></strong></p>'))).toEqual({
+      body: '',
+      formatted: null,
+      mentions: { userIds: [], room: false },
+    });
+  });
 });

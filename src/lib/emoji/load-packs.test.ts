@@ -10,6 +10,7 @@ const cached: ImagePackView[] = [
     name: null,
     avatar_url: null,
     attribution: null,
+    usage: ['emoticon', 'sticker'],
     images: [],
   },
 ];

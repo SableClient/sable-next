@@ -102,3 +102,29 @@ test('an edit with no composition before it runs no rule', () => {
 
   expect(editor().state.doc.textContent).toBe('~~b~~');
 });
+
+test('a fence composed on a soft line below other text opens a block after it', () => {
+  open();
+  editor().dispatch(
+    editor().state.tr.insertText('look:').insert(6, composerSchema.nodes.hard_break.create())
+  );
+  commit('```rust ');
+
+  const doc = editor().state.doc;
+  expect(doc.childCount).toBe(2);
+  expect(doc.firstChild?.textContent).toBe('look:');
+  expect(doc.child(1).type.name).toBe('code_block');
+  expect(doc.child(1).attrs.language).toBe('rust');
+});
+
+test('a bullet composed on a soft line makes a list after the text', () => {
+  open();
+  editor().dispatch(
+    editor().state.tr.insertText('list:').insert(6, composerSchema.nodes.hard_break.create())
+  );
+  commit('- ');
+
+  const doc = editor().state.doc;
+  expect(doc.firstChild?.textContent).toBe('list:');
+  expect(doc.child(1).type.name).toBe('bullet_list');
+});

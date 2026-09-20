@@ -4,7 +4,7 @@ import { endSystemCall, reportIncomingSystemCall } from '#lib/platform/calls.js'
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { ignoreError } from './call-transport';
-import { startRingtone, type Ringtone } from './ringtone';
+import { ringtoneVolume, startRingtone, type Ringtone } from './ringtone';
 
 export type IncomingCall = {
   roomId: string;
@@ -130,9 +130,11 @@ export class IncomingCalls {
   }
 
   #syncRingtone(): void {
-    const shouldRing = this.calls.some((call) => !this.#system.has(call.notificationEventId));
+    const shouldRing =
+      preferences.incomingCallSound &&
+      this.calls.some((call) => !this.#system.has(call.notificationEventId));
     if (shouldRing && !this.#ringtone) {
-      this.#ringtone = startRingtone();
+      this.#ringtone = startRingtone(ringtoneVolume(preferences.callRingtoneVolume));
       return;
     }
     if (!shouldRing && this.#ringtone) {

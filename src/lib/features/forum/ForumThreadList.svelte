@@ -20,23 +20,23 @@
 <div class="forum-thread-list">
   {#if threads.length === 0 && !loading}
     <p class="forum-thread-list-empty">{$i18n.t('forum.empty')}</p>
-  {:else}
+  {:else if threads.length > 0}
     <ul aria-label={$i18n.t('forum.threads')}>
       {#each threads as thread (thread.id)}
         <ForumThreadItem {thread} {onOpen} />
       {/each}
     </ul>
-    {#if canLoadMore}
-      <div class="forum-thread-list-more">
-        <Button variant="ghost" size="small" onclick={onLoadMore} {loading}>
-          {$i18n.t('forum.loadMore')}
-        </Button>
-      </div>
-    {:else if loading}
-      <div class="forum-thread-list-more">
-        <Spinner small label={$i18n.t('a11y.loading')} />
-      </div>
-    {/if}
+  {/if}
+  {#if canLoadMore}
+    <div class="forum-thread-list-more">
+      <Button variant="ghost" size="small" onclick={onLoadMore} {loading}>
+        {$i18n.t('forum.loadMore')}
+      </Button>
+    </div>
+  {:else if loading}
+    <div class="forum-thread-list-more">
+      <Spinner small label={$i18n.t('a11y.loading')} />
+    </div>
   {/if}
 </div>
 

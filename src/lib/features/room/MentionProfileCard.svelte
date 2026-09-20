@@ -29,7 +29,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { preferredPronouns } from '#lib/personas/pronouns.js';
+  import { clampPronoun, preferredPronouns, pronounPillLength } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
@@ -47,6 +47,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
+  import type { MatrixLink } from './matrix-link.js';
   import MutualRoomsPanel from './MutualRoomsPanel.svelte';
   import { senderColor } from './timeline-format';
 
@@ -60,6 +61,7 @@
     permissions?: RoomPermissionsView | null;
     profile: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     failed?: boolean;
     variant?: 'popover' | 'sheet';
   }
@@ -72,6 +74,7 @@
     permissions = null,
     profile,
     onAvatarClick,
+    onMatrixLink,
     failed = false,
     variant = 'popover',
   }: Props = $props();
@@ -104,12 +107,19 @@
   let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let pronouns = $derived(
-    (preferences.filterPronounsByLanguage
-      ? preferredPronouns(currentProfile?.pronouns ?? [], $i18n.resolvedLanguage ?? $i18n.language)
-      : (currentProfile?.pronouns ?? [])
-    )
-      .map((pronoun) => pronoun.summary)
-      .join(', ')
+    !preferences.showPronouns
+      ? ''
+      : (preferences.filterPronounsByLanguage
+          ? preferredPronouns(
+              currentProfile?.pronouns ?? [],
+              $i18n.resolvedLanguage ?? $i18n.language
+            )
+          : (currentProfile?.pronouns ?? [])
+        )
+          .map((pronoun) =>
+            clampPronoun(pronoun.summary, pronounPillLength(preferences.pronounPillLength))
+          )
+          .join(', ')
   );
   let localTime = $derived.by(() => {
     const timezone = currentProfile?.timezone;
@@ -521,7 +531,7 @@
   {#if showFailure}
     <Alert variant="warning" role="status">{$i18n.t('timeline.profileUnavailable')}</Alert>
   {:else if currentProfile?.bio}
-    <FormattedBody html={currentProfile.bio} />
+    <FormattedBody html={currentProfile.bio} {onMatrixLink} />
   {/if}
 {/snippet}
 

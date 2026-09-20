@@ -103,7 +103,8 @@
       <h2 id={`settings-${category.id}`} class="screen-reader-only">{$i18n.t(category.name)}</h2>
       <ul class="settings">
         {#each items as setting (setting.key)}
-          {@const disabled = setting.unavailable === true || gated(setting)}
+          {@const gate = gated(setting)}
+          {@const disabled = setting.unavailable === true || gate}
           {@const anchor = settingFocusId(setting.key)}
           <SettingsRow
             id={anchor}
@@ -142,7 +143,7 @@
               <Switch
                 {disabled}
                 label={$i18n.t(setting.name)}
-                checked={preferences[key]}
+                checked={gate ? false : preferences[key]}
                 onCheckedChange={(checked: boolean) => {
                   setPreference(key, checked);
                   setting.onChange?.(checked);

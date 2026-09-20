@@ -70,6 +70,11 @@ export class RoomList {
     return this.notificationModes.get(roomId)?.room ?? null;
   }
 
+  notificationMode(roomId: string): NotificationModeView | null {
+    const mode = this.notificationModes.get(roomId);
+    return mode?.room ?? mode?.fallback ?? null;
+  }
+
   async start(): Promise<void> {
     if (this.subscription !== null) return;
     if (this.startPromise) return this.startPromise;

@@ -3,6 +3,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { RoomSummary } from '#src/generated/protocol';
 
+import { countNotifications, notifications } from '#lib/features/inbox/inbox.js';
+
 import { RoomList } from './room-list.svelte.js';
 
 afterEach(() => {
@@ -56,6 +58,52 @@ test('resolves notification modes for the whole list in one command', async () =
 
   expect(roomNotificationModes).toHaveBeenCalledTimes(1);
   expect(roomNotificationModes.mock.calls[0]?.[0]).toHaveLength(20);
+  expect(roomList.notificationMode('!room-0:example.org')).toBe('all');
+  expect(roomList.notificationMode('!room-1:example.org')).toBe('mute');
+  roomList.stop();
+});
+
+test('inbox counts follow room overrides and default changes', async () => {
+  const rooms = [
+    { room_id: '!inherited', state: 'joined', unread: 2, highlight: 0 },
+    { room_id: '!override', state: 'joined', unread: 3, highlight: 0 },
+  ] as RoomSummary[];
+  let fallback = 'mentions' as 'all' | 'mentions';
+  const listeners: ((event: unknown) => void)[] = [];
+  const core = {
+    subscribeEvents: (listener: (event: unknown) => void) => {
+      listeners.push(listener);
+      return () => {};
+    },
+    commands: {
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms }),
+      roomNotificationModes: () =>
+        Promise.resolve(
+          rooms.map((room) => ({
+            room_id: room.room_id,
+            room: room.room_id === '!override' ? 'all' : null,
+            default: fallback,
+          }))
+        ),
+      unsubscribe: async () => {},
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  const mode = (roomId: string) => roomList.notificationMode(roomId);
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(countNotifications(roomList.rooms, mode)).toBe(3);
+  });
+  expect(notifications(roomList.rooms, 'all', mode).map((room) => room.room_id)).toEqual([
+    '!override',
+  ]);
+
+  fallback = 'all';
+  for (const listener of listeners) listener({ type: 'notification_settings_changed' });
+  await vi.waitFor(() => {
+    expect(countNotifications(roomList.rooms, mode)).toBe(5);
+  });
+  expect(notifications(roomList.rooms, 'mentions', mode)).toEqual([]);
   roomList.stop();
 });
 

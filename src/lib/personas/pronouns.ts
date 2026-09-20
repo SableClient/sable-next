@@ -1,6 +1,6 @@
 import type { PronounView } from '#src/generated/protocol';
 
-import type { PronounPillLimit } from '#lib/settings/preferences.svelte.js';
+import type { PronounPillLength, PronounPillLimit } from '#lib/settings/preferences.svelte.js';
 
 export function parsePronouns(input: string): PronounView[] {
   return input
@@ -41,14 +41,27 @@ export function pronounPillLimit(setting: PronounPillLimit): number {
   return setting === 'all' ? Number.POSITIVE_INFINITY : Number(setting);
 }
 
+export function pronounPillLength(setting: PronounPillLength): number {
+  return setting === 'all' ? Number.POSITIVE_INFINITY : Number(setting);
+}
+
+export function clampPronoun(summary: string, maxLength: number): string {
+  return summary.length > maxLength ? `${summary.slice(0, Math.max(1, maxLength - 1))}…` : summary;
+}
+
 export function visiblePronouns(
   pronouns: readonly PronounView[],
   {
     language,
     filterByLanguage = true,
     limit = DEFAULT_VISIBLE_PRONOUNS,
-  }: { language: string; filterByLanguage?: boolean; limit?: number }
+    maxLength = Number.POSITIVE_INFINITY,
+  }: { language: string; filterByLanguage?: boolean; limit?: number; maxLength?: number }
 ): { visible: PronounView[]; overflow: PronounView[] } {
   const preferred = filterByLanguage ? preferredPronouns(pronouns, language) : [...pronouns];
-  return { visible: preferred.slice(0, limit), overflow: preferred.slice(limit) };
+  const clamped = preferred.map((pronoun) => ({
+    ...pronoun,
+    summary: clampPronoun(pronoun.summary, maxLength),
+  }));
+  return { visible: clamped.slice(0, limit), overflow: clamped.slice(limit) };
 }

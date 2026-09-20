@@ -11,6 +11,10 @@ export interface NativeNotificationAction extends NativeNotificationTarget {
   text: string | null;
 }
 
+export interface NativePushMessage {
+  message: string;
+}
+
 export function alertsNatively(): boolean {
   return isTauri();
 }
@@ -109,6 +113,25 @@ export async function watchNativeNotificationClicks(
   };
 }
 
+export async function watchNativePushMessages(
+  handler: (message: NativePushMessage) => void
+): Promise<() => void> {
+  if (!isTauri()) return () => {};
+
+  const listener = await addPluginListener('notifications', 'push-message', (event: unknown) => {
+    const message = readPushMessage(event);
+    if (message !== null) handler({ message });
+  });
+  await invoke('plugin:notifications|set_push_message_listener_active', { active: true });
+
+  return () => {
+    void invoke('plugin:notifications|set_push_message_listener_active', { active: false }).catch(
+      () => undefined
+    );
+    void listener.unregister().catch(() => undefined);
+  };
+}
+
 function text(value: unknown): string | null {
   return typeof value === 'string' && value !== '' ? value : null;
 }
@@ -137,4 +160,12 @@ export function readAction(value: unknown): NativeNotificationAction | null {
 
   const typed = text(event.inputValue);
   return { ...target, actionId, text: typed === null ? null : text(typed.trim()) };
+}
+
+export function readPushMessage(value: unknown): string | null {
+  if (value === null || typeof value !== 'object') return null;
+  const event = value as { message?: unknown; data?: unknown };
+  if (typeof event.message === 'string') return event.message;
+  if (event.data === null || typeof event.data !== 'object') return null;
+  return JSON.stringify(event.data);
 }

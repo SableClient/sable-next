@@ -18,11 +18,12 @@ const apkUrl = `${server}/${repository}/releases/download/${tag}/${apkName}`;
 // Obtainium fills in every other setting from its own defaults on import.
 const additionalSettings = {
   about: `The next Sable Matrix client${isNightly ? ' (nightly)' : ''}`,
+  fallbackToOlderReleases: true,
   // The nightly tag name never changes, so the version has to come from the
   // release date instead.
   ...(isNightly && {
     includePrereleases: true,
-    useLatestAssetDateAsReleaseDate: true,
+    filterReleaseTitlesByRegEx: '^Nightly',
     releaseDateAsVersion: true,
     versionDetection: false,
   }),

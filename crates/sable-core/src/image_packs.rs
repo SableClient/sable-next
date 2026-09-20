@@ -27,6 +27,13 @@ pub struct PackContent {
     pub pack: Option<PackMeta>,
 }
 
+impl PackContent {
+    #[must_use]
+    pub fn is_deleted(&self) -> bool {
+        self.images.is_empty() && self.pack.is_none()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PackImage {
     pub url: String,
@@ -159,6 +166,7 @@ pub fn pack_view(
             .pack
             .as_ref()
             .and_then(|meta| meta.attribution.clone()),
+        usage: usages(pack_usage),
         images,
     }
 }
@@ -467,6 +475,9 @@ impl Core {
             if wanted.is_some_and(|keys| !keys.contains(&state_key)) {
                 continue;
             }
+            if event.content.is_deleted() {
+                continue;
+            }
             let mut view = pack_view(
                 event.content,
                 state_key,
@@ -621,6 +632,14 @@ mod tests {
         assert_eq!(view.attribution.as_deref(), Some("CC BY 4.0"));
         assert_eq!(view.room_id.as_deref(), Some("!r:example.org"));
         assert_eq!(view.images[0].body.as_deref(), Some("blob party"));
+    }
+
+    #[test]
+    fn an_emptied_state_event_is_a_deleted_pack() {
+        assert!(parse("{}").is_deleted());
+        assert!(parse(r#"{"images":{}}"#).is_deleted());
+        assert!(!parse(r#"{"pack":{"display_name":"Blobs"},"images":{}}"#).is_deleted());
+        assert!(!parse(r#"{"images":{"blob":{"url":"mxc://a/b"}}}"#).is_deleted());
     }
 
     #[test]

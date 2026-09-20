@@ -7,6 +7,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import ThreadPanel from '#lib/features/room/ThreadPanel.svelte';
   import { Conversation } from '#lib/features/room/conversation.svelte.js';
+  import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -24,6 +25,8 @@
   import ForumHeader from './ForumHeader.svelte';
   import ForumThreadList from './ForumThreadList.svelte';
 
+  const AUTO_FILL_ROUNDS = 10;
+
   interface Props {
     roomId: string;
   }
@@ -36,6 +39,8 @@
   const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
   const forumThreads = new ForumThreads(core);
   const memberLoader = new RoomMemberLoader();
+  const pinnedEvents = new PinnedEvents(core.commands);
+  providePinnedEvents(pinnedEvents);
 
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
@@ -44,6 +49,7 @@
   let desktop = $derived(sidePanels.matches);
   let threadRootId = $state<string | null>(null);
   let permissions = $state<RoomPermissionsView | null>(null);
+  let autoFills = 0;
 
   const conversation = new Conversation({
     core,
@@ -54,6 +60,7 @@
   });
 
   $effect(() => {
+    autoFills = 0;
     void forumThreads.start(resolvedRoomId);
     return () => {
       void forumThreads.stop();
@@ -61,8 +68,20 @@
   });
 
   $effect(() => {
+    if (forumThreads.threads.length > 0) return;
+    if (forumThreads.loading || forumThreads.backwardPagination !== 'idle') return;
+    if (autoFills >= AUTO_FILL_ROUNDS) return;
+    autoFills += 1;
+    forumThreads.paginateBackward(50).catch(() => {});
+  });
+
+  $effect(() => {
     void resolvedRoomId;
     memberLoader.reset();
+  });
+
+  $effect(() => {
+    void pinnedEvents.load(resolvedRoomId);
   });
 
   $effect(() => {
@@ -171,7 +190,7 @@
     />
     <ForumThreadList
       threads={forumThreads.threads}
-      loading={forumThreads.loading}
+      loading={forumThreads.loading || forumThreads.backwardPagination === 'loading'}
       canLoadMore={forumThreads.backwardPagination === 'idle'}
       onOpen={openThread}
       onLoadMore={loadMoreThreads}

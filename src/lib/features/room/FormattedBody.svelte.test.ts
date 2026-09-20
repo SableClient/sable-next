@@ -54,27 +54,35 @@ test('opens Matrix links through the room-level handler', async () => {
   await unmount(instance);
 });
 
-test('prefixes a user mention with its sigil', async () => {
+test.each([
+  '<a href="matrix:u/ana:example.org">Ana</a>',
+  '<a href="matrix:somethingnewer/abc">Future</a>',
+])('never lets a matrix: link reach the browser: %s', async (html) => {
+  const instance = mount(FormattedBody, { target: document.body, props: { html } });
+  await tick();
+
+  const anchor = document.querySelector('a');
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+  anchor?.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+  await unmount(instance);
+});
+
+test.each([
+  ['\u2190', '@ezera'],
+  ['Ana', '@ezera'],
+  ['@ezera:example.org', '@ezera'],
+])('labels a user mention from the id, not the author text %s', async (label, expected) => {
   const instance = mount(FormattedBody, {
     target: document.body,
-    props: { html: '<a href="https://matrix.to/#/@ana:example.org">Ana</a>' },
+    props: { html: `<a href="https://matrix.to/#/@ezera:example.org">${label}</a>` },
   });
   await tick();
 
   const anchor = document.querySelector<HTMLAnchorElement>('a');
   expect(anchor?.dataset.matrixLink).toBe('user');
-  expect(anchor?.textContent).toBe('@Ana');
-  await unmount(instance);
-});
-
-test('leaves a user mention that already carries its sigil alone', async () => {
-  const instance = mount(FormattedBody, {
-    target: document.body,
-    props: { html: '<a href="https://matrix.to/#/@ana:example.org">@ana:example.org</a>' },
-  });
-  await tick();
-
-  expect(document.querySelector('a')?.textContent).toBe('@ana:example.org');
+  expect(anchor?.textContent).toBe(expected);
   await unmount(instance);
 });
 

@@ -90,6 +90,10 @@
     document.documentElement.dataset.fontScale = preferences.fontScale;
     document.documentElement.dataset.highContrast = preferences.highContrast ? 'on' : 'off';
     document.documentElement.dataset.reducedMotion = preferences.reducedMotion ? 'on' : 'off';
+    document.documentElement.dataset.twitterEmoji = preferences.twitterEmoji ? 'on' : 'off';
+    document.documentElement.dataset.blurMedia = preferences.blurMedia ? 'on' : 'off';
+    document.documentElement.dataset.blurAvatars = preferences.blurAvatars ? 'on' : 'off';
+    document.documentElement.dataset.blurEmotes = preferences.blurEmotes ? 'on' : 'off';
   });
 
   $effect(() => {

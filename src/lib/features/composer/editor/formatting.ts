@@ -1,11 +1,13 @@
 import { lift, setBlockType, toggleMark } from 'prosemirror-commands';
-import { InputRule, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
-import type { MarkType, Node as ProseMirrorNode, NodeType } from 'prosemirror-model';
+import { InputRule } from 'prosemirror-inputrules';
+import type { Attrs, MarkType, Node as ProseMirrorNode, NodeType } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
-import type { Command, EditorState } from 'prosemirror-state';
+import { TextSelection, type Command, type EditorState, type Transaction } from 'prosemirror-state';
+import { canJoin, findWrapping } from 'prosemirror-transform';
 import { wrapIn } from 'prosemirror-commands';
 
 import { composerSchema } from './schema';
+import { atomText } from './serialize';
 
 const nodes = composerSchema.nodes;
 const marks = composerSchema.marks;
@@ -33,31 +35,105 @@ function markRule(pattern: RegExp, type: MarkType): InputRule {
   );
 }
 
-const URL_PATTERN = /(?:^|[\s(])((?:https?:\/\/|www\.)[^\s<>()]*[^\s<>().,;:!?'"])([\s)])$/;
+const URL_PATTERN =
+  /(?:^|[\s(])((?:https?:\/\/|www\.)[^\s<>()]*[^\s<>().,;:!?'"])[.,;:!?'"]*([\s)])$/;
+
+const LINE_BREAK = '\uFFFC';
+
+type LineHandler = (
+  tr: Transaction,
+  match: RegExpMatchArray,
+  start: number,
+  end: number
+) => boolean;
+
+function lineRule(pattern: RegExp, handler: LineHandler): InputRule {
+  return new InputRule(pattern, (state, match, start, end) => {
+    const tr = state.tr;
+    if (match[0].startsWith(LINE_BREAK)) {
+      if (state.doc.nodeAt(start)?.type !== nodes.hard_break) return null;
+      tr.delete(start, start + 1).split(start);
+      const offset = tr.mapping.map(start, 1) - start;
+      start += offset;
+      end += offset - 1;
+    }
+    return handler(tr, match, start, end) ? tr : null;
+  });
+}
+
+function lineTextblockRule(
+  pattern: RegExp,
+  type: NodeType,
+  getAttrs: (match: RegExpMatchArray) => Attrs
+): InputRule {
+  return lineRule(pattern, (tr, match, start, end) => {
+    const $start = tr.doc.resolve(start);
+    if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), type))
+      return false;
+    tr.delete(start, end).setBlockType(start, start, type, getAttrs(match));
+    return true;
+  });
+}
+
+function lineWrappingRule(
+  pattern: RegExp,
+  type: NodeType,
+  getAttrs?: (match: RegExpMatchArray) => Attrs,
+  joinPredicate?: (match: RegExpMatchArray, node: ProseMirrorNode) => boolean
+): InputRule {
+  return lineRule(pattern, (tr, match, start, end) => {
+    tr.delete(start, end);
+    const $start = tr.doc.resolve(start);
+    if (type === nodes.blockquote && $start.node(-1).type === type) return true;
+    if (
+      $start.depth > 2 &&
+      $start.node(-1).type === nodes.list_item &&
+      $start.node(-2).type === type &&
+      $start.index(-1) > 0
+    ) {
+      tr.split($start.before());
+      return true;
+    }
+    const range = $start.blockRange();
+    const wrapping = range && findWrapping(range, type, getAttrs?.(match));
+    if (!range || !wrapping) return false;
+    tr.wrap(range, wrapping);
+    const before = tr.doc.resolve(start - 1).nodeBefore;
+    if (
+      before?.type === type &&
+      canJoin(tr.doc, start - 1) &&
+      (!joinPredicate || joinPredicate(match, before))
+    ) {
+      tr.join(start - 1);
+    }
+    return true;
+  });
+}
 
 export const formattingInputRules: readonly InputRule[] = [
-  markRule(/\*\*([^*]+)\*\*$/, marks.strong),
-  markRule(/(?<!\*)\*([^*]+)\*$/, marks.em),
-  markRule(/(?<![\p{L}\p{N}_])_([^_]+)_$/u, marks.em),
-  markRule(/~~([^~]+)~~$/, marks.strike),
+  markRule(/\*\*([^*\s](?:[^*]*[^*\s])?)\*\*$/, marks.strong),
+  markRule(/(?<!\*)\*([^*\s](?:[^*]*[^*\s])?)\*$/, marks.em),
+  markRule(/(?<![\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_$/u, marks.em),
+  markRule(/~~([^~\s](?:[^~]*[^~\s])?)~~$/, marks.strike),
   markRule(/`([^`]+)`$/, marks.code),
-  textblockTypeInputRule(/^(#{1,3})\s$/, nodes.heading, (match) => ({
+  lineTextblockRule(/(?:^|\uFFFC)(#{1,3})\s$/, nodes.heading, (match) => ({
     level: match[1].length,
   })),
-  wrappingInputRule(/^\s*>\s$/, nodes.blockquote),
-  wrappingInputRule(/^\s*([-+*])\s$/, nodes.bullet_list),
-  wrappingInputRule(
-    /^(\d+)\.\s$/,
+  lineWrappingRule(/(?:^|\uFFFC)\s*>\s$/, nodes.blockquote),
+  lineWrappingRule(/(?:^|\uFFFC)\s*([-+*])\s$/, nodes.bullet_list),
+  lineWrappingRule(
+    /(?:^|\uFFFC)(\d+)\.\s$/,
     nodes.ordered_list,
     (match) => ({ order: Number(match[1]) }),
     (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
   ),
-  textblockTypeInputRule(/^```([^`\s]*) $/, nodes.code_block, (match) => ({
+  lineTextblockRule(/(?:^|\uFFFC)```([^`\s]*) $/, nodes.code_block, (match) => ({
     language: match[1],
   })),
-  new InputRule(/^(?:---|\*\*\*|___)$/, (state, _match, start, end) =>
-    state.tr.replaceRangeWith(start, end, nodes.horizontal_rule.create()).scrollIntoView()
-  ),
+  lineRule(/(?:^|\uFFFC)(?:---|\*\*\*|___)$/, (tr, _match, start, end) => {
+    tr.replaceRangeWith(start, end, nodes.horizontal_rule.create()).scrollIntoView();
+    return true;
+  }),
   autolinkRule(),
 ];
 
@@ -66,16 +142,16 @@ function autolinkRule(): InputRule {
     URL_PATTERN,
     (state, match, start, end) => {
       const text = match[1];
-      const from = start + (match[0].length - text.length - match[2].length);
+      const from = start + match[0].indexOf(text);
       const to = from + text.length;
-      if (from < 0 || marks.link.isInSet(state.doc.resolve(from).marks())) return null;
+      if (from < 0 || state.doc.rangeHasMark(from, to, marks.link)) return null;
 
       const href = text.startsWith('www.') ? `https://${text}` : text;
       const tr = state.tr
         .addMark(from, to, marks.link.create({ href }))
         .removeStoredMark(marks.link);
 
-      return end - start === match[0].length ? tr : tr.insertText(match[2], to);
+      return end - start === match[0].length ? tr : tr.insertText(match[2], end);
     },
     { inCodeMark: false }
   );
@@ -101,10 +177,31 @@ function headingCommand(level: number): Command {
       : setBlockType(nodes.heading, { level })(state, dispatch);
 }
 
-const codeBlockCommand: Command = (state, dispatch) =>
-  state.selection.$from.parent.type === nodes.code_block
-    ? setBlockType(nodes.paragraph)(state, dispatch)
-    : setBlockType(nodes.code_block)(state, dispatch);
+const codeBlockCommand: Command = (state, dispatch) => {
+  const { $from, $to } = state.selection;
+  if ($from.parent.type === nodes.code_block) return setBlockType(nodes.paragraph)(state, dispatch);
+  if (!$from.sameParent($to) || !$from.parent.isTextblock) {
+    return setBlockType(nodes.code_block)(state, dispatch);
+  }
+
+  const block = $from.parent;
+  const $start = state.doc.resolve($from.start());
+  const codeBlock = nodes.code_block;
+  if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), codeBlock)) {
+    return false;
+  }
+
+  if (dispatch) {
+    const leafText = (leaf: ProseMirrorNode) =>
+      leaf.type === nodes.hard_break ? '\n' : atomText(leaf);
+    const text = block.textBetween(0, block.content.size, undefined, leafText);
+    const before = block.textBetween(0, $from.parentOffset, undefined, leafText);
+    const replacement = codeBlock.create(null, text === '' ? null : composerSchema.text(text));
+    const tr = state.tr.replaceWith($from.before(), $from.after(), replacement);
+    dispatch(tr.setSelection(TextSelection.create(tr.doc, $from.before() + 1 + before.length)));
+  }
+  return true;
+};
 
 const liftListEntry = liftListItem(nodes.list_item);
 
@@ -113,23 +210,67 @@ function toggleWrap(type: NodeType): Command {
     isInside(state, type) ? lift(state, dispatch, view) : wrapIn(type)(state, dispatch, view);
 }
 
+function enclosingDepth(state: EditorState, type: NodeType): number | null {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type === type) return depth;
+  }
+  return null;
+}
+
+function joinAdjacentList(tr: Transaction, type: NodeType): void {
+  const { $from } = tr.selection;
+  const depth = enclosingDepth(tr as unknown as EditorState, type);
+  if (depth === null) return;
+  const before = $from.before(depth);
+  if (tr.doc.resolve(before).nodeBefore?.type === type && canJoin(tr.doc, before)) tr.join(before);
+}
+
 function toggleList(type: NodeType): Command {
   const other = type === nodes.bullet_list ? nodes.ordered_list : nodes.bullet_list;
   const wrap = wrapInList(type);
 
   return (state, dispatch, view) => {
     if (isInside(state, type)) return liftListEntry(state, dispatch, view);
-    if (!isInside(state, other)) return wrap(state, dispatch, view);
 
-    let lifted = state;
-    if (!liftListEntry(state, (tr) => (lifted = state.apply(tr)), view)) return false;
-    if (!wrap(lifted, undefined, view)) return false;
-    if (!dispatch) return true;
+    const otherDepth = enclosingDepth(state, other);
+    if (otherDepth !== null) {
+      if (dispatch) {
+        const tr = state.tr.setNodeMarkup(state.selection.$from.before(otherDepth), type);
+        joinAdjacentList(tr, type);
+        dispatch(tr.scrollIntoView());
+      }
+      return true;
+    }
 
-    liftListEntry(state, dispatch, view);
-    return wrap(lifted, dispatch, view);
+    return wrap(
+      state,
+      dispatch &&
+        ((tr) => {
+          joinAdjacentList(tr, type);
+          dispatch(tr);
+        }),
+      view
+    );
   };
 }
+
+export const joinListItemBackward: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parentOffset !== 0 || $from.depth < 3) return false;
+  if ($from.node(-1).type !== nodes.list_item || $from.index(-1) !== 0) return false;
+  if ($from.index(-2) === 0) return false;
+
+  const boundary = $from.before(-1);
+  if (!canJoin(state.doc, boundary)) return false;
+  if (dispatch) {
+    const tr = state.tr.join(boundary);
+    const inner = tr.mapping.map($from.before());
+    if (canJoin(tr.doc, inner)) tr.join(inner);
+    dispatch(tr.scrollIntoView());
+  }
+  return true;
+};
 
 function canInsert(state: EditorState, type: NodeType): boolean {
   const { $from } = state.selection;
@@ -197,6 +338,7 @@ export const formattingKeymap: Record<string, Command> = {
 };
 
 export const splitListEntry = splitListItem(nodes.list_item);
+export const insideListItem = (state: EditorState): boolean => isInside(state, nodes.list_item);
 export const sinkListEntry = sinkListItem(nodes.list_item);
 
 export type FormatAction =

@@ -72,7 +72,8 @@
   </p>
 {:else if item.content.kind === 'sticker'}
   <MediaImage
-    class="sticker"
+    class="sticker privacy-media"
+    autoplay={preferences.autoplayStickers}
     source={item.content.source}
     alt={item.content.body}
     title={item.content.body}
@@ -87,7 +88,7 @@
   {#if preferences.alwaysShowAltText}<p class="body">{item.content.body}</p>{/if}
 {:else if item.content.kind === 'image'}
   <MediaImage
-    class="image"
+    class="image privacy-media"
     source={item.content.source}
     alt={item.content.caption ?? item.content.filename}
     title={item.content.caption ?? item.content.filename}
@@ -135,7 +136,7 @@
   />
 {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
   <MediaContent
-    class="media"
+    class="media privacy-media"
     source={item.content.source}
     mime={item.content.mime}
     filename={item.content.filename}

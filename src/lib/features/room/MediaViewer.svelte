@@ -7,6 +7,8 @@
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
+  import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
   import {
     AXIS_LOCK_THRESHOLD,
@@ -79,6 +81,7 @@
     item === undefined ? '' : item.kind === 'sticker' ? item.body : (item.caption ?? item.filename)
   );
   let url = $state<string | null>(null);
+  let videoEl = $state<HTMLVideoElement>();
   let failed = $state(false);
   let zoom = $state(1);
   let rotation = $state(0);
@@ -113,6 +116,14 @@
   let panOrigin: Vector2 = { x: 0, y: 0 };
   let panStartPointer: Vector2 = { x: 0, y: 0 };
   let isImage = $derived(item?.kind === 'image' || item?.kind === 'sticker');
+  let streamUnavailable = $state(false);
+  let streamedSource: string | null = null;
+  let transcode = $derived(
+    item?.kind === 'video' &&
+      !canPlayVideo(mime) &&
+      !streamUnavailable &&
+      videoStreamingSupported(core)
+  );
   let isPdf = $derived(item?.kind === 'file');
   let pdfPages = $state(0);
   let pdfPage = $state(1);
@@ -170,6 +181,36 @@
 
     let active = true;
     failed = false;
+    if (transcode) {
+      // Once per source: an effect re-run would restart the encode and
+      // supersede the stream already feeding the element.
+      if (streamedSource === source) {
+        return () => {
+          active = false;
+        };
+      }
+      streamedSource = source;
+      url = null;
+      const wanted = source;
+      void videoStreamUrl(
+        core,
+        wanted,
+        () => videoEl?.currentTime ?? 0,
+        (next) => {
+          if (streamedSource === wanted) url = next;
+        }
+      )
+        .then((streamUrl) => {
+          if (streamedSource === wanted) url = streamUrl;
+        })
+        .catch(() => {
+          streamUnavailable = true;
+        });
+      return () => {
+        active = false;
+      };
+    }
+
     const release = holdMediaUrl(core, source, 0, 0);
     const cached = cachedMediaUrl(core, source, 0, 0);
     url = cached ?? null;
@@ -629,6 +670,7 @@
               <!-- Matrix carries no caption track for an attachment. -->
               <!-- svelte-ignore a11y_media_has_caption -->
               <video
+                bind:this={videoEl}
                 class="media-player"
                 controls
                 src={url}

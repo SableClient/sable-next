@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 
 import { inputRules } from 'prosemirror-inputrules';
-import { EditorState, TextSelection } from 'prosemirror-state';
+import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 
 import { activeMarks, formatCommands, formattingInputRules } from './formatting';
 import { composerSchema } from './schema';
@@ -317,4 +317,183 @@ test('three dashes become a rule rather than a paragraph of dashes', () => {
   type('---');
 
   expect(view?.state.doc.firstChild?.type.name).toBe('horizontal_rule');
+});
+
+test.each(['2 * 3 * 4', 'a ** b ** c', 'x ~~ y ~~ z', 'p _ q _ r'])(
+  'delimiters beside whitespace do not format %j',
+  (text) => {
+    open();
+    type(text);
+
+    expect(view?.state.doc.textContent).toBe(text);
+  }
+);
+
+test('the code_block command spells atoms out instead of dropping them', () => {
+  open();
+  type('hey ');
+  const editor = view;
+  if (!editor) throw new Error('no editor');
+  editor.dispatch(
+    editor.state.tr.replaceSelectionWith(
+      composerSchema.nodes.mention.create({ userId: '@a:example.org', name: 'A' })
+    )
+  );
+  formatCommands.code_block(editor.state, editor.dispatch);
+
+  expect(editor.state.doc.firstChild?.type.name).toBe('code_block');
+  expect(editor.state.doc.firstChild?.textContent).toBe('hey A');
+});
+
+describe('toolbar block insertion', () => {
+  test('a horizontal rule is inserted and the caret lands after it', () => {
+    open();
+    type('above');
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    expect(formatCommands.horizontal_rule(editor.state, editor.dispatch)).toBe(true);
+
+    expect(editor.state.doc.child(1).type.name).toBe('horizontal_rule');
+  });
+
+  test('a table arrives with a header row and two body rows of two cells', () => {
+    open();
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    expect(formatCommands.table(editor.state, editor.dispatch)).toBe(true);
+
+    const table = editor.state.doc.firstChild;
+    expect(table?.type.name).toBe('table');
+    expect(table?.childCount).toBe(3);
+    expect(table?.firstChild?.firstChild?.type.name).toBe('table_header');
+    expect(table?.child(1).firstChild?.type.name).toBe('table_cell');
+    expect(table?.child(1).childCount).toBe(2);
+  });
+
+  test('a collapsible section arrives with a summary and a body', () => {
+    open();
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    expect(formatCommands.details(editor.state, editor.dispatch)).toBe(true);
+
+    const details = editor.state.doc.firstChild;
+    expect(details?.type.name).toBe('details');
+    expect(details?.firstChild?.type.name).toBe('summary');
+    expect(details?.child(1).type.name).toBe('paragraph');
+  });
+});
+
+describe('activeMarks reports the block the caret is in', () => {
+  function activeAfter(command: keyof typeof formatCommands): string[] {
+    open();
+    type('x');
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    formatCommands[command](editor.state, editor.dispatch);
+    return activeMarks(editor.state);
+  }
+
+  test.each([
+    ['bullet_list', 'bullet_list'],
+    ['ordered_list', 'ordered_list'],
+    ['blockquote', 'blockquote'],
+    ['code_block', 'code_block'],
+    ['heading1', 'heading1'],
+    ['heading2', 'heading2'],
+    ['heading3', 'heading3'],
+  ] as const)('%s', (command, expected) => {
+    expect(activeAfter(command)).toEqual([expected]);
+  });
+
+  test('a table and a section report themselves once the caret is inside', () => {
+    open();
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    formatCommands.table(editor.state, editor.dispatch);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    expect(activeMarks(editor.state)).toEqual(['table']);
+
+    open();
+    const second = view;
+    if (!second) throw new Error('no editor');
+    formatCommands.details(second.state, second.dispatch);
+    second.dispatch(second.state.tr.setSelection(TextSelection.create(second.state.doc, 2)));
+    expect(activeMarks(second.state)).toEqual(['details']);
+  });
+});
+
+describe('autolink edge cases', () => {
+  test('an address already inside a link is not linked again', () => {
+    open();
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    editor.dispatch(
+      editor.state.tr
+        .insertText('https://a.b')
+        .addMark(1, 12, composerSchema.marks.link.create({ href: 'https://other' }))
+    );
+    type(' ');
+
+    const hrefs: string[] = [];
+    editor.state.doc.descendants((node) => {
+      for (const mark of node.marks)
+        if (mark.type.name === 'link') hrefs.push(mark.attrs.href as string);
+    });
+    expect(hrefs).toEqual(['https://other']);
+  });
+
+  test('a closing paren ends the address and is kept', () => {
+    open();
+    type('(see https://a.b/c) ok');
+
+    expect(view?.state.doc.textContent).toBe('(see https://a.b/c) ok');
+    expect(marksOn('https://a.b/c')).toEqual(['link']);
+  });
+
+  test.each(['.', ',', '?', '!', ':', ';', '."'])('trailing %j is left out of the link', (tail) => {
+    open();
+    type(`go to https://a.b/c${tail} now`);
+
+    expect(view?.state.doc.textContent).toBe(`go to https://a.b/c${tail} now`);
+    expect(marksOn('https://a.b/c')).toEqual(['link']);
+  });
+});
+
+describe('ordered list numbering', () => {
+  test('a number continuing the list joins it, another number starts a new list', () => {
+    open();
+    type('1. a');
+    const editor = view;
+    if (!editor) throw new Error('no editor');
+    editor.dispatch(
+      editor.state.tr.insert(editor.state.doc.content.size, composerSchema.nodes.paragraph.create())
+    );
+    editor.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)));
+    type('2. b');
+    expect(editor.state.doc.childCount).toBe(1);
+    expect(editor.state.doc.firstChild?.childCount).toBe(2);
+
+    editor.dispatch(
+      editor.state.tr.insert(editor.state.doc.content.size, composerSchema.nodes.paragraph.create())
+    );
+    editor.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)));
+    type('7. c');
+    expect(editor.state.doc.childCount).toBe(2);
+    expect(editor.state.doc.child(1).attrs.order).toBe(7);
+  });
+});
+
+describe('mark rules', () => {
+  test('an empty pair of delimiters is left alone', () => {
+    open();
+    type('a **** b');
+    expect(view?.state.doc.textContent).toBe('a **** b');
+  });
+
+  test('a rule typed inside a heading applies there', () => {
+    open();
+    type('# a **b**');
+    expect(view?.state.doc.firstChild?.type.name).toBe('heading');
+    expect(marksOn('b')).toEqual(['strong']);
+  });
 });

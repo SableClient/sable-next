@@ -151,3 +151,22 @@ test('a spoiler serialises to the data-mx-spoiler span and parses back for edit'
     'spoiler',
   ]);
 });
+
+test('a room ping round trips through its own span', () => {
+  const doc = composerSchema.node('doc', null, [
+    paragraph.create(null, [composerSchema.nodes.room_ping.create(), composerSchema.text(' hi')]),
+  ]);
+  const markup = html(doc);
+  expect(markup).toBe('<p><span data-sable-room-ping="">@room</span> hi</p>');
+  expect(parse(markup).firstChild?.firstChild?.type.name).toBe('room_ping');
+});
+
+test('a code block reads its language from either the pre or the code class', () => {
+  expect(parse('<pre class="language-go"><code>x</code></pre>').firstChild?.attrs.language).toBe(
+    'go'
+  );
+  expect(parse('<pre><code class="language-rs">x</code></pre>').firstChild?.attrs.language).toBe(
+    'rs'
+  );
+  expect(parse('<pre><code>x</code></pre>').firstChild?.attrs.language).toBe('');
+});

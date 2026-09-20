@@ -88,7 +88,7 @@ test.each(['image', 'video', 'audio', 'file'] as const)(
 
     const mention = document.querySelector<HTMLAnchorElement>('a[href*="matrix.to"]');
     expect(mention?.dataset.matrixLink).toBe('user');
-    expect(mention?.textContent).toBe('@Ana');
+    expect(mention?.textContent).toBe('@ana');
     expect(document.querySelector('img[data-mx-emoticon]')?.getAttribute('alt')).toBe('party');
 
     await unmount(instance);

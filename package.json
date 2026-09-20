@@ -39,6 +39,7 @@
     "@choochmeque/tauri-plugin-sharekit-api": "0.4.0-rc.7",
     "@fontsource-variable/nunito": "5.3.0",
     "@sableclient/tauri-plugin-livekit-mobile": "^0.3.0",
+    "@sableclient/twemoji-font": "^1.0.4",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.3",
     "@tauri-apps/plugin-fs": "2.5.2",
@@ -69,6 +70,7 @@
     "prosemirror-model": "^1.25.11",
     "prosemirror-schema-list": "^1.5.1",
     "prosemirror-state": "^1.4.4",
+    "prosemirror-transform": "^1.12.1",
     "prosemirror-view": "^1.42.3",
     "svelte-i18next": "^2.2.2",
     "tauri-plugin-android-fs-api": "29.0.0"
