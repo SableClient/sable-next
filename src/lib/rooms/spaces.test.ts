@@ -91,8 +91,8 @@ test('sums the mentions of a space across its nested rooms, counting each room o
 
   expect(spaceUnreadCounts([root, sub], [root, sub, deep, shared])).toEqual(
     new Map([
-      ['!root:example.org', { unread: 6, highlight: 3, marked: false }],
-      ['!sub:example.org', { unread: 6, highlight: 3, marked: false }],
+      ['!root:example.org', { unread: 6, highlight: 3, marked: false, notifying: 6 }],
+      ['!sub:example.org', { unread: 6, highlight: 3, marked: false, notifying: 6 }],
     ])
   );
 });
@@ -117,7 +117,9 @@ test('a hand-marked room dots its parent space, even muted', () => {
     spaceUnreadCounts([root], [root, muted], (roomId) =>
       roomId === '!muted:example.org' ? 'mute' : 'all'
     )
-  ).toEqual(new Map([['!root:example.org', { unread: 0, highlight: 0, marked: true }]]));
+  ).toEqual(
+    new Map([['!root:example.org', { unread: 0, highlight: 0, marked: true, notifying: 0 }]])
+  );
 });
 
 test('a joined space lends its edge to a room opened from a link', () => {
@@ -169,4 +171,50 @@ test('finds the space holding a call room through a nested space, with cycles', 
   );
   expect(spacesContainingRoom([root, other], rooms, null)).toEqual(new Set());
   expect(spacesContainingRoom([root, other], rooms, '!elsewhere:example.org')).toEqual(new Set());
+});
+
+test('a mentions-only child still marks its space unread', () => {
+  const space = room({
+    room_id: '!space:example.org',
+    is_space: true,
+    space_children: [
+      {
+        room_id: '!quiet:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 1,
+        suggested: false,
+      },
+    ],
+  });
+  const quiet = room({ room_id: '!quiet:example.org', unread: 5, highlight: 0 });
+
+  expect(spaceUnreadCounts([space], [space, quiet], () => 'mentions')).toEqual(
+    new Map([['!space:example.org', { unread: 5, highlight: 0, marked: false, notifying: 0 }]])
+  );
+});
+
+test('a space totals how much of its unread notified', () => {
+  const space = room({
+    room_id: '!space:example.org',
+    is_space: true,
+    space_children: [
+      { room_id: '!loud:example.org', via: [], order: null, origin_server_ts: 1, suggested: false },
+      {
+        room_id: '!quiet:example.org',
+        via: [],
+        order: null,
+        origin_server_ts: 2,
+        suggested: false,
+      },
+    ],
+  });
+  const loud = room({ room_id: '!loud:example.org', unread: 4 });
+  const quiet = room({ room_id: '!quiet:example.org', unread: 5 });
+  const mode = (roomId: string) => (roomId === '!loud:example.org' ? 'all' : 'mentions');
+
+  const totals = spaceUnreadCounts([space], [space, loud, quiet], mode).get('!space:example.org');
+
+  expect(totals?.unread).toBe(9);
+  expect(totals?.notifying).toBe(4);
 });

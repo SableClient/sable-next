@@ -78,6 +78,7 @@
   import { paletteState, shortcutsHelpState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { unreadRoomsByPriority } from '#lib/ui/shortcuts/room-jump.js';
   import { markRoomsRead } from '#lib/features/sidebar/nav-rooms.js';
+  import { hasUnread } from '#lib/rooms/unread.js';
   import { roomAtOffset } from '#lib/features/sidebar/visible-rooms.svelte.js';
 
   interface Props {
@@ -216,7 +217,9 @@
   let countedRooms = $derived(
     roomList.rooms.filter((room) => room.state === 'joined' && !room.is_space)
   );
-  let unreadTotal = $derived(countedRooms.reduce((total, room) => total + room.highlight, 0));
+  let unreadTotal = $derived(
+    countedRooms.reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
+  );
 
   $effect(() => {
     void setUnreadBadge(unreadTotal);
@@ -236,7 +239,7 @@
 
   $effect(() => {
     const state = faviconState(
-      countedRooms.some((room) => room.unread > 0 || room.marked_unread),
+      countedRooms.some((room) => hasUnread(roomList.notificationsFor(room))),
       unreadTotal > 0,
       preferences.faviconForMentionsOnly
     );
@@ -441,7 +444,7 @@
 
   $effect(() => {
     if (core.status !== 'ready') return;
-    notifications.retireRead(roomList.rooms);
+    notifications.retireRead(roomList.rooms, roomList.notificationsFor);
   });
 
   let visible = $state(true);

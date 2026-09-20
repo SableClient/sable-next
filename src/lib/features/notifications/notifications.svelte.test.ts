@@ -32,7 +32,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 function room(unread: number): RoomSummary {
-  return { room_id: '!room:example.org', unread } as RoomSummary;
+  return {
+    room_id: '!room:example.org',
+    state: 'joined',
+    unread,
+    highlight: 0,
+    marked_unread: false,
+  } as RoomSummary;
 }
 
 function center(): NotificationCenter {

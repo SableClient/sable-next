@@ -84,20 +84,14 @@
   );
   let entries = $derived(mergeSpaces(spaceSidebar.items, orderedSpaceIds));
   let homeRooms = $derived(
-    roomList.rooms.filter(
-      (room) =>
-        room.state === 'joined' && !room.is_space && !roomList.mutedRoomIds.has(room.room_id)
-    )
+    roomList.rooms.filter((room) => room.state === 'joined' && !room.is_space)
   );
   let homeUnread = $derived(unreadCounts(homeRooms));
   let unspacedUnread = $derived(
     unreadCounts(homeRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id)))
   );
   let allDirectRooms = $derived(
-    roomList.rooms.filter(
-      (room) =>
-        room.state === 'joined' && room.is_direct && !roomList.mutedRoomIds.has(room.room_id)
-    )
+    roomList.rooms.filter((room) => room.state === 'joined' && room.is_direct)
   );
   let directRooms = $derived(
     allDirectRooms

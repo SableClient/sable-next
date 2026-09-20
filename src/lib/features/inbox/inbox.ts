@@ -3,7 +3,7 @@ import type { BookmarkView, NotificationModeView, RoomSummary } from '#src/gener
 import {
   hasUnread,
   type NotificationModeResolver,
-  roomUnread,
+  roomNotifications,
   UNRESOLVED_MODE,
 } from '#lib/rooms/unread.js';
 
@@ -17,7 +17,7 @@ export function notificationCount(
   room: RoomSummary,
   mode: NotificationModeView | null = null
 ): number {
-  return roomUnread(room, mode).unread;
+  return roomNotifications(room, mode).unread;
 }
 
 function matchesFilter(
@@ -25,7 +25,7 @@ function matchesFilter(
   filter: NotificationFilter,
   mode: NotificationModeView | null
 ): boolean {
-  const count = roomUnread(room, mode);
+  const count = roomNotifications(room, mode);
 
   switch (filter) {
     case 'direct':

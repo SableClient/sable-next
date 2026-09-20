@@ -277,7 +277,7 @@
   let mentionCount = $derived(
     roomList.rooms
       .filter((room) => room.state === 'joined' && !room.is_space)
-      .reduce((total, room) => total + room.highlight, 0)
+      .reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
   );
   let pageTitle = $derived(
     mentionCount > 0 ? `(${mentionCount}) ${roomName} - Sable` : `${roomName} - Sable`

@@ -4,6 +4,7 @@ import { createContext } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
+import { hasUnread, roomNotifications, type RoomUnread } from '#lib/rooms/unread.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadMediaUrl } from '#lib/ui/media-url.js';
 
@@ -82,7 +83,7 @@ export class NotificationCenter {
     if (roomId !== null && preferences.clearNotificationsOnRead) this.retire(roomId);
   }
 
-  retireRead(rooms: readonly RoomSummary[]): void {
+  retireRead(rooms: readonly RoomSummary[], unreadFor: RoomUnread = roomNotifications): void {
     if (!preferences.clearNotificationsOnRead) return;
 
     for (const [roomId, appeared] of this.invites) {
@@ -96,7 +97,7 @@ export class NotificationCenter {
 
     for (const room of rooms) {
       if (room.state === 'invited') continue;
-      if (room.unread > 0) {
+      if (hasUnread(unreadFor(room))) {
         this.unread.add(room.room_id);
         this.retired.delete(room.room_id);
         continue;

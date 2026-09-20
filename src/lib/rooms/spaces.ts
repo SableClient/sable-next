@@ -2,7 +2,12 @@ import type { RoomSummary } from '#src/generated/protocol';
 
 import { type NotificationModeResolver, roomUnread, UNRESOLVED_MODE } from './unread.js';
 
-export type UnreadCount = { unread: number; highlight: number; marked?: boolean };
+export type UnreadCount = {
+  unread: number;
+  highlight: number;
+  marked?: boolean;
+  notifying?: number;
+};
 
 export function spaceUnreadCounts(
   spaces: readonly RoomSummary[],
@@ -32,6 +37,7 @@ export function spaceUnreadCounts(
       if (counts.marked) total.marked = true;
       total.unread += counts.unread;
       total.highlight += counts.highlight;
+      total.notifying = (total.notifying ?? 0) + (counts.notifying ?? 0);
     }
     return total;
   }
@@ -53,6 +59,7 @@ export function addUnread(left: UnreadCount, right: UnreadCount): UnreadCount {
     unread: left.unread + right.unread,
     highlight: left.highlight + right.highlight,
     marked: (left.marked ?? false) || (right.marked ?? false),
+    notifying: (left.notifying ?? 0) + (right.notifying ?? 0),
   };
 }
 

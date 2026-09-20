@@ -61,3 +61,31 @@ test('counts stop spelling themselves out past a thousand', () => {
   expect(formatUnreadCount(1000)).toBe('1k');
   expect(formatUnreadCount(1001)).toBe('1k+');
 });
+
+test('a room whose ordinary messages notify counts them, and counts them loudly', () => {
+  const counts = { unread: 6, highlight: 0, notifying: 6 };
+
+  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 6, highlight: true });
+});
+
+test('a notifying room still counts a mention as the mention', () => {
+  const counts = { unread: 9, highlight: 2, notifying: 9 };
+
+  expect(resolveUnreadBadge(counts, { ...off, showPingCounts: true })).toEqual({
+    mode: 'count',
+    count: 2,
+    highlight: true,
+  });
+});
+
+test('a room that notified nothing keeps its quiet dot', () => {
+  expect(resolveUnreadBadge({ unread: 6, highlight: 0, notifying: 0 }, off)).toEqual({
+    mode: 'dot',
+    count: 6,
+    highlight: false,
+  });
+});
+
+test('notifying does not resurrect a room with nothing unread', () => {
+  expect(resolveUnreadBadge({ unread: 0, highlight: 0, notifying: 0 }, off)).toBeNull();
+});

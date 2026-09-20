@@ -208,3 +208,104 @@ test('keeps the rail order when a room-list reset reorders spaces', async () => 
     fixture.roomList = null;
   }
 });
+
+test('a muted direct chat marked unread by hand still reaches the navbar', async () => {
+  const room: RoomSummary = {
+    ...space('!muted:example.org', 'Bo'),
+    is_space: false,
+    is_direct: true,
+    direct_targets: ['@bo:example.org'],
+    marked_unread: true,
+  };
+  const core = {
+    subscribeEvents: () => () => {},
+    commands: {
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
+      roomNotificationModes: (roomIds: readonly string[]) =>
+        Promise.resolve(
+          roomIds.map((room_id) => ({ room_id, room: 'mute' as const, default: 'all' as const }))
+        ),
+      unsubscribe: () => Promise.resolve(),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  fixture.roomList = roomList;
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(room.room_id)).toBe('mute');
+  });
+
+  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
+  try {
+    await tick();
+    expect(document.querySelector('.rail a[href="/direct/!muted%3Aexample.org"]')).not.toBeNull();
+  } finally {
+    await unmount(instance);
+  }
+});
+
+test('a muted room marked unread by hand still marks its section as unread', async () => {
+  setPreference('showHome', true);
+  const room: RoomSummary = {
+    ...space('!muted-room:example.org', 'Ops'),
+    is_space: false,
+    marked_unread: true,
+  };
+  const core = {
+    subscribeEvents: () => () => {},
+    commands: {
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
+      roomNotificationModes: (roomIds: readonly string[]) =>
+        Promise.resolve(
+          roomIds.map((room_id) => ({ room_id, room: 'mute' as const, default: 'all' as const }))
+        ),
+      unsubscribe: () => Promise.resolve(),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  fixture.roomList = roomList;
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(room.room_id)).toBe('mute');
+  });
+
+  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
+  try {
+    await tick();
+    const rooms = document.querySelector('.rail a[href="/rooms"]');
+    expect(rooms?.querySelector('.unread-badge-dot')).not.toBeNull();
+  } finally {
+    await unmount(instance);
+  }
+});
+
+test('a section totals its notifying rooms in green', async () => {
+  const room: RoomSummary = { ...space('!loud:example.org', 'Loud'), is_space: false, unread: 4 };
+  const core = {
+    subscribeEvents: () => () => {},
+    commands: {
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
+      roomNotificationModes: (roomIds: readonly string[]) =>
+        Promise.resolve(
+          roomIds.map((room_id) => ({ room_id, room: 'all' as const, default: 'all' as const }))
+        ),
+      unsubscribe: () => Promise.resolve(),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  fixture.roomList = roomList;
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(room.room_id)).toBe('all');
+  });
+
+  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
+  try {
+    await tick();
+    const rooms = document.querySelector('.rail a[href="/rooms"]');
+    expect(rooms?.querySelector('.unread-badge-count')?.textContent).toBe('4');
+    expect(rooms?.querySelector('.unread-badge-highlight')).not.toBeNull();
+  } finally {
+    await unmount(instance);
+  }
+});

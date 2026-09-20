@@ -10,17 +10,34 @@ export type RoomUnread = (room: RoomSummary) => UnreadCount;
 
 export const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0, marked: false };
 
+function counts(room: RoomSummary): UnreadCount {
+  return {
+    unread: room.unread || 0,
+    highlight: room.highlight || 0,
+    marked: room.marked_unread,
+  };
+}
+
 export function roomUnread(
   room: RoomSummary,
   mode: NotificationModeView | null = null
 ): UnreadCount {
-  const marked = room.marked_unread;
+  const { unread, highlight, marked } = counts(room);
+  const notifying = roomNotifications(room, mode).unread;
+
+  if (mode === 'mute') return { unread: 0, highlight: 0, marked, notifying };
+  return { unread: Math.max(unread, highlight), highlight, marked, notifying };
+}
+
+export function roomNotifications(
+  room: RoomSummary,
+  mode: NotificationModeView | null = null
+): UnreadCount {
+  const { unread, highlight, marked } = counts(room);
 
   if (mode === 'mute') return { unread: 0, highlight: 0, marked };
-  if (mode === 'mentions') {
-    return { unread: room.highlight, highlight: room.highlight, marked };
-  }
-  return { unread: Math.max(room.unread, room.highlight), highlight: room.highlight, marked };
+  if (mode === 'mentions') return { unread: highlight, highlight, marked };
+  return { unread: Math.max(unread, highlight), highlight, marked };
 }
 
 export function hasUnread(count: UnreadCount): boolean {

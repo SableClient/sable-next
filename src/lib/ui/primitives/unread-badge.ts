@@ -4,6 +4,7 @@ export interface UnreadBadgeCounts {
   unread: number;
   highlight: number;
   marked?: boolean;
+  notifying?: number;
 }
 
 export interface UnreadBadgeSettings {
@@ -25,16 +26,19 @@ export function resolveUnreadBadge(
 ): UnreadBadgeView | null {
   if (counts === undefined) return null;
 
-  const highlight = counts.highlight > 0;
-  const count = highlight ? counts.highlight : counts.unread;
+  const mention = counts.highlight > 0;
+  const count = mention ? counts.highlight : counts.unread;
   if (count <= 0) {
     return counts.marked ? { mode: 'dot', count: 0, highlight: false } : null;
   }
 
+  const notified = (counts.notifying ?? 0) > 0;
+  const highlight = mention || notified;
   const numeric =
+    (notified && !mention) ||
     (dm && settings.badgeCountDMsOnly) ||
     (!dm && settings.showUnreadCounts) ||
-    (highlight && settings.showPingCounts);
+    (mention && settings.showPingCounts);
 
   return { mode: numeric ? 'count' : 'dot', count, highlight };
 }

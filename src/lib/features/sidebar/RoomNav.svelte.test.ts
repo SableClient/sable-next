@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
+import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
+
 const pageState = vi.hoisted(() => ({
   url: { pathname: '/home' },
   params: {},
@@ -15,17 +17,15 @@ const roomsFixture = vi.hoisted(() => {
   const muteAware = {
     notificationMode: (roomId: string): NotificationModeView =>
       fixture.mutedRoomIds.has(roomId) ? 'mute' : 'all',
-    unreadFor: (room: RoomSummary) => ({
-      unread: fixture.mutedRoomIds.has(room.room_id) ? 0 : Math.max(room.unread, room.highlight),
-      highlight: fixture.mutedRoomIds.has(room.room_id) ? 0 : room.highlight,
-      marked: room.marked_unread,
-    }),
   };
   const fixture = {
     rooms: [] as RoomSummary[],
     mutedRoomIds: new Set<string>(),
     typingUsers: new Map<string, readonly string[]>(),
     notificationOverride: () => null,
+    unreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
+    notificationsFor: (room: RoomSummary) =>
+      roomNotifications(room, fixture.notificationMode(room.room_id)),
     ...muteAware,
     reset(): void {
       fixture.mutedRoomIds = new Set();
@@ -345,34 +345,29 @@ test('does not show a badge for a muted room', async () => {
   await unmount(instance);
 });
 
-test('a mentions-only room badges its mentions and not its other messages', async () => {
+test('a mentions-only room keeps its unread marker and badges its mentions', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
     makeRoom({ room_id: '!pinged:example.org', name: 'Pinged', unread: 6, highlight: 2 }),
   ];
   roomsFixture.notificationMode = () => 'mentions';
-  roomsFixture.unreadFor = (room) => ({
-    unread: room.highlight,
-    highlight: room.highlight,
-    marked: room.marked_unread,
-  });
 
   const instance = await mountNav();
   const rows = Array.from(document.querySelectorAll('.room-row'));
   const quiet = rows.find((row) => row.textContent.includes('Quiet'));
   const pinged = rows.find((row) => row.textContent.includes('Pinged'));
 
-  expect(quiet?.querySelector('.unread-badge-dot')).toBeNull();
-  expect(quiet?.querySelector('.unread-badge-count')).toBeNull();
+  expect(quiet?.querySelector('.unread-badge-dot')).not.toBeNull();
   expect(pinged?.querySelector('.unread-badge-count')?.textContent).toBe('2');
   await unmount(instance);
 });
 
-test('counts mentions in the badge and marks plain unread with a dot', async () => {
+test('counts mentions in the badge, and quiet traffic only dots', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!mention:example.org', name: 'Mentioned', unread: 9, highlight: 2 }),
     makeRoom({ room_id: '!plain:example.org', name: 'Plain', unread: 5 }),
   ];
+  roomsFixture.notificationMode = () => 'mentions';
 
   const instance = await mountNav();
   const rows = Array.from(document.querySelectorAll('.room-row'));
@@ -561,5 +556,41 @@ test('hovering a collapsed room row shows its full name in a tooltip', async () 
     'A very long room name that truncates'
   );
   vi.useRealTimers();
+  await unmount(instance);
+});
+
+test('a muted room marked unread by hand keeps its dot and no count', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!muted:example.org', name: 'Muted', unread: 9, marked_unread: true }),
+  ];
+  roomsFixture.mutedRoomIds = new Set(['!muted:example.org']);
+
+  const instance = await mountNav();
+  const row = Array.from(document.querySelectorAll('.room-row')).find((entry) =>
+    entry.textContent.includes('Muted')
+  );
+
+  expect(row?.querySelector('.unread-badge-dot')).not.toBeNull();
+  expect(row?.querySelector('.unread-badge-count')).toBeNull();
+  await unmount(instance);
+});
+
+test('a room set to all messages badges its unread messages in green', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!loud:example.org', name: 'Loud', unread: 6 }),
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
+  ];
+  roomsFixture.notificationMode = (roomId: string) =>
+    roomId === '!loud:example.org' ? 'all' : 'mentions';
+
+  const instance = await mountNav();
+  const rows = Array.from(document.querySelectorAll('.room-row'));
+  const loud = rows.find((row) => row.textContent.includes('Loud'));
+  const quiet = rows.find((row) => row.textContent.includes('Quiet'));
+
+  expect(loud?.querySelector('.unread-badge-count')?.textContent).toBe('6');
+  expect(loud?.querySelector('.unread-badge-highlight')).not.toBeNull();
+  expect(quiet?.querySelector('.unread-badge-dot')).not.toBeNull();
+  expect(quiet?.querySelector('.unread-badge-highlight')).toBeNull();
   await unmount(instance);
 });

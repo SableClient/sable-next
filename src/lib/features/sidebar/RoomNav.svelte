@@ -810,7 +810,7 @@
                       {/if}
                       <span class="room-status">
                         <UnreadBadge
-                          counts={{ unread, highlight: mentions, marked }}
+                          {counts}
                           dm={room?.is_direct ?? false}
                           role="img"
                           aria-label={mentions > 0

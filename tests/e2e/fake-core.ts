@@ -141,6 +141,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       ...room,
       room_id: '!second:example.test',
       name: 'Random',
+      unread: 3,
+      highlight: 0,
     };
     const invitedRoom: RoomSummary = {
       ...room,
@@ -737,7 +739,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       room_notification_modes: (command) => ({
         type: 'room_notification_modes',
-        modes: command.room_ids.map((room_id) => ({ room_id, room: null, default: 'all' })),
+        modes: command.room_ids.map((room_id) => ({
+          room_id,
+          room: null,
+          default: joinedRooms.find((joined) => joined.room_id === room_id)?.is_direct
+            ? 'all'
+            : 'mentions',
+        })),
       }),
       default_notification_modes: () => ({
         type: 'default_notification_modes',

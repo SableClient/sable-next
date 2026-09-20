@@ -53,7 +53,9 @@ test('resolves notification modes for the whole list in one command', async () =
 
   await roomList.start();
   await vi.waitFor(() => {
-    expect(roomList.mutedRoomIds.size).toBe(11);
+    expect(
+      rooms.filter((entry) => roomList.notificationMode(entry.room_id) === 'mute')
+    ).toHaveLength(11);
   });
 
   expect(roomNotificationModes).toHaveBeenCalledTimes(1);
@@ -225,4 +227,56 @@ test('persists the live room list for the next launch', async () => {
 
   roomList.stop();
   vi.useRealTimers();
+});
+
+test('a muted room that drops out of a reset and returns stays muted', async () => {
+  const muted = {
+    room_id: '!muted:example.org',
+    unread: 4,
+    highlight: 0,
+    marked_unread: false,
+  } as RoomSummary;
+  const eventListeners: ((event: unknown) => void)[] = [];
+  let reloads = 0;
+  const roomNotificationModes = vi.fn(async (roomIds: readonly string[]) => {
+    reloads += 1;
+    if (reloads > 1) await new Promise(() => {});
+    return roomIds.map((room_id) => ({ room_id, room: 'mute' as const, default: 'all' as const }));
+  });
+  const core = {
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [muted] })),
+      roomNotificationModes,
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(muted.room_id)).toBe('mute');
+  });
+
+  const reset = (rooms: RoomSummary[]): void => {
+    eventListeners[0]?.({
+      type: 'room_list_diff',
+      subscription: 1,
+      diffs: [{ op: 'reset', values: rooms }],
+    });
+  };
+  reset([]);
+  reset([muted]);
+
+  expect(roomList.notificationMode(muted.room_id)).toBe('mute');
+  expect(roomList.unreadFor(muted)).toEqual({
+    unread: 0,
+    highlight: 0,
+    marked: false,
+    notifying: 0,
+  });
+  roomList.stop();
 });
