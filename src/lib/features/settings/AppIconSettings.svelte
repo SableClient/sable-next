@@ -4,7 +4,8 @@
   import { type as osType } from '@tauri-apps/plugin-os';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
-  import Button from '#lib/ui/primitives/Button.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 
   import defaultIcon from './app-icons/default.png';
   import propeller from './app-icons/propeller.png';
@@ -33,6 +34,7 @@
   let selected = $state('primary');
   let changing = $state(false);
   let failed = $state(false);
+  let selectVersion = $state(0);
   let android = $state(false);
 
   onMount(() => {
@@ -69,69 +71,45 @@
       failed = true;
     } finally {
       changing = false;
+      selectVersion += 1;
     }
   }
 </script>
 
 {#if icons.length}
-  <div class="app-icons" class:android>
-    <h2>{$i18n.t('settings.appIconTitle')}</h2>
-    <p>{$i18n.t('settings.appIconDescription')}</p>
-    <div
-      class="choices"
-      role="group"
-      aria-label={$i18n.t('settings.appIconTitle')}
-      aria-busy={changing}
+  <ul class="app-icons" class:android aria-busy={changing}>
+    <SettingsRow
+      title={$i18n.t('settings.appIconTitle')}
+      description={$i18n.t('settings.appIconDescription')}
+      wide
     >
-      {#each ['primary', ...icons] as icon (icon)}
-        <Button
-          variant={selected === icon ? 'primary' : 'secondary'}
+      {#key selectVersion}
+        <Select
+          value={selected}
           disabled={changing}
-          aria-pressed={selected === icon}
-          onclick={() => void select(icon)}
-        >
-          <span class="choice">
-            {#if previews[icon]}<img src={previews[icon]} alt="" width="48" height="48" />{/if}
-            <span>{$i18n.t(`settings.appIcons.${icon}`, { defaultValue: icon })}</span>
-          </span>
-        </Button>
-      {/each}
-    </div>
-    {#if failed}<Alert variant="critical" role="alert">{$i18n.t('settings.appIconFailed')}</Alert
-      >{/if}
-  </div>
+          aria-label={$i18n.t('settings.appIconTitle')}
+          items={['primary', ...icons].map((icon) => ({
+            value: icon,
+            label: $i18n.t(`settings.appIcons.${icon}`, { defaultValue: icon }),
+            image: previews[icon],
+            imageClass: android ? 'app-icon-image-android' : undefined,
+          }))}
+          onValueChange={(icon) => void select(icon)}
+        />
+      {/key}
+    </SettingsRow>
+  </ul>
+  {#if failed}<Alert variant="critical" role="alert">{$i18n.t('settings.appIconFailed')}</Alert
+    >{/if}
 {/if}
 
 <style>
   .app-icons {
-    display: grid;
-    gap: var(--space-300);
-    padding: var(--space-400);
-  }
-
-  h2,
-  p {
     margin: 0;
+    padding: 0;
   }
 
-  .choices {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-200);
-  }
-
-  .choice {
-    align-items: center;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-200);
-  }
-
-  img {
-    border-radius: 22.5%;
-  }
-
-  .android img {
+  :global(.app-icon-image-android) {
     border-radius: 50%;
   }
 </style>

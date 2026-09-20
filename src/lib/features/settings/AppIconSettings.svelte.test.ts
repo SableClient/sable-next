@@ -25,40 +25,78 @@ afterEach(async () => {
   document.body.replaceChildren();
 });
 
-async function render(): Promise<HTMLButtonElement[]> {
+async function press(element: Element): Promise<void> {
+  element.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      button: 0,
+      isPrimary: true,
+    })
+  );
+  element.dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' })
+  );
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  await tick();
+}
+
+async function render(): Promise<HTMLButtonElement> {
   instance = mount(AppIconSettings, { target: document.body });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('button')).toHaveLength(3);
+    expect(document.querySelectorAll('button')).toHaveLength(1);
   });
-  return Array.from(document.querySelectorAll('button'));
+  const button = document.querySelector<HTMLButtonElement>('button');
+  if (!button) throw new Error('App icon selector did not render');
+  return button;
+}
+
+async function options(trigger: HTMLElement): Promise<HTMLElement[]> {
+  await press(trigger);
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll<HTMLElement>('[role="option"]')).toHaveLength(3);
+  });
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'));
+}
+
+function selectorTrigger(): HTMLButtonElement {
+  const button = document.querySelector<HTMLButtonElement>('button');
+  if (!button) throw new Error('App icon selector did not render');
+  return button;
 }
 
 test('reads the installed icon without changing it, then restores default with null', async () => {
-  const buttons = await render();
-  expect(buttons[2].getAttribute('aria-pressed')).toBe('true');
+  const trigger = await render();
+  expect(trigger.textContent).toContain('Pride');
   expect(invoke).toHaveBeenCalledTimes(2);
-  buttons[0].click();
+  const choices = await options(trigger);
+  expect(choices.every((choice) => choice.querySelector('.select-item-image') !== null)).toBe(true);
+  expect(choices[0].querySelector('.app-icon-image-android')).not.toBeNull();
+  await press(choices[0]);
   await vi.waitFor(() => {
     expect(invoke).toHaveBeenCalledWith('plugin:app-icon|set_icon', {
       request: { icon: null },
     });
   });
   await tick();
-  expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
+  expect(trigger.textContent).toContain('Default');
 });
 
 test('keeps the confirmed icon on failure and allows retry', async () => {
-  const buttons = await render();
+  const trigger = await render();
+  const choices = await options(trigger);
   vi.mocked(invoke).mockRejectedValueOnce(new Error('native failure'));
-  buttons[1].click();
+  await press(choices[1]);
   await vi.waitFor(() => {
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
   });
-  expect(buttons[2].getAttribute('aria-pressed')).toBe('true');
+  expect(selectorTrigger().textContent).toContain('Pride');
   vi.mocked(invoke).mockResolvedValueOnce(undefined);
-  buttons[1].click();
+  const retryChoices = await options(selectorTrigger());
+  await press(retryChoices[1]);
   await vi.waitFor(() => {
-    expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
+    expect(selectorTrigger().textContent).toContain('Propeller');
   });
   expect(invoke).toHaveBeenLastCalledWith('plugin:app-icon|set_icon', {
     request: { icon: 'propeller' },
@@ -66,7 +104,8 @@ test('keeps the confirmed icon on failure and allows retry', async () => {
 });
 
 test('disables choices during a native change', async () => {
-  const buttons = await render();
+  const trigger = await render();
+  const choices = await options(trigger);
   let complete!: () => void;
   vi.mocked(invoke).mockImplementationOnce(
     () =>
@@ -74,12 +113,12 @@ test('disables choices during a native change', async () => {
         complete = resolve;
       })
   );
-  buttons[1].click();
+  await press(choices[1]);
   await tick();
-  expect(buttons.every((button) => button.disabled)).toBe(true);
+  expect(trigger.disabled).toBe(true);
   complete();
   await tick();
-  expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
+  expect(trigger.textContent).toContain('Propeller');
 });
 
 test.each(['web', 'linux', 'macos', 'windows'])(
@@ -103,8 +142,8 @@ test('hides the picker when native discovery fails', async () => {
 
 test('uses the current native icon on iOS', async () => {
   vi.mocked(osType).mockReturnValue('ios');
-  const buttons = await render();
-  expect(buttons[2].getAttribute('aria-pressed')).toBe('true');
+  const trigger = await render();
+  expect(trigger.textContent).toContain('Pride');
   expect(document.querySelector('.app-icons.android')).toBeNull();
 });
 
@@ -114,7 +153,7 @@ test('shows Default for an unknown native icon without resetting it', async () =
       command === 'plugin:app-icon|get_available_icons' ? ['propeller', 'pride'] : 'old-icon'
     )
   );
-  const buttons = await render();
-  expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
+  const trigger = await render();
+  expect(trigger.textContent).toContain('Default');
   expect(invoke).toHaveBeenCalledTimes(2);
 });

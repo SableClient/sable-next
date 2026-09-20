@@ -10,6 +10,8 @@
   type Item = {
     value: string;
     label: string;
+    image?: string;
+    imageClass?: ClassValue;
     disabled?: boolean;
   };
 
@@ -56,6 +58,14 @@
             class="menu-item choice"
           >
             {#snippet children({ selected })}
+              {#if item.image}
+                <img
+                  class={['select-item-image', item.imageClass]}
+                  src={item.image}
+                  alt=""
+                  aria-hidden="true"
+                />
+              {/if}
               <span class="selection-label">{item.label}</span>
               {#if selected}<CheckIcon class="select-check" aria-hidden="true" />{/if}
             {/snippet}
@@ -87,6 +97,13 @@
     flex: 0 0 auto;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  .select-item-image {
+    border-radius: 22.5%;
+    height: 48px;
+    object-fit: cover;
+    width: 48px;
   }
 
   :global(.menu-surface.select-content) {
