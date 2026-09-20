@@ -73,6 +73,7 @@
 {:else if item.content.kind === 'sticker'}
   <MediaImage
     class="sticker privacy-media"
+    autoplay={preferences.autoplayStickers}
     source={item.content.source}
     alt={item.content.body}
     title={item.content.body}

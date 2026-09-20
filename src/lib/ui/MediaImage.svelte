@@ -44,6 +44,7 @@
     retryable?: boolean;
     uniform?: boolean;
     original?: boolean;
+    autoplay?: boolean | null;
   }
 
   let {
@@ -65,6 +66,7 @@
     retryable = false,
     uniform = false,
     original = false,
+    autoplay = null,
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
@@ -100,7 +102,7 @@
     ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
   );
   let animatedGif = $derived(mime === 'image/gif' || named('.gif'));
-  let manualGif = $derived(animatedGif && !preferences.autoplayGifs);
+  let manualGif = $derived(animatedGif && !(autoplay ?? preferences.autoplayGifs));
   let steppedGif = $derived(gifFrames !== null);
   let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
   let painted = $derived(manualGif ? gifPreviewReady : imageLoaded);

@@ -281,6 +281,49 @@ test('shows a static GIF preview until its play button is pressed', async () => 
   await unmount(instance);
 });
 
+test('an autoplay prop overrides the GIF preference in both directions', async () => {
+  preferences.autoplayGifs = true;
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:held');
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/held',
+      alt: 'Animated sticker',
+      width: 304,
+      height: 304,
+      mime: 'image/gif',
+      autoplay: false,
+    },
+  });
+
+  const container = document.querySelector<HTMLElement>('.media-image');
+  if (!container) throw new Error('media image was not rendered');
+  await vi.waitFor(() => {
+    expect(container.querySelector('.gif-preview-source')).not.toBeNull();
+  });
+  await unmount(instance);
+
+  preferences.autoplayGifs = false;
+  const playing = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/playing',
+      alt: 'Animated sticker',
+      width: 304,
+      height: 304,
+      mime: 'image/gif',
+      autoplay: true,
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('.gif-preview-source')).toBeNull();
+    expect(document.querySelector('.media-image img')).not.toBeNull();
+  });
+  await unmount(playing);
+});
+
 test('stops a playing GIF instead of opening the viewer', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));

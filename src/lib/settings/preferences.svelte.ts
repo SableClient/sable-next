@@ -59,6 +59,7 @@ export interface Preferences {
   composerGifButton: boolean;
   composerStickerButton: boolean;
   composerEmoteButton: boolean;
+  composerVoiceButton: boolean;
   scheduleInEncryptedRooms: boolean;
 
   personaPicker: boolean;
@@ -77,6 +78,7 @@ export interface Preferences {
 
   mediaAutoLoad: boolean;
   autoplayGifs: boolean;
+  autoplayStickers: boolean;
   gifProvider: GifProviderChoice;
   urlPreviews: boolean;
   encryptedUrlPreviews: boolean;
@@ -204,6 +206,7 @@ const DEFAULTS: Preferences = {
   composerGifButton: true,
   composerStickerButton: true,
   composerEmoteButton: true,
+  composerVoiceButton: true,
   scheduleInEncryptedRooms: true,
 
   personaPicker: true,
@@ -222,6 +225,7 @@ const DEFAULTS: Preferences = {
 
   mediaAutoLoad: true,
   autoplayGifs: true,
+  autoplayStickers: true,
   gifProvider: 'default',
   urlPreviews: false,
   encryptedUrlPreviews: false,

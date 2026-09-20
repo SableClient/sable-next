@@ -215,7 +215,13 @@
   let hasContent = $derived(!empty || staged.length > 0);
   let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
   let primaryAction = $derived(
-    !hasContent && !canDeleteEdited && voiceSupported && !micDenied ? 'record' : 'send'
+    !hasContent &&
+      !canDeleteEdited &&
+      preferences.composerVoiceButton &&
+      voiceSupported &&
+      !micDenied
+      ? 'record'
+      : 'send'
   );
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 

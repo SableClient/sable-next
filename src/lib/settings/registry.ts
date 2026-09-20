@@ -29,6 +29,7 @@ import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
+import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
@@ -598,6 +599,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'composerVoiceButton',
+        icon: MicrophoneIcon,
+        name: 'settings.composerVoiceButton',
+        description: 'settings.composerVoiceButtonHint',
+        type: 'boolean',
+      },
+      {
         key: 'scheduleInEncryptedRooms',
         icon: LockIcon,
         name: 'settings.scheduleInEncryptedRooms',
@@ -676,6 +684,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: FilmStripIcon,
         name: 'settings.autoplayGifs',
         description: 'settings.autoplayGifsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'autoplayStickers',
+        icon: StickerIcon,
+        name: 'settings.autoplayStickers',
+        description: 'settings.autoplayStickersHint',
         type: 'boolean',
       },
       {
