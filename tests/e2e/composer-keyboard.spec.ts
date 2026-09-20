@@ -109,3 +109,29 @@ test('mobile autocomplete truncates a long suggestion instead of scrolling sidew
   expect(measured.option).toBeLessThanOrEqual(measured.list);
   expect(['auto', 'scroll']).not.toContain(measured.overflowX);
 });
+
+// Android is the other way round: the native insets shrink the WebView, so
+// `dvh` already excludes the keyboard and subtracting it again left one row.
+test('mobile autocomplete does not subtract the keyboard twice on android', async ({
+  page,
+  app,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await page.setViewportSize({ width: 390, height: 508 });
+  await page.evaluate(() => {
+    document.documentElement.dataset.tauriOs = 'android';
+    document.documentElement.style.setProperty('--keyboard-height', '336px');
+  });
+  await app.composer.fill(':smi');
+  await expect(page.getByRole('option').first()).toBeVisible();
+
+  const share = await page.evaluate(() => {
+    const panel = document.querySelector('.autocomplete');
+    if (!panel) throw new Error('missing panel');
+    return panel.getBoundingClientRect().height / window.innerHeight;
+  });
+  expect(share).toBeGreaterThan(0.25);
+  expect(share).toBeLessThanOrEqual(0.34);
+});

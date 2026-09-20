@@ -417,10 +417,12 @@ html {
   --safe-right: var(--safe-area-inset-right);
   --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
   --safe-left: var(--safe-area-inset-left);
+  --keyboard-overlap: var(--keyboard-height, 0px);
 }
 
 :root[data-tauri-os='android'] {
   --safe-bottom: var(--safe-area-inset-bottom);
+  --keyboard-overlap: 0px;
 }
 
 :root[data-client-decorations='desktop'],
