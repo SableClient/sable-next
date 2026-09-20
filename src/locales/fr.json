@@ -749,7 +749,6 @@
     "animalIs": "Est {{is}}",
     "animalHas": "A {{has}}",
     "animalNeed": "{{identity}}, donnez {{need}} !",
-    "animalDefaultNeed": "des caresses sur la tête",
     "powerLevelMuted": "Muet",
     "profileUnban": "Révoquer le bannissement",
     "profileChangePower": "Modifier le rôle",

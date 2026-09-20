@@ -79,6 +79,7 @@ export interface Preferences {
   blurEmotes: boolean;
   presence: PresenceView;
   presenceStatusMessage: string;
+  loadingAnimal: string;
 
   mediaAutoLoad: boolean;
   autoplayGifs: boolean;
@@ -174,6 +175,7 @@ const ENUMS = {
     `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
   'presenceStatusMessage',
+  'loadingAnimal',
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
@@ -243,6 +245,7 @@ const DEFAULTS: Preferences = {
   blurEmotes: false,
   presence: 'online',
   presenceStatusMessage: '',
+  loadingAnimal: '',
 
   mediaAutoLoad: true,
   autoplayGifs: true,

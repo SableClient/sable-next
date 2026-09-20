@@ -151,10 +151,9 @@
       return null;
     }
 
-    return $i18n.t('timeline.animalNeed', {
-      identity,
-      need: animal.animal_need ?? $i18n.t('timeline.animalDefaultNeed'),
-    });
+    if (!animal.animal_need) return `${identity}!`;
+
+    return $i18n.t('timeline.animalNeed', { identity, need: animal.animal_need });
   });
   let extra = $derived(currentProfile?.extra ?? []);
   let showFailure = $derived(failed && !currentProfile && member === null);

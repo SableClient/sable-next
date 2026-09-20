@@ -506,6 +506,7 @@
   },
   "app": {
     "starting": "Starting Sable…",
+    "pettingAnimal": "Petting {{animal}}",
     "unableToStart": "Sable could not start. Check your connection and try again.",
     "startFailed": "The client could not connect to its core or restore your session.",
     "tryAgain": "Try again"
@@ -736,7 +737,6 @@
     "animalIs": "Is {{is}}",
     "animalHas": "Has {{has}}",
     "animalNeed": "{{identity}}, give {{need}}!",
-    "animalDefaultNeed": "headpats",
     "powerLevelMuted": "Muted",
     "profileUnban": "Unban",
     "profileChangePower": "Change role",

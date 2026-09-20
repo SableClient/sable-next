@@ -38,7 +38,11 @@
   import highlightFavicon from '#lib/assets/res/svg/highlight.svg';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { ensureAndroidHistoryRoot } from '#lib/platform/android-back.js';
-  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import {
+    preferences,
+    readReceiptIsPrivate,
+    setPreference,
+  } from '#lib/settings/preferences.svelte.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
   import {
     draftsDocument,
@@ -106,6 +110,23 @@
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
   let incoming = $derived(incomingCalls.calls.at(0) ?? null);
   let incomingProfile = $state.raw<{ name: string; avatar: string | null } | null>(null);
+  let loadingAnimal = $derived(preferences.loadingAnimal || null);
+
+  $effect(() => {
+    const userId = core.session?.user_id;
+    if (core.status !== 'ready' || !userId) return;
+
+    let cancelled = false;
+    void core
+      .userProfile(userId)
+      .then((profile) => {
+        if (!cancelled) setPreference('loadingAnimal', profile.animal?.is_animal ?? '');
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  });
 
   $effect(() => {
     const sender = incoming?.sender;
@@ -619,7 +640,11 @@
   <main class="app-status" aria-labelledby="app-status-title" aria-busy="true">
     <div class="app-status-card" role="status">
       <Spinner />
-      <h1 id="app-status-title">{$i18n.t('app.starting')}</h1>
+      <h1 id="app-status-title">
+        {loadingAnimal
+          ? $i18n.t('app.pettingAnimal', { animal: loadingAnimal })
+          : $i18n.t('app.starting')}
+      </h1>
     </div>
   </main>
 {/if}

@@ -192,6 +192,27 @@ test('renders the extended profile fields', async () => {
   await unmount(instance);
 });
 
+test('does not invent an animal need', async () => {
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: {
+        ...emptyProfile,
+        animal: { is_animal: 'cat', has_animal: null, animal_need: null },
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.profile-card-meta .profile-meta-item')?.textContent).toBe(
+    'Is cat!'
+  );
+  await unmount(instance);
+});
+
 test('reserves the metadata row while the profile is still loading', async () => {
   const instance = mount(MentionProfileCard, {
     target: document.body,
