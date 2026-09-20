@@ -692,6 +692,7 @@
     "closeMenu": "Close menu",
     "toggleReaction": "{{key}}, {{count, number}} reactions. Toggle yours.",
     "reactedWith": "{{people}} reacted with {{key}}",
+    "customEmote": "Custom emote",
     "reactionPeopleTwo": "{{first}} and {{second}}",
     "reactionPeopleThree": "{{first}}, {{second}}, and {{third}}",
     "reactionPeopleMany": "{{names}}, and {{count, number}} others",

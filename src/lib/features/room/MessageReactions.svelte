@@ -2,8 +2,9 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import { onDestroy } from 'svelte';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type { ImagePackView, MemberView, TimelineItemView } from '#src/generated/protocol';
 
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -11,6 +12,11 @@
   import { LongPress } from './long-press.svelte.js';
   import ReactionPicker from './ReactionPicker.svelte';
   import { reactionSummary } from './reaction-summary.js';
+  import {
+    isCustomReaction,
+    loadReactionEmotePacks,
+    reactionEmoteLabel,
+  } from './reaction-emote-label.js';
 
   interface Props {
     reactions: TimelineItemView['reactions'];
@@ -44,6 +50,8 @@
   }: Props = $props();
 
   let pressIndex = 0;
+  const core = useCoreClient();
+  let imagePacks = $state.raw<ImagePackView[]>([]);
   const press = new LongPress({
     stopPropagation: true,
     onPress: () => onViewReactions?.(pressIndex),
@@ -58,11 +66,24 @@
   onDestroy(() => {
     press.cancel();
   });
+
+  $effect(() => {
+    let current = true;
+    void loadReactionEmotePacks(roomId, core.commands.imagePacks)
+      .then((packs) => {
+        if (current) imagePacks = packs;
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  });
 </script>
 
 <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
   {#each reactions as reaction, index (reaction.key)}
     {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
+    {@const label = reactionEmoteLabel(reaction.key, imagePacks, $i18n.t('timeline.customEmote'))}
     {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
       <button
         {...props}
@@ -70,7 +91,7 @@
         type="button"
         aria-pressed={mine}
         aria-label={$i18n.t('timeline.toggleReaction', {
-          key: reaction.key,
+          key: label,
           count: reaction.senders.length,
         })}
         disabled={eventId === null}
@@ -93,11 +114,11 @@
         onpointercancel={press.end}
       >
         <span class="reaction-key">
-          {#if reaction.key.startsWith('mxc://')}
+          {#if isCustomReaction(reaction.key)}
             <MediaImage
               class="reaction-image"
               source={reaction.key}
-              alt={reaction.key}
+              alt={label}
               width={64}
               height={64}
               original
@@ -110,7 +131,7 @@
       </button>
     {/snippet}
     <Tooltip
-      label={reactionSummary(reaction.senders, reaction.key, members, $i18n.t)}
+      label={reactionSummary(reaction.senders, label, members, $i18n.t)}
       side="top"
       trigger={reactionTrigger}
     />

@@ -1,15 +1,23 @@
 <script lang="ts">
-  import type { MemberView, ReactionGroup } from '#src/generated/protocol';
+  import type { ImagePackView, MemberView, ReactionGroup } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import MemberIdentityRow from './MemberIdentityRow.svelte';
+  import {
+    isCustomReaction,
+    loadReactionEmotePacks,
+    reactionEmoteLabel,
+  } from './reaction-emote-label.js';
 
   interface Props {
     open?: boolean;
     reactions: readonly ReactionGroup[];
+    roomId: string;
     members: readonly MemberView[];
     active?: number;
     onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
@@ -18,6 +26,7 @@
   let {
     open = $bindable(false),
     reactions,
+    roomId,
     members,
     active = $bindable(0),
     onMemberProfile,
@@ -25,6 +34,20 @@
   let group = $derived<ReactionGroup | undefined>(
     reactions[Math.min(active, reactions.length - 1)]
   );
+  const core = useCoreClient();
+  let imagePacks = $state.raw<ImagePackView[]>([]);
+
+  $effect(() => {
+    let current = true;
+    void loadReactionEmotePacks(roomId, core.commands.imagePacks)
+      .then((packs) => {
+        if (current) imagePacks = packs;
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  });
 </script>
 
 <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.viewReactions')}>
@@ -32,6 +55,11 @@
     <h2>{$i18n.t('timeline.viewReactions')}</h2>
     <div class="tabs" role="tablist" aria-label={$i18n.t('timeline.viewReactions')}>
       {#each reactions as reaction, index (reaction.key)}
+        {@const label = reactionEmoteLabel(
+          reaction.key,
+          imagePacks,
+          $i18n.t('timeline.customEmote')
+        )}
         <Button
           size="small"
           variant="ghost"
@@ -42,7 +70,18 @@
             active = index;
           }}
         >
-          <em>{reaction.key}</em>
+          {#if isCustomReaction(reaction.key)}
+            <MediaImage
+              class="reaction-image"
+              source={reaction.key}
+              alt={label}
+              width={64}
+              height={64}
+              original
+            />
+          {:else}
+            <em>{reaction.key}</em>
+          {/if}
           {reaction.senders.length}
         </Button>
       {/each}
@@ -93,6 +132,12 @@
 
   :global(.tab em) {
     font-style: normal;
+  }
+
+  :global(.tab .reaction-image) {
+    height: 1.125rem;
+    object-fit: contain;
+    width: auto;
   }
 
   ul {

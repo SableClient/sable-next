@@ -701,6 +701,7 @@
     "closeMenu": "Fermer le menu",
     "toggleReaction": "{{key}}, {{count, number}} réactions. Activer ou désactiver la vôtre.",
     "reactedWith": "{{people}} a réagi avec {{key}}",
+    "customEmote": "Émoticône personnalisée",
     "reactionPeopleTwo": "{{first}} et {{second}}",
     "reactionPeopleThree": "{{first}}, {{second}} et {{third}}",
     "reactionPeopleMany": "{{names}} et {{count, number}} autres",

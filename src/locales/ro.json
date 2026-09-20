@@ -701,6 +701,7 @@
     "closeMenu": "Închide meniul",
     "toggleReaction": "{{key}}, {{count, number}} reacții.",
     "reactedWith": "{{key}} a fost o reacție de la {{people}}",
+    "customEmote": "Emoticon personalizat",
     "reactionPeopleTwo": "{{first}} și {{second}}",
     "reactionPeopleThree": "{{first}}, {{second}}, și {{third}}",
     "reactionPeopleMany": "{{names}}, și {{count, number}} de alte persoane",

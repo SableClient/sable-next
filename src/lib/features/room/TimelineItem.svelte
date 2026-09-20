@@ -604,6 +604,7 @@
         bind:open={reactionsOpen}
         bind:active={reactionActive}
         reactions={item.reactions}
+        {roomId}
         {members}
         onMemberProfile={onSenderProfile}
       />
