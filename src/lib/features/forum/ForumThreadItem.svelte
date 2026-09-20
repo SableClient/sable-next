@@ -70,7 +70,7 @@
     align-items: center;
     background: var(--surface-var-container);
     border: 0;
-    border-radius: var(--radius-400);
+    border-radius: var(--radii-400);
     box-sizing: border-box;
     cursor: pointer;
     display: flex;

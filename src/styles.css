@@ -377,7 +377,8 @@ html {
   --resize-handle: 4px;
   --mac-traffic-lights: 4.5rem;
 
-  font-size: calc(100% * var(--font-scale));
+  /* Keep rem-based geometry independent of Android Chrome's text-size default. */
+  font-size: calc(16px * var(--font-scale));
 
   /* Code blocks: the estimator reads this, so it has to be a fixed length. */
   --code-line-height: 1.25rem;
