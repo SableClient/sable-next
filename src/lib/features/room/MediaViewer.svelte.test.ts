@@ -91,11 +91,10 @@ test('renders a video attachment with a player and no zoom controls', async () =
     props: { items: [videoItem], selectedEventId: '$video', onClose: () => {} },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await vi.waitFor(() => {
+    expect(document.querySelector('video')).not.toBeNull();
+  });
 
-  expect(document.querySelector('video')).not.toBeNull();
   expect(document.querySelector('.zoom-controls')).toBeNull();
   expect(document.querySelector('.reset')).toBeNull();
   expect(document.querySelector('[aria-label="viewer.downloadVideo"]')).not.toBeNull();
@@ -132,11 +131,10 @@ test('renders an audio attachment with a player', async () => {
     props: { items: [audioItem], selectedEventId: '$audio', onClose: () => {} },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await vi.waitFor(() => {
+    expect(document.querySelector('audio')).not.toBeNull();
+  });
 
-  expect(document.querySelector('audio')).not.toBeNull();
   expect(document.querySelector('[aria-label="viewer.downloadAudio"]')).not.toBeNull();
   await unmount(instance);
 });
