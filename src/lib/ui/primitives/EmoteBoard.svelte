@@ -70,14 +70,20 @@
 
   $effect(() => {
     let cancelled = false;
+    const accountId = core.session?.account_id ?? null;
     loading = true;
     failed = false;
     packs = [];
-    void loadPacks(core.commands, roomId, (loaded) => {
-      if (cancelled) return;
-      packs = loaded;
-      loading = false;
-    }).catch(() => {
+    void loadPacks(
+      core.commands,
+      roomId,
+      (loaded) => {
+        if (cancelled) return;
+        packs = loaded;
+        loading = false;
+      },
+      accountId
+    ).catch(() => {
       if (cancelled) return;
       failed = true;
       loading = false;

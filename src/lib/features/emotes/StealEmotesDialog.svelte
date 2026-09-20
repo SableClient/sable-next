@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
+  import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -40,6 +41,7 @@
       const added = await uploadCandidates(core, $state.snapshot(picks));
       const current = await core.commands.accountData(USER_EMOTES_EVENT_TYPE);
       await core.commands.setAccountData(USER_EMOTES_EVENT_TYPE, mergedPackContent(current, added));
+      invalidatePacks(core.commands);
       names = {};
       open = false;
     } catch (error) {

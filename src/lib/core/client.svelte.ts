@@ -15,6 +15,7 @@ import type {
 } from '#src/generated/protocol';
 
 import { createCommands } from './commands.svelte.js';
+import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.js';
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
@@ -779,6 +780,9 @@ export class CoreClient {
       case 'search_coverage':
         this.searchCoverage = event.coverage;
         this.searchCoverageUnavailable = false;
+        return;
+      case 'account_data_changed':
+        if (isPackAccountDataEvent(event.event_type)) invalidatePacks(this.commands);
         return;
       case 'session_ended':
         this.reauthenticationAccountId = this.session?.account_id ?? null;

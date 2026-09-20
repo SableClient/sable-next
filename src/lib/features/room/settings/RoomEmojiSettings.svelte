@@ -10,6 +10,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import ImagePackEditor from '#lib/features/emotes/ImagePackEditor.svelte';
   import { ROOM_IMAGE_PACK_EVENT_TYPE } from '#lib/features/emotes/pack-address.js';
   import {
@@ -85,6 +86,7 @@
     if (!target) return;
 
     await core.commands.sendStateEvent(target, ROOM_IMAGE_PACK_EVENT_TYPE, stateKey, content);
+    invalidatePacks(core.commands);
     await load();
   }
 

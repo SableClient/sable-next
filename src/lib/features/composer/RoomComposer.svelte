@@ -445,12 +445,17 @@
     loadedEmotesFor = target;
     emotes = [];
     try {
-      await loadPacks(core.commands, target, (packs) => {
-        if (roomId !== target) return;
-        emotes = packs
-          .flatMap((pack) => pack.images)
-          .filter((image) => image.usage.includes('emoticon'));
-      });
+      await loadPacks(
+        core.commands,
+        target,
+        (packs) => {
+          if (roomId !== target) return;
+          emotes = packs
+            .flatMap((pack) => pack.images)
+            .filter((image) => image.usage.includes('emoticon'));
+        },
+        core.session?.account_id ?? null
+      );
     } catch {
       if (roomId === target) loadedEmotesFor = null;
     }

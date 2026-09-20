@@ -2,6 +2,7 @@
   import type { ImagePackView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import ImagePackEditor from './ImagePackEditor.svelte';
@@ -36,6 +37,7 @@
 
   async function apply(draft: PackDraft): Promise<void> {
     await core.commands.setAccountData(USER_EMOTES_EVENT_TYPE, packEventContent(draft));
+    invalidatePacks(core.commands);
     await load();
   }
 </script>

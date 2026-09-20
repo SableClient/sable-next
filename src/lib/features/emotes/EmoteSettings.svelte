@@ -4,6 +4,7 @@
   import type { ImagePackView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -113,6 +114,7 @@
     failed = false;
     try {
       await core.commands.setAccountData(IMAGE_PACK_ROOMS_EVENT_TYPE, emoteRoomsEventContent(next));
+      invalidatePacks(core.commands);
       selection = next;
     } catch (error) {
       console.warn('[sable emotes] the pack selection could not be saved', error);
@@ -148,6 +150,7 @@
     failed = false;
     try {
       await core.commands.setAccountData(IMAGE_PACK_ROOMS_EVENT_TYPE, emoteRoomsEventContent(next));
+      invalidatePacks(core.commands);
       selection = next;
     } catch (error) {
       console.warn('[sable emotes] the pack selection could not be saved', error);

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import type { ImagePackView } from '#src/generated/protocol';
-import { loadPacks } from './load-packs';
+import { invalidatePacks, isPackAccountDataEvent, loadPacks } from './load-packs';
 
 const cached: ImagePackView[] = [
   {
@@ -31,6 +31,115 @@ test('cached packs are available while the full state request remains pending', 
   refresh.resolve([]);
   await loading;
   expect(apply).toHaveBeenLastCalledWith([]);
+});
+
+test('keeps a complete pack snapshot for later picker mounts', async () => {
+  const commands = {
+    imagePacks: vi.fn((_room: string, cachedOnly = false) =>
+      Promise.resolve(cachedOnly ? [] : cached)
+    ),
+  };
+
+  await loadPacks(commands, '!room:example.org', vi.fn());
+  const apply = vi.fn();
+  await loadPacks(commands, '!room:example.org', apply);
+
+  expect(commands.imagePacks).toHaveBeenCalledTimes(2);
+  expect(commands.imagePacks).toHaveBeenNthCalledWith(1, '!room:example.org', true);
+  expect(commands.imagePacks).toHaveBeenNthCalledWith(2, '!room:example.org');
+  expect(apply).toHaveBeenCalledExactlyOnceWith(cached);
+});
+
+test('does not share a pack snapshot between accounts', async () => {
+  const commands = {
+    imagePacks: vi.fn((_room: string, cachedOnly = false) =>
+      Promise.resolve(cachedOnly ? [] : cached)
+    ),
+  };
+
+  await loadPacks(commands, '!room:example.org', vi.fn(), 'account-one');
+  await loadPacks(commands, '!room:example.org', vi.fn(), 'account-two');
+
+  expect(commands.imagePacks).toHaveBeenCalledTimes(4);
+});
+
+test('recognizes account data that changes available packs', () => {
+  expect(isPackAccountDataEvent('im.ponies.user_emotes')).toBe(true);
+  expect(isPackAccountDataEvent('im.ponies.emote_rooms')).toBe(true);
+  expect(isPackAccountDataEvent('m.image_pack.rooms')).toBe(true);
+  expect(isPackAccountDataEvent('m.direct')).toBe(false);
+});
+
+test('reloads packs after an explicit invalidation', async () => {
+  const commands = {
+    imagePacks: vi.fn((_room: string, cachedOnly = false) =>
+      Promise.resolve(cachedOnly ? [] : cached)
+    ),
+  };
+
+  await loadPacks(commands, '!room:example.org', vi.fn());
+  invalidatePacks(commands);
+  await loadPacks(commands, '!room:example.org', vi.fn());
+
+  expect(commands.imagePacks).toHaveBeenCalledTimes(4);
+});
+
+test('does not restore a snapshot from a refresh invalidated while pending', async () => {
+  const first = Promise.withResolvers<ImagePackView[]>();
+  const second = Promise.withResolvers<ImagePackView[]>();
+  let refreshes = 0;
+  const commands = {
+    imagePacks: vi.fn((_room: string, cachedOnly = false) => {
+      if (cachedOnly) return Promise.resolve([]);
+      refreshes += 1;
+      return refreshes === 1 ? first.promise : second.promise;
+    }),
+  };
+
+  const staleApply = vi.fn();
+  const stale = loadPacks(commands, '!room:example.org', staleApply);
+  await vi.waitFor(() => {
+    expect(commands.imagePacks).toHaveBeenCalledTimes(2);
+  });
+  invalidatePacks(commands);
+  const fresh = loadPacks(commands, '!room:example.org', vi.fn());
+  await vi.waitFor(() => {
+    expect(commands.imagePacks).toHaveBeenCalledTimes(4);
+  });
+  first.resolve(cached);
+  await stale;
+  expect(staleApply).not.toHaveBeenCalled();
+  second.resolve(cached);
+  await fresh;
+
+  const apply = vi.fn();
+  await loadPacks(commands, '!room:example.org', apply);
+  expect(apply).toHaveBeenCalledExactlyOnceWith(cached);
+});
+
+test('shares a full refresh between concurrent picker mounts', async () => {
+  const refresh = Promise.withResolvers<ImagePackView[]>();
+  const commands = {
+    imagePacks: vi.fn((_room: string, cachedOnly = false) =>
+      cachedOnly ? Promise.resolve([]) : refresh.promise
+    ),
+  };
+  const first = vi.fn();
+  const second = vi.fn();
+
+  const loading = Promise.all([
+    loadPacks(commands, '!room:example.org', first),
+    loadPacks(commands, '!room:example.org', second),
+  ]);
+  await vi.waitFor(() => {
+    expect(commands.imagePacks).toHaveBeenCalledTimes(3);
+  });
+  refresh.resolve(cached);
+  await loading;
+
+  expect(commands.imagePacks).toHaveBeenLastCalledWith('!room:example.org');
+  expect(first).toHaveBeenLastCalledWith(cached);
+  expect(second).toHaveBeenLastCalledWith(cached);
 });
 
 test('offline refresh keeps the cached packs visible', async () => {
