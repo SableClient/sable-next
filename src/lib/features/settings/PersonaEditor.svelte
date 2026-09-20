@@ -243,8 +243,12 @@
 
 <style>
   .persona-editor {
+    align-content: start;
+    block-size: 100%;
     display: grid;
     gap: var(--space-400);
+    overflow: hidden auto;
+    overscroll-behavior: contain;
     padding: var(--space-400);
   }
 
