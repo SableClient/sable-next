@@ -5,6 +5,7 @@ import {
   exitCode,
   liftEmptyBlock,
   newlineInCode,
+  splitBlock,
   splitBlockKeepMarks,
 } from 'prosemirror-commands';
 import { dropCursor } from 'prosemirror-dropcursor';
@@ -12,7 +13,7 @@ import { gapCursor } from 'prosemirror-gapcursor';
 import { history, redo, undo } from 'prosemirror-history';
 import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
-import { Slice, type Node as ProseMirrorNode } from 'prosemirror-model';
+import { Slice, type Node as ProseMirrorNode, type ResolvedPos } from 'prosemirror-model';
 import { Plugin, EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
@@ -34,6 +35,8 @@ import {
   formatCommands,
   formattingInputRules,
   formattingKeymap,
+  insideListItem,
+  joinListItemBackward,
   sinkListEntry,
   splitListEntry,
   type FormatAction,
@@ -100,6 +103,11 @@ const exitEmptyCodeLine: Command = (state, dispatch) => {
   if (!paragraph) return false;
 
   if (dispatch) {
+    if (block.content.size === 1) {
+      const tr = state.tr.replaceWith($from.before(), $from.after(), paragraph);
+      dispatch(tr.setSelection(TextSelection.create(tr.doc, $from.before() + 1)).scrollIntoView());
+      return true;
+    }
     const position = $from.after() - 1;
     const tr = state.tr.delete($from.pos - 1, $from.pos);
     const next = tr.doc.resolve(position).nodeAfter;
@@ -108,6 +116,15 @@ const exitEmptyCodeLine: Command = (state, dispatch) => {
     }
     dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(position), 1)).scrollIntoView());
   }
+  return true;
+};
+
+const headingToParagraphBackward: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parent.type !== composerSchema.nodes.heading || $from.parentOffset !== 0) {
+    return false;
+  }
+  dispatch?.(state.tr.setBlockType($from.before(), $from.after(), composerSchema.nodes.paragraph));
   return true;
 };
 
@@ -134,28 +151,44 @@ const deleteEmptyCodeBlock: Command = (state, dispatch) => {
 
 const FENCE = /^```([^`\s]*)[ \t]*$/;
 
+function softLineStart($from: ResolvedPos): number {
+  const { parent } = $from;
+  let start = $from.start();
+  parent.forEach((child, offset) => {
+    if (child.type === composerSchema.nodes.hard_break && offset < $from.parentOffset) {
+      start = $from.start() + offset + 1;
+    }
+  });
+  return start;
+}
+
 const openFence: Command = (state, dispatch) => {
   const { $from } = state.selection;
   const block = $from.parent;
   if (!state.selection.empty || block.type !== composerSchema.nodes.paragraph) return false;
   if ($from.parentOffset !== block.content.size) return false;
 
-  const match = FENCE.exec(block.textContent);
+  const lineStart = softLineStart($from);
+  const match = FENCE.exec(state.doc.textBetween(lineStart, $from.pos));
   if (!match) return false;
 
-  const start = $from.start();
-  const $start = state.doc.resolve(start);
+  const $start = state.doc.resolve($from.start());
   const codeBlock = composerSchema.nodes.code_block;
   if (!$start.node(-1).canReplaceWith($start.index(-1), $start.indexAfter(-1), codeBlock)) {
     return false;
   }
 
-  dispatch?.(
-    state.tr
-      .delete(start, start + block.content.size)
-      .setBlockType(start, start, codeBlock, { language: match[1] })
-      .scrollIntoView()
-  );
+  if (dispatch) {
+    const tr = state.tr.delete(lineStart, $from.pos);
+    let position = lineStart;
+    if (lineStart > $from.start()) {
+      tr.delete(lineStart - 1, lineStart).split(lineStart - 1);
+      position = lineStart + 1;
+    }
+    dispatch(
+      tr.setBlockType(position, position, codeBlock, { language: match[1] }).scrollIntoView()
+    );
+  }
   return true;
 };
 
@@ -226,8 +259,36 @@ function enterCodeBlock(direction: -1 | 1): Command {
   };
 }
 
+const exitHeadingOnSoftBreak: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parent.type !== composerSchema.nodes.heading) return false;
+  if ($from.parentOffset !== $from.parent.content.size) return false;
+  return splitBlock(state, dispatch);
+};
+
+const exitQuoteOnSoftBreak: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  const { paragraph, hard_break: hardBreak, blockquote } = composerSchema.nodes;
+  if (!empty || $from.parent.type !== paragraph || $from.depth < 2) return false;
+  if ($from.parentOffset !== $from.parent.content.size) return false;
+  if ($from.nodeBefore?.type !== hardBreak || $from.node(-1).type !== blockquote) return false;
+  if ($from.index(-1) !== $from.node(-1).childCount - 1) return false;
+
+  if (dispatch) {
+    const after = $from.after(-1) - 1;
+    const tr = state.tr.delete($from.pos - 1, $from.pos).insert(after, paragraph.create());
+    dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView());
+  }
+  return true;
+};
+
 /** Shift+Enter: stay in the paragraph so the marks survive serialization. */
-const softBreak: Command = chainCommands(newlineInCode, insertHardBreak);
+const softBreak: Command = chainCommands(
+  newlineInCode,
+  exitHeadingOnSoftBreak,
+  exitQuoteOnSoftBreak,
+  insertHardBreak
+);
 
 /** `baseKeymap`'s Enter, re-chained because ours shadows it. */
 const splitEntry: Command = chainCommands(
@@ -259,6 +320,29 @@ function codeLanguageLabels(): Plugin {
   });
 }
 
+function isTrailingParagraph(doc: ProseMirrorNode): boolean {
+  const last = doc.lastChild;
+  if (!last || doc.childCount < 2) return false;
+  if (last.type !== composerSchema.nodes.paragraph || last.content.size > 0) return false;
+  return doc.child(doc.childCount - 2).type !== composerSchema.nodes.paragraph;
+}
+
+const undoBlockRule: Command = (state, dispatch, view) =>
+  undoInputRule(
+    state,
+    dispatch &&
+      ((tr) => {
+        const last = tr.doc.lastChild;
+        if (isTrailingParagraph(state.doc) && last && !isTrailingParagraph(tr.doc)) {
+          if (last.type === composerSchema.nodes.paragraph && last.content.size === 0) {
+            tr.delete(tr.doc.content.size - last.nodeSize, tr.doc.content.size);
+          }
+        }
+        dispatch(tr);
+      }),
+    view
+  );
+
 function trailingParagraph(): Plugin {
   return new Plugin({
     appendTransaction: (transactions, _old, state) => {
@@ -266,12 +350,32 @@ function trailingParagraph(): Plugin {
       const last = state.doc.lastChild;
       if (!last || last.type === composerSchema.nodes.paragraph) return null;
       if (last.type === composerSchema.nodes.code_block) return null;
-      return state.tr.insert(state.doc.content.size, composerSchema.nodes.paragraph.create());
+      const tr = state.tr.insert(state.doc.content.size, composerSchema.nodes.paragraph.create());
+      for (const plugin of state.plugins) {
+        if ((plugin.spec as { isInputRules?: boolean }).isInputRules) {
+          tr.setMeta(plugin, plugin.getState(state) as unknown);
+        }
+      }
+      return tr;
     },
   });
 }
 
 const URL_ONLY = /^(?:https?:\/\/|mailto:)\S+$/;
+
+const PILL_SPACE = 'pillSpace';
+
+function atDocumentEdge(direction: 'left' | 'right' | 'up' | 'down'): Command {
+  return (state, _dispatch, view) => {
+    if (!state.selection.empty || !view) return false;
+    const { $from } = state.selection;
+    if (direction === 'left') return $from.pos === Selection.atStart(state.doc).from;
+    if (direction === 'right') return $from.pos === Selection.atEnd(state.doc).to;
+    const edgeBlock =
+      direction === 'up' ? $from.index(0) === 0 : $from.index(0) === state.doc.childCount - 1;
+    return edgeBlock && view.endOfTextblock(direction);
+  };
+}
 
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape';
 
@@ -305,7 +409,7 @@ function isDocEmpty(doc: ProseMirrorNode): boolean {
 
   let atom = false;
   doc.descendants((node) => {
-    if (node.isAtom && !node.isText) atom = true;
+    if (node.isAtom && !node.isText && node.type !== composerSchema.nodes.hard_break) atom = true;
     return !atom;
   });
   return !atom;
@@ -324,6 +428,7 @@ function isPlaceholderDoc(doc: ProseMirrorNode): boolean {
 export class ComposerEditor {
   private view: EditorView | undefined;
   private source = false;
+  private pillSpace: number | null = null;
 
   constructor(private options: ComposerEditorOptions) {}
 
@@ -343,9 +448,11 @@ export class ComposerEditor {
 
   private enter: Command = (state, dispatch, view) => {
     if (this.options.onNavigate('Enter')) return true;
-    if (openFence(state, dispatch, view)) return true;
+    if (!this.source && openFence(state, dispatch, view)) return true;
     if (exitEmptyCodeLine(state, dispatch, view)) return true;
     if (newlineInCode(state, dispatch, view)) return true;
+    if (splitListEntry(state, dispatch, view)) return true;
+    if (insideListItem(state) && liftEmptyBlock(state, dispatch, view)) return true;
     return preferences.enterForNewline ? splitEntry(state, dispatch, view) : this.submit();
   };
 
@@ -366,61 +473,81 @@ export class ComposerEditor {
     };
   }
 
-  private createState(doc?: ProseMirrorNode, selection?: Selection): EditorState {
+  private plugins(): Plugin[] {
     /* Read once, here, rather than inside the view: an option the constructor
        calls becomes a dependency of the attachment that mounts it. */
-    const rich = untrack(() => preferences.richTextComposer);
+    const rich = untrack(() => preferences.richTextComposer) && !this.source;
 
+    return [
+      history(),
+      queryPlugin(),
+      inputRules({
+        rules: [shortcodeInputRule(this.options.emotes), ...(rich ? formattingInputRules : [])],
+      }),
+      compositionInputRules(),
+      ...(rich
+        ? [
+            keymap(formattingKeymap),
+            keymap({
+              'Mod-Shift-k': () => {
+                this.options.onLinkRequest();
+                return true;
+              },
+            }),
+          ]
+        : []),
+      gapCursor(),
+      dropCursor(),
+      trailingParagraph(),
+      codeLanguageLabels(),
+      keymap({
+        'Mod-z': undo,
+        'Mod-y': redo,
+        'Shift-Mod-z': redo,
+        Backspace: chainCommands(
+          deleteEmptyCodeBlock,
+          undoBlockRule,
+          joinListItemBackward,
+          headingToParagraphBackward
+        ),
+        ArrowUp: (state, dispatch, view) =>
+          this.options.onNavigate('ArrowUp') || atDocumentEdge('up')(state, dispatch, view),
+        ArrowDown: (state, dispatch, view) =>
+          this.options.onNavigate('ArrowDown') || atDocumentEdge('down')(state, dispatch, view),
+        ArrowLeft: atDocumentEdge('left'),
+        ArrowRight: atDocumentEdge('right'),
+        'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
+        'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),
+        Tab: (state, dispatch, view) =>
+          this.options.onNavigate('Tab') || sinkListEntry(state, dispatch, view),
+        Escape: () => this.options.onNavigate('Escape'),
+        Enter: this.enter,
+        'Shift-Enter': (state, dispatch, view) =>
+          preferences.enterForNewline ? this.submit() : softBreak(state, dispatch, view),
+        'Mod-Enter': () => this.submit(),
+        'Mod-Shift-m': () => {
+          this.options.onSourceToggle(this.toggleSource());
+          return true;
+        },
+      }),
+      keymap(baseKeymap),
+    ];
+  }
+
+  private createState(doc?: ProseMirrorNode, selection?: Selection): EditorState {
     return EditorState.create({
       ...(doc ? { doc } : {}),
       ...(selection ? { selection } : {}),
       schema: composerSchema,
-      plugins: [
-        history(),
-        queryPlugin(),
-        inputRules({
-          rules: [shortcodeInputRule(this.options.emotes), ...(rich ? formattingInputRules : [])],
-        }),
-        compositionInputRules(),
-        ...(rich
-          ? [
-              keymap(formattingKeymap),
-              keymap({
-                'Mod-Shift-k': () => {
-                  this.options.onLinkRequest();
-                  return true;
-                },
-              }),
-            ]
-          : []),
-        gapCursor(),
-        dropCursor(),
-        trailingParagraph(),
-        codeLanguageLabels(),
-        keymap({
-          'Mod-z': undo,
-          'Mod-y': redo,
-          'Shift-Mod-z': redo,
-          Backspace: chainCommands(deleteEmptyCodeBlock, undoInputRule),
-          ArrowUp: () => this.options.onNavigate('ArrowUp'),
-          ArrowDown: () => this.options.onNavigate('ArrowDown'),
-          'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
-          'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),
-          Tab: (state, dispatch, view) =>
-            this.options.onNavigate('Tab') || sinkListEntry(state, dispatch, view),
-          Escape: () => this.options.onNavigate('Escape'),
-          Enter: this.enter,
-          'Shift-Enter': (state, dispatch, view) =>
-            preferences.enterForNewline ? this.submit() : softBreak(state, dispatch, view),
-          'Mod-Enter': () => this.submit(),
-          'Mod-Shift-m': () => {
-            this.options.onSourceToggle(this.toggleSource());
-            return true;
-          },
-        }),
-        keymap(baseKeymap),
-      ],
+      plugins: this.plugins(),
     });
+  }
+
+  private reconfigurePlugins(): void {
+    const view = this.view;
+    if (!view) return;
+    view.updateState(view.state.reconfigure({ plugins: this.plugins() }));
+    this.report(view.state, false);
   }
 
   private rebuild(): void {
@@ -452,7 +579,14 @@ export class ComposerEditor {
             this.handlePastedImages(slice) ||
             this.linkSelection(pasteView, slice),
           clipboardTextParser: (text, _context, plain) =>
-            plain || !preferences.richTextComposer ? textSlice(text) : markdownSlice(text),
+            plain || this.source || !preferences.richTextComposer
+              ? textSlice(text)
+              : markdownSlice(text),
+          handleTextInput: (_inputView, from, to, text) => {
+            if (text !== ' ' || from !== to || from !== this.pillSpace) return false;
+            this.pillSpace = null;
+            return true;
+          },
           clipboardTextSerializer: (slice) => markdownFromSlice(slice),
           handleDrop: (_view, event) => this.handleFiles(filesFrom(event.dataTransfer)),
           handleDOMEvents: {
@@ -490,6 +624,7 @@ export class ComposerEditor {
             },
           },
           dispatchTransaction: (tr) => {
+            this.pillSpace = (tr.getMeta(PILL_SPACE) as number | undefined) ?? null;
             const next = view.state.apply(tr);
             view.updateState(next);
             this.report(next, tr.docChanged);
@@ -582,16 +717,21 @@ export class ComposerEditor {
 
     if (this.source) {
       this.source = false;
+      this.reconfigurePlugins();
       this.setDoc(richFromPlain(doc));
     } else {
       this.source = true;
+      this.reconfigurePlugins();
       this.setSource(composerMarkdown(doc));
     }
     return this.source;
   }
 
   leaveSource(): boolean {
-    this.source = false;
+    if (this.source) {
+      this.source = false;
+      this.reconfigurePlugins();
+    }
     return false;
   }
 
@@ -658,8 +798,9 @@ export class ComposerEditor {
   private replaceRange(from: number, to: number, node: ProseMirrorNode): void {
     const view = this.view;
     if (!view) return;
+    const after = from + node.nodeSize + 1;
     const tr = view.state.tr.replaceWith(from, to, [node, composerSchema.text(' ')]);
-    tr.setSelection(TextSelection.create(tr.doc, from + node.nodeSize + 1));
+    tr.setSelection(TextSelection.create(tr.doc, after)).setMeta(PILL_SPACE, after);
     view.dispatch(tr);
     view.focus();
   }

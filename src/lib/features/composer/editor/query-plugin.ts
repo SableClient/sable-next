@@ -1,12 +1,14 @@
 import { Plugin, PluginKey, type EditorState } from 'prosemirror-state';
 
 import { activeQuery, type AutocompleteQuery } from '../autocomplete';
+import { composerSchema } from './schema';
 
 export const queryKey = new PluginKey<AutocompleteQuery | null>('composer-autocomplete');
 
 function readQuery(state: EditorState): AutocompleteQuery | null {
   const { $from, empty } = state.selection;
-  if (!empty || !$from.parent.isTextblock) return null;
+  if (!empty || !$from.parent.isTextblock || $from.parent.type.spec.code) return null;
+  if (composerSchema.marks.code.isInSet(state.storedMarks ?? $from.marks())) return null;
 
   const start = $from.start();
   const text = state.doc.textBetween(start, $from.pos, ' ', ' ');

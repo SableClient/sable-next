@@ -59,3 +59,23 @@ test('a caret on the sigil or before it opens nothing', () => {
   expect(queryAfter([composerSchema.text('hey @no')], 6)).toBeNull();
   expect(queryAfter([composerSchema.text('hey @no')], 4)).toBeNull();
 });
+
+test('nothing opens inside a code block', () => {
+  const state = EditorState.create({
+    doc: doc.create(null, [
+      composerSchema.nodes.code_block.create(null, composerSchema.text('x :smi')),
+    ]),
+    plugins: [queryPlugin()],
+  });
+  const moved = state.apply(
+    state.tr.setSelection(TextSelection.create(state.doc, state.doc.content.size - 1))
+  );
+
+  expect(queryKey.getState(moved)).toBeNull();
+});
+
+test('nothing opens inside a code span', () => {
+  expect(
+    queryAfter([composerSchema.text('run @no', [composerSchema.marks.code.create()])])
+  ).toBeNull();
+});

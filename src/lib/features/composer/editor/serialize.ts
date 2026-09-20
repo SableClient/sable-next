@@ -355,7 +355,7 @@ const markdownParser = new MarkdownParser(composerSchema, tokenizer, PARSE_TOKEN
 
 const ATOM_PLACEHOLDER = '\uFFFC';
 
-function atomText(node: ProseMirrorNode): string {
+export function atomText(node: ProseMirrorNode): string {
   const { emoticon, room_ping: roomPing, image, math_inline: math } = composerSchema.nodes;
   if (node.type === emoticon) return `:${node.attrs.shortcode as string}:`;
   if (node.type === roomPing) return ROOM_PING;

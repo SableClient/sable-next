@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { undo } from 'prosemirror-history';
+import { Fragment, Slice } from 'prosemirror-model';
 import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
@@ -980,5 +981,530 @@ describe('spoilers', () => {
     const doc = editor.doc();
     if (!doc) throw new Error('no doc');
     expect(serializeComposer(doc).formatted).toBe('<span data-mx-spoiler="ending">later</span>');
+  });
+});
+
+function type(editor: ComposerEditor, text: string): void {
+  const editorView = view(editor);
+  for (const char of text) {
+    const { from, to } = editorView.state.selection;
+    const handled = editorView.someProp('handleTextInput', (handler) =>
+      handler(editorView, from, to, char, () => editorView.state.tr)
+    );
+    if (!handled) editorView.dispatch(editorView.state.tr.insertText(char, from, to));
+  }
+}
+
+describe('block markup on a soft line', () => {
+  test('enter after a fence typed below a soft break opens a block instead of sending', () => {
+    let sent = 0;
+    const editor = openWith({ onSubmit: () => (sent += 1) });
+    type(editor, 'look:');
+    press(editor, 'Enter', true);
+    type(editor, '```rust');
+    press(editor, 'Enter');
+
+    expect(sent).toBe(0);
+    const doc = editor.doc();
+    expect(doc?.childCount).toBe(2);
+    expect(doc?.firstChild?.textContent).toBe('look:');
+    expect(doc?.child(1).type.name).toBe('code_block');
+    expect(doc?.child(1).attrs.language).toBe('rust');
+  });
+
+  test('a bullet marker typed below a soft break opens a list', () => {
+    const editor = open();
+    type(editor, 'list:');
+    press(editor, 'Enter', true);
+    type(editor, '- one');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<p>list:</p><ul><li><p>one</p></li></ul>'
+    );
+  });
+
+  test('a heading marker below a soft break becomes a heading', () => {
+    const editor = open();
+    type(editor, 'intro');
+    press(editor, 'Enter', true);
+    type(editor, '## title');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe('<p>intro</p><h2>title</h2>');
+  });
+
+  test('a marker after a mention rather than a soft break is left alone', () => {
+    const editor = open();
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@a:example.org', name: 'A' }));
+    type(editor, '- x');
+
+    expect(editor.doc()?.childCount).toBe(1);
+    expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
+  });
+});
+
+describe('enter inside a list', () => {
+  test('starts a new item rather than sending', () => {
+    let sent = 0;
+    const editor = openWith({ onSubmit: () => (sent += 1) });
+    type(editor, '- one');
+    press(editor, 'Enter');
+    type(editor, 'two');
+
+    expect(sent).toBe(0);
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<ul><li><p>one</p></li><li><p>two</p></li></ul>'
+    );
+  });
+
+  test('on an empty item leaves the list, and the next enter sends', () => {
+    let sent = 0;
+    const editor = openWith({ onSubmit: () => (sent += 1) });
+    type(editor, '- one');
+    press(editor, 'Enter');
+    press(editor, 'Enter');
+    expect(sent).toBe(0);
+    expect(editor.doc()?.lastChild?.type.name).toBe('paragraph');
+
+    press(editor, 'Enter');
+    expect(sent).toBe(1);
+  });
+});
+
+describe('markdown source mode', () => {
+  test('leaves typed markdown as text', () => {
+    const editor = open();
+    editor.setText('hi');
+    editor.toggleSource();
+    type(editor, ' **bold** and `code`');
+
+    expect(editor.doc()?.firstChild?.childCount).toBe(1);
+    expect(editor.doc()?.textContent).toBe('hi **bold** and `code`');
+
+    editor.toggleSource();
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      'hi <strong>bold</strong> and <code>code</code>'
+    );
+  });
+
+  test('a fence followed by enter stays text', () => {
+    let sent = 0;
+    const editor = openWith({ onSubmit: () => (sent += 1) });
+    editor.setText('x');
+    editor.toggleSource();
+    press(editor, 'Enter', true);
+    type(editor, '```');
+    press(editor, 'Enter');
+
+    expect(sent).toBe(1);
+  });
+
+  test('keeps its undo history across the toggle', () => {
+    const editor = open();
+    editor.setText('one');
+    editor.toggleSource();
+    const editorView = view(editor);
+    undo(editorView.state, editorView.dispatch, editorView);
+
+    expect(editor.doc()?.textContent).toBe('');
+  });
+});
+
+describe('a typed space after a committed pill', () => {
+  test('is swallowed, since the commit already wrote one', () => {
+    const editor = open();
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@a:example.org', name: 'A' }));
+    type(editor, ' x');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).body).toBe('A x');
+  });
+
+  test('a second deliberate space still goes in', () => {
+    const editor = open();
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@a:example.org', name: 'A' }));
+    type(editor, '  x');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).body).toBe('A  x');
+  });
+});
+
+test('a soft break on its own is not content', () => {
+  const editor = open();
+  press(editor, 'Enter', true);
+
+  expect(editor.isEmpty()).toBe(true);
+});
+
+describe('soft breaks leave a heading and a quote', () => {
+  test('shift+enter at the end of a heading starts a paragraph', () => {
+    const editor = open();
+    type(editor, '# Title');
+    press(editor, 'Enter', true);
+    type(editor, 'body');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe('<h1>Title</h1><p>body</p>');
+  });
+
+  test('a second shift+enter on the blank last line of a quote leaves it', () => {
+    const editor = open();
+    type(editor, '> quote');
+    press(editor, 'Enter', true);
+    press(editor, 'Enter', true);
+    type(editor, 'out');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<blockquote><p>quote</p></blockquote><p>out</p>'
+    );
+  });
+});
+
+describe('markers on a soft line inside a container', () => {
+  test('a quote marker continues the quote instead of nesting one', () => {
+    const editor = open();
+    type(editor, '> a');
+    press(editor, 'Enter', true);
+    type(editor, '> b');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<blockquote><p>a</p><p>b</p></blockquote>'
+    );
+  });
+
+  test('a bullet marker makes a sibling item instead of a sublist', () => {
+    const editor = open();
+    type(editor, '- a');
+    press(editor, 'Enter', true);
+    type(editor, '- b');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<ul><li><p>a</p></li><li><p>b</p></li></ul>'
+    );
+  });
+
+  test('a number marker makes a sibling item too', () => {
+    const editor = open();
+    type(editor, '1. a');
+    press(editor, 'Enter', true);
+    type(editor, '2. b');
+
+    const doc = editor.doc();
+    expect(doc && serializeComposer(doc).formatted).toBe(
+      '<ol><li><p>a</p></li><li><p>b</p></li></ol>'
+    );
+  });
+});
+
+describe('backspace undoes a block rule even when the block ends the document', () => {
+  test.each(['- ', '# ', '> '])('%j comes back as text', (marker) => {
+    const editor = open();
+    type(editor, marker);
+    press(editor, 'Backspace');
+
+    expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
+    expect(editor.doc()?.textContent).toBe(marker);
+  });
+
+  test('a marker typed below a soft break comes back with the break', () => {
+    const editor = open();
+    type(editor, 'x');
+    press(editor, 'Enter', true);
+    type(editor, '- ');
+    press(editor, 'Backspace');
+
+    expect(editor.doc()?.childCount).toBe(1);
+    expect(editor.doc()?.firstChild?.child(1).type.name).toBe('hard_break');
+    expect(editor.doc()?.textContent).toBe('x- ');
+  });
+});
+
+describe('arrow keys at the edge of the document', () => {
+  function caretAt(editor: ComposerEditor, where: 'start' | 'end' | number): void {
+    const editorView = view(editor);
+    const { doc } = editorView.state;
+    const selection =
+      where === 'start'
+        ? Selection.atStart(doc)
+        : where === 'end'
+          ? Selection.atEnd(doc)
+          : TextSelection.create(doc, where);
+    editorView.dispatch(editorView.state.tr.setSelection(selection));
+  }
+
+  function onLineEdge(editor: ComposerEditor, value: boolean): void {
+    vi.spyOn(view(editor), 'endOfTextblock').mockReturnValue(value);
+  }
+
+  test('left at the very start is claimed so the webview cannot move focus away', () => {
+    const editor = open();
+    editor.setText('ab');
+    caretAt(editor, 'start');
+
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(true);
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(false);
+  });
+
+  test('right at the very end is claimed', () => {
+    const editor = open();
+    editor.setText('ab');
+    caretAt(editor, 'end');
+
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(true);
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
+  });
+
+  test('left and right in the middle of the text are left to the browser', () => {
+    const editor = open();
+    editor.setText('abc');
+    caretAt(editor, 2);
+
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(false);
+  });
+
+  test('the start of a later block is not the start of the document', () => {
+    const editor = open();
+    editor.setText('one\n\ntwo');
+    const editorView = view(editor);
+    caretAt(editor, editorView.state.doc.child(0).nodeSize + 1);
+
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
+  });
+
+  test('a selection is never claimed, so shift-selecting still reaches the browser', () => {
+    const editor = open();
+    editor.setText('ab');
+    const editorView = view(editor);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, 1, 2))
+    );
+
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(false);
+  });
+
+  test('the start of a code block that opens the document counts as the start', () => {
+    const editor = open();
+    editor.setHtml('<pre>code</pre><p>after</p>');
+    caretAt(editor, 1);
+
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(true);
+  });
+
+  test('up on the first line of the first block is claimed', () => {
+    const editor = open();
+    editor.setText('one');
+    caretAt(editor, 'end');
+    onLineEdge(editor, true);
+
+    expect(pressSurface('ArrowUp').defaultPrevented).toBe(true);
+  });
+
+  test('up on a wrapped line below the first is left to the browser', () => {
+    const editor = open();
+    editor.setText('one');
+    caretAt(editor, 'end');
+    onLineEdge(editor, false);
+
+    expect(pressSurface('ArrowUp').defaultPrevented).toBe(false);
+  });
+
+  test('down on the last line of the last block is claimed', () => {
+    const editor = open();
+    editor.setText('one\n\ntwo');
+    caretAt(editor, 'end');
+    onLineEdge(editor, true);
+
+    expect(pressSurface('ArrowDown').defaultPrevented).toBe(true);
+  });
+
+  test('up and down inside an earlier or later block are left to the browser', () => {
+    const editor = open();
+    editor.setText('one\n\ntwo');
+    onLineEdge(editor, true);
+
+    caretAt(editor, 'start');
+    expect(pressSurface('ArrowDown').defaultPrevented).toBe(false);
+
+    caretAt(editor, 'end');
+    expect(pressSurface('ArrowUp').defaultPrevented).toBe(false);
+  });
+
+  test('the suggestion panel still gets the arrows first', () => {
+    const keys: string[] = [];
+    const editor = openWith({
+      onNavigate: (key) => {
+        keys.push(key);
+        return true;
+      },
+    });
+    editor.setText('@no');
+    caretAt(editor, 'end');
+    onLineEdge(editor, false);
+
+    expect(pressSurface('ArrowUp').defaultPrevented).toBe(true);
+    expect(pressSurface('ArrowDown').defaultPrevented).toBe(true);
+    expect(keys).toEqual(['ArrowUp', 'ArrowDown']);
+  });
+
+  test('an empty composer claims all four directions', () => {
+    const editor = open();
+    onLineEdge(editor, true);
+
+    for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+      expect(pressSurface(key).defaultPrevented, key).toBe(true);
+    }
+  });
+});
+
+describe('the editor api the composer component drives', () => {
+  test('text spells atoms and breaks back out', () => {
+    const editor = open();
+    editor.setText('hi');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@a:x', name: 'A' }));
+    press(editor, 'Enter', true);
+    editor.insert(composerSchema.text('x'));
+
+    expect(editor.text()).toBe('hiA \nx ');
+  });
+
+  test('focus and blur move the document focus onto and off the surface', () => {
+    const editor = open();
+    editor.focus();
+    expect(document.activeElement).toBe(surface());
+    editor.blur();
+    expect(document.activeElement).not.toBe(surface());
+    expect(editor.editable()).toBe(surface());
+  });
+
+  test('syncLabel and syncEditable re-read the options onto the surface', () => {
+    let label = 'first';
+    let editable = true;
+    const editor = openWith({ label: () => label, editable: () => editable });
+    expect(surface().getAttribute('aria-label')).toBe('first');
+    expect(surface().getAttribute('contenteditable')).toBe('true');
+
+    label = 'second';
+    editor.syncLabel();
+    expect(surface().getAttribute('aria-label')).toBe('second');
+
+    editable = false;
+    editor.syncEditable();
+    expect(surface().getAttribute('contenteditable')).toBe('false');
+  });
+
+  test('the enter key hint follows the newline preference', () => {
+    const editor = open();
+    expect(surface().getAttribute('enterkeyhint')).toBe('send');
+    preferences.enterForNewline = true;
+    editor.syncKeyHint();
+    expect(surface().getAttribute('enterkeyhint')).toBe('enter');
+  });
+
+  test('copying formatted text puts markdown on the clipboard', () => {
+    const editor = open();
+    editor.setHtml('<p>a <strong>bold</strong> <a href="https://x.y">link</a></p>');
+    const editorView = view(editor);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, 1, editorView.state.doc.content.size - 1)
+      )
+    );
+    const { text } = editorView.serializeForClipboard(editorView.state.selection.content());
+
+    expect(text).toBe('a **bold** [link](https://x.y)');
+  });
+
+  test('copying plain text leaves it plain', () => {
+    const editor = open();
+    editor.setText('just words');
+    const editorView = view(editor);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(
+        TextSelection.create(editorView.state.doc, 1, editorView.state.doc.content.size - 1)
+      )
+    );
+    expect(editorView.serializeForClipboard(editorView.state.selection.content()).text).toBe(
+      'just words'
+    );
+  });
+
+  test('dropped files are handed to the caller instead of being inserted', () => {
+    const onFiles = vi.fn();
+    const editor = openWith({ onFiles });
+    const file = new File(['x'], 'x.png', { type: 'image/png' });
+    const event = { dataTransfer: { files: [file], items: [] } } as unknown as DragEvent;
+    const handled = view(editor).someProp('handleDrop', (handler) =>
+      handler(view(editor), event, Slice.empty, false)
+    );
+
+    expect(handled).toBe(true);
+    expect(onFiles).toHaveBeenCalledWith([file]);
+  });
+
+  test('a drop without files is left to ProseMirror', () => {
+    const editor = open();
+    const event = { dataTransfer: { files: [], items: [] } } as unknown as DragEvent;
+    const handled = view(editor).someProp('handleDrop', (handler) =>
+      handler(view(editor), event, Slice.empty, false)
+    );
+
+    expect(handled).toBeFalsy();
+  });
+
+  test('a pasted blob image is fetched back into a file for the caller', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(new Response(new Blob(['x'], { type: 'image/png' })))
+    );
+    const onFiles = vi.fn();
+    const editor = openWith({ onFiles });
+    const slice = new Slice(
+      Fragment.from(composerSchema.nodes.image.create({ src: 'blob:tauri://localhost/abc' })),
+      0,
+      0
+    );
+    const event = { clipboardData: { files: [], items: [] } } as unknown as ClipboardEvent;
+    const handled = view(editor).someProp('handlePaste', (handler) =>
+      handler(view(editor), event, slice)
+    );
+
+    expect(handled).toBe(true);
+    await vi.waitFor(() => {
+      expect(onFiles).toHaveBeenCalledOnce();
+    });
+    expect((onFiles.mock.calls[0] as [File[]])[0][0]?.name).toBe('pasted-image.png');
+    expect(editor.isEmpty()).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  test('a paste that is only prose is left to ProseMirror', () => {
+    const editor = open();
+    const slice = new Slice(Fragment.from(composerSchema.text('plain')), 0, 0);
+    const event = { clipboardData: { files: [], items: [] } } as unknown as ClipboardEvent;
+    const handled = view(editor).someProp('handlePaste', (handler) =>
+      handler(view(editor), event, slice)
+    );
+
+    expect(handled).toBeFalsy();
+  });
+
+  test('a rebuild for a preference change keeps the document and the caret', () => {
+    const editor = open();
+    editor.setText('keep');
+    preferences.richTextComposer = false;
+    editor.reconfigure();
+
+    expect(editor.doc()?.textContent).toBe('keep');
+    expect(view(editor).state.selection.from).toBe(5);
+    type(editor, ' **x**');
+    expect(editor.doc()?.textContent).toBe('keep **x**');
   });
 });
