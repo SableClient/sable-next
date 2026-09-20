@@ -89,13 +89,16 @@ export interface Preferences {
 
   desktopNotifications: boolean;
   notificationSounds: boolean;
+  backgroundNotificationSounds: boolean;
   notificationContent: boolean;
   notificationEncryptedContent: boolean;
   richPushPayloads: boolean;
   clearNotificationsOnRead: boolean;
   highlightMentions: boolean;
+  faviconForMentionsOnly: boolean;
   ringForGroupCalls: boolean;
   incomingCallSound: boolean;
+  outgoingRingback: boolean;
   callRingtoneVolume: CallRingtoneVolume;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
@@ -250,13 +253,16 @@ const DEFAULTS: Preferences = {
 
   desktopNotifications: false,
   notificationSounds: true,
+  backgroundNotificationSounds: true,
   notificationContent: false,
   notificationEncryptedContent: false,
   richPushPayloads: true,
   clearNotificationsOnRead: true,
   highlightMentions: true,
+  faviconForMentionsOnly: false,
   ringForGroupCalls: false,
   incomingCallSound: true,
+  outgoingRingback: true,
   callRingtoneVolume: 'normal',
 
   pushGatewayUrl: '',

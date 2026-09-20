@@ -771,6 +771,14 @@ export const settingsCategories: SettingsCategory[] = [
         supported: presentsInApp,
       },
       {
+        key: 'backgroundNotificationSounds',
+        icon: SpeakerHighIcon,
+        name: 'settings.backgroundNotificationSounds',
+        description: 'settings.backgroundNotificationSoundsHint',
+        type: 'boolean',
+        gatedBy: 'notificationSounds',
+      },
+      {
         key: 'notificationContent',
         icon: ChatTextIcon,
         name: 'settings.notificationContent',
@@ -801,6 +809,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'faviconForMentionsOnly',
+        icon: AtIcon,
+        name: 'settings.faviconForMentionsOnly',
+        description: 'settings.faviconForMentionsOnlyHint',
+        type: 'boolean',
+      },
+      {
         key: 'clearNotificationsOnRead',
         icon: CheckCircleIcon,
         name: 'settings.clearNotificationsOnRead',
@@ -812,6 +827,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: PhoneIcon,
         name: 'settings.incomingCallSound',
         description: 'settings.incomingCallSoundHint',
+        type: 'boolean',
+      },
+      {
+        key: 'outgoingRingback',
+        icon: PhoneIcon,
+        name: 'settings.outgoingRingback',
+        description: 'settings.outgoingRingbackHint',
         type: 'boolean',
       },
       {

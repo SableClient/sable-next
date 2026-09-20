@@ -5,6 +5,9 @@ import { ignoreError } from './call-transport';
 const RING_HZ = [440, 480];
 const BURST_MS = 1200;
 const GAP_MS = 2400;
+const RINGBACK_BURST_MS = 1000;
+const RINGBACK_GAP_MS = 3000;
+const RINGBACK_GAIN = 0.4;
 
 export type Ringtone = { stop: () => void };
 
@@ -16,7 +19,15 @@ export function ringtoneVolume(setting: CallRingtoneVolume): number {
   return VOLUMES[setting];
 }
 
+export function startRingback(volume = 1): Ringtone {
+  return tone(volume * RINGBACK_GAIN, RINGBACK_BURST_MS, RINGBACK_GAP_MS);
+}
+
 export function startRingtone(volume = 1): Ringtone {
+  return tone(volume, BURST_MS, GAP_MS);
+}
+
+function tone(volume: number, burstMs: number, gapMs: number): Ringtone {
   const scope = globalThis as {
     AudioContext?: typeof AudioContext;
     webkitAudioContext?: typeof AudioContext;
@@ -41,8 +52,8 @@ export function startRingtone(volume = 1): Ringtone {
     const gain = context.createGain();
     gain.gain.setValueAtTime(0.0001, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(peak, context.currentTime + 0.05);
-    gain.gain.setValueAtTime(peak, context.currentTime + BURST_MS / 1000 - 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + BURST_MS / 1000);
+    gain.gain.setValueAtTime(peak, context.currentTime + burstMs / 1000 - 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + burstMs / 1000);
     gain.connect(context.destination);
 
     for (const frequency of RING_HZ) {
@@ -50,10 +61,10 @@ export function startRingtone(volume = 1): Ringtone {
       oscillator.frequency.value = frequency;
       oscillator.connect(gain);
       oscillator.start();
-      oscillator.stop(context.currentTime + BURST_MS / 1000);
+      oscillator.stop(context.currentTime + burstMs / 1000);
     }
 
-    timer = setTimeout(burst, BURST_MS + GAP_MS);
+    timer = setTimeout(burst, burstMs + gapMs);
   };
 
   void context.resume().then(burst, ignoreError);

@@ -32,6 +32,10 @@
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
+  import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
+  import idleFavicon from '#lib/assets/favicon.png';
+  import unreadFavicon from '#lib/assets/res/svg/unread.svg';
+  import highlightFavicon from '#lib/assets/res/svg/highlight.svg';
   import { startSystemBarSync } from '#lib/platform/system-bars.js';
   import { ensureAndroidHistoryRoot } from '#lib/platform/android-back.js';
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
@@ -56,6 +60,7 @@
   import IncomingCallDialog from '#lib/features/call/IncomingCallDialog.svelte';
   import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
+  import { ringtoneVolume, startRingback } from '#lib/features/call/ringtone.js';
   import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import { syncPushSubscription } from '#lib/features/notifications/web-push.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
@@ -196,14 +201,40 @@
     });
   }
 
-  let unreadTotal = $derived(
-    roomList.rooms
-      .filter((room) => room.state === 'joined' && !room.is_space)
-      .reduce((total, room) => total + room.highlight, 0)
+  const FAVICONS: Record<FaviconState, string> = {
+    idle: idleFavicon,
+    unread: unreadFavicon,
+    highlight: highlightFavicon,
+  };
+
+  let countedRooms = $derived(
+    roomList.rooms.filter((room) => room.state === 'joined' && !room.is_space)
   );
+  let unreadTotal = $derived(countedRooms.reduce((total, room) => total + room.highlight, 0));
 
   $effect(() => {
     void setUnreadBadge(unreadTotal);
+  });
+
+  $effect(() => {
+    if (!preferences.outgoingRingback) return;
+    if (callSession.lifecycle !== 'active') return;
+    if (callSession.transport.participants.length > 0) return;
+    if (!roomList.rooms.find((room) => room.room_id === callSession.roomId)?.is_direct) return;
+
+    const ringback = startRingback(ringtoneVolume(preferences.callRingtoneVolume));
+    return () => {
+      ringback.stop();
+    };
+  });
+
+  $effect(() => {
+    const state = faviconState(
+      countedRooms.some((room) => room.unread > 0 || room.marked_unread),
+      unreadTotal > 0,
+      preferences.faviconForMentionsOnly
+    );
+    setFavicon(FAVICONS[state]);
   });
 
   $effect(() => {

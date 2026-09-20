@@ -113,7 +113,7 @@ export class NotificationCenter {
 
     void this.show(view, lines);
 
-    if (view.noisy !== false && preferences.notificationSounds) chime();
+    if (view.noisy !== false && preferences.notificationSounds && soundsAllowed()) chime();
   }
 
   private async show(view: NotificationView, lines: readonly ConversationLine[]): Promise<void> {
@@ -149,6 +149,11 @@ async function avatar(core: CoreClient, view: NotificationView): Promise<string>
 }
 
 const FALLBACK_ICON = '/favicon.png';
+
+function soundsAllowed(): boolean {
+  if (preferences.backgroundNotificationSounds) return true;
+  return typeof document !== 'undefined' && document.hasFocus();
+}
 
 function chime(): void {
   try {
