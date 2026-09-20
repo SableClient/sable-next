@@ -165,6 +165,7 @@
 
   .thread-panel.modal {
     border-left: none;
+    height: 100%;
     width: 100%;
   }
 
