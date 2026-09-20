@@ -13,6 +13,8 @@
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import ColorSetting from './ColorSetting.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
+  import TestTubeIcon from 'phosphor-svelte/lib/TestTubeIcon';
 
   interface Props {
     profile: ProfileView;
@@ -40,6 +42,7 @@
   let saving = $state<string | null>(null);
   let error = $state<string | null>(null);
   let banner = $derived(profile.banner_url?.startsWith('mxc://') ? profile.banner_url : null);
+  let editKey = $state<{ key: string; value: string; original: string } | undefined>(undefined);
 
   $effect(() => {
     void core.session?.user_id;
@@ -303,12 +306,27 @@
       </form>
     </SettingsSection>
 
+    <!-- very sloppy fix, WILL NEED A PROPER IMPLEMENTATION LATER i just cba to figure it out rnrn -->
     <SettingsSection title={$i18n.t('settings.biography')} headingId="profile-bio">
       <form
         class="form-stack"
         onsubmit={(event) => {
           event.preventDefault();
-          void save('bio', [['moe.sable.app.bio', bio || null]]);
+          void save('bio', [
+            [
+              'gay.fomx.biography',
+              bio
+                ? {
+                    'm.text': [
+                      { body: bio, mimetype: 'text/html' },
+                      {
+                        body: bio,
+                      },
+                    ],
+                  }
+                : null,
+            ],
+          ]);
         }}
       >
         <TextArea bind:value={bio} rows={5} maxlength={5000} />
@@ -316,16 +334,6 @@
       </form>
     </SettingsSection>
 
-    {#if profile.extra.length}
-      <SettingsSection title={$i18n.t('settings.otherProfileFields')} headingId="profile-extra">
-        <dl class="extra-fields">
-          {#each profile.extra as field (field.key)}<div>
-              <dt>{field.key}</dt>
-              <dd>{field.value}</dd>
-            </div>{/each}
-        </dl>
-      </SettingsSection>
-    {/if}
     <SettingsSection title={$i18n.t('settings.animalIdentity')} headingId="profile-animal">
       <form
         class="form-stack"
@@ -359,7 +367,106 @@
         <Button type="submit" loading={saving === 'animal'}>{$i18n.t('settings.saveButton')}</Button
         >
       </form>
-    </SettingsSection>{/if}
+    </SettingsSection>
+
+    <SettingsSection title={$i18n.t('settings.otherProfileFields')} headingId="profile-extra">
+      <SettingsRow
+        title={$i18n.t('settings.otherProfileFieldsTitle')}
+        description={$i18n.t('settings.otherProfileFieldsDescription')}
+        icon={TestTubeIcon}
+      >
+        <Button
+          variant="secondary"
+          size="small"
+          onclick={() => {
+            editKey = { key: '', value: '', original: '' };
+          }}
+        >
+          {$i18n.t('settings.addButton')}
+        </Button>
+      </SettingsRow>
+      <div class="extra-fields">
+        {#if profile.extra.length || editKey}
+          <div class="extra-list">
+            {#each profile.extra as field, i (i)}
+              <Button
+                variant={editKey?.original === field.key ? 'primary' : 'ghost'}
+                size="small"
+                class="choice"
+                aria-pressed={editKey?.original === field.key}
+                block
+                onclick={() => {
+                  editKey = { key: field.key, value: field.value, original: field.key };
+                }}
+              >
+                {field.key}
+              </Button>
+            {/each}
+          </div>
+        {:else}
+          <span>{$i18n.t('settings.otherProfileFieldsEmpty')}</span>
+        {/if}
+        {#if editKey !== undefined}
+          <div class="extra-edit">
+            <TextInput
+              bind:value={editKey.key}
+              maxlength={256}
+              placeholder={$i18n.t('settings.otherProfileFieldsKeyPlaceholder')}
+            />
+            <TextArea
+              bind:value={editKey.value}
+              rows={5}
+              maxlength={5000}
+              placeholder={$i18n.t('settings.otherProfileFieldsValuePlaceholder')}
+            />
+            <div class="extra-buttons">
+              <Button
+                size="small"
+                onclick={() => {
+                  if (!editKey || editKey.key.length === 0) return;
+                  if (editKey.original === editKey.key) {
+                    void save('field', [[editKey.key, editKey.value]]);
+                  } else {
+                    void save('field', [
+                      [editKey.key, editKey.value],
+                      [editKey.original, null],
+                    ]);
+                  }
+                  const oldPosition = profile.extra.findIndex(
+                    (field) => field.key === editKey?.original
+                  );
+                  if (oldPosition !== -1) profile.extra.splice(oldPosition, 1);
+                  profile.extra.push({ key: editKey.key, value: editKey.value });
+                  profile.extra = profile.extra.sort((a, b) => a.key.localeCompare(b.key));
+                  editKey = undefined;
+                }}>{$i18n.t('settings.saveButton')}</Button
+              >
+              <Button
+                variant="danger"
+                size="small"
+                onclick={() => {
+                  if (!editKey) return;
+                  void save(
+                    'field',
+                    editKey.original === editKey.key
+                      ? [[editKey.key, null]]
+                      : [
+                          [editKey.key, null],
+                          [editKey.original, null],
+                        ]
+                  );
+                  editKey = undefined;
+                }}>{$i18n.t('settings.removeButton')}</Button
+              >
+              <Button size="small" onclick={() => (editKey = undefined)}>
+                {$i18n.t('settings.cancel')}
+              </Button>
+            </div>
+          </div>
+        {/if}
+      </div>
+    </SettingsSection>
+  {/if}
 
   {#if section === 'account'}<SettingsSection
       title={$i18n.t('settings.contactInformation')}
@@ -481,17 +588,24 @@
     padding: var(--space-400);
   }
 
-  .extra-fields div {
-    display: grid;
+  .extra-list {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-200);
+    max-height: 14rem;
+    overflow: auto;
   }
 
-  .extra-fields dt {
-    font-weight: var(--font-weight-medium);
+  .extra-edit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-100);
   }
 
-  .extra-fields dd {
-    margin: 0;
-    overflow-wrap: anywhere;
+  .extra-buttons {
+    align-items: center;
+    display: flex;
+    gap: var(--space-100);
+    justify-content: end;
   }
 </style>

@@ -7,10 +7,9 @@ use crate::protocol::{
 
 type ProfileResponse = matrix_sdk::ruma::api::client::profile::get_profile::v3::Response;
 
-const RENDERED_PROFILE_FIELDS: [&str; 22] = [
+const RENDERED_PROFILE_FIELDS: [&str; 21] = [
     "displayname",
     "avatar_url",
-    "moe.sable.app.bio",
     "chat.commet.profile_bio",
     "gay.fomx.biography",
     "chat.commet.profile_color_scheme",
