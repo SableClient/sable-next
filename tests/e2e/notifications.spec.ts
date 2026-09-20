@@ -15,11 +15,13 @@ async function stubNotifications(page: Page): Promise<void> {
     Object.defineProperty(window, '__e2eNotifications', { configurable: true, value: raised });
 
     function StubNotification(
-      this: unknown,
+      this: { addEventListener: () => void; close: () => void },
       title: string,
       options: { body?: string; tag?: string } = {}
     ) {
       raised.push({ title, body: options.body ?? '', tag: options.tag ?? '' });
+      this.addEventListener = () => {};
+      this.close = () => {};
     }
     StubNotification.permission = 'granted';
     StubNotification.requestPermission = () => Promise.resolve('granted');
@@ -45,46 +47,65 @@ test.beforeEach(async ({ page }) => {
   await stubNotifications(page);
 });
 
-test.fixme('shows what the core resolved, once the reader has opted in', async ({
-  page,
-  app,
-  admin,
-  guest,
-}) => {
-  const roomName = `Notified ${String(Date.now())}`;
-  const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
-  await admin.join(roomId);
+for (const opened of [false, true]) {
+  test(`shows ordinary channel messages in browser notifications and the inbox (opened: ${String(opened)})`, async ({
+    page,
+    app,
+    admin,
+    guest,
+  }) => {
+    test.fixme(
+      !opened,
+      'The test homeserver does not resolve $ME/$LAZY membership selectors in sliding sync.'
+    );
+    const roomName = `Notified ${String(Date.now())}`;
+    const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
+    await admin.join(roomId);
+    await admin.sendMessage(roomId, 'Channel opened');
+    await admin.request('PUT', `client/v3/pushrules/global/room/${encodeURIComponent(roomId)}`, {
+      actions: ['notify'],
+    });
 
-  await app.openRooms();
-  await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
-  await turnOn(page, 'System notifications');
-  await turnOn(page, 'Show message content');
-  await app.openRooms();
-  await page.reload();
-  await expect(app.primaryNavigation).toBeVisible();
-  await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
+    await app.openRooms();
+    if (opened) {
+      await app.openRoom(roomId);
+      await expect(app.composer).toBeVisible();
+    }
+    await turnOn(page, 'System notifications');
+    await turnOn(page, 'Show message content');
+    await app.openRooms();
+    await page.reload();
+    await expect(app.primaryNavigation).toBeVisible();
+    await expect(page.locator(`a[href="/rooms/${roomId}"]`)).toBeVisible({ timeout: 30_000 });
 
-  const body = `shipped the patch ${String(Date.now())}`;
-  await guest.sendMessage(roomId, body, { 'm.mentions': { user_ids: [admin.userId] } });
+    const body = `shipped the patch ${String(Date.now())}`;
+    await guest.sendMessage(roomId, body);
 
-  await expect
-    .poll(() => page.evaluate(() => window.__e2eNotifications), { timeout: 40_000 })
-    .toEqual([
-      {
-        title: roomName,
-        body: `${GUEST_DISPLAY_NAME}: ${body}`,
-        tag: `${admin.userId} ${roomId}`,
-      },
-    ]);
-});
+    await expect
+      .poll(() => page.evaluate(() => window.__e2eNotifications), { timeout: 40_000 })
+      .toEqual([
+        {
+          title: roomName,
+          body: `${GUEST_DISPLAY_NAME}: ${body}`,
+          tag: `${admin.userId} ${roomId}`,
+        },
+      ]);
+
+    await page.goto('/inbox');
+    await expect(page.getByRole('link').filter({ hasText: body })).toBeVisible();
+  });
+}
 
 test('stays quiet until the switch is on', async ({ page, app, admin, guest }) => {
   const roomName = `Quiet ${String(Date.now())}`;
   const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
   await admin.join(roomId);
+  await admin.sendMessage(roomId, 'Channel opened');
 
   await app.openRooms();
-  await expect(app.roomLink(roomName)).toBeVisible({ timeout: 30_000 });
+  await app.openRoom(roomId);
+  await expect(app.composer).toBeVisible();
+  await app.openRooms();
 
   await guest.sendMessage(roomId, `unheard ${String(Date.now())}`, {
     'm.mentions': { user_ids: [admin.userId] },

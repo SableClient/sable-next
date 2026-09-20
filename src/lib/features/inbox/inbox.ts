@@ -1,4 +1,4 @@
-import type { BookmarkView, RoomSummary } from '#src/generated/protocol';
+import type { BookmarkView, NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
 export type NotificationFilter = 'all' | 'mentions' | 'direct';
 
@@ -6,18 +6,31 @@ export function parseFilter(value: string | null): NotificationFilter {
   return value === 'mentions' || value === 'direct' ? value : 'all';
 }
 
-export function notificationCount(room: RoomSummary): number {
-  return room.is_direct ? room.unread : room.highlight;
+type NotificationModeResolver = (roomId: string) => NotificationModeView | null;
+const unknownMode: NotificationModeResolver = () => null;
+
+export function notificationCount(
+  room: RoomSummary,
+  mode: NotificationModeView | null = null
+): number {
+  if (mode === 'mute') return 0;
+  if (mode === 'mentions') return room.highlight;
+  return mode === 'all' || room.is_direct ? Math.max(room.unread, room.highlight) : room.highlight;
 }
 
-function matchesFilter(room: RoomSummary, filter: NotificationFilter): boolean {
+function matchesFilter(
+  room: RoomSummary,
+  filter: NotificationFilter,
+  mode: NotificationModeView | null
+): boolean {
+  if (mode === 'mute') return false;
   switch (filter) {
     case 'direct':
-      return room.is_direct && (room.unread > 0 || room.marked_unread);
+      return room.is_direct && (notificationCount(room, mode) > 0 || room.marked_unread);
     case 'mentions':
       return room.highlight > 0;
     default:
-      return notificationCount(room) > 0 || room.marked_unread;
+      return notificationCount(room, mode) > 0 || room.marked_unread;
   }
 }
 
@@ -27,19 +40,32 @@ function byRecency(left: RoomSummary, right: RoomSummary): number {
 
 export function notifications(
   rooms: readonly RoomSummary[],
-  filter: NotificationFilter
+  filter: NotificationFilter,
+  mode: NotificationModeResolver = unknownMode
 ): RoomSummary[] {
   return rooms
-    .filter((room) => room.state === 'joined' && !room.is_space && matchesFilter(room, filter))
+    .filter(
+      (room) =>
+        room.state === 'joined' && !room.is_space && matchesFilter(room, filter, mode(room.room_id))
+    )
     .sort(byRecency);
 }
 
-export function countNotifications(rooms: readonly RoomSummary[]): number {
-  return notifications(rooms, 'all').reduce((total, room) => total + notificationCount(room), 0);
+export function countNotifications(
+  rooms: readonly RoomSummary[],
+  mode: NotificationModeResolver = unknownMode
+): number {
+  return notifications(rooms, 'all', mode).reduce(
+    (total, room) => total + notificationCount(room, mode(room.room_id)),
+    0
+  );
 }
 
-export function hasMarkedUnread(rooms: readonly RoomSummary[]): boolean {
-  return notifications(rooms, 'all').some((room) => room.marked_unread);
+export function hasMarkedUnread(
+  rooms: readonly RoomSummary[],
+  mode: NotificationModeResolver = unknownMode
+): boolean {
+  return notifications(rooms, 'all', mode).some((room) => room.marked_unread);
 }
 
 export function pendingInvites(rooms: readonly RoomSummary[]): RoomSummary[] {

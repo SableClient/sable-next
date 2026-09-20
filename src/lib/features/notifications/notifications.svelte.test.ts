@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 
@@ -28,6 +28,8 @@ beforeEach(() => {
   preferences.desktopNotifications = false;
   preferences.clearNotificationsOnRead = true;
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 function room(unread: number): RoomSummary {
   return { room_id: '!room:example.org', unread } as RoomSummary;
@@ -113,6 +115,39 @@ function invite(): NotificationView {
     noisy: false,
   };
 }
+
+test('shows ordinary channel messages when browser notifications are enabled', async () => {
+  const show = vi.fn();
+  class BrowserNotification {
+    static permission = 'granted';
+    constructor(title: string, options: NotificationOptions) {
+      show(title, options);
+    }
+    addEventListener() {}
+    close() {}
+  }
+  vi.stubGlobal('Notification', BrowserNotification);
+  preferences.desktopNotifications = true;
+  preferences.notificationContent = true;
+  const notifications = center();
+  notifications.present({
+    ...invite(),
+    event_id: '$message',
+    is_direct: false,
+    room_name: 'General',
+    body: 'Hello everyone',
+  });
+  await vi.waitFor(() => {
+    expect(show).toHaveBeenCalledWith(
+      'General',
+      expect.objectContaining({
+        body: 'Alice: Hello everyone',
+        tag: '@me:example.org !room:example.org',
+      })
+    );
+  });
+  notifications.stop();
+});
 
 test.each(['joined', 'left', 'banned'] as const)(
   'an invite survives unrelated updates until its membership becomes %s',
