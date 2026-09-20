@@ -9,6 +9,7 @@
 
   import { markAbbreviations } from './abbreviations';
   import { hasRoomAbbreviations, useRoomAbbreviations } from './room-abbreviations.svelte.js';
+  import { hasRoomMemberNames, mentionLabel, useRoomMemberNames } from './room-member-names.js';
 
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';
@@ -27,6 +28,7 @@
   const core = useCoreClient();
   const roomList = useRoomList();
   const abbreviations = hasRoomAbbreviations() ? useRoomAbbreviations() : null;
+  const memberNames = hasRoomMemberNames() ? useRoomMemberNames() : null;
   let definitionAnchor = $state.raw<HTMLElement | null>(null);
   let definitionPinned = $state(false);
   let definition = $derived(definitionAnchor?.dataset.abbrDefinition ?? '');
@@ -132,8 +134,7 @@
         if (link) {
           anchor.dataset.matrixLink = link.kind;
           if (link.kind === 'user') {
-            const label = anchor.textContent.trim();
-            if (label && !label.startsWith('@')) anchor.textContent = `@${label}`;
+            anchor.textContent = mentionLabel(link.userId, memberNames);
             continue;
           }
           if (anchor.textContent.trim() === anchor.getAttribute('href')?.trim()) {

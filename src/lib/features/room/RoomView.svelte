@@ -22,6 +22,7 @@
     provideRoomAbbreviations,
     RoomAbbreviations,
   } from './room-abbreviations.svelte.js';
+  import { provideRoomMemberNames } from './room-member-names.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
   import { Conversation } from './conversation.svelte.js';
@@ -261,6 +262,7 @@
 
   const abbreviations = new RoomAbbreviations(core.commands);
   provideRoomAbbreviations(abbreviations);
+  provideRoomMemberNames({ displayName: memberDisplayName });
 
   let ancestorSpaceKey = $derived(ancestorSpaceIds(roomList.rooms, resolvedRoomId).join(','));
 
@@ -282,7 +284,7 @@
   let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
   let typingLabel = $derived.by(() => {
     if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
-    const names = typingUserIds.slice(0, 3).map(typingMemberName);
+    const names = typingUserIds.slice(0, 3).map(memberDisplayName);
     if (names.some((name) => name === null)) return $i18n.t('timeline.unknownTyping');
     if (names.length === 1) return $i18n.t('timeline.oneTyping', { name: names[0] });
     if (names.length === 2)
@@ -534,7 +536,7 @@
     }
   }
 
-  function typingMemberName(userId: string): string | null {
+  function memberDisplayName(userId: string): string | null {
     return memberLoader.members.find((member) => member.user_id === userId)?.display_name ?? null;
   }
 
@@ -1037,6 +1039,7 @@
     {profile}
     failed={profileFailed}
     onAvatarClick={openProfileAvatar}
+    onMatrixLink={handleMatrixLink}
   />
 
   {#if mediaEventId}
