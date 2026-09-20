@@ -63,18 +63,18 @@
 <style>
   .forum-thread-item {
     list-style: none;
+    margin-top: var(--space-300);
   }
 
   .forum-thread-button {
     align-items: center;
-    background: none;
-    border: none;
-    border-bottom: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border: 0;
+    border-radius: var(--radius-400);
     box-sizing: border-box;
     cursor: pointer;
     display: flex;
-    gap: var(--space-400);
-    min-height: 2.75rem;
+    gap: var(--space-300);
     padding: var(--space-400);
     text-align: left;
     width: 100%;
@@ -113,13 +113,15 @@
   }
 
   .forum-thread-preview {
-    color: var(--surface-on-container);
+    color: var(--bg-on-container);
+    font-weight: var(--font-weight-500);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .forum-thread-meta {
+    align-items: center;
     color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-small);
@@ -128,7 +130,10 @@
   }
 
   .forum-thread-replies {
+    background: var(--surface-container);
+    border-radius: var(--radius-pill);
     flex: 0 0 auto;
+    padding: var(--space-050) var(--space-200);
   }
 
   .forum-thread-last {

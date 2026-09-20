@@ -45,6 +45,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    padding: var(--space-200) var(--space-400) var(--space-500);
   }
 
   .forum-thread-list ul {

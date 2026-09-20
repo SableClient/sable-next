@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/protocol';
   import { onDestroy, untrack } from 'svelte';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -93,7 +94,10 @@
 
 <aside class="thread-panel" class:modal aria-label={$i18n.t('timeline.thread')}>
   <header class="thread-header">
-    <h2>{$i18n.t('timeline.thread')}</h2>
+    <div class="thread-title">
+      <ChatsIcon aria-hidden="true" />
+      <h2>{$i18n.t('timeline.thread')}</h2>
+    </div>
     <IconButton
       variant="ghost"
       size="small"
@@ -161,7 +165,7 @@
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
-    width: 22rem;
+    width: 100%;
   }
 
   .thread-panel.modal {
@@ -176,7 +180,15 @@
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
-    padding: var(--space-300) var(--space-400);
+    min-height: 3.75rem;
+    padding: 0 var(--space-200) 0 var(--space-400);
+  }
+
+  .thread-title {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+    min-width: 0;
   }
 
   .thread-header h2 {
@@ -187,6 +199,6 @@
 
   .thread-composer {
     border-top: var(--border-width) solid var(--surface-container-line);
-    padding: var(--space-300);
+    padding: 0 var(--space-400);
   }
 </style>

@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { onMount } from 'svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
   import ThreadPanel from '#lib/features/room/ThreadPanel.svelte';
@@ -24,8 +25,16 @@
   import { ForumThreads } from './forum-threads.svelte.js';
   import ForumHeader from './ForumHeader.svelte';
   import ForumThreadList from './ForumThreadList.svelte';
+  import {
+    clampThreadPanelWidth,
+    MAX_THREAD_PANEL_WIDTH,
+    MIN_THREAD_PANEL_WIDTH,
+    remFromPointerDelta,
+    THREAD_PANEL_WIDTH_STEP,
+  } from './thread-panel-width.js';
 
   const AUTO_FILL_ROUNDS = 10;
+  const THREAD_PANEL_WIDTH_STORAGE_KEY = 'sable-forum-thread-panel-width';
 
   interface Props {
     roomId: string;
@@ -50,6 +59,9 @@
   let threadRootId = $state<string | null>(null);
   let permissions = $state<RoomPermissionsView | null>(null);
   let autoFills = 0;
+  let threadPanelWidth = $state(27.5);
+  let threadPanelDragging = $state(false);
+  let threadPanelDrag: { pointerId: number; startX: number; startWidth: number } | null = null;
 
   const conversation = new Conversation({
     core,
@@ -65,6 +77,11 @@
     return () => {
       void forumThreads.stop();
     };
+  });
+
+  onMount(() => {
+    const stored = Number.parseInt(localStorage.getItem(THREAD_PANEL_WIDTH_STORAGE_KEY) ?? '', 10);
+    if (Number.isFinite(stored)) threadPanelWidth = clampThreadPanelWidth(stored);
   });
 
   $effect(() => {
@@ -141,6 +158,46 @@
     forumThreads.paginateBackward(30).catch(() => {});
   }
 
+  function startThreadPanelResize(event: PointerEvent): void {
+    if (event.button !== 0) return;
+    const handle = event.currentTarget;
+    if (!(handle instanceof HTMLElement)) return;
+
+    threadPanelDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: threadPanelWidth,
+    };
+    threadPanelDragging = true;
+    handle.setPointerCapture(event.pointerId);
+  }
+
+  function resizeThreadPanel(event: PointerEvent): void {
+    if (threadPanelDrag === null || event.pointerId !== threadPanelDrag.pointerId) return;
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    threadPanelWidth = clampThreadPanelWidth(
+      threadPanelDrag.startWidth +
+        remFromPointerDelta(threadPanelDrag.startX - event.clientX, rootFontSize)
+    );
+  }
+
+  function finishThreadPanelResize(event: PointerEvent): void {
+    if (threadPanelDrag === null || event.pointerId !== threadPanelDrag.pointerId) return;
+    threadPanelDrag = null;
+    threadPanelDragging = false;
+    localStorage.setItem(THREAD_PANEL_WIDTH_STORAGE_KEY, String(threadPanelWidth));
+  }
+
+  function resizeThreadPanelWithKeyboard(event: KeyboardEvent): void {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    threadPanelWidth = clampThreadPanelWidth(
+      threadPanelWidth +
+        (event.key === 'ArrowLeft' ? THREAD_PANEL_WIDTH_STEP : -THREAD_PANEL_WIDTH_STEP)
+    );
+    localStorage.setItem(THREAD_PANEL_WIDTH_STORAGE_KEY, String(threadPanelWidth));
+  }
+
   async function findJustSent(body: string, sentAfter: number): Promise<string | null> {
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
@@ -188,30 +245,32 @@
       onBack={goBack}
       onSearch={openSearch}
     />
-    <ForumThreadList
-      threads={forumThreads.threads}
-      loading={forumThreads.loading || forumThreads.backwardPagination === 'loading'}
-      canLoadMore={forumThreads.backwardPagination === 'idle'}
-      onOpen={openThread}
-      onLoadMore={loadMoreThreads}
-    />
-    <div class="forum-composer">
-      <p class="forum-composer-hint">{$i18n.t('forum.newThreadHint')}</p>
-      <RoomComposer
-        roomId={resolvedRoomId}
-        onSend={sendMessage}
-        onSendAttachment={conversation.sendAttachment}
-        onSendGallery={conversation.sendGallery}
-        onSendSticker={conversation.sendSticker}
-        onSendGif={conversation.sendGif}
-        onCreatePoll={conversation.createPoll}
-        onSendLocation={conversation.sendLocation}
-        onTyping={conversation.setTyping}
-        {roomName}
-        readOnly={permissions ? !permissions.can_post : false}
-        context={conversation.context}
-        onCancelContext={conversation.clearContext}
-        onToggleSilentReply={conversation.toggleSilentReply}
+    <div class="forum-content">
+      <div class="forum-compose-area">
+        <p class="forum-composer-hint">{$i18n.t('forum.newThreadHint')}</p>
+        <RoomComposer
+          roomId={resolvedRoomId}
+          onSend={sendMessage}
+          onSendAttachment={conversation.sendAttachment}
+          onSendGallery={conversation.sendGallery}
+          onSendSticker={conversation.sendSticker}
+          onSendGif={conversation.sendGif}
+          onCreatePoll={conversation.createPoll}
+          onSendLocation={conversation.sendLocation}
+          onTyping={conversation.setTyping}
+          {roomName}
+          readOnly={permissions ? !permissions.can_post : false}
+          context={conversation.context}
+          onCancelContext={conversation.clearContext}
+          onToggleSilentReply={conversation.toggleSilentReply}
+        />
+      </div>
+      <ForumThreadList
+        threads={forumThreads.threads}
+        loading={forumThreads.loading || forumThreads.backwardPagination === 'loading'}
+        canLoadMore={forumThreads.backwardPagination === 'idle'}
+        onOpen={openThread}
+        onLoadMore={loadMoreThreads}
       />
     </div>
   </div>
@@ -219,15 +278,33 @@
   {#if desktop}
     {#if threadRootId !== null}
       {#key threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={threadRootId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          onClose={closeThread}
-        />
+        <section class="forum-thread-panel" style:width={`${threadPanelWidth}rem`}>
+          <button
+            type="button"
+            class="forum-thread-resize-handle"
+            class:dragging={threadPanelDragging}
+            role="slider"
+            aria-orientation="horizontal"
+            aria-valuemin={MIN_THREAD_PANEL_WIDTH}
+            aria-valuemax={MAX_THREAD_PANEL_WIDTH}
+            aria-valuenow={threadPanelWidth}
+            aria-label={$i18n.t('timeline.thread')}
+            onpointerdown={startThreadPanelResize}
+            onpointermove={resizeThreadPanel}
+            onpointerup={finishThreadPanelResize}
+            onpointercancel={finishThreadPanelResize}
+            onkeydown={resizeThreadPanelWithKeyboard}
+          ></button>
+          <ThreadPanel
+            roomId={resolvedRoomId}
+            rootEventId={threadRootId}
+            {roomName}
+            members={memberLoader.members}
+            readOnly={permissions ? !permissions.can_post : false}
+            canRedactOthers={permissions?.can_redact_others ?? false}
+            onClose={closeThread}
+          />
+        </section>
       {/key}
     {/if}
   {:else}
@@ -276,15 +353,65 @@
     min-width: 0;
   }
 
-  .forum-composer {
+  .forum-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    margin: 0 auto;
+    max-width: 60rem;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .forum-compose-area {
     flex: 0 0 auto;
-    padding-bottom: var(--space-200);
+    padding: var(--space-400) var(--space-400) var(--space-200);
   }
 
   .forum-composer-hint {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-300) var(--space-400) 0;
+    padding: 0 0 var(--space-200);
+  }
+
+  .forum-thread-panel {
+    display: flex;
+    flex: 0 0 auto;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+  }
+
+  .forum-thread-panel :global(.thread-panel) {
+    flex: 1;
+    width: 100%;
+  }
+
+  .forum-thread-resize-handle {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    cursor: col-resize;
+    height: 100%;
+    left: -0.25rem;
+    padding: 0;
+    position: absolute;
+    touch-action: none;
+    user-select: none;
+    width: 0.5rem;
+    z-index: 1;
+  }
+
+  .forum-thread-resize-handle:hover,
+  .forum-thread-resize-handle.dragging,
+  .forum-thread-resize-handle:focus-visible {
+    background: var(--primary-main);
+  }
+
+  .forum-thread-resize-handle:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: -0.1875rem;
   }
 </style>

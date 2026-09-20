@@ -113,3 +113,22 @@ test('opening a topic shows the thread panel', async ({ page, admin }) => {
   await expect(thread).toBeVisible();
   await expect(thread).toContainText('The answer');
 });
+
+test('resizes a forum thread panel with the keyboard', async ({ page, admin }) => {
+  const roomId = await admin.createRoom({
+    name: `Forum resize ${String(Date.now())}`,
+    roomType: 'pl.chrome.forum',
+  });
+  await admin.sendMessage(roomId, 'Resize me');
+
+  await page.goto(`/rooms/${encodeURIComponent(roomId)}`);
+
+  const threads = page.getByRole('list', { name: 'Threads' });
+  await expect(threads).toBeVisible({ timeout: 30_000 });
+  await threads.getByRole('listitem').first().click();
+
+  const resize = page.getByRole('slider', { name: 'Thread' });
+  await expect(resize).toHaveAttribute('aria-valuenow', '27.5');
+  await resize.press('ArrowLeft');
+  await expect(resize).toHaveAttribute('aria-valuenow', '32.5');
+});
