@@ -64,7 +64,7 @@
   import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
   import { ringtoneVolume, startRingback } from '#lib/features/call/ringtone.js';
-  import { RoomNameWriter } from '#lib/features/notifications/room-names.js';
+  import { putPushContentPolicy, RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import {
     dropPushSubscription,
     syncPushSubscription,
@@ -302,6 +302,11 @@
     void setNativeEncryptedContentAllowed(
       preferences.notificationContent && preferences.notificationEncryptedContent
     ).catch(() => {});
+
+    void putPushContentPolicy({
+      content: preferences.notificationContent,
+      encryptedContent: preferences.notificationEncryptedContent,
+    });
   });
 
   $effect(() => {
@@ -334,7 +339,7 @@
   });
 
   $effect(() => {
-    if (core.status !== 'ready' || preferences.desktopNotifications || !deliversWebPush()) return;
+    if (core.status !== 'ready' || preferences.systemNotifications || !deliversWebPush()) return;
 
     void dropPushSubscription(core, pushOverride()).catch((error: unknown) => {
       console.debug('[sable notifications] push not dropped', error);
@@ -344,7 +349,7 @@
   // The browser can rotate a subscription behind our back, so the worker asks
   // for a fresh look rather than the app polling for one.
   $effect(() => {
-    if (core.status !== 'ready' || !preferences.desktopNotifications || !deliversWebPush()) return;
+    if (core.status !== 'ready' || !preferences.systemNotifications || !deliversWebPush()) return;
 
     // Read before the first await, or a retargeted gateway never re-registers.
     const override = pushOverride();
@@ -535,21 +540,21 @@
         markRoomsRead(roomList.rooms, core.commands, readReceiptIsPrivate());
       },
       'navigation.nextUnread': () => {
-        const unread = unreadRoomsByPriority(roomList.rooms, openRoomId);
+        const unread = unreadRoomsByPriority(roomList.rooms, openRoomId, roomList.unreadFor);
         const target = unread[0];
         if (!target) return;
         unreadCycleIndex = 0;
         jumpToRoom(target.room_id);
       },
       'navigation.cycleNextUnread': () => {
-        const unread = unreadRoomsByPriority(roomList.rooms, null);
+        const unread = unreadRoomsByPriority(roomList.rooms, null, roomList.unreadFor);
         if (unread.length === 0) return;
         unreadCycleIndex = (unreadCycleIndex + 1) % unread.length;
         const target = unread[unreadCycleIndex];
         if (target) jumpToRoom(target.room_id);
       },
       'navigation.cyclePreviousUnread': () => {
-        const unread = unreadRoomsByPriority(roomList.rooms, null);
+        const unread = unreadRoomsByPriority(roomList.rooms, null, roomList.unreadFor);
         if (unread.length === 0) return;
         unreadCycleIndex = (unreadCycleIndex - 1 + unread.length) % unread.length;
         const target = unread[unreadCycleIndex];

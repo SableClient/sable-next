@@ -1,21 +1,23 @@
 import type { BookmarkView, NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
+import {
+  hasUnread,
+  type NotificationModeResolver,
+  roomUnread,
+  UNRESOLVED_MODE,
+} from '#lib/rooms/unread.js';
+
 export type NotificationFilter = 'all' | 'mentions' | 'direct';
 
 export function parseFilter(value: string | null): NotificationFilter {
   return value === 'mentions' || value === 'direct' ? value : 'all';
 }
 
-type NotificationModeResolver = (roomId: string) => NotificationModeView | null;
-const unknownMode: NotificationModeResolver = () => null;
-
 export function notificationCount(
   room: RoomSummary,
   mode: NotificationModeView | null = null
 ): number {
-  if (mode === 'mute') return 0;
-  if (mode === 'mentions') return room.highlight;
-  return mode === 'all' || room.is_direct ? Math.max(room.unread, room.highlight) : room.highlight;
+  return roomUnread(room, mode).unread;
 }
 
 function matchesFilter(
@@ -23,14 +25,15 @@ function matchesFilter(
   filter: NotificationFilter,
   mode: NotificationModeView | null
 ): boolean {
-  if (mode === 'mute') return false;
+  const count = roomUnread(room, mode);
+
   switch (filter) {
     case 'direct':
-      return room.is_direct && (notificationCount(room, mode) > 0 || room.marked_unread);
+      return room.is_direct && hasUnread(count);
     case 'mentions':
-      return room.highlight > 0;
+      return count.highlight > 0;
     default:
-      return notificationCount(room, mode) > 0 || room.marked_unread;
+      return hasUnread(count);
   }
 }
 
@@ -41,7 +44,7 @@ function byRecency(left: RoomSummary, right: RoomSummary): number {
 export function notifications(
   rooms: readonly RoomSummary[],
   filter: NotificationFilter,
-  mode: NotificationModeResolver = unknownMode
+  mode: NotificationModeResolver = UNRESOLVED_MODE
 ): RoomSummary[] {
   return rooms
     .filter(
@@ -53,7 +56,7 @@ export function notifications(
 
 export function countNotifications(
   rooms: readonly RoomSummary[],
-  mode: NotificationModeResolver = unknownMode
+  mode: NotificationModeResolver = UNRESOLVED_MODE
 ): number {
   return notifications(rooms, 'all', mode).reduce(
     (total, room) => total + notificationCount(room, mode(room.room_id)),
@@ -63,7 +66,7 @@ export function countNotifications(
 
 export function hasMarkedUnread(
   rooms: readonly RoomSummary[],
-  mode: NotificationModeResolver = unknownMode
+  mode: NotificationModeResolver = UNRESOLVED_MODE
 ): boolean {
   return notifications(rooms, 'all', mode).some((room) => room.marked_unread);
 }

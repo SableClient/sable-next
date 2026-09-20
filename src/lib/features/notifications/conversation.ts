@@ -16,6 +16,14 @@ export function appendLine(
   return [...lines, line].slice(-MAX_CONVERSATION_LINES);
 }
 
+export function hideLines(lines: readonly ConversationLine[]): ConversationLine[] {
+  return lines.map((line) => ({
+    sender: null,
+    body: line.sender === null ? line.body : `New message from ${line.sender}`,
+    eventId: line.eventId,
+  }));
+}
+
 export function summarise(lines: readonly ConversationLine[]): string {
   return lines.map(render).join('\n');
 }

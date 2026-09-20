@@ -50,7 +50,11 @@ test('does not mark a space unread for a muted child room', () => {
   });
   const muted = room({ room_id: '!muted:example.org', unread: 3 });
 
-  expect(spaceUnreadCounts([space], [space, muted], new Set([muted.room_id]))).toEqual(new Map());
+  expect(
+    spaceUnreadCounts([space], [space, muted], (roomId) =>
+      roomId === muted.room_id ? 'mute' : 'all'
+    )
+  ).toEqual(new Map());
 });
 
 test('sums the mentions of a space across its nested rooms, counting each room once', () => {
@@ -109,9 +113,11 @@ test('a hand-marked room dots its parent space, even muted', () => {
   });
   const muted = room({ room_id: '!muted:example.org', marked_unread: true });
 
-  expect(spaceUnreadCounts([root], [root, muted], new Set(['!muted:example.org']))).toEqual(
-    new Map([['!root:example.org', { unread: 0, highlight: 0, marked: true }]])
-  );
+  expect(
+    spaceUnreadCounts([root], [root, muted], (roomId) =>
+      roomId === '!muted:example.org' ? 'mute' : 'all'
+    )
+  ).toEqual(new Map([['!root:example.org', { unread: 0, highlight: 0, marked: true }]]));
 });
 
 test('a joined space lends its edge to a room opened from a link', () => {

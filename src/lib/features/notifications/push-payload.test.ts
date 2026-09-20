@@ -172,3 +172,18 @@ test('an unparseable or incomplete handshake acknowledges nothing', () => {
     webPushValidation(JSON.stringify({ app_id: 'a', ack_token: 'tok', unread: 0 }))
   ).toBeNull();
 });
+
+test('a push renders no preview while the reader has previews off', () => {
+  const message = payload({
+    room_id: '!room:example.org',
+    event_id: '$event',
+    sender_display_name: 'Ada',
+    content: { body: 'the merger closes friday' },
+  });
+
+  const hidden = alert(message, 'Design crew', false);
+  expect(hidden?.body).toBe('New message from Ada');
+  expect(hidden?.line.body).toBe('New message from Ada');
+
+  expect(alert(message, 'Design crew', true)?.body).toBe('Ada: the merger closes friday');
+});

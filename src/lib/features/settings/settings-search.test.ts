@@ -4,8 +4,8 @@ import { searchSettings } from './settings-search.js';
 
 const translations: Record<string, string> = {
   'category.notifications': 'Notifications',
-  'setting.desktopNotifications': 'System notifications',
-  'setting.desktopNotificationsHint': 'Hands alerts to your operating system.',
+  'setting.systemNotifications': 'System notifications',
+  'setting.systemNotificationsHint': 'Hands alerts to your operating system.',
   'category.media': 'Media',
   'setting.autoplayGifs': 'Autoplay GIFs',
   'setting.autoplayGifsHint': 'Off shows a preview with a play button.',
@@ -23,10 +23,10 @@ const categories: SettingsCategory[] = [
     icon: (() => {}) as unknown as SettingsCategory['icon'],
     items: [
       {
-        key: 'desktopNotifications',
+        key: 'systemNotifications',
         icon: (() => {}) as unknown as SettingsCategory['icon'],
-        name: 'setting.desktopNotifications',
-        description: 'setting.desktopNotificationsHint',
+        name: 'setting.systemNotifications',
+        description: 'setting.systemNotificationsHint',
         type: 'boolean',
       },
     ],
@@ -68,12 +68,12 @@ describe('searchSettings', () => {
 
   it('matches on the translated description, case-insensitively', () => {
     const hits = searchSettings('OPERATING SYSTEM', categories, translate);
-    expect(hits.map((hit) => hit.setting.key)).toEqual(['desktopNotifications']);
+    expect(hits.map((hit) => hit.setting.key)).toEqual(['systemNotifications']);
   });
 
   it('matches a setting whose own name does not mention the category', () => {
     const hits = searchSettings('notification', categories, translate);
-    expect(hits.map((hit) => hit.setting.key)).toEqual(['desktopNotifications']);
+    expect(hits.map((hit) => hit.setting.key)).toEqual(['systemNotifications']);
   });
 
   it('excludes settings the platform does not support', () => {

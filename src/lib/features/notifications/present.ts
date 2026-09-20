@@ -11,7 +11,7 @@ import type { ConversationLine } from './conversation';
 import { roomTag } from './tag';
 
 export function enabled(): boolean {
-  return presentsInApp() && preferences.desktopNotifications && permission() === 'granted';
+  return presentsInApp() && preferences.systemNotifications && permission() === 'granted';
 }
 
 export function permission(): NotificationPermission {

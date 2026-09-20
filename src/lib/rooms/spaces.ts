@@ -1,11 +1,13 @@
 import type { RoomSummary } from '#src/generated/protocol';
 
+import { type NotificationModeResolver, roomUnread, UNRESOLVED_MODE } from './unread.js';
+
 export type UnreadCount = { unread: number; highlight: number; marked?: boolean };
 
 export function spaceUnreadCounts(
   spaces: readonly RoomSummary[],
   rooms: readonly RoomSummary[],
-  mutedRoomIds: ReadonlySet<string> = new Set()
+  mode: NotificationModeResolver = UNRESOLVED_MODE
 ): Map<string, UnreadCount> {
   const roomsById = new Map(
     rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
@@ -26,10 +28,10 @@ export function spaceUnreadCounts(
       }
       if (visited.has(room.room_id)) continue;
       visited.add(room.room_id);
-      if (room.marked_unread) total.marked = true;
-      if (mutedRoomIds.has(room.room_id)) continue;
-      total.unread += room.unread;
-      total.highlight += room.highlight;
+      const counts = roomUnread(room, mode(room.room_id));
+      if (counts.marked) total.marked = true;
+      total.unread += counts.unread;
+      total.highlight += counts.highlight;
     }
     return total;
   }

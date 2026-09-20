@@ -32,13 +32,13 @@ function tweak(id: string, css: string): StoredThemes['tweaks'][number] {
 describe('prepareSettings', () => {
   it('uploads syncable preferences and withholds device-local ones', () => {
     const { content } = prepareSettings(
-      { ...base, layout: 'compact', developerTools: true, desktopNotifications: true },
+      { ...base, layout: 'compact', developerTools: true, systemNotifications: true },
       noThemes
     );
 
     expect(content.settings.layout).toBe('compact');
     expect(content.settings).not.toHaveProperty('developerTools');
-    expect(content.settings).not.toHaveProperty('desktopNotifications');
+    expect(content.settings).not.toHaveProperty('systemNotifications');
     expect(content.settings).not.toHaveProperty('settingsSync');
   });
 

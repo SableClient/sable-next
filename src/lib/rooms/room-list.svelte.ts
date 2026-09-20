@@ -13,6 +13,7 @@ import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
+import { type NotificationModeResolver, type RoomUnread, roomUnread } from './unread.js';
 
 type RoomListDiffs = Extract<CoreEvent, { type: 'room_list_diff' }>['diffs'];
 
@@ -74,6 +75,10 @@ export class RoomList {
     const mode = this.notificationModes.get(roomId);
     return mode?.room ?? mode?.fallback ?? null;
   }
+
+  readonly notificationModeOf: NotificationModeResolver = (roomId) => this.notificationMode(roomId);
+
+  readonly unreadFor: RoomUnread = (room) => roomUnread(room, this.notificationMode(room.room_id));
 
   async start(): Promise<void> {
     if (this.subscription !== null) return;

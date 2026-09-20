@@ -7,7 +7,12 @@ import { version } from '$app/env';
 import { resolve } from '$app/paths';
 
 import favicon from '#lib/assets/favicon.png';
-import { appendLine, readLines, summarise } from '#lib/features/notifications/conversation.js';
+import {
+  appendLine,
+  hideLines,
+  readLines,
+  summarise,
+} from '#lib/features/notifications/conversation.js';
 import {
   alert,
   parsePushPayload,
@@ -15,7 +20,7 @@ import {
   unreadCount,
   webPushValidation,
 } from '#lib/features/notifications/push-payload.js';
-import { roomName } from '#lib/features/notifications/room-names.js';
+import { pushContentPolicy, roomName } from '#lib/features/notifications/room-names.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
@@ -112,11 +117,14 @@ async function present(payload: PushPayload | undefined): Promise<void> {
 
   if (await focused()) return;
 
-  // `event_id_only` leaves nothing to reveal, so what arrives is what shows.
-  const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), true);
+  const policy = await pushContentPolicy();
+  const encrypted = payload.notification?.type === 'm.room.encrypted';
+  const showContent = policy.content && (!encrypted || policy.encryptedContent);
+  const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), showContent);
   if (!showing) return;
 
-  const lines = appendLine(await conversation(showing.tag), showing.line);
+  const held = await conversation(showing.tag);
+  const lines = appendLine(showContent ? held : hideLines(held), showing.line);
 
   const options: NotificationOptions & { renotify?: boolean; timestamp?: number } = {
     body: lines.length > 1 ? summarise(lines) : showing.body,

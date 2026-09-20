@@ -34,6 +34,7 @@
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
+  import { hasUnread, NO_UNREAD } from '#lib/rooms/unread.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
@@ -293,8 +294,7 @@
       const room = item.room;
       if (room === undefined) return false;
       if (page.url.pathname === roomHref(item)) return true;
-      if (room.marked_unread) return true;
-      return !roomList.mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0);
+      return hasUnread(roomList.unreadFor(room));
     })
   );
   let visibleRooms = $derived<RoomNavItem[]>([
@@ -454,11 +454,7 @@
   let sectionUnread = $derived(
     rooms.some((item) => {
       const room = item.room;
-      return (
-        room !== undefined &&
-        (room.marked_unread ||
-          (!roomList.mutedRoomIds.has(room.room_id) && (room.unread > 0 || room.highlight > 0)))
-      );
+      return room !== undefined && hasUnread(roomList.unreadFor(room));
     })
   );
 
@@ -723,10 +719,10 @@
               {@const name = room ? roomName(room) : item.roomId}
               {@const href = roomHref(item)}
               {@const active = page.url.pathname === href}
-              {@const muted = !room || roomList.mutedRoomIds.has(room.room_id)}
-              {@const mentions = muted ? 0 : room.highlight}
-              {@const unread = muted ? 0 : room.unread}
-              {@const marked = room?.marked_unread ?? false}
+              {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}
+              {@const mentions = counts.highlight}
+              {@const unread = counts.unread}
+              {@const marked = counts.marked ?? false}
               {@const live = room?.call_participants.length ?? 0}
               {@const notifyMode = room ? roomList.notificationOverride(room.room_id) : null}
               {@const typing =

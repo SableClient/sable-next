@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import {
   appendLine,
+  hideLines,
   type ConversationLine,
   MAX_CONVERSATION_LINES,
   readLines,
@@ -62,4 +63,16 @@ test('lines read back off a notification drop whatever is not a line', () => {
     { sender: null, body: 'anon', eventId: null },
   ]);
   expect(readLines(undefined)).toEqual([]);
+});
+
+test('turning previews off scrubs the lines an earlier push stored', () => {
+  const held = [
+    { sender: 'Ada', body: 'the merger closes friday', eventId: '$one' },
+    { sender: null, body: 'New message', eventId: '$two' },
+  ];
+
+  expect(hideLines(held)).toEqual([
+    { sender: null, body: 'New message from Ada', eventId: '$one' },
+    { sender: null, body: 'New message', eventId: '$two' },
+  ]);
 });

@@ -217,3 +217,19 @@ test('a marked direct chat shows under the direct filter', () => {
   expect(notifications([marked], 'direct').map((entry) => entry.room_id)).toEqual(['!dm']);
   expect(notifications([marked], 'mentions')).toEqual([]);
 });
+
+test('a channel whose mode has not loaded yet still shows its unread messages', () => {
+  const channel = room({ room_id: '!channel', unread: 4 });
+
+  expect(notifications([channel], 'all').map((entry) => entry.room_id)).toEqual(['!channel']);
+  expect(countNotifications([channel])).toBe(4);
+});
+
+test('a muted room that was marked unread by hand still reaches the inbox', () => {
+  const marked = room({ room_id: '!muted', unread: 9, marked_unread: true });
+  const mode = () => 'mute' as const;
+
+  expect(notifications([marked], 'all', mode).map((entry) => entry.room_id)).toEqual(['!muted']);
+  expect(countNotifications([marked], mode)).toBe(0);
+  expect(notifications([marked], 'mentions', mode)).toEqual([]);
+});

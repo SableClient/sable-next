@@ -14,6 +14,7 @@
     spaceUnreadCounts,
     type UnreadCount,
   } from '#lib/rooms/spaces.js';
+  import { hasUnread } from '#lib/rooms/unread.js';
   import {
     applyDrop,
     folderName,
@@ -66,7 +67,9 @@
   let callRoom = $derived(
     call.roomId === null ? undefined : roomList.rooms.find((room) => room.room_id === call.roomId)
   );
-  let spaceUnread = $derived(spaceUnreadCounts(spaces, roomList.rooms, roomList.mutedRoomIds));
+  let spaceUnread = $derived(
+    spaceUnreadCounts(spaces, roomList.rooms, roomList.notificationModeOf)
+  );
   let callSpaces = $derived(
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
   );
@@ -94,7 +97,7 @@
   );
   let directRooms = $derived(
     allDirectRooms
-      .filter((room) => room.highlight > 0 || room.unread > 0)
+      .filter((room) => hasUnread(roomList.unreadFor(room)))
       .sort(
         (left, right) => (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0)
       )
@@ -109,10 +112,10 @@
   );
 
   function unreadCounts(rooms: readonly RoomSummary[]): UnreadCount {
-    return rooms.reduce(
-      (total, room) => addUnread(total, { unread: room.unread, highlight: room.highlight }),
-      { unread: 0, highlight: 0 }
-    );
+    return rooms.reduce((total, room) => addUnread(total, roomList.unreadFor(room)), {
+      unread: 0,
+      highlight: 0,
+    });
   }
 
   function markSectionRead(section: 'home' | 'direct'): void {
@@ -239,6 +242,7 @@
           {unspacedUnread}
           {directRooms}
           {directUnread}
+          unreadFor={roomList.unreadFor}
           mobile
           {onNavigate}
           {...railProps}
@@ -259,6 +263,7 @@
           {unspacedUnread}
           {directRooms}
           {directUnread}
+          unreadFor={roomList.unreadFor}
           compact={collapsed}
           {...railProps}
         />

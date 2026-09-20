@@ -25,7 +25,7 @@ beforeEach(() => {
   mocks.retire.mockClear();
   mocks.setReadRoom.mockClear();
   mocks.watchNativePushMessages.mockClear();
-  preferences.desktopNotifications = false;
+  preferences.systemNotifications = false;
   preferences.clearNotificationsOnRead = true;
 });
 
@@ -127,7 +127,7 @@ test('shows ordinary channel messages when browser notifications are enabled', a
     close() {}
   }
   vi.stubGlobal('Notification', BrowserNotification);
-  preferences.desktopNotifications = true;
+  preferences.systemNotifications = true;
   preferences.notificationContent = true;
   const notifications = center();
   notifications.present({

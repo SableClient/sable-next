@@ -74,3 +74,31 @@ describe('select settings', () => {
     }
   });
 });
+
+describe('notification settings', () => {
+  it('offer one switch per lever, on every platform', { timeout: 30_000 }, async () => {
+    vi.resetModules();
+    const { settingsCategories } = await import('./registry');
+    const notifications = settingsCategories.find((category) => category.id === 'notifications');
+    const keys = notifications?.items.map((item) => item.key) ?? [];
+
+    expect(keys).toContain('systemNotifications');
+    expect(keys).not.toContain('desktopNotifications');
+    expect([...new Set(keys)]).toEqual(keys);
+  });
+
+  it('gate every alert detail on the one alert switch', { timeout: 30_000 }, async () => {
+    vi.resetModules();
+    const { settingsCategories } = await import('./registry');
+    const notifications = settingsCategories.find((category) => category.id === 'notifications');
+    const gates = new Map(
+      (notifications?.items ?? []).map((item) => [item.key, item.gatedBy ?? null])
+    );
+
+    expect(gates.get('notificationSounds')).toBe('systemNotifications');
+    expect(gates.get('notificationContent')).toBe('systemNotifications');
+    expect(gates.get('notificationEncryptedContent')).toBe('notificationContent');
+    expect(gates.get('backgroundNotificationSounds')).toBe('notificationSounds');
+    expect(gates.get('systemNotifications')).toBeNull();
+  });
+});

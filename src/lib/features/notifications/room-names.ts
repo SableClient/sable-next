@@ -59,6 +59,35 @@ export async function roomName(roomId: string): Promise<string | null> {
   }
 }
 
+export interface PushContentPolicy {
+  content: boolean;
+  encryptedContent: boolean;
+}
+
+const POLICY_KEY = '\u0000push-content-policy';
+
+export async function putPushContentPolicy(policy: PushContentPolicy): Promise<void> {
+  try {
+    await transact('readwrite', (store) => store.put(policy, POLICY_KEY));
+  } catch {
+    return;
+  }
+}
+
+export async function pushContentPolicy(): Promise<PushContentPolicy> {
+  try {
+    const stored = (await transact<unknown>('readonly', (store) => store.get(POLICY_KEY))) as
+      | Partial<PushContentPolicy>
+      | undefined;
+    return {
+      content: stored?.content === true,
+      encryptedContent: stored?.encryptedContent === true,
+    };
+  } catch {
+    return { content: false, encryptedContent: false };
+  }
+}
+
 export type RoomNameSink = (names: ReadonlyMap<string, string>) => Promise<void>;
 
 const WRITE_DELAY_MS = 1000;

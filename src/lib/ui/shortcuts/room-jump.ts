@@ -1,5 +1,7 @@
 import type { RoomSummary } from '#src/generated/protocol';
 
+import { type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
+
 import { fuzzyFilter } from './fuzzy.js';
 
 const MAX_RESULTS = 20;
@@ -68,9 +70,12 @@ export function parentSpaceNames(rooms: readonly RoomSummary[]): Map<string, str
 
 export function unreadRoomsByPriority(
   rooms: readonly RoomSummary[],
-  excludeRoomId: string | null
+  excludeRoomId: string | null,
+  unreadFor: RoomUnread = roomUnread
 ): RoomSummary[] {
   return rooms
-    .filter((room) => room.unread > 0 && room.room_id !== excludeRoomId)
-    .sort((a, b) => b.highlight - a.highlight || b.unread - a.unread);
+    .map((room) => ({ room, counts: unreadFor(room) }))
+    .filter(({ room, counts }) => counts.unread > 0 && room.room_id !== excludeRoomId)
+    .sort((a, b) => b.counts.highlight - a.counts.highlight || b.counts.unread - a.counts.unread)
+    .map(({ room }) => room);
 }

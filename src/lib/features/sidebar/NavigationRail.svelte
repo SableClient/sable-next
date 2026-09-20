@@ -12,6 +12,7 @@
   import { i18n } from '#lib/i18n.js';
   import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
   import { addUnread, type UnreadCount } from '#lib/rooms/spaces.js';
+  import { NO_UNREAD, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
   import {
     folderName,
     mergeSpaces,
@@ -53,8 +54,6 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UserQuickTools from './UserQuickTools.svelte';
 
-  const NO_UNREAD: UnreadCount = { unread: 0, highlight: 0 };
-
   type RailSection = 'home' | 'direct';
 
   type RailItem = {
@@ -81,6 +80,7 @@
     unspacedUnread?: UnreadCount;
     directRooms?: readonly RoomSummary[];
     directUnread?: UnreadCount;
+    unreadFor?: RoomUnread;
     mobile?: boolean;
     compact?: boolean;
     onNavigate?: (href: string) => void;
@@ -102,6 +102,7 @@
     unspacedUnread = NO_UNREAD,
     directRooms = [],
     directUnread = NO_UNREAD,
+    unreadFor = roomUnread,
     mobile = false,
     compact = false,
     onNavigate,
@@ -186,7 +187,7 @@
         initial: toInitials(name),
         avatar: room.avatar_url,
         label: name,
-        unread: { unread: room.unread, highlight: room.highlight },
+        unread: unreadFor(room),
         dm: true,
       };
     })

@@ -87,7 +87,6 @@ export interface Preferences {
   urlPreviews: boolean;
   encryptedUrlPreviews: boolean;
 
-  desktopNotifications: boolean;
   systemNotifications: boolean;
   notificationSounds: boolean;
   backgroundNotificationSounds: boolean;
@@ -252,7 +251,6 @@ const DEFAULTS: Preferences = {
   urlPreviews: false,
   encryptedUrlPreviews: false,
 
-  desktopNotifications: false,
   systemNotifications: true,
   notificationSounds: true,
   backgroundNotificationSounds: true,
@@ -329,13 +327,18 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
   return next;
 }
 
+function mergeNotificationSwitch(stored: Record<string, unknown>, next: Preferences): Preferences {
+  if (stored.desktopNotifications === false) next.systemNotifications = false;
+  return next;
+}
+
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
   const stored = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
   if (!stored) return { ...DEFAULTS };
 
-  return sanitize(stored, DEFAULTS);
+  return mergeNotificationSwitch(stored, sanitize(stored, DEFAULTS));
 }
 
 export const preferences = $state<Preferences>(load());
