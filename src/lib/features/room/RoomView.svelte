@@ -245,6 +245,9 @@
       callSupport.can_join &&
       (callSupport.has_focus || callParticipants.length > 0)
   );
+  let callOffered = $derived(
+    callable && ((resolvedRoom?.is_direct ?? false) || callParticipants.length > 0)
+  );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let isVoiceRoom = $derived(resolvedRoom?.is_voice ?? false);
@@ -720,7 +723,7 @@
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
       membersOpen={desktop ? desktopMembersOpen : membersOpen}
-      onCall={callable && !isVoiceRoom ? openPrescreen : null}
+      onCall={callOffered && !isVoiceRoom ? openPrescreen : null}
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
       onBack={goBack}
