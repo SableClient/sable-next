@@ -6,12 +6,16 @@ use matrix_sdk::ruma::api::client::push::{
 };
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
+#[cfg(not(target_family = "wasm"))]
+use matrix_sdk::ruma::events::room::encrypted::OriginalSyncRoomEncryptedEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
 use matrix_sdk::ruma::push::{
     Action, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule,
     PredefinedContentRuleId, PredefinedOverrideRuleId, PushFormat, RuleKind, Ruleset,
     SoundTweakValue, Tweak,
 };
+#[cfg(not(target_family = "wasm"))]
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
@@ -25,8 +29,57 @@ use crate::protocol::{
     MentionRuleView, NotificationModeView, NotificationSettingsView, NotificationView, PusherView,
     RoomNotificationModeView,
 };
+#[cfg(not(target_family = "wasm"))]
+use crate::session::{AccountRegistry, PersistedAccount};
+#[cfg(not(target_family = "wasm"))]
+use crate::store::{FileSessionStore, SessionStore};
 
 const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
+
+#[cfg(not(target_family = "wasm"))]
+fn push_account<'a>(
+    accounts: &'a AccountRegistry,
+    user_id: &str,
+    device_id: &str,
+) -> Option<&'a PersistedAccount> {
+    accounts.accounts.iter().find(|account| {
+        !account.needs_reauth
+            && account.session.credentials.user_id() == user_id
+            && account.session.credentials.device_id() == device_id
+    })
+}
+
+/// Decrypt an Android push without a running Tauri application.
+#[cfg(not(target_family = "wasm"))]
+pub async fn decrypt_cold_push(
+    data_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &str,
+    event_json: &str,
+) -> Option<String> {
+    let stored = FileSessionStore::new(data_dir).load().await.ok()??;
+    let base_store = data_dir.to_str()?;
+    let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
+    accounts.reanchor_stores(base_store);
+    let account = push_account(&accounts, user_id, device_id)?;
+    let client = crate::session::restore_authenticated_client(&account.store_id, &account.session)
+        .await
+        .ok()?;
+    let room_id = RoomId::parse(room_id).ok()?;
+    let room = client.get_room(&room_id)?;
+    let event =
+        Raw::<OriginalSyncRoomEncryptedEvent>::from_json_string(event_json.to_owned()).ok()?;
+    let decrypted = room.decrypt_event(&event, None).await.ok()?;
+
+    match decrypted.kind {
+        matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(event) => {
+            Some(event.event.json().get().to_owned())
+        }
+        matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt { .. }
+        | matrix_sdk::deserialized_responses::TimelineEventKind::PlainText { .. } => None,
+    }
+}
 
 impl From<NotificationModeView> for RoomNotificationMode {
     fn from(mode: NotificationModeView) -> Self {
@@ -631,7 +684,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        gateway, is_backfill, mention_actions, mention_rule, read_mention_mode, timeline_body,
+        gateway, is_backfill, mention_actions, mention_rule, push_account, read_mention_mode,
+        timeline_body,
     };
     use crate::protocol::{MentionNotificationModeView, MentionRuleView};
 
@@ -644,6 +698,31 @@ mod tests {
             .expect("the fixture is valid JSON")
             .deserialize()
             .expect("the fixture is a timeline event")
+    }
+
+    #[test]
+    fn a_cold_push_only_opens_its_exact_authenticated_account() {
+        let accounts: crate::session::AccountRegistry = serde_json::from_value(json!({
+            "version": 1, "active_account_id": "a1", "next_account_id": 3,
+            "accounts": [
+                { "account_id": "a1", "store_id": "one", "needs_reauth": false,
+                  "session": { "homeserver": "https://example.org", "credentials": {
+                    "kind": "password", "user_id": "@alice:example.org", "device_id": "A", "access_token": "token"
+                  }}},
+                { "account_id": "a2", "store_id": "two", "needs_reauth": true,
+                  "session": { "homeserver": "https://example.org", "credentials": {
+                    "kind": "password", "user_id": "@alice:example.org", "device_id": "B", "access_token": "token"
+                  }}}
+            ]
+        }))
+        .expect("the account registry fixture is valid");
+
+        assert_eq!(
+            push_account(&accounts, "@alice:example.org", "A").map(|account| &account.store_id),
+            Some(&"one".to_owned())
+        );
+        assert!(push_account(&accounts, "@alice:example.org", "B").is_none());
+        assert!(push_account(&accounts, "@mallory:example.org", "A").is_none());
     }
 
     fn stub(event_type: &str, content: &serde_json::Value) -> serde_json::Value {

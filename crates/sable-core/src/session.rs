@@ -259,6 +259,37 @@ pub async fn restore_client(
     }
 }
 
+/// Restore the persisted login after opening its local SDK store.
+///
+/// # Errors
+///
+/// Returns an error if the client or saved login cannot be restored.
+pub async fn restore_authenticated_client(
+    store_id: &str,
+    persisted: &PersistedSession,
+) -> Result<Client, String> {
+    let client = restore_client(store_id, persisted)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    match persisted.credentials.clone() {
+        Credentials::Password(matrix) => client
+            .restore_session(matrix)
+            .await
+            .map_err(|error| error.to_string())?,
+        Credentials::OAuth { client_id, user } => client
+            .oauth()
+            .restore_session(
+                oauth_session(client_id, user),
+                matrix_sdk::store::RoomLoadSettings::default(),
+            )
+            .await
+            .map_err(|error| error.to_string())?,
+    }
+
+    Ok(client)
+}
+
 fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
     let builder = builder
         .request_config(RequestConfig::new().timeout(SESSION_TIMEOUT))
