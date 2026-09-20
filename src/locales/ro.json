@@ -1564,9 +1564,9 @@
     "errorTracking": "Urmărire eroare",
     "sendToSentry": "Trimite un raport câtre Sentry",
     "includeDebugLogs": "Include jurnalul de depanare",
-    "openOnGitHub": "Creează și o problemă pe Git",
+    "openOnForge": "Creează și o problemă pe Git",
     "submit": "Trimite Raportul",
-    "openOnGitHubAction": "Deschide în Git",
+    "openOnForgeAction": "Deschide în Git",
     "cancel": "Anulează",
     "submitFailed": "Raportul nu a putut fi trimis. Încearcă din nou."
   },

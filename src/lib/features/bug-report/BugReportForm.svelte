@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { SvelteURLSearchParams } from 'svelte/reactivity';
   import * as Sentry from '@sentry/sveltekit';
+  import {
+    type ForgeIssue,
+    type ReportType,
+    forgeIssueUrl,
+    openForgeIssueUrl,
+    searchForgeIssues,
+  } from '#lib/features/bug-report/forge.js';
   import { i18n } from '#lib/i18n.js';
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
   import { describePlatform } from '#lib/platform/diagnostics.js';
@@ -12,19 +18,10 @@
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  type ReportType = 'bug' | 'feature';
-
-  type SimilarIssue = {
-    number: number;
-    title: string;
-    html_url: string;
-  };
-
   interface Props {
     onDone: () => void;
   }
 
-  const GITHUB_REPO = 'SableClient/Sable';
   const sentryEnabled = Sentry.isInitialized();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
   const userAgent = typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent;
@@ -42,8 +39,8 @@
   let context = $state('');
   let sendToSentry = $state(true);
   let includeDebugLogs = $state(true);
-  let openOnGitHub = $state(!sentryEnabled);
-  let similarIssues = $state<SimilarIssue[]>([]);
+  let openOnForge = $state(!sentryEnabled);
+  let similarIssues = $state<ForgeIssue[]>([]);
   let searching = $state(false);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let searchController: AbortController | undefined;
@@ -63,26 +60,9 @@
     const controller = new AbortController();
     searchController = controller;
     searchTimer = setTimeout(async () => {
-      const words = query
-        .split(/[\s\-_/]+/)
-        .map((word) => word.replace(/[^\w]/g, ''))
-        .filter((word) => word.length >= 3);
-      if (words.length === 0) {
-        searching = false;
-        return;
-      }
-
       try {
-        const params = new globalThis.URLSearchParams({
-          q: `${words.join(' OR ')} repo:${GITHUB_REPO} is:issue is:open`,
-          per_page: '5',
-        });
-        const response = await fetch(`https://api.github.com/search/issues?${params}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok || controller.signal.aborted) return;
-        const data = (await response.json()) as { items?: SimilarIssue[] };
-        similarIssues = data.items ?? [];
+        const issues = await searchForgeIssues(query, controller.signal);
+        if (!controller.signal.aborted) similarIssues = issues;
       } catch {
         return;
       } finally {
@@ -100,38 +80,23 @@
     if (searchTimer !== undefined) clearTimeout(searchTimer);
   });
 
-  function githubUrl(fields: Record<string, string>): string {
-    const params = new SvelteURLSearchParams({
-      title: title.trim(),
-      template: `${type === 'bug' ? 'bug_report' : 'feature_request'}.yml`,
-    });
-    if (type === 'bug') {
-      if (fields.description) params.set('description', fields.description);
-      if (fields.reproduction) params.set('reproduction', fields.reproduction);
-      if (fields.expectedBehavior) params.set('expected-behavior', fields.expectedBehavior);
-      params.set('info', `- OS: ${platform}\n- Browser: ${userAgent}\n- Sable: ${version}`);
-      if (fields.context) params.set('context', fields.context);
-    } else {
-      if (fields.problem) params.set('problem', fields.problem);
-      if (fields.solution) params.set('solution', fields.solution);
-      if (fields.alternatives) params.set('alternatives', fields.alternatives);
-      if (fields.context) params.set('context', fields.context);
-    }
-    return `https://github.com/${GITHUB_REPO}/issues/new?${params}`;
+  function issueUrl(): string {
+    const fields: Record<string, string> =
+      type === 'bug'
+        ? {
+            description,
+            reproduction,
+            'expected-behavior': expectedBehavior,
+            info: `- OS: ${platform}\n- Browser: ${userAgent}\n- Sable: ${version}`,
+            context,
+          }
+        : { problem, solution, alternatives, context };
+    return forgeIssueUrl(type, title, fields);
   }
 
   function submit(): void {
     if (!canSubmit) return;
 
-    const fields = {
-      description,
-      reproduction,
-      expectedBehavior,
-      problem,
-      solution,
-      alternatives,
-      context,
-    };
     if (sendToSentry && type === 'bug') {
       const sentryMessage = [
         `[Bug Report] ${title.trim()}`,
@@ -169,8 +134,8 @@
       }
     }
 
-    if (type === 'feature' || !sentryEnabled || openOnGitHub) {
-      window.open(githubUrl(fields), '_blank', 'noopener,noreferrer');
+    if (type === 'feature' || !sentryEnabled || openOnForge) {
+      void openForgeIssueUrl(issueUrl());
     }
     onDone();
   }
@@ -279,8 +244,8 @@
         </label>
       {/if}
       <label class="option">
-        <input type="checkbox" bind:checked={openOnGitHub} />
-        {$i18n.t('bugReport.openOnGitHub')}
+        <input type="checkbox" bind:checked={openOnForge} />
+        {$i18n.t('bugReport.openOnForge')}
       </label>
     </fieldset>
   {/if}
@@ -289,7 +254,7 @@
     <Button variant="ghost" onclick={onDone}>{$i18n.t('bugReport.cancel')}</Button>
     <Button type="submit" variant="primary" disabled={!canSubmit}>
       {$i18n.t(
-        type === 'bug' && sentryEnabled ? 'bugReport.submit' : 'bugReport.openOnGitHubAction'
+        type === 'bug' && sentryEnabled ? 'bugReport.submit' : 'bugReport.openOnForgeAction'
       )}
     </Button>
   </div>

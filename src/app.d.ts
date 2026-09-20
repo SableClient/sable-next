@@ -1,5 +1,11 @@
 declare global {
   namespace App {
+    interface Error {
+      message: string;
+      stack?: string;
+      eventId?: string;
+    }
+
     interface PageState {
       /** Settings opened as a shallow route over the page it was opened from. */
       settings?: { section: string; focus?: string };

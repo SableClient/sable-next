@@ -108,10 +108,17 @@ export const handleError: HandleClientError = (input) => {
 
   console.error('[sable] unhandled error', input.error);
 
-  Sentry.captureException(input.error, {
+  const eventId = Sentry.captureException(input.error, {
     mechanism: {
       type: 'auto.function.sveltekit.handle_error',
       handled: false,
     },
   });
+
+  const error = input.error instanceof Error ? input.error : undefined;
+  return {
+    message: error?.message ?? String(input.error),
+    stack: error?.stack,
+    eventId: Sentry.isInitialized() ? eventId : undefined,
+  };
 };
