@@ -10,6 +10,8 @@ const HOST_PORT = 18008;
 const CLIENT_HOST = process.env.TESTCONTAINERS_HOST_OVERRIDE ?? '127.0.0.1';
 const PUBLIC_URL = `http://${CLIENT_HOST}:${String(HOST_PORT)}`;
 const SERVER_NAME = 'test.local';
+// A release build refuses challengeless registration, so registering needs a token.
+const REGISTRATION_TOKEN = 'sable-e2e';
 const API_REACHABLE_TIMEOUT = 60_000;
 const API_ATTEMPT_TIMEOUT = 5_000;
 const execFileAsync = promisify(execFile);
@@ -40,6 +42,7 @@ export async function startContinuwuity(): Promise<TestHomeserver> {
       CONTINUWUITY_PORT: String(CLIENT_SERVER_PORT),
       CONTINUWUITY_DATABASE_PATH: '/database',
       CONTINUWUITY_ALLOW_REGISTRATION: 'true',
+      CONTINUWUITY_REGISTRATION_TOKEN: REGISTRATION_TOKEN,
       CONTINUWUITY_YES_I_AM_VERY_VERY_SURE_I_WANT_AN_OPEN_REGISTRATION_SERVER_PRONE_TO_ABUSE:
         'true',
       CONTINUWUITY_FORCE_DISABLE_FIRST_RUN_MODE: 'true',
@@ -128,7 +131,8 @@ export async function registerUser(
             username,
             password,
             auth: {
-              type: 'm.login.dummy',
+              type: 'm.login.registration_token',
+              token: REGISTRATION_TOKEN,
               session: ((await probe.json()) as { session: string }).session,
             },
           }),

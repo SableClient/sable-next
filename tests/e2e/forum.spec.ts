@@ -73,3 +73,43 @@ test('a forum inside a space opens on its thread list', async ({ page, admin }) 
   await expect(threads).toBeVisible({ timeout: 30_000 });
   await expect(threads).toContainText('Spaced topic');
 });
+
+test('a topic older than the sync window is paged in', async ({ page, admin }) => {
+  const roomId = await admin.createRoom({
+    name: `Forum buried ${String(Date.now())}`,
+    roomType: 'pl.chrome.forum',
+  });
+  const rootId = await admin.sendMessage(roomId, 'Buried topic');
+  for (let index = 0; index < 25; index += 1) {
+    await admin.sendMessage(roomId, `Reply ${String(index)}`, {
+      'm.relates_to': { rel_type: 'm.thread', event_id: rootId },
+    });
+  }
+
+  await page.goto(`/rooms/${encodeURIComponent(roomId)}`);
+
+  const threads = page.getByRole('list', { name: 'Threads' });
+  await expect(threads).toBeVisible({ timeout: 30_000 });
+  await expect(threads).toContainText('Buried topic');
+});
+
+test('opening a topic shows the thread panel', async ({ page, admin }) => {
+  const roomId = await admin.createRoom({
+    name: `Forum thread ${String(Date.now())}`,
+    roomType: 'pl.chrome.forum',
+  });
+  const rootId = await admin.sendMessage(roomId, 'Open me');
+  await admin.sendMessage(roomId, 'The answer', {
+    'm.relates_to': { rel_type: 'm.thread', event_id: rootId },
+  });
+
+  await page.goto(`/rooms/${encodeURIComponent(roomId)}`);
+
+  const threads = page.getByRole('list', { name: 'Threads' });
+  await expect(threads).toBeVisible({ timeout: 30_000 });
+  await threads.getByRole('listitem').first().click();
+
+  const thread = page.getByRole('complementary', { name: 'Thread' });
+  await expect(thread).toBeVisible();
+  await expect(thread).toContainText('The answer');
+});
