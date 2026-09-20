@@ -38,11 +38,11 @@ export interface Transport {
   /** Thumbnail bytes for an `mxc://` URI. */
   fetchMedia(source: string, width: number, height: number): Promise<Uint8Array<ArrayBuffer>>;
 
-  /** The `SourceBuffer` type {@link streamVideo} delivers. */
+  /** The MIME type {@link streamVideo} delivers. */
   videoStreamMime(): Promise<string>;
 
   /** Calls `onChunk` as bytes are produced; rejects where no re-encoder runs. */
-  streamVideo(source: string, onChunk: (chunk: Uint8Array) => void): Promise<void>;
+  streamVideo(source: string, id: number, onChunk: (chunk: Uint8Array) => void): Promise<void>;
 
   /**
    * Resolves once the event is queued, not once the upload finishes. Progress

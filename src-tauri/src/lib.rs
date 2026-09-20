@@ -102,7 +102,7 @@ async fn fetch_media(
     Ok(Response::new(bytes))
 }
 
-/// The `SourceBuffer` type [`stream_video`] delivers.
+/// The MIME type [`stream_video`] delivers.
 #[cfg(all(feature = "cef", target_os = "linux"))]
 #[tauri::command]
 #[allow(clippy::unnecessary_wraps)] // The frontend transport expects a Result.
@@ -110,21 +110,33 @@ async fn video_stream_mime() -> Result<&'static str, CommandErr> {
     Ok(video_transcode::STREAM_MIME)
 }
 
-/// Streams a re-encode into `MediaSource`, so playback starts during it.
+/// Sends a re-encode over `chunks`, ending with the empty end-of-stream chunk.
 #[cfg(all(feature = "cef", target_os = "linux"))]
 #[tauri::command]
 async fn stream_video(
     app: AppHandle<BrowserEngine>,
     state: State<'_, AppState>,
     source: String,
+    id: u64,
     chunks: tauri::ipc::Channel<Response>,
 ) -> Result<(), CommandErr> {
-    let input = state.core.media_thumbnail(source.clone(), 0, 0).await?;
+    tracing::info!(%source, id, "video stream requested");
+    let input = state
+        .core
+        .media_thumbnail(source.clone(), 0, 0)
+        .await
+        .inspect_err(
+            |error| tracing::warn!(%source, ?error, "video stream could not fetch the attachment"),
+        )?;
+    tracing::info!(id, bytes = input.len(), "video stream fetched, encoding");
     tauri::async_runtime::spawn_blocking(move || {
-        video_transcode::stream_to(&app, &source, &input, &chunks)
+        video_transcode::stream_to(&app, &source, &input, &chunks, id)
     })
     .await
-    .map_err(|_| CommandErr::Unavailable)?
+    .map_err(|error| {
+        tracing::error!(%error, "video encode task did not finish");
+        CommandErr::Unavailable
+    })?
 }
 
 pub(crate) fn decode_header(request: &Request<'_>, name: &str) -> Option<String> {

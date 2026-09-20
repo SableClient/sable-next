@@ -15,7 +15,7 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextAttachmentViewer from '#lib/ui/TextAttachmentViewer.svelte';
-  import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.js';
+  import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import {
     MAX_TEXT_ATTACHMENT_BYTES,
@@ -159,19 +159,9 @@
       retryAt = 0;
     }
     if (transcode) {
-      url = null;
-      if (!started) {
-        return () => {
-          active = false;
-        };
-      }
-      void videoStreamUrl(core, source, () => videoEl?.currentTime ?? 0)
-        .then((streamUrl) => {
-          if (active) url = streamUrl;
-        })
-        .catch(() => {
-          if (active) streamUnavailable = true;
-        });
+      // Started by the play button, not here: an effect re-run would restart
+      // the encode and supersede the stream already feeding the element.
+      if (!started) url = null;
       return () => {
         active = false;
       };
@@ -206,6 +196,26 @@
       release();
     };
   });
+
+  function play(): void {
+    startedSource = source;
+    url = null;
+    const wanted = source;
+    void videoStreamUrl(
+      core,
+      wanted,
+      () => videoEl?.currentTime ?? 0,
+      (next) => {
+        if (startedSource === wanted) url = next;
+      }
+    )
+      .then((streamUrl) => {
+        if (startedSource === wanted) url = streamUrl;
+      })
+      .catch(() => {
+        streamUnavailable = true;
+      });
+  }
 
   function retry(): void {
     if (retryWait > 0) return;
@@ -298,9 +308,7 @@
     <button
       type="button"
       class="media-play"
-      onclick={() => {
-        startedSource = source;
-      }}
+      onclick={play}
       aria-label={$i18n.t('timeline.playVideo', { name: mediaLabel })}
     >
       {#if posterUrl}

@@ -1105,8 +1105,8 @@ export function createCommands(transport: () => Transport) {
       return transport().videoStreamMime();
     },
 
-    streamVideo(source: string, onChunk: (chunk: Uint8Array) => void): Promise<void> {
-      return transport().streamVideo(source, onChunk);
+    streamVideo(source: string, id: number, onChunk: (chunk: Uint8Array) => void): Promise<void> {
+      return transport().streamVideo(source, id, onChunk);
     },
 
     async markRead(

@@ -71,16 +71,27 @@ export function createTauriTransport(): Transport {
       }
     },
 
-    async streamVideo(source, onChunk) {
+    async streamVideo(source, id, onChunk) {
       const chunks = new Channel<ArrayBuffer>();
+      let drained!: () => void;
+      // Chunks are still in flight when the command resolves, so the empty
+      // chunk the backend sends last is what marks the stream whole.
+      const complete = new Promise<void>((resolve) => {
+        drained = resolve;
+      });
       chunks.onmessage = (chunk) => {
+        if (chunk.byteLength === 0) {
+          drained();
+          return;
+        }
         onChunk(new Uint8Array(chunk));
       };
       try {
-        await invoke('stream_video', { source, chunks });
+        await invoke('stream_video', { source, id, chunks });
       } catch (error) {
         throw new CoreError(error as CommandErr);
       }
+      await complete;
     },
 
     async sendAttachment({
