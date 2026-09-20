@@ -16,6 +16,14 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+async function settle(): Promise<void> {
+  await tick();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+}
+
 test.each([
   { kind: 'video' as const, selector: 'video', width: 1920, height: 1080 },
   { kind: 'audio' as const, selector: 'audio', width: null, height: null },
@@ -36,9 +44,7 @@ test.each([
       },
     });
 
-    await tick();
-    await Promise.resolve();
-    await tick();
+    await settle();
 
     expect(core.fetchMedia).toHaveBeenCalledWith(`mxc://example.org/${kind}`, 0, 0);
     expect(document.querySelector(selector)).not.toBeNull();
@@ -63,9 +69,7 @@ test('renders the extension badge and human-readable size for a file attachment'
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.media-file-ext')?.textContent).toBe('zip');
   expect(document.querySelector('.media-file-size')?.textContent).toBe('1.5 MB');
@@ -87,9 +91,7 @@ test('offers a PDF as a file plus a preview that opens the viewer', async () => 
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.pdf-viewer')).toBeNull();
   expect(document.querySelector('a[download="report.pdf"]')).not.toBeNull();
@@ -115,13 +117,9 @@ test('previews a readable text attachment and leaves an opaque one alone', async
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
-  await Promise.resolve();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   const preview = document.querySelector<HTMLButtonElement>('.text-preview');
   expect(preview?.textContent).toContain('"hello"');
@@ -138,9 +136,7 @@ test('previews a readable text attachment and leaves an opaque one alone', async
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.text-preview')).toBeNull();
   expect(document.querySelector('.text-open')).toBeNull();
@@ -162,9 +158,7 @@ test('renders a voice message with a waveform when a waveform is present', async
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.voice-message-player')).not.toBeNull();
   expect(document.querySelectorAll('.voice-bar')).toHaveLength(5);
@@ -185,9 +179,7 @@ test('falls back to the plain audio player when there is no waveform', async () 
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.voice-message-player')).toBeNull();
   expect(document.querySelector('audio.media-content')).not.toBeNull();
@@ -208,16 +200,13 @@ test('labels unavailable attachments', async () => {
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.media-error')?.textContent).toContain(
     'report.pdf: Media unavailable'
   );
   document.querySelector<HTMLButtonElement>('.retry-media')?.click();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   expect(document.querySelector('.media-error')).toBeNull();

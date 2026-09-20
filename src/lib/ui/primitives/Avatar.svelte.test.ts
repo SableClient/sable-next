@@ -11,6 +11,7 @@ import Avatar from './Avatar.svelte';
 import { identityColor } from './identity-color.js';
 
 afterEach(() => {
+  vi.useRealTimers();
   document.body.replaceChildren();
 });
 
@@ -54,15 +55,31 @@ test('tints the picture box until the picture paints, and never the root', () =>
 });
 
 test('a picture the media layer cannot fetch falls back to the initials', async () => {
-  core.fetchMedia.mockRejectedValueOnce(new Error('gone'));
+  vi.useFakeTimers();
+  core.fetchMedia.mockRejectedValue(new Error('gone'));
   mount(Avatar, {
     target: document.body,
     props: { src: 'mxc://example.org/gone', name: 'Sable', id: '@sable:example.org' },
   });
 
-  for (let index = 0; index < 20; index += 1) await tick();
+  await vi.advanceTimersByTimeAsync(30_000);
 
   expect(fallback()?.style.display).toBe('');
+});
+
+test('keeps its picture while a transient media failure retries', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia
+    .mockRejectedValueOnce(new Error('temporary failure'))
+    .mockResolvedValueOnce(new Uint8Array([1]));
+  mount(Avatar, {
+    target: document.body,
+    props: { src: 'mxc://example.org/retrying', name: 'Sable', id: '@sable:example.org' },
+  });
+
+  await vi.advanceTimersByTimeAsync(0);
+
+  expect(fallback()?.style.display).not.toBe('');
 });
 
 test('leaves a picture on a transparent box, so a transparent png keeps its own shape', () => {

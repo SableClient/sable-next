@@ -16,6 +16,7 @@ const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
 const MAX_MEDIA_REQUESTS = 6;
+const MEDIA_REQUEST_TIMEOUT_MS = 30_000;
 const MEDIA_FAILURE_TTL_MS = 30_000;
 let objectUrlBytes = 0;
 let inflight = 0;
@@ -141,11 +142,27 @@ function fetchThroughGate(
 ): Promise<Uint8Array<ArrayBuffer>> {
   const fetch = (): Promise<Uint8Array<ArrayBuffer>> =>
     core.commands.fetchMedia(source, width, height);
+  const withinDeadline = (
+    request: Promise<Uint8Array<ArrayBuffer>>
+  ): Promise<Uint8Array<ArrayBuffer>> => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<Uint8Array<ArrayBuffer>>((_, reject) => {
+      timeout = setTimeout(() => {
+        reject(new Error('Media request timed out'));
+      }, MEDIA_REQUEST_TIMEOUT_MS);
+    });
+    return Promise.race([request, deadline]).finally(() => {
+      if (timeout !== undefined) clearTimeout(timeout);
+    });
+  };
+  const guardedFetch = (): Promise<Uint8Array<ArrayBuffer>> => {
+    return withinDeadline(fetch());
+  };
   if (inflight < MAX_MEDIA_REQUESTS) {
     inflight += 1;
-    return fetch();
+    return guardedFetch();
   }
-  return new Promise<void>((resolve) => waiting.push(resolve)).then(fetch);
+  return new Promise<void>((resolve) => waiting.push(resolve)).then(guardedFetch);
 }
 
 export function loadMediaUrl(

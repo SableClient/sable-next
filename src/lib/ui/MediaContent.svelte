@@ -10,6 +10,7 @@
   import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
+  import { mediaRetryDelay } from '#lib/ui/media-retry.js';
   import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
@@ -187,7 +188,7 @@
         if (!active) return;
         failed = true;
         if (retryCount > 0) {
-          retryAt = Date.now() + Math.min(2 ** retryCount * 1000, 30_000);
+          retryAt = Date.now() + mediaRetryDelay(retryCount);
           clock = Date.now();
         }
       });

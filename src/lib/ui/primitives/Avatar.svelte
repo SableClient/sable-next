@@ -66,7 +66,10 @@
       width={96}
       height={96}
       {uniform}
-      onloaded={() => (paintedSrc = src)}
+      onloaded={() => {
+        paintedSrc = src;
+        failedSrc = null;
+      }}
       onfailed={() => (failedSrc = src)}
     />
   {:else if src}

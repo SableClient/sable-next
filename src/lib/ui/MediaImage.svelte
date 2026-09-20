@@ -6,6 +6,7 @@
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { dominantColor } from '#lib/ui/dominant-color.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
+  import { automaticMediaRetryDelay, mediaRetryDelay } from '#lib/ui/media-retry.js';
   import {
     cachedMediaUrl,
     holdMediaUrl,
@@ -23,7 +24,6 @@
   const ORIENTATION_TOLERANCE = 0.05;
   const ANIMATED_MIMES = ['image/gif', 'image/apng', 'image/avif', 'image/webp'];
   const ANIMATED_EXTENSIONS = ['.gif', '.apng', '.avif', '.webp'];
-  const AUTO_RETRIES = 4;
 
   interface Props {
     source: string;
@@ -150,14 +150,12 @@
   });
 
   $effect(() => {
-    if (!failed || autoRetries === 0 || autoRetries > AUTO_RETRIES) return;
-    const timeout = setTimeout(
-      () => {
-        retryNextLoad = true;
-        loadGeneration += 1;
-      },
-      2 ** autoRetries * 1000
-    );
+    const delay = automaticMediaRetryDelay(autoRetries);
+    if (!failed || delay === null) return;
+    const timeout = setTimeout(() => {
+      retryNextLoad = true;
+      loadGeneration += 1;
+    }, delay);
     return () => {
       clearTimeout(timeout);
     };
@@ -225,11 +223,11 @@
         if (!active) return;
         failed = true;
         if (retryable && retryCount > 0) {
-          retryAt = Date.now() + Math.min(2 ** retryCount * 1000, 30_000);
+          retryAt = Date.now() + mediaRetryDelay(retryCount);
           clock = Date.now();
         }
         autoRetries += 1;
-        onfailed?.();
+        if (automaticMediaRetryDelay(autoRetries) === null) onfailed?.();
       });
 
     return () => {
@@ -364,6 +362,7 @@
   function brokenImage(): void {
     url = null;
     failed = true;
+    autoRetries = 0;
     onfailed?.();
   }
 

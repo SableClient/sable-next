@@ -30,9 +30,7 @@ test('does not retry a failed media request in a render loop', async () => {
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   await unmount(instance);
@@ -48,9 +46,7 @@ test('does not re-request media that the homeserver cannot provide', async () =>
   };
   const first = mount(MediaImage, { target: document.body, props });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
   await unmount(first);
 
   const second = mount(MediaImage, { target: document.body, props });
@@ -76,9 +72,7 @@ test('shows an unavailable state instead of a blank image', async () => {
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(document.querySelector('.media-image-unavailable')?.textContent).toContain(
     'Holiday photo: Media unavailable'
@@ -86,8 +80,7 @@ test('shows an unavailable state instead of a blank image', async () => {
   const retry = document.querySelector<HTMLButtonElement>('.retry-media');
   expect(retry?.disabled).toBe(false);
   retry?.click();
-  await Promise.resolve();
-  await tick();
+  await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   expect(document.querySelector('.media-image-unavailable')).toBeNull();
@@ -107,9 +100,7 @@ test('backs off repeated manual retries', async () => {
     },
   });
 
-  await tick();
-  await Promise.resolve();
-  await tick();
+  await settle();
   document.querySelector<HTMLButtonElement>('.retry-media')?.click();
   await vi.waitFor(() => {
     expect(core.fetchMedia).toHaveBeenCalledTimes(2);
@@ -197,8 +188,7 @@ test('shares a pending media request across component instances', async () => {
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   resolve(new Uint8Array(new ArrayBuffer()));
-  await Promise.resolve();
-  await tick();
+  await settle();
   expect(createObjectURL).toHaveBeenCalledTimes(1);
   await unmount(first);
   await unmount(second);
@@ -469,6 +459,7 @@ test('steps GIF frames itself and stops on the frame it held', async () => {
 
 async function settle(): Promise<void> {
   await tick();
+  await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();

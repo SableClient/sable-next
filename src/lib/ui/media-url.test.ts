@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { holdMediaUrl, loadMediaUrl } from './media-url.js';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -157,4 +158,24 @@ test('lets a failed source be fetched again once its backoff has elapsed', async
   vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000);
 
   await expect(loadMediaUrl(core, source, 96, 96)).resolves.toBe('blob:recovered');
+});
+
+test('does not let stalled media requests block later media forever', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:after-stall');
+  const core = {
+    session: session('account-stalled', '@a:example.org', 'device-a'),
+    commands: {
+      fetchMedia: vi.fn(() => new Promise<Uint8Array<ArrayBuffer>>(() => {})),
+    },
+  };
+
+  const requests = Array.from({ length: 7 }, (_, index) =>
+    loadMediaUrl(core, `mxc://example.org/stalled-${String(index)}`, 96, 96)
+  );
+  void Promise.allSettled(requests);
+
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(7);
 });
