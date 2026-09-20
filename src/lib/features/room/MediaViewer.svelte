@@ -81,6 +81,7 @@
     item === undefined ? '' : item.kind === 'sticker' ? item.body : (item.caption ?? item.filename)
   );
   let url = $state<string | null>(null);
+  let videoEl = $state<HTMLVideoElement>();
   let failed = $state(false);
   let zoom = $state(1);
   let rotation = $state(0);
@@ -181,7 +182,7 @@
     failed = false;
     if (transcode) {
       url = null;
-      void videoStreamUrl(core, source)
+      void videoStreamUrl(core, source, () => videoEl?.currentTime ?? 0)
         .then((streamUrl) => {
           if (active) url = streamUrl;
         })
@@ -652,6 +653,7 @@
               <!-- Matrix carries no caption track for an attachment. -->
               <!-- svelte-ignore a11y_media_has_caption -->
               <video
+                bind:this={videoEl}
                 class="media-player"
                 controls
                 src={url}

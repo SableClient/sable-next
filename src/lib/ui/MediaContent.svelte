@@ -57,6 +57,7 @@
   }: Props = $props();
   const core = useCoreClient();
   let url = $state<string | null>(null);
+  let videoEl = $state<HTMLVideoElement>();
   let failed = $state(false);
   let retryCount = $state(0);
   let retryAt = $state(0);
@@ -164,7 +165,7 @@
           active = false;
         };
       }
-      void videoStreamUrl(core, source)
+      void videoStreamUrl(core, source, () => videoEl?.currentTime ?? 0)
         .then((streamUrl) => {
           if (active) url = streamUrl;
         })
@@ -234,6 +235,7 @@
       <!-- Matrix carries no caption track for an attachment. -->
       <!-- svelte-ignore a11y_media_has_caption -->
       <video
+        bind:this={videoEl}
         class="media-content media-video"
         controls
         autoplay={started}

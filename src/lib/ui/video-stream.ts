@@ -11,26 +11,42 @@ export function videoStreamingSupported(core: VideoStreamer): boolean {
   );
 }
 
-/** `appendBuffer` throws while the buffer is updating, so appends queue. */
-function appender(buffer: SourceBuffer): {
-  push: (chunk: Uint8Array) => void;
-  idle: () => Promise<void>;
-} {
+const KEEP_BEHIND_SECONDS = 10;
+
+function appender(
+  buffer: SourceBuffer,
+  currentTime: () => number
+): { push: (chunk: Uint8Array) => void; idle: () => Promise<void> } {
   const queue: Uint8Array[] = [];
   let waiting: (() => void)[] = [];
 
+  const evict = (): boolean => {
+    if (buffer.buffered.length === 0) return false;
+    const start = buffer.buffered.start(0);
+    const safe = Math.max(start, currentTime() - KEEP_BEHIND_SECONDS);
+    if (safe <= start + 0.1) return false;
+    buffer.remove(start, safe);
+    return true;
+  };
+
   const drain = (): void => {
     if (buffer.updating) return;
-    const next = queue.shift();
-    if (next === undefined) {
+    if (queue.length === 0) {
       const settled = waiting;
       waiting = [];
       for (const resolve of settled) resolve();
       return;
     }
+    const next = queue[0];
     try {
       buffer.appendBuffer(next as unknown as BufferSource);
-    } catch {
+      queue.shift();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        // No `updateend` follows a throw, so the pump needs restarting.
+        if (!evict()) setTimeout(drain, 500);
+        return;
+      }
       queue.length = 0;
     }
   };
@@ -49,7 +65,11 @@ function appender(buffer: SourceBuffer): {
 }
 
 /** An object URL backed by a `MediaSource` that fills as the re-encode runs. */
-export async function videoStreamUrl(core: VideoStreamer, source: string): Promise<string> {
+export async function videoStreamUrl(
+  core: VideoStreamer,
+  source: string,
+  currentTime: () => number
+): Promise<string> {
   const { streamVideo, videoStreamMime } = core.commands;
   if (typeof streamVideo !== 'function' || typeof videoStreamMime !== 'function') {
     throw new Error('no native video re-encoder');
@@ -78,7 +98,7 @@ export async function videoStreamUrl(core: VideoStreamer, source: string): Promi
 
   // `sourceopen` waits on the element attaching, which happens after this returns.
   void open.then(async (buffer) => {
-    const { push, idle } = appender(buffer);
+    const { push, idle } = appender(buffer, currentTime);
     try {
       await streamVideo(source, (chunk) => {
         push(chunk);
