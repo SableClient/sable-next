@@ -29,7 +29,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { preferredPronouns } from '#lib/personas/pronouns.js';
+  import { clampPronoun, preferredPronouns, pronounPillLength } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
@@ -107,12 +107,19 @@
   let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let pronouns = $derived(
-    (preferences.filterPronounsByLanguage
-      ? preferredPronouns(currentProfile?.pronouns ?? [], $i18n.resolvedLanguage ?? $i18n.language)
-      : (currentProfile?.pronouns ?? [])
-    )
-      .map((pronoun) => pronoun.summary)
-      .join(', ')
+    !preferences.showPronouns
+      ? ''
+      : (preferences.filterPronounsByLanguage
+          ? preferredPronouns(
+              currentProfile?.pronouns ?? [],
+              $i18n.resolvedLanguage ?? $i18n.language
+            )
+          : (currentProfile?.pronouns ?? [])
+        )
+          .map((pronoun) =>
+            clampPronoun(pronoun.summary, pronounPillLength(preferences.pronounPillLength))
+          )
+          .join(', ')
   );
   let localTime = $derived.by(() => {
     const timezone = currentProfile?.timezone;

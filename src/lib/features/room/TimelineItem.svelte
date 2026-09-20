@@ -25,7 +25,7 @@
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { projectPersona } from '#lib/personas/persona.js';
-  import { pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
+  import { pronounPillLength, pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -174,11 +174,15 @@
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
-    visiblePronouns(persona?.pronouns ?? profile?.pronouns ?? [], {
-      language: $i18n.resolvedLanguage ?? $i18n.language,
-      filterByLanguage: preferences.filterPronounsByLanguage,
-      limit: pronounPillLimit(preferences.pronounPillLimit),
-    })
+    visiblePronouns(
+      preferences.showPronouns ? (persona?.pronouns ?? profile?.pronouns ?? []) : [],
+      {
+        language: $i18n.resolvedLanguage ?? $i18n.language,
+        filterByLanguage: preferences.filterPronounsByLanguage,
+        limit: pronounPillLimit(preferences.pronounPillLimit),
+        maxLength: pronounPillLength(preferences.pronounPillLength),
+      }
+    )
   );
   let replyNameBase = $derived(
     replyPersona?.display_name ??

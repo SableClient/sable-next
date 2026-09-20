@@ -127,10 +127,31 @@ function isVisibleEvent(
       if (item.content.change) return true;
       return preferences.showHiddenEvents;
     case 'hidden_event':
-      return preferences.showHiddenEvents;
+      return preferences.showHiddenEvents && preferences.hiddenEventOther;
     default:
       return true;
   }
+}
+
+export function visibleAggregations(
+  aggregations: readonly TimelineItemView[],
+  preferences: TimelinePreferences
+): readonly TimelineItemView[] {
+  if (!preferences.showHiddenEvents) return [];
+
+  return aggregations.filter((item) => {
+    if (item.content.kind !== 'hidden_event') return true;
+    switch (item.content.event_type) {
+      case 'm.reaction':
+        return preferences.hiddenEventReactions;
+      case 'm.room.redaction':
+        return preferences.hiddenEventRedactions;
+      case 'm.room.message':
+        return preferences.hiddenEventEdits;
+      default:
+        return preferences.hiddenEventOther;
+    }
+  });
 }
 
 export function mergeAggregations(

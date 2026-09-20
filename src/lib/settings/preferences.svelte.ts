@@ -11,9 +11,11 @@ export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
 export type FontScale = 'smallest' | 'small' | 'default' | 'large' | 'largest' | 'huge';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
+export type PronounPillLength = '12' | '16' | '24' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
 export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
+export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
 
 export interface Preferences {
   language: string;
@@ -50,7 +52,9 @@ export interface Preferences {
   memberSort: MemberSort;
   groupMembersByPresence: boolean;
   filterPronounsByLanguage: boolean;
+  showPronouns: boolean;
   pronounPillLimit: PronounPillLimit;
+  pronounPillLength: PronounPillLength;
 
   enterForNewline: boolean;
   mentionInReplies: boolean;
@@ -91,6 +95,8 @@ export interface Preferences {
   clearNotificationsOnRead: boolean;
   highlightMentions: boolean;
   ringForGroupCalls: boolean;
+  incomingCallSound: boolean;
+  callRingtoneVolume: CallRingtoneVolume;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
   pushGatewayUrl: string;
@@ -112,6 +118,10 @@ export interface Preferences {
 
   developerTools: boolean;
   showHiddenEvents: boolean;
+  hiddenEventEdits: boolean;
+  hiddenEventReactions: boolean;
+  hiddenEventRedactions: boolean;
+  hiddenEventOther: boolean;
 }
 
 /** The subset the timeline reads when deciding which events to render. */
@@ -123,6 +133,10 @@ export type TimelinePreferences = Pick<
   | 'hideMemberInReadOnly'
   | 'showTombstoneEvents'
   | 'showHiddenEvents'
+  | 'hiddenEventEdits'
+  | 'hiddenEventReactions'
+  | 'hiddenEventRedactions'
+  | 'hiddenEventOther'
 >;
 
 const STORAGE_KEY = 'sable-preferences';
@@ -144,8 +158,10 @@ const ENUMS = {
   showRoomIcon: ['always', 'collapsed', 'never'],
   fontScale: ['smallest', 'small', 'default', 'large', 'largest', 'huge'],
   pronounPillLimit: ['1', '2', '3', 'all'],
+  pronounPillLength: ['12', '16', '24', 'all'],
   readReceiptPlacement: ['message', 'room'],
   replyPreviewStyle: ['connected', 'compact', 'expanded'],
+  callRingtoneVolume: ['quiet', 'normal', 'loud'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   personaLatching: ['off', 'room', 'account'],
   presence: ['online', 'unavailable', 'offline'],
@@ -197,7 +213,9 @@ const DEFAULTS: Preferences = {
   memberSort: 'name-asc',
   groupMembersByPresence: true,
   filterPronounsByLanguage: true,
+  showPronouns: true,
   pronounPillLimit: '3',
+  pronounPillLength: 'all',
 
   enterForNewline: false,
   mentionInReplies: true,
@@ -238,6 +256,8 @@ const DEFAULTS: Preferences = {
   clearNotificationsOnRead: true,
   highlightMentions: true,
   ringForGroupCalls: false,
+  incomingCallSound: true,
+  callRingtoneVolume: 'normal',
 
   pushGatewayUrl: '',
   pushVapidKey: '',
@@ -257,6 +277,10 @@ const DEFAULTS: Preferences = {
 
   developerTools: false,
   showHiddenEvents: false,
+  hiddenEventEdits: true,
+  hiddenEventReactions: true,
+  hiddenEventRedactions: true,
+  hiddenEventOther: true,
 };
 
 function prefersReducedMotion(): boolean {

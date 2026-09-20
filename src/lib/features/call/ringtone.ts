@@ -1,3 +1,5 @@
+import type { CallRingtoneVolume } from '#lib/settings/preferences.svelte.js';
+
 import { ignoreError } from './call-transport';
 
 const RING_HZ = [440, 480];
@@ -6,7 +8,15 @@ const GAP_MS = 2400;
 
 export type Ringtone = { stop: () => void };
 
-export function startRingtone(): Ringtone {
+const PEAK_GAIN = 0.12;
+
+const VOLUMES: Record<CallRingtoneVolume, number> = { quiet: 0.35, normal: 1, loud: 2 };
+
+export function ringtoneVolume(setting: CallRingtoneVolume): number {
+  return VOLUMES[setting];
+}
+
+export function startRingtone(volume = 1): Ringtone {
   const scope = globalThis as {
     AudioContext?: typeof AudioContext;
     webkitAudioContext?: typeof AudioContext;
@@ -27,10 +37,11 @@ export function startRingtone(): Ringtone {
   const burst = (): void => {
     if (stopped) return;
 
+    const peak = Math.max(0.0002, PEAK_GAIN * volume);
     const gain = context.createGain();
     gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.05);
-    gain.gain.setValueAtTime(0.12, context.currentTime + BURST_MS / 1000 - 0.05);
+    gain.gain.exponentialRampToValueAtTime(peak, context.currentTime + 0.05);
+    gain.gain.setValueAtTime(peak, context.currentTime + BURST_MS / 1000 - 0.05);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + BURST_MS / 1000);
     gain.connect(context.destination);
 
