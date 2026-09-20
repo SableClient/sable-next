@@ -1,17 +1,11 @@
-import i18next from 'i18next';
-
 import type {
   PerMessageProfileView,
   TimelineItemContentView,
   TimelineItemView,
 } from '#src/generated/protocol';
-import { t } from '#lib/i18n.js';
+import { currentLocale, t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { ReplyPreviewStyle, TimelinePreferences } from '#lib/settings/preferences.svelte.js';
-
-function locale(): string {
-  return i18next.resolvedLanguage ?? i18next.language;
-}
 
 function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.toDateString() === b.toDateString();
@@ -328,7 +322,7 @@ export function readReceiptEventId(
 }
 
 export function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString(locale(), {
+  return new Date(timestamp).toLocaleTimeString(currentLocale(), {
     hour: '2-digit',
     minute: '2-digit',
     ...(preferences.hour24Clock ? { hour12: false } : {}),
@@ -340,7 +334,7 @@ function pad(value: number): string {
 }
 
 function formatMessageDatePart(date: Date, includeYear: boolean): string {
-  return date.toLocaleDateString(locale(), {
+  return date.toLocaleDateString(currentLocale(), {
     day: 'numeric',
     month: 'long',
     ...(includeYear ? { year: 'numeric' } : {}),
@@ -382,7 +376,7 @@ export function formatDate(timestamp: number): string {
     case 'ymd':
       return `${year}-${month}-${day}`;
     default:
-      return date.toLocaleDateString(locale(), {
+      return date.toLocaleDateString(currentLocale(), {
         day: 'numeric',
         month: 'long',
         year: 'numeric',

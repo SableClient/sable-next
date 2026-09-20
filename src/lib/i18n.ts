@@ -2,6 +2,7 @@ import i18next from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { createI18nStore } from 'svelte-i18next';
 import en from '../locales/en.json';
+import { currentLanguage, setCurrentLanguage } from './language.svelte.js';
 import { availableLocales, loadLocaleBundle, SYSTEM_LANGUAGE } from './locales.js';
 import { preferences } from './settings/preferences.svelte.js';
 
@@ -16,7 +17,8 @@ async function ensureBundle(code: string): Promise<void> {
   if (bundle) i18next.addResourceBundle(code, 'translation', bundle, true, true);
 }
 
-function applyDocumentLanguage(code: string): void {
+function applyLanguage(code: string): void {
+  setCurrentLanguage(code);
   if (typeof document === 'undefined') return;
   document.documentElement.lang = code;
 }
@@ -45,8 +47,8 @@ i18next
     console.error('[sable i18n] init failed; the UI will render raw translation keys', error);
   });
 
-i18next.on('languageChanged', applyDocumentLanguage);
-applyDocumentLanguage(i18next.resolvedLanguage ?? i18next.language);
+i18next.on('languageChanged', applyLanguage);
+applyLanguage(i18next.resolvedLanguage ?? i18next.language);
 
 export async function setLanguage(value: string): Promise<void> {
   if (value === SYSTEM_LANGUAGE) {
@@ -64,7 +66,12 @@ if (initialLanguage !== undefined) {
 }
 
 export const i18n = createI18nStore(i18next);
-/** Translate outside of templates (not reactive). */
+
+export function currentLocale(): string {
+  return currentLanguage() || (i18next.resolvedLanguage ?? i18next.language);
+}
+
 export function t(key: string, options?: Record<string, unknown>): string {
+  currentLanguage();
   return i18next.t(key, options);
 }
