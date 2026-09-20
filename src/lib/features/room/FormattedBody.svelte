@@ -371,6 +371,7 @@
 
     const anchor = target.closest<HTMLAnchorElement>('a');
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    if (anchor.href.toLowerCase().startsWith('matrix:')) event.preventDefault();
     const link = parseMatrixLink(anchor.href);
     if (!link || !onMatrixLink) return;
     event.preventDefault();

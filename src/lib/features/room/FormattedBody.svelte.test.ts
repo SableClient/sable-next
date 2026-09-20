@@ -54,6 +54,21 @@ test('opens Matrix links through the room-level handler', async () => {
   await unmount(instance);
 });
 
+test.each([
+  '<a href="matrix:u/ana:example.org">Ana</a>',
+  '<a href="matrix:somethingnewer/abc">Future</a>',
+])('never lets a matrix: link reach the browser: %s', async (html) => {
+  const instance = mount(FormattedBody, { target: document.body, props: { html } });
+  await tick();
+
+  const anchor = document.querySelector('a');
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+  anchor?.dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+  await unmount(instance);
+});
+
 test('prefixes a user mention with its sigil', async () => {
   const instance = mount(FormattedBody, {
     target: document.body,

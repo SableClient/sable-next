@@ -59,7 +59,7 @@ const STRIPPED_CONTENT_TAGS: [&str; 6] = [
     "mx-reply", "script", "style", "textarea", "option", "noscript",
 ];
 
-const URL_SCHEMES: [&str; 7] = ["http", "https", "ftp", "mailto", "magnet", "matrix", "mxc"];
+const URL_SCHEMES: [&str; 6] = ["http", "https", "ftp", "mailto", "matrix", "mxc"];
 
 fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
     HashMap::from([
@@ -817,6 +817,16 @@ mod tests {
         ] {
             let _ = display_html("", Some(markup));
         }
+    }
+
+    #[test]
+    fn a_magnet_link_never_becomes_an_anchor() {
+        let markup = "<a href=\"magnet:?xt=urn:btih:abc\">torrent</a>";
+        let html = display_html("", Some(markup));
+        assert!(!html.contains("magnet:"), "magnet href survived: {html}");
+
+        let plain = display_html("magnet:?xt=urn:btih:abc", None);
+        assert!(!plain.contains("<a "), "magnet was autolinked: {plain}");
     }
 
     #[test]
