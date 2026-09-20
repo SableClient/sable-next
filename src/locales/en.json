@@ -1521,7 +1521,22 @@
     "customThemesErrorHeader": "This file is not a Sable theme or tweak. It must include @sable-theme or @sable-tweak metadata.",
     "customThemesErrorLoad": "Could not load the official theme catalog.",
     "customThemesErrorInstall": "Could not install {{file}}.",
-    "customThemesErrorChoose": "Choose a .sable.css theme file."
+    "customThemesErrorChoose": "Choose a .sable.css theme file.",
+    "appIconTitle": "App icon",
+    "appIconDescription": "Choose your home screen icon.",
+    "appIconFailed": "Could not change the app icon. Try again.",
+    "appIcons": {
+      "primary": "Default",
+      "propeller": "Propeller",
+      "agender": "Agender",
+      "bisexual": "Bisexual",
+      "trans": "Trans",
+      "transgradient": "Trans (Gradient)",
+      "intersex": "Intersex",
+      "lesbian": "Lesbian",
+      "mlm": "MLM",
+      "pride": "Pride"
+    }
   },
   "errors": {
     "pageTitle": "Something went wrong",

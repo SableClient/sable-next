@@ -1538,7 +1538,22 @@
     "customThemesErrorHeader": "Ce fichier n’est pas un thème ou ajustement Sable. Il doit inclure les métadonnées @sable-theme ou @sable-tweak.",
     "customThemesErrorLoad": "Impossible de charger le catalogue officiel des thèmes.",
     "customThemesErrorInstall": "Impossible d’installer {{file}}.",
-    "customThemesErrorChoose": "Choisissez un fichier de thème .sable.css."
+    "customThemesErrorChoose": "Choisissez un fichier de thème .sable.css.",
+    "appIconTitle": "Icône de l’application",
+    "appIconDescription": "Choisissez l’icône de votre écran d’accueil.",
+    "appIconFailed": "Impossible de changer l’icône de l’application. Réessayez.",
+    "appIcons": {
+      "primary": "Par défaut",
+      "propeller": "Hélice",
+      "agender": "Agenre",
+      "bisexual": "Bisexuel",
+      "trans": "Trans",
+      "transgradient": "Trans (dégradé)",
+      "intersex": "Intersexe",
+      "lesbian": "Lesbien",
+      "mlm": "MLM",
+      "pride": "Fiertés"
+    }
   },
   "errors": {
     "pageTitle": "Un problème est survenu",

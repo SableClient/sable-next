@@ -534,6 +534,7 @@ pub fn run() {
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let builder = builder
+        .plugin(tauri_plugin_app_icon::init())
         .plugin(tauri_plugin_edge_to_edge::init())
         .plugin(tauri_plugin_geolocation::init())
         .plugin(tauri_plugin_livekit_mobile::init());
