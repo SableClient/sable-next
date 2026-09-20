@@ -355,6 +355,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.uniformIconsHint',
         type: 'boolean',
       },
+      {
+        key: 'twitterEmoji',
+        icon: SmileyIcon,
+        name: 'settings.twitterEmoji',
+        description: 'settings.twitterEmojiHint',
+        type: 'boolean',
+      },
     ],
   },
   {

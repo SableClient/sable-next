@@ -1,4 +1,5 @@
 @import url('@fontsource-variable/nunito');
+@import url('@sableclient/twemoji-font');
 @import url('./lib/ui/primitives/selection.css');
 @import url('./lib/ui/primitives/settings-nav.css');
 
@@ -382,6 +383,7 @@ html {
   --code-line-height: 1.25rem;
 
   /* Font families */
+  --font-family-emoji: 'Twemoji_DISABLED';
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 
   /* Typography scale */
@@ -514,6 +516,10 @@ body {
   --font-scale: 1.25;
 }
 
+:root[data-twitter-emoji='on'] {
+  --font-family-emoji: 'Twemoji';
+}
+
 :root[data-high-contrast='on'] {
   --border-width: var(--border-width-500);
   --focus-ring-width: var(--border-width-700);
@@ -533,7 +539,7 @@ body {
 body {
   background: var(--bg-container);
   color: var(--bg-on-container);
-  font-family: 'Nunito Variable', sans-serif;
+  font-family: 'Nunito Variable', var(--font-family-emoji), sans-serif;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-body);

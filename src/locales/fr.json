@@ -1241,6 +1241,8 @@
     "showPingCountsHint": "Affiche sur les mentions et mots-clés un nombre plutôt qu’un point.",
     "uniformIcons": "Style d’icônes cohérent",
     "uniformIconsHint": "Donne aux icônes transparentes de salons et d’espaces un arrière-plan adapté à leurs couleurs.",
+    "twitterEmoji": "Émojis Twitter",
+    "twitterEmojiHint": "Utilise les émojis de style Twitter à la place de ceux du système.",
     "timeTitle": "Heure et date",
     "timeDescription": "La manière dont s’affichent les horodatages et séparateurs de jour.",
     "hour24Clock": "Format 24 heures",

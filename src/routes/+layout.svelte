@@ -90,6 +90,7 @@
     document.documentElement.dataset.fontScale = preferences.fontScale;
     document.documentElement.dataset.highContrast = preferences.highContrast ? 'on' : 'off';
     document.documentElement.dataset.reducedMotion = preferences.reducedMotion ? 'on' : 'off';
+    document.documentElement.dataset.twitterEmoji = preferences.twitterEmoji ? 'on' : 'off';
   });
 
   $effect(() => {

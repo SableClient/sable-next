@@ -1220,6 +1220,8 @@
     "showPingCountsHint": "Badge mentions and keywords with a number instead of a dot.",
     "uniformIcons": "Consistent icon style",
     "uniformIconsHint": "Give a transparent room or space icon a background matched to its own colours.",
+    "twitterEmoji": "Twitter emoji",
+    "twitterEmojiHint": "Use Twitter-style emoji instead of the system ones.",
     "timeTitle": "Time & date",
     "timeDescription": "How timestamps and day separators read.",
     "hour24Clock": "24-hour clock",

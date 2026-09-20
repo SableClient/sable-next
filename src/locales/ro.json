@@ -1241,6 +1241,8 @@
     "showPingCountsHint": "Insignă de mesaje necitite cu mențiuni sau cuvinte cheie va avea un număr în loc de un punct.",
     "uniformIcons": "Stilul iconițelor consistent",
     "uniformIconsHint": "Dă un fundal bazat pe culoarea iconiței iconițelor de cameră sau spațiu care au un fundal transparent.",
+    "twitterEmoji": "Emoji Twitter",
+    "twitterEmojiHint": "Schimbă aspectul emoji-urilor într-unele „Twitter”.",
     "timeTitle": "Data & Ora",
     "timeDescription": "Cum vor fi prezentate marcajele de timp și separatoarele de zi.",
     "hour24Clock": "Ceas cu 24 de ore",

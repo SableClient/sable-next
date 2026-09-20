@@ -26,6 +26,7 @@ export interface Preferences {
   fontScale: FontScale;
   highContrast: boolean;
   alwaysShowAltText: boolean;
+  twitterEmoji: boolean;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   showHome: boolean;
@@ -167,6 +168,7 @@ const DEFAULTS: Preferences = {
   fontScale: 'default',
   highContrast: false,
   alwaysShowAltText: false,
+  twitterEmoji: true,
   showRoomIcon: 'always',
   showRoomBanners: true,
   showHome: false,
