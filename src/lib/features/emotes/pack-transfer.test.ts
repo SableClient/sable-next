@@ -41,6 +41,7 @@ function pack(overrides: Partial<ImagePackView> = {}): ImagePackView {
     name: 'Blobs',
     avatar_url: 'mxc://old/av',
     attribution: 'CC BY 4.0',
+    usage: ['emoticon', 'sticker'],
     images: [
       {
         shortcode: 'blob_wave',

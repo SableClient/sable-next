@@ -331,6 +331,7 @@ export type ImagePackView = {
 	name: string | null,
 	avatar_url: string | null,
 	attribution: string | null,
+	usage: ImageUsageView[],
 	images: PackImageView[],
 };
 

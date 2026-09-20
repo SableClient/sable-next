@@ -23,7 +23,7 @@ export function packDraft(pack: ImagePackView): PackDraft {
     name: pack.name ?? '',
     avatarUrl: pack.avatar_url,
     attribution: pack.attribution ?? '',
-    usage: ALL_USAGES,
+    usage: pack.usage,
     images: pack.images.map((image) => ({
       shortcode: image.shortcode,
       url: image.url,
@@ -43,6 +43,17 @@ const SHORTCODE_ALLOWED = /[^a-zA-Z0-9_-]/gu;
 
 export function usageContent(usage: ImageUsageView[]): ImageUsageView[] | undefined {
   return usage.length === ALL_USAGES.length ? undefined : usage;
+}
+
+function sameUsage(left: ImageUsageView[], right: ImageUsageView[]): boolean {
+  return left.length === right.length && left.every((entry) => right.includes(entry));
+}
+
+export function imageUsageContent(
+  image: ImageUsageView[],
+  pack: ImageUsageView[]
+): ImageUsageView[] | undefined {
+  return sameUsage(image, pack) ? undefined : image;
 }
 
 export interface PackImageInfoContent {
@@ -78,7 +89,7 @@ export function packEventContent(draft: PackDraft): Record<string, unknown> {
         {
           url: image.url,
           body: image.body ?? undefined,
-          usage: usageContent(image.usage),
+          usage: imageUsageContent(image.usage, draft.usage),
           info: infoContent(image.info),
         },
       ])

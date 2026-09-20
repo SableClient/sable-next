@@ -2,6 +2,7 @@ import type { ImageUsageView } from '#src/generated/protocol';
 
 import {
   ALL_USAGES,
+  imageUsageContent,
   infoContent,
   MAX_SHORTCODE_LENGTH,
   normalizeShortcode,
@@ -67,7 +68,7 @@ export function archivePack(
     images[image.shortcode] = {
       file,
       body: image.body ?? undefined,
-      usage: usageContent(image.usage),
+      usage: imageUsageContent(image.usage, draft.usage),
       info: infoContent(image.info),
     };
   }

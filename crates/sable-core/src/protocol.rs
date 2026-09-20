@@ -2852,6 +2852,7 @@ pub struct ImagePackView {
     pub name: Option<String>,
     pub avatar_url: Option<String>,
     pub attribution: Option<String>,
+    pub usage: Vec<ImageUsageView>,
     pub images: Vec<PackImageView>,
 }
 

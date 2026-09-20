@@ -36,6 +36,7 @@
 
   async function apply(draft: PackDraft): Promise<void> {
     await core.commands.setAccountData(USER_EMOTES_EVENT_TYPE, packEventContent(draft));
+    await load();
   }
 </script>
 
