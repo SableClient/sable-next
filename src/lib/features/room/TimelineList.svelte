@@ -919,6 +919,12 @@
     flex: none;
   }
 
+  @media (width < 48rem) {
+    .timeline-foot {
+      z-index: 0;
+    }
+  }
+
   :global(button.jump-to-latest) {
     --button-height: var(--timeline-indicator-size);
 
