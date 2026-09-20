@@ -11,7 +11,7 @@
 
   interface Props {
     title: string;
-    description?: string;
+    description?: string | Snippet;
     icon?: Component;
     disabled?: boolean;
     highlighted?: boolean;
@@ -61,7 +61,12 @@
         </span>
       {/if}
     </div>
-    {#if description}<p>{description}</p>{/if}
+    {#if typeof description === 'string'}<p>{description}</p>
+    {:else if description}
+      <p>
+        {@render description()}
+      </p>
+    {/if}
   </div>
   <div class={['row-control', { wide }]}>{@render children?.()}</div>
 </li>

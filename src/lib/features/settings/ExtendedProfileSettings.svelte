@@ -370,11 +370,13 @@
     </SettingsSection>
 
     <SettingsSection title={$i18n.t('settings.otherProfileFields')} headingId="profile-extra">
-      <SettingsRow
-        title={$i18n.t('settings.otherProfileFieldsTitle')}
-        description={$i18n.t('settings.otherProfileFieldsDescription')}
-        icon={TestTubeIcon}
-      >
+      <SettingsRow title={$i18n.t('settings.otherProfileFieldsTitle')} icon={TestTubeIcon}>
+        {#snippet description()}
+          <span>{$i18n.t('settings.otherProfileFieldsDescription')}</span>
+          <span aria-label={$i18n.t('settings.otherProfileFieldsKaomojiTranslation')}
+            >{$i18n.t('settings.otherProfileFieldsKaomoji')}</span
+          >
+        {/snippet}
         <Button
           variant="secondary"
           size="small"
