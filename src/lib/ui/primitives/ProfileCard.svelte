@@ -54,6 +54,7 @@
     composer,
   }: Props = $props();
   let banner = $derived(bannerUrl?.startsWith('mxc://') ? bannerUrl : null);
+  let cover = $derived(banner ?? (avatarUrl?.startsWith('mxc://') ? avatarUrl : null));
   let tinted = $derived(heroColor !== null && heroColor !== '');
   let nameColor = $derived(nameColorLight ?? nameColorDark);
   let nameColorForDark = $derived(nameColorDark ?? nameColorLight);
@@ -71,8 +72,14 @@
   style:--profile-hero={heroColor}
 >
   <div class="profile-card-cover" style:background={color}>
-    {#if banner}
-      <MediaImage class="profile-card-banner" source={banner} alt="" width={720} height={240} />
+    {#if cover}
+      <MediaImage
+        class={banner ? 'profile-card-banner' : 'profile-card-banner profile-card-banner-fallback'}
+        source={cover}
+        alt=""
+        width={720}
+        height={240}
+      />
     {/if}
   </div>
   <div class="profile-card-crest">
@@ -184,6 +191,7 @@
 
   .profile-card-cover {
     height: var(--profile-cover-height);
+    overflow: hidden;
   }
 
   .profile-card-sheet {
@@ -200,6 +208,11 @@
   .profile-card-cover :global(.profile-card-banner img) {
     object-fit: cover;
     object-position: center;
+  }
+
+  .profile-card-cover :global(.profile-card-banner-fallback img) {
+    filter: blur(1.5rem) saturate(1.2);
+    transform: scale(1.4);
   }
 
   .profile-card-crest {
