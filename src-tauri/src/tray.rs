@@ -229,6 +229,11 @@ fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         builder = builder.icon(icon.clone());
     }
 
+    #[cfg(target_os = "linux")]
+    {
+        builder = builder.temp_dir_path(app.path().app_cache_dir()?);
+    }
+
     builder.build(app)?;
     Ok(())
 }
