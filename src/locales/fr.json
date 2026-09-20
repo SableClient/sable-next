@@ -1495,6 +1495,7 @@
     "removeButton": "Supprimer",
     "blockButton": "Bloquer",
     "unblockButton": "Débloquer",
+    "addButton": "Ajouter",
     "status": "Statut",
     "statusPlaceholder": "Que faites-vous ?",
     "profileColors": "Couleurs du profil",
