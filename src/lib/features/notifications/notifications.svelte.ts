@@ -3,10 +3,12 @@ import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 import { createContext } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadMediaUrl } from '#lib/ui/media-url.js';
 
 import { appendLine, type ConversationLine, summarise } from './conversation';
+import { parsePushPayload } from './push-payload';
 import { enabled, line, tag, title } from './present';
 import { retireRoomAlerts } from './retire';
 
@@ -20,11 +22,14 @@ type OpenRoom = (roomId: string) => void;
 
 export class NotificationCenter {
   private stopEvents: (() => void) | null = null;
+  private stopNativePush: (() => void) | null = null;
+  private nativePushGeneration = 0;
   private client: CoreClient | null = null;
   private open: OpenRoom | null = null;
   private reading: string | null = null;
   /* eslint-disable svelte/prefer-svelte-reactivity -- a write from a notification would subscribe whichever effect is running */
   private readonly unread = new Set<string>();
+  private readonly retired = new Set<string>();
   private readonly invites = new Map<string, boolean>();
   private readonly conversations = new Map<string, ConversationLine[]>();
   private readonly presented = new Map<string, Notification>();
@@ -32,6 +37,7 @@ export class NotificationCenter {
 
   start(core: CoreClient, open: OpenRoom): void {
     this.stopEvents?.();
+    this.stopNativePush?.();
     this.client = core;
     this.open = open;
     this.stopEvents = core.subscribeEvents((event) => {
@@ -41,15 +47,28 @@ export class NotificationCenter {
       }
       if (event.type === 'notification') this.present(event.notification);
     });
+    const generation = ++this.nativePushGeneration;
+    void watchNativePushMessages((message) => {
+      this.retirePush(message.message);
+    })
+      .then((stop) => {
+        if (generation === this.nativePushGeneration) this.stopNativePush = stop;
+        else stop();
+      })
+      .catch(() => undefined);
   }
 
   stop(): void {
     this.stopEvents?.();
     this.stopEvents = null;
+    this.stopNativePush?.();
+    this.stopNativePush = null;
+    this.nativePushGeneration += 1;
     this.client = null;
     this.open = null;
     this.reading = null;
     this.unread.clear();
+    this.retired.clear();
     this.invites.clear();
     this.conversations.clear();
     this.presented.clear();
@@ -79,16 +98,19 @@ export class NotificationCenter {
       if (room.state === 'invited') continue;
       if (room.unread > 0) {
         this.unread.add(room.room_id);
+        this.retired.delete(room.room_id);
         continue;
       }
-      if (!this.unread.delete(room.room_id)) continue;
 
+      this.unread.delete(room.room_id);
+      if (this.retired.has(room.room_id)) continue;
       this.retire(room.room_id);
     }
   }
 
   private retire(roomId: string): void {
     this.unread.delete(roomId);
+    this.retired.add(roomId);
     this.invites.delete(roomId);
     this.conversations.delete(roomId);
     this.presented.get(roomId)?.close();
@@ -100,6 +122,7 @@ export class NotificationCenter {
   }
 
   present(view: NotificationView): void {
+    this.retired.delete(view.room_id);
     if (view.event_id === null) {
       this.invites.set(view.room_id, this.invites.get(view.room_id) ?? false);
     } else {
@@ -114,6 +137,14 @@ export class NotificationCenter {
     void this.show(view, lines);
 
     if (view.noisy !== false && preferences.notificationSounds && soundsAllowed()) chime();
+  }
+
+  private retirePush(raw: string): void {
+    const notification = parsePushPayload(raw)?.notification;
+    if (notification?.room_id === undefined) return;
+    if (notification.counts?.unread === 0 || this.reading === notification.room_id) {
+      this.retire(notification.room_id);
+    }
   }
 
   private async show(view: NotificationView, lines: readonly ConversationLine[]): Promise<void> {

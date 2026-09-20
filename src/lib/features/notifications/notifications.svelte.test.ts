@@ -7,9 +7,13 @@ import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 const mocks = vi.hoisted(() => ({
   retire: vi.fn().mockResolvedValue(undefined),
   setReadRoom: vi.fn().mockResolvedValue(undefined),
+  watchNativePushMessages: vi.fn().mockResolvedValue(() => {}),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
+vi.mock('#lib/platform/native-notifications.js', () => ({
+  watchNativePushMessages: mocks.watchNativePushMessages,
+}));
 vi.mock('./retire', () => ({ retireRoomAlerts: mocks.retire }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -20,6 +24,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 beforeEach(() => {
   mocks.retire.mockClear();
   mocks.setReadRoom.mockClear();
+  mocks.watchNativePushMessages.mockClear();
   preferences.desktopNotifications = false;
   preferences.clearNotificationsOnRead = true;
 });
@@ -51,13 +56,13 @@ test('a room read after it was unread retires its alerts', () => {
   expect(mocks.retire).toHaveBeenCalledWith('@me:example.org', '!room:example.org');
 });
 
-test('a room that was never unread retires nothing', () => {
+test('a room already read on another device retires a cold notification', () => {
   const notifications = center();
 
   notifications.retireRead([room(0)]);
   notifications.retireRead([room(0)]);
 
-  expect(mocks.retire).not.toHaveBeenCalled();
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
 });
 
 test('opening a room retires its alerts and tells the core to skip it', () => {
@@ -76,6 +81,19 @@ test('leaving a room clears the core-side gate', () => {
   notifications.readRoom(null);
 
   expect(mocks.setReadRoom).toHaveBeenLastCalledWith(null);
+});
+
+test('an Android push for the room being read is immediately retired', () => {
+  const notifications = center();
+  notifications.readRoom('!room:example.org');
+  mocks.retire.mockClear();
+
+  const handler = mocks.watchNativePushMessages.mock.calls[0]?.[0] as
+    | ((message: { message: string }) => void)
+    | undefined;
+  handler?.({ message: JSON.stringify({ notification: { room_id: '!room:example.org' } }) });
+
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
 });
 
 function invite(): NotificationView {

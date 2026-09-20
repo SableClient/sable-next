@@ -6,7 +6,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   addPluginListener: vi.fn(),
 }));
 
-import { readAction, readTarget } from './native-notifications';
+import { readAction, readPushMessage, readTarget } from './native-notifications';
 
 const extra = {
   user_id: '@me:example.org',
@@ -41,4 +41,12 @@ test('an action without text reports none', () => {
 test('an action that names no room is not one of ours', () => {
   expect(readAction({ actionId: 'sable-reply', notification: {} })).toBeNull();
   expect(readAction({ notification: { extra } })).toBeNull();
+});
+
+test('a native push message preserves its payload', () => {
+  expect(readPushMessage({ message: '{"notification":{}}' })).toBe('{"notification":{}}');
+  expect(JSON.parse(readPushMessage({ data: { notification: '{}' } }) ?? '')).toEqual({
+    notification: '{}',
+  });
+  expect(readPushMessage({})).toBeNull();
 });
