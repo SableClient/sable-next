@@ -114,6 +114,8 @@ export type SendAttachmentOptions = {
   spoiler?: boolean;
 };
 
+export type SendGalleryOptions = Omit<SendAttachmentOptions, 'persona' | 'spoiler'>;
+
 export type EditMessageOptions = Omit<SendMessageOptions, 'inReplyTo' | 'silentReply'> & {
   mediaCaption?: boolean;
   transactionId?: string | null;
@@ -1094,6 +1096,37 @@ export function createCommands(transport: () => Transport) {
         threadRoot: options.threadRoot ?? null,
         persona: options.persona ?? null,
         spoiler: options.spoiler ?? false,
+      });
+    },
+
+    async sendGallery(
+      roomId: string,
+      files: readonly File[],
+      options: SendGalleryOptions = {}
+    ): Promise<void> {
+      if (files.length < 2) throw new Error('A gallery needs at least two attachments');
+      const attachments = await Promise.all(
+        files.map(async (file) => {
+          if (file.size > maxAttachmentBytes)
+            throw new Error('Attachment exceeds the 100 MiB limit');
+          return {
+            roomId,
+            filename: file.name,
+            mime: file.type || 'application/octet-stream',
+            bytes: new Uint8Array(await file.arrayBuffer()),
+            info: await measureAttachment(file),
+          };
+        })
+      );
+      await transport().sendGallery({
+        roomId,
+        attachments,
+        caption: options.caption ?? null,
+        formattedCaption: options.formattedCaption ?? null,
+        mentions: options.mentions?.userIds ?? [],
+        mentionsRoom: options.mentions?.room ?? false,
+        inReplyTo: options.inReplyTo ?? null,
+        threadRoot: options.threadRoot ?? null,
       });
     },
 

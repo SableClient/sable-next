@@ -26,6 +26,19 @@ export type Attachment = {
   spoiler?: boolean;
 };
 
+export type Gallery = {
+  roomId: string;
+  attachments: GalleryAttachment[];
+  caption?: string | null;
+  formattedCaption?: string | null;
+  mentions?: string[];
+  mentionsRoom?: boolean;
+  inReplyTo?: string | null;
+  threadRoot?: string | null;
+};
+
+export type GalleryAttachment = Pick<Attachment, 'filename' | 'mime' | 'bytes' | 'info'>;
+
 export class CoreError extends Error {
   constructor(readonly detail: CommandErr) {
     super(detail.code);
@@ -49,6 +62,8 @@ export interface Transport {
    * and failure arrive as `send_state` on the local echo.
    */
   sendAttachment(attachment: Attachment): Promise<void>;
+
+  sendGallery(gallery: Gallery): Promise<void>;
 
   /** Resolves with the `mxc:` URI, which the avatar commands take. */
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;

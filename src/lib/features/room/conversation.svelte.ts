@@ -12,7 +12,7 @@ import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
-import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
+import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
 import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import {
@@ -177,6 +177,18 @@ export class Conversation {
       inReplyTo: this.#consumeReply(),
       threadRoot: this.#threadRoot,
       persona,
+    });
+  };
+
+  readonly sendGallery = async (
+    targetRoomId: string,
+    files: readonly File[],
+    options: SendGalleryOptions = {}
+  ): Promise<void> => {
+    await this.#core.commands.sendGallery(targetRoomId, files, {
+      ...options,
+      inReplyTo: this.#consumeReply(),
+      threadRoot: this.#threadRoot,
     });
   };
 

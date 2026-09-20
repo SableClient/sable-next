@@ -2,7 +2,7 @@
 
 import type { ImagePackView, MemberView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
+import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -76,6 +76,11 @@ interface ComposerProps {
     mentions: { userIds: string[]; room: boolean }
   ) => Promise<void>;
   onSendAttachment?: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
+  onSendGallery?: (
+    roomId: string,
+    files: readonly File[],
+    options: SendGalleryOptions
+  ) => Promise<void>;
   onSchedule?: (
     roomId: string,
     body: string,
@@ -176,6 +181,30 @@ test('stages any selected attachment, not only images, and sends it on submit', 
   await tick();
 
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
+  void unmount(instance);
+});
+
+test('sends multiple staged files as one gallery', async () => {
+  const gallery = vi.fn(async () => {});
+  const attachment = vi.fn(async () => {});
+  const instance = render({
+    roomId: '!room:example.org',
+    onSendAttachment: attachment,
+    onSendGallery: gallery,
+  });
+  const first = new File(['one'], 'one.png', { type: 'image/png' });
+  const second = new File(['two'], 'two.pdf', { type: 'application/pdf' });
+
+  await pick(first, second);
+  submit();
+  await tick();
+
+  expect(gallery).toHaveBeenCalledWith('!room:example.org', [first, second], {
+    caption: null,
+    formattedCaption: null,
+    mentions: { userIds: [], room: false },
+  });
+  expect(attachment).not.toHaveBeenCalled();
   void unmount(instance);
 });
 

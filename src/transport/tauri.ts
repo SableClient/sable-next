@@ -125,6 +125,22 @@ export function createTauriTransport(): Transport {
       });
     },
 
+    async sendGallery(gallery) {
+      try {
+        await invoke('send_gallery', {
+          request: {
+            ...gallery,
+            attachments: gallery.attachments.map((attachment) => ({
+              ...attachment,
+              bytes: Array.from(attachment.bytes),
+            })),
+          },
+        });
+      } catch (error) {
+        throw new CoreError(error as CommandErr);
+      }
+    },
+
     uploadMedia(mime, bytes) {
       return carry<string>('upload_media', bytes, { mime });
     },

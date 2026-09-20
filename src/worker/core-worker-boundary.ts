@@ -23,6 +23,16 @@ export type WorkerCore = {
     persona: string | null,
     spoiler: boolean
   ): Promise<void>;
+  sendGallery(
+    roomId: string,
+    attachments: string,
+    caption: string | null,
+    inReplyTo: string | null,
+    threadRoot: string | null,
+    formattedCaption: string | null,
+    mentions: string | null,
+    mentionsRoom: boolean
+  ): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 };
 
@@ -218,6 +228,37 @@ export function createCoreWorkerBoundary(
             mentionsRoom,
             persona === null ? null : JSON.stringify(persona),
             spoiler
+          );
+          port.postMessage({ id, uri: null } satisfies WorkerMessage);
+          return;
+        }
+        if ('gallery' in request) {
+          const {
+            roomId,
+            attachments,
+            caption,
+            inReplyTo,
+            threadRoot,
+            formattedCaption,
+            mentions,
+            mentionsRoom,
+          } = request.gallery;
+          await instance.sendGallery(
+            roomId,
+            JSON.stringify(
+              attachments.map(({ filename, mime, bytes, info = null }) => ({
+                filename,
+                mime,
+                bytes: Array.from(bytes),
+                info,
+              }))
+            ),
+            caption,
+            inReplyTo,
+            threadRoot,
+            formattedCaption,
+            JSON.stringify(mentions),
+            mentionsRoom
           );
           port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;

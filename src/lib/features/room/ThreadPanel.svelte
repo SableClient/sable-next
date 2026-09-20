@@ -139,6 +139,7 @@
       {readOnly}
       onSend={conversation.sendMessage}
       onSendAttachment={conversation.sendAttachment}
+      onSendGallery={conversation.sendGallery}
       onSendSticker={conversation.sendSticker}
       onSendGif={conversation.sendGif}
       onCreatePoll={conversation.createPoll}

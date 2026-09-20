@@ -352,6 +352,35 @@ export function createWebTransport(): Transport {
       );
     },
 
+    async sendGallery({
+      roomId,
+      attachments,
+      caption,
+      formattedCaption,
+      mentions,
+      mentionsRoom,
+      inReplyTo,
+      threadRoot,
+    }) {
+      const transfer = attachments.map((attachment) => attachment.bytes.buffer);
+      await request<null>(
+        (id) => ({
+          id,
+          gallery: {
+            roomId,
+            attachments,
+            caption: caption ?? null,
+            formattedCaption: formattedCaption ?? null,
+            mentions: mentions ?? [],
+            mentionsRoom: mentionsRoom ?? false,
+            inReplyTo: inReplyTo ?? null,
+            threadRoot: threadRoot ?? null,
+          },
+        }),
+        transfer
+      );
+    },
+
     async uploadMedia(mime, bytes) {
       const uri = await request<string | null>(
         (id) => ({ id, upload: { mime, bytes } }),

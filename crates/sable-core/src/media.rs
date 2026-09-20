@@ -9,7 +9,7 @@ use matrix_sdk::ruma::{
     OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, UInt,
     events::room::message::TextMessageEventContent,
 };
-use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource};
+use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource, GalleryConfig, GalleryItemInfo};
 use mime::Mime;
 
 use crate::messages::outgoing_mentions;
@@ -20,6 +20,14 @@ use crate::view::SPOILER_PROPERTY;
 use crate::Core;
 
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
+
+#[derive(serde::Deserialize)]
+pub struct GalleryAttachment {
+    pub filename: String,
+    pub mime: String,
+    pub bytes: Vec<u8>,
+    pub info: Option<AttachmentInfoView>,
+}
 
 impl Core {
     /// Downloads a persona avatar over native HTTP and uploads it to Matrix.
@@ -194,6 +202,70 @@ impl Core {
             .await
             .map_err(|error| self.failed("send_attachment", error))?;
 
+        Ok(())
+    }
+
+    /// # Errors
+    ///
+    /// Returns an error when an attachment is invalid, the room is unavailable,
+    /// or queuing the gallery fails.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn send_gallery(
+        &self,
+        room_id: String,
+        attachments: Vec<GalleryAttachment>,
+        caption: Option<String>,
+        in_reply_to: Option<String>,
+        thread_root: Option<String>,
+        formatted_caption: Option<String>,
+        mentions: Vec<String>,
+        mentions_room: bool,
+    ) -> Result<(), CommandErr> {
+        if attachments.len() < 2
+            || attachments
+                .iter()
+                .any(|item| item.bytes.len() > MAX_ATTACHMENT_BYTES)
+        {
+            return Err(CommandErr::InvalidMedia);
+        }
+        let room_id = OwnedRoomId::try_from(room_id).map_err(|_| CommandErr::UnknownRoom)?;
+        let in_reply_to = in_reply_to
+            .map(OwnedEventId::try_from)
+            .transpose()
+            .map_err(|_| CommandErr::UnknownRoom)?;
+        let thread_root = thread_root
+            .map(OwnedEventId::try_from)
+            .transpose()
+            .map_err(|_| CommandErr::UnknownRoom)?;
+        let mentions = mentions
+            .into_iter()
+            .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut gallery = GalleryConfig::new()
+            .caption(attachment_caption(caption, formatted_caption))
+            .mentions(outgoing_mentions(mentions, mentions_room))
+            .in_reply_to(in_reply_to);
+        for item in attachments {
+            let mime: Mime = item.mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
+            let info = attachment_info(&mime, &item.info.unwrap_or_default(), item.bytes.len());
+            gallery = gallery.add_item(GalleryItemInfo {
+                source: AttachmentSource::Data {
+                    bytes: item.bytes,
+                    filename: item.filename,
+                },
+                content_type: mime,
+                attachment_info: info,
+                caption: None,
+                thumbnail: None,
+            });
+        }
+
+        self.timeline_for(&room_id, thread_root.as_ref())
+            .await?
+            .send_gallery(gallery)
+            .await
+            .map_err(|error| self.failed("send_gallery", error))?;
         Ok(())
     }
 }

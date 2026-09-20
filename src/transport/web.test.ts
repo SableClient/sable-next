@@ -124,6 +124,49 @@ test('preserves rich attachment captions and mentions across the worker transpor
   transport.close();
 });
 
+test('sends a gallery as one worker request', async () => {
+  const transport = await load();
+  const first = new Uint8Array([1]);
+  const second = new Uint8Array([2]);
+  const pending = transport.sendGallery({
+    roomId: '!room:example.org',
+    attachments: [
+      { filename: 'one.png', mime: 'image/png', bytes: first },
+      {
+        filename: 'two.pdf',
+        mime: 'application/pdf',
+        bytes: second,
+      },
+    ],
+    caption: 'Weekend',
+    formattedCaption: '<strong>Weekend</strong>',
+    mentions: ['@one:example.org'],
+    mentionsRoom: true,
+    inReplyTo: '$reply',
+    threadRoot: '$thread',
+  });
+
+  expect(FakeSharedWorker.last?.port.posted).toContainEqual({
+    id: 1,
+    gallery: {
+      roomId: '!room:example.org',
+      attachments: [
+        { filename: 'one.png', mime: 'image/png', bytes: first },
+        { filename: 'two.pdf', mime: 'application/pdf', bytes: second },
+      ],
+      caption: 'Weekend',
+      formattedCaption: '<strong>Weekend</strong>',
+      mentions: ['@one:example.org'],
+      mentionsRoom: true,
+      inReplyTo: '$reply',
+      threadRoot: '$thread',
+    },
+  });
+  FakeSharedWorker.last?.port.receive({ id: 1, uri: null });
+  await pending;
+  transport.close();
+});
+
 test('a slow command reports an unresponsive worker', async () => {
   expect(
     await stalledFor((transport) => {

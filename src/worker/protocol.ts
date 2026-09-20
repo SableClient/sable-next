@@ -1,7 +1,10 @@
 import type { Command, CommandErr, CommandOk, CoreEvent } from '#src/generated/protocol';
-import type { Attachment } from '#src/transport';
+import type { Attachment, Gallery, GalleryAttachment } from '#src/transport';
 
 export type AttachmentRequest = Required<Attachment>;
+export type GalleryRequest = Required<Omit<Gallery, 'attachments'>> & {
+  attachments: GalleryAttachment[];
+};
 
 export type WorkerRequest =
   | { id: number; command: Command }
@@ -11,6 +14,7 @@ export type WorkerRequest =
   | { debugLogs: boolean }
   | { id: number; media: { source: string; width: number; height: number } }
   | { id: number; attachment: AttachmentRequest }
+  | { id: number; gallery: GalleryRequest }
   | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } };
 
 /** Worker → page. Events carry no id because they answer nothing. */

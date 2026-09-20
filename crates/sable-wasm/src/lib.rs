@@ -294,6 +294,44 @@ impl SableCore {
 
     /// # Errors
     ///
+    /// Returns a JSON-encoded command error when an attachment is invalid or sending fails.
+    #[wasm_bindgen(js_name = sendGallery)]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn send_gallery(
+        &self,
+        room_id: String,
+        attachments: String,
+        caption: Option<String>,
+        in_reply_to: Option<String>,
+        thread_root: Option<String>,
+        formatted_caption: Option<String>,
+        mentions: Option<String>,
+        mentions_room: bool,
+    ) -> Result<(), String> {
+        let attachments = serde_json::from_str(&attachments).map_err(|_| {
+            serde_json::to_string(&CommandErr::InvalidMedia).unwrap_or_else(err_json)
+        })?;
+        let mentions = mentions
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok())
+            .unwrap_or_default();
+        self.core
+            .send_gallery(
+                room_id,
+                attachments,
+                caption,
+                in_reply_to,
+                thread_root,
+                formatted_caption,
+                mentions,
+                mentions_room,
+            )
+            .await
+            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+    }
+
+    /// # Errors
+    ///
     /// Returns a JSON-encoded command error when the upload fails.
     #[wasm_bindgen(js_name = uploadMedia)]
     pub async fn upload_media(&self, mime: String, bytes: Vec<u8>) -> Result<String, String> {

@@ -16,6 +16,7 @@
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
+  import type { SendGalleryOptions } from '#lib/core/commands.svelte.js';
   import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
@@ -84,6 +85,11 @@
       imageSourcePacks?: import('#src/generated/protocol').ImageSourcePackReferenceView[]
     ) => Promise<unknown>;
     onSendAttachment: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
+    onSendGallery?: (
+      roomId: string,
+      files: readonly File[],
+      options: SendGalleryOptions
+    ) => Promise<void>;
     onSendSticker?: (
       roomId: string,
       url: string,
@@ -123,6 +129,7 @@
     roomId,
     onSend,
     onSendAttachment,
+    onSendGallery,
     onSendSticker,
     onSendGif,
     onCreatePoll,
@@ -531,6 +538,22 @@
               imageSourcePacks: [],
             };
         const captioned = unsent.length === 1 && message.body !== '';
+        const gallery =
+          onSendGallery !== undefined && unsent.length > 1 && unsent.every((item) => !item.spoiler);
+
+        if (gallery) {
+          await onSendGallery(
+            roomId,
+            unsent.map((item) => item.file),
+            {
+              caption: message.body || null,
+              formattedCaption: message.formatted,
+              mentions: message.mentions,
+            }
+          );
+          unsent = [];
+          return;
+        }
 
         while (unsent.length > 0) {
           const [next, ...rest] = unsent;

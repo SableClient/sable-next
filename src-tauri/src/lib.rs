@@ -35,7 +35,7 @@ use std::{
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sable_core::{
-    Core,
+    Core, GalleryAttachment,
     protocol::{Command, CommandErr, CommandOk, CoreEvent},
 };
 use tauri::{
@@ -179,6 +179,39 @@ impl Base64Invoke {
             .get(name)
             .and_then(|value| decode_header_value(value))
     }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GalleryInvoke {
+    room_id: String,
+    attachments: Vec<GalleryAttachment>,
+    caption: Option<String>,
+    formatted_caption: Option<String>,
+    mentions: Vec<String>,
+    mentions_room: bool,
+    in_reply_to: Option<String>,
+    thread_root: Option<String>,
+}
+
+#[tauri::command]
+async fn send_gallery(
+    state: State<'_, AppState>,
+    request: GalleryInvoke,
+) -> Result<(), CommandErr> {
+    state
+        .core
+        .send_gallery(
+            request.room_id,
+            request.attachments,
+            request.caption,
+            request.in_reply_to,
+            request.thread_root,
+            request.formatted_caption,
+            request.mentions,
+            request.mentions_room,
+        )
+        .await
 }
 
 #[tauri::command]
@@ -569,6 +602,7 @@ pub fn run() {
             video_stream_mime,
             import_persona_avatar,
             send_attachment,
+            send_gallery,
             send_attachment_base64,
             upload_media,
             upload_media_base64,

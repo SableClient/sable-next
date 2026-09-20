@@ -25,6 +25,7 @@ function fakeCore(submitCommand: WorkerCore['submitCommand']): WorkerCore {
     submitCommand,
     fetchMedia: () => Promise.resolve(new Uint8Array(new ArrayBuffer())),
     sendAttachment: () => Promise.resolve(),
+    sendGallery: () => Promise.resolve(),
     uploadMedia: () => Promise.resolve(''),
   };
 }
@@ -71,6 +72,55 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
     JSON.stringify(['@one:example.org']),
     true,
     null,
+    true
+  );
+  expect(port.messages).toEqual([{ id: 1, uri: null }]);
+});
+
+test('passes gallery items and shared metadata to the WASM core', async () => {
+  const core = fakeCore(() => Promise.resolve(''));
+  const sendGallery = vi.fn(() => Promise.resolve());
+  core.sendGallery = sendGallery;
+  const boundary = createCoreWorkerBoundary(Promise.resolve(core));
+  const port = new FakePort();
+  boundary.connect(port);
+
+  await port.send({
+    id: 1,
+    gallery: {
+      roomId: '!room:example.org',
+      attachments: [
+        {
+          filename: 'one.png',
+          mime: 'image/png',
+          bytes: new Uint8Array([1]),
+        },
+        {
+          filename: 'two.pdf',
+          mime: 'application/pdf',
+          bytes: new Uint8Array([2]),
+        },
+      ],
+      caption: 'Weekend',
+      formattedCaption: '<strong>Weekend</strong>',
+      mentions: ['@one:example.org'],
+      mentionsRoom: true,
+      inReplyTo: '$reply',
+      threadRoot: '$thread',
+    },
+  });
+
+  expect(sendGallery).toHaveBeenCalledWith(
+    '!room:example.org',
+    JSON.stringify([
+      { filename: 'one.png', mime: 'image/png', bytes: [1], info: null },
+      { filename: 'two.pdf', mime: 'application/pdf', bytes: [2], info: null },
+    ]),
+    'Weekend',
+    '$reply',
+    '$thread',
+    '<strong>Weekend</strong>',
+    JSON.stringify(['@one:example.org']),
     true
   );
   expect(port.messages).toEqual([{ id: 1, uri: null }]);

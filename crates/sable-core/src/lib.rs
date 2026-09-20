@@ -9,6 +9,7 @@ mod errors;
 pub mod image_packs;
 pub mod matrix_html;
 mod media;
+pub use media::GalleryAttachment;
 mod messages;
 pub mod notifications;
 mod personas;

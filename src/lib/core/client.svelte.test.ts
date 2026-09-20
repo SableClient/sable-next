@@ -150,6 +150,37 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
   });
 });
 
+test('sending a gallery forwards shared metadata and every attachment', async () => {
+  const fake = fakeTransport();
+  const sendGallery = vi.fn<Transport['sendGallery']>();
+  fake.transport.sendGallery = sendGallery;
+  const core = createCoreClient(() => fake.transport);
+  const first = new File(['one'], 'one.png', { type: 'image/png' });
+  const second = new File(['two'], 'two.pdf', { type: 'application/pdf' });
+
+  await core.commands.sendGallery('!room:example.org', [first, second], {
+    caption: 'Weekend',
+    formattedCaption: '<strong>Weekend</strong>',
+    mentions: { userIds: ['@one:example.org'], room: true },
+    inReplyTo: '$reply',
+    threadRoot: '$thread',
+  });
+
+  expect(sendGallery).toHaveBeenCalledWith({
+    roomId: '!room:example.org',
+    attachments: [
+      expect.objectContaining({ filename: 'one.png', mime: 'image/png' }),
+      expect.objectContaining({ filename: 'two.pdf', mime: 'application/pdf' }),
+    ],
+    caption: 'Weekend',
+    formattedCaption: '<strong>Weekend</strong>',
+    mentions: ['@one:example.org'],
+    mentionsRoom: true,
+    inReplyTo: '$reply',
+    threadRoot: '$thread',
+  });
+});
+
 test('stopping clears the session and closes the transport', async () => {
   const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
   const core = createCoreClient(() => fake.transport);

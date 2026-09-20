@@ -95,6 +95,41 @@ test.each(['image', 'video', 'audio', 'file'] as const)(
   }
 );
 
+test('renders a gallery in the timeline', async () => {
+  const instance = mount(MessageBody, {
+    target: document.body,
+    props: {
+      item: item({
+        kind: 'gallery',
+        body: 'Weekend',
+        html: '<p>Weekend</p>',
+        items: [
+          {
+            kind: 'image',
+            body: 'one.png',
+            source: 'mxc://example.org/one',
+            mime: 'image/png',
+            width: 100,
+            height: 100,
+          },
+          {
+            kind: 'file',
+            body: 'notes.pdf',
+            source: 'mxc://example.org/two',
+            mime: 'application/pdf',
+          },
+        ],
+      }),
+      canRedactOthers: false,
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.gallery')).not.toBeNull();
+  expect(document.body.textContent).toContain('Weekend');
+  void unmount(instance);
+});
+
 test('keeps an image filename hidden without the alt-text preference', async () => {
   const instance = mount(MessageBody, {
     target: document.body,
