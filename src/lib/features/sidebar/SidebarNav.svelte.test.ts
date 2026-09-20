@@ -164,3 +164,47 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     fixture.roomList = null;
   }
 });
+
+test('keeps the rail order when a room-list reset reorders spaces', async () => {
+  const alpha = space('!alpha:example.org', 'Alpha');
+  const beta = space('!beta:example.org', 'Beta');
+  const listeners = new Set<(event: CoreEvent) => void>();
+  const core = {
+    subscribeEvents: (listener: (event: CoreEvent) => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    commands: {
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [alpha, beta] }),
+      roomNotificationModes: () => Promise.resolve([]),
+      unsubscribe: () => Promise.resolve(),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  fixture.roomList = roomList;
+  await roomList.start();
+  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
+  try {
+    await tick();
+    const railOrder = () =>
+      [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
+    expect(railOrder()).toEqual(['Alpha', 'Beta']);
+
+    for (const listener of listeners) {
+      listener({
+        type: 'room_list_diff',
+        subscription: 1,
+        diffs: [{ op: 'reset', values: [beta, alpha] }],
+      });
+    }
+    await tick();
+
+    expect(railOrder()).toEqual(['Alpha', 'Beta']);
+  } finally {
+    await unmount(instance);
+    roomList.stop();
+    fixture.roomList = null;
+  }
+});

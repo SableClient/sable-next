@@ -5,6 +5,8 @@ import {
   sameLayout,
   folderName,
   mergeSpaces,
+  orderedKnownSpaceIds,
+  rememberSpaceIds,
   removeFromFolder,
   renameFolder,
   ungroupFolder,
@@ -38,6 +40,39 @@ describe('mergeSpaces', () => {
     const merged = mergeSpaces([space('!a'), folder('f', ['!a', '!b'])], ['!a', '!b']);
 
     expect(merged).toEqual([space('!a'), folder('f', ['!b'])]);
+  });
+});
+
+describe('space order history', () => {
+  it('keeps the first observed order when a room-list snapshot is reordered', () => {
+    const known = rememberSpaceIds([], ['!alpha', '!beta', '!gamma']);
+
+    expect(orderedKnownSpaceIds(known, ['!gamma', '!alpha', '!beta'])).toEqual([
+      '!alpha',
+      '!beta',
+      '!gamma',
+    ]);
+  });
+
+  it('remembers a temporarily absent space for a later snapshot', () => {
+    const known = rememberSpaceIds(['!alpha', '!beta'], ['!alpha']);
+
+    expect(orderedKnownSpaceIds(known, ['!beta', '!alpha'])).toEqual(['!alpha', '!beta']);
+  });
+
+  it('keeps an order set by dragging after a reordered snapshot', () => {
+    const known = rememberSpaceIds([], ['!alpha', '!beta']);
+    const dragged = applyDrop(
+      mergeSpaces([], orderedKnownSpaceIds(known, ['!alpha', '!beta'])),
+      { kind: 'space', roomId: '!beta' },
+      { kind: 'space', roomId: '!alpha' },
+      'above'
+    );
+
+    expect(mergeSpaces(dragged, orderedKnownSpaceIds(known, ['!beta', '!alpha']))).toEqual([
+      space('!beta'),
+      space('!alpha'),
+    ]);
   });
 });
 

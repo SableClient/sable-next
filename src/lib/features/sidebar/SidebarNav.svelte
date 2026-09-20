@@ -19,6 +19,8 @@
     applyDrop,
     folderName,
     mergeSpaces,
+    orderedKnownSpaceIds,
+    rememberSpaceIds,
     removeFromFolder,
     renameFolder,
     ungroupFolder,
@@ -54,6 +56,7 @@
   let renamingFolder = $state<SidebarFolder | null>(null);
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
+  let knownSpaceIds = $state.raw<string[]>([]);
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
   let spaces = $derived.by(() => {
     const joinedSpaces = roomList.rooms.filter(isActiveSpace);
@@ -64,6 +67,12 @@
     return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
   });
   let claimed = $derived(claimedRoomIds(roomList.rooms));
+  let orderedSpaceIds = $derived(
+    orderedKnownSpaceIds(
+      knownSpaceIds,
+      spaces.map((space) => space.room_id)
+    )
+  );
   let callRoom = $derived(
     call.roomId === null ? undefined : roomList.rooms.find((room) => room.room_id === call.roomId)
   );
@@ -73,12 +82,7 @@
   let callSpaces = $derived(
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
   );
-  let entries = $derived(
-    mergeSpaces(
-      spaceSidebar.items,
-      spaces.map((space) => space.room_id)
-    )
-  );
+  let entries = $derived(mergeSpaces(spaceSidebar.items, orderedSpaceIds));
   let homeRooms = $derived(
     roomList.rooms.filter(
       (room) =>
@@ -125,6 +129,14 @@
       readReceiptIsPrivate()
     );
   }
+
+  $effect.pre(() => {
+    const next = rememberSpaceIds(
+      knownSpaceIds,
+      spaces.map((space) => space.room_id)
+    );
+    if (next.length !== knownSpaceIds.length) knownSpaceIds = next;
+  });
 
   onMount(() => {
     const storedWidth = Number.parseInt(localStorage.getItem(ROOM_NAV_STORAGE_KEY) ?? '', 10);

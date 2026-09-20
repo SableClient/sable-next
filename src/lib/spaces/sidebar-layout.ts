@@ -59,6 +59,29 @@ export function mergeSpaces(
   return merged;
 }
 
+export function rememberSpaceIds(
+  knownSpaceIds: readonly string[],
+  currentSpaceIds: readonly string[]
+): string[] {
+  const known = new Set(knownSpaceIds);
+
+  return [...knownSpaceIds, ...currentSpaceIds.filter((roomId) => !known.has(roomId))];
+}
+
+export function orderedKnownSpaceIds(
+  knownSpaceIds: readonly string[],
+  currentSpaceIds: readonly string[]
+): string[] {
+  const active = new Set(currentSpaceIds);
+  const ordered = knownSpaceIds.filter((roomId) => active.has(roomId));
+  const placed = new Set(ordered);
+
+  for (const roomId of currentSpaceIds) {
+    if (!placed.has(roomId)) ordered.push(roomId);
+  }
+  return ordered;
+}
+
 export function sameLayout(left: readonly SidebarItem[], right: readonly SidebarItem[]): boolean {
   if (left.length !== right.length) return false;
 
