@@ -13,6 +13,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'enterForNewline',
   'reducedMotion',
   'desktopNotifications',
+  'systemNotifications',
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',

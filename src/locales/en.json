@@ -1334,6 +1334,7 @@
     "notificationsDescription": "When and how Sable interrupts you.",
     "desktopNotifications": "System notifications",
     "desktopNotificationsHint": "Hands alerts to your operating system.",
+    "systemNotificationsHint": "Lets the app raise a system notification for a message you have not read.",
     "notificationSounds": "Notification sounds",
     "notificationSoundsHint": "Plays a sound for mentions and direct messages.",
     "backgroundNotificationSounds": "Sounds while in the background",

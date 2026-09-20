@@ -52,6 +52,7 @@ import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
+import { alertsNatively } from '#lib/platform/native-notifications.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
@@ -762,6 +763,14 @@ export const settingsCategories: SettingsCategory[] = [
         supported: presentsInApp,
       },
       {
+        key: 'systemNotifications',
+        icon: BellIcon,
+        name: 'settings.desktopNotifications',
+        description: 'settings.systemNotificationsHint',
+        type: 'boolean',
+        supported: alertsNatively,
+      },
+      {
         key: 'notificationSounds',
         icon: SpeakerHighIcon,
         name: 'settings.notificationSounds',
@@ -769,6 +778,15 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
         gatedBy: 'desktopNotifications',
         supported: presentsInApp,
+      },
+      {
+        key: 'notificationSounds',
+        icon: SpeakerHighIcon,
+        name: 'settings.notificationSounds',
+        description: 'settings.notificationSoundsHint',
+        type: 'boolean',
+        gatedBy: 'systemNotifications',
+        supported: alertsNatively,
       },
       {
         key: 'backgroundNotificationSounds',
@@ -785,6 +803,16 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.notificationContentHint',
         type: 'boolean',
         gatedBy: 'desktopNotifications',
+        supported: presentsInApp,
+      },
+      {
+        key: 'notificationContent',
+        icon: ChatTextIcon,
+        name: 'settings.notificationContent',
+        description: 'settings.notificationContentHint',
+        type: 'boolean',
+        gatedBy: 'systemNotifications',
+        supported: alertsNatively,
       },
       {
         key: 'notificationEncryptedContent',

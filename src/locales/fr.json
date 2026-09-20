@@ -1355,6 +1355,7 @@
     "notificationsDescription": "Quand et comment Sable vous interrompt.",
     "desktopNotifications": "Notifications système",
     "desktopNotificationsHint": "Confie les alertes à votre système d’exploitation.",
+    "systemNotificationsHint": "Autorise l’application à afficher une notification système pour un message non lu.",
     "notificationSounds": "Sons de notification",
     "notificationSoundsHint": "Joue un son pour les mentions et conversations privées.",
     "backgroundNotificationSounds": "Sons en arrière-plan",

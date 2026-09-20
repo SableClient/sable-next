@@ -156,6 +156,10 @@ pub async fn show<R: Runtime>(
     core: &sable_core::Core,
     view: &NotificationView,
 ) {
+    if !core.notifications_enabled() {
+        return;
+    }
+
     let content = shows_content(
         view.encrypted,
         core.notification_content(),

@@ -88,6 +88,7 @@ export interface Preferences {
   encryptedUrlPreviews: boolean;
 
   desktopNotifications: boolean;
+  systemNotifications: boolean;
   notificationSounds: boolean;
   backgroundNotificationSounds: boolean;
   notificationContent: boolean;
@@ -252,6 +253,7 @@ const DEFAULTS: Preferences = {
   encryptedUrlPreviews: false,
 
   desktopNotifications: false,
+  systemNotifications: true,
   notificationSounds: true,
   backgroundNotificationSounds: true,
   notificationContent: false,

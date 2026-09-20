@@ -1822,6 +1822,12 @@ impl Core {
                 Ok(CommandOk::SetNotificationSounds)
             }
 
+            Command::SetNotificationsEnabled { enabled } => {
+                self.notifications_enabled.store(enabled, Ordering::Relaxed);
+
+                Ok(CommandOk::SetNotificationsEnabled)
+            }
+
             Command::SetReadRoom { room_id } => {
                 self.set_read_room(room_id);
 
