@@ -1101,6 +1101,14 @@ export function createCommands(transport: () => Transport) {
       return transport().fetchMedia(source, width, height);
     },
 
+    videoStreamMime(): Promise<string> {
+      return transport().videoStreamMime();
+    },
+
+    streamVideo(source: string, onChunk: (chunk: Uint8Array) => void): Promise<void> {
+      return transport().streamVideo(source, onChunk);
+    },
+
     async markRead(
       roomId: string,
       eventId: string | null,

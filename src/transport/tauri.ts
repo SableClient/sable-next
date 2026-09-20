@@ -63,6 +63,26 @@ export function createTauriTransport(): Transport {
       }
     },
 
+    async videoStreamMime() {
+      try {
+        return await invoke<string>('video_stream_mime');
+      } catch (error) {
+        throw new CoreError(error as CommandErr);
+      }
+    },
+
+    async streamVideo(source, onChunk) {
+      const chunks = new Channel<ArrayBuffer>();
+      chunks.onmessage = (chunk) => {
+        onChunk(new Uint8Array(chunk));
+      };
+      try {
+        await invoke('stream_video', { source, chunks });
+      } catch (error) {
+        throw new CoreError(error as CommandErr);
+      }
+    },
+
     async sendAttachment({
       roomId,
       filename,

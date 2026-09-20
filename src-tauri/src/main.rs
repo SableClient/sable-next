@@ -116,6 +116,9 @@ fn install_permission_policy() {
 fn cef_command_line_args() -> Vec<(String, Option<String>)> {
     let mut args: Vec<(String, Option<String>)> = vec![
         ("--disable-gpu-sandbox".into(), None),
+        // ANGLE's OpenGL backend cannot import decoded video frames on the
+        // NVIDIA proprietary driver, so video plays with sound and no picture.
+        ("use-angle".into(), Some("vulkan".into())),
         ("--disable-font-subpixel-positioning".into(), None),
         ("--enable-font-antialiasing".into(), None),
         ("--disable-background-timer-throttling".into(), None),

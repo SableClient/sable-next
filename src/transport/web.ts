@@ -305,6 +305,15 @@ export function createWebTransport(): Transport {
       }));
     },
 
+    // A browser decodes what it advertises, so nothing here should ask.
+    videoStreamMime() {
+      return Promise.reject(new CoreError({ code: 'unsupported' }));
+    },
+
+    streamVideo() {
+      return Promise.reject(new CoreError({ code: 'unsupported' }));
+    },
+
     async sendAttachment({
       roomId,
       filename,

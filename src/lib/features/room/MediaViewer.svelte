@@ -7,6 +7,8 @@
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.js';
+  import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
   import {
     AXIS_LOCK_THRESHOLD,
@@ -113,6 +115,13 @@
   let panOrigin: Vector2 = { x: 0, y: 0 };
   let panStartPointer: Vector2 = { x: 0, y: 0 };
   let isImage = $derived(item?.kind === 'image' || item?.kind === 'sticker');
+  let streamUnavailable = $state(false);
+  let transcode = $derived(
+    item?.kind === 'video' &&
+      !canPlayVideo(mime) &&
+      !streamUnavailable &&
+      videoStreamingSupported(core)
+  );
   let isPdf = $derived(item?.kind === 'file');
   let pdfPages = $state(0);
   let pdfPage = $state(1);
@@ -170,6 +179,20 @@
 
     let active = true;
     failed = false;
+    if (transcode) {
+      url = null;
+      void videoStreamUrl(core, source)
+        .then((streamUrl) => {
+          if (active) url = streamUrl;
+        })
+        .catch(() => {
+          if (active) streamUnavailable = true;
+        });
+      return () => {
+        active = false;
+      };
+    }
+
     const release = holdMediaUrl(core, source, 0, 0);
     const cached = cachedMediaUrl(core, source, 0, 0);
     url = cached ?? null;

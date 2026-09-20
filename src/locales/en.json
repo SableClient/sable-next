@@ -627,6 +627,8 @@
     "retrySend": "Retry",
     "cancelSend": "Delete",
     "videoAttachment": "Video attachment",
+    "videoConverting": "Converting video…",
+    "playVideo": "Play {{name}}",
     "audioAttachment": "Audio attachment",
     "fileAttachment": "File attachment",
     "openFileNamed": "Open {{name}}",

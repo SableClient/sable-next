@@ -1,5 +1,6 @@
 <script lang="ts">
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
+  import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -12,7 +13,10 @@
   import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextAttachmentViewer from '#lib/ui/TextAttachmentViewer.svelte';
+  import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.js';
+  import { canPlayVideo } from '#lib/ui/video-support.js';
   import {
     MAX_TEXT_ATTACHMENT_BYTES,
     isTextAttachment,
@@ -70,6 +74,16 @@
           ? $i18n.t('timeline.audioAttachment')
           : $i18n.t('timeline.fileAttachment'))
   );
+  /* Unlatches where no re-encoder answers, so a pessimistic `canPlayType`
+     cannot strand the attachment. */
+  let streamUnavailable = $state(false);
+  let transcode = $derived(
+    kind === 'video' && !canPlayVideo(mime) && !streamUnavailable && videoStreamingSupported(core)
+  );
+  /* Keyed by source: a recycled tile must not inherit another's start. */
+  let startedSource = $state<string | null>(null);
+  let started = $derived(startedSource === source);
+  let awaitingPlay = $derived(transcode && !started);
   let aspectRatio = $derived(
     kind === 'video' &&
       typeof width === 'number' &&
@@ -143,6 +157,25 @@
       retryCount = 0;
       retryAt = 0;
     }
+    if (transcode) {
+      url = null;
+      if (!started) {
+        return () => {
+          active = false;
+        };
+      }
+      void videoStreamUrl(core, source)
+        .then((streamUrl) => {
+          if (active) url = streamUrl;
+        })
+        .catch(() => {
+          if (active) streamUnavailable = true;
+        });
+      return () => {
+        active = false;
+      };
+    }
+
     const release = holdMediaUrl(core, source, 0, 0);
     const cached = cachedMediaUrl(core, source, 0, 0);
     if (cached !== undefined) {
@@ -203,6 +236,7 @@
       <video
         class="media-content media-video"
         controls
+        autoplay={started}
         src={url}
         poster={posterUrl}
         width={width ?? undefined}
@@ -258,12 +292,99 @@
       {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
     </span>
   {/if}
+  {#if awaitingPlay && !failed}
+    <button
+      type="button"
+      class="media-play"
+      onclick={() => {
+        startedSource = source;
+      }}
+      aria-label={$i18n.t('timeline.playVideo', { name: mediaLabel })}
+    >
+      {#if posterUrl}
+        <img class="media-loading-poster" src={posterUrl} alt="" aria-hidden="true" />
+      {/if}
+      <span class="media-play-badge" aria-hidden="true">
+        <PlayIcon weight="fill" />
+      </span>
+    </button>
+  {:else if !failed && !url}
+    <span class="media-loading">
+      {#if posterUrl}
+        <img class="media-loading-poster" src={posterUrl} alt="" aria-hidden="true" />
+      {/if}
+      <span class="media-loading-status">
+        <Spinner small />
+        {#if transcode}
+          <span class="media-loading-label">{$i18n.t('timeline.videoConverting')}</span>
+        {/if}
+      </span>
+    </span>
+  {/if}
 </div>
 
 <style>
   .media-frame {
     display: block;
     max-width: 100%;
+    position: relative;
+  }
+
+  .media-loading {
+    align-items: center;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+  }
+
+  .media-loading-poster {
+    filter: blur(var(--blur-small));
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
+  }
+
+  .media-loading-status {
+    align-items: center;
+    background: var(--surface-container);
+    border-radius: var(--radius);
+    color: var(--surface-var-on-container);
+    display: flex;
+    gap: var(--space-100);
+    padding: var(--space-100) var(--space-200);
+    position: relative;
+  }
+
+  .media-loading-label {
+    font-size: var(--font-size-small);
+  }
+
+  .media-play {
+    align-items: center;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    width: 100%;
+  }
+
+  .media-play-badge {
+    align-items: center;
+    background: var(--surface-container);
+    border-radius: 50%;
+    color: var(--surface-var-on-container);
+    display: flex;
+    height: var(--control-height-medium);
+    justify-content: center;
+    position: relative;
+    width: var(--control-height-medium);
   }
 
   .media-frame-video {
