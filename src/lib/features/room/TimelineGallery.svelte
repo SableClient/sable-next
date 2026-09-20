@@ -22,7 +22,7 @@
   {#each items as item, index (index)}
     {#if item.kind === 'image'}
       <MediaImage
-        class="tile"
+        class="tile privacy-media"
         source={item.source}
         alt={item.body}
         width={800}
@@ -34,7 +34,7 @@
       />
     {:else}
       <MediaContent
-        class="tile"
+        class="tile privacy-media"
         source={item.source}
         mime={item.mime}
         filename={item.body}

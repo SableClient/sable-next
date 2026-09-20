@@ -520,6 +520,26 @@ body {
   --font-family-emoji: 'Twemoji';
 }
 
+:root[data-blur-media='on'] .privacy-media,
+:root[data-blur-avatars='on'] .avatar-root,
+:root[data-blur-emotes='on'] img[data-mx-emoticon],
+:root[data-blur-emotes='on'] .reaction-image {
+  filter: blur(1.5rem) grayscale(1);
+  opacity: 0.7;
+  transition:
+    filter var(--duration-fast) ease,
+    opacity var(--duration-fast) ease;
+}
+
+:root[data-blur-media='on'] .privacy-media:hover,
+:root[data-blur-media='on'] .privacy-media:focus-within,
+:root[data-blur-avatars='on'] .avatar-root:hover,
+:root[data-blur-emotes='on'] img[data-mx-emoticon]:hover,
+:root[data-blur-emotes='on'] .reaction-image:hover {
+  filter: none;
+  opacity: 1;
+}
+
 :root[data-high-contrast='on'] {
   --border-width: var(--border-width-500);
   --focus-ring-width: var(--border-width-700);

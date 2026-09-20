@@ -69,6 +69,9 @@ export interface Preferences {
   sendTypingNotifications: boolean;
   sendReadReceipts: boolean;
   sendPresence: boolean;
+  blurMedia: boolean;
+  blurAvatars: boolean;
+  blurEmotes: boolean;
   presence: PresenceView;
   presenceStatusMessage: string;
 
@@ -211,6 +214,9 @@ const DEFAULTS: Preferences = {
   sendTypingNotifications: true,
   sendReadReceipts: true,
   sendPresence: true,
+  blurMedia: false,
+  blurAvatars: false,
+  blurEmotes: false,
   presence: 'online',
   presenceStatusMessage: '',
 
