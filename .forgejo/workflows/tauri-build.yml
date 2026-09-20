@@ -396,7 +396,7 @@ jobs:
             --names github-bundles.json --attempts 220 --interval 30
   obtainium:
     name: Publish Obtainium config
-    needs: [setup-release, github-bundles]
+    needs: [setup-release, android, github-bundles]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
