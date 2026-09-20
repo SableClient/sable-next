@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { MemberView, ProfileView, RoomPermissionsView } from '#src/generated/protocol';
+
+  import type { MatrixLink } from './matrix-link.js';
   import { Popover } from 'bits-ui';
 
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -19,6 +21,7 @@
     permissions?: RoomPermissionsView | null;
     profile?: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     failed?: boolean;
     anchor: HTMLElement | null;
     onOpenChange?: (open: boolean) => void;
@@ -33,6 +36,7 @@
     permissions = null,
     profile = null,
     onAvatarClick,
+    onMatrixLink,
     failed = false,
     anchor,
     onOpenChange,
@@ -81,6 +85,7 @@
             {permissions}
             {profile}
             {onAvatarClick}
+            {onMatrixLink}
             {failed}
           />
         {/if}
@@ -106,6 +111,7 @@
         {permissions}
         {profile}
         {onAvatarClick}
+        {onMatrixLink}
         {failed}
         variant="sheet"
       />

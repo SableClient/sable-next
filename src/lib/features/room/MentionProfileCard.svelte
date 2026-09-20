@@ -47,6 +47,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import FormattedBody from './FormattedBody.svelte';
+  import type { MatrixLink } from './matrix-link.js';
   import MutualRoomsPanel from './MutualRoomsPanel.svelte';
   import { senderColor } from './timeline-format';
 
@@ -60,6 +61,7 @@
     permissions?: RoomPermissionsView | null;
     profile: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     failed?: boolean;
     variant?: 'popover' | 'sheet';
   }
@@ -72,6 +74,7 @@
     permissions = null,
     profile,
     onAvatarClick,
+    onMatrixLink,
     failed = false,
     variant = 'popover',
   }: Props = $props();
@@ -521,7 +524,7 @@
   {#if showFailure}
     <Alert variant="warning" role="status">{$i18n.t('timeline.profileUnavailable')}</Alert>
   {:else if currentProfile?.bio}
-    <FormattedBody html={currentProfile.bio} />
+    <FormattedBody html={currentProfile.bio} {onMatrixLink} />
   {/if}
 {/snippet}
 
