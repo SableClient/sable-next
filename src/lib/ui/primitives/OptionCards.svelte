@@ -52,7 +52,7 @@
     align-items: center;
     background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radii-400);
+    border-radius: var(--radius-inner);
     color: inherit;
     cursor: pointer;
     display: flex;

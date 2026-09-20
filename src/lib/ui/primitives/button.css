@@ -7,7 +7,7 @@
   align-items: center;
   background: var(--button-container);
   border: var(--border-width) solid var(--button-line);
-  border-radius: var(--radii-400);
+  border-radius: var(--radius-inner);
   box-sizing: border-box;
   color: var(--button-on-container);
   cursor: pointer;

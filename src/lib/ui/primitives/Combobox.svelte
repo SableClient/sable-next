@@ -163,7 +163,7 @@
   }
 
   .combobox-trigger:focus-visible {
-    border-radius: var(--radius);
+    border-radius: var(--radius-inner);
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: -4px;
   }

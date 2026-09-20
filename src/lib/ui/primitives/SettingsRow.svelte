@@ -161,7 +161,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    border-radius: var(--radius);
+    border-radius: var(--radius-inner);
     color: inherit;
     cursor: pointer;
     display: inline-flex;

@@ -9,7 +9,7 @@
 
   background: var(--form-control-container);
   border: 0;
-  border-radius: var(--radii-400);
+  border-radius: var(--radius-inner);
   box-shadow: inset 0 0 0 var(--form-control-ring) var(--form-control-line);
   box-sizing: border-box;
   color: var(--form-control-color);
