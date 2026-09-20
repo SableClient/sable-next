@@ -224,13 +224,13 @@ export function applyChildOverrides(
 export function levelTargets(
   sections: readonly HierarchySection[],
   rootId: string,
-  closed: ReadonlySet<string> = new Set()
+  visible: ReadonlySet<string> = new Set()
 ): string[] {
   const targets = [rootId];
   for (const section of sections) {
     const spaceId = section.space?.room_id;
     if (spaceId === undefined || targets.includes(spaceId)) continue;
-    if (closed.has(section.key)) continue;
+    if (!visible.has(section.key)) continue;
     targets.push(spaceId);
   }
   return targets;

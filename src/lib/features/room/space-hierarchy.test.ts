@@ -320,7 +320,7 @@ test('a section already showing rooms reserves none once it has them all', () =>
   expect(placeholderRows(section)).toBe(0);
 });
 
-test('every open section is a level to fetch, the closed ones are not', () => {
+test('only visible sections are levels to fetch', () => {
   const rooms = [
     room('!root', { is_space: true, children: [edge('!a'), edge('!open'), edge('!shut')] }),
     room('!a'),
@@ -330,10 +330,10 @@ test('every open section is a level to fetch, the closed ones are not', () => {
     room('!c'),
   ];
   const sections = buildHierarchySections(rooms, '!root');
-  const shut = sections.find((section) => section.space?.room_id === '!shut');
+  const open = sections.find((section) => section.space?.room_id === '!open');
 
-  expect(levelTargets(sections, '!root')).toEqual(['!root', '!open', '!shut']);
-  expect(levelTargets(sections, '!root', new Set([shut?.key ?? '']))).toEqual(['!root', '!open']);
+  expect(levelTargets(sections, '!root')).toEqual(['!root']);
+  expect(levelTargets(sections, '!root', new Set([open?.key ?? '']))).toEqual(['!root', '!open']);
 });
 
 test('an override replaces a parent edges until its baseline moves', () => {

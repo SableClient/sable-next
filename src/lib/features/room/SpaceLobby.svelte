@@ -65,6 +65,7 @@
   const joinErrors = new SvelteMap<string, string>();
   const removed = new SvelteSet<string>();
   const closed = new SvelteSet<string>();
+  const visibleLevels = new SvelteSet<string>();
   const loadedLevels = new SvelteSet<string>();
   const pendingLevels = new SvelteSet<string>();
   const failedLevels = new SvelteSet<string>();
@@ -128,6 +129,7 @@
     knocked.clear();
     joinErrors.clear();
     closed.clear();
+    visibleLevels.clear();
   });
 
   $effect(() => {
@@ -135,7 +137,7 @@
     if (target === null) return;
 
     const mine = generation;
-    for (const levelId of levelTargets(sections, target, closed)) {
+    for (const levelId of levelTargets(sections, target, visibleLevels)) {
       if (requested.has(levelId)) continue;
 
       requested.add(levelId);
@@ -451,6 +453,7 @@
         {canManage}
         {label}
         onToggle={toggle}
+        onVisible={(key) => visibleLevels.add(key)}
         onOpen={open}
         onJoin={(child: HierarchyRoomView, via: readonly string[], parentId: string) => {
           void join(child, via, parentId);

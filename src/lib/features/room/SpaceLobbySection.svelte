@@ -12,6 +12,7 @@
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { whenVisible } from '#lib/ui/when-visible.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -34,6 +35,7 @@
     canManage: boolean;
     label: (child: HierarchyRoomView) => string;
     onToggle: (key: string) => void;
+    onVisible: (key: string) => void;
     onOpen: (child: HierarchyRoomView) => void;
     onJoin: (child: HierarchyRoomView, via: readonly string[], parentId: string) => void;
     onCopyLink: (child: HierarchyRoomView) => void;
@@ -58,6 +60,7 @@
     canManage,
     label,
     onToggle,
+    onVisible,
     onOpen,
     onJoin,
     onCopyLink,
@@ -88,7 +91,14 @@
   }
 </script>
 
-<div class="section">
+<div
+  class="section"
+  {@attach section.space && !closed && !section.loaded && !section.failed
+    ? whenVisible(() => {
+        onVisible(section.key);
+      })
+    : undefined}
+>
   <div class="section-header">
     <Button
       variant="ghost"
