@@ -470,7 +470,6 @@ fn auto_update_supported() -> bool {
     !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some()
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Two SDK sites log once per room per sync response, which on a phone costs
 /// more than they are worth: heroes it cannot name, and the latest-event
 /// builder choking on the bare `{}` a space child removal carries.
@@ -485,6 +484,7 @@ fn install_logging() {
     }
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_logging();
 
