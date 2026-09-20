@@ -504,6 +504,10 @@ body {
   }
 }
 
+:root[data-font-scale='smallest'] {
+  --font-scale: 0.75;
+}
+
 :root[data-font-scale='small'] {
   --font-scale: 0.9375;
 }
@@ -514,6 +518,10 @@ body {
 
 :root[data-font-scale='largest'] {
   --font-scale: 1.25;
+}
+
+:root[data-font-scale='huge'] {
+  --font-scale: 1.5;
 }
 
 :root[data-twitter-emoji='on'] {

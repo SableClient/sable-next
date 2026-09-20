@@ -9,7 +9,7 @@ export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
-export type FontScale = 'small' | 'default' | 'large' | 'largest';
+export type FontScale = 'smallest' | 'small' | 'default' | 'large' | 'largest' | 'huge';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
@@ -142,7 +142,7 @@ const ENUMS = {
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'collapsed', 'never'],
-  fontScale: ['small', 'default', 'large', 'largest'],
+  fontScale: ['smallest', 'small', 'default', 'large', 'largest', 'huge'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   readReceiptPlacement: ['message', 'room'],
   replyPreviewStyle: ['connected', 'compact', 'expanded'],

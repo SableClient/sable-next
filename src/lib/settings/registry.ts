@@ -378,10 +378,12 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.fontScaleHint',
         type: 'select',
         options: [
-          { value: 'small', label: 'settings.fontScaleSmall' },
-          { value: 'default', label: 'settings.fontScaleDefault' },
-          { value: 'large', label: 'settings.fontScaleLarge' },
-          { value: 'largest', label: 'settings.fontScaleLargest' },
+          { value: 'smallest', label: '75%', literal: true },
+          { value: 'small', label: '94%', literal: true },
+          { value: 'default', label: '100%', literal: true },
+          { value: 'large', label: '113%', literal: true },
+          { value: 'largest', label: '125%', literal: true },
+          { value: 'huge', label: '150%', literal: true },
         ],
       },
       {
