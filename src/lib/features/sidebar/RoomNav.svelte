@@ -1209,7 +1209,7 @@
   }
 
   .rooms-heading-label {
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-500);
     margin: 0;
   }
@@ -1419,7 +1419,7 @@
     display: flex;
     flex: 1;
     font: inherit;
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-500);
     gap: var(--space-100);
     min-height: var(--control-height-medium);

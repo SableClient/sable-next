@@ -388,11 +388,15 @@ html {
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 
   /* Typography scale */
-  --font-size-x-small: 0.8rem;
-  --font-size-small: 0.875rem;
+  --font-size-x-small: 0.75rem;
+  --font-size-small: 0.75rem;
+  --font-size-label: 0.875rem;
   --font-size-body: 0.9375rem;
-  --font-size-heading: 1.25rem;
+  --font-size-subheading: 1rem;
+  --font-size-heading: 1.125rem;
   --font-size-display: 2rem;
+  --font-size-emoji-display: 2.1875rem;
+  --font-size-editor: 1rem;
 
   /* Line heights */
   --line-height-small: 1.25rem;

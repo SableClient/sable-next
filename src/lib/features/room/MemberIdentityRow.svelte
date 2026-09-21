@@ -107,6 +107,7 @@
     align-items: center;
     color: inherit;
     display: flex;
+    font-size: var(--font-size-label);
     gap: var(--space-250);
     min-width: 0;
     text-align: left;

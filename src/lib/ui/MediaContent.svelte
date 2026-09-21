@@ -446,6 +446,7 @@
   }
 
   .media-file-name {
+    font-size: var(--font-size-label);
     overflow-wrap: anywhere;
   }
 

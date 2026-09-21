@@ -282,6 +282,7 @@
     border-left: calc(var(--border-width) * 3) solid transparent;
     color: inherit;
     display: flex;
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
     gap: var(--space-300);
     min-height: var(--control-height-medium);

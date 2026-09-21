@@ -28,10 +28,19 @@
   const borders = scale('--border-width', ['300', '400', '500', '600', '700']);
   const shadows = scale('--shadow', ['e100', 'e200', 'e300', 'e400']);
   const type = [
+    { step: 'x-small', size: '--font-size-x-small', lineHeight: '--line-height-small' },
     { step: 'small', size: '--font-size-small', lineHeight: '--line-height-small' },
+    { step: 'label', size: '--font-size-label', lineHeight: '--line-height-small' },
     { step: 'body', size: '--font-size-body', lineHeight: '--line-height-body' },
+    { step: 'subheading', size: '--font-size-subheading', lineHeight: '--line-height-heading' },
     { step: 'heading', size: '--font-size-heading', lineHeight: '--line-height-heading' },
     { step: 'display', size: '--font-size-display', lineHeight: '--line-height-heading' },
+    {
+      step: 'emoji-display',
+      size: '--font-size-emoji-display',
+      lineHeight: '--line-height-heading',
+    },
+    { step: 'editor', size: '--font-size-editor', lineHeight: '--line-height-body' },
   ];
 
   const containerSteps = ['container', 'container-hover', 'container-active', 'container-line'];

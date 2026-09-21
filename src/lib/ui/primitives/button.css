@@ -13,6 +13,7 @@
   cursor: pointer;
   display: inline-flex;
   font: inherit;
+  font-size: var(--font-size-label);
   font-weight: var(--font-weight-600);
   gap: var(--button-gap);
   justify-content: center;
@@ -69,6 +70,8 @@
   --button-height: var(--control-height-300);
   --button-gap: var(--space-100);
   --button-padding-inline: var(--control-padding-300);
+
+  font-size: var(--font-size-small);
 }
 
 .btn-large {

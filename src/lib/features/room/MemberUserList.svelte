@@ -75,7 +75,7 @@
   }
 
   .title {
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-subheading);
     margin: 0;
   }
 

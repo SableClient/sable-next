@@ -127,6 +127,7 @@
 
   .label {
     flex: 1 1 auto;
+    font-size: var(--font-size-label);
   }
 
   .label,

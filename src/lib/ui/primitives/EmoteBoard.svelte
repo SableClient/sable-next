@@ -641,7 +641,7 @@
   }
 
   .board :global(.board-search) {
-    font-size: max(var(--font-size-small), var(--font-size-input-min));
+    font-size: max(var(--font-size-label), var(--font-size-input-min));
     min-width: 0;
   }
 
@@ -849,7 +849,7 @@
 
   .preview code {
     color: var(--bg-on-container);
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-subheading);
   }
 
   .preview :global(.preview-image) {

@@ -217,6 +217,7 @@
 
   .reaction-count {
     align-self: center;
+    font-size: var(--font-size-label);
     white-space: nowrap;
   }
 

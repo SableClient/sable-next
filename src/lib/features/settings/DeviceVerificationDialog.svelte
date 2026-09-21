@@ -170,7 +170,7 @@
   }
 
   .emoji-item span {
-    font-size: var(--font-size-display);
+    font-size: var(--font-size-emoji-display);
     line-height: 1;
   }
 

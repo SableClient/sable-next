@@ -91,7 +91,7 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-500);
     gap: var(--space-300);
     line-height: var(--line-height-small);

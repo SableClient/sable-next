@@ -74,7 +74,7 @@
     --menu-item-padding: var(--space-400);
 
     border-radius: 0;
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-label);
   }
 
   .action-menu-rows {

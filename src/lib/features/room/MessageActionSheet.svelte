@@ -83,6 +83,6 @@
     --menu-item-padding: var(--space-400);
     --menu-item-radius: var(--radii-300);
 
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-label);
   }
 </style>

@@ -55,7 +55,7 @@
   cursor: pointer;
   display: flex;
   font: inherit;
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-label);
   gap: var(--menu-item-gap);
   justify-content: start;
   line-height: var(--line-height-small);
