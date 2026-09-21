@@ -1247,6 +1247,7 @@
     align-items: center;
     color: var(--surface-var-on-container);
     display: flex;
+    font-size: max(var(--font-size-editor), var(--font-size-input-min));
     grid-column: 1 / -1;
     justify-content: center;
     margin: 0;
