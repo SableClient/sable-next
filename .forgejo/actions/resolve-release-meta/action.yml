@@ -1,5 +1,5 @@
 name: Resolve release meta
-description: Detects whether a build is a rolling nightly or a stable tag, and outputs its tag, version, ref, and build flavor.
+description: Outputs the release tag, version, ref, and build flavor.
 
 inputs:
   input-tag:
@@ -9,7 +9,7 @@ inputs:
 
 outputs:
   tag:
-    description: Release tag name (e.g. "nightly" or "v1.2.3").
+    description: Release tag name (e.g. "nightly-<version>" or "v1.2.3").
     value: ${{ steps.meta.outputs.tag }}
   version:
     description: SemVer version string stamped into the build.
@@ -18,7 +18,7 @@ outputs:
     description: Git ref to build (commit SHA for nightly, tag ref for stable).
     value: ${{ steps.meta.outputs.ref }}
   nightly:
-    description: '"true" when this is a rolling nightly build.'
+    description: '"true" for nightly builds.'
     value: ${{ steps.meta.outputs.nightly }}
 
 runs:

@@ -65,13 +65,13 @@ modules:
     sources:
       - type: extra-data
         filename: sable-next.tar.gz
-        url: https://git.sable.moe/SableClient/sable-next/releases/download/nightly/sable-next-@VERSION@-linux-x86_64.tar.gz
+        url: https://git.sable.moe/SableClient/sable-next/releases/download/@TAG@/sable-next-@VERSION@-linux-x86_64.tar.gz
         sha256: '@SHA256_X86_64@'
         size: @SIZE_X86_64@
         only-arches: [x86_64]
       - type: extra-data
         filename: sable-next.tar.gz
-        url: https://git.sable.moe/SableClient/sable-next/releases/download/nightly/sable-next-@VERSION@-linux-aarch64.tar.gz
+        url: https://git.sable.moe/SableClient/sable-next/releases/download/@TAG@/sable-next-@VERSION@-linux-aarch64.tar.gz
         sha256: '@SHA256_AARCH64@'
         size: @SIZE_AARCH64@
         only-arches: [aarch64]

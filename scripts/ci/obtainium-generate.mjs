@@ -11,7 +11,7 @@ if (!version || !tag || !outputPath) {
 
 const repository = 'SableClient/sable-next';
 const server = 'https://git.sable.moe';
-const isNightly = tag === 'nightly';
+const isNightly = tag.startsWith('nightly-');
 const apkName = `sable-next-${version}-android-universal.apk`;
 const apkUrl = `${server}/${repository}/releases/download/${tag}/${apkName}`;
 
@@ -19,13 +19,9 @@ const apkUrl = `${server}/${repository}/releases/download/${tag}/${apkName}`;
 const additionalSettings = {
   about: `The next Sable Matrix client${isNightly ? ' (nightly)' : ''}`,
   fallbackToOlderReleases: true,
-  // The nightly tag name never changes, so the version has to come from the
-  // release date instead.
   ...(isNightly && {
     includePrereleases: true,
-    filterReleaseTitlesByRegEx: '^Nightly',
-    releaseDateAsVersion: true,
-    versionDetection: false,
+    filterReleaseTitlesByRegEx: '^Nightly build ',
   }),
 };
 

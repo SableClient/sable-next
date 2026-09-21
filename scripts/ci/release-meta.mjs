@@ -19,7 +19,7 @@ function commitDate() {
   return new Date();
 }
 
-function nightlyVersion() {
+function nightlyVersion(gitSha) {
   const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
   if (!match) {
@@ -28,7 +28,6 @@ function nightlyVersion() {
 
   const date = commitDate();
   const pad = (value) => String(value).padStart(2, '0');
-  // Second resolution so same-minute commits get distinct build versions.
   const stamp = [
     String(date.getUTCFullYear()).slice(-2),
     pad(date.getUTCMonth() + 1),
@@ -39,7 +38,7 @@ function nightlyVersion() {
   ].join('');
 
   const [, major, minor, patch] = match;
-  return `${major}.${minor}.${Number(patch) + 1}-nightly.${stamp}`;
+  return `${major}.${minor}.${Number(patch) + 1}-nightly.${stamp}.${gitSha.slice(0, 12)}`;
 }
 
 function resolveReleaseMeta({ eventName, inputTag, gitRef, gitRefName, gitSha }) {
@@ -47,7 +46,11 @@ function resolveReleaseMeta({ eventName, inputTag, gitRef, gitRefName, gitSha })
     return { tag: inputTag, version: inputTag.replace(/^v/, ''), ref: inputTag, nightly: false };
   }
   if (gitRef === 'refs/heads/main') {
-    return { tag: 'nightly', version: nightlyVersion(), ref: gitSha, nightly: true };
+    if (!/^[0-9a-f]{12,}$/i.test(gitSha)) {
+      throw new Error('GIT_SHA must contain at least 12 hexadecimal characters for nightly builds');
+    }
+    const version = nightlyVersion(gitSha);
+    return { tag: `nightly-${version}`, version, ref: gitSha, nightly: true };
   }
   if (/^v\d+\./.test(gitRefName)) {
     return { tag: gitRefName, version: gitRefName.replace(/^v/, ''), ref: gitRef, nightly: false };

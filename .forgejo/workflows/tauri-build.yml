@@ -47,20 +47,18 @@ jobs:
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: node scripts/ci/forgejo-release.mjs wait --attempts 12 --interval 15
-      - name: Ensure nightly prerelease exists
+      - name: Create nightly prerelease
         if: ${{ steps.meta.outputs.nightly == 'true' }}
         env:
           SHA: ${{ github.sha }}
         run: |
           node scripts/ci/forgejo-release.mjs ensure \
-            --tag nightly \
+            --tag "${{ steps.meta.outputs.tag }}" \
             --sha "$SHA" \
+            --draft true \
             --prerelease true \
-            --title 'Nightly (main)' \
-            --notes "Rolling nightly build from main at $SHA"
-          # A manifest left by the previous run passes wait-assets early and
-          # makes the AltStore job point at an IPA finalize-nightly will delete.
-          node scripts/ci/forgejo-release.mjs delete-asset --tag nightly --name github-bundles.json || true
+            --title "Nightly build ${{ steps.meta.outputs.version }}" \
+            --notes "Nightly build from main at $SHA"
   build-web:
     name: Build web assets
     needs: setup-release
@@ -441,9 +439,10 @@ jobs:
           ipa_build="$(jq -r '.ipa.build' github-bundles.json)"
 
           if [ "$IS_NIGHTLY" = 'true' ]; then
-            # Older entries would 404 once finalize-nightly prunes their IPAs.
-            export ALTSTORE_MAX_VERSIONS=1
-            cp scripts/ci/templates/altstore-source-nightly.json altstore-source.json
+            node scripts/ci/forgejo-release.mjs download \
+              --tag nightly --pattern altstore-source.json --dir .
+            [ -e altstore-source.json ] || \
+              cp scripts/ci/templates/altstore-source-nightly.json altstore-source.json
           else
             previous="$(
               node scripts/ci/forgejo-release.mjs find-previous --asset altstore-source.json
@@ -529,18 +528,16 @@ jobs:
             --title 'Latest stable' \
             --notes "Stable manifests for $VERSION. Bundles live on the $TAG release."
           node scripts/ci/forgejo-release.mjs upload --tag latest latest.json altstore-source.json
-  finalize-nightly:
-    name: Finalize nightly release
-    needs: [setup-release, linux, android, github-bundles, obtainium, altstore]
-    # The prune only removes what this run replaced, so a failed platform
-    # cannot strand the release on the previous run's bundles.
-    if: ${{ always() && needs.setup-release.result == 'success' && needs.setup-release.outputs.nightly == 'true' }}
+  publish-nightly-channel:
+    name: Refresh nightly channel metadata
+    needs: [setup-release, updater-manifest, obtainium, altstore]
+    if: ${{ needs.setup-release.outputs.nightly == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     env:
-      TAG: nightly
+      TAG: ${{ needs.setup-release.outputs.tag }}
       SHA: ${{ github.sha }}
       VERSION: ${{ needs.setup-release.outputs.version }}
     steps:
@@ -549,42 +546,36 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # What remains after stripping this run's version names the platform:
-      # `linux-x86_64.deb`, `android-universal.apk`.
-      - name: Collect the bundles this run produced
-        id: fresh
+      - name: Update the nightly channel
         run: |
-          node scripts/ci/forgejo-release.mjs assets \
-            | sed -n "s/^sable-next-${VERSION}-//p" | sort -u > fresh
-          echo 'This run produced:'
-          cat fresh
-          if [ -s fresh ]; then echo 'any=true' >> "$GITHUB_OUTPUT"; fi
-      - name: Update nightly tag
-        if: ${{ steps.fresh.outputs.any == 'true' }}
-        run: |
-          git tag -f nightly "$SHA"
-          git push --force \
-            "https://oauth2:${FORGEJO_TOKEN}@git.sable.moe/${FORGEJO_REPOSITORY}.git" \
-            refs/tags/nightly
-          node scripts/ci/forgejo-release.mjs edit \
+          node scripts/ci/forgejo-release.mjs ensure \
+            --tag nightly \
+            --sha "$SHA" \
             --prerelease true \
-            --title 'Nightly (main)' \
-            --notes "Rolling nightly build $VERSION from main at $SHA"
-      # Stamped names never clobber, so they accumulate and Obtainium starts
-      # offering a stale APK. The .json manifests clobber in place.
-      - name: Remove superseded nightly assets
-        run: |
-          node scripts/ci/forgejo-release.mjs assets \
-            | grep -v "^sable-next-${VERSION}-" | grep -v '\.json$' \
+            --title 'Nightly channel' \
+            --notes "Update metadata for nightly build $VERSION. Bundles live on the $TAG release."
+          node scripts/ci/forgejo-release.mjs edit \
+            --tag "$TAG" \
+            --draft false \
+            --prerelease true
+          node scripts/ci/forgejo-release.mjs edit \
+            --tag nightly \
+            --prerelease true \
+            --title 'Nightly channel' \
+            --notes "Update metadata for nightly build $VERSION. Bundles live on the $TAG release."
+          node scripts/ci/forgejo-release.mjs download \
+            --tag "$TAG" --pattern obtainium.json --dir .
+          node scripts/ci/forgejo-release.mjs download \
+            --tag "$TAG" --pattern altstore-source.json --dir .
+          node scripts/ci/forgejo-release.mjs download \
+            --tag "$TAG" --pattern latest.json --dir . || true
+          node scripts/ci/forgejo-release.mjs upload \
+            --tag nightly obtainium.json altstore-source.json
+          [ ! -e latest.json ] || \
+            node scripts/ci/forgejo-release.mjs upload --tag nightly latest.json
+          # Keep the channel metadata-only.
+          node scripts/ci/forgejo-release.mjs assets --tag nightly \
+            | { grep '^sable-next-' || true; } \
             | while read -r name; do
-                [ -n "$name" ] || continue
-                while read -r suffix; do
-                  case "$name" in
-                    *-"$suffix")
-                      echo "Removing superseded nightly asset: $name"
-                      node scripts/ci/forgejo-release.mjs delete-asset --name "$name"
-                      break
-                      ;;
-                  esac
-                done < fresh
+                node scripts/ci/forgejo-release.mjs delete-asset --tag nightly --name "$name"
               done

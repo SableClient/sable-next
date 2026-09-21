@@ -53,9 +53,9 @@
 
   <releases>
     <release version="@VERSION@" date="@DATE@">
-      <url type="details">https://git.sable.moe/SableClient/sable-next/releases/tag/nightly</url>
+      <url type="details">https://git.sable.moe/SableClient/sable-next/releases</url>
       <description>
-        <p>Rolling nightly build from the main branch</p>
+        <p>Nightly build from the main branch</p>
       </description>
     </release>
   </releases>

@@ -21,31 +21,39 @@ if (!version || !/^\d+\.\d+\.\d+/.test(version)) {
 // overflows the u32 Tauri parses each version part into.
 let stampedVersion = version;
 let wixVersion;
-if (foldNightlyIntoPatch) {
-  const nightly = /^(\d+\.\d+)\.\d+-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(
+const nightlyVersion =
+  /^(\d+)\.(\d+)\.(\d+)-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\.[0-9a-f]+)?$/.exec(
     version
   );
-  if (!nightly) {
+const androidVersionCode = nightlyVersion
+  ? Date.UTC(
+      2000 + +nightlyVersion[4],
+      +nightlyVersion[5] - 1,
+      +nightlyVersion[6],
+      +nightlyVersion[7],
+      +nightlyVersion[8],
+      +nightlyVersion[9]
+    ) / 1000
+  : undefined;
+if (foldNightlyIntoPatch) {
+  if (!nightlyVersion) {
     console.error(`--apple-short-version needs a nightly version (got: ${version})`);
     process.exit(1);
   }
-  const [, base, yy, mm, dd, hh, min, sec] = nightly;
-  const patch = Date.UTC(2000 + +yy, mm - 1, +dd, +hh, +min, +sec) / 1000;
+  const [, major, minor] = nightlyVersion;
+  const patch = androidVersionCode;
   if (!Number.isInteger(patch) || patch <= 0 || patch > 0xffffffff) {
     console.error(`Nightly stamp does not map to a u32 patch version: ${version}`);
     process.exit(1);
   }
-  stampedVersion = `${base}.${patch}`;
+  stampedVersion = `${major}.${minor}.${patch}`;
 }
 
 if (setMsiVersion) {
-  const nightly = /^(\d+\.\d+\.\d+)-nightly\.(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(
-    version
-  );
-  if (nightly) {
-    const [, base, yy, mm, dd] = nightly;
-    const day = Date.UTC(2000 + +yy, +mm - 1, +dd) / 86_400_000;
-    wixVersion = `${base}.${day % 65_536}`;
+  if (nightlyVersion) {
+    const [, major, minor, patch] = nightlyVersion;
+    const day = Math.floor(androidVersionCode / 86_400);
+    wixVersion = `${major}.${minor}.${patch}.${day % 65_536}`;
   }
 }
 
@@ -62,6 +70,11 @@ if (updaterEndpoint) {
   config.plugins ??= {};
   config.plugins.updater ??= {};
   config.plugins.updater.endpoints = [updaterEndpoint];
+}
+if (androidVersionCode) {
+  config.bundle ??= {};
+  config.bundle.android ??= {};
+  config.bundle.android.versionCode = androidVersionCode;
 }
 writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`Set ${file} version to ${stampedVersion}`);

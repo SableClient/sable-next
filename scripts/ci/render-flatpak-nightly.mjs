@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /* oxlint-disable no-console */
 
-// Usage: render-flatpak-nightly.mjs <version> <x86_64-sha256:size> <aarch64-sha256:size> [date]
+// Usage: render-flatpak-nightly.mjs <version> <tag> <x86_64-sha256:size> <aarch64-sha256:size> [date]
 // Pass "-" for an architecture that is not being published.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 
-const [version, x86, arm, dateArg] = process.argv.slice(2);
+const [version, tag, x86, arm, dateArg] = process.argv.slice(2);
 
-if (!version || !x86 || !arm) {
+if (!version || !tag || !x86 || !arm) {
   console.error(
-    'Usage: render-flatpak-nightly.mjs <version> <x86_64-sha256:size> <aarch64-sha256:size> [date]'
+    'Usage: render-flatpak-nightly.mjs <version> <tag> <x86_64-sha256:size> <aarch64-sha256:size> [date]'
   );
   process.exit(1);
 }
@@ -44,10 +44,9 @@ if (!arches.x86_64 && !arches.aarch64) {
 const date = dateArg || new Date().toISOString().slice(0, 10);
 const dir = 'packaging/flatpak/nightly';
 
-let manifest = readFileSync(`${dir}/moe.sable.next.Nightly.yml.in`, 'utf8').replaceAll(
-  '@VERSION@',
-  version
-);
+let manifest = readFileSync(`${dir}/moe.sable.next.Nightly.yml.in`, 'utf8')
+  .replaceAll('@VERSION@', version)
+  .replaceAll('@TAG@', tag);
 
 for (const [arch, values] of Object.entries(arches)) {
   const suffix = arch.toUpperCase();
