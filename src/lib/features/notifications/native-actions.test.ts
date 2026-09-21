@@ -6,23 +6,40 @@ vi.mock('@tauri-apps/api/core', () => ({
   addPluginListener: vi.fn(),
 }));
 
-import type { NativeNotificationAction } from '#lib/platform/native-notifications.js';
+import type {
+  NativeNotificationAction,
+  NativeNotificationTarget,
+} from '#lib/platform/native-notifications.js';
 
-import { performNotificationAction } from './native-actions';
+import { openNativeNotification, performNotificationAction } from './native-actions';
 
 type Replier = Parameters<typeof performNotificationAction>[0];
 
-function core(accountId = '@me:example.org') {
+function core(accountId = 'account-me') {
   const sendMessage = vi.fn().mockResolvedValue(undefined);
   const markRead = vi.fn().mockResolvedValue(undefined);
   const switchAccount = vi.fn().mockResolvedValue(undefined);
+  const accounts = [
+    { account_id: 'account-me', user_id: '@me:example.org' },
+    { account_id: 'account-other', user_id: '@other:example.org' },
+  ];
   const client = {
-    session: { account_id: accountId },
+    session: accounts.find((account) => account.account_id === accountId),
+    accounts,
     commands: { sendMessage, markRead },
     switchAccount,
   } as unknown as Replier;
 
   return { client, sendMessage, markRead, switchAccount };
+}
+
+function target(overrides: Partial<NativeNotificationTarget> = {}): NativeNotificationTarget {
+  return {
+    userId: '@me:example.org',
+    roomId: '!room:example.org',
+    eventId: '$event:example.org',
+    ...overrides,
+  };
 }
 
 function action(overrides: Partial<NativeNotificationAction> = {}): NativeNotificationAction {
@@ -66,9 +83,20 @@ test('a blank reply and an unknown action do nothing', async () => {
 });
 
 test('an action for another account switches to it first', async () => {
-  const { client, sendMessage, switchAccount } = core('@other:example.org');
+  const { client, sendMessage, switchAccount } = core('account-other');
   await performNotificationAction(client, action(), false);
 
-  expect(switchAccount).toHaveBeenCalledWith('@me:example.org');
+  expect(switchAccount).toHaveBeenCalledWith('account-me');
   expect(sendMessage).toHaveBeenCalled();
+});
+
+test('opening an inactive account notification switches before navigating', async () => {
+  const { client, switchAccount } = core();
+  const open = vi.fn();
+
+  await openNativeNotification(client, target({ userId: '@other:example.org' }), open);
+
+  expect(switchAccount).toHaveBeenCalledWith('account-other');
+  expect(open).toHaveBeenCalledWith('!room:example.org');
+  expect(switchAccount).toHaveBeenCalledBefore(open);
 });

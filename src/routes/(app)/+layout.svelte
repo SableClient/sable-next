@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, type Snippet, untrack } from 'svelte';
+  import { onDestroy, tick, type Snippet, untrack } from 'svelte';
   import { on } from 'svelte/events';
   import { page } from '$app/state';
   import AppShell from '#lib/ui/AppShell.svelte';
@@ -59,6 +59,7 @@
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import {
     callNotificationAction,
+    openNativeNotification,
     performNotificationAction,
   } from '#lib/features/notifications/native-actions.js';
   import {
@@ -460,8 +461,10 @@
     };
   });
 
-  function openNotification(roomId: string): void {
-    void goto(roomSectionPath(roomList.rooms, roomId));
+  async function openNotification(roomId: string): Promise<void> {
+    await tick();
+    await roomList.start();
+    await goto(roomSectionPath(roomList.rooms, roomId));
   }
 
   $effect(() => {
@@ -525,7 +528,9 @@
         );
       }),
       watchNativeNotificationClicks((target) => {
-        openNotification(target.roomId);
+        void openNativeNotification(core, target, openNotification).catch((error: unknown) => {
+          console.debug('[sable notifications] notification not opened', error);
+        });
       }),
     ])
       .then((offs) => {
