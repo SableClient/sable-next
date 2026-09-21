@@ -18,6 +18,34 @@
     "account": "sina",
     "switchAccount": "o ante e sina",
     "addAccount": "o kama e sina kin",
-    "manageAccounts": "o ante e kulupu sina"
+    "manageAccounts": "o ante e kulupu sina",
+    "rooms": "tomo mute",
+    "roomsUnavailable": "sona li kama la tomo sina li kama.",
+    "unspaced": "tomo insa kulupu ala",
+    "unspacedEmpty": "tomo insa kulupu ala la tomo ni li kama lon ni.",
+    "showRoomList": "o open li poki tomo",
+    "folderUngroup": "o insa ante e poki lon kulupu ni",
+    "folder": "poki",
+    "showConversation": "o open e toki ni",
+    "createRoomInSpace": "o pali e tomo lon kulupu",
+    "createSubspace": "o pali e kulupu insa kulupu",
+    "folderRename": "o nimi sin e poki",
+    "folderCancel": "pali ante",
+    "markedUnread": "toki ni li kon",
+    "voiceRoom": "tomo pi toki kute",
+    "folderName": "nimi poki",
+    "folderSave": "pali sin",
+    "folderCollapse": "o pini e poki {{name}}",
+    "folderExpand": "poki {{name}}",
+    "chatsEmpty": "sina toki tawa ona ala.",
+    "createSpace": "o pali e kulupu",
+    "unreadMessages": "toki sin {{count, number}}",
+    "unreadMentions": "toki wawa {{count, number}}",
+    "voiceLive": "jan {{count, number}} insa tomo ni"
+  },
+  "inbox": {
+    "notifications": "toki sin",
+    "filterAll": "ale",
+    "filterMentions": "toki wawa"
   }
 }
