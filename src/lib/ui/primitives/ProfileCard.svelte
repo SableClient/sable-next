@@ -71,7 +71,7 @@
   class:tint-dark={heroBrightness === 'dark'}
   style:--profile-hero={heroColor}
 >
-  <div class="profile-card-cover" style:background={color}>
+  <div class="profile-card-cover" class:has-banner={banner} style:background={color}>
     {#if cover}
       <MediaImage
         class={banner ? 'profile-card-banner' : 'profile-card-banner profile-card-banner-fallback'}
@@ -197,6 +197,10 @@
   .profile-card-sheet {
     --profile-cover-height: 6rem;
     --profile-bio-lines: 6;
+  }
+
+  .profile-card-cover.has-banner {
+    --profile-cover-height: 6rem;
   }
 
   /* Both dimensions, so the ratio MediaImage sets inline stops applying. */
