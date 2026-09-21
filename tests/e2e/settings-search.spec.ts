@@ -20,7 +20,7 @@ function resultsList(page: import('@playwright/test').Page) {
 }
 
 test('typing filters settings by their name across categories', async ({ page }) => {
-  await searchField(page).fill('autoplay');
+  await searchField(page).fill('autoplay gifs');
 
   const results = resultsList(page).getByRole('listitem');
   await expect(results).toHaveCount(1);
@@ -29,7 +29,7 @@ test('typing filters settings by their name across categories', async ({ page })
 });
 
 test('typing matches on the translated description, not just the name', async ({ page }) => {
-  await searchField(page).fill('operating system');
+  await searchField(page).fill('have not read');
 
   const results = resultsList(page).getByRole('listitem');
   await expect(results).toHaveCount(1);
@@ -44,7 +44,7 @@ test('the summary reports how many results there are', async ({ page }) => {
   expect(count).toBeGreaterThan(1);
   await expect(page.getByText(`${String(count)} results`)).toBeVisible();
 
-  await searchField(page).fill('autoplay');
+  await searchField(page).fill('autoplay gifs');
   await expect(page.getByText('1 result', { exact: true })).toBeVisible();
 });
 
