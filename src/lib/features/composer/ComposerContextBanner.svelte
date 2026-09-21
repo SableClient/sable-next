@@ -65,8 +65,12 @@
 
   .context-kind {
     color: var(--primary-main);
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     font-weight: var(--font-weight-medium);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .context-body {

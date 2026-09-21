@@ -138,6 +138,7 @@
     gap: var(--space-500);
     margin: 0 auto;
     max-width: 52rem;
+    min-width: 0;
     padding: var(--page-gutter);
   }
 
@@ -196,5 +197,21 @@
   .error {
     color: var(--crit-main);
     margin: 0;
+  }
+
+  @media (width < 42rem) {
+    .product {
+      flex-direction: column;
+    }
+
+    .product-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .product-actions :global(.btn) {
+      min-width: 0;
+      width: 100%;
+    }
   }
 </style>

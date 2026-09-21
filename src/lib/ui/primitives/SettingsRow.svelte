@@ -188,10 +188,12 @@
   .row-control {
     align-items: center;
     display: flex;
-    flex: 0 0 auto;
+    flex: 1 1 100%;
     justify-content: flex-start;
+    max-width: 100%;
+    min-width: 0;
     padding-left: calc(var(--control-height-small) + var(--space-400));
-    width: 100%;
+    width: auto;
   }
 
   .row-control.wide {
@@ -215,6 +217,7 @@
     }
 
     .row-control {
+      flex: 0 0 auto;
       justify-content: flex-end;
       padding-left: 0;
       width: auto;

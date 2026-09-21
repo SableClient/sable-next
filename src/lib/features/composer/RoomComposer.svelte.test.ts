@@ -522,6 +522,25 @@ test('replying to the same event restores focus to the editor', async () => {
   void unmount(instance);
 });
 
+test('a long reply sender keeps both context actions in the composer', async () => {
+  const instance = render({
+    roomId: '!room:example.org',
+    context: {
+      kind: 'reply',
+      eventId: '$one:example.org',
+      sender: '@a-user-name-that-is-long-enough-to-push-the-actions-off-screen:example.org',
+      body: 'Hello',
+    },
+  });
+  await tick();
+
+  const contextKind = document.querySelector('.context-kind');
+  expect(contextKind).not.toBeNull();
+  expect(document.querySelectorAll('.context button')).toHaveLength(2);
+
+  void unmount(instance);
+});
+
 test('the editor keeps focus while a send is pending', async () => {
   let resolveSend: (() => void) | undefined;
   const instance = render({
