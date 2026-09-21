@@ -115,6 +115,9 @@
     body={item.content.body}
     html={item.content.html}
     {onMatrixLink}
+    onOpen={item.event_id
+      ? (index) => onOpenMedia?.(`${item.event_id}:gallery:${index}`)
+      : undefined}
   />
 {:else if item.content.kind === 'location'}
   <TimelineLocation

@@ -95,7 +95,8 @@ test.each(['image', 'video', 'audio', 'file'] as const)(
   }
 );
 
-test('renders a gallery in the timeline', async () => {
+test('opens the selected gallery image', async () => {
+  const onOpenMedia = vi.fn();
   const instance = mount(MessageBody, {
     target: document.body,
     props: {
@@ -113,21 +114,28 @@ test('renders a gallery in the timeline', async () => {
             height: 100,
           },
           {
-            kind: 'file',
-            body: 'notes.pdf',
+            kind: 'image',
+            body: 'two.png',
             source: 'mxc://example.org/two',
-            mime: 'application/pdf',
+            mime: 'image/png',
+            width: 100,
+            height: 100,
           },
         ],
       }),
       canRedactOthers: false,
+      onOpenMedia,
     },
   });
   await tick();
 
   expect(document.querySelector('.gallery')).not.toBeNull();
   expect(document.body.textContent).toContain('Weekend');
-  void unmount(instance);
+  const images = document.querySelectorAll<HTMLButtonElement>('.gallery .media-image');
+  images.item(1).click();
+
+  expect(onOpenMedia).toHaveBeenCalledWith('$item:gallery:1');
+  await unmount(instance);
 });
 
 test('keeps an image filename hidden without the alt-text preference', async () => {

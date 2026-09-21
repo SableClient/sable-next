@@ -12,9 +12,10 @@
     body: string;
     html: string;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+    onOpen?: (index: number) => void;
   }
 
-  let { items, body, html, onMatrixLink }: Props = $props();
+  let { items, body, html, onMatrixLink, onOpen }: Props = $props();
   let columns = $derived(items.length > 1 ? 2 : 1);
 </script>
 
@@ -31,6 +32,7 @@
         intrinsicHeight={item.height}
         mime={item.mime}
         retryable
+        onclick={() => onOpen?.(index)}
       />
     {:else}
       <MediaContent
