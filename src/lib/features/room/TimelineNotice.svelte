@@ -97,9 +97,9 @@
     align-items: center;
     color: var(--surface-var-on-container);
     display: flex;
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-body);
     gap: var(--space-200);
-    line-height: 1.3;
+    line-height: var(--line-height-body);
     padding: 0;
   }
 
