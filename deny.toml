@@ -130,6 +130,7 @@ allow-git = [
   "https://github.com/matrix-org/vodozemac",
   "https://github.com/ruma/ruma",
   "https://github.com/SableClient/tauri-plugin-edge-to-edge",
+  "https://github.com/SableClient/tauri-plugin-app-icon",
   "https://github.com/SableClient/tauri-plugin-livekit-mobile",
   "https://github.com/SableClient/tauri-plugin-notifications",
   "https://github.com/SableClient/tauri-runtime-cef",
