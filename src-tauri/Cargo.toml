@@ -96,7 +96,7 @@ gtk = "0.18"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
 tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "eace83edf055acc17e811b2bc75d4b6eadf39670", optional = true }
 cef = { version = "=150.2.1", optional = true }
-sha2 = { version = "0.10", optional = true }
+sha2 = { version = "0.11", optional = true }
 # Auto-download stays off: fetching a codec build would make Sable the one
 # distributing an H.264 decoder.
 ffmpeg-sidecar = { version = "2.5", optional = true }

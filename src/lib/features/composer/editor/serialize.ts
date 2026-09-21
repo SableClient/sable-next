@@ -351,7 +351,11 @@ const PARSE_TOKENS: Record<string, ParseSpec> = {
   td: { block: 'table_cell' },
 };
 
-const markdownParser = new MarkdownParser(composerSchema, tokenizer, PARSE_TOKENS);
+const markdownParser = new MarkdownParser(
+  composerSchema,
+  tokenizer as unknown as ConstructorParameters<typeof MarkdownParser>[1],
+  PARSE_TOKENS
+);
 
 const ATOM_PLACEHOLDER = '\uFFFC';
 
