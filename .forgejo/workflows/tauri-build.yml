@@ -307,8 +307,6 @@ jobs:
           rustup target add $RUST_TARGETS
       - name: Set up Gradle cache
         uses: https://github.com/gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-disabled: true
       - name: Stamp release version into tauri.conf.json
         run: |
           args=''
