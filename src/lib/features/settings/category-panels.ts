@@ -3,6 +3,7 @@ import type { Component } from 'svelte';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
+import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
@@ -32,6 +33,13 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
   appearance: [
     { component: CustomThemes, class: 'custom-themes-card' },
     { component: AppIconSettings },
+  ],
+  composer: [
+    {
+      component: ComposerButtonOrder,
+      title: 'settings.composerButtonOrder',
+      headingId: 'composer-button-order',
+    },
   ],
   notifications: [
     { component: NotificationDefaults },

@@ -64,11 +64,12 @@
   );
 
   let triggers = $derived.by(() => {
-    const wanted = [
-      preferences.composerGifButton && gifs ? ('gif' as const) : null,
-      preferences.composerStickerButton ? ('sticker' as const) : null,
-      preferences.composerEmoteButton ? ('emoticon' as const) : null,
-    ].filter((id) => id !== null);
+    const wanted = preferences.composerButtonOrder.filter(
+      (id) =>
+        (id !== 'gif' || (preferences.composerGifButton && gifs)) &&
+        (id !== 'sticker' || preferences.composerStickerButton) &&
+        (id !== 'emoticon' || preferences.composerEmoteButton)
+    );
     return wanted.length > 0 ? wanted : (['emoticon'] as const);
   });
 

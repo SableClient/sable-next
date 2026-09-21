@@ -17,6 +17,12 @@ export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
 export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
+export type ComposerButton = 'gif' | 'sticker' | 'emoticon';
+export const COMPOSER_BUTTONS = [
+  'gif',
+  'sticker',
+  'emoticon',
+] as const satisfies readonly ComposerButton[];
 
 export interface Preferences {
   language: string;
@@ -67,6 +73,7 @@ export interface Preferences {
   composerStickerButton: boolean;
   composerEmoteButton: boolean;
   composerVoiceButton: boolean;
+  composerButtonOrder: ComposerButton[];
   scheduleInEncryptedRooms: boolean;
 
   personaPicker: boolean;
@@ -237,6 +244,7 @@ const DEFAULTS: Preferences = {
   composerStickerButton: true,
   composerEmoteButton: true,
   composerVoiceButton: true,
+  composerButtonOrder: [...COMPOSER_BUTTONS],
   scheduleInEncryptedRooms: true,
 
   personaPicker: true,
@@ -328,6 +336,18 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
     if (allowed) {
       if (typeof value === 'string' && allowed.includes(value)) {
         (next as Record<string, unknown>)[key] = value;
+      }
+    } else if (key === 'composerButtonOrder') {
+      if (Array.isArray(value)) {
+        const order = value.filter(
+          (entry): entry is ComposerButton =>
+            typeof entry === 'string' && COMPOSER_BUTTONS.includes(entry as ComposerButton)
+        );
+        const unique = order.filter((entry, index) => order.indexOf(entry) === index);
+        (next as Record<string, unknown>)[key] = [
+          ...unique,
+          ...COMPOSER_BUTTONS.filter((entry) => !unique.includes(entry)),
+        ];
       }
     } else if ((FREE_TEXT as readonly string[]).includes(key)) {
       if (typeof value === 'string') (next as Record<string, unknown>)[key] = value;

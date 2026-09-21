@@ -1284,6 +1284,7 @@
     "composerEmoteButtonHint": "Shows an emote button beside the composer. Turning every button off keeps this one.",
     "composerVoiceButton": "Voice message button",
     "composerVoiceButtonHint": "Shows a microphone in place of send while the composer is empty.",
+    "composerButtonOrder": "Composer button order",
     "scheduleInEncryptedRooms": "Schedule in encrypted rooms",
     "scheduleInEncryptedRoomsHint": "Your homeserver cannot hold an encrypted message, so a scheduled one is kept in your account data as plain text until a device of yours sends it. Off refuses to schedule in encrypted rooms.",
     "formattingToolbar": "Formatting toolbar",
