@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { page } from '$app/state';
   import type { ProfileView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
@@ -112,34 +113,14 @@
 {/snippet}
 
 {#if mode === 'mobile'}
-  <ActionMenu
-    label={$i18n.t('nav.switchAccount')}
-    class="account-popover"
-    side="top"
-    align="center"
-    sideOffset={8}
+  <a
+    class="quick-tool mobile-tool account-tool selection-layer"
+    href={resolve('/(app)/profile')}
+    aria-label={$i18n.t('nav.manageAccounts')}
+    aria-current={page.url.pathname === '/profile' ? 'page' : undefined}
   >
-    {#snippet trigger({ props })}
-      <button
-        {...props}
-        class="quick-tool mobile-tool account-tool selection-layer"
-        type="button"
-        aria-label={$i18n.t('nav.switchAccount')}
-      >
-        {@render ownAvatar()}
-      </button>
-    {/snippet}
-    <AccountMenuItems
-      accounts={core.accounts}
-      currentAccountId={core.session?.account_id}
-      {switching}
-      onSwitch={switchAccount}
-      onProfile={openProfile}
-      onLogoutAccount={requestLogout}
-      onLogout={logout}
-      onAddAccount={openAddAccount}
-    />
-  </ActionMenu>
+    {@render ownAvatar()}
+  </a>
 {:else}
   {#snippet profileTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
     <ActionMenu
