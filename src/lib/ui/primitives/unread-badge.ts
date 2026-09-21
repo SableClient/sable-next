@@ -34,13 +34,15 @@ export function resolveUnreadBadge(
 
   const notified = (counts.notifying ?? 0) > 0;
   const highlight = mention || notified;
-  const numeric =
-    (notified && !mention) ||
-    (dm && settings.badgeCountDMsOnly) ||
-    (!dm && settings.showUnreadCounts) ||
-    (mention && settings.showPingCounts);
+  const all = (dm && settings.badgeCountDMsOnly) || (!dm && settings.showUnreadCounts);
+  const numeric = (notified && !mention) || all || (mention && settings.showPingCounts);
+  if (!numeric) return { mode: 'dot', count, highlight };
 
-  return { mode: numeric ? 'count' : 'dot', count, highlight };
+  return {
+    mode: 'count',
+    count: mention || all ? count : (counts.notifying ?? count),
+    highlight,
+  };
 }
 
 export function formatUnreadCount(count: number): string {

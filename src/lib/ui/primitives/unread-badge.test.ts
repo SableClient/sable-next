@@ -89,3 +89,14 @@ test('a room that notified nothing keeps its quiet dot', () => {
 test('notifying does not resurrect a room with nothing unread', () => {
   expect(resolveUnreadBadge({ unread: 0, highlight: 0, notifying: 0 }, off)).toBeNull();
 });
+
+test('an aggregate counts what notified, not every unread message under it', () => {
+  const counts = { unread: 32, highlight: 0, notifying: 2 };
+
+  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 2, highlight: true });
+  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
+    mode: 'count',
+    count: 32,
+    highlight: true,
+  });
+});
