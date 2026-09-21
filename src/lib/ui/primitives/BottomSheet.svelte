@@ -32,8 +32,12 @@
   }: Props = $props();
   let pointerId = $state<number | null>(null);
   let startY = 0;
+  let lastY = 0;
+  let lastTime = 0;
+  let velocityY = 0;
   let dragProgress = $state(0);
   let suppressClick = false;
+  const dismissVelocity = 0.3;
 
   $effect(() => {
     // Closing from the outside unmounts the handle mid-drag, so `endDrag` never
@@ -55,12 +59,24 @@
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointerId = event.pointerId;
     startY = event.clientY;
+    lastY = event.clientY;
+    lastTime = event.timeStamp;
+    velocityY = 0;
     dragProgress = 0;
     suppressClick = false;
   }
 
+  function trackVelocity(event: PointerEvent): void {
+    const elapsed = event.timeStamp - lastTime;
+    if (elapsed <= 0) return;
+    velocityY = (event.clientY - lastY) / elapsed;
+    lastY = event.clientY;
+    lastTime = event.timeStamp;
+  }
+
   function drag(event: PointerEvent): void {
     if (pointerId !== event.pointerId) return;
+    trackVelocity(event);
     const viewportHeight = Math.max(window.innerHeight, 1);
     dragProgress = Math.min(Math.max(0, event.clientY - startY) / viewportHeight, 0.5);
     if (dragProgress <= 0) return;
@@ -73,8 +89,9 @@
 
   function endDrag(event: PointerEvent): void {
     if (pointerId !== event.pointerId) return;
+    trackVelocity(event);
     pointerId = null;
-    if (dragProgress >= 0.18) {
+    if (dragProgress >= 0.18 || velocityY >= dismissVelocity) {
       close();
       return;
     }
@@ -103,7 +120,6 @@
   <div class:content-inset={contentInset}>{@render children()}</div>
   <div
     class="bottom-sheet-grip"
-    class:bottom-sheet-grip-wide={contentInset}
     role="presentation"
     onpointerdown={startDrag}
     onpointermove={drag}
@@ -132,14 +148,8 @@
     top: 0;
     touch-action: none;
     transform: translateX(-50%);
-    width: 4rem;
-    z-index: 3;
-  }
-
-  :global(.bottom-sheet-grip-wide) {
-    left: 0;
-    transform: none;
     width: 100%;
+    z-index: 3;
   }
 
   :global(.bottom-sheet-handle) {
