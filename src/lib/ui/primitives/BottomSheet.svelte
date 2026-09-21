@@ -87,6 +87,17 @@
     }
   }
 
+  function startContentDrag(event: PointerEvent): void {
+    startDrag(event);
+  }
+
+  function contentClick(event: MouseEvent): void {
+    if (!suppressClick) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClick = false;
+  }
+
   function endDrag(event: PointerEvent): void {
     if (pointerId !== event.pointerId) return;
     trackVelocity(event);
@@ -117,7 +128,17 @@
   contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
   {onOpenChange}
 >
-  <div class:content-inset={contentInset}>{@render children()}</div>
+  <div
+    class:content-inset={contentInset}
+    role="presentation"
+    onclickcapture={contentClick}
+    onpointerdown={startContentDrag}
+    onpointermove={drag}
+    onpointerup={endDrag}
+    onpointercancel={endDrag}
+  >
+    {@render children()}
+  </div>
   <div
     class="bottom-sheet-grip"
     role="presentation"
