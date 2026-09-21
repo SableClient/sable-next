@@ -63,6 +63,12 @@ runs:
         toolchain: 1.98.1
         targets: wasm32-unknown-unknown
 
+    - name: Install sccache
+      if: ${{ inputs.rust == 'true' || (inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true') }}
+      uses: https://github.com/taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+      with:
+        tool: sccache@0.18.0
+
     - name: Cache Rust artifacts
       if: ${{ inputs.rust == 'true' || (inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true') }}
       uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2

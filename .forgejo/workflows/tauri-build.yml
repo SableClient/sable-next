@@ -20,6 +20,15 @@ env:
   FORGEJO_URL: https://git.sable.moe
   FORGEJO_REPOSITORY: ${{ github.repository }}
   FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+  # Empty resets cargo to no wrapper; fork PRs get no secrets.
+  RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+  SCCACHE_BUCKET: sccache
+  SCCACHE_S3_KEY_PREFIX: sable-next
+  SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
+  SCCACHE_REGION: us-east-1
+  SCCACHE_S3_USE_SSL: "true"
+  AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
 jobs:
   setup-release:
     name: Resolve release target
