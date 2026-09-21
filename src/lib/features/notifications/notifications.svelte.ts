@@ -9,7 +9,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { loadMediaUrl } from '#lib/ui/media-url.js';
 
 import { appendLine, type ConversationLine, summarise } from './conversation';
-import { parsePushPayload } from './push-payload';
+import { parsePushPayload, webPushValidation } from './push-payload';
 import { enabled, line, tag, title } from './present';
 import { retireRoomAlerts } from './retire';
 import { playNotificationSound } from './sound';
@@ -51,6 +51,14 @@ export class NotificationCenter {
     });
     const generation = ++this.nativePushGeneration;
     void watchNativePushMessages((message) => {
+      const validation = webPushValidation(message.message);
+      if (validation !== null) {
+        if (message.nativeActivation) return;
+        void core.commands
+          .ackWebPusher(validation.appId, validation.ackToken)
+          .catch(() => undefined);
+        return;
+      }
       this.retirePush(message.message);
     })
       .then((stop) => {

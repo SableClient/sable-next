@@ -36,6 +36,13 @@ use crate::store::{FileSessionStore, SessionStore};
 
 const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
 
+/// Resolve Android's app-data root to the session and SDK stores under `files`.
+#[cfg(not(target_family = "wasm"))]
+#[must_use]
+fn cold_push_store_dir(data_dir: &std::path::Path) -> std::path::PathBuf {
+    data_dir.join("files")
+}
+
 #[cfg(not(target_family = "wasm"))]
 fn push_account<'a>(
     accounts: &'a AccountRegistry,
@@ -58,8 +65,22 @@ pub async fn decrypt_cold_push(
     room_id: &str,
     event_json: &str,
 ) -> Option<String> {
-    let stored = FileSessionStore::new(data_dir).load().await.ok()??;
-    let base_store = data_dir.to_str()?;
+    let store_dir = cold_push_store_dir(data_dir);
+    decrypt_push_from_store(&store_dir, user_id, device_id, room_id, event_json).await
+}
+
+/// Decrypt using the same session and SDK stores as the application. Callers
+/// must bound the operation to the platform's notification processing budget.
+#[cfg(not(target_family = "wasm"))]
+pub async fn decrypt_push_from_store(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &str,
+    event_json: &str,
+) -> Option<String> {
+    let stored = FileSessionStore::new(store_dir).load().await.ok()??;
+    let base_store = store_dir.to_str()?;
     let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
     accounts.reanchor_stores(base_store);
     let account = push_account(&accounts, user_id, device_id)?;
@@ -684,10 +705,11 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        gateway, is_backfill, mention_actions, mention_rule, push_account, read_mention_mode,
-        timeline_body,
+        cold_push_store_dir, decrypt_cold_push, gateway, is_backfill, mention_actions,
+        mention_rule, push_account, read_mention_mode, timeline_body,
     };
     use crate::protocol::{MentionNotificationModeView, MentionRuleView};
+    use crate::store::{FileSessionStore, SessionStore};
 
     fn ts(millis: u32) -> MilliSecondsSinceUnixEpoch {
         MilliSecondsSinceUnixEpoch(UInt::from(millis))
@@ -723,6 +745,121 @@ mod tests {
         );
         assert!(push_account(&accounts, "@alice:example.org", "B").is_none());
         assert!(push_account(&accounts, "@mallory:example.org", "A").is_none());
+    }
+
+    #[test]
+    fn a_cold_push_uses_androids_files_directory() {
+        assert_eq!(
+            cold_push_store_dir(std::path::Path::new("/data/user/0/moe.sable.client")),
+            std::path::Path::new("/data/user/0/moe.sable.client/files")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_decrypts_from_androids_persisted_store() {
+        use crate::session::{PersistedSession, restore_authenticated_client};
+        use matrix_sdk::ruma::{owned_device_id, room_id, user_id};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_base::crypto::{
+            olm::{Account, InboundGroupSession, OutboundGroupSession, SenderData},
+            types::EventEncryptionAlgorithm,
+        };
+        use matrix_sdk_test::JoinedRoomBuilder;
+
+        let data_dir =
+            std::env::temp_dir().join(format!("sable-cold-push-test-{}", std::process::id()));
+        let store_dir = cold_push_store_dir(&data_dir);
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        let persisted: PersistedSession = serde_json::from_value(json!({
+            "homeserver": server.uri(), "resolved_homeserver": server.uri(),
+            "credentials": {"kind": "password", "user_id": "@alice:example.org",
+                "device_id": "A", "access_token": "test-token"}
+        }))
+        .unwrap();
+        FileSessionStore::new(&store_dir)
+            .save(serde_json::to_vec(&persisted).unwrap())
+            .await
+            .unwrap();
+        let client = restore_authenticated_client(store_dir.to_str().unwrap(), &persisted)
+            .await
+            .unwrap();
+        let room = room_id!("!cold:example.org");
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_joined_room(JoinedRoomBuilder::new(room));
+            })
+            .await;
+        let sender = Account::new(user_id!("@sender:example.org"));
+        let keys = sender.identity_keys();
+        let outbound = OutboundGroupSession::new(
+            owned_device_id!("SENDER"),
+            std::sync::Arc::new(keys),
+            room,
+            Default::default(),
+        )
+        .unwrap();
+        let inbound = InboundGroupSession::new(
+            outbound.sender_key(),
+            keys.ed25519,
+            room,
+            &outbound.session_key().await,
+            SenderData::unknown(),
+            None,
+            EventEncryptionAlgorithm::MegolmV1AesSha2,
+            None,
+            false,
+        )
+        .unwrap();
+        client
+            .olm_machine_for_testing()
+            .await
+            .as_ref()
+            .unwrap()
+            .store()
+            .import_room_keys(vec![inbound.export().await], None, |_, _| ())
+            .await
+            .unwrap();
+        let content = outbound
+            .encrypt(
+                "m.room.message",
+                &serde_json::from_value(json!({"msgtype":"m.text", "body":"Cold preview 🔐"}))
+                    .unwrap(),
+            )
+            .await
+            .content;
+        let event = json!({"type":"m.room.encrypted", "event_id":"$cold",
+            "sender":"@sender:example.org", "origin_server_ts":1, "content":content})
+        .to_string();
+        // A second SDK client must coexist with the warm application's store owner.
+        let clear = decrypt_cold_push(&data_dir, "@alice:example.org", "A", room.as_str(), &event)
+            .await
+            .expect("cold decryption while the application has the store open");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&clear).unwrap()["content"]["body"],
+            "Cold preview 🔐"
+        );
+        drop(client);
+        assert!(
+            decrypt_cold_push(&data_dir, "@alice:example.org", "A", room.as_str(), &event)
+                .await
+                .is_some()
+        );
+        assert!(
+            decrypt_cold_push(
+                &data_dir,
+                "@alice:example.org",
+                "OTHER",
+                room.as_str(),
+                &event
+            )
+            .await
+            .is_none()
+        );
+        assert!(!data_dir.join("session.json").exists());
+
+        tokio::fs::remove_dir_all(&data_dir).await.unwrap();
     }
 
     fn stub(event_type: &str, content: &serde_json::Value) -> serde_json::Value {

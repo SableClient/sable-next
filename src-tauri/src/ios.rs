@@ -18,6 +18,45 @@ use objc2_photos::{
     PHPhotoLibrary,
 };
 
+/// # Errors
+/// When the signed app has no accessible App Group container.
+pub fn shared_store_dir() -> Result<std::path::PathBuf, String> {
+    use objc2_foundation::{NSBundle, NSFileManager};
+    let bundle = NSBundle::mainBundle();
+    let identifier = bundle
+        .bundleIdentifier()
+        .ok_or("missing bundle identifier")?;
+    let group = NSString::from_str(&format!("group.{identifier}"));
+    let url = NSFileManager::defaultManager()
+        .containerURLForSecurityApplicationGroupIdentifier(&group)
+        .ok_or("App Group container unavailable; enable the shared App Group entitlement")?;
+    let path = url
+        .path()
+        .ok_or("App Group container has no filesystem path")?;
+    let root = std::path::PathBuf::from(path.to_string()).join("Sable");
+    std::fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+    Ok(root)
+}
+
+/// # Errors
+/// When the shared policy cannot be written.
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "persisted notification preferences"
+)]
+pub fn write_push_policy(
+    enabled: bool,
+    content: bool,
+    encrypted_content: bool,
+    sounds: bool,
+) -> Result<(), String> {
+    let root = shared_store_dir()?;
+    let value = serde_json::json!({"enabled":enabled,"content":content,"encrypted_content":encrypted_content,"sounds":sounds});
+    let temporary = root.join("push-policy.json.tmp");
+    std::fs::write(&temporary, value.to_string()).map_err(|error| error.to_string())?;
+    std::fs::rename(temporary, root.join("push-policy.json")).map_err(|error| error.to_string())
+}
+
 #[link(name = "Photos", kind = "framework")]
 unsafe extern "C" {}
 

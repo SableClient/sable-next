@@ -245,3 +245,14 @@ test('taking over the delivery retires the gateway pusher left behind', async ()
     expect.objectContaining({ pushkey: 'keys-p256dh', app_id: shipped.appId })
   );
 });
+
+test('a missing server pusher is recreated even when the local marker matches', async () => {
+  mocks.activeServiceWorker.mockResolvedValue(registration(SERVER_KEY));
+  client = core(SERVER_KEY);
+  await syncPushSubscription(client, NONE);
+  commandsOf.setWebPusher.mockClear();
+
+  await syncPushSubscription(client, NONE);
+
+  expect(commandsOf.setWebPusher).toHaveBeenCalledOnce();
+});

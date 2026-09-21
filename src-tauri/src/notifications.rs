@@ -1,6 +1,6 @@
-#[cfg(any(mobile, test))]
-use sable_core::protocol::WebPushKeys;
 use sable_core::protocol::{CommandErr, NotificationView};
+#[cfg(any(mobile, test))]
+use sable_core::protocol::{WebPushKeys, WebPusherView};
 use sable_core::ruma::{owned_event_id, owned_room_id, owned_user_id};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
@@ -42,8 +42,190 @@ struct Line {
 static CONVERSATIONS: LazyLock<Mutex<HashMap<String, Vec<Line>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-static REGISTERED_PUSHER: LazyLock<Mutex<Option<(String, String)>>> =
-    LazyLock::new(|| Mutex::new(None));
+static PUSH_REGISTRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+struct RegisteredPusher {
+    user_id: String,
+    device_id: String,
+    pushkey: String,
+    app_id: String,
+    #[serde(default)]
+    gateway: Option<String>,
+    #[serde(default)]
+    event_id_only: bool,
+}
+
+fn push_store<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, CommandErr> {
+    use tauri::Manager;
+    app.try_state::<PushStore>()
+        .map(|store| store.0.clone())
+        .ok_or(CommandErr::Unavailable)
+}
+
+pub struct PushStore(pub std::path::PathBuf);
+
+fn registered_pushers(root: &std::path::Path) -> Result<Vec<RegisteredPusher>, CommandErr> {
+    match std::fs::read(root.join("pushers.json")) {
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| CommandErr::Unavailable),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(_) => Err(CommandErr::Unavailable),
+    }
+}
+
+fn save_pushers(root: &std::path::Path, pushers: &[RegisteredPusher]) -> Result<(), CommandErr> {
+    std::fs::create_dir_all(root).map_err(|_| CommandErr::Unavailable)?;
+    let bytes = serde_json::to_vec(pushers).map_err(|_| CommandErr::Unavailable)?;
+    std::fs::write(root.join("pushers.tmp"), bytes).map_err(|_| CommandErr::Unavailable)?;
+    std::fs::rename(root.join("pushers.tmp"), root.join("pushers.json"))
+        .map_err(|_| CommandErr::Unavailable)
+}
+
+async fn remove_saved_pusher(
+    root: &std::path::Path,
+    pusher: &RegisteredPusher,
+) -> Result<(), CommandErr> {
+    let client = pusher_client(root, pusher).await?;
+    sable_core::notifications::remove_pusher(&client, pusher.pushkey.clone(), pusher.app_id.clone())
+        .await
+        .map_err(|_| CommandErr::Unavailable)
+}
+
+async fn pusher_client(
+    root: &std::path::Path,
+    pusher: &RegisteredPusher,
+) -> Result<sable_core::MatrixClient, CommandErr> {
+    use sable_core::store::SessionStore;
+    let bytes = sable_core::store::FileSessionStore::new(root)
+        .load()
+        .await
+        .map_err(|_| CommandErr::Unavailable)?
+        .ok_or(CommandErr::Unavailable)?;
+    let (mut accounts, _) =
+        sable_core::session::AccountRegistry::from_bytes(&bytes, &root.to_string_lossy())
+            .map_err(|_| CommandErr::Unavailable)?;
+    accounts.reanchor_stores(&root.to_string_lossy());
+    let account = accounts
+        .accounts
+        .iter()
+        .find(|account| {
+            !account.needs_reauth
+                && account.session.credentials.user_id() == pusher.user_id
+                && account.session.credentials.device_id() == pusher.device_id
+        })
+        .ok_or(CommandErr::Unavailable)?;
+    sable_core::session::restore_authenticated_client(&account.store_id, &account.session)
+        .await
+        .map_err(|_| CommandErr::Unavailable)
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Deserialize)]
+#[serde(tag = "operation", rename_all = "snake_case")]
+pub enum BackgroundPush {
+    Rotate {
+        user_id: String,
+        device_id: String,
+        endpoint: String,
+        p256dh: Option<String>,
+        auth: Option<String>,
+    },
+    Activate {
+        app_id: String,
+        ack_token: String,
+    },
+}
+
+#[cfg(target_os = "android")]
+pub async fn maintain_background_push(
+    root: &std::path::Path,
+    operation: BackgroundPush,
+) -> Result<(), CommandErr> {
+    use sable_core::protocol::{PusherView, WebPushKeys};
+    let _guard = PUSH_REGISTRATION_LOCK.lock().await;
+    let Some(current) = registered_pushers(root)?.last().cloned() else {
+        return Err(CommandErr::Unavailable);
+    };
+    let client = pusher_client(root, &current).await?;
+    match operation {
+        BackgroundPush::Activate { app_id, ack_token } => {
+            if app_id != current.app_id {
+                return Err(CommandErr::Unavailable);
+            }
+            sable_core::webpush::ack(&client, app_id, ack_token)
+                .await
+                .map_err(|_| CommandErr::Unavailable)
+        }
+        BackgroundPush::Rotate {
+            user_id,
+            device_id,
+            endpoint,
+            p256dh,
+            auth,
+        } => {
+            if user_id != current.user_id
+                || device_id != current.device_id
+                || !is_unified_push_endpoint(&endpoint)
+            {
+                return Err(CommandErr::Unavailable);
+            }
+            let registration = Registration {
+                token: endpoint,
+                p256dh,
+                auth,
+            };
+            let pushkey = if let Some(gateway) = &current.gateway {
+                let key = registration
+                    .p256dh
+                    .clone()
+                    .unwrap_or_else(|| registration.token.clone());
+                let web_push = match (&registration.p256dh, &registration.auth) {
+                    (Some(p256dh), Some(auth)) => Some(WebPushKeys {
+                        endpoint: registration.token.clone(),
+                        p256dh: p256dh.clone(),
+                        auth: auth.clone(),
+                    }),
+                    (None, None) => None,
+                    _ => return Err(CommandErr::Unavailable),
+                };
+                sable_core::notifications::set_pusher(
+                    &client,
+                    PusherView {
+                        pushkey: key.clone(),
+                        app_id: current.app_id.clone(),
+                        url: gateway.clone(),
+                        device_display_name: "Sable on Android".into(),
+                        web_push,
+                        event_id_only: current.event_id_only,
+                        append: false,
+                    },
+                )
+                .await
+                .map_err(|_| CommandErr::Unavailable)?;
+                key
+            } else {
+                let pusher =
+                    server_web_pusher(&registration, &current.app_id, current.event_id_only)
+                        .ok_or(CommandErr::Unavailable)?;
+                let key = pusher.pushkey.clone();
+                sable_core::webpush::set_pusher(&client, pusher)
+                    .await
+                    .map_err(|_| CommandErr::Unavailable)?;
+                key
+            };
+            remember_pusher(
+                root,
+                &(user_id, device_id),
+                pushkey,
+                current.app_id,
+                current.gateway,
+                current.event_id_only,
+            )?;
+            retire_old_pushers(root).await;
+            Ok(())
+        }
+    }
+}
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -119,12 +301,14 @@ fn forget(user_id: &str, room_id: &str) {
     }
 }
 
-fn conversation_message(line: &Line) -> Option<NotificationMessage> {
+fn conversation_message(line: &Line, encrypted: bool) -> Option<NotificationMessage> {
     serde_json::from_value(serde_json::json!({
         "body": line.body,
         "timestamp": line.at,
         "senderName": line.sender_name,
         "senderKey": line.sender_key,
+        "eventId": line.event_id,
+        "encrypted": encrypted,
     }))
     .ok()
 }
@@ -201,8 +385,14 @@ pub async fn show<R: Runtime>(
     if lines.len() > 1 {
         builder = builder.large_body(collapsed(&lines));
     }
-    for line in &lines {
-        if let Some(message) = conversation_message(line) {
+    // Android retains displayed history in the OS, including cold deliveries.
+    let skip = if cfg!(target_os = "android") {
+        lines.len().saturating_sub(1)
+    } else {
+        0
+    };
+    for line in lines.iter().skip(skip) {
+        if let Some(message) = conversation_message(line, view.encrypted) {
             builder = builder.message(message);
         }
     }
@@ -331,6 +521,8 @@ pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id: &st
 )]
 pub struct PushConfig {
     pub gateway_url: String,
+    #[serde(default)]
+    pub gateway_override: bool,
     pub vapid_key: String,
     pub web_app_id: String,
     pub event_id_only: bool,
@@ -382,6 +574,33 @@ fn pusher(
     }
 }
 
+/// An MSC4174 pusher belongs to the homeserver: its endpoint is the Web Push
+/// subscription, never an HTTP push gateway.
+#[cfg(any(mobile, test))]
+fn server_web_pusher(
+    registration: &Registration,
+    app_id: &str,
+    event_id_only: bool,
+) -> Option<WebPusherView> {
+    Some(WebPusherView {
+        pushkey: registration.p256dh.clone()?,
+        app_id: app_id.to_owned(),
+        device_display_name: format!("Sable on {}", std::env::consts::OS),
+        endpoint: registration.token.clone(),
+        auth: registration.auth.clone()?,
+        event_id_only,
+    })
+}
+
+/// Let the platform resolve Auto using its installed distributors and services.
+#[cfg(any(mobile, test))]
+fn provider_for_server_delivery(
+    _server_vapid: Option<&str>,
+    provider: Option<&str>,
+) -> Option<String> {
+    provider.map(str::to_owned)
+}
+
 #[cfg(any(mobile, test))]
 fn is_unified_push_endpoint(token: &str) -> bool {
     tauri::Url::parse(token).is_ok_and(|url| {
@@ -398,6 +617,9 @@ fn registration_gateway<'a>(
     registration: &Registration,
     config: &'a PushConfig,
 ) -> Option<&'a str> {
+    if config.gateway_override {
+        return Some(&config.gateway_url);
+    }
     if registration.p256dh.is_none()
         && registration.auth.is_none()
         && is_unified_push_endpoint(&registration.token)
@@ -422,12 +644,30 @@ pub async fn register_push<R: Runtime>(
     config: PushConfig,
 ) -> Result<(), CommandErr> {
     use sable_core::protocol::{Command, PusherView};
+    let _guard = PUSH_REGISTRATION_LOCK.lock().await;
+    let root = push_store(app)?;
+    let identity = (
+        config.user_id.clone().ok_or(CommandErr::Unavailable)?,
+        config.device_id.clone().ok_or(CommandErr::Unavailable)?,
+    );
 
+    // MSC4174 makes the homeserver the push gateway. Query before creating the
+    // subscription because the distributor must bind it to the server's VAPID key.
+    let server_vapid = if config.gateway_override || cfg!(target_os = "ios") {
+        None
+    } else {
+        server_vapid_from_response(Box::pin(core.dispatch(Command::WebPusherSupport)).await)?
+    };
     let registered = app
         .notifications()
         .register_for_push_notifications(
-            Some(config.vapid_key.clone()),
-            config.provider.clone(),
+            Some(
+                server_vapid
+                    .as_deref()
+                    .unwrap_or(&config.vapid_key)
+                    .to_owned(),
+            ),
+            provider_for_server_delivery(server_vapid.as_deref(), config.provider.as_deref()),
             config.embedded_gateway_url.clone(),
             config.user_id.clone(),
             config.device_id.clone(),
@@ -443,6 +683,29 @@ pub async fn register_push<R: Runtime>(
         p256dh: registered.p256dh,
         auth: registered.auth,
     };
+    if server_vapid.is_some() {
+        if let Some(pusher) =
+            server_web_pusher(&registration, &config.web_app_id, config.event_id_only)
+        {
+            let pushkey = pusher.pushkey.clone();
+            let app_id = pusher.app_id.clone();
+            if let Err(error) = Box::pin(core.dispatch(Command::SetWebPusher { pusher })).await {
+                log::warn!("homeserver rejected the MSC4174 pusher: {error:?}");
+                return Err(error);
+            }
+            log::debug!("registered an MSC4174 pusher through the homeserver");
+            remember_pusher(
+                &root,
+                &identity,
+                pushkey,
+                app_id,
+                None,
+                config.event_id_only,
+            )?;
+            retire_old_pushers(&root).await;
+            return Ok(());
+        }
+    }
 
     let gateway_url = registration_gateway(&registration, &config)
         .ok_or_else(|| {
@@ -467,7 +730,7 @@ pub async fn register_push<R: Runtime>(
         pusher: PusherView {
             pushkey: pushkey.clone(),
             app_id: app_id.clone(),
-            url: gateway_url,
+            url: gateway_url.clone(),
             device_display_name: format!("Sable on {}", std::env::consts::OS),
             web_push,
             event_id_only: config.event_id_only,
@@ -476,34 +739,92 @@ pub async fn register_push<R: Runtime>(
     };
 
     Box::pin(core.dispatch(command)).await.map(|_| ())?;
-    remember_pusher(pushkey, app_id);
+    remember_pusher(
+        &root,
+        &identity,
+        pushkey,
+        app_id,
+        Some(gateway_url),
+        config.event_id_only,
+    )?;
+    retire_old_pushers(&root).await;
     Ok(())
 }
 
-#[cfg(mobile)]
-fn remember_pusher(pushkey: String, app_id: String) {
-    *REGISTERED_PUSHER
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((pushkey, app_id));
+#[cfg(any(mobile, test))]
+fn server_vapid_from_response(
+    response: Result<sable_core::protocol::CommandOk, CommandErr>,
+) -> Result<Option<String>, CommandErr> {
+    match response? {
+        sable_core::protocol::CommandOk::WebPusherSupport { vapid } => Ok(vapid),
+        _ => Err(CommandErr::Unavailable),
+    }
+}
+
+#[cfg(any(mobile, test))]
+fn remember_pusher(
+    root: &std::path::Path,
+    identity: &(String, String),
+    pushkey: String,
+    app_id: String,
+    gateway: Option<String>,
+    event_id_only: bool,
+) -> Result<(), CommandErr> {
+    let mut pushers = registered_pushers(root)?;
+    pushers.retain(|p| {
+        !(p.user_id == identity.0
+            && p.device_id == identity.1
+            && p.pushkey == pushkey
+            && p.app_id == app_id)
+    });
+    pushers.push(RegisteredPusher {
+        user_id: identity.0.clone(),
+        device_id: identity.1.clone(),
+        pushkey,
+        app_id,
+        gateway,
+        event_id_only,
+    });
+    save_pushers(root, &pushers)
+}
+
+#[cfg(any(mobile, test))]
+async fn retire_old_pushers(root: &std::path::Path) {
+    let Ok(mut pushers) = registered_pushers(root) else {
+        return;
+    };
+    while pushers.len() > 1 {
+        let Some(pusher) = pushers.first() else {
+            return;
+        };
+        if remove_saved_pusher(root, pusher).await.is_err() {
+            return;
+        }
+        pushers.remove(0);
+        if save_pushers(root, &pushers).is_err() {
+            return;
+        }
+    }
 }
 
 /// # Errors
 ///
 /// When the homeserver refuses to delete the pusher.
-pub async fn unregister_push(core: &Arc<sable_core::Core>) -> Result<(), CommandErr> {
-    use sable_core::protocol::Command;
-
-    let Some((pushkey, app_id)) = REGISTERED_PUSHER
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .take()
-    else {
-        return Ok(());
-    };
-
-    Box::pin(core.dispatch(Command::RemovePusher { pushkey, app_id }))
+pub async fn unregister_push<R: Runtime>(app: &AppHandle<R>) -> Result<(), CommandErr> {
+    let _guard = PUSH_REGISTRATION_LOCK.lock().await;
+    #[cfg(mobile)]
+    app.notifications()
+        .unregister_for_push_notifications()
         .await
-        .map(|_| ())
+        .map_err(|_| CommandErr::Unavailable)?;
+    let root = push_store(app)?;
+    let mut pushers = registered_pushers(&root)?;
+    while let Some(pusher) = pushers.first() {
+        remove_saved_pusher(&root, pusher).await?;
+        pushers.remove(0);
+        save_pushers(&root, &pushers)?;
+    }
+    Ok(())
 }
 
 /// A desktop build has no distributor to register with, and nothing runs to
@@ -528,8 +849,71 @@ mod tests {
 
     use super::{
         Line, MAX_CONVERSATION_LINES, MESSAGE_ACTIONS, Registration, alerts_silently, body,
-        collapsed, forget, java_hash, pusher, remember, room_notification_id, shows_content,
+        collapsed, forget, java_hash, provider_for_server_delivery, pusher, remember,
+        room_notification_id, server_web_pusher, shows_content,
     };
+
+    #[test]
+    fn failed_capability_lookup_does_not_select_a_fallback_gateway() {
+        assert!(super::server_vapid_from_response(Err(super::CommandErr::Unavailable)).is_err());
+        assert!(matches!(
+            super::server_vapid_from_response(Ok(
+                sable_core::protocol::CommandOk::WebPusherSupport { vapid: None }
+            )),
+            Ok(None)
+        ));
+    }
+
+    #[test]
+    fn explicit_gateway_applies_to_direct_unifiedpush_too() {
+        let config = serde_json::from_value(serde_json::json!({
+            "gateway_url": "https://custom.example/_matrix/push/v1/notify",
+            "gateway_override": true,
+            "vapid_key": "key",
+            "web_app_id": "custom",
+            "event_id_only": false,
+            "unified_push_gateway_url": "https://default.example/_matrix/push/v1/notify"
+        }))
+        .expect("push config");
+        let registration = Registration {
+            token: "https://ntfy.example/endpoint".into(),
+            p256dh: None,
+            auth: None,
+        };
+        assert_eq!(
+            super::registration_gateway(&registration, &config),
+            Some("https://custom.example/_matrix/push/v1/notify")
+        );
+    }
+
+    #[tokio::test]
+    async fn pusher_rotation_survives_restart_and_failed_retirement() {
+        let root = std::env::temp_dir().join(format!("sable-pusher-ledger-{}", std::process::id()));
+        let identity = ("@alice:example.org".to_owned(), "DEVICE".to_owned());
+        for endpoint in ["old", "new", "new"] {
+            super::remember_pusher(
+                &root,
+                &identity,
+                endpoint.to_owned(),
+                "app".to_owned(),
+                None,
+                false,
+            )
+            .expect("persist pusher");
+        }
+        let saved = super::registered_pushers(&root).expect("reload ledger");
+        assert_eq!(saved.len(), 2);
+        assert_eq!(saved.last().expect("current pusher").pushkey, "new");
+        // No session: deletion must fail without discarding its retry identity.
+        super::retire_old_pushers(&root).await;
+        assert_eq!(
+            super::registered_pushers(&root)
+                .expect("retained ledger")
+                .len(),
+            2
+        );
+        std::fs::remove_dir_all(root).expect("remove test ledger");
+    }
 
     fn view(is_direct: bool) -> NotificationView {
         NotificationView {
@@ -837,5 +1221,39 @@ mod tests {
             id,
             room_notification_id("@ada:example.org", "!room:example.org")
         );
+    }
+
+    #[test]
+    fn msc4174_uses_the_distributor_subscription_without_a_gateway() {
+        let registration = Registration {
+            token: "https://push.example/subscription".to_owned(),
+            p256dh: Some("public-key".to_owned()),
+            auth: Some("auth-secret".to_owned()),
+        };
+
+        let pusher = server_web_pusher(&registration, "org.example.sable", true)
+            .expect("web push keys create an MSC4174 pusher");
+        assert_eq!(pusher.pushkey, "public-key");
+        assert_eq!(pusher.endpoint, registration.token);
+        assert_eq!(pusher.auth, "auth-secret");
+        assert_eq!(pusher.app_id, "org.example.sable");
+        assert!(pusher.event_id_only);
+    }
+
+    #[test]
+    fn msc4174_auto_preserves_platform_provider_selection() {
+        assert_eq!(
+            provider_for_server_delivery(Some("server-key"), None).as_deref(),
+            None
+        );
+        assert_eq!(
+            provider_for_server_delivery(Some("server-key"), Some("auto")).as_deref(),
+            Some("auto")
+        );
+        assert_eq!(
+            provider_for_server_delivery(Some("server-key"), Some("unifiedpush")).as_deref(),
+            Some("unifiedpush")
+        );
+        assert_eq!(provider_for_server_delivery(None, None), None);
     }
 }

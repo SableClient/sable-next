@@ -27,6 +27,44 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
+  SableNotificationService:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ../../ios/NotificationService
+      - path: ../../ios/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    info:
+      path: SableNotificationService/Info.plist
+      properties:
+        SableAppGroup: group.{{app.identifier}}
+        CFBundleShortVersionString: {{apple.bundle-version-short}}
+        CFBundleVersion: "{{apple.bundle-version}}"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+    entitlements:
+      path: SableNotificationService/SableNotificationService.entitlements
+      properties:
+        com.apple.security.application-groups: [group.{{app.identifier}}]
+        com.apple.developer.default-data-protection: NSFileProtectionCompleteUntilFirstUserAuthentication
+    settings:
+      groups: [app]
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: {{app.identifier}}.notifications
+        PRODUCT_NAME: SableNotificationService
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_VERSION: "5.0"
+        SWIFT_OBJC_BRIDGING_HEADER: ../../ios/NotificationService/SablePush.h
+        OTHER_LDFLAGS: ["$(inherited)", "$(DERIVED_FILE_DIR)/libsable_push.a", "-lc++", "-lz", "-liconv"]
+    dependencies:
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
+    preBuildScripts:
+      - name: Build notification decryption
+        script: bash ../../ios/build-notification-extension.sh
+        basedOnDependencyAnalysis: false
+        outputFiles: ["$(DERIVED_FILE_DIR)/libsable_push.a"]
   {{app.name}}_iOS:
     type: application
     platform: iOS
@@ -92,6 +130,8 @@ targets:
       path: {{app.name}}_iOS/{{app.name}}_iOS.entitlements
       properties:
         aps-environment: development
+        com.apple.security.application-groups: [group.{{app.identifier}}]
+        com.apple.developer.default-data-protection: NSFileProtectionCompleteUntilFirstUserAuthentication
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -114,6 +154,8 @@ targets:
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconPropeller AppIconAgender AppIconBisexual AppIconTrans AppIconTransgradient AppIconIntersex AppIconLesbian AppIconMlm AppIconPride
       groups: [app]
     dependencies:
+      - target: SableNotificationService
+        embed: true
       - framework: {{ lib-output-file-name }}
         embed: false
       {{~#each ios-libraries}}

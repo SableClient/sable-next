@@ -7,6 +7,7 @@ import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 const mocks = vi.hoisted(() => ({
   retire: vi.fn().mockResolvedValue(undefined),
   setReadRoom: vi.fn().mockResolvedValue(undefined),
+  ackWebPusher: vi.fn().mockResolvedValue(undefined),
   watchNativePushMessages: vi.fn().mockResolvedValue(() => {}),
 }));
 
@@ -24,6 +25,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 beforeEach(() => {
   mocks.retire.mockClear();
   mocks.setReadRoom.mockClear();
+  mocks.ackWebPusher.mockClear();
   mocks.watchNativePushMessages.mockClear();
   preferences.systemNotifications = false;
   preferences.clearNotificationsOnRead = true;
@@ -46,7 +48,7 @@ function center(): NotificationCenter {
   notifications.start(
     {
       session: { account_id: '@me:example.org' },
-      commands: { setReadRoom: mocks.setReadRoom },
+      commands: { setReadRoom: mocks.setReadRoom, ackWebPusher: mocks.ackWebPusher },
       subscribeEvents: () => () => {},
     } as unknown as CoreClient,
     () => {}
@@ -102,6 +104,33 @@ test('an Android push for the room being read is immediately retired', () => {
   handler?.({ message: JSON.stringify({ notification: { room_id: '!room:example.org' } }) });
 
   expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
+});
+
+test('a native MSC4174 validation push without native handling is acknowledged without an alert', async () => {
+  center();
+  const handler = mocks.watchNativePushMessages.mock.calls[0]?.[0] as
+    | ((message: { message: string }) => void)
+    | undefined;
+
+  handler?.({ message: JSON.stringify({ app_id: 'moe.sable.webpush', ack_token: 'token' }) });
+
+  await vi.waitFor(() => {
+    expect(mocks.ackWebPusher).toHaveBeenCalledWith('moe.sable.webpush', 'token');
+  });
+  expect(mocks.retire).not.toHaveBeenCalled();
+});
+
+test('native activation work is not acknowledged a second time by JavaScript', () => {
+  center();
+  const handler = mocks.watchNativePushMessages.mock.calls[0]?.[0] as
+    | ((message: { message: string; nativeActivation: boolean }) => void)
+    | undefined;
+  handler?.({
+    message: JSON.stringify({ app_id: 'moe.sable.webpush', ack_token: 'token' }),
+    nativeActivation: true,
+  });
+  expect(mocks.ackWebPusher).not.toHaveBeenCalled();
+  expect(mocks.retire).not.toHaveBeenCalled();
 });
 
 function invite(): NotificationView {

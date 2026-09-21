@@ -25,18 +25,61 @@ pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeDe
             .build()
             .ok()
             .and_then(|runtime| {
-                runtime.block_on(sable_core::notifications::decrypt_cold_push(
-                    std::path::Path::new(&data_dir),
-                    &user_id,
-                    &device_id,
-                    &room_id,
-                    &event_json,
-                ))
+                runtime.block_on(async {
+                    tokio::time::timeout(
+                        std::time::Duration::from_secs(20),
+                        sable_core::notifications::decrypt_cold_push(
+                            std::path::Path::new(&data_dir),
+                            &user_id,
+                            &device_id,
+                            &room_id,
+                            &event_json,
+                        ),
+                    )
+                    .await
+                    .ok()
+                    .flatten()
+                })
             })
             .unwrap_or_default();
 
         JString::from_str(env, clear)
     });
 
+    result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
+}
+
+#[unsafe(no_mangle)]
+#[expect(unsafe_code, reason = "JNI entry point")]
+pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeMaintainPush<
+    'frame,
+>(
+    mut unowned_env: EnvUnowned<'frame>,
+    _class: JClass<'frame>,
+    store_dir: JString<'frame>,
+    operation: JString<'frame>,
+) -> JString<'frame> {
+    let result = unowned_env.with_env(|env: &mut Env<'frame>| -> Result<_, jni::errors::Error> {
+        let root = std::path::PathBuf::from(store_dir.to_string());
+        let success = serde_json::from_str(&operation.to_string())
+            .ok()
+            .and_then(|operation| {
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .ok()?;
+                runtime.block_on(async {
+                    tokio::time::timeout(
+                        std::time::Duration::from_secs(20),
+                        crate::notifications::maintain_background_push(&root, operation),
+                    )
+                    .await
+                    .ok()?
+                    .ok()
+                })
+            })
+            .is_some();
+        JString::from_str(env, if success { "ok" } else { "retry" })
+    });
     result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
 }

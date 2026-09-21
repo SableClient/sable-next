@@ -51,7 +51,10 @@
   let serverPush = $state(false);
 
   async function refreshServerPush(): Promise<void> {
-    if (!deliversWebPush() || hasCompleteOverride(pushOverride())) {
+    if (
+      !(deliversWebPush() || (await deliversNativePush())) ||
+      hasCompleteOverride(pushOverride())
+    ) {
       serverPush = false;
       return;
     }

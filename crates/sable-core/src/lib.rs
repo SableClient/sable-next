@@ -30,9 +30,9 @@ pub mod tls;
 mod verification;
 pub mod view;
 mod watchers;
-mod webpush;
+pub mod webpush;
 
-pub use matrix_sdk::{reqwest, ruma};
+pub use matrix_sdk::{Client as MatrixClient, reqwest, ruma};
 
 mod widgets;
 

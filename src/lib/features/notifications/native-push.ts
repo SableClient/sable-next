@@ -9,7 +9,7 @@ import {
 } from '#lib/platform/push.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { pushConfig, type PushOverride } from './push-config';
+import { hasCompleteOverride, pushConfig, type PushOverride } from './push-config';
 
 export type PushProvider = 'auto' | 'fcm' | 'unifiedpush' | 'embedded';
 
@@ -25,14 +25,16 @@ async function register(
 
   await registerNativePushConfig({
     gatewayUrl: resolved.gateway,
+    gatewayOverride: hasCompleteOverride(override),
     vapidKey: resolved.vapid,
     webAppId: resolved.appId,
     nativeAppId:
       details !== null && resolved.gateway === details.pushNotifyUrl
         ? details.nativePushAppID
         : null,
-    iosAppId:
-      details !== null && resolved.gateway === details.pushNotifyUrl
+    iosAppId: hasCompleteOverride(override)
+      ? resolved.appId
+      : details !== null && resolved.gateway === details.pushNotifyUrl
         ? (details.iosPushAppID ?? null)
         : null,
     unifiedPushGatewayUrl: details?.unifiedPushGatewayUrl ?? null,

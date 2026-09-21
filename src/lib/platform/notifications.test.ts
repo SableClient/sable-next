@@ -100,6 +100,7 @@ test('forwards the built-in server and account through the native command', asyn
   expect(mocks.invoke).toHaveBeenLastCalledWith('register_push', {
     config: {
       gateway_url: 'https://push.example/_matrix/push/v1/notify',
+      gateway_override: false,
       vapid_key: 'key',
       web_app_id: 'web',
       native_app_id: 'android',

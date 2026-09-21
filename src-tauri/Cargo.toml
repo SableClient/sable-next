@@ -106,7 +106,7 @@ zbus = "5"
 [target."cfg(target_os = \"ios\")".dependencies]
 block2 = "0.6"
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSError", "NSString", "NSURL"] }
+objc2-foundation = { version = "0.3", features = ["NSError", "NSString", "NSURL", "NSFileManager", "NSBundle"] }
 objc2-photos = { version = "0.3.2", default-features = false, features = [
   "std",
   "PHPhotoLibrary",

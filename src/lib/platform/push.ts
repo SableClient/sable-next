@@ -4,6 +4,7 @@ import { deliversNativePush } from './notifications.js';
 
 export interface NativePushConfig {
   gatewayUrl: string;
+  gatewayOverride?: boolean;
   vapidKey: string;
   webAppId: string;
   nativeAppId: string | null;
@@ -22,6 +23,7 @@ export async function registerNativePushConfig(config: NativePushConfig): Promis
   await invoke('register_push', {
     config: {
       gateway_url: config.gatewayUrl,
+      gateway_override: config.gatewayOverride ?? false,
       vapid_key: config.vapidKey,
       web_app_id: config.webAppId,
       native_app_id: config.nativeAppId,

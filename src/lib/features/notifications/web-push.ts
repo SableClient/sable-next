@@ -186,7 +186,7 @@ export async function syncPushSubscription(
     if (abandoned) await core.commands.removePusher(keys.p256dh, abandoned).catch(() => undefined);
   } else {
     const activated = await serverPusherActivated(core, keys.p256dh, target.appId);
-    if (activated !== false) return;
+    if (activated === true) return;
   }
 
   await removeStaleGatewayPushers(core, target.appId, keys.p256dh, rekeyed);

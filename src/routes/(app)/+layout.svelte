@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { onDestroy, tick, type Snippet, untrack } from 'svelte';
   import { on } from 'svelte/events';
   import { page } from '$app/state';
@@ -26,6 +27,7 @@
   import {
     alertsNatively,
     setNativeEncryptedContentAllowed,
+    watchNativePushTokens,
     watchNativeNotificationActions,
     watchNativeNotificationClicks,
   } from '#lib/platform/native-notifications.js';
@@ -326,7 +328,10 @@
     void core.commands.setNotificationsEnabled(preferences.systemNotifications).catch(() => {});
 
     void setNativeEncryptedContentAllowed(
-      preferences.notificationContent && preferences.notificationEncryptedContent
+      preferences.notificationContent && preferences.notificationEncryptedContent,
+      preferences.notificationContent,
+      preferences.systemNotifications,
+      preferences.notificationSounds
     ).catch(() => {});
 
     void putPushContentPolicy({
@@ -362,6 +367,27 @@
     void registerNativePush(pushOverride(), core.session).catch((error: unknown) => {
       console.debug('[sable notifications] native push not registered', error);
     });
+  });
+
+  onMount(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void watchNativePushTokens(() => {
+      if (core.status === 'ready' && preferences.systemNotifications) {
+        void registerNativePush(pushOverride(), core.session).catch((error: unknown) => {
+          console.debug('[sable notifications] rotated token not registered', error);
+        });
+      }
+    })
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      stop?.();
+    };
   });
 
   $effect(() => {

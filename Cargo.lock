@@ -6626,6 +6626,7 @@ dependencies = [
  "linkify",
  "matrix-sdk",
  "matrix-sdk-base",
+ "matrix-sdk-common",
  "matrix-sdk-test",
  "matrix-sdk-test-utils",
  "matrix-sdk-ui",
@@ -6647,6 +6648,16 @@ dependencies = [
  "wasm-bindgen-futures",
  "webpki-roots",
  "wiremock",
+]
+
+[[package]]
+name = "sable-push"
+version = "0.1.0"
+dependencies = [
+ "sable-core",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -8062,7 +8073,6 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-notifications"
 version = "0.5.0"
-source = "git+https://github.com/SableClient/tauri-plugin-notifications.git?rev=23d68c35cba79607c5c83f21f7c101f95c36f3f0#23d68c35cba79607c5c83f21f7c101f95c36f3f0"
 dependencies = [
  "log",
  "notify-rust",

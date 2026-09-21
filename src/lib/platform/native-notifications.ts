@@ -13,6 +13,7 @@ export interface NativeNotificationAction extends NativeNotificationTarget {
 
 export interface NativePushMessage {
   message: string;
+  nativeActivation?: boolean;
 }
 
 export function alertsNatively(): boolean {
@@ -36,9 +37,14 @@ export async function dismissNativeRoomNotification(userId: string, roomId: stri
   await invoke('dismiss_room_notification', { userId, roomId });
 }
 
-export async function setNativeEncryptedContentAllowed(allowed: boolean): Promise<void> {
+export async function setNativeEncryptedContentAllowed(
+  allowed: boolean,
+  content = false,
+  enabled = true,
+  sounds = true
+): Promise<void> {
   if (!isTauri()) return;
-  await invoke('set_notification_encrypted_content', { allowed });
+  await invoke('set_notification_encrypted_content', { allowed, content, enabled, sounds });
 }
 
 export async function sendNativeTestNotification(sequence: number): Promise<void> {
@@ -120,7 +126,16 @@ export async function watchNativePushMessages(
 
   const listener = await addPluginListener('notifications', 'push-message', (event: unknown) => {
     const message = readPushMessage(event);
-    if (message !== null) handler({ message });
+    if (message !== null)
+      handler({
+        message,
+        ...(event !== null &&
+        typeof event === 'object' &&
+        'nativeActivation' in event &&
+        event.nativeActivation === true
+          ? { nativeActivation: true }
+          : {}),
+      });
   });
   await invoke('plugin:notifications|set_push_message_listener_active', { active: true });
 
@@ -128,6 +143,17 @@ export async function watchNativePushMessages(
     void invoke('plugin:notifications|set_push_message_listener_active', { active: false }).catch(
       () => undefined
     );
+    void listener.unregister().catch(() => undefined);
+  };
+}
+
+export async function watchNativePushTokens(handler: () => void): Promise<() => void> {
+  if (!isTauri()) return () => {};
+  const listener = await addPluginListener('notifications', 'push-token', (event: unknown) => {
+    if (event !== null && typeof event === 'object' && 'rotated' in event && event.rotated === true)
+      handler();
+  });
+  return () => {
     void listener.unregister().catch(() => undefined);
   };
 }

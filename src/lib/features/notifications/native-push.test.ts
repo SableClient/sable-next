@@ -17,7 +17,10 @@ vi.mock('#lib/platform/push.js', () => ({
 }));
 vi.mock('#lib/platform/notifications.js', () => ({ deliversNativePush: mocks.native }));
 vi.mock('#lib/settings/preferences.svelte.js', () => ({ preferences: { richPushPayloads: true } }));
-vi.mock('./push-config', () => ({ pushConfig: mocks.config }));
+vi.mock('./push-config', async (original) => ({
+  ...(await original<typeof import('./push-config')>()),
+  pushConfig: mocks.config,
+}));
 
 import {
   registerNativePush,
@@ -83,6 +86,26 @@ test('passes the selected native provider to the plugin', async () => {
   localStorage.setItem('sable.push.provider', 'fcm');
   await registerNativePush(override, session);
   expect(mocks.register.mock.calls[0][0].provider).toBe('fcm');
+});
+
+test('uses an explicit gateway app ID for iOS', async () => {
+  const custom = {
+    pushGatewayUrl: 'https://custom.example/notify',
+    pushVapidKey: 'key',
+    pushAppId: 'custom.ios',
+  };
+  mocks.config.mockResolvedValue({
+    ...config,
+    resolved: { gateway: custom.pushGatewayUrl, vapid: 'key', appId: custom.pushAppId },
+  });
+  await registerNativePush(custom, session);
+  expect(mocks.register).toHaveBeenCalledWith(
+    expect.objectContaining({
+      gatewayOverride: true,
+      iosAppId: 'custom.ios',
+      gatewayUrl: custom.pushGatewayUrl,
+    })
+  );
 });
 
 test('switches to UnifiedPush and selects an installed distributor', async () => {

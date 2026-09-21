@@ -21,6 +21,8 @@ mod cold_push;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;
+#[cfg(mobile)]
+use tauri_plugin_notifications::NotificationsExt;
 mod sentry;
 mod share_inbox;
 #[cfg(desktop)]
@@ -326,9 +328,8 @@ async fn register_push(
 }
 
 #[tauri::command]
-async fn unregister_push(state: State<'_, AppState>) -> Result<(), CommandErr> {
-    let core = state.core.clone();
-    Box::pin(notifications::unregister_push(&core)).await
+async fn unregister_push(app: AppHandle<BrowserEngine>) -> Result<(), CommandErr> {
+    Box::pin(notifications::unregister_push(&app)).await
 }
 
 #[tauri::command]
@@ -344,8 +345,29 @@ async fn test_notification(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
-async fn set_notification_encrypted_content(app: AppHandle<BrowserEngine>, allowed: bool) {
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "notification preference command arguments"
+)]
+async fn set_notification_encrypted_content(
+    app: AppHandle<BrowserEngine>,
+    allowed: bool,
+    content: bool,
+    enabled: bool,
+    sounds: bool,
+) -> Result<(), CommandErr> {
+    #[cfg(mobile)]
+    app.notifications()
+        .set_push_policy(enabled, content, allowed, sounds)
+        .await
+        .map_err(|_| CommandErr::Unavailable)?;
+    #[cfg(not(mobile))]
+    let _ = (content, enabled, sounds);
+    #[cfg(target_os = "ios")]
+    ios::write_push_policy(enabled, content, allowed, sounds)
+        .map_err(|_| CommandErr::Unavailable)?;
     notifications::allow_encrypted_content(&app, allowed).await;
+    Ok(())
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -374,6 +396,23 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     // itself may not write to; only `files` under it.
     #[cfg(target_os = "android")]
     let data_dir = data_dir.join("files");
+    #[cfg(target_os = "ios")]
+    let data_dir = {
+        let shared = ios::shared_store_dir().unwrap_or_else(|error| {
+            log::warn!("Shared notification storage unavailable: {error}");
+            data_dir.clone()
+        });
+        // Do not silently abandon an older installation's credentials or SDK store.
+        if data_dir.join("session.json").exists() && !shared.join("session.json").exists() {
+            log::warn!(
+                "Keeping the existing private iOS session; cold previews require signing in with shared storage"
+            );
+            data_dir
+        } else {
+            shared
+        }
+    };
+    app.manage(notifications::PushStore(data_dir.clone()));
     let (core, events) = Core::new(
         data_dir.to_string_lossy().into_owned(),
         Box::new(sable_core::store::FileSessionStore::new(&data_dir)),

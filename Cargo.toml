@@ -9,7 +9,12 @@ resolver = "3"
 [patch."https://github.com/SableClient/tauri-plugin-edge-to-edge.git"]
 tauri-plugin-edge-to-edge = { path = "vendor/tauri-plugin-edge-to-edge" }
 
+# Local notification integration while the mobile fixes are being validated.
+[patch."https://github.com/SableClient/tauri-plugin-notifications.git"]
+tauri-plugin-notifications = { path = "../tauri-plugin-notifications" }
+
 [workspace.dependencies]
+matrix-sdk-common = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "0202eb52b6b9aa03bad41e100c90f10741816bdb" }
 matrix-sdk = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "0202eb52b6b9aa03bad41e100c90f10741816bdb", default-features = false, features = [
   "e2e-encryption",
   "automatic-room-key-forwarding",

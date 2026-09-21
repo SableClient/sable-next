@@ -302,7 +302,25 @@ fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
         });
 
     #[cfg(not(target_family = "wasm"))]
-    let builder = builder.sqlite_store(std::path::Path::new(store_id).join("store"), None);
+    let builder = {
+        static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let holder = format!(
+            "sable-{}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+            NEXT_CLIENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
+        builder
+            .sqlite_store(std::path::Path::new(store_id).join("store"), None)
+            .cross_process_store_config(
+                matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
+                    holder,
+                ),
+            )
+    };
 
     #[cfg(target_family = "wasm")]
     let builder = builder.indexeddb_store(store_id, None);
