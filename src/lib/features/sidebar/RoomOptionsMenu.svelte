@@ -134,6 +134,13 @@
   let canInvite = $state(false);
   let inviteRun = 0;
 
+  $effect(() => {
+    if (!open) return;
+    opened = true;
+    readManageableSpaces();
+    readInvitePermission();
+  });
+
   function report(error: unknown): void {
     console.warn('[sable room] room action failed', error);
     toasts.error($i18n.t('errors.actionFailed'));
@@ -202,12 +209,6 @@
   {align}
   preventScroll={false}
   trigger={anchor ? undefined : optionsTrigger}
-  onOpenChange={(open) => {
-    if (!open) return;
-    opened = true;
-    readManageableSpaces();
-    readInvitePermission();
-  }}
 >
   <IconContext values={{ 'aria-hidden': 'true' }}>
     {#if room.is_space || unread}

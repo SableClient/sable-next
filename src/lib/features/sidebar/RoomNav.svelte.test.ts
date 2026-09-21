@@ -3,7 +3,11 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import type { NotificationModeView, RoomSummary } from '#src/generated/protocol';
+import type {
+  NotificationModeView,
+  NotificationSettingsView,
+  RoomSummary,
+} from '#src/generated/protocol';
 
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 
@@ -40,6 +44,8 @@ vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
+const notificationSettings = vi.fn<(roomId: string) => Promise<NotificationSettingsView>>();
+Object.assign(core, { notificationSettings });
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string> = {}) => {
     const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
@@ -130,11 +136,64 @@ beforeEach(() => {
   presenceFixture.entry = null;
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('no profile'));
+  core.roomPermissions.mockReset();
+  core.roomPermissions.mockResolvedValue({ can_invite: false, can_manage_children: false });
+  notificationSettings.mockReset();
+  notificationSettings.mockResolvedValue({ room: null, default: 'mentions' });
 });
 
 afterEach(() => {
   document.body.replaceChildren();
   globalThis.IntersectionObserver = realObserver;
+});
+
+test.each([
+  ['room', false],
+  ['space', true],
+])('enables Invite in a %s context menu when the user can invite', async (_, isSpace) => {
+  const target = makeRoom({ room_id: '!plain:example.org', name: 'Plain', is_space: isSpace });
+  roomsFixture.rooms = isSpace
+    ? [
+        makeRoom({
+          room_id: '!root:example.org',
+          name: 'Root',
+          is_space: true,
+          space_children: [
+            {
+              room_id: target.room_id,
+              via: [],
+              order: null,
+              origin_server_ts: 1,
+              suggested: false,
+            },
+          ],
+        }),
+        target,
+      ]
+    : [target];
+  if (isSpace) {
+    pageState.url.pathname = '/space/!root%3Aexample.org';
+    pageState.params = { spaceId: '!root:example.org' };
+  }
+  core.roomPermissions.mockResolvedValue({ can_invite: true, can_manage_children: false });
+  const instance = await mountNav();
+
+  const trigger = Array.from(
+    document.querySelectorAll<HTMLElement>('.room-row, .room-category')
+  ).find((entry) => entry.textContent.includes('Plain'));
+  if (!trigger) throw new Error('Room context-menu trigger missing');
+  trigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 10, clientY: 10 }));
+
+  await vi.waitFor(() => {
+    expect(core.roomPermissions).toHaveBeenCalledWith('!plain:example.org');
+  });
+  const invite = Array.from(document.querySelectorAll<HTMLElement>('.menu-item')).find((item) =>
+    item.textContent.includes('room.menuInvite')
+  );
+  if (!invite) throw new Error('Invite action missing');
+  expect(invite.hasAttribute('data-disabled')).toBe(false);
+
+  await unmount(instance);
 });
 
 test('home lists every joined room, including the children of joined spaces', async () => {

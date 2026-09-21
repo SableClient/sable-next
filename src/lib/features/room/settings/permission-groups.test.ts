@@ -2,7 +2,13 @@ import { expect, test } from 'vitest';
 
 import type { RoomPowerLevelsView } from '#src/generated/protocol';
 
-import { levelAt, permissionGroups, toEventContent, withLevel } from './permission-groups';
+import {
+  canSendState,
+  levelAt,
+  permissionGroups,
+  toEventContent,
+  withLevel,
+} from './permission-groups';
 
 const levels: RoomPowerLevelsView = {
   ban: 50,
@@ -12,7 +18,12 @@ const levels: RoomPowerLevelsView = {
   events_default: 0,
   state_default: 50,
   users_default: 0,
-  events: { 'm.reaction': 25, 'm.room.name': 75 },
+  events: {
+    'im.vector.modular.widgets': 20,
+    'm.reaction': 25,
+    'm.room.name': 75,
+    'm.room.tombstone': 100,
+  },
   users: { '@admin:example.org': 100 },
   notifications_room: 50,
 };
@@ -25,6 +36,13 @@ test('a listed event type answers with its own level', () => {
 test('an absent type falls back to the default its kind uses', () => {
   expect(levelAt(levels, { kind: 'event', eventType: 'm.room.message' })).toBe(0);
   expect(levelAt(levels, { kind: 'state', eventType: 'm.room.topic' })).toBe(50);
+});
+
+test('state-event permission respects each explicit event override', () => {
+  expect(canSendState(levels, 60, 'm.room.topic')).toBe(true);
+  expect(canSendState(levels, 60, 'm.room.name')).toBe(false);
+  expect(canSendState(levels, 60, 'm.room.tombstone')).toBe(false);
+  expect(canSendState(levels, 60, 'im.vector.modular.widgets')).toBe(true);
 });
 
 test('actions and the room ping read their own fields', () => {
@@ -58,7 +76,12 @@ test('the event content carries every field the room needs', () => {
     events_default: 0,
     state_default: 50,
     users_default: 0,
-    events: { 'm.reaction': 25, 'm.room.name': 75 },
+    events: {
+      'im.vector.modular.widgets': 20,
+      'm.reaction': 25,
+      'm.room.name': 75,
+      'm.room.tombstone': 100,
+    },
     users: { '@admin:example.org': 100 },
     notifications: { room: 50 },
   });

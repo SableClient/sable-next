@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import type { RoomPermissionsView, RoomSummary, RoomVersionsView } from '#src/generated/protocol';
+  import type { RoomPowerLevelsView, RoomSummary, RoomVersionsView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -17,14 +17,16 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import { additionalCreatorsSupported, readCreate, readTombstone } from './room-upgrade';
+  import { canSendState } from './permission-groups';
 
   interface Props {
     room: RoomSummary | null;
-    permissions: RoomPermissionsView | null;
+    levels: RoomPowerLevelsView | null;
+    ownPowerLevel: number;
     onClose: () => void;
   }
 
-  let { room, permissions, onClose }: Props = $props();
+  let { room, levels, ownPowerLevel, onClose }: Props = $props();
   const core = useCoreClient();
   const userIdPattern = /^@[^:\s]+:\S+$/;
 
@@ -45,7 +47,7 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let isSpace = $derived(room?.is_space ?? false);
-  let canUpgrade = $derived(permissions?.can_change_settings ?? false);
+  let canUpgrade = $derived(canSendState(levels, ownPowerLevel, 'm.room.tombstone'));
   let allowCreators = $derived(additionalCreatorsSupported(target));
   let versionOptions = $derived(
     (versions?.available ?? []).map((entry) => ({

@@ -4,6 +4,7 @@
     MemberView,
     MembershipView,
     ProfileView,
+    RoomPowerLevelsView,
     RoomPermissionsView,
     RoomStateEventView,
     CallSupportView,
@@ -58,6 +59,7 @@
   import RoomHeader from './RoomHeader.svelte';
   import RoomHeaderMenu from './RoomHeaderMenu.svelte';
   import RoomInviteDialog from './RoomInviteDialog.svelte';
+  import { canSendState } from './settings/permission-groups';
   import RoomPinMenu from './RoomPinMenu.svelte';
   import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomTopicViewer from './RoomTopicViewer.svelte';
@@ -106,6 +108,7 @@
   });
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
+  let powerLevels = $state<RoomPowerLevelsView | null>(null);
   let powerTags = $state.raw<PowerLevelTagMap>({});
   let settingsOpen = $state(false);
   let topicOpen = $state(false);
@@ -314,6 +317,7 @@
   $effect(() => {
     const activeRoomId = resolvedRoomId;
     permissions = null;
+    powerLevels = null;
     powerTags = {};
     widgets = [];
     let current = true;
@@ -329,10 +333,22 @@
       .catch((error: unknown) => {
         console.debug('[sable room] room details unavailable', error);
       });
+    void core.commands
+      .roomPowerLevels(activeRoomId)
+      .then((next) => {
+        if (current) powerLevels = next;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] power levels unavailable', error);
+      });
     return () => {
       current = false;
     };
   });
+
+  let canManageWidgets = $derived(
+    canSendState(powerLevels, permissions?.own_power_level ?? 0, 'im.vector.modular.widgets')
+  );
 
   $effect(() => {
     const activeRoomId = resolvedRoomId;
@@ -903,7 +919,7 @@
         userId={core.session?.user_id ?? ''}
         displayName={ownMember?.display_name ?? core.session?.user_id ?? ''}
         avatarUrl={ownMember?.avatar_url ?? ''}
-        canManage={permissions?.can_change_settings ?? false}
+        canManage={canManageWidgets}
         onClose={closeWidgets}
         onRemove={removeWidget}
       />
@@ -966,7 +982,7 @@
         userId={core.session?.user_id ?? ''}
         displayName={ownMember?.display_name ?? core.session?.user_id ?? ''}
         avatarUrl={ownMember?.avatar_url ?? ''}
-        canManage={permissions?.can_change_settings ?? false}
+        canManage={canManageWidgets}
         modal
         onClose={closeWidgets}
         onRemove={removeWidget}
