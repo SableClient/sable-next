@@ -9,7 +9,7 @@ export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
-export type ShowRoomIcon = 'always' | 'collapsed' | 'never';
+export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
 export type FontScale = 'smallest' | 'small' | 'default' | 'large' | 'largest' | 'huge';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type PronounPillLength = '12' | '16' | '24' | 'all';
@@ -163,7 +163,7 @@ const ENUMS = {
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
-  showRoomIcon: ['always', 'collapsed', 'never'],
+  showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
   fontScale: ['smallest', 'small', 'default', 'large', 'largest', 'huge'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   pronounPillLength: ['12', '16', '24', 'all'],

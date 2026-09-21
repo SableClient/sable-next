@@ -3,7 +3,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import type { ShowRoomIcon } from '#lib/settings/preferences.svelte.js';
 
 const STORAGE_KEY = 'sable-room-appearance';
-const MODES: readonly ShowRoomIcon[] = ['always', 'collapsed', 'never'];
+const MODES: readonly ShowRoomIcon[] = ['always', 'sometimes', 'collapsed', 'never'];
 
 const overrides = new SvelteMap<string, ShowRoomIcon>(load());
 
@@ -56,8 +56,13 @@ export function setRoomIconOverride(roomId: string, mode: ShowRoomIcon | null): 
   persist();
 }
 
-export function showsRoomIcon(mode: ShowRoomIcon, collapsed: boolean): boolean {
+export function showsRoomAvatar(
+  mode: ShowRoomIcon,
+  collapsed: boolean,
+  hasAvatar: boolean
+): boolean {
   if (mode === 'always') return true;
-  if (mode === 'never') return false;
-  return collapsed;
+  if (mode === 'sometimes') return collapsed || hasAvatar;
+  if (mode === 'collapsed') return collapsed;
+  return false;
 }

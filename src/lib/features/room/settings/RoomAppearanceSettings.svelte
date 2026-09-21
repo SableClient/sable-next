@@ -29,6 +29,7 @@
       }),
     },
     { value: 'always', label: $i18n.t('settings.showRoomIconAlways') },
+    { value: 'sometimes', label: $i18n.t('settings.showRoomIconSometimes') },
     { value: 'collapsed', label: $i18n.t('settings.showRoomIconCollapsed') },
     { value: 'never', label: $i18n.t('settings.showRoomIconNever') },
   ]);

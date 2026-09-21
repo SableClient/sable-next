@@ -1424,6 +1424,7 @@
     "showRoomIcon": "Room icons in the sidebar",
     "showRoomIconHint": "Show each room’s avatar beside its name.",
     "showRoomIconAlways": "Always",
+    "showRoomIconSometimes": "Sometimes",
     "showRoomIconCollapsed": "Only when collapsed",
     "showRoomIconNever": "Never",
     "selectDevice": "Select {{name}}",

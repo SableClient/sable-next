@@ -303,6 +303,7 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'select',
         options: [
           { value: 'always', label: 'settings.showRoomIconAlways' },
+          { value: 'sometimes', label: 'settings.showRoomIconSometimes' },
           { value: 'collapsed', label: 'settings.showRoomIconCollapsed' },
           { value: 'never', label: 'settings.showRoomIconNever' },
         ],

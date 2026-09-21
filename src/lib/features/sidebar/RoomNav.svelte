@@ -53,7 +53,7 @@
   } from '#lib/settings/preferences.svelte.js';
   import {
     roomIconOverride,
-    showsRoomIcon,
+    showsRoomAvatar,
   } from '#lib/features/room/settings/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
@@ -131,7 +131,6 @@
   // same space, and the permission effect below would re-run on every one.
   let activeSpaceId = $derived(activeSpace?.room_id ?? null);
   let iconMode = $derived(roomIconOverride(activeSpaceId) ?? preferences.showRoomIcon);
-  let showIcons = $derived(showsRoomIcon(iconMode, collapsed));
   // Outside a space anyone may create a room; inside one it also has to land as
   // a child, which the space's own power levels govern.
   let canCreateHere = $derived(
@@ -800,7 +799,7 @@
                         })
                       : undefined}
                   >
-                    {#if showIcons}
+                    {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(room?.avatar_url))}
                       <span class="room-avatar">
                         <Avatar
                           class={[
@@ -827,6 +826,15 @@
                             size="large"
                           />
                         {/if}
+                      </span>
+                    {:else}
+                      <span class="room-icon" aria-hidden="true">
+                        <RoomIcon
+                          isSpace={room?.is_space ?? false}
+                          isVoice={room?.is_voice ?? false}
+                          joinRule={room?.join_rule ?? null}
+                          weight={active ? 'fill' : 'regular'}
+                        />
                       </span>
                     {/if}
                     {#if !collapsed}

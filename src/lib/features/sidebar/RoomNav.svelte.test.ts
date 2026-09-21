@@ -10,6 +10,7 @@ import type {
 } from '#src/generated/protocol';
 
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 const pageState = vi.hoisted(() => ({
   url: { pathname: '/home' },
@@ -143,6 +144,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setPreference('showRoomIcon', 'always');
   document.body.replaceChildren();
   globalThis.IntersectionObserver = realObserver;
 });
@@ -502,6 +504,45 @@ test('a voice room shows a speaker icon and the live count', async () => {
   expect(
     Array.from(document.querySelectorAll('.voice-badge')).map((node) => node.textContent)
   ).toEqual(['2']);
+  await unmount(instance);
+});
+
+test('the collapsed icon mode uses generic glyphs until the sidebar is collapsed', async () => {
+  setPreference('showRoomIcon', 'collapsed');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!with-avatar:example.org',
+      name: 'With avatar',
+      avatar_url: 'mxc://avatar',
+    }),
+    makeRoom({ room_id: '!without-avatar:example.org', name: 'Without avatar' }),
+  ];
+
+  const expanded = await mountNav();
+  expect(document.querySelectorAll('.room-row .room-icon')).toHaveLength(2);
+  expect(document.querySelectorAll('.room-row .room-avatar-icon')).toHaveLength(0);
+  await unmount(expanded);
+
+  const compact = await mountNav({ collapsed: true });
+  expect(document.querySelectorAll('.room-row .room-avatar-icon')).toHaveLength(2);
+  expect(document.querySelectorAll('.room-row .room-icon')).toHaveLength(0);
+  await unmount(compact);
+});
+
+test('the sometimes icon mode keeps existing avatars in an expanded sidebar', async () => {
+  setPreference('showRoomIcon', 'sometimes');
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!with-avatar:example.org',
+      name: 'With avatar',
+      avatar_url: 'mxc://avatar',
+    }),
+    makeRoom({ room_id: '!without-avatar:example.org', name: 'Without avatar' }),
+  ];
+
+  const instance = await mountNav();
+  expect(document.querySelectorAll('.room-row .room-avatar-icon')).toHaveLength(1);
+  expect(document.querySelectorAll('.room-row .room-icon')).toHaveLength(1);
   await unmount(instance);
 });
 
