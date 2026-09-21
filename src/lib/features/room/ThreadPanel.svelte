@@ -180,7 +180,7 @@
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
-    min-height: 3.75rem;
+    min-height: 3.5rem;
     padding: 0 var(--space-200) 0 var(--space-400);
   }
 

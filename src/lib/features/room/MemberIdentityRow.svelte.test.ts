@@ -3,7 +3,12 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-const presence = vi.hoisted(() => ({ entry: null as { statusMessage: string | null } | null }));
+const presence = vi.hoisted(() => ({
+  entry: null as {
+    presence: 'online' | 'unavailable' | 'offline';
+    statusMessage: string | null;
+  } | null,
+}));
 
 vi.mock('#lib/core/context.js');
 
@@ -117,9 +122,19 @@ test('shows the profile status, emoji first', async () => {
   await unmount(instance);
 });
 
+test('renders a medium presence marker', async () => {
+  presence.entry = { presence: 'online', statusMessage: null };
+  const instance = await mountRow({});
+
+  const dot = document.querySelector('[data-presence="online"]');
+  expect(dot?.classList.contains('presence-dot-medium')).toBe(true);
+  expect(dot?.classList.contains('presence-dot-large')).toBe(false);
+  await unmount(instance);
+});
+
 test('falls back to the presence message when the profile has no status', async () => {
   core.userProfile.mockResolvedValue({ ...profileFor('@bob:example.org'), status: null });
-  presence.entry = { statusMessage: 'In a meeting' };
+  presence.entry = { presence: 'online', statusMessage: 'In a meeting' };
   const instance = await mountRow({ showStatus: true });
 
   expect(document.querySelector('.member-identity-status')?.textContent.trim()).toBe(

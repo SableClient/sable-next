@@ -70,7 +70,7 @@
     border-bottom: var(--border-width) solid var(--surface-var-container);
     display: flex;
     justify-content: space-between;
-    min-height: 3.75rem;
+    min-height: 3.5rem;
     padding: var(--space-200) var(--space-300) var(--space-200) var(--space-400);
   }
 
@@ -94,7 +94,7 @@
   }
 
   :global(.member-user-list .member-identity-row.member) {
-    min-height: 3rem;
+    min-height: 2.75rem;
     padding: 0 var(--space-200);
   }
 </style>

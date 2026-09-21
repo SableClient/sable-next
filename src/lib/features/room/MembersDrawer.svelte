@@ -367,7 +367,7 @@
     border-bottom: var(--border-width) solid var(--surface-var-container);
     display: flex;
     justify-content: space-between;
-    min-height: 3.75rem;
+    min-height: 3.5rem;
     padding: var(--space-200) var(--space-300) var(--space-200) var(--space-400);
     position: sticky;
     top: 0;
@@ -402,9 +402,9 @@
     background: var(--bg-container);
     display: grid;
     gap: var(--space-200);
-    padding: var(--space-300);
+    padding: var(--space-250);
     position: sticky;
-    top: 3.75rem;
+    top: 3.5rem;
     z-index: 1;
   }
 
@@ -454,7 +454,7 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     color: inherit;
-    min-height: 2.5rem;
+    min-height: 2.25rem;
     padding: 0 var(--space-300);
     width: 100%;
   }
@@ -486,8 +486,12 @@
   }
 
   :global(.member-identity-row.member) {
-    min-height: 3rem;
+    min-height: 2.75rem;
     padding: 0 var(--space-200);
+  }
+
+  :global(.member-identity-row.member .avatar-small) {
+    --avatar-size: 2.125rem;
   }
 
   @media (width > 70.25rem) {

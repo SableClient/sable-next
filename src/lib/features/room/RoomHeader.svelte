@@ -173,7 +173,7 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-250);
-    min-height: 3.75rem;
+    min-height: 3.5rem;
     padding: 0 var(--page-gutter);
   }
 
