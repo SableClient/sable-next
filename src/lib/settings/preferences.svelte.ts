@@ -31,6 +31,7 @@ export interface Preferences {
   twitterEmoji: boolean;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
+  roomBannerHeight: number;
   showHome: boolean;
   showSearch: boolean;
   showUnreadCounts: boolean;
@@ -197,6 +198,7 @@ const DEFAULTS: Preferences = {
   twitterEmoji: true,
   showRoomIcon: 'always',
   showRoomBanners: true,
+  roomBannerHeight: 190,
   showHome: false,
   showSearch: true,
   showUnreadCounts: false,

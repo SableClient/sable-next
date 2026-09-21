@@ -46,7 +46,11 @@
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
-  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import {
+    preferences,
+    readReceiptIsPrivate,
+    setPreference,
+  } from '#lib/settings/preferences.svelte.js';
   import {
     roomIconOverride,
     showsRoomIcon,
@@ -397,6 +401,30 @@
   });
 
   let bannerShown = $derived(banner !== null && !collapsed && preferences.showRoomBanners);
+  let bannerResizing = $state(false);
+  let bannerResizeStartY = 0;
+  let bannerResizeStartHeight = 0;
+
+  function startBannerResize(event: PointerEvent): void {
+    event.preventDefault();
+    bannerResizing = true;
+    bannerResizeStartY = event.clientY;
+    bannerResizeStartHeight = preferences.roomBannerHeight;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function resizeBanner(event: PointerEvent): void {
+    if (!bannerResizing) return;
+    const height = Math.max(
+      56,
+      Math.min(500, bannerResizeStartHeight + event.clientY - bannerResizeStartY)
+    );
+    setPreference('roomBannerHeight', height);
+  }
+
+  function finishBannerResize(): void {
+    bannerResizing = false;
+  }
 
   function notificationChip(mode: NotificationModeView): { icon: Component; label: string } {
     if (mode === 'mute') return { icon: BellSlashIcon, label: 'room.notifyMute' };
@@ -484,8 +512,23 @@
 >
   <div class="room-nav-top">
     {#if bannerShown && banner}
-      <div class="room-banner">
+      <div class="room-banner" style:height={`${preferences.roomBannerHeight}px`}>
         <MediaImage source={banner} alt="" width={640} height={190} class="room-banner-image" />
+        <button
+          type="button"
+          class="room-banner-resize"
+          class:dragging={bannerResizing}
+          role="slider"
+          aria-orientation="vertical"
+          aria-valuemin="56"
+          aria-valuemax="500"
+          aria-valuenow={preferences.roomBannerHeight}
+          aria-label={$i18n.t('nav.resizeRooms')}
+          onpointerdown={startBannerResize}
+          onpointermove={resizeBanner}
+          onpointerup={finishBannerResize}
+          onpointercancel={finishBannerResize}
+        ></button>
       </div>
     {/if}
     <header class="room-nav-header" class:collapsed class:on-banner={bannerShown}>
@@ -901,8 +944,33 @@
   }
 
   .room-banner {
-    height: 11.875rem;
     overflow: hidden;
+    position: relative;
+  }
+
+  .room-banner-resize {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    bottom: 0;
+    cursor: ns-resize;
+    height: 0.5rem;
+    left: 0;
+    padding: 0;
+    position: absolute;
+    touch-action: none;
+    width: 100%;
+  }
+
+  .room-banner-resize:hover,
+  .room-banner-resize.dragging,
+  .room-banner-resize:focus-visible {
+    background: var(--primary-main);
+  }
+
+  .room-banner-resize:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: -3px;
   }
 
   .room-banner :global(.room-banner-image),
